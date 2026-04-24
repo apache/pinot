@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -39,7 +38,7 @@ public class VectorBackendCapabilitiesTest {
     assertTrue(caps.supportsFilterAwareSearch());
     assertFalse(caps.supportsApproximateRadius());
     assertTrue(caps.supportsExactRerank());
-    assertFalse(caps.supportsRuntimeSearchParams());
+    assertTrue(caps.supportsRuntimeSearchParams());
   }
 
   @Test
@@ -48,7 +47,7 @@ public class VectorBackendCapabilitiesTest {
     assertNotNull(caps);
     assertTrue(caps.supportsTopKAnn());
     assertTrue(caps.supportsFilterAwareSearch());
-    assertFalse(caps.supportsApproximateRadius());
+    assertTrue(caps.supportsApproximateRadius());
     assertTrue(caps.supportsExactRerank());
     assertTrue(caps.supportsRuntimeSearchParams());
   }
@@ -59,18 +58,34 @@ public class VectorBackendCapabilitiesTest {
     assertNotNull(caps);
     assertTrue(caps.supportsTopKAnn());
     assertTrue(caps.supportsFilterAwareSearch());
-    assertFalse(caps.supportsApproximateRadius());
+    assertTrue(caps.supportsApproximateRadius());
+    assertTrue(caps.supportsExactRerank());
+    assertTrue(caps.supportsRuntimeSearchParams());
+  }
+
+  @Test
+  public void testIvfOnDiskCapabilities() {
+    VectorBackendCapabilities caps = VectorBackendType.IVF_ON_DISK.getCapabilities();
+    assertNotNull(caps);
+    assertTrue(caps.supportsTopKAnn());
+    assertTrue(caps.supportsFilterAwareSearch());
+    assertTrue(caps.supportsApproximateRadius());
     assertTrue(caps.supportsExactRerank());
     assertTrue(caps.supportsRuntimeSearchParams());
   }
 
   @Test
   public void testConsistencyWithLegacyMethods() {
-    // Verify that capabilities are consistent with the existing VectorBackendType methods
+    // Nprobe remains IVF-specific, while runtime search params are now supported by all current ANN backends.
     for (VectorBackendType type : VectorBackendType.values()) {
       VectorBackendCapabilities caps = type.getCapabilities();
-      assertEquals(caps.supportsRuntimeSearchParams(), type.supportsNprobe(),
-          "supportsRuntimeSearchParams should match supportsNprobe for " + type);
+      assertTrue(caps.supportsRuntimeSearchParams(),
+          "All current ANN backends should advertise runtime search params for " + type);
+      if (type == VectorBackendType.HNSW) {
+        assertFalse(type.supportsNprobe(), "HNSW should not advertise IVF nprobe controls");
+      } else {
+        assertTrue(type.supportsNprobe(), "IVF backends should continue advertising nprobe support");
+      }
     }
   }
 
@@ -106,7 +121,7 @@ public class VectorBackendCapabilitiesTest {
     String str = caps.toString();
     assertTrue(str.contains("topKAnn=true"));
     assertTrue(str.contains("filterAwareSearch=true"));
-    assertTrue(str.contains("runtimeSearchParams=false"));
+    assertTrue(str.contains("runtimeSearchParams=true"));
   }
 
   @Test

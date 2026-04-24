@@ -129,7 +129,13 @@ public class BrokerCache {
         .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
         .setHandshakeTimeout(handshakeTimeoutMs)
         .setUserAgent(ConnectionUtils.getUserAgentVersionFromClassPath("ua_broker_cache", appId))
-        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));
+        .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]))
+        // Reuse a JVM-wide Netty I/O thread pool and timer across all BrokerCache instances so
+        // that the periodic broker refresh does not multiply Netty threads by the number of
+        // client connections. AHC will not shut these down on close() because they are externally
+        // supplied (see ChannelManager#allowReleaseEventLoopGroup / AHC#allowStopNettyTimer).
+        .setEventLoopGroup(PinotClientNettyResources.eventLoopGroup())
+        .setNettyTimer(PinotClientNettyResources.timer());
 
     _client = Dsl.asyncHttpClient(builder.build());
     ControllerRequestURLBuilder controllerRequestURLBuilder =

@@ -61,11 +61,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-java</artifactId>
-    </dependency>
-
     <!-- Test Dependencies -->
     <dependency>
       <groupId>org.apache.pinot</groupId>

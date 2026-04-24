@@ -59,6 +59,7 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final boolean _nullHandlingEnabled;
   private final boolean _enableColumnMajor;
+  private final ServerMetrics _serverMetrics;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
@@ -78,9 +79,10 @@ public class RealtimeSegmentConverter {
     } else {
       _enableColumnMajor = _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
     }
+    _serverMetrics = ServerMetrics.get();
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
+  public void build(@Nullable SegmentVersion segmentVersion)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
     genConfig.setInstanceType(InstanceType.SERVER);
@@ -136,7 +138,7 @@ public class RealtimeSegmentConverter {
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
         buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, validDocIds);
-        publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
+        publishCompactionMetrics(preCommitRowCount, driver, compactionStartTime);
       }
     } else {
       // Use regular PinotSegmentRecordReader (existing behavior)
@@ -156,11 +158,11 @@ public class RealtimeSegmentConverter {
       }
     }
 
-    if (segmentPartitionConfig != null && serverMetrics != null) {
+    if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       for (String columnName : columnPartitionMap.keySet()) {
         int numPartitions = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitions().size();
-        serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
+        _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
       }
     }
   }
@@ -175,11 +177,8 @@ public class RealtimeSegmentConverter {
    * Publishes segment build metrics including common metrics (always published) and compaction-specific metrics
    * (published only when compaction is enabled)
    */
-  private void publishCompactionMetrics(@Nullable ServerMetrics serverMetrics,
-      int preCommitRowCount, SegmentIndexCreationDriverImpl driver, long buildStartTime) {
-    if (serverMetrics == null) {
-      return;
-    }
+  private void publishCompactionMetrics(int preCommitRowCount, SegmentIndexCreationDriverImpl driver,
+      long buildStartTime) {
     try {
       int postCommitRowCount = driver.getSegmentStats().getTotalDocCount();
       long buildProcessingTime = System.currentTimeMillis() - buildStartTime;
@@ -187,24 +186,23 @@ public class RealtimeSegmentConverter {
       int rowsRemoved = preCommitRowCount - postCommitRowCount;
 
       // Only publish compaction-specific metrics when compaction is actually enabled
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS, 1L);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION,
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS, 1L);
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION,
           preCommitRowCount);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION,
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION,
           postCommitRowCount);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_REMOVED, rowsRemoved);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_BUILD_TIME_MS,
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_REMOVED, rowsRemoved);
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_BUILD_TIME_MS,
           buildProcessingTime);
 
       // Calculate and publish compaction ratio percentage (only if we had rows to compact)
       if (preCommitRowCount > 0) {
         double compactionRatioPercent = (double) rowsRemoved / preCommitRowCount * 100.0;
-        serverMetrics.setOrUpdateTableGauge(_tableName, ServerGauge.COMMIT_TIME_COMPACTION_RATIO_PERCENT,
+        _serverMetrics.setOrUpdateTableGauge(_tableName, ServerGauge.COMMIT_TIME_COMPACTION_RATIO_PERCENT,
             (long) compactionRatioPercent);
       }
     } catch (Exception e) {
-      LOGGER.warn("Failed to publish segment build metrics for table: {}, segment: {}", _tableName,
-          _segmentName, e);
+      LOGGER.warn("Failed to publish segment build metrics for table: {}, segment: {}", _tableName, _segmentName, e);
     }
   }
 

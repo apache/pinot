@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -115,7 +116,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
           keyStats.collect(value);
           continue;
         }
-        if (keyStats instanceof BytesColumnPredIndexStatsCollector) {
+        if (keyStats instanceof BytesColumnPreIndexStatsCollector) {
           keyStats.collect(value);
           continue;
         }
@@ -206,37 +207,40 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     }
   }
 
+  @Nullable
   @Override
   public String getMinValue() {
     if (_sealed) {
-      return _sortedKeys[0];
+      return _sortedKeys.length > 0 ? _sortedKeys[0] : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
+  @Nullable
   @Override
   public String getMaxValue() {
     if (_sealed) {
-      return _sortedKeys[_sortedKeys.length - 1];
+      return _sortedKeys.length > 0 ? _sortedKeys[_sortedKeys.length - 1] : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
+  @Nullable
   @Override
   public String[] getUniqueValuesSet() {
     if (_sealed) {
-      return _sortedKeys;
+      return _sortedKeys.length > 0 ? _sortedKeys : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
   public int getLengthOfShortestElement() {
-    return _minLength;
+    return _minLength != Integer.MAX_VALUE ? _minLength : 0;
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxLength;
   }
 
@@ -304,7 +308,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       case BIG_DECIMAL:
         return new BigDecimalColumnPreIndexStatsCollector(key, config);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(key, config);
+        return new BytesColumnPreIndexStatsCollector(key, config);
       case STRING:
       case MAP:
         return new StringColumnPreIndexStatsCollector(key, config);

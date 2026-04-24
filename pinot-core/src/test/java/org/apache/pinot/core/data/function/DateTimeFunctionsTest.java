@@ -27,8 +27,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import org.apache.pinot.common.evaluator.InbuiltFunctionEvaluator;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -307,6 +307,28 @@ public class DateTimeFunctionsTest {
     inputs.add(new Object[]{
         "fromDateTime(dateTime, 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z''', 'UTC', -1)", Lists.newArrayList("dateTime"),
         row114, -1L
+    });
+
+    // fromDateTime on a DST spring-forward gap: 2010-04-30 00:00 did not exist in Africa/Cairo because the
+    // clock sprang forward to 01:00. Instead of throwing, the scalar should shift forward past the gap and
+    // return the first valid instant (01:00 EEST). Using a historical date keeps this test stable against
+    // future tzdata updates.
+    GenericRow row115 = new GenericRow();
+    row115.putValue("dateTime", "2010-04-30");
+    long cairoDstGapExpected =
+        new DateTime(2010, 4, 30, 1, 0, 0, 0, DateTimeZone.forID("Africa/Cairo")).getMillis();
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo')", Lists.newArrayList("dateTime"), row115,
+        cairoDstGapExpected
+    });
+
+    // Same DST gap through the defaultVal overload: the fix resolves a valid instant rather than silently
+    // falling through to the default sentinel.
+    GenericRow row116 = new GenericRow();
+    row116.putValue("dateTime", "2010-04-30");
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo', -1)", Lists.newArrayList("dateTime"), row116,
+        cairoDstGapExpected
     });
 
     // timezone_hour and timezone_minute

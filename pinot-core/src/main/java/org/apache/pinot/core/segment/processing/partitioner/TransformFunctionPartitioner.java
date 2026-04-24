@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
 /**

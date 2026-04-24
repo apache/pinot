@@ -207,7 +207,7 @@ public class QueryInvertedSortedIndexRecommender {
       // Pick the top N candidates whose nESI saved are > ratio * top_nESI_saved. Forming a list of candidates.
       // However only one of these candidates will be counted towards the global recommendation, this is called
       // exclusive candidates
-      // This is to ensure the the per-query near-optimal recommendations not be overshadowed by the optimal
+      // This is to ensure the per-query near-optimal recommendations not be overshadowed by the optimal
       // recommendations
       // Which will make the global recommendation optimal
       if (totalNESIWithIdxSorted.isEmpty()) { // If no applicable PredicateParseResult

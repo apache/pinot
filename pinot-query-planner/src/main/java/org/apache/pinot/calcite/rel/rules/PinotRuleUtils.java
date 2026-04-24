@@ -100,7 +100,7 @@ public class PinotRuleUtils {
    * <ul>
    *   <li>`RelNode` that are single-in, single-out are possible (Project/Filter/)</li>
    *   <li>`Join` can be stacked on top if we only consider SEMI-JOIN</li>
-   *   <li>`Window` should be allowed but we dont have impl for Window on leaf, so not yet included.</li>
+   *   <li>`Window` should be allowed but we don't have impl for Window on leaf, so not yet included.</li>
    *   <li>`Sort` should be allowed but we need to reorder Sort and Join first, so not yet included.</li>
    * </ul>
    */

@@ -504,7 +504,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     // check no mis-configured aggregation function parameters
     Set<String> allowedFunctionParameterNames = ImmutableSet.of(Constants.CPCSKETCH_LGK_KEY.toLowerCase(),
         Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY.toLowerCase(),
-        Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES.toLowerCase());
+        Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES.toLowerCase(),
+        Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY.toLowerCase());
     Map<String, Map<String, String>> aggregationFunctionParameters =
         MergeRollupTaskUtils.getAggregationFunctionParameters(taskConfigs);
     for (String fieldName : aggregationFunctionParameters.keySet()) {
@@ -515,10 +516,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       for (String functionParameterName : functionParameters.keySet()) {
         // check that function parameter name is valid
         Preconditions.checkState(allowedFunctionParameterNames.contains(functionParameterName.toLowerCase()),
-            "Aggregation function parameter name must be one of [lgK, samplingProbability, nominalEntries]!");
+            "Aggregation function parameter name must be one of " + allowedFunctionParameterNames + "!");
         // check that function parameter value is valid for nominal entries
         if (functionParameterName.equalsIgnoreCase(Constants.CPCSKETCH_LGK_KEY)
-            || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+            || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)
+            || functionParameterName.equalsIgnoreCase(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {
           String value = functionParameters.get(functionParameterName);
           String err = "Aggregation function parameter \"" + functionParameterName + "\" on column \"" + fieldName
               + "\" has invalid value: " + value;

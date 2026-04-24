@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
+import java.lang.reflect.Field;
+import java.util.List;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
@@ -102,5 +105,23 @@ public class RealtimeInvertedIndexReaderTest {
     assertFalse(docIds.contains(0));
     assertFalse(docIds.contains(1));
     assertTrue(docIds.contains(2));
+  }
+
+  @Test
+  public void testCloseClearsBitmaps()
+      throws ReflectiveOperationException {
+    RealtimeInvertedIndex realtimeInvertedIndex = new RealtimeInvertedIndex();
+    realtimeInvertedIndex.add(0, 0);
+    realtimeInvertedIndex.add(1, 1);
+
+    realtimeInvertedIndex.close();
+
+    assertTrue(realtimeInvertedIndex.getDocIds(0).isEmpty());
+    assertTrue(realtimeInvertedIndex.getDocIds(1).isEmpty());
+
+    Field bitmapsField = RealtimeInvertedIndex.class.getDeclaredField("_bitmaps");
+    bitmapsField.setAccessible(true);
+    List<?> bitmaps = (List<?>) bitmapsField.get(realtimeInvertedIndex);
+    assertEquals(bitmaps.size(), 0);
   }
 }

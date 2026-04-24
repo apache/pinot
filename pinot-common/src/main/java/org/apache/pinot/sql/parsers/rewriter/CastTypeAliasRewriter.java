@@ -75,6 +75,8 @@ public class CastTypeAliasRewriter implements QueryRewriter {
           break;
         default:
       }
+      Expression castExpr = expression.getFunctionCall().getOperands().get(0);
+      expression.getFunctionCall().getOperands().set(0, rewriteCastTypeAlias(castExpr));
     } else {
       for (int i = 0; i < expression.getFunctionCall().getOperandsSize(); i++) {
         Expression operand = rewriteCastTypeAlias(expression.getFunctionCall().getOperands().get(i));

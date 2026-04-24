@@ -18,20 +18,21 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
-import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.ColumnReader;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,134 +50,70 @@ import org.slf4j.LoggerFactory;
  * <p>The statistics are collected using the same underlying collectors as the row-based approach
  * (SegmentPreIndexStatsCollectorImpl) but with more efficient column-wise iteration.
  */
-public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexStatsCollector {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnarSegmentPreIndexStatsContainer.class);
+public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexStatsContainer {
+  private final Map<String, ColumnStatistics> _columnStatisticsMap;
+  private final int _totalDocCount;
 
-  private final Map<String, ColumnReader> _columnReaders;
-  private final StatsCollectorConfig _statsCollectorConfig;
-  private final Schema _targetSchema;
-  private final Map<String, AbstractColumnStatisticsCollector> _columnStatsCollectorMap;
-  private int _totalDocCount;
-
-  /**
-   * Create a ColumnarSegmentPreIndexStatsContainer.
-   *
-   * @param columnReaders Map of column name to ColumnReader instances
-   * @param statsCollectorConfig Configuration for statistics collection
-   */
-  public ColumnarSegmentPreIndexStatsContainer(Map<String, ColumnReader> columnReaders,
-      StatsCollectorConfig statsCollectorConfig) {
-    _columnReaders = columnReaders;
-    _statsCollectorConfig = statsCollectorConfig;
-    _targetSchema = statsCollectorConfig.getSchema();
-    _columnStatsCollectorMap = new HashMap<>(columnReaders.size());
-    _totalDocCount = -1; // indicates unset
-  }
-
-  /**
-   * Initialize stats collectors for all columns in the target schema.
-   */
-  private void initializeStatsCollectors() {
-    Map<String, FieldIndexConfigs> indexConfigsByCol = FieldIndexConfigsUtil.createIndexConfigsByColName(
-        _statsCollectorConfig.getTableConfig(), _statsCollectorConfig.getSchema());
-    for (FieldSpec fieldSpec : _targetSchema.getAllFieldSpecs()) {
-      if (fieldSpec.isVirtualColumn()) {
-        continue;
+  public ColumnarSegmentPreIndexStatsContainer(StatsCollectorConfig statsCollectorConfig,
+      Map<String, ColumnReader> columnReaders) {
+    int totalDocs = -1;
+    for (ColumnReader columnReader : columnReaders.values()) {
+      if (totalDocs < 0) {
+        totalDocs = columnReader.getTotalDocs();
+      } else {
+        Preconditions.checkState(columnReader.getTotalDocs() == totalDocs,
+            "ColumnReader totalDocs mismatch for column: %s. Expected: %s, got: %s", columnReader.getColumnName(),
+            totalDocs, columnReader.getTotalDocs());
       }
-
-      String columnName = fieldSpec.getName();
-      AbstractColumnStatisticsCollector collector = StatsCollectorUtil.createStatsCollector(
-          columnName, fieldSpec, indexConfigsByCol.get(columnName), _statsCollectorConfig);
-      _columnStatsCollectorMap.put(columnName, collector);
     }
-  }
+    Preconditions.checkState(totalDocs >= 0, "Total docs must not be negative, got: %s", totalDocs);
+    _totalDocCount = totalDocs;
 
-  /**
-   * Collect stats by iterating column-wise using the provided ColumnReader instances.
-   */
-  private void collectColumnStats() {
-    LOGGER.info("Collecting stats for {} columns using column-wise iteration", _columnReaders.size());
-
-    for (String columnName : _columnStatsCollectorMap.keySet()) {
-      AbstractColumnStatisticsCollector statsCollector = _columnStatsCollectorMap.get(columnName);
-      ColumnReader columnReader = _columnReaders.get(columnName);
-
-      if (columnReader == null) {
-        throw new RuntimeException("Column reader for column " + columnName + " not found");
+    Schema schema = statsCollectorConfig.getSchema();
+    Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
+    _columnStatisticsMap = Maps.newHashMapWithExpectedSize(fieldSpecs.size());
+    if (_totalDocCount == 0) {
+      for (FieldSpec fieldSpec : fieldSpecs) {
+        if (!fieldSpec.isVirtualColumn()) {
+          String columnName = fieldSpec.getName();
+          PartitionFunction partitionFunction = statsCollectorConfig.getPartitionFunction(columnName);
+          Set<Integer> partitions = partitionFunction != null ? Set.of() : null;
+          _columnStatisticsMap.put(columnName, new EmptyColumnStatistics(fieldSpec, partitionFunction, partitions));
+        }
       }
-
-      LOGGER.debug("Collecting stats for column: {}", columnName);
-      collectStatsFromColumnReader(columnName, columnReader, statsCollector);
-
-      // Seal the stats collector
-      statsCollector.seal();
-    }
-  }
-
-  /**
-   * Collect stats from a column reader by iterating over all values using the iterator pattern.
-   */
-  private void collectStatsFromColumnReader(String columnName, ColumnReader columnReader,
-      AbstractColumnStatisticsCollector statsCollector) {
-    try {
-      // Reset the column reader to start from the beginning
-      columnReader.rewind();
-
-      int docCount = 0;
-      while (columnReader.hasNext()) {
-        Object value = columnReader.next();
-        statsCollector.collect(value);
-        docCount++;
+    } else {
+      Map<String, FieldIndexConfigs> indexConfigsByCol =
+          FieldIndexConfigsUtil.createIndexConfigsByColName(statsCollectorConfig.getTableConfig(), schema);
+      for (FieldSpec fieldSpec : fieldSpecs) {
+        if (fieldSpec.isVirtualColumn()) {
+          continue;
+        }
+        String columnName = fieldSpec.getName();
+        AbstractColumnStatisticsCollector statsCollector =
+            StatsCollectorUtil.createStatsCollector(columnName, fieldSpec, indexConfigsByCol.get(columnName),
+                statsCollectorConfig);
+        ColumnReader columnReader = columnReaders.get(columnName);
+        Preconditions.checkState(columnReader != null, "Failed to find column reader for column: %s", columnName);
+        try {
+          for (int i = 0; i < _totalDocCount; i++) {
+            statsCollector.collect(columnReader.getValue(i));
+          }
+        } catch (IOException e) {
+          throw new RuntimeException("Caught exception collecting stats for column: " + columnName, e);
+        }
+        statsCollector.seal();
+        _columnStatisticsMap.put(columnName, statsCollector);
       }
-
-      // if totalDocCount is unset then set total doc count from the first column
-      if (_totalDocCount == -1) {
-        _totalDocCount = docCount;
-      } else if (_totalDocCount != docCount) {
-        // all columns should have same count
-        LOGGER.warn("Column {} has {} documents, but expected {} documents",
-            columnName, docCount, _totalDocCount);
-        throw new RuntimeException("Columns have inconsistent document counts");
-      }
-    } catch (IOException e) {
-      LOGGER.error("Failed to collect stats for column: {}", columnName, e);
-      throw new RuntimeException("Failed to collect stats for column: " + columnName, e);
     }
   }
 
   @Override
   public ColumnStatistics getColumnProfileFor(String column) {
-    return _columnStatsCollectorMap.get(column);
+    return _columnStatisticsMap.get(column);
   }
 
   @Override
   public int getTotalDocCount() {
     return _totalDocCount;
-  }
-
-  @Override
-  public void init() {
-    initializeStatsCollectors();
-    collectColumnStats();
-  }
-
-  @Override
-  public void build() {
-    // Stats are already collected in constructor
-  }
-
-  @Override
-  public void logStats() {
-    LOGGER.info("Columnar segment stats collection completed for {} columns with {} documents",
-        _columnStatsCollectorMap.size(), _totalDocCount);
-  }
-
-  @Override
-  public void collectRow(GenericRow row) {
-    // This method is not used in columnar stats collection as we iterate column-wise
-    // instead of row-wise. The stats are collected in the constructor by iterating
-    // over each column using ColumnReader instances.
-    throw new UnsupportedOperationException(
-        "collectRow is not supported in columnar stats collection. Stats are collected column-wise.");
   }
 }

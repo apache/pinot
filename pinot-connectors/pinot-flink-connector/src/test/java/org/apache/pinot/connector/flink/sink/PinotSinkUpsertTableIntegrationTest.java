@@ -130,9 +130,9 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
 
     // Single-thread write
     execEnv.setParallelism(1);
-    DataStream<Row> srcDs = execEnv.fromCollection(_data).returns(_typeInfo);
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
-        PinotSinkFunction.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
+    DataStream<Row> srcDs = execEnv.fromData(_data, _typeInfo);
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
+        PinotSink.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSink.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
         1724045185L));
     execEnv.execute();
     // 1 uploaded, 2 realtime in progress segment
@@ -142,19 +142,19 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
     execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(2);
 
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo)
+    srcDs = execEnv.fromData(_data, _typeInfo)
         .partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
-        PinotSinkFunction.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
+        PinotSink.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSink.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
         1724045186L));
     execEnv.execute();
     verifySegments(5, 8);
 
     // Generate next sequence segments in partitioned segments
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo)
+    srcDs = execEnv.fromData(_data, _typeInfo)
         .partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema, 1,
-        PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch", 1724045187L));
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema, 1,
+        PinotSink.DEFAULT_EXECUTOR_POOL_SIZE, "batch", 1724045187L));
     execEnv.execute();
     verifySegments(9, 12);
     verifyContainsSegments(Arrays.asList("batch__mytable__0__1724045187__0", "batch__mytable__0__1724045187__1",

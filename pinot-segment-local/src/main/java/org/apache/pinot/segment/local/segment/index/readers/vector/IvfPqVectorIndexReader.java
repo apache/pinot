@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.index.vector.IvfPqVectorIndexCreat
 import org.apache.pinot.segment.local.segment.index.vector.ProductQuantizer;
 import org.apache.pinot.segment.local.segment.index.vector.VectorQuantizationUtils;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.reader.ApproximateRadiusVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NprobeAware;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -47,7 +48,8 @@ import org.slf4j.LoggerFactory;
  * nearest coarse centroids, then scoring candidates with either asymmetric L2 lookup tables
  * or full reconstructed-vector distance evaluation for non-L2 metrics.</p>
  */
-public class IvfPqVectorIndexReader implements FilterAwareVectorIndexReader, NprobeAware {
+public class IvfPqVectorIndexReader
+    implements FilterAwareVectorIndexReader, ApproximateRadiusVectorIndexReader, NprobeAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(IvfPqVectorIndexReader.class);
 
   /** Default nprobe value when not explicitly configured. */
@@ -256,6 +258,73 @@ public class IvfPqVectorIndexReader implements FilterAwareVectorIndexReader, Npr
           float normSquare = computeApproximateNormSquare(probe, centroid, codes);
           float distance = computeCosineDistanceFromDotProduct(dotProd, queryNormSquare, normSquare);
           offer(heap, listDocIds[i], distance, effectiveTopK);
+        }
+      }
+    }
+
+    MutableRoaringBitmap result = new MutableRoaringBitmap();
+    for (ScoredDoc scoredDoc : heap) {
+      result.add(scoredDoc._docId);
+    }
+    return result;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getDocIdsWithinApproximateRadius(float[] searchQuery, float threshold,
+      int maxCandidates) {
+    Preconditions.checkArgument(searchQuery.length == _dimension,
+        "Query dimension mismatch: expected %s, got %s", _dimension, searchQuery.length);
+    Preconditions.checkArgument(maxCandidates > 0, "maxCandidates must be positive, got: %s", maxCandidates);
+
+    if (_numVectors == 0 || _nlist == 0) {
+      return new MutableRoaringBitmap();
+    }
+
+    float[] query = VectorQuantizationUtils.transformForDistance(searchQuery, _distanceFunction);
+    int effectiveNprobe = Math.min(getNprobe(), _nlist);
+    int[] probeCentroids = findClosestCentroids(query, effectiveNprobe);
+    int effectiveMaxCandidates = Math.min(maxCandidates, _numVectors);
+    PriorityQueue<ScoredDoc> heap = new PriorityQueue<>(effectiveMaxCandidates,
+        (a, b) -> Float.compare(b._distance, a._distance));
+
+    for (int probe : probeCentroids) {
+      float[] centroid = _centroids[probe];
+      float[] queryResidual = VectorQuantizationUtils.subtractVectors(query, centroid);
+      byte[][] listCodes = _listCodes[probe];
+      int[] listDocIds = _listDocIds[probe];
+
+      if (_distanceFunction == VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN
+          || _distanceFunction == VectorIndexConfig.VectorDistanceFunction.L2) {
+        float[][] tables = ProductQuantizer.buildL2DistanceTables(queryResidual, _codebooks, _subvectorLengths);
+        for (int i = 0; i < listDocIds.length; i++) {
+          float distance = 0.0f;
+          byte[] codes = listCodes[i];
+          for (int m = 0; m < _pqM; m++) {
+            distance += tables[m][codes[m] & 0xFF];
+          }
+          if (distance <= threshold) {
+            offer(heap, listDocIds[i], distance, effectiveMaxCandidates);
+          }
+        }
+      } else if (_distanceFunction == VectorIndexConfig.VectorDistanceFunction.INNER_PRODUCT
+          || _distanceFunction == VectorIndexConfig.VectorDistanceFunction.DOT_PRODUCT) {
+        for (int i = 0; i < listDocIds.length; i++) {
+          byte[] codes = listCodes[i];
+          float distance = -computeApproximateDotProduct(query, centroid, codes);
+          if (distance <= threshold) {
+            offer(heap, listDocIds[i], distance, effectiveMaxCandidates);
+          }
+        }
+      } else {
+        float queryNormSquare = dotProduct(query, query);
+        for (int i = 0; i < listDocIds.length; i++) {
+          byte[] codes = listCodes[i];
+          float dotProduct = computeApproximateDotProduct(query, centroid, codes);
+          float normSquare = computeApproximateNormSquare(probe, centroid, codes);
+          float distance = computeCosineDistanceFromDotProduct(dotProduct, queryNormSquare, normSquare);
+          if (distance <= threshold) {
+            offer(heap, listDocIds[i], distance, effectiveMaxCandidates);
+          }
         }
       }
     }

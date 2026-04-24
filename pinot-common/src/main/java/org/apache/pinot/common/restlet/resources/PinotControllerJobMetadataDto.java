@@ -41,6 +41,7 @@ public class PinotControllerJobMetadataDto {
   private int _messageCount;
   private String _segmentName;
   private String _instanceName;
+  private String _instanceToSegmentsMap;
 
   public String getJobId() {
     return _jobId;
@@ -104,6 +105,16 @@ public class PinotControllerJobMetadataDto {
 
   public PinotControllerJobMetadataDto setInstanceName(@Nullable String instanceName) {
     _instanceName = instanceName;
+    return this;
+  }
+
+  @Nullable
+  public String getInstanceToSegmentsMap() {
+    return _instanceToSegmentsMap;
+  }
+
+  public PinotControllerJobMetadataDto setInstanceToSegmentsMap(@Nullable String instanceToSegmentsMap) {
+    _instanceToSegmentsMap = instanceToSegmentsMap;
     return this;
   }
 }

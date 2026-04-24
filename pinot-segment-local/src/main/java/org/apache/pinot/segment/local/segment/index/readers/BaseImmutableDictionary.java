@@ -107,13 +107,6 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   }
 
   @Override
-  public Object getSortedValues() {
-    // This method is for the stats collection phase when sealing the consuming segment, so it is not required for
-    // regular immutable dictionary within the immutable segment.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void close()
       throws IOException {
     if (_valueReader != null) {

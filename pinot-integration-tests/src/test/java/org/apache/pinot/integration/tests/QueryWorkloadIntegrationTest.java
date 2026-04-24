@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -51,14 +52,14 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
+
 public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    configuration.setProperty(Accounting.BROKER_PREFIX + "." + Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION, true);
     try {
       configuration.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
           org.apache.pinot.spi.utils.NetUtils.findOpenPort());
@@ -69,8 +70,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
   protected void overrideServerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
+    configuration.setProperty(Accounting.SERVER_PREFIX + "." + Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION, true);
   }
 
   @BeforeClass
@@ -141,7 +141,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
   // TODO: Expand tests to cover more scenarios for workload enforcement
   @Test
-  public void testQueryWorkloadConfig() throws Exception {
+  public void testQueryWorkloadConfig()
+      throws Exception {
     EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
     PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME + "_OFFLINE", 1000L, 1000L, null);
     PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
@@ -176,8 +177,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   /**
    * Test QueryWorkloadResource endpoints on a specific server instance for a specific workload
    */
-  private void testServerQueryWorkloadEndpoints(String serverInstance, String workloadName,
-                                                long expectedCpuBudgetNs, long expectedMemoryBudgetBytes)
+  private void testServerQueryWorkloadEndpoints(String serverInstance, String workloadName, long expectedCpuBudgetNs,
+      long expectedMemoryBudgetBytes)
       throws Exception {
     // Extract host from server instance name (format: Server_hostname_port)
     String[] parts = serverInstance.split("_");
@@ -202,7 +203,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   /**
    * Get the definitive list of server instances that serve a specific table
    */
-  private Set<String> getServerInstancesForTable(String tableName) throws Exception {
+  private Set<String> getServerInstancesForTable(String tableName)
+      throws Exception {
     // Use the controller API to get server instances for the specific table
     String response = getOrCreateAdminClient().getTableClient().getTableInstances(tableName, "server");
 
@@ -228,10 +230,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     constraints.add("constraints1");
     InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
     InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1, 1,
-            1, 1, 1, minimizeDataMovement,
-            null);
-    return new InstanceAssignmentConfig(instanceTagPoolConfig,
-        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
+        new InstanceReplicaGroupPartitionConfig(true, 1, 1, 1, 1, 1, minimizeDataMovement, null);
+    return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
+        instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
   }
 }

@@ -138,9 +138,11 @@ public class FsResponseStore extends AbstractResponseStore {
           LOGGER.debug("Checking for query dir {} & metadata file: {}. Metadata file exists: {}", queryDir,
               metadataFile, metadataFileExists);
           if (metadataFileExists) {
-            BrokerResponse response =
-                _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
-            if (response.getBrokerId().equals(_brokerId)) {
+            BrokerResponse response;
+            try (InputStream is = pinotFS.open(metadataFile)) {
+              response = _responseSerde.deserialize(is, CursorResponseNative.class);
+            }
+            if (_brokerId.equals(response.getBrokerId())) {
               requestIdList.add(response.getRequestId());
               LOGGER.debug("Added response store {}", queryDir);
             }
@@ -163,10 +165,11 @@ public class FsResponseStore extends AbstractResponseStore {
       pinotFS.delete(queryDir, true);
       return true;
     } catch (Exception e) {
-      // Directory may have been deleted concurrently. If it's gone, treat as success.
       if (!pinotFS.exists(queryDir)) {
         LOGGER.debug("Directory already deleted for requestId={} (likely concurrent deletion)", requestId);
-        return true;
+        // synchronized serializes JVM-local callers; the directory can still disappear due to operator cleanup,
+        // manual FS edits, or tooling. Other brokers should not delete this broker's request ids per SPI contract.
+        return false;
       }
       throw e;
     }

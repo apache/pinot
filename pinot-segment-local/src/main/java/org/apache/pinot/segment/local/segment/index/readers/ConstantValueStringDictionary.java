@@ -23,21 +23,19 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /**
  * Dictionary of a single string value.
  */
-public class ConstantValueStringDictionary extends BaseImmutableDictionary {
+public class ConstantValueStringDictionary extends BaseConstantValueDictionary {
   private final String _value;
   private final byte[] _bytes;
 
   public ConstantValueStringDictionary(String value) {
-    super(1);
     _value = value;
-    _bytes = value.getBytes(UTF_8);
+    _bytes = Utf8Utils.encode(value);
   }
 
   @Override
@@ -75,6 +73,21 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   @Override
   public String[] getSortedValues() {
     return new String[]{_value};
+  }
+
+  @Override
+  public int getLengthOfShortestElement() {
+    return _bytes.length;
+  }
+
+  @Override
+  public int getLengthOfLongestElement() {
+    return _bytes.length;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _bytes.length == _value.length();
   }
 
   @Override
