@@ -117,6 +117,8 @@
       bytecode in their own maven-compiler-plugin configuration.
     -->
     <jdk.version>21</jdk.version>
+    <!-- OS classifier for platform-specific protoc/grpc binaries, overridden by OS detection profiles -->
+    <os.detected.classifier>linux-x86_64</os.detected.classifier>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
@@ -391,6 +393,56 @@
         <pinot.skip.remote.resources>true</pinot.skip.remote.resources>
       </properties>
     </profile>
+    <!-- OS detection profiles: set os.detected.classifier for protoc/grpc binary resolution -->
+    <profile>
+      <id>os-detect-linux-aarch64</id>
+      <activation>
+        <os>
+          <name>linux</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>linux-aarch_64</os.detected.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>os-detect-osx-x86_64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>x86_64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>osx-x86_64</os.detected.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>os-detect-osx-aarch64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>osx-aarch_64</os.detected.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>os-detect-windows-x86_64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>windows-x86_64</os.detected.classifier>
+      </properties>
+    </profile>
+
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
     <profile>
       <id>linux-aarch64</id>
@@ -443,7 +495,32 @@
         </plugins>
       </build>
     </profile>
-    <!-- Apple Silicon Mac with Homebrew for protoc -->
+    <!-- Apple Silicon Mac with protoc-gen-grpc-java at /usr/local (fallback path) -->
+    <profile>
+      <id>macos-arm64-protobuf-homebrew-fallback</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <file>
+          <exists>/usr/local/bin/protoc-gen-grpc-java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <configuration>
+              <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Apple Silicon Mac with Homebrew for protoc (wins over fallback when both exist) -->
     <profile>
       <id>macos-arm64-protobuf-homebrew</id>
       <activation>
@@ -462,32 +539,6 @@
             <artifactId>protobuf-maven-plugin</artifactId>
             <configuration>
               <pluginExecutable>/opt/homebrew/bin/protoc-gen-grpc-java</pluginExecutable>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
-    <!-- Apple Silicon Mac with Homebrew (fallback path) -->
-    <profile>
-      <id>macos-arm64-protobuf-homebrew-fallback</id>
-      <activation>
-        <os>
-          <family>mac</family>
-          <arch>aarch64</arch>
-        </os>
-        <file>
-          <exists>/usr/local/bin/protoc-gen-grpc-java</exists>
-          <missing>/opt/homebrew/bin/protoc-gen-grpc-java</missing>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.xolstice.maven.plugins</groupId>
-            <artifactId>protobuf-maven-plugin</artifactId>
-            <configuration>
-              <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
             </configuration>
           </plugin>
         </plugins>
@@ -944,6 +995,12 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- Explicit pin: arrow-bom declares arrow-vector twice (with empty classifier), causing Maven 4 warnings -->
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-vector</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.checkerframework</groupId>
@@ -1373,6 +1430,22 @@
         <version>${google.cloud.libraries.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- Explicit pins: libraries-bom transitively imports protobuf-bom:4.33.2, conflicting with our 4.34.0 -->
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java-util</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-kotlin</artifactId>
+        <version>${protobuf.version}</version>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry.contrib</groupId>
@@ -2240,14 +2313,6 @@
 
   <build>
     <defaultGoal>clean install</defaultGoal>
-
-    <extensions>
-      <extension>
-        <groupId>kr.motd.maven</groupId>
-        <artifactId>os-maven-plugin</artifactId>
-        <version>1.7.1</version>
-      </extension>
-    </extensions>
 
     <pluginManagement>
       <plugins>
