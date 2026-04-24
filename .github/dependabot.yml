@@ -26,18 +26,24 @@ updates:
       interval: "daily"
     open-pull-requests-limit: 20
     ignore:
+    # Locked test resources for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java.
+    # These artifacts are pinned in pinot-spi/pom.xml (maven-dependency-plugin artifactItems) because
+    # ClassLoaderTest asserts plugin realm isolation against known artifact contents. Dependabot's
+    # `versions` filter is matched against the *target* version of an update, so we use range filters
+    # (">= <next>") to block every bump to a newer version for these coordinates.
+    #
+    # Caveat: these rules apply repo-wide by coordinate. pinot-dropwizard / pinot-yammer /
+    # com.yammer.metrics:metrics-core are not referenced anywhere else, so locking them is safe.
+    # commons-io:commons-io is also consumed in the top-level pom.xml at a newer version, so it is
+    # intentionally NOT locked here; Dependabot may still open PRs that also modify the hardcoded
+    # 2.11.0 in pinot-spi/pom.xml — reviewers must revert that part manually (see the DO NOT BUMP
+    # comment next to the <version>2.11.0</version> entry in pinot-spi/pom.xml).
     - dependency-name: "org.apache.pinot:pinot-dropwizard"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["0.10.0"]
+      versions: [">= 0.10.1"]
     - dependency-name: "org.apache.pinot:pinot-yammer"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["0.10.0"]
-    - dependency-name: "commons-io:commons-io"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["2.11.0"]
+      versions: [">= 0.10.1"]
     - dependency-name: "com.yammer.metrics:metrics-core"
-      # Locked test resource for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java
-      versions: ["2.1.5"]
+      versions: [">= 2.1.6"]
 
   - package-ecosystem: "npm"
     directory: "/pinot-controller/src/main/resources"
