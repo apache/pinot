@@ -44,7 +44,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
+public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationTest {
 
   protected static final Logger LOGGER = LoggerFactory.getLogger(DimensionTableIntegrationTest.class);
   private static final String LONG_COL = "longCol";
@@ -143,6 +143,7 @@ public class DimensionTableIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
     FileUtils.deleteDirectory(_tempDir);
+    deleteSchema(getTableName());
 
     stopServer();
     stopBroker();
