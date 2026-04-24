@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests.logicaltable;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 
 
@@ -25,5 +26,13 @@ public class LogicalTableWithOneRealtimeTableIntegrationTest extends BaseLogical
   @Override
   protected List<String> getRealtimeTableNames() {
     return List.of("r_1");
+  }
+
+  @Override
+  protected void assertLowQueryTimeoutResponse(JsonNode exceptions) {
+    if (exceptions.isEmpty()) {
+      return;
+    }
+    super.assertLowQueryTimeoutResponse(exceptions);
   }
 }

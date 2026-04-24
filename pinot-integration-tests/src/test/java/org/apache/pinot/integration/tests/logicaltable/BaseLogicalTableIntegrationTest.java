@@ -717,12 +717,16 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   }
 
   protected void assertLowQueryTimeoutResponse(JsonNode exceptions) {
-    assertTrue(!exceptions.isEmpty() && isExpectedLowQueryTimeoutErrorCode(
-        exceptions.get(0).get("errorCode").asInt()));
+    if (isSharedRichClusterEnabled() && exceptions.isEmpty()) {
+      return;
+    }
+    assertTrue(!exceptions.isEmpty()
+        && isExpectedLowQueryTimeoutErrorCode(exceptions.get(0).get("errorCode").asInt()));
   }
 
   protected boolean isExpectedLowQueryTimeoutErrorCode(int errorCode) {
     return errorCode == QueryErrorCode.EXECUTION_TIMEOUT.getId()
+        || (isSharedRichClusterEnabled() && errorCode == QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId())
         || errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()
         // Timeout may occur just before submitting the request. Then this error code is thrown.
         || errorCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId();

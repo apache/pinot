@@ -38,6 +38,10 @@
       <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$MultiStageControllerTestCase"/>
       <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$SingleStageControllerTestCase"/>
       <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithOneOfflineTableIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwoOfflineTablesIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwelveOfflineTablesIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithOneRealtimeTableIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.PurgeMetadataPushMinionClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.RealtimeToOfflineSegmentsMinionClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.QueryQuotaClusterIntegrationTest"/>
