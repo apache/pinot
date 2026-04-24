@@ -55,7 +55,7 @@ import org.testng.annotations.Test;
  * Currently only tests METADATA push type.
  * todo: add test for URI push
  */
-public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentUploadIntegrationTest extends SharedRichClusterIntegrationTest {
   private static String _tableNameSuffix;
 
   @Override

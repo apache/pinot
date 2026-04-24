@@ -35,8 +35,8 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
+import org.apache.pinot.integration.tests.SharedRichClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -54,7 +54,7 @@ import org.testng.annotations.Test;
  * REAME.md to generate a larger dataset for better testing.
  * Queries are executed against Pinot and H2, and the results are compared.
  */
-public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
+public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 24;
 
   // Pinot queries 15, 16, 17 fail due to lack of support for views.
