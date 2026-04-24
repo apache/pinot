@@ -29,7 +29,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -62,8 +66,11 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -269,17 +276,18 @@ public class PinotDdlRestletResource {
     Schema storedSchema = _pinotHelixResourceManager.getSchema(schemaName);
     boolean schemaPreexisted = storedSchema != null;
     if (schemaPreexisted) {
-      // Use JsonNode structural comparison rather than string equality: Jackson may serialize
-      // fields in a different order or represent defaults differently (e.g. 0 vs 0.0) depending
-      // on which code path populated the Schema object, causing false mismatches that would block
-      // valid hybrid table creation even when the schemas are semantically identical.
-      JsonNode storedNode = JsonUtils.objectToJsonNode(storedSchema);
-      JsonNode compiledNode = JsonUtils.objectToJsonNode(create.getSchema());
-      if (!storedNode.equals(compiledNode)) {
+      // Compare only the column-shape attributes that the DDL column list actually controls.
+      // Comparing full JSON would include schema-level metadata (primary keys, null-handling,
+      // tags, description) that the DDL does not express when a column list is given for the
+      // second hybrid variant — e.g. a DDL without PRIMARY KEY would spuriously conflict with
+      // a stored schema whose primary keys were set by the first variant.
+      String mismatch = describeColumnShapeMismatch(storedSchema, create.getSchema());
+      if (mismatch != null) {
         throw new ControllerApplicationException(LOGGER,
-            "Schema '" + schemaName + "' already exists and does not match the column list in the DDL. "
-                + "Either omit the column list to reuse the existing schema, or drop and recreate the table pair "
-                + "if the schema has genuinely changed.",
+            "Schema '" + schemaName + "' already exists and does not match the column list in the DDL: "
+                + mismatch
+                + ". Either omit the column list to reuse the existing schema, or drop and recreate the "
+                + "table pair if the schema has genuinely changed.",
             Response.Status.CONFLICT);
       }
     }
@@ -341,13 +349,84 @@ public class PinotDdlRestletResource {
   }
 
   /**
+   * Compares two schemas by the column-shape attributes that a DDL column list actually controls
+   * (column name, data type, field type, single/multi-value, NOT NULL, default null value, and —
+   * for DATETIME columns — format and granularity) and returns a human-readable description of
+   * the first mismatch, or {@code null} if the shapes are equivalent. Schema-level metadata that
+   * a DDL column list does not express ({@code primaryKeyColumns}, {@code tags},
+   * {@code enableColumnBasedNullHandling}, {@code description}) is intentionally ignored so the
+   * second hybrid variant can be created via DDL without restating metadata set by the first
+   * variant.
+   */
+  // Package-private for unit testing.
+  @Nullable
+  static String describeColumnShapeMismatch(Schema stored, Schema compiled) {
+    Set<String> storedColumns = stored.getColumnNames();
+    Set<String> compiledColumns = compiled.getColumnNames();
+    if (!storedColumns.equals(compiledColumns)) {
+      Set<String> missing = new HashSet<>(storedColumns);
+      missing.removeAll(compiledColumns);
+      Set<String> extra = new HashSet<>(compiledColumns);
+      extra.removeAll(storedColumns);
+      StringBuilder sb = new StringBuilder("column sets differ");
+      if (!missing.isEmpty()) {
+        sb.append("; missing from DDL: ").append(missing);
+      }
+      if (!extra.isEmpty()) {
+        sb.append("; extra in DDL: ").append(extra);
+      }
+      return sb.toString();
+    }
+    for (String columnName : storedColumns) {
+      FieldSpec storedSpec = stored.getFieldSpecFor(columnName);
+      FieldSpec compiledSpec = compiled.getFieldSpecFor(columnName);
+      if (storedSpec.getDataType() != compiledSpec.getDataType()) {
+        return "column '" + columnName + "' data type differs (stored=" + storedSpec.getDataType()
+            + ", DDL=" + compiledSpec.getDataType() + ")";
+      }
+      if (storedSpec.getFieldType() != compiledSpec.getFieldType()) {
+        return "column '" + columnName + "' field type differs (stored=" + storedSpec.getFieldType()
+            + ", DDL=" + compiledSpec.getFieldType() + ")";
+      }
+      if (storedSpec.isSingleValueField() != compiledSpec.isSingleValueField()) {
+        return "column '" + columnName + "' single-valued flag differs";
+      }
+      if (storedSpec.isNotNull() != compiledSpec.isNotNull()) {
+        return "column '" + columnName + "' NOT NULL flag differs (stored=" + storedSpec.isNotNull()
+            + ", DDL=" + compiledSpec.isNotNull() + ")";
+      }
+      // Compare default null value by its string form: the DDL always sets defaults from a
+      // string literal, and FieldSpec normalizes the stored representation to a typed value.
+      // The string form is the stable projection that survives both serialization round trips.
+      String storedDefault = storedSpec.getDefaultNullValueString();
+      String compiledDefault = compiledSpec.getDefaultNullValueString();
+      if (!Objects.equals(storedDefault, compiledDefault)) {
+        return "column '" + columnName + "' default null value differs (stored=" + storedDefault
+            + ", DDL=" + compiledDefault + ")";
+      }
+      if (storedSpec instanceof DateTimeFieldSpec && compiledSpec instanceof DateTimeFieldSpec) {
+        DateTimeFieldSpec storedDt = (DateTimeFieldSpec) storedSpec;
+        DateTimeFieldSpec compiledDt = (DateTimeFieldSpec) compiledSpec;
+        if (!Objects.equals(storedDt.getFormat(), compiledDt.getFormat())) {
+          return "column '" + columnName + "' DATETIME format differs (stored="
+              + storedDt.getFormat() + ", DDL=" + compiledDt.getFormat() + ")";
+        }
+        if (!Objects.equals(storedDt.getGranularity(), compiledDt.getGranularity())) {
+          return "column '" + columnName + "' DATETIME granularity differs (stored="
+              + storedDt.getGranularity() + ", DDL=" + compiledDt.getGranularity() + ")";
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Runs the same schema/table validation stack that {@code /tables} and {@code /tableConfigs}
    * apply before any ZK write, so DDL-created configs are subject to the same rules as
    * JSON-API-created configs (upsert/dedup primary-key requirements, field config column
    * references, task config validation, registry-level semantic checks, etc.).
    */
-  private void validateTableConfig(Schema schema,
-      org.apache.pinot.spi.config.table.TableConfig tableConfig) {
+  private void validateTableConfig(Schema schema, TableConfig tableConfig) {
     try {
       TableConfigUtils.validateTableName(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, null);
@@ -467,21 +546,11 @@ public class PinotDdlRestletResource {
         }
       }
     }
-    // Delete the shared schema when the last physical variant has been removed. A schema
-    // without any table leaves stale metadata that blocks future CREATE TABLE for the same
-    // raw name with a different column list. Only attempt if all targets were deleted.
+    // Intentionally do NOT delete the shared schema when the last physical variant is removed.
+    // This matches the existing `/tables/{name}` DELETE contract, which also leaves the schema
+    // intact. Two doors into the same state machine must have the same side effects; a caller
+    // who wants to remove the schema can issue an explicit DELETE /schemas/{name} afterwards.
     if (failed.isEmpty()) {
-      boolean offlineExists = _pinotHelixResourceManager.hasOfflineTable(fullyQualifiedRaw);
-      boolean realtimeExists = _pinotHelixResourceManager.hasRealtimeTable(fullyQualifiedRaw);
-      if (!offlineExists && !realtimeExists) {
-        try {
-          _pinotHelixResourceManager.deleteSchema(fullyQualifiedRaw);
-          LOGGER.info("DDL deleted schema {} after dropping last table variant", fullyQualifiedRaw);
-        } catch (Exception schemaEx) {
-          LOGGER.warn("Failed to delete schema {} after DROP TABLE; manual cleanup may be required",
-              fullyQualifiedRaw, schemaEx);
-        }
-      }
       response.setMessage("Dropped " + dropped.size() + " table(s).");
       LOGGER.info("DDL dropped tables {}", dropped);
       return response;
@@ -491,8 +560,7 @@ public class PinotDdlRestletResource {
     String causeDesc = firstFailure.getMessage() != null
         ? firstFailure.getMessage() : firstFailure.getClass().getSimpleName();
     String msg = "Partial DROP TABLE: dropped " + dropped + ", failed to drop " + failed
-        + ": " + causeDesc + ". Schema '" + fullyQualifiedRaw
-        + "' may require manual deletion if the remaining variant is also removed.";
+        + ": " + causeDesc + ".";
     throw new ControllerApplicationException(LOGGER, msg,
         Response.Status.INTERNAL_SERVER_ERROR, firstFailure);
   }
