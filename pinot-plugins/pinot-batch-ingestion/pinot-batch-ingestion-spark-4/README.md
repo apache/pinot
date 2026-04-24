@@ -114,3 +114,14 @@ Run the tests:
 ```
 ./mvnw -pl pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-4 -am test
 ```
+
+### Known coverage gap
+
+The Spark 3 counterpart has a `SparkSegmentMetadataPushIntegrationTest` end-to-end test in
+`pinot-integration-tests` that exercises the runner against a real broker / controller / server.
+Spark 4 does not yet have an equivalent: the Spark 4 runtime (Jetty 12 / Jakarta Servlet 5) and
+`pinot-integration-tests`' existing Spark 3 / Jersey 2 / `javax.servlet-*` classpath cannot
+currently coexist in a single Maven module's test classpath. Restoring parity needs either a new
+`pinot-spark-4-integration-tests` module (isolated reactor) or per-test classpath realms via
+failsafe. Tracked separately; unit tests here cover the in-process driver path but not the
+segment-push wire flow across role boundaries.
