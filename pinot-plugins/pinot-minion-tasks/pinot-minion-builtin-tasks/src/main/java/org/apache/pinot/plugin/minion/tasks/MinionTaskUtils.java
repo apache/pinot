@@ -557,8 +557,8 @@ public class MinionTaskUtils {
     int excludedCount = 0;
     for (SegmentZKMetadata segment : segments) {
       long endTimeMs = segment.getEndTimeMs();
-      if ((TimeUtils.timeValueInValidRange(endTimeMs)) &&
-          (currentTimeMs - endTimeMs > effectiveRetentionMs)) {
+      if ((TimeUtils.timeValueInValidRange(endTimeMs))
+          && (currentTimeMs - endTimeMs > effectiveRetentionMs)) {
         excludedCount++;
       } else {
         filtered.add(segment);
