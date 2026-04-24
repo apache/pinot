@@ -20,14 +20,12 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
@@ -44,14 +42,17 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The {@code ExpressionTransformer} class will evaluate the function expressions.
+ * {@link RecordTransformer} that evaluates ingestion transform functions from table config and field specs.
+ * <p>Per-row evaluation logic is shared with the enricher pipeline via
+ * {@link IngestionFunctionEvaluation#applyExpressionTransformations};
+ * see {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher} for the
+ * enricher-specific configuration and {@link IngestionFunctionEvaluation#applyEnricherEvaluations} semantics.
  * <p>NOTE: should put this before the {@link DataTypeTransformer}. After this, transformed column can be treated as
  * regular column for other record transformers.
- * TODO: Merge this and CustomFunctionEnricher
  */
 public class ExpressionTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
-
+  
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
   /// Tracks columns whose transform functions were implicitly derived from MAP field specs (e.g. `mapField__KEYS`,
@@ -177,43 +178,8 @@ public class ExpressionTransformer implements RecordTransformer {
 
   @Override
   public void transform(GenericRow record) {
-    for (Map.Entry<String, FunctionEvaluator> entry : _expressionEvaluators.entrySet()) {
-      String column = entry.getKey();
-      FunctionEvaluator transformFunctionEvaluator = entry.getValue();
-      Object existingValue = record.getValue(column);
-      boolean shouldApplyTransform = _overwriteExistingValues || existingValue == null || record.isNullValue(column);
-      if (shouldApplyTransform) {
-        try {
-          // Apply transformation when overwriting is enabled or when the current value is null.
-          // NOTE: column value might already exist for OFFLINE data. For backward compatibility, we may override
-          // nested fields like arrays, collections, or maps since they were not included in the record
-          // transformation before.
-          Object transformedValue = transformFunctionEvaluator.evaluate(record);
-          applyTransformedValue(record, column, transformedValue);
-        } catch (Exception e) {
-          if (!_continueOnError) {
-            throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
-          }
-          _throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
-          record.markIncomplete();
-        }
-      } else if (existingValue.getClass().isArray() || existingValue instanceof Collection
-          || existingValue instanceof Map) {
-        try {
-          Object transformedValue = transformFunctionEvaluator.evaluate(record);
-          if (transformedValue == null && _implicitMapTransformColumns.contains(column)) {
-            continue;
-          }
-          // For backward compatibility, The only exception here is that we will override nested field like array,
-          // collection or map since they were not included in the record transformation before.
-          if (!isTypeCompatible(existingValue, transformedValue)) {
-            applyTransformedValue(record, column, transformedValue);
-          }
-        } catch (Exception e) {
-          LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
-        }
-      }
-    }
+    IngestionFunctionEvaluation.applyExpressionTransformations(record, _expressionEvaluators, _continueOnError,
+        _overwriteExistingValues, _implicitMapTransformColumns, _throttledLogger);
   }
 
   private static boolean isImplicitMapTransform(FieldSpec fieldSpec) {
@@ -223,31 +189,5 @@ public class ExpressionTransformer implements RecordTransformer {
     String fieldName = fieldSpec.getName();
     return fieldName.endsWith(SchemaUtils.MAP_KEY_COLUMN_SUFFIX)
         || fieldName.endsWith(SchemaUtils.MAP_VALUE_COLUMN_SUFFIX);
-  }
-
-  private void applyTransformedValue(GenericRow record, String column, @Nullable Object transformedValue) {
-    if (transformedValue != null) {
-      record.removeNullValueField(column);
-      record.putValue(column, transformedValue);
-    } else {
-      record.removeValue(column);
-      record.addNullValueField(column);
-    }
-  }
-
-  private boolean isTypeCompatible(Object existingValue, @Nullable Object transformedValue) {
-    if (transformedValue == null || existingValue == null) {
-      return transformedValue == existingValue;
-    }
-    if (transformedValue.getClass() == existingValue.getClass()) {
-      return true;
-    }
-    if (transformedValue instanceof Collection && existingValue instanceof Collection) {
-      return true;
-    }
-    if (transformedValue instanceof Map && existingValue instanceof Map) {
-      return true;
-    }
-    return transformedValue.getClass().isArray() && existingValue.getClass().isArray();
   }
 }
