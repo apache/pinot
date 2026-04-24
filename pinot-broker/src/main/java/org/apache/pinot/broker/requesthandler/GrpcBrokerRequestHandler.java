@@ -99,18 +99,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       throws Exception {
     // TODO: Add servers queried/responded stats
     assert route.getOfflineBrokerRequest() != null || route.getRealtimeBrokerRequest() != null;
-
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = doScatter(requestId, route,
         requestContext);
-
-    // Hook for subclasses to inject cached DataTables as synthetic streaming responses before reduce.
-    mergeWithCachedStreamingResponses(responseMap, serverBrokerRequest, requestContext);
-
-    long reduceStartTimeNs = System.nanoTime();
-    BrokerResponseNative brokerResponse =
-        _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
-    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - reduceStartTimeNs));
-    return brokerResponse;
+    return doReduce(originalBrokerRequest, responseMap, timeoutMs);
   }
 
   /**
@@ -140,15 +131,18 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   }
 
   /**
-   * Hook for subclasses to inject cached DataTables as synthetic streaming responses before the reduce step.
-   * Implementations should call {@link #dataTableToStreamingIterator(DataTable)} to convert each cached
-   * DataTable into the {@code Iterator<Server.ServerResponse>} format expected by
-   * {@link StreamingReduceService}. The default implementation is a no-op.
+   * Executes the reduce step on the given responseMap.
+   * Subclasses may pass a responseMap that differs from the live scatter result (e.g., with cached
+   * entries injected as synthetic streaming iterators).
    */
-  protected void mergeWithCachedStreamingResponses(
-      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap,
-      BrokerRequest serverBrokerRequest, RequestContext requestContext) {
-    // no-op by default
+  protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, long timeoutMs)
+      throws Exception {
+    long reduceStartTimeNs = System.nanoTime();
+    BrokerResponseNative brokerResponse =
+        _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
+    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - reduceStartTimeNs));
+    return brokerResponse;
   }
 
   /**

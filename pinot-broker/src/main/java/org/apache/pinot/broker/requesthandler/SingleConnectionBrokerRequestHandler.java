@@ -105,57 +105,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     if (requestContext.isSampledRequest()) {
       serverBrokerRequest.getPinotQuery().putToQueryOptions(CommonConstants.Broker.Request.TRACE, "true");
     }
-
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
-
     ScatterResult scatterResult = doScatter(requestId, rawTableName, route, timeoutMs, serverStats);
-
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
-        System.nanoTime() - scatterGatherStartTimeNs);
-
-    if (scatterResult.isTimedOut()) {
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
-      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
-    }
-
-    long reduceStartTimeNs = System.nanoTime();
-    long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
-
-    Map<ServerRoutingInstance, DataTable> dataTableMap =
-        mergeWithCachedDataTables(scatterResult.getDataTableMap(), serverBrokerRequest, requestContext);
-
-    BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
-            reduceTimeoutMs, _brokerMetrics);
-    long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
-
-    brokerResponse.setNumServersQueried(scatterResult.getNumServersQueried());
-    brokerResponse.setNumServersResponded(scatterResult.getNumServersResponded());
-    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(reduceTimeNanos));
-
-    if (scatterResult.getSendException() != null) {
-      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND,
-          scatterResult.getSendException().getMessage()));
-    }
-    List<ServerRoutingInstance> serversNotResponded = scatterResult.getServersNotResponded();
-    if (!serversNotResponded.isEmpty()) {
-      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.SERVER_NOT_RESPONDING,
-          String.format("%d servers %s not responded", serversNotResponded.size(), serversNotResponded)));
-      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
-          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
-          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
-      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
-    }
-    if (brokerResponse.getExceptionsSize() > 0) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
-    }
-    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
-        scatterResult.getTotalResponseSize());
-
-    return brokerResponse;
+    return doReduce(originalBrokerRequest, serverBrokerRequest, scatterResult.getDataTableMap(), scatterResult,
+        scatterGatherStartTimeNs, timeoutMs, rawTableName);
   }
 
   /**
@@ -193,13 +147,56 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   }
 
   /**
-   * Hook for subclasses to merge cached DataTables into the live scatter result before reduce.
-   * The default implementation returns the live map unchanged.
+   * Executes the reduce step on the given dataTableMap and populates the response with scatter stats.
+   * Subclasses may pass a dataTableMap that differs from scatterResult.getDataTableMap() (e.g., with
+   * additional cached DataTables merged in), while scatterResult is always used for server stats so
+   * that cached entries are never counted as real servers queried.
    */
-  protected Map<ServerRoutingInstance, DataTable> mergeWithCachedDataTables(
-      Map<ServerRoutingInstance, DataTable> liveDataTableMap, BrokerRequest serverBrokerRequest,
-      RequestContext requestContext) {
-    return liveDataTableMap;
+  protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+      Map<ServerRoutingInstance, DataTable> dataTableMap, ScatterResult scatterResult,
+      long scatterGatherStartTimeNs, long timeoutMs, String rawTableName)
+      throws Exception {
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
+        System.nanoTime() - scatterGatherStartTimeNs);
+
+    if (scatterResult.isTimedOut()) {
+      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
+          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
+      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
+    }
+
+    long reduceStartTimeNs = System.nanoTime();
+    long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
+    BrokerResponseNative brokerResponse =
+        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
+            reduceTimeoutMs, _brokerMetrics);
+    long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
+
+    brokerResponse.setNumServersQueried(scatterResult.getNumServersQueried());
+    brokerResponse.setNumServersResponded(scatterResult.getNumServersResponded());
+    brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(reduceTimeNanos));
+
+    if (scatterResult.getSendException() != null) {
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.BROKER_REQUEST_SEND,
+          scatterResult.getSendException().getMessage()));
+    }
+    List<ServerRoutingInstance> serversNotResponded = scatterResult.getServersNotResponded();
+    if (!serversNotResponded.isEmpty()) {
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.SERVER_NOT_RESPONDING,
+          String.format("%d servers %s not responded", serversNotResponded.size(), serversNotResponded)));
+      BrokerMeter meter = QueryOptionsUtils.isSecondaryWorkload(serverBrokerRequest.getPinotQuery().getQueryOptions())
+          ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED
+          : BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED;
+      _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
+    }
+    if (brokerResponse.getExceptionsSize() > 0) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
+    }
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+        scatterResult.getTotalResponseSize());
+
+    return brokerResponse;
   }
 
   /**
