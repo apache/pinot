@@ -20,6 +20,8 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 
@@ -63,6 +65,28 @@ public class BloomFilterConfig extends IndexConfig {
 
   public boolean isLoadOnHeap() {
     return _loadOnHeap;
+  }
+
+  /**
+   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
+   *
+   * <p>Note: the constructor coerces {@code fpp == 0.0} to {@link #DEFAULT_FPP}, so the only
+   * sane slim form for the default {@code fpp} is omitting the key entirely.
+   */
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (Double.compare(_fpp, DEFAULT_FPP) != 0) {
+      node.put("fpp", _fpp);
+    }
+    if (_maxSizeInBytes != 0) {
+      node.put("maxSizeInBytes", _maxSizeInBytes);
+    }
+    if (_loadOnHeap) {
+      node.put("loadOnHeap", true);
+    }
+    return node;
   }
 
   @Override

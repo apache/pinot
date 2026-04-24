@@ -20,10 +20,13 @@ package org.apache.pinot.segment.spi.index.creator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -148,6 +151,35 @@ public class VectorIndexConfig extends IndexConfig {
    */
   public VectorBackendType resolveBackendType() {
     return VectorIndexConfigValidator.resolveBackendType(this);
+  }
+
+  /**
+   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
+   *
+   * <p>Note: {@code @JsonCreator} reads {@code vectorDimension} and {@code version} as primitive
+   * {@code int}, so a value of {@code 0} is indistinguishable from "absent" and is therefore
+   * treated as the default and omitted on serialization.
+   */
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (_vectorIndexType != null) {
+      node.put("vectorIndexType", _vectorIndexType);
+    }
+    if (_vectorDimension != 0) {
+      node.put("vectorDimension", _vectorDimension);
+    }
+    if (_version != 0) {
+      node.put("version", _version);
+    }
+    if (_vectorDistanceFunction != null) {
+      node.put("vectorDistanceFunction", _vectorDistanceFunction.name());
+    }
+    if (_properties != null && !_properties.isEmpty()) {
+      node.set("properties", JsonUtils.objectToJsonNode(_properties));
+    }
+    return node;
   }
 
   public String toString() {

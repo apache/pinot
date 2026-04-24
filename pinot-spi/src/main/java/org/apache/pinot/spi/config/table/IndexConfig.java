@@ -21,8 +21,11 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Objects;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -52,6 +55,25 @@ public class IndexConfig extends BaseJsonConfig {
   @JsonIgnore
   public boolean isEnabled() {
     return !_disabled;
+  }
+
+  /**
+   * Curated Jackson serializer. Annotated with {@link JsonValue} so Jackson skips default bean
+   * introspection and uses this method as the sole source of truth, emitting only fields whose
+   * value differs from the class default. Subclasses override and call {@code super.toJsonObject()}
+   * first to inherit the {@code disabled} key handling.
+   *
+   * <p>This mirrors the slim-serialization pattern introduced for {@code Schema} and
+   * {@code TableConfigs} in apache/pinot#17558 and ensures user-supplied slim index configs do not
+   * get fattened with defaults on the first round-trip through any Pinot {@code ObjectMapper}.
+   */
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = JsonUtils.newObjectNode();
+    if (_disabled) {
+      node.put("disabled", true);
+    }
+    return node;
   }
 
   @Override

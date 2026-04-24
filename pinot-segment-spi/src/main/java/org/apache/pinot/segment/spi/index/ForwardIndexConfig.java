@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
@@ -248,6 +250,43 @@ public class ForwardIndexConfig extends IndexConfig {
 
   public EncodingType getEncodingType() {
     return _encodingType;
+  }
+
+  /**
+   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
+   *
+   * <p>Emits each field only when it differs from its class default. The three writer-version /
+   * chunk-size defaults are cluster-tunable statics, so they are read at call time (not captured)
+   * to keep the serialized form consistent with the live cluster default.
+   *
+   * <p>Deprecated input keys {@code chunkCompressionType} and {@code dictIdCompressionType} are
+   * intentionally not emitted — their getters were already {@code @JsonIgnore}, so the slim form
+   * matches prior behavior for those keys. The same applies to {@code configs}.
+   */
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (_encodingType != EncodingType.DICTIONARY) {
+      node.put("encodingType", _encodingType.name());
+    }
+    if (_compressionCodec != null) {
+      node.put("compressionCodec", _compressionCodec.name());
+    }
+    if (_deriveNumDocsPerChunk) {
+      node.put("deriveNumDocsPerChunk", true);
+    }
+    // Read cluster-tunable statics at call time so the serialized form tracks the live default.
+    if (_rawIndexWriterVersion != _defaultRawIndexWriterVersion) {
+      node.put("rawIndexWriterVersion", _rawIndexWriterVersion);
+    }
+    if (!Objects.equals(_targetMaxChunkSize, _defaultTargetMaxChunkSize)) {
+      node.put("targetMaxChunkSize", _targetMaxChunkSize);
+    }
+    if (_targetDocsPerChunk != _defaultTargetDocsPerChunk) {
+      node.put("targetDocsPerChunk", _targetDocsPerChunk);
+    }
+    return node;
   }
 
   @Override

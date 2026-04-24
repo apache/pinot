@@ -20,10 +20,13 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -195,6 +198,49 @@ public class JsonIndexConfig extends IndexConfig {
 
   public void setMaxBytesSize(@Nullable Long maxBytesSize) {
     _maxBytesSize = maxBytesSize;
+  }
+
+  /**
+   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
+   */
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    // Both -1 (no-arg ctor field default) and 0 (@JsonCreator primitive default) are functionally
+    // equivalent — JsonUtils.flatten() only consults maxLevels when > 0. Treat both as default
+    // and omit, which keeps the slim form idempotent under round-trip.
+    if (_maxLevels > 0) {
+      node.put("maxLevels", _maxLevels);
+    }
+    if (_excludeArray) {
+      node.put("excludeArray", true);
+    }
+    if (_disableCrossArrayUnnest) {
+      node.put("disableCrossArrayUnnest", true);
+    }
+    if (_includePaths != null) {
+      node.set("includePaths", JsonUtils.objectToJsonNode(_includePaths));
+    }
+    if (_excludePaths != null) {
+      node.set("excludePaths", JsonUtils.objectToJsonNode(_excludePaths));
+    }
+    if (_excludeFields != null) {
+      node.set("excludeFields", JsonUtils.objectToJsonNode(_excludeFields));
+    }
+    if (_indexPaths != null) {
+      node.set("indexPaths", JsonUtils.objectToJsonNode(_indexPaths));
+    }
+    if (_maxValueLength != 0) {
+      node.put("maxValueLength", _maxValueLength);
+    }
+    if (_skipInvalidJson) {
+      node.put("skipInvalidJson", true);
+    }
+    if (_maxBytesSize != null) {
+      node.put("maxBytesSize", _maxBytesSize);
+    }
+    return node;
   }
 
   @Override

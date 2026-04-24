@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.utils.CsvParser;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class TextIndexConfig extends IndexConfig {
@@ -336,6 +339,75 @@ public class TextIndexConfig extends IndexConfig {
    */
   public boolean isStoreInSegmentFile() {
     return _storeInSegmentFile;
+  }
+
+  /**
+   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
+   *
+   * <p>Each of the 18 lucene defaults — declared as {@code LUCENE_INDEX_DEFAULT_*} constants at
+   * the top of this file — is omitted from the output when the field still equals its default.
+   * Empty / null lists for {@code stopWords*} and {@code luceneAnalyzerClassArgs*} are also
+   * treated as defaults and omitted.
+   */
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (_rawValueForTextIndex != null) {
+      node.set("rawValue", JsonUtils.objectToJsonNode(_rawValueForTextIndex));
+    }
+    if (_enableQueryCache) {
+      node.put("queryCache", true);
+    }
+    if (_useANDForMultiTermQueries) {
+      node.put("useANDForMultiTermQueries", true);
+    }
+    if (_stopWordsInclude != null && !_stopWordsInclude.isEmpty()) {
+      node.set("stopWordsInclude", JsonUtils.objectToJsonNode(_stopWordsInclude));
+    }
+    if (_stopWordsExclude != null && !_stopWordsExclude.isEmpty()) {
+      node.set("stopWordsExclude", JsonUtils.objectToJsonNode(_stopWordsExclude));
+    }
+    if (_luceneUseCompoundFile != LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE) {
+      node.put("luceneUseCompoundFile", _luceneUseCompoundFile);
+    }
+    if (_luceneMaxBufferSizeMB != LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB) {
+      node.put("luceneMaxBufferSizeMB", _luceneMaxBufferSizeMB);
+    }
+    if (!Objects.equals(_luceneAnalyzerClass, FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS)) {
+      node.put("luceneAnalyzerClass", _luceneAnalyzerClass);
+    }
+    if (_luceneAnalyzerClassArgs != null && !_luceneAnalyzerClassArgs.isEmpty()) {
+      node.set("luceneAnalyzerClassArgs", JsonUtils.objectToJsonNode(_luceneAnalyzerClassArgs));
+    }
+    if (_luceneAnalyzerClassArgTypes != null && !_luceneAnalyzerClassArgTypes.isEmpty()) {
+      node.set("luceneAnalyzerClassArgTypes", JsonUtils.objectToJsonNode(_luceneAnalyzerClassArgTypes));
+    }
+    if (!Objects.equals(_luceneQueryParserClass, FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS)) {
+      node.put("luceneQueryParserClass", _luceneQueryParserClass);
+    }
+    if (_enablePrefixSuffixMatchingInPhraseQueries != LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH) {
+      node.put("enablePrefixSuffixMatchingInPhraseQueries", _enablePrefixSuffixMatchingInPhraseQueries);
+    }
+    if (_reuseMutableIndex != LUCENE_INDEX_REUSE_MUTABLE_INDEX) {
+      node.put("reuseMutableIndex", _reuseMutableIndex);
+    }
+    if (_luceneNRTCachingDirectoryMaxBufferSizeMB != LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB) {
+      node.put("luceneNRTCachingDirectoryMaxBufferSizeMB", _luceneNRTCachingDirectoryMaxBufferSizeMB);
+    }
+    if (_useLogByteSizeMergePolicy != LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY) {
+      node.put("useLogByteSizeMergePolicy", _useLogByteSizeMergePolicy);
+    }
+    if (_docIdTranslatorMode != LUCENE_TRANSLATOR_MODE) {
+      node.put("docIdTranslatorMode", _docIdTranslatorMode.name());
+    }
+    if (_caseSensitive != LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX) {
+      node.put("caseSensitive", _caseSensitive);
+    }
+    if (_storeInSegmentFile != LUCENE_INDEX_DEFAULT_STORE_IN_SEGMENT_FILE) {
+      node.put("storeInSegmentFile", _storeInSegmentFile);
+    }
+    return node;
   }
 
   public static abstract class AbstractBuilder {

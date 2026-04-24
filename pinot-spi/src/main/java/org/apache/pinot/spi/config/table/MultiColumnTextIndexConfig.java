@@ -20,10 +20,13 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /** Index configuration for single text index containing multiple columns.
@@ -66,5 +69,23 @@ public class MultiColumnTextIndexConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, Map<String, String>> getPerColumnProperties() {
     return _perColumnProperties;
+  }
+
+  /**
+   * Curated slim serializer. Standalone (not inheriting from {@link IndexConfig}) — this class
+   * extends {@link BaseJsonConfig} directly and has no {@code disabled} field. {@code columns}
+   * is required and is always emitted; the optional maps are emitted only when non-null.
+   */
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = JsonUtils.newObjectNode();
+    node.set("columns", JsonUtils.objectToJsonNode(_columns));
+    if (_properties != null) {
+      node.set("properties", JsonUtils.objectToJsonNode(_properties));
+    }
+    if (_perColumnProperties != null) {
+      node.set("perColumnProperties", JsonUtils.objectToJsonNode(_perColumnProperties));
+    }
+    return node;
   }
 }

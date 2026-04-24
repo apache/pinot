@@ -21,6 +21,8 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,6 +33,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class DictionaryIndexConfig extends IndexConfig {
@@ -88,6 +91,25 @@ public class DictionaryIndexConfig extends IndexConfig {
 
   public Intern getIntern() {
     return _intern;
+  }
+
+  /**
+   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
+   */
+  @Override
+  @JsonValue
+  public ObjectNode toJsonObject() {
+    ObjectNode node = super.toJsonObject();
+    if (_onHeap) {
+      node.put("onHeap", true);
+    }
+    if (_useVarLengthDictionary) {
+      node.put("useVarLengthDictionary", true);
+    }
+    if (_intern != null) {
+      node.set("intern", JsonUtils.objectToJsonNode(_intern));
+    }
+    return node;
   }
 
   @Override
