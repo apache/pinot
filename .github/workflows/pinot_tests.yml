@@ -227,7 +227,7 @@ jobs:
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -316,7 +316,7 @@ jobs:
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -346,7 +346,7 @@ jobs:
           .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
       - name: Upload coverage to Codecov
         if : ${{ matrix.testset == 1 }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         continue-on-error: true
         timeout-minutes: 5
         with:
