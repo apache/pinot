@@ -63,9 +63,9 @@ class FilterPushDownTest extends BaseTest {
     val expectedOutput =
       s"""("attr1" = 1) AND ("attr2" IN ('1', '2', '''5''')) AND ("attr3" < 1) AND ("attr4" <= 3) AND ("attr5" > 10) AND """ +
         s"""("attr6" >= 15) AND (NOT ("attr7" = '1')) AND (("attr8" < 10) AND ("attr9" <= 3)) AND """ +
-        s"""(("attr10" = 'hello') OR ("attr11" >= 13)) AND ("attr12" LIKE '%pinot%') AND ("attr13" IN (10, 20)) AND """ +
+        s"""(("attr10" = 'hello') OR ("attr11" >= 13)) AND ("attr12" LIKE '%pinot%' ESCAPE '\\') AND ("attr13" IN (10, 20)) AND """ +
         s"""(NOT ("attr20" != '123' OR "attr20" IS NULL OR '123' IS NULL) OR ("attr20" IS NULL AND '123' IS NULL)) AND """ +
-        s"""("attr14" IS NULL) AND ("attr15" IS NOT NULL) AND ("attr16" LIKE 'pinot1%') AND ("attr17" LIKE '%pinot2') AND """ +
+        s"""("attr14" IS NULL) AND ("attr15" IS NOT NULL) AND ("attr16" LIKE 'pinot1%' ESCAPE '\\') AND ("attr17" LIKE '%pinot2' ESCAPE '\\') AND """ +
         s"""("attr18" = '2020-01-01 00:00:15.0') AND ("attr19" < '2020-01-01') AND ("attr21" = List(1, 2)) AND """ +
         s"""("attr22" = 10.5)"""
 
@@ -78,5 +78,48 @@ class FilterPushDownTest extends BaseTest {
     val expectedOutput = "(\"some\".\"nested\".\"column\" = 1)"
 
     whereClause.get shouldEqual expectedOutput
+  }
+
+  test("Compound filter with unsupported child should be rejected by acceptFilters") {
+    // The connector does not recognize AlwaysTrue as a pushable leaf, so wrapping it in
+    // And/Or/Not should fall through to postScan. Before this fix the compound was accepted
+    // even though compileFilter silently returned None, which caused Pinot to return
+    // unfiltered rows.
+    val unsupportedLeaf = AlwaysTrue
+    val orWithUnsupported = Or(EqualTo("a", 1), unsupportedLeaf)
+    val andWithUnsupported = And(EqualTo("a", 1), unsupportedLeaf)
+    val notWithUnsupported = Not(unsupportedLeaf)
+
+    val (accepted, postScan) =
+      FilterPushDown.acceptFilters(Array(orWithUnsupported, andWithUnsupported, notWithUnsupported))
+    accepted shouldBe empty
+    postScan should contain theSameElementsAs
+      Seq(orWithUnsupported, andWithUnsupported, notWithUnsupported)
+  }
+
+  test("Compound filter whose children are all supported should still be accepted") {
+    val andOk = And(EqualTo("a", 1), LessThan("b", 10))
+    val orOk = Or(EqualTo("a", 1), GreaterThanOrEqual("b", 10))
+    val notOk = Not(EqualTo("a", 1))
+
+    val (accepted, postScan) = FilterPushDown.acceptFilters(Array(andOk, orOk, notOk))
+    accepted should contain theSameElementsAs Seq(andOk, orOk, notOk)
+    postScan shouldBe empty
+  }
+
+  test("LIKE pushdowns should escape SQL and LIKE wildcard characters in the value") {
+    // Literal %, _, and single-quote in the user-supplied string would change the Pinot
+    // predicate meaning (or break the SQL) if they leaked through unescaped. Backslash
+    // itself also needs doubling so the LIKE ESCAPE clause matches a literal backslash.
+    val filters = Array[Filter](
+      StringStartsWith("name", "50%_off'sale\\2024"),
+      StringEndsWith("name", "10%_off'sale\\2024"),
+      StringContains("name", "%_'\\")
+    )
+    val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(filters)
+    whereClause.get shouldEqual
+      """("name" LIKE '50\%\_off''sale\\2024%' ESCAPE '\') AND """ +
+        """("name" LIKE '%10\%\_off''sale\\2024' ESCAPE '\') AND """ +
+        """("name" LIKE '%\%\_''\\%' ESCAPE '\')"""
   }
 }
