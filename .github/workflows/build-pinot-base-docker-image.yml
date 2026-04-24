@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [11, 17, 21, 25]
+        jdk_version: [21, 25]
         arch: [amd64, arm64]
         type: [build, runtime]
         include:
@@ -60,7 +60,7 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [11, 17, 21, 25]
+        jdk_version: [21, 25]
         type: [build, runtime]
     steps:
       - name: Login to DockerHub

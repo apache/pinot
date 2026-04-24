@@ -46,7 +46,7 @@ if [[ "$#" -gt 3 ]]
 then
   JAVA_VERSION=$4
 else
-  JAVA_VERSION=11
+  JAVA_VERSION=21
 fi
 
 echo "Trying to build Pinot docker image on git ref: [ ${PINOT_GIT_REF} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. Java Version: [ ${JAVA_VERSION} ]."

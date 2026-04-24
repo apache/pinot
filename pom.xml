@@ -110,7 +110,13 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>11</jdk.version>
+    <!--
+      Pinot services build against Java 21 by default. SPI/client modules consumed
+      by external JVMs (pinot-spi, pinot-segment-spi, pinot-timeseries-spi,
+      pinot-common, pinot-java-client, pinot-jdbc-client) hard-code Java 11
+      bytecode in their own maven-compiler-plugin configuration.
+    -->
+    <jdk.version>21</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
@@ -2623,6 +2629,28 @@
     </pluginManagement>
 
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-java-version</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                  <message>Apache Pinot requires JDK 21 or newer to build.</message>
+                </requireJavaVersion>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>

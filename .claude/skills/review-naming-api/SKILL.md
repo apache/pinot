@@ -35,7 +35,7 @@ Severity:
 - Public API surface: if adding a method to an SPI interface, confirm domain-1 backward-compat story (C1.3).
 - Javadoc: new public classes must describe behavior and thread-safety.
 - Imports: `com.foo.Bar foo = new com.foo.Bar()` → use import.
-- CLAUDE.md checks: license header, Java 11 target (no Java 17 syntax), SLF4J logger pattern.
+- CLAUDE.md checks: license header, Java 21 target (Java 11 bytecode for SPI/client modules), SLF4J logger pattern.
 
 ## 3. Findings
 

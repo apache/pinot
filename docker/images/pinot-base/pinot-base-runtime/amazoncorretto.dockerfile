@@ -20,7 +20,7 @@
 # AL2023 image to avoid system packages (python3, etc.) that are not needed
 # at runtime and consistently accumulate CVEs. wget is used instead of curl
 # to avoid pulling in libcurl's LDAP/HTTP2 dependencies.
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 FROM debian:bookworm-slim
 
 LABEL MAINTAINER=dev@pinot.apache.org
@@ -41,7 +41,7 @@ RUN set -eux \
 # Install Amazon Corretto JDK.
 # /etc/apt/keyrings/ is the correct path for user-managed keys referenced via
 # signed-by=; apt natively handles ASCII-armored .asc files at that path.
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 RUN set -eux \
   && mkdir -p /etc/apt/keyrings \
   && wget -qO /etc/apt/keyrings/corretto.asc https://apt.corretto.aws/corretto.key \
