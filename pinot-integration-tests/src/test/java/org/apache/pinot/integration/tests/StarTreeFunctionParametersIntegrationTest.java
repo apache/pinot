@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ConfigAccessor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.integration.tests.custom.StarTreeTest;
@@ -37,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -46,8 +48,11 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 
 
-public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegrationTest {
+public class StarTreeFunctionParametersIntegrationTest extends SharedRichClusterIntegrationTest {
   private TableConfig _tableConfig;
+  private String _originalMaxSegmentStarTreePreprocessParallelism;
+  private String _originalMaxSegmentDownloadParallelism;
+  private boolean _clusterConfigOverridesApplied;
 
   @BeforeClass
   public void setUp()
@@ -57,17 +62,27 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     // Start the Pinot cluster
     startZk();
     startController();
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    // Set max segment startree preprocess parallelism to 6
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(8));
-    // Set max segment download parallelism to 6 to test that all segments can be processed
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(6
-
-        ));
+    HelixConfigScope scope = getClusterConfigScope();
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
+    _originalMaxSegmentStarTreePreprocessParallelism =
+        configAccessor.get(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM);
+    _originalMaxSegmentDownloadParallelism =
+        configAccessor.get(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM);
+    try {
+      // Set max segment star-tree preprocess parallelism to 8
+      configAccessor.set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+          Integer.toString(8));
+      // Set max segment download parallelism to 6 to test that all segments can be processed
+      configAccessor.set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(6));
+      _clusterConfigOverridesApplied = true;
+    } catch (RuntimeException e) {
+      restoreClusterConfig(configAccessor, scope,
+          CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+          _originalMaxSegmentStarTreePreprocessParallelism);
+      restoreClusterConfig(configAccessor, scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+          _originalMaxSegmentDownloadParallelism);
+      throw e;
+    }
     startBroker();
     startServer();
 
@@ -92,16 +107,69 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
   @AfterClass
   public void tearDown()
       throws Exception {
-    dropOfflineTable(getTableName());
+    try {
+      cleanTableAndSchema();
+    } finally {
+      try {
+        restoreClusterConfigOverrides();
+      } finally {
+        // Stop the Pinot cluster
+        stopServer();
+        stopBroker();
+        stopController();
 
-    // Stop the Pinot cluster
-    stopServer();
-    stopBroker();
-    stopController();
+        // Stop Zookeeper
+        stopZk();
+        FileUtils.deleteDirectory(_tempDir);
+      }
+    }
+  }
 
-    // Stop Zookeeper
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        getTableName())) {
+      dropOfflineTable(getTableName());
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void restoreClusterConfigOverrides() {
+    if (!_clusterConfigOverridesApplied || _helixManager == null) {
+      return;
+    }
+
+    HelixConfigScope scope = getClusterConfigScope();
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
+    restoreClusterConfig(configAccessor, scope,
+        CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        _originalMaxSegmentStarTreePreprocessParallelism);
+    restoreClusterConfig(configAccessor, scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
+        _originalMaxSegmentDownloadParallelism);
+    _clusterConfigOverridesApplied = false;
+  }
+
+  private void restoreClusterConfig(ConfigAccessor configAccessor, HelixConfigScope scope, String key,
+      String originalValue) {
+    if (originalValue == null) {
+      configAccessor.remove(scope, key);
+    } else {
+      configAccessor.set(scope, key, originalValue);
+    }
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(getHelixClusterName())
+        .build();
   }
 
   // Use the smallest sample dataset so that dynamic creation and deletion of star-tree indexes during segment reload

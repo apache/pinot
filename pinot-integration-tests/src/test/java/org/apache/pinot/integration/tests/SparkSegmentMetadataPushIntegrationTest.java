@@ -46,7 +46,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTest {
+public class SparkSegmentMetadataPushIntegrationTest extends SharedRichClusterIntegrationTest {
 
   private SparkContext _sparkContext;
   private final String _testTable = DEFAULT_TABLE_NAME;
@@ -375,6 +375,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
       throws IOException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     dropOfflineTable(offlineTableName);
+    waitForEVToDisappear(offlineTableName);
+    deleteSchema(getTableName());
 
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
   }
@@ -382,11 +384,15 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   @AfterClass
   public void tearDown()
       throws Exception {
-    _sparkContext.stop();
+    if (_sparkContext != null) {
+      _sparkContext.stop();
+      _sparkContext = null;
+    }
 
     stopServer();
     stopBroker();
     stopController();
     stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 }

@@ -177,7 +177,7 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 
 ### Current Draft Suite Timing
 
-The current draft suite moves eight low-risk no-override classes behind the shared
+The current draft suite moves eleven low-risk no-override classes behind the shared
 rich cluster:
 
 - `SegmentUploadIntegrationTest`
@@ -188,15 +188,18 @@ rich cluster:
 - `SegmentWriterUploaderIntegrationTest`
 - `SegmentGenerationMinionClusterIntegrationTest`
 - `DimensionTableIntegrationTest`
+- `SparkSegmentMetadataPushIntegrationTest`
+- `StarTreeFunctionParametersIntegrationTest`
+- `SegmentPartitionLLCRealtimeClusterIntegrationTest`
 
-On this workstation, the same 36 TestNG tests passed in both modes:
+On this workstation, the same 48 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 119.24s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 82.36s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 181.25s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 146.74s |
 
-That is a 36.88s wall-clock reduction, about 31% for this draft batch.
+That is a 34.51s wall-clock reduction, about 19% for this draft batch.
 
 Attempted but not included yet:
 
@@ -204,6 +207,10 @@ Attempted but not included yet:
   strict replica-group routing in the shared run.
 - Logical-table classes: setup can be attached to the shared cluster, but the inherited logical-table query-timeout
   assertion needs a targeted fix before adding the batch.
+- `SegmentGenerationMinionRealtimeIngestionTest`: uses `@BeforeTest` and creates `mytable_REALTIME` before earlier
+  suite classes; it needs class-scoped setup or unique table/topic names before sharing.
+- `CommitTimeCompactionIntegrationTest`: needs a complete conversion to unique per-method table/topic names and
+  cleanup; the first worker pass was intentionally parked before wiring it into the suite.
 
 ### Suite Infrastructure
 

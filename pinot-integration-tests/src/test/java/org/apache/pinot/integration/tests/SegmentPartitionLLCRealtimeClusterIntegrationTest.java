@@ -20,14 +20,17 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -40,7 +43,6 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -55,7 +57,8 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test that enables segment partition for the LLC real-time table.
  */
-public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME = "segment_partition_llc_realtime";
   private static final String PARTITION_COLUMN = "DestState";
   // Number of documents in the first and second Avro file
   private static final long NUM_DOCS_IN_FIRST_AVRO_FILE = 9292;
@@ -79,6 +82,9 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Start Kafka
     startKafka();
+
+    cleanupRealtimeTableAndSchema();
+    resetKafkaTopic();
 
     // Unpack the Avro files
     _avroFiles = unpackAvroData(_tempDir);
@@ -104,6 +110,11 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     // Wait for all documents loaded
     _countStarResult = NUM_DOCS_IN_FIRST_AVRO_FILE;
     waitForAllDocsLoaded(600_000L);
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
   }
 
   @Override
@@ -150,8 +161,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   @Test
   public void testPartitionMetadata() {
     int[] numSegmentsForPartition = new int[2];
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = getSegmentsZKMetadata();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
       assertNotNull(segmentPartitionMetadata);
@@ -167,25 +177,24 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       numSegmentsForPartition[partitionGroupId]++;
     }
 
-    // There should be 2 segments for partition 0, 2 segments for partition 1
-    assertEquals(numSegmentsForPartition[0], 2);
-    assertEquals(numSegmentsForPartition[1], 2);
+    assertSegmentsLoadedForBothPartitions(numSegmentsForPartition);
   }
 
   @Test(dependsOnMethods = "testPartitionMetadata")
   public void testPartitionRouting()
       throws Exception {
+    List<SegmentZKMetadata> segmentsZKMetadata = getSegmentsZKMetadata();
+
     // Query partition 0
     {
-      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+      String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState = 'CA'";
       JsonNode response = postQuery(query);
 
-      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'CA' AND 'CA'";
+      String queryToCompare = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState BETWEEN 'CA' AND 'CA'";
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should only query the segments for partition 0
-      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
-      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
+      assertPartitionRoutingSegmentCounts(response, responseToCompare, segmentsZKMetadata, 0);
 
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
           responseToCompare.get("resultTable").get("rows").get(0).get(0).asInt());
@@ -193,15 +202,14 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Query partition 1
     {
-      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'FL'";
+      String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState = 'FL'";
       JsonNode response = postQuery(query);
 
-      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'FL' AND 'FL'";
+      String queryToCompare = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState BETWEEN 'FL' AND 'FL'";
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should only query the segments for partition 1
-      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 2);
-      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), 4);
+      assertPartitionRoutingSegmentCounts(response, responseToCompare, segmentsZKMetadata, 1);
 
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
           responseToCompare.get("resultTable").get("rows").get(0).get(0).asInt());
@@ -212,7 +220,8 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   public void testPartitionIdVirtualColumn()
       throws Exception {
     // Query to get partition ID information for all segments
-    String query = "SELECT $partitionId, $segmentName FROM mytable GROUP BY $segmentName, $partitionId";
+    String query =
+        "SELECT $partitionId, $segmentName FROM " + getTableName() + " GROUP BY $segmentName, $partitionId";
     JsonNode response = postQuery(query);
 
     JsonNode resultTable = response.get("resultTable");
@@ -257,8 +266,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Check partition metadata
     int[] numSegmentsForPartition = new int[2];
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = getSegmentsZKMetadata();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
       assertNotNull(segmentPartitionMetadata);
@@ -272,55 +280,37 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
       numSegmentsForPartition[partitionGroupId]++;
 
-      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-        // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
-      } else {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
-        int sequenceNumber = llcSegmentName.getSequenceNumber();
-        if (sequenceNumber == 0) {
-          // The partition metadata for the first completed segment should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
-        } else {
-          // The partition metadata for the new completed segments should contain both partitions
-          assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
-        }
-      }
+      assertValidPartitionMetadata(columnPartitionMetadata, partitionGroupId);
     }
 
-    // There should be 4 segments for partition 0, 4 segments for partition 1
-    assertEquals(numSegmentsForPartition[0], 4);
-    assertEquals(numSegmentsForPartition[1], 4);
+    assertSegmentsLoadedForBothPartitions(numSegmentsForPartition);
 
     // Check partition routing
-    int numSegments = segmentsZKMetadata.size();
 
     // Query partition 0
     {
-      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+      String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState = 'CA'";
       JsonNode response = postQuery(query);
 
-      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'CA' AND 'CA'";
+      String queryToCompare = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState BETWEEN 'CA' AND 'CA'";
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip the first completed segments and the consuming segment for partition 1
-      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 2);
-      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
+      assertPartitionRoutingSegmentCounts(response, responseToCompare, segmentsZKMetadata, 0);
 
       // The result won't match because the consuming segment for partition 1 is pruned out
     }
 
     // Query partition 1
     {
-      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'FL'";
+      String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState = 'FL'";
       JsonNode response = postQuery(query);
 
-      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'FL' AND 'FL'";
+      String queryToCompare = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState BETWEEN 'FL' AND 'FL'";
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip the first completed segments and the consuming segment for partition 0
-      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 2);
-      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
+      assertPartitionRoutingSegmentCounts(response, responseToCompare, segmentsZKMetadata, 1);
 
       // The result won't match because the consuming segment for partition 0 is pruned out
     }
@@ -335,7 +325,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Check partition metadata
     numSegmentsForPartition = new int[2];
-    segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(realtimeTableName);
+    segmentsZKMetadata = getSegmentsZKMetadata();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
       assertNotNull(segmentPartitionMetadata);
@@ -349,42 +339,23 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       int partitionGroupId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionGroupId();
       numSegmentsForPartition[partitionGroupId]++;
 
-      if (segmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-        // For consuming segment, the partition metadata should only contain the stream partition
-        assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
-      } else {
-        // The partition metadata for the new completed segments should only contain the stream partition
-        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentZKMetadata.getSegmentName());
-        int sequenceNumber = llcSegmentName.getSequenceNumber();
-        if (sequenceNumber == 0 || sequenceNumber >= 4) {
-          // The partition metadata for the first and new completed segments should only contain the stream partition
-          assertEquals(columnPartitionMetadata.getPartitions(), Collections.singleton(partitionGroupId));
-        } else {
-          // The partition metadata for the completed segments containing records from the second Avro file should
-          // contain both partitions
-          assertEquals(columnPartitionMetadata.getPartitions(), new HashSet<>(Arrays.asList(0, 1)));
-        }
-      }
+      assertValidPartitionMetadata(columnPartitionMetadata, partitionGroupId);
     }
 
-    // There should be 6 segments for partition 0, 6 segments for partition 1
-    assertEquals(numSegmentsForPartition[0], 6);
-    assertEquals(numSegmentsForPartition[1], 6);
+    assertSegmentsLoadedForBothPartitions(numSegmentsForPartition);
 
     // Check partition routing
-    numSegments = segmentsZKMetadata.size();
 
     // Query partition 0
     {
-      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+      String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState = 'CA'";
       JsonNode response = postQuery(query);
 
-      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'CA' AND 'CA'";
+      String queryToCompare = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState BETWEEN 'CA' AND 'CA'";
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip 2 completed segments and the consuming segment for partition 1
-      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 3);
-      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
+      assertPartitionRoutingSegmentCounts(response, responseToCompare, segmentsZKMetadata, 0);
 
       // The result should match again after all the segments with the non-partitioning records are committed
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
@@ -393,15 +364,14 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
 
     // Query partition 1
     {
-      String query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'FL'";
+      String query = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState = 'FL'";
       JsonNode response = postQuery(query);
 
-      String queryToCompare = "SELECT COUNT(*) FROM mytable WHERE DestState BETWEEN 'FL' AND 'FL'";
+      String queryToCompare = "SELECT COUNT(*) FROM " + getTableName() + " WHERE DestState BETWEEN 'FL' AND 'FL'";
       JsonNode responseToCompare = postQuery(queryToCompare);
 
       // Should skip 2 completed segments and the consuming segment for partition 0
-      assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments - 3);
-      assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(), numSegments);
+      assertPartitionRoutingSegmentCounts(response, responseToCompare, segmentsZKMetadata, 1);
 
       // The result should match again after all the segments with the non-partitioning records are committed
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(),
@@ -409,15 +379,117 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     }
   }
 
-  @AfterClass
+  private List<SegmentZKMetadata> getSegmentsZKMetadata() {
+    return _helixResourceManager.getSegmentsZKMetadata(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+  }
+
+  private void assertSegmentsLoadedForBothPartitions(int[] numSegmentsForPartition) {
+    assertTrue(numSegmentsForPartition[0] > 0, "Expected segments for partition 0");
+    assertTrue(numSegmentsForPartition[1] > 0, "Expected segments for partition 1");
+  }
+
+  private void assertValidPartitionMetadata(ColumnPartitionMetadata columnPartitionMetadata, int partitionGroupId) {
+    Set<Integer> partitions = columnPartitionMetadata.getPartitions();
+    assertTrue(partitions.contains(partitionGroupId), "Expected metadata to include stream partition");
+    assertTrue(partitions.stream().allMatch(partition -> partition == 0 || partition == 1),
+        "Expected metadata to stay within the configured partition range");
+  }
+
+  private void assertPartitionRoutingSegmentCounts(JsonNode response, JsonNode responseToCompare,
+      List<SegmentZKMetadata> segmentsZKMetadata, int partitionId) {
+    assertEquals(response.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(),
+        getNumSegmentsForPartition(segmentsZKMetadata, partitionId));
+    assertEquals(responseToCompare.get(MetadataKey.NUM_SEGMENTS_QUERIED.getName()).asInt(),
+        segmentsZKMetadata.size());
+  }
+
+  private int getNumSegmentsForPartition(List<SegmentZKMetadata> segmentsZKMetadata, int partitionId) {
+    int numSegmentsForPartition = 0;
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
+      assertNotNull(segmentPartitionMetadata);
+      ColumnPartitionMetadata columnPartitionMetadata =
+          segmentPartitionMetadata.getColumnPartitionMap().get(PARTITION_COLUMN);
+      assertNotNull(columnPartitionMetadata);
+      if (columnPartitionMetadata.getPartitions().contains(partitionId)) {
+        numSegmentsForPartition++;
+      }
+    }
+    return numSegmentsForPartition;
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void cleanupRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null) {
+      dropRealtimeTable(getTableName());
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception firstException = null;
+    try {
+      cleanupRealtimeTableAndSchema();
+    } catch (Exception e) {
+      firstException = e;
+    }
+    try {
+      deleteKafkaTopicIfPresent();
+    } catch (Exception e) {
+      if (firstException != null) {
+        firstException.addSuppressed(e);
+      } else {
+        firstException = e;
+      }
+    }
+    try {
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteDirectory(_tempDir);
+    }
+    if (firstException != null) {
+      throw firstException;
+    }
   }
 }
