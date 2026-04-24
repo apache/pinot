@@ -67,12 +67,19 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   private static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable";
   protected static final String DEFAULT_TABLE_NAME = "physicalTable";
   protected static final String EMPTY_OFFLINE_TABLE_NAME = "empty_o";
+  private static final String EMPTY_OFFLINE_LOGICAL_TABLE_NAME = EMPTY_OFFLINE_TABLE_NAME + "_logical";
   protected static BaseLogicalTableIntegrationTest _sharedClusterTestSuite = null;
   protected List<File> _avroFiles;
 
   @BeforeSuite
   public void setUpSuite()
       throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      LOGGER.info("Using shared rich integration test suite");
+      _sharedClusterTestSuite = this;
+      return;
+    }
+
     LOGGER.info("Setting up integration test suite");
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     _sharedClusterTestSuite = this;
@@ -90,6 +97,11 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   @AfterSuite
   public void tearDownSuite()
       throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      _sharedClusterTestSuite = null;
+      return;
+    }
+
     LOGGER.info("Tearing down integration test suite");
     // Shutdown the Pinot cluster
     stopServer();
@@ -100,14 +112,21 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+    _sharedClusterTestSuite = null;
     LOGGER.info("Finished tearing down integration test suite");
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      attachSharedRichCluster();
+      if (!getRealtimeTableNames().isEmpty()) {
+        createKafkaTopic(getKafkaTopic());
+      }
+    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
-    if (_sharedClusterTestSuite != this) {
+    if (!isSharedRichClusterEnabled() && _sharedClusterTestSuite != this) {
       _controllerRequestURLBuilder = _sharedClusterTestSuite._controllerRequestURLBuilder;
       _helixResourceManager = _sharedClusterTestSuite._helixResourceManager;
       _kafkaStarters = _sharedClusterTestSuite._kafkaStarters;
@@ -168,10 +187,110 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     createLogicalTableWithEmptyOfflineTable();
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    cleanup();
+    Exception firstException = null;
+    try {
+      cleanUpTestResources();
+    } catch (Exception e) {
+      firstException = e;
+    }
+    try {
+      closeH2Connection();
+    } catch (Exception e) {
+      firstException = addSuppressed(firstException, e);
+    }
+    try {
+      FileUtils.deleteDirectory(_tempDir);
+    } catch (Exception e) {
+      firstException = addSuppressed(firstException, e);
+    }
+    if (firstException != null) {
+      throw firstException;
+    }
+  }
+
+  private void cleanUpTestResources()
+      throws Exception {
+    if (isSharedRichClusterEnabled() && _helixResourceManager == null) {
+      attachSharedRichCluster();
+    }
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    dropLogicalTableIfExists(getLogicalTableName());
+    dropLogicalTableIfExists(EMPTY_OFFLINE_LOGICAL_TABLE_NAME);
+
+    for (String tableName : getOfflineTableNames()) {
+      dropOfflineTableIfExists(tableName);
+    }
+    for (String tableName : getRealtimeTableNames()) {
+      dropRealtimeTableIfExists(tableName);
+    }
+    dropOfflineTableIfExists(EMPTY_OFFLINE_TABLE_NAME);
+
+    HashSet<String> schemaNames = new HashSet<>();
+    schemaNames.add(getLogicalTableName());
+    schemaNames.add(EMPTY_OFFLINE_LOGICAL_TABLE_NAME);
+    schemaNames.addAll(getOfflineTableNames());
+    schemaNames.addAll(getRealtimeTableNames());
+    schemaNames.add(EMPTY_OFFLINE_TABLE_NAME);
+    for (String schemaName : schemaNames) {
+      deleteSchemaIfExists(schemaName);
+    }
+  }
+
+  private void dropLogicalTableIfExists(String logicalTableName)
+      throws Exception {
+    if (_helixResourceManager.getAllLogicalTableNames().contains(logicalTableName)) {
+      dropLogicalTable(logicalTableName);
+    }
+  }
+
+  private void dropOfflineTableIfExists(String tableName)
+      throws Exception {
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(tableNameWithType)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(tableNameWithType);
+      waitForEVToDisappear(tableNameWithType);
+    }
+  }
+
+  private void dropRealtimeTableIfExists(String tableName)
+      throws Exception {
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(tableNameWithType)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(tableNameWithType);
+      waitForEVToDisappear(tableNameWithType);
+    }
+  }
+
+  private void deleteSchemaIfExists(String schemaName)
+      throws Exception {
+    if (_helixResourceManager.getSchema(schemaName) != null) {
+      deleteSchema(schemaName);
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+    _queryGenerator = null;
+  }
+
+  private static Exception addSuppressed(Exception firstException, Exception nextException) {
+    if (firstException == null) {
+      return nextException;
+    }
+    firstException.addSuppressed(nextException);
+    return firstException;
   }
 
   protected List<String> getOfflineTableNames() {
@@ -342,26 +461,28 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
         new PhysicalTableConfig());
     String refOfflineTableName = TableNameBuilder.OFFLINE.tableNameWithType(EMPTY_OFFLINE_TABLE_NAME);
 
-    String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
-
     Schema logicalTableSchema = createSchema(getSchemaFileName());
-    logicalTableSchema.setSchemaName(logicalTableName);
+    logicalTableSchema.setSchemaName(EMPTY_OFFLINE_LOGICAL_TABLE_NAME);
     addSchema(logicalTableSchema);
     LogicalTableConfigBuilder builder =
-        new LogicalTableConfigBuilder().setTableName(logicalTableName)
+        new LogicalTableConfigBuilder().setTableName(EMPTY_OFFLINE_LOGICAL_TABLE_NAME)
             .setBrokerTenant(DEFAULT_TENANT)
         .setRefOfflineTableName(refOfflineTableName)
         .setPhysicalTableConfigMap(physicalTableConfigMap);
 
     String resp = getOrCreateAdminClient().getLogicalTableClient()
         .createLogicalTable(builder.build().toSingleLineJsonString());
-    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName
+    assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + EMPTY_OFFLINE_LOGICAL_TABLE_NAME
         + " logical table successfully added.\"}");
   }
 
   @Override
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      super.pushAvroIntoKafka(avroFiles);
+      return;
+    }
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles,
         "localhost:" + _sharedClusterTestSuite._kafkaStarters.get(0).getPort(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
@@ -369,6 +490,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   @Override
   public String getZkUrl() {
+    if (isSharedRichClusterEnabled()) {
+      return super.getZkUrl();
+    }
     if (_sharedClusterTestSuite != this) {
       return _sharedClusterTestSuite.getZkUrl();
     }
@@ -377,6 +501,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   @Override
   protected String getBrokerBaseApiUrl() {
+    if (isSharedRichClusterEnabled()) {
+      return super.getBrokerBaseApiUrl();
+    }
     if (_sharedClusterTestSuite != this) {
       return _sharedClusterTestSuite.getBrokerBaseApiUrl();
     }
@@ -385,6 +512,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   @Override
   protected String getBrokerGrpcEndpoint() {
+    if (isSharedRichClusterEnabled()) {
+      return super.getBrokerGrpcEndpoint();
+    }
     if (_sharedClusterTestSuite != this) {
       return _sharedClusterTestSuite.getBrokerGrpcEndpoint();
     }
@@ -393,6 +523,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   @Override
   public int getControllerPort() {
+    if (isSharedRichClusterEnabled()) {
+      return super.getControllerPort();
+    }
     if (_sharedClusterTestSuite != this) {
       return _sharedClusterTestSuite.getControllerPort();
     }
@@ -401,6 +534,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   @Override
   public int getRandomBrokerPort() {
+    if (isSharedRichClusterEnabled()) {
+      return super.getRandomBrokerPort();
+    }
     if (_sharedClusterTestSuite != this) {
       return _sharedClusterTestSuite.getRandomBrokerPort();
     }
@@ -409,6 +545,9 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
 
   @Override
   public String getHelixClusterName() {
+    if (isSharedRichClusterEnabled()) {
+      return super.getHelixClusterName();
+    }
     return "BaseLogicalTableIntegrationTest";
   }
 
@@ -558,10 +697,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     updateLogicalTableConfig(logicalTableConfig);
     JsonNode response = postQuery(starQuery);
     JsonNode exceptions = response.get("exceptions");
-    assertTrue(
-        !exceptions.isEmpty() && (exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.BROKER_TIMEOUT.getId()
-            // Timeout may occur just before submitting the request. Then this error code is thrown.
-            || exceptions.get(0).get("errorCode").asInt() == QueryErrorCode.SERVER_NOT_RESPONDING.getId()));
+    assertLowQueryTimeoutResponse(exceptions);
 
     // Query Succeeds with a high limit.
     queryConfig = new QueryConfig(1000000L, null, null, null, null, null);
@@ -580,15 +716,26 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
     assertTrue(exceptions.isEmpty(), "Query should not throw exception");
   }
 
+  protected void assertLowQueryTimeoutResponse(JsonNode exceptions) {
+    assertTrue(!exceptions.isEmpty() && isExpectedLowQueryTimeoutErrorCode(
+        exceptions.get(0).get("errorCode").asInt()));
+  }
+
+  protected boolean isExpectedLowQueryTimeoutErrorCode(int errorCode) {
+    return errorCode == QueryErrorCode.EXECUTION_TIMEOUT.getId()
+        || errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()
+        // Timeout may occur just before submitting the request. Then this error code is thrown.
+        || errorCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId();
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testLogicalTableWithEmptyOfflineTable(boolean useMultiStageQueryEngine)
       throws Exception {
 
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String logicalTableName = EMPTY_OFFLINE_TABLE_NAME + "_logical";
     // Query should return empty result
-    JsonNode queryResponse = postQuery("SELECT count(*) FROM " + logicalTableName);
+    JsonNode queryResponse = postQuery("SELECT count(*) FROM " + EMPTY_OFFLINE_LOGICAL_TABLE_NAME);
     assertEquals(queryResponse.get("numDocsScanned").asInt(), 0);
     assertEquals(queryResponse.get("numServersQueried").asInt(), useMultiStageQueryEngine ? 1 : 0);
     assertTrue(queryResponse.get("exceptions").isEmpty());

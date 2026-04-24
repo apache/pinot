@@ -56,8 +56,8 @@ import static org.testng.Assert.assertTrue;
 /**
  * Integration test for minion task of type "PurgeTask"
  */
-public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String PURGE_FIRST_RUN_TABLE = "myTable1";
+public class PurgeMinionClusterIntegrationTest extends SharedRichClusterIntegrationTest {
+  protected static final String PURGE_FIRST_RUN_TABLE = "myTable1";
   private static final String PURGE_DELTA_PASSED_TABLE = "myTable2";
   private static final String PURGE_DELTA_NOT_PASSED_TABLE = "myTable3";
   private static final String PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE = "myTable4";
@@ -71,6 +71,15 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
 
   protected final File _segmentDataDir = new File(_tempDir, "segmentDataDir");
   protected final File _segmentTarDir = new File(_tempDir, "segmentTarDir");
+
+  @Override
+  protected boolean isSharedRichClusterEnabled() {
+    return shouldUseSharedRichCluster() && super.isSharedRichClusterEnabled();
+  }
+
+  protected boolean shouldUseSharedRichCluster() {
+    return false;
+  }
 
   @BeforeClass
   public void setUp()
@@ -163,7 +172,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     }
   }
 
-  private void setRecordPurger() {
+  protected void setRecordPurger() {
     MinionContext minionContext = MinionContext.getInstance();
     minionContext.setRecordPurgerFactory(rawTableName -> {
       List<String> tableNames =

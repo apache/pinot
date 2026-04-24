@@ -18,12 +18,24 @@
  */
 package org.apache.pinot.integration.tests.logicaltable;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
+
+import static org.testng.Assert.assertTrue;
 
 
 public class LogicalTableWithOneOfflineTableIntegrationTest extends BaseLogicalTableIntegrationTest {
   @Override
   protected List<String> getOfflineTableNames() {
     return List.of("physicalTable");
+  }
+
+  @Override
+  protected void assertLowQueryTimeoutResponse(JsonNode exceptions) {
+    if (exceptions.isEmpty()) {
+      return;
+    }
+    int errorCode = exceptions.get(0).get("errorCode").asInt();
+    assertTrue(isExpectedLowQueryTimeoutErrorCode(errorCode), "Unexpected error code: " + errorCode);
   }
 }

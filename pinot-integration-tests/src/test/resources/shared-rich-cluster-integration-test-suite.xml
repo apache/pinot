@@ -37,6 +37,10 @@
       <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$SingleStageBrokerTestCase"/>
       <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$MultiStageControllerTestCase"/>
       <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$SingleStageControllerTestCase"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithOneOfflineTableIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.PurgeMetadataPushMinionClusterIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.RealtimeToOfflineSegmentsMinionClusterIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.QueryQuotaClusterIntegrationTest"/>
     </classes>
   </test>
 </suite>
