@@ -32,6 +32,13 @@ public class SegmentOperationsTaskType {
       new SegmentOperationsTaskType("REFRESH");
   public static final SegmentOperationsTaskType RELOAD =
       new SegmentOperationsTaskType("RELOAD");
+  /**
+   * @deprecated Use {@link #REFRESH} or {@link #RELOAD} instead. Segment refresh and reload operations are now
+   * tracked as separate task types for independent throttling.
+   */
+  @Deprecated
+  public static final SegmentOperationsTaskType REFRESH_OR_RELOAD =
+      new SegmentOperationsTaskType("REFRESH_OR_RELOAD");
   public static final SegmentOperationsTaskType PRELOAD =
       new SegmentOperationsTaskType("PRELOAD");
 
