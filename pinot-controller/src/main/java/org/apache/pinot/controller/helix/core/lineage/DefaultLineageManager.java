@@ -140,6 +140,8 @@ public class DefaultLineageManager implements LineageManager {
     if (!batchSegmentIngestionType.equalsIgnoreCase("REFRESH")) {
       return true;
     }
+    // Strict < means a 0ms retention won't delete on the exact same millisecond; this is intentional to
+    // avoid edge-case races and is consistent with the existing behavior for non-zero retention values.
     return lineageEntry.getTimestamp() < (System.currentTimeMillis() - replacedSegmentsRetentionMs);
   }
 
@@ -149,7 +151,7 @@ public class DefaultLineageManager implements LineageManager {
       try {
         long ms = TimeUtils.convertPeriodToMillis(period);
         if (ms <= 0) {
-          LOGGER.warn("Retention period '{}' for config field '{}' resolves to {}ms for table: {}: cleanup will run "
+          LOGGER.debug("Retention period '{}' for config field '{}' resolves to {}ms for table: {}: cleanup will run "
               + "immediately with no rollback window", period, configFieldName, ms, tableNameWithType);
         }
         return ms;

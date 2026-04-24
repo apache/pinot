@@ -115,10 +115,12 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * Returns the retention period for segments replaced by a REFRESH ingestion job. When a lineage entry transitions
-   * to COMPLETED state, source segments are preserved for this duration before being scheduled for deletion,
-   * providing a rollback window. Consumers of this config (e.g. the lineage manager) treat a null or unparseable
-   * value as a 1 day default.
+   * Returns the retention period for segments replaced by a REFRESH ingestion job. Only applies to tables with
+   * REFRESH ingestion type; for APPEND tables this setting is ignored and replaced segments are deleted immediately.
+   *
+   * <p>When a lineage entry transitions to COMPLETED state, source segments are preserved for this duration before
+   * being scheduled for deletion, providing a rollback window. Consumers of this config (e.g. the lineage manager)
+   * treat a null or unparseable value as a 1 day default.
    *
    * <p>Accepts a human-readable period string (e.g. {@code "7d"}, {@code "12h"}) as understood by
    * {@code TimeUtils.convertPeriodToMillis}. Setting this value too low (e.g. {@code "0d"}) eliminates the rollback

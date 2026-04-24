@@ -239,4 +239,47 @@ public class DefaultLineageManagerTest {
     assertTrue(segmentsToDelete.contains("dst1"),
         "Destination segment must be deleted immediately when lineageEntryCleanupRetentionPeriod is 0d");
   }
+
+  // ---------------------------------------------------------------------------
+  // Unparseable retention period falls back to 1-day default
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testUnparseableReplacedRetentionFallsBackToDefault() {
+    // An invalid period string should fall back to the 1-day default, so a recently-completed entry must NOT delete
+    TableConfig tableConfig = refreshTableBuilder().setReplacedSegmentsRetentionPeriod("foo").build();
+
+    String entryId = UUID.randomUUID().toString();
+    long recentTimestamp = System.currentTimeMillis();
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(Arrays.asList("src1"), Arrays.asList("dst1"), LineageEntryState.COMPLETED, recentTimestamp));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, Arrays.asList("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertFalse(segmentsToDelete.contains("src1"),
+        "Unparseable replacedSegmentsRetentionPeriod must fall back to 1-day default");
+  }
+
+  @Test
+  public void testUnparseableLineageCleanupRetentionFallsBackToDefault() {
+    // An invalid period string should fall back to the 1-day default, so a recent IN_PROGRESS entry must NOT delete
+    TableConfig tableConfig = refreshTableBuilder().setLineageEntryCleanupRetentionPeriod("notaperiod").build();
+
+    String entryId = UUID.randomUUID().toString();
+    long recentTimestamp = System.currentTimeMillis();
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(Collections.emptyList(), Arrays.asList("dst1"), LineageEntryState.IN_PROGRESS,
+            recentTimestamp));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, Arrays.asList("dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertFalse(segmentsToDelete.contains("dst1"),
+        "Unparseable lineageEntryCleanupRetentionPeriod must fall back to 1-day default");
+  }
 }
