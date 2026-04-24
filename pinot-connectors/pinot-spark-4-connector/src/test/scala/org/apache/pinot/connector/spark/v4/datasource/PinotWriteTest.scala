@@ -86,6 +86,23 @@ class PinotWriteTest extends AnyFunSuite with Matchers {
         |""".stripMargin)
     pinotWrite.pinotSchema shouldEqual expectedPinotSchema
   }
+
+  test("PinotWriteBuilder.overwrite(...) rejects predicates instead of silently appending") {
+    // Spark 4's SupportsOverwriteV2 contract is that matching rows are replaced; Pinot's
+    // write path only appends. Advertising but silently ignoring overwrite semantics would
+    // leave stale rows in place. Fail fast with a clear message instead.
+    import org.apache.spark.sql.connector.expressions.filter.{AlwaysTrue, Predicate}
+    val info = new TestLogicalWriteInfo(
+      new CaseInsensitiveStringMap(Map.empty[String, String].asJava),
+      StructType(Seq(StructField("id", LongType))))
+    val builder = new PinotWriteBuilder(info)
+
+    val ex = intercept[UnsupportedOperationException] {
+      builder.overwrite(Array[Predicate](new AlwaysTrue()))
+    }
+    ex.getMessage should include("does not support overwrite")
+    ex.getMessage should include("1")
+  }
 }
 
 class TestLogicalWriteInfo(

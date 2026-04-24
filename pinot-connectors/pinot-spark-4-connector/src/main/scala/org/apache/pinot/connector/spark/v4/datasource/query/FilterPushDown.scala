@@ -64,14 +64,30 @@ private[pinot] object FilterPushDown {
     case _: StringStartsWith => true
     case _: StringEndsWith => true
     case _: StringContains => true
-    case _: Not => true
-    case _: Or => true
-    case _: And => true
+    // Compound filters are supported only when every child is also supported. Declaring
+    // Or/And/Not as unconditionally supported would cause Spark to drop them from its
+    // residual filter list while compileFilter silently returns None for filters whose
+    // children don't compile, yielding unfiltered rows from Pinot.
+    case Not(f) => isFilterSupported(f)
+    case Or(f1, f2) => isFilterSupported(f1) && isFilterSupported(f2)
+    case And(f1, f2) => isFilterSupported(f1) && isFilterSupported(f2)
     case _ => false
   }
 
   private def escapeSql(value: String): String =
     if (value == null) null else value.replace("'", "''")
+
+  // Escape backslash, SQL LIKE wildcards, and single-quote in a literal so it matches itself
+  // verbatim under `LIKE ... ESCAPE '\'`. Backslash must be replaced first to avoid
+  // double-escaping the escapes added afterwards.
+  private def escapeLikeLiteral(value: String): String = {
+    if (value == null) null
+    else value
+      .replace("\\", "\\\\")
+      .replace("%", "\\%")
+      .replace("_", "\\_")
+      .replace("'", "''")
+  }
 
   private def compileValue(value: Any): Any = value match {
     case stringValue: String => s"'${escapeSql(stringValue)}'"
@@ -98,9 +114,12 @@ private[pinot] object FilterPushDown {
       case GreaterThanOrEqual(attr, value) => s"${escapeAttr(attr)} >= ${compileValue(value)}"
       case IsNull(attr) => s"${escapeAttr(attr)} IS NULL"
       case IsNotNull(attr) => s"${escapeAttr(attr)} IS NOT NULL"
-      case StringStartsWith(attr, value) => s"${escapeAttr(attr)} LIKE '$value%'"
-      case StringEndsWith(attr, value) => s"${escapeAttr(attr)} LIKE '%$value'"
-      case StringContains(attr, value) => s"${escapeAttr(attr)} LIKE '%$value%'"
+      case StringStartsWith(attr, value) =>
+        s"${escapeAttr(attr)} LIKE '${escapeLikeLiteral(value)}%' ESCAPE '\\'"
+      case StringEndsWith(attr, value) =>
+        s"${escapeAttr(attr)} LIKE '%${escapeLikeLiteral(value)}' ESCAPE '\\'"
+      case StringContains(attr, value) =>
+        s"${escapeAttr(attr)} LIKE '%${escapeLikeLiteral(value)}%' ESCAPE '\\'"
       case In(attr, value) if value.isEmpty =>
         s"CASE WHEN ${escapeAttr(attr)} IS NULL THEN NULL ELSE FALSE END"
       case In(attr, value) => s"${escapeAttr(attr)} IN (${compileValue(value)})"
