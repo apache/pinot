@@ -44,7 +44,7 @@ public class IngestionFunctionEvaluationTest {
   @Test
   public void testApplyEnricherEvaluationsAlwaysOverwrites() {
     FunctionEvaluator evaluator = mock(FunctionEvaluator.class);
-    when(evaluator.evaluate(any())).thenReturn("enriched");
+    when(evaluator.evaluate(any(GenericRow.class))).thenReturn("enriched");
     LinkedHashMap<String, FunctionEvaluator> map = new LinkedHashMap<>();
     map.put("out", evaluator);
     GenericRow record = new GenericRow();
@@ -57,7 +57,7 @@ public class IngestionFunctionEvaluationTest {
   @Test
   public void testApplyExpressionTransformationsFillsWhenColumnNull() {
     FunctionEvaluator evaluator = mock(FunctionEvaluator.class);
-    when(evaluator.evaluate(any())).thenReturn(99L);
+    when(evaluator.evaluate(any(GenericRow.class))).thenReturn(99L);
     LinkedHashMap<String, FunctionEvaluator> map = new LinkedHashMap<>();
     map.put("c", evaluator);
     GenericRow record = new GenericRow();
@@ -85,7 +85,8 @@ public class IngestionFunctionEvaluationTest {
   @Test
   public void testApplyExpressionTransformationsContinueOnErrorMarksIncomplete() {
     FunctionEvaluator evaluator = mock(FunctionEvaluator.class);
-    when(evaluator.evaluate(any())).thenThrow(new RuntimeException("eval failed"));
+    when(evaluator.evaluate(any(GenericRow.class)))
+        .thenThrow(new RuntimeException("eval failed"));
     LinkedHashMap<String, FunctionEvaluator> map = new LinkedHashMap<>();
     map.put("c", evaluator);
     GenericRow record = new GenericRow();
