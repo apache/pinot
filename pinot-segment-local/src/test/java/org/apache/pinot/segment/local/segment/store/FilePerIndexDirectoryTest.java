@@ -163,14 +163,25 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
   @Test
   public void testRemoveIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-        //buff needs closing because removeIndex() doesn't do it.
-        PinotDataBuffer buff = fpi.newBuffer("col1", StandardIndexes.forward(), 1024)) {
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       fpi.newBuffer("col2", StandardIndexes.dictionary(), 100);
       assertTrue(fpi.getFileFor("col1", StandardIndexes.forward()).exists());
       assertTrue(fpi.getFileFor("col2", StandardIndexes.dictionary()).exists());
       fpi.removeIndex("col1", StandardIndexes.forward());
       assertFalse(fpi.getFileFor("col1", StandardIndexes.forward()).exists());
+    }
+  }
+
+  @Test
+  public void testRemoveIndexClosesReadBuffer()
+      throws IOException {
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      fpi.newBuffer("toRemove", StandardIndexes.dictionary(), 16);
+    }
+    try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
+      fpi.getBuffer("toRemove", StandardIndexes.dictionary());
+      fpi.removeIndex("toRemove", StandardIndexes.dictionary());
     }
   }
 
