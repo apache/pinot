@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ExpressionTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExpressionTransformer.class);
-  
+
   @VisibleForTesting
   final LinkedHashMap<String, FunctionEvaluator> _expressionEvaluators = new LinkedHashMap<>();
   /// Tracks columns whose transform functions were implicitly derived from MAP field specs (e.g. `mapField__KEYS`,
