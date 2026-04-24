@@ -522,6 +522,8 @@ public class WorkerManager {
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
     PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
+    // When broker pruning is enabled, routingPinotQuery carries the leaf stage filter so that segment pruners can
+    // eliminate segments. When disabled (null), fall back to an unfiltered SELECT * routing request.
     Map<String, RoutingTable> routingTableMap = routingPinotQuery != null
         ? getRoutingTable(routingPinotQuery, context.getRequestId())
         : getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());

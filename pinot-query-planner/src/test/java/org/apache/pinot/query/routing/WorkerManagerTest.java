@@ -42,6 +42,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -115,8 +116,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(emptyTableSchema);
-    when(tableCache.getTableConfig("emptyTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("emptyTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -151,8 +151,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(schema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -197,10 +196,8 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(schema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
-    when(tableCache.getTableConfig("testTable_REALTIME"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+    when(tableCache.getTableConfig("testTable_REALTIME")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -243,8 +240,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(schema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -277,8 +273,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(schema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -315,8 +310,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(schema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -385,8 +379,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(tableSchema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 5, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,

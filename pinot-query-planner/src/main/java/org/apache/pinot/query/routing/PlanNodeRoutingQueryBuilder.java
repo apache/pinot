@@ -92,18 +92,14 @@ public class PlanNodeRoutingQueryBuilder {
   }
 
   private static void handleProject(ProjectNode project, PinotQuery pinotQuery) {
-    if (project != null) {
-      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(project.getProjects(),
-          pinotQuery.getSelectList());
-      pinotQuery.setSelectList(selectList);
-    }
+    List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(project.getProjects(),
+        pinotQuery.getSelectList());
+    pinotQuery.setSelectList(selectList);
   }
 
   private static void handleFilter(FilterNode filter, PinotQuery pinotQuery) {
-    if (filter != null) {
-      Expression filterExpression = CalciteRexExpressionParser.toExpression(filter.getCondition(),
-          pinotQuery.getSelectList());
-      pinotQuery.setFilterExpression(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(filterExpression));
-    }
+    Expression filterExpression = CalciteRexExpressionParser.toExpression(filter.getCondition(),
+        pinotQuery.getSelectList());
+    pinotQuery.setFilterExpression(LeafStageToPinotQuery.ensureFilterIsFunctionExpression(filterExpression));
   }
 }
