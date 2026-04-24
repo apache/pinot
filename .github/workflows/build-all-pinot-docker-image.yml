@@ -37,7 +37,7 @@ jobs:
       commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
       tags: ${{ steps.generate-build-info.outputs.tags }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Generate Build Info
         id: generate-build-info
         env:
@@ -62,7 +62,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Compile Pinot and push build image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -92,7 +92,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Package and push the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -119,7 +119,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Create Multi-Arch Manifest
         env:
           TAGS: "${{ needs.generate-build-info.outputs.tags }}"
