@@ -22,23 +22,29 @@ import org.apache.spark.sql.connector.expressions.filter.Predicate
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, SupportsOverwriteV2, Write, WriteBuilder}
 
 /**
- * Spark 4 write builder. Uses SupportsOverwriteV2 (Predicate-based) — the V1 SupportsOverwrite
- * (Filter-based) is deprecated in Spark 4 and slated for removal in a future release.
- * Predicates are not currently consulted; writes are unconditional. The parameter is retained
- * to record the caller's intent for potential future use.
+ * Spark 4 write builder. Implements {@link SupportsOverwriteV2} (Predicate-based) — the V1
+ * {@code SupportsOverwrite} (Filter-based) is deprecated in Spark 4 and slated for removal in
+ * a future release.
+ *
+ * The Pinot write path only ever appends new segments: it cannot drop or replace segments
+ * matching an arbitrary predicate as part of the same write job. Rather than silently dropping
+ * the predicates the caller supplies to {@code overwrite(...)} (which would leave existing
+ * rows in place while new rows are appended, producing duplicate or stale query results), we
+ * fail fast with a clear message. Users who need replacement semantics should drop the
+ * target table first or use pinot-batch-ingestion-spark-4's segment push runners with
+ * REFRESH / consistent-push enabled.
  */
-class PinotWriteBuilder(
-                         predicates: Array[Predicate],
-                         logicalWriteInfo: LogicalWriteInfo,
-                       )
+class PinotWriteBuilder(logicalWriteInfo: LogicalWriteInfo)
   extends WriteBuilder with SupportsOverwriteV2 {
 
-  override def build(): Write = {
-    // TODO: utilize predicates
-    new PinotWrite(logicalWriteInfo)
-  }
+  override def build(): Write = new PinotWrite(logicalWriteInfo)
 
   override def overwrite(predicates: Array[Predicate]): WriteBuilder = {
-    new PinotWriteBuilder(predicates, logicalWriteInfo)
+    throw new UnsupportedOperationException(
+      "The Pinot Spark 4 connector does not support overwrite semantics: df.write always " +
+        "appends new segments. Received " + predicates.length + " overwrite predicate(s). To " +
+        "replace existing data, drop the Pinot table via the controller REST API first, or use " +
+        "pinot-batch-ingestion-spark-4's SparkSegment*PushJobRunner with REFRESH / " +
+        "consistent-push enabled.")
   }
 }
