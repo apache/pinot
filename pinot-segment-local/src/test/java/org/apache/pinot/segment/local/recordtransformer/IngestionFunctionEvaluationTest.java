@@ -43,10 +43,9 @@ public class IngestionFunctionEvaluationTest {
 
   @Test
   public void testApplyEnricherEvaluationsAlwaysOverwrites() {
-    org.apache.pinot.segment.local.function.FunctionEvaluator evaluator =
-        mock(org.apache.pinot.segment.local.function.FunctionEvaluator.class);
+    FunctionEvaluator evaluator = mock(FunctionEvaluator.class);
     when(evaluator.evaluate(any())).thenReturn("enriched");
-    LinkedHashMap<String, org.apache.pinot.segment.local.function.FunctionEvaluator> map = new LinkedHashMap<>();
+    LinkedHashMap<String, FunctionEvaluator> map = new LinkedHashMap<>();
     map.put("out", evaluator);
     GenericRow record = new GenericRow();
     record.putValue("out", "stale");
