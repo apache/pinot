@@ -76,7 +76,7 @@ jobs:
         if: always()
         run: |
           zip -1 -r artifacts.zip /tmp/compatibility-verifier/*
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         name: Store compatibility verifier work directory
         if: always()
         with:

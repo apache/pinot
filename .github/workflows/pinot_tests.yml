@@ -244,7 +244,7 @@ jobs:
           mvn surefire-report:report-only -P github-actions,codecoverage,no-integration-tests
       - name: Upload Surefire Reports
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-reports-unit-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
           path: |
@@ -363,7 +363,7 @@ jobs:
           mvn surefire-report:report-only -P github-actions,codecoverage
       - name: Upload Surefire Reports
         if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-reports-integration-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
           path: |
