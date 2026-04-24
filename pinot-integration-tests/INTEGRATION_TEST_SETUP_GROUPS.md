@@ -177,8 +177,9 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 
 ### Current Draft Suite Timing
 
-The current draft suite moves eleven low-risk no-override classes behind the shared
-rich cluster:
+The current draft suite moves twelve low-risk no-override classes behind the shared
+rich cluster. `ErrorCodesIntegrationTest` is represented by its four concrete
+inner TestNG classes:
 
 - `SegmentUploadIntegrationTest`
 - `IngestionConfigHybridIntegrationTest`
@@ -191,15 +192,19 @@ rich cluster:
 - `SparkSegmentMetadataPushIntegrationTest`
 - `StarTreeFunctionParametersIntegrationTest`
 - `SegmentPartitionLLCRealtimeClusterIntegrationTest`
+- `ErrorCodesIntegrationTest$MultiStageBrokerTestCase`
+- `ErrorCodesIntegrationTest$SingleStageBrokerTestCase`
+- `ErrorCodesIntegrationTest$MultiStageControllerTestCase`
+- `ErrorCodesIntegrationTest$SingleStageControllerTestCase`
 
-On this workstation, the same 48 TestNG tests passed in both modes:
+On this workstation, the same 64 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 181.25s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 146.74s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 195.71s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 127.30s |
 
-That is a 34.51s wall-clock reduction, about 19% for this draft batch.
+That is a 68.41s wall-clock reduction, about 35% for this draft batch.
 
 Attempted but not included yet:
 
@@ -211,6 +216,10 @@ Attempted but not included yet:
   suite classes; it needs class-scoped setup or unique table/topic names before sharing.
 - `CommitTimeCompactionIntegrationTest`: needs a complete conversion to unique per-method table/topic names and
   cleanup; the first worker pass was intentionally parked before wiring it into the suite.
+- `PurgeMinionClusterIntegrationTest`: a shared-mode patch compiled, but `testRealtimeLastSegmentPreservation`
+  timed out waiting for purged realtime records; it needs deeper realtime purge/task-state isolation.
+- `UpsertCompactMergeTaskIntegrationTest`: a shared-mode patch compiled, but the task generator skipped segments
+  with empty download URLs and no task names were scheduled; segment download URL generation needs a targeted fix.
 
 ### Suite Infrastructure
 

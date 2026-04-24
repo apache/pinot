@@ -33,6 +33,10 @@
       <class name="org.apache.pinot.integration.tests.SparkSegmentMetadataPushIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.StarTreeFunctionParametersIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.SegmentPartitionLLCRealtimeClusterIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$MultiStageBrokerTestCase"/>
+      <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$SingleStageBrokerTestCase"/>
+      <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$MultiStageControllerTestCase"/>
+      <class name="org.apache.pinot.integration.tests.ErrorCodesIntegrationTest$SingleStageControllerTestCase"/>
     </classes>
   </test>
 </suite>
