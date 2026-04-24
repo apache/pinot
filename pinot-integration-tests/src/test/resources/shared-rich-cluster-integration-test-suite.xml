@@ -28,6 +28,7 @@
       <class name="org.apache.pinot.integration.tests.BaseDedupIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.StaleSegmentCheckIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.SegmentWriterUploaderIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.SegmentGenerationMinionClusterIntegrationTest"/>
     </classes>
   </test>
 </suite>

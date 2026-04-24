@@ -177,7 +177,7 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 
 ### Current Draft Suite Timing
 
-The current draft suite moves six low-risk no-override classes behind the shared
+The current draft suite moves seven low-risk no-override classes behind the shared
 rich cluster:
 
 - `SegmentUploadIntegrationTest`
@@ -186,15 +186,16 @@ rich cluster:
 - `BaseDedupIntegrationTest`
 - `StaleSegmentCheckIntegrationTest`
 - `SegmentWriterUploaderIntegrationTest`
+- `SegmentGenerationMinionClusterIntegrationTest`
 
-On this workstation, the same 32 TestNG tests passed in both modes:
+On this workstation, the same 35 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 87.26s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 51.32s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 115.09s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 89.87s |
 
-That is a 35.94s wall-clock reduction, about 41% for this draft batch.
+That is a 25.22s wall-clock reduction, about 22% for this draft batch.
 
 Attempted but not included yet:
 

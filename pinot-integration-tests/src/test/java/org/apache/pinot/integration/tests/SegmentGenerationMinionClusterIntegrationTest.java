@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentGenerationMinionClusterIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGenerationMinionClusterIntegrationTest.class);
 
   @BeforeClass
@@ -61,6 +61,7 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
   @AfterClass
   public void tearDown() {
     try {
+      cleanup();
       stopMinion();
       stopServer();
       stopBroker();
