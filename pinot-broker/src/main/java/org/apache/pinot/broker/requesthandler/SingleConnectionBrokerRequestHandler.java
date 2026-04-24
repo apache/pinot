@@ -208,6 +208,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     private final long _totalResponseSize;
     private final boolean _timedOut;
     private final Exception _sendException;
+    private final int _numServersQueried;
+    private final int _numServersResponded;
 
     public ScatterResult(Map<ServerRoutingInstance, DataTable> dataTableMap,
         List<ServerRoutingInstance> serversNotResponded, long totalResponseSize, boolean timedOut,
@@ -217,6 +219,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       _totalResponseSize = totalResponseSize;
       _timedOut = timedOut;
       _sendException = sendException;
+      _numServersQueried = dataTableMap.size() + serversNotResponded.size();
+      _numServersResponded = dataTableMap.size();
     }
 
     public Map<ServerRoutingInstance, DataTable> getDataTableMap() {
@@ -228,11 +232,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     }
 
     public int getNumServersQueried() {
-      return _dataTableMap.size() + _serversNotResponded.size();
+      return _numServersQueried;
     }
 
     public int getNumServersResponded() {
-      return _dataTableMap.size();
+      return _numServersResponded;
     }
 
     public long getTotalResponseSize() {
