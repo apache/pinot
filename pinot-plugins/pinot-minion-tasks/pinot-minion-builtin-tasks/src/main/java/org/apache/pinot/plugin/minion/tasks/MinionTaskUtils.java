@@ -557,15 +557,12 @@ public class MinionTaskUtils {
     int excludedCount = 0;
     for (SegmentZKMetadata segment : segments) {
       long endTimeMs = segment.getEndTimeMs();
-      if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
-        filtered.add(segment);
-        continue;
-      }
-      if (currentTimeMs - endTimeMs > effectiveRetentionMs) {
+      if ((TimeUtils.timeValueInValidRange(endTimeMs)) &&
+          (currentTimeMs - endTimeMs > effectiveRetentionMs)) {
         excludedCount++;
-        continue;
+      } else {
+        filtered.add(segment);
       }
-      filtered.add(segment);
     }
     if (excludedCount > 0) {
       LOGGER.info("Excluded {} segments past retention for table: {} (retentionMs={}, bufferMs={}, effectiveMs={})",
