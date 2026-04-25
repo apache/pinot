@@ -22,6 +22,12 @@ import org.testng.annotations.BeforeMethod;
 
 
 public class OfflineGRPCServerMultiStageIntegrationTest extends OfflineGRPCServerIntegrationTest {
+  private static final String SHARED_TABLE_NAME = "offline_grpc_server_multistage";
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
 
   @BeforeMethod
   public void enableMultiStage() {

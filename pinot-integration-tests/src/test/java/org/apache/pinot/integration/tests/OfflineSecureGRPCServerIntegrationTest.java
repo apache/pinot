@@ -28,10 +28,16 @@ import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
 public class OfflineSecureGRPCServerIntegrationTest extends OfflineGRPCServerIntegrationTest {
+  private static final String SHARED_TABLE_NAME = "offline_secure_grpc_server";
   private static final String JKS = "JKS";
   private static final String JDK = "JDK";
   private static final String PASSWORD = "changeit";
   private final URL _tlsStoreJKS = OfflineSecureGRPCServerIntegrationTest.class.getResource("/tlstest.jks");
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
 
   @Override
   protected void overrideServerConf(PinotConfiguration serverConf) {

@@ -42,9 +42,19 @@ import org.testng.annotations.BeforeSuite;
  */
 public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegrationTest {
   public static final String SHARED_RICH_CLUSTER_ENABLED_PROPERTY = "pinot.integration.sharedRichCluster.enabled";
+  public static final String SHARED_RICH_CLUSTER_START_KAFKA_PROPERTY =
+      "pinot.integration.sharedRichCluster.startKafka";
+  public static final String SHARED_RICH_CLUSTER_NUM_BROKERS_PROPERTY =
+      "pinot.integration.sharedRichCluster.numBrokers";
+  public static final String SHARED_RICH_CLUSTER_NUM_SERVERS_PROPERTY =
+      "pinot.integration.sharedRichCluster.numServers";
+  public static final String SHARED_RICH_CLUSTER_START_MINION_PROPERTY =
+      "pinot.integration.sharedRichCluster.startMinion";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SharedRichClusterIntegrationTest.class);
   private static final String SHARED_CLUSTER_NAME = "SharedRichClusterIntegrationTestSuite";
+  private static final int DEFAULT_SHARED_NUM_BROKERS = 1;
+  private static final int DEFAULT_SHARED_NUM_SERVERS = 2;
 
   protected static SharedRichClusterIntegrationTest _sharedRichClusterTestSuite;
 
@@ -66,13 +76,17 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
     System.setProperty(ZkSystemPropertyKeys.ZK_SERIALIZER_ZNRECORD_WRITE_SIZE_LIMIT_BYTES, "4000000");
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     super.startZk();
-    super.startKafkaWithoutTopic();
+    if (shouldStartSharedKafka()) {
+      super.startKafkaWithoutTopic();
+    }
     Map<String, Object> controllerConfig = super.getDefaultControllerConfiguration();
     controllerConfig.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, true);
     super.startController(controllerConfig);
-    super.startBrokers(1);
-    super.startServers(2);
-    super.startMinion();
+    super.startBrokers(getSharedNumBrokers());
+    super.startServers(getSharedNumServers());
+    if (shouldStartSharedMinion()) {
+      super.startMinion();
+    }
     attachSharedRichCluster();
     LOGGER.warn("Finished setting up shared rich integration test suite");
   }
@@ -115,6 +129,32 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
 
   protected boolean isSharedRichClusterOwner() {
     return isSharedRichClusterEnabled() && _sharedRichClusterTestSuite == this;
+  }
+
+  protected boolean shouldStartSharedKafka() {
+    return getSharedBooleanProperty(SHARED_RICH_CLUSTER_START_KAFKA_PROPERTY, true);
+  }
+
+  protected int getSharedNumBrokers() {
+    return getSharedIntegerProperty(SHARED_RICH_CLUSTER_NUM_BROKERS_PROPERTY, DEFAULT_SHARED_NUM_BROKERS);
+  }
+
+  protected int getSharedNumServers() {
+    return getSharedIntegerProperty(SHARED_RICH_CLUSTER_NUM_SERVERS_PROPERTY, DEFAULT_SHARED_NUM_SERVERS);
+  }
+
+  protected boolean shouldStartSharedMinion() {
+    return getSharedBooleanProperty(SHARED_RICH_CLUSTER_START_MINION_PROPERTY, true);
+  }
+
+  private boolean getSharedBooleanProperty(String propertyName, boolean defaultValue) {
+    String propertyValue = System.getProperty(propertyName);
+    return propertyValue == null ? defaultValue : Boolean.parseBoolean(propertyValue);
+  }
+
+  private int getSharedIntegerProperty(String propertyName, int defaultValue) {
+    String propertyValue = System.getProperty(propertyName);
+    return propertyValue == null ? defaultValue : Integer.parseInt(propertyValue);
   }
 
   protected void attachSharedRichCluster() {

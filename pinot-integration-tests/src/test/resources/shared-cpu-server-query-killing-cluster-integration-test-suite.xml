@@ -19,11 +19,10 @@
 
 -->
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
-<suite name="SharedOfflineGrpcClusterIntegrationTestSuite">
-  <test name="SharedOfflineGrpcClusterIntegrationTests">
+<suite name="SharedCpuServerQueryKillingClusterIntegrationTestSuite">
+  <test name="SharedCpuServerQueryKillingClusterIntegrationTests">
     <classes>
-      <class name="org.apache.pinot.integration.tests.OfflineGRPCServerIntegrationTest"/>
-      <class name="org.apache.pinot.integration.tests.OfflineGRPCServerMultiStageIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.CpuBasedServerQueryKillingIntegrationTest"/>
     </classes>
   </test>
 </suite>

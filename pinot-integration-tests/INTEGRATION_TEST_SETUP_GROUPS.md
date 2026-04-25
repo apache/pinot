@@ -262,7 +262,11 @@ instead of the main no-override suite:
 | Shared group-by trim suite | `./mvnw -pl pinot-integration-tests -Pshared-group-by-trim-cluster-integration-test-suite test` | 2 | 20.59s |
 | Shared JMX metrics suite | `./mvnw -pl pinot-integration-tests -Pshared-jmx-metrics-cluster-integration-test-suite test` | 4 | 26.76s |
 | Shared window accounting suite | `./mvnw -pl pinot-integration-tests -Pshared-window-accounting-cluster-integration-test-suite test` | 1 | 19.73s |
-| Shared offline gRPC suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-grpc-cluster-integration-test-suite test` | 13 | 27.45s |
+| Shared offline gRPC suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-grpc-cluster-integration-test-suite test` | 26 | 35.50s |
+| Shared offline secure gRPC suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-secure-grpc-cluster-integration-test-suite test` | 13 | 27.53s |
+| Shared CPU broker query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-cpu-broker-query-killing-cluster-integration-test-suite test` | 3 | 43.65s |
+| Shared CPU server query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-cpu-server-query-killing-cluster-integration-test-suite test` | 8 | 43.60s |
+| Shared memory server query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-memory-server-query-killing-cluster-integration-test-suite test` | 8 | 40.79s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -277,10 +281,18 @@ single per-class lifecycle command in 40.31s, while these four shared profiles
 total 84.11s. They are separated because they exercise different broker/server
 process configuration overrides.
 
-The group-by trim, JMX metrics, window accounting, and offline gRPC suites are
-also exact broker/server-config buckets. The same 20 tests passed in a single
-per-class lifecycle command in 58.00s, while these four shared profiles total
-94.53s.
+At the previous checkpoint, the group-by trim, JMX metrics, window accounting,
+and original 13-test offline gRPC suites were also exact broker/server-config
+buckets. The same 20 tests passed in a single per-class lifecycle command in
+58.00s, while those four shared profiles totaled 94.53s.
+
+The expanded offline gRPC and query-killing buckets also show why component
+count matters. `CpuBasedServerQueryKillingIntegrationTest` failed with the
+default 2-server shared topology because both servers could return resource-limit
+exceptions; it passes when the profile uses the original 1-server topology. The
+same 58 tests passed in a single per-class lifecycle command in 147.11s, while
+the five exact profiles above total 191.07s. This batch is about getting the
+right setup buckets in place, not a wall-clock win yet.
 
 Attempted but not included yet:
 
@@ -303,7 +315,8 @@ it reusable by the non-custom no-override tests:
 
 1. Add a shared suite holder that starts the rich environment in `@BeforeSuite`.
 2. Start Kafka with no default topic; classes create only the topics they need.
-3. Start 2 Pinot servers and 1 minion even for tests that do not need minion.
+3. Default to 2 Pinot servers and 1 minion for the rich no-override suite, but let exact-config profiles override
+   server count, Kafka startup, and minion startup.
 4. Expose shared controller, broker, server, minion, Kafka, Helix, and admin-client state through delegation methods.
 5. Tear everything down once in `@AfterSuite`.
 
