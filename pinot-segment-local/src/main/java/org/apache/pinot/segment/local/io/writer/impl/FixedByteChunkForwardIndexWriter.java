@@ -27,7 +27,8 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 /// Chunk-based raw (non-dictionary-encoded) forward index writer where each chunk contains fixed number of docs, and
 /// each entry has fixed number of bytes.
 @NotThreadSafe
-public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter {
+public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter
+    implements FixedByteValueWriter {
   private int _chunkDataOffset;
 
   /// Constructor for the class.

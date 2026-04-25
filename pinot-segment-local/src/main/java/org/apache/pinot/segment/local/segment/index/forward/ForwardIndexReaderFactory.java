@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
@@ -113,11 +114,23 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
 
   public ForwardIndexReader createRawIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
       boolean isSingleValue) {
+    if (dataBuffer.size() < Integer.BYTES) {
+      throw new IllegalArgumentException(
+          "Raw forward index is truncated: " + dataBuffer.size() + " bytes; cannot read format version");
+    }
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION
-          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      if (FixedByteChunkSVForwardIndexReaderV7.hasCodecPipelineHeader(dataBuffer)) {
+        if (storedType != DataType.INT && storedType != DataType.LONG) {
+          throw new UnsupportedOperationException(
+              "V7 codec pipeline does not yet support " + storedType + " columns");
+        }
+        return new FixedByteChunkSVForwardIndexReaderV7(dataBuffer, storedType);
+      }
+      if (version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION) {
+        return new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType);
+      }
+      return new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
     if (version == VarByteChunkForwardIndexWriterV6.VERSION) {

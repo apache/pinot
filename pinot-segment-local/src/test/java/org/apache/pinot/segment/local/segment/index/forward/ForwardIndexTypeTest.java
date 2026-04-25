@@ -303,6 +303,25 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
+    public void newRawConfigWithCodecSpecInheritsFieldEncoding()
+        throws IOException {
+      // indexes.forward does not need to repeat the column-level encodingType. ForwardIndexType injects the
+      // resolved RAW encoding before deserializing ForwardIndexConfig, so codecSpec remains valid here.
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"encodingType\": \"RAW\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"codecSpec\": \"ZSTD(3)\" }"
+          + "    }\n"
+          + " }");
+
+      assertEquals(new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+          .withCodecSpec("ZSTD(3)")
+          .build());
+    }
+
+    @Test
     public void newConfigMVEntryDictFormat()
         throws IOException {
       addFieldIndexConfig(""
