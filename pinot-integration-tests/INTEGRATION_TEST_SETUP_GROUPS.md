@@ -251,6 +251,17 @@ instead of the main no-override suite:
 | Suite | Command | TestNG tests | Wall time |
 | --- | --- | ---: | ---: |
 | Shared MSE explain suite | `./mvnw -pl pinot-integration-tests -Pshared-mse-explain-cluster-integration-test-suite test` | 4 | 23.86s |
+| Shared cursor memory suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-memory-cluster-integration-test-suite test` | 19 | 74.29s |
+| Shared cursor filesystem suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-fs-cluster-integration-test-suite test` | 15 | 30.30s |
+| Shared cursor cron cleanup suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-cron-cluster-integration-test-suite test` | 1 | 24.47s |
+| Shared empty response suite | `./mvnw -pl pinot-integration-tests -Pshared-empty-response-cluster-integration-test-suite test` | 6 | 22.98s |
+
+The four cursor/empty-response broker-config suites are exact-config buckets, so
+they are not yet a wall-clock improvement when run as four separate profiles.
+The same 41 tests passed in a single per-class lifecycle command in 112.06s,
+while the four shared profiles total 152.04s. They are suite-ready buckets for
+future tests with the same broker configuration rather than a speed win by
+themselves.
 
 Attempted but not included yet:
 

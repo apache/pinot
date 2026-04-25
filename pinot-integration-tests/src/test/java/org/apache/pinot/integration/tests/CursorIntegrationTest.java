@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
@@ -35,10 +36,12 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -61,6 +64,9 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
       "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
 
   private static int _resultSize;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
@@ -74,7 +80,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start Zk, Kafka and Pinot
     startZk();
@@ -82,7 +91,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     startBroker();
     startServer();
 
-    List<File> avroFiles = getAllAvroFiles();
+    cleanTableAndSchema();
+    deleteAllResponses();
+
+    List<File> avroFiles = getAllAvroFiles(_classTempDir);
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
 
     // Create and upload the schema and table config
@@ -92,15 +104,61 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     addTableConfig(offlineTableConfig);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
 
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(100_000L);
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::deleteAllResponsesIfBrokerStarted);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private File getClassTempDir() {
+    if (!isSharedRichClusterEnabled()) {
+      return _tempDir;
+    }
+    return new File(FileUtils.getTempDirectory(), CursorIntegrationTest.class.getSimpleName() + "-"
+        + getClass().getSimpleName());
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private List<File> getAllAvroFiles(File tempDir)
+      throws Exception {
+    int numSegments = unpackAvroData(tempDir).size();
+
+    // Avro files has to be ordered as time series data
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(tempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+
+    return avroFiles;
   }
 
   protected String getBrokerGetAllResponseStoresApiUrl(String brokerBaseApiUrl) {
@@ -149,6 +207,77 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
       ClusterTest.sendDeleteRequest(
           getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), response.getRequestId()), getHeaders());
     }
+  }
+
+  private void deleteAllResponsesIfBrokerStarted()
+      throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      if (_sharedRichClusterTestSuite == null || _sharedRichClusterTestSuite._brokerStarters.isEmpty()) {
+        return;
+      }
+    } else if (_brokerStarters.isEmpty()) {
+      return;
+    }
+    deleteAllResponses();
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        getTableName())) {
+      dropOfflineTable(getTableName());
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   /*
