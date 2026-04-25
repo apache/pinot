@@ -226,14 +226,19 @@ public final class DdlCompiler {
     if (literal == null) {
       return null;
     }
-    if (literal instanceof SqlLiteral) {
-      try {
-        return ((SqlLiteral) literal).toValue();
-      } catch (UnsupportedOperationException e) {
-        throw new DdlCompilationException("Unsupported DEFAULT literal: " + literal, e);
-      }
+    if (!(literal instanceof SqlLiteral)) {
+      // The grammar's `<DEFAULT_> Literal()` production is currently guaranteed to produce a
+      // SqlLiteral; this guard is here so a future grammar relaxation cannot silently route
+      // a quoted-string toString() form into FieldSpec.defaultNullValue and cause downstream
+      // ingestion to compare against a wire-format value with embedded quotes.
+      throw new DdlCompilationException(
+          "DEFAULT requires a literal value; got: " + literal.getClass().getSimpleName());
     }
-    return literal.toString();
+    try {
+      return ((SqlLiteral) literal).toValue();
+    } catch (UnsupportedOperationException e) {
+      throw new DdlCompilationException("Unsupported DEFAULT literal: " + literal, e);
+    }
   }
 
   private static ColumnRole inferRole(SqlPinotColumnDeclaration col, DataType dt) {
