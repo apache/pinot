@@ -623,50 +623,41 @@ public class PinotDdlRestletResource {
             "Table not found: " + tableNameWithType, Response.Status.NOT_FOUND);
       }
     } else {
-      // Authorize ONLY the variant(s) we would actually surface, not both unconditionally.
-      // The previous "authorize both up-front" pattern caused a regression for the legitimate
-      // case where a caller has READ on OFFLINE only, the table exists only as OFFLINE, and
-      // the caller would have a valid 200 from `GET /tables/foo` — but the up-front REALTIME
-      // auth check threw 403, blocking a read they should be allowed to perform.
-      //
-      // The no-fingerprinting goal (don't let an unauthorized caller distinguish "exists but
-      // forbidden" from "not found") is preserved by:
-      //   - When neither variant exists, still run an auth check (against OFFLINE) before
-      //     returning 404 so an unauthorized caller gets 403 just like they would for an
-      //     existing-but-forbidden table.
-      //   - When both variants exist, authorize both before surfacing the disambiguation 400,
-      //     since the disambiguation message itself reveals the existence of both variants.
+      // No-TYPE form: authorize BOTH candidate variants before any existence-revealing branch.
+      // This is required to prevent fingerprinting under access-control plugins that grant
+      // per-type permissions (the SPI permits this and enterprise plugins use it). With both
+      // checks up-front:
+      //   - A caller without permission on either variant always gets 403, regardless of
+      //     existence.
+      //   - A caller with permission on only one variant must use SHOW CREATE TABLE ... TYPE
+      //     {OFFLINE|REALTIME} to read that single variant — the bare form is intentionally
+      //     more restrictive because answering it requires reading both candidates' state.
+      // This mirrors the DROP TABLE pattern (lines 469-474) for symmetry between read and
+      // delete operations.
       String off = TableNameBuilder.OFFLINE.tableNameWithType(fullyQualifiedRaw);
       String rt = TableNameBuilder.REALTIME.tableNameWithType(fullyQualifiedRaw);
+      ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
+          AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
+      ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
+          AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
       boolean offExists = _pinotHelixResourceManager.hasTable(off);
       boolean rtExists = _pinotHelixResourceManager.hasTable(rt);
       if (offExists && rtExists) {
-        ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
-            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
-        ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
-            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         throw new ControllerApplicationException(LOGGER,
             "Table '" + fullyQualifiedRaw + "' has both OFFLINE and REALTIME variants. "
                 + "Use 'SHOW CREATE TABLE ... TYPE OFFLINE' or 'TYPE REALTIME' to specify which.",
             Response.Status.BAD_REQUEST);
       } else if (offExists) {
-        ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
-            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         tableNameWithType = off;
         resolvedType = TableType.OFFLINE;
       } else if (rtExists) {
-        ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
-            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         tableNameWithType = rt;
         resolvedType = TableType.REALTIME;
       } else {
-        // Neither variant exists. Run auth before 404 so an unauthorized probe returns 403
-        // (the same response they would have gotten for an existing-but-forbidden table) —
-        // no fingerprinting via 403-vs-404.
-        ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
-            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         throw new ControllerApplicationException(LOGGER,
-            "Table not found: " + fullyQualifiedRaw, Response.Status.NOT_FOUND);
+            "Table not found: " + fullyQualifiedRaw + ". If you only have permission for "
+                + "one variant, use 'SHOW CREATE TABLE ... TYPE OFFLINE' or 'TYPE REALTIME'.",
+            Response.Status.NOT_FOUND);
       }
     }
 
