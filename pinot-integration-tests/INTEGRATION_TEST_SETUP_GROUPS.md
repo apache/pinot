@@ -270,6 +270,8 @@ instead of the main no-override suite:
 | Shared MSQ small-buffer suite | `./mvnw -pl pinot-integration-tests -Pshared-msq-small-buffer-cluster-integration-test-suite test` | 50 | 34.42s |
 | Shared query workload suite | `./mvnw -pl pinot-integration-tests -Pshared-query-workload-cluster-integration-test-suite test` | 1 | 39.11s |
 | Shared realtime rate-limiter suite | `./mvnw -pl pinot-integration-tests -Pshared-realtime-rate-limiter-cluster-integration-test-suite test` | 2 | 92.03s |
+| Shared Kafka partition suite | `./mvnw -pl pinot-integration-tests -Pshared-kafka-partition-cluster-integration-test-suite test` | 11 | 112.96s |
+| Shared exactly-once Kafka suite | `./mvnw -pl pinot-integration-tests -Pshared-exactly-once-kafka-cluster-integration-test-suite test` | 9 | 104.45s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -301,6 +303,13 @@ The MSQ small-buffer, query workload, and realtime rate-limiter suites are also
 exact topology/config buckets. The same 53 tests passed in a single per-class
 lifecycle command in 140.90s, while the three shared profiles total 165.56s.
 These profiles preserve required 4-server/no-Kafka and 1-server/Kafka shapes.
+
+The Kafka partition and exactly-once Kafka suites preserve the 1-server/Kafka
+server-config bucket while keeping transactional Kafka separate. The same 20
+tests passed in a single per-class lifecycle command in 205.87s, while the two
+shared profiles total 217.41s. The non-transactional partition/rebalance profile
+does share one setup across two classes; exactly-once remains separate because
+it starts transactional Kafka.
 
 Attempted but not included yet:
 
