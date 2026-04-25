@@ -65,6 +65,11 @@ class PinotDataWriter[InternalRow](
   private val timeColumnName = writeOptions.timeColumnName
   private val timeColumnIndex = if (timeColumnName != null) writeSchema.fieldIndex(timeColumnName) else -1
 
+  // Holds the per-partition temp directory that `generateSegment` creates so that `commit()`
+  // and `abort()` can delete it. Without this, long-running executors accumulate uncompressed
+  // segment build artifacts under the JVM tmpdir and can fill the disk.
+  private var segmentOutputDir: File = _
+
   private var isTimeColumnNumeric = false
   if (timeColumnIndex > -1) {
     isTimeColumnNumeric = writeSchema.fields(timeColumnIndex).dataType match {
@@ -90,9 +95,16 @@ class PinotDataWriter[InternalRow](
   override def commit(): WriterCommitMessage = {
     val segmentName = getSegmentName
     val segmentDir = generateSegment(segmentName)
-    val segmentTarFile = tarSegmentDir(segmentName, segmentDir)
-    pushSegmentTarFile(segmentTarFile)
-    new SuccessWriterCommitMessage(segmentName)
+    try {
+      val segmentTarFile = tarSegmentDir(segmentName, segmentDir)
+      pushSegmentTarFile(segmentTarFile)
+      new SuccessWriterCommitMessage(segmentName)
+    } finally {
+      // Always clear the temp build dir — both the uncompressed segment tree and the tar file
+      // live inside it, and once the tar is copied to savePath the local copies are disposable.
+      FileUtils.deleteQuietly(segmentDir)
+      segmentOutputDir = null
+    }
   }
 
   /** This method is used to generate the segment name based on the format
@@ -146,6 +158,9 @@ class PinotDataWriter[InternalRow](
 
   private[pinot] def generateSegment(segmentName: String): File = {
     val outputDir = Files.createTempDirectory(classOf[PinotDataWriter[InternalRow]].getName).toFile
+    // Record for cleanup in abort(); commit()'s finally block overrides this to null after
+    // cleaning up itself.
+    segmentOutputDir = outputDir
     val indexingConfig = getIndexConfig
     val segmentGeneratorConfig = getSegmentGenerationConfig(segmentName, indexingConfig, outputDir)
 
@@ -275,11 +290,21 @@ class PinotDataWriter[InternalRow](
   override def abort(): Unit = {
     logger.info("Aborting writer")
     bufferedRecordReader.close()
+    if (segmentOutputDir != null) {
+      FileUtils.deleteQuietly(segmentOutputDir)
+      segmentOutputDir = null
+    }
   }
 
   override def close(): Unit = {
     logger.info("Closing writer")
     bufferedRecordReader.close()
+    // Spark may call close() after abort() on some error paths; segmentOutputDir is idempotently
+    // null after commit() or abort() has already cleaned it up.
+    if (segmentOutputDir != null) {
+      FileUtils.deleteQuietly(segmentOutputDir)
+      segmentOutputDir = null
+    }
   }
 }
 
