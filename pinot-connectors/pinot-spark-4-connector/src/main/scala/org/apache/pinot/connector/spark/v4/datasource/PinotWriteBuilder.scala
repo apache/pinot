@@ -36,11 +36,13 @@ import org.apache.spark.sql.connector.write.{LogicalWriteInfo, SupportsOverwrite
  *      {@code df.writeTo(...).overwrite(Predicate)} and by the V2Writes analyzer rule when an
  *      overwrite carries a non-trivial predicate.
  *   2. {@link org.apache.spark.sql.connector.write.SupportsTruncate#truncate()} — invoked by
- *      the V2Writes analyzer rule for the common {@code df.write.mode("overwrite")} path, which
- *      lowers to an overwrite-by-TRUE and is dispatched to {@code truncate()} because
- *      {@code SupportsOverwriteV2} extends {@code SupportsTruncate}. The default
- *      {@code truncate()} returns {@code this}, so without an explicit override the silent-
- *      append bug is reachable via {@code mode("overwrite")} alone.
+ *      the V2Writes analyzer rule for the common {@code df.write.mode("overwrite")} path,
+ *      which lowers to an overwrite-by-TRUE and is dispatched to {@code truncate()} because
+ *      {@code SupportsOverwriteV2} extends {@code SupportsTruncate}. In Spark 4.0.0 the default
+ *      {@code truncate()} happens to delegate to {@code overwrite([AlwaysTrue])} so the
+ *      override above would already throw, but we override {@code truncate()} explicitly to
+ *      (a) emit an error message tailored to the {@code df.write.mode("overwrite")} entry
+ *      point and (b) defend against future Spark default-implementation changes.
  *
  * Users who need replacement semantics should drop the target table first or use
  * pinot-batch-ingestion-spark-4's segment push runners with REFRESH / consistent-push enabled.
