@@ -121,6 +121,91 @@ class PinotWriteTest extends AnyFunSuite with Matchers {
     ex.getMessage should include("does not support truncate / overwrite")
     ex.getMessage should include("df.write.mode(\"append\")")
   }
+
+  // -------- abort() runtime cleanup tests --------
+  // These cover the new best-effort leftover-tar deletion path that runs on the driver when
+  // a write job aborts (one or more tasks failed). The branches exercised are: missing
+  // savePath, malformed scheme (FileSystem.get throws), the happy path (delete succeeds for
+  // SuccessWriterCommitMessage), null entries from Spark, and unknown subclasses.
+
+  import java.io.File
+  import java.nio.file.{Files, Paths}
+  import org.apache.pinot.spi.ingestion.batch.spec.Constants
+  import org.apache.spark.sql.connector.write.WriterCommitMessage
+
+  private def writeWithSavePath(savePath: String): PinotWrite = {
+    val options = Map(
+      "table" -> "abortTest",
+      "segmentNameFormat" -> "my_segment",
+      "path" -> savePath,
+      "timeColumnName" -> "ts",
+      "timeFormat" -> "EPOCH|SECONDS",
+      "timeGranularity" -> "1:SECONDS"
+    )
+    val schema = StructType(Seq(StructField("id", LongType), StructField("ts", LongType)))
+    new PinotWrite(new TestLogicalWriteInfo(
+      new CaseInsensitiveStringMap(options.asJava), schema))
+  }
+
+  test("PinotWrite.abort() does not throw when savePath is empty") {
+    // PinotDataSourceWriteOptions.from() requires a non-null path, but an empty string
+    // bypasses that check. abort() must short-circuit on empty/null savePath without
+    // attempting any FileSystem call.
+    val pinotWrite = writeWithSavePath("")
+    noException should be thrownBy pinotWrite.abort(
+      Array(new SuccessWriterCommitMessage("seg1")))
+  }
+
+  test("PinotWrite.abort() tolerates a malformed savePath URI") {
+    // Some FileSystem.get(URI, conf) implementations throw on unrecognized schemes.
+    // abort() must catch and log without rethrowing — the driver already has a failure
+    // to surface and a cleanup miss is recoverable.
+    val pinotWrite = writeWithSavePath("not-a-real-scheme://nowhere/segments")
+    noException should be thrownBy pinotWrite.abort(
+      Array(new SuccessWriterCommitMessage("seg1")))
+  }
+
+  test("PinotWrite.abort() deletes leftover tars for SuccessWriterCommitMessage entries") {
+    val tmp = Files.createTempDirectory("pinot-spark4-abort-test").toFile
+    try {
+      val seg1Tar = new File(tmp, "seg1" + Constants.TAR_GZ_FILE_EXT)
+      val seg2Tar = new File(tmp, "seg2" + Constants.TAR_GZ_FILE_EXT)
+      Files.createFile(seg1Tar.toPath)
+      Files.createFile(seg2Tar.toPath)
+      seg1Tar.exists() shouldBe true
+      seg2Tar.exists() shouldBe true
+
+      val pinotWrite = writeWithSavePath("file://" + tmp.getAbsolutePath)
+      pinotWrite.abort(Array(
+        new SuccessWriterCommitMessage("seg1"),
+        new SuccessWriterCommitMessage("seg2")))
+
+      seg1Tar.exists() shouldBe false
+      seg2Tar.exists() shouldBe false
+    } finally {
+      org.apache.commons.io.FileUtils.deleteQuietly(tmp)
+    }
+  }
+
+  test("PinotWrite.abort() tolerates null and unknown commit message types") {
+    val tmp = Files.createTempDirectory("pinot-spark4-abort-test").toFile
+    try {
+      val segTar = new File(tmp, "real-seg" + Constants.TAR_GZ_FILE_EXT)
+      Files.createFile(segTar.toPath)
+
+      val pinotWrite = writeWithSavePath("file://" + tmp.getAbsolutePath)
+      val unknown = new WriterCommitMessage {} // anonymous subclass, not SuccessWriterCommitMessage
+      noException should be thrownBy pinotWrite.abort(Array(
+        null,
+        unknown,
+        new SuccessWriterCommitMessage("real-seg")))
+      // The Success entry should still have been cleaned up alongside the harmless null /
+      // unknown entries.
+      segTar.exists() shouldBe false
+    } finally {
+      org.apache.commons.io.FileUtils.deleteQuietly(tmp)
+    }
+  }
 }
 
 class TestLogicalWriteInfo(
