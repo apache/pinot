@@ -294,6 +294,9 @@ instead of the main no-override suite:
 | Shared segment-completion suite | `./mvnw -pl pinot-integration-tests -Pshared-segment-completion-cluster-integration-test-suite test` | 1 | 19.41s |
 | Shared controller-only suite | `./mvnw -pl pinot-integration-tests -Pshared-controller-only-cluster-integration-test-suite test` | 7 | 109.46s |
 | Shared multi-nodes offline suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-nodes-offline-cluster-integration-test-suite test` | 137 | 119.99s |
+| Shared dedup preload suite | `./mvnw -pl pinot-integration-tests -Pshared-dedup-preload-cluster-integration-test-suite test` | 1 | 24.75s |
+| Shared upsert preload suite | `./mvnw -pl pinot-integration-tests -Pshared-upsert-preload-cluster-integration-test-suite test` | 1 | 27.68s |
+| Disabled manual suite | `./mvnw -pl pinot-integration-tests -Pdisabled-manual-cluster-integration-test-suite test` | 0 | 12.14s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -439,6 +442,23 @@ mode restores the baseline broker-port and server-starter state before suite
 teardown. The same 137 TestNG methods passed per-class in 119.01s and in the
 shared profile in 119.99s. This is a setup-correctness bucket as a single-class
 profile.
+
+The dedup preload suite preserves the 1-server/Kafka/no-minion server-config
+bucket used by `DedupPreloadIntegrationTest`. It needs the dedup preload server
+override and restarts the server inside the test, so it stays separate from the
+plain upsert preload restart bucket. The same 1 TestNG method passed per-class
+in 24.10s and in the shared profile in 24.75s.
+
+The upsert preload suite preserves the 1-server/Kafka/no-minion server-config
+bucket used by `UpsertTableSegmentPreloadIntegrationTest`. It requires the
+upsert snapshot/preload server overrides plus one preload thread, then restarts
+the server inside the test. The same 1 TestNG method passed per-class in 28.60s
+and in the shared profile in 27.68s.
+
+The disabled manual suite documents tests that should not start shared Pinot
+infra today because they currently have no runnable TestNG methods. It covers
+`ChaosMonkeyIntegrationTest` and `TPCHGeneratedQueryIntegrationTest`; the profile
+sets `failIfNoTests=false` and passed with 0 tests in 12.14s.
 
 Attempted but not included yet:
 
@@ -674,7 +694,7 @@ baseline before the next class runs.
 | Baseline setup | External infra | Classes |
 | --- | --- | --- |
 | `C=1 B=1 S=1 M=0` | Kafka | `KafkaPartitionSubsetChaosIntegrationTest` |
-| `C=1 B=1 S=1 M=0` | Kafka | `DedupPreloadIntegrationTest`, `UpsertTableSegmentPreloadIntegrationTest` *(server config override plus restart)* |
+| `C=1 B=1 S=1 M=0` | Kafka | `DedupPreloadIntegrationTest` *(moved to dedicated shared dedup preload suite; server config override plus restart)*, `UpsertTableSegmentPreloadIntegrationTest` *(moved to dedicated shared upsert preload suite; different server config override plus restart)* |
 | `C=1 B=1 S=2 M=0` | Kafka | `UpsertTableSegmentUploadIntegrationTest` |
 
 ### Special Infrastructure
@@ -685,6 +705,7 @@ baseline before the next class runs.
 | `C=1 B=1 S=1 M=0` | Docker LocalStack/Kinesis | `KinesisShardChangeTest`, `RealtimeKinesisIntegrationTest` |
 | `C=1 B=1 S=1 M=1` | manual UDF cluster | `UdfTest` |
 | `C=2 B=3 S=2 M=0` | two ZK-backed clusters | `MultiClusterIntegrationTest`, `SameTableNameMultiClusterIntegrationTest` |
+| `C=0 B=0 S=0 M=0` | disabled/manual, no suite infra | `ChaosMonkeyIntegrationTest`, `TPCHGeneratedQueryIntegrationTest` |
 
 ## Must Stay Dedicated Initially
 
@@ -696,8 +717,10 @@ single-cluster suites without a deeper refactor:
 - `MultiClusterIntegrationTest`: starts two isolated Pinot clusters plus an extra broker.
 - `SameTableNameMultiClusterIntegrationTest`: extends the multi-cluster setup.
 - `UdfTest`: starts `IntegrationUdfTestCluster` manually and notes leaked non-daemon threads.
-- `ChaosMonkeyIntegrationTest`: disabled test methods and external process management.
-- `TPCHGeneratedQueryIntegrationTest`: generated-query test method is disabled.
+- `ChaosMonkeyIntegrationTest`: disabled test methods and external process management; covered by the disabled manual
+  suite with no shared infra startup.
+- `TPCHGeneratedQueryIntegrationTest`: generated-query test method is disabled; covered by the disabled manual suite
+  with no shared infra startup.
 
 ## Implementation Notes
 

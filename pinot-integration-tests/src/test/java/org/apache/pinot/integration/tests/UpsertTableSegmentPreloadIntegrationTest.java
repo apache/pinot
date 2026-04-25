@@ -23,8 +23,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -46,24 +50,35 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_SERVERS = 1;
   private static final String PRIMARY_KEY_COL = "clientId";
-  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME);
+  private static final String SHARED_TABLE_NAME = "upsert_table_segment_preload";
+  private static final String SHARED_KAFKA_TOPIC = "upsert-table-segment-preload";
 
   // Segment 1 contains records of pk value 100000 (partition 0)
-  private static final String UPLOADED_SEGMENT_1 = "mytable_10027_19736_0 %";
+  private static final String UPLOADED_SEGMENT_1_SUFFIX = "_10027_19736_0 %";
   // Segment 2 contains records of pk value 100001 (partition 1)
-  private static final String UPLOADED_SEGMENT_2 = "mytable_10072_19919_1 %";
+  private static final String UPLOADED_SEGMENT_2_SUFFIX = "_10072_19919_1 %";
   // Segment 3 contains records of pk value 100002 (partition 1)
-  private static final String UPLOADED_SEGMENT_3 = "mytable_10158_19938_2 %";
+  private static final String UPLOADED_SEGMENT_3_SUFFIX = "_10158_19938_2 %";
 
-  @BeforeClass
+  private final String _resourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
@@ -74,6 +89,9 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
 
     // Start Kafka and push data into Kafka
     startKafka();
+    validateSharedTopology();
+    cleanRealtimeTableAndSchema();
+    resetKafkaTopic();
 
     populateTables();
   }
@@ -81,7 +99,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   protected void populateTables()
       throws Exception {
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload schema and table config
     Schema schema = createSchema();
@@ -92,8 +110,9 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     addTableConfig(tableConfig);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), TableType.REALTIME, _classTarDir);
 
     pushAvroIntoKafka(avroFiles);
     // Wait for all documents loaded
@@ -112,33 +131,56 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
             Server.Upsert.DEFAULT_ENABLE_PRELOAD), "true");
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
-      throws IOException {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
-
-    // Test dropping all segments one by one
-    List<String> segments = listSegments(realtimeTableName);
-    assertFalse(segments.isEmpty());
-    for (String segment : segments) {
-      dropSegment(realtimeTableName, segment);
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::closeAdminClientInSharedMode);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, this::stopServerIfStarted);
+      exception = runCleanup(exception, this::stopBrokerIfStarted);
+      exception = runCleanup(exception, this::stopControllerIfStarted);
+      exception = runCleanup(exception, this::stopKafkaIfStarted);
+      exception = runCleanup(exception, this::stopZk);
     }
-    // NOTE: There is a delay to remove the segment from property store
-    TestUtils.waitForCondition((aVoid) -> {
-      try {
-        return listSegments(realtimeTableName).isEmpty();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 60_000L, "Failed to drop the segments");
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
-    dropRealtimeTable(realtimeTableName);
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME + "_" + _resourceSuffix : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC + "-" + _resourceSuffix : super.getKafkaTopic();
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
   }
 
   @Override
@@ -204,6 +246,13 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     waitForAllDocsLoaded(600_000L);
   }
 
+  @Override
+  protected void restartServers()
+      throws Exception {
+    super.restartServers();
+    restoreSharedOwnerServerStarters();
+  }
+
   protected void waitForSnapshotCreation()
       throws Exception {
     // Pause consumption and wait until all consuming segments are committed and loaded as immutable segment
@@ -235,7 +284,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   }
 
   protected void verifyIdealState(int numSegmentsExpected) {
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, REALTIME_TABLE_NAME);
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, getRealtimeTableName());
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     assertEquals(segmentAssignment.size(), numSegmentsExpected);
 
@@ -290,15 +339,198 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     }
   }
 
-  private static int getSegmentPartitionId(String segmentName) {
-    switch (segmentName) {
-      case UPLOADED_SEGMENT_1:
-        return 0;
-      case UPLOADED_SEGMENT_2:
-      case UPLOADED_SEGMENT_3:
-        return 1;
-      default:
-        return new LLCSegmentName(segmentName).getPartitionGroupId();
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _resourceSuffix)
+        : _tempDir;
+  }
+
+  private String getRealtimeTableName() {
+    return TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+  }
+
+  private int getSegmentPartitionId(String segmentName) {
+    if (segmentName.equals(getTableName() + UPLOADED_SEGMENT_1_SUFFIX)) {
+      return 0;
     }
+    if (segmentName.equals(getTableName() + UPLOADED_SEGMENT_2_SUFFIX)
+        || segmentName.equals(getTableName() + UPLOADED_SEGMENT_3_SUFFIX)) {
+      return 1;
+    }
+    return new LLCSegmentName(segmentName).getPartitionGroupId();
+  }
+
+  private void validateSharedTopology() {
+    if (!isSharedRichClusterEnabled()) {
+      return;
+    }
+    assertEquals(_brokerStarters.size(), 1, "Shared rich cluster broker count mismatch");
+    assertEquals(_serverStarters.size(), NUM_SERVERS, "Shared rich cluster server count mismatch");
+    assertNotNull(_controllerStarter, "Shared rich cluster controller is not started");
+    assertNotNull(_kafkaStarters, "Shared rich cluster Kafka is not started");
+    assertFalse(_kafkaStarters.isEmpty(), "Shared rich cluster Kafka is not started");
+    assertNull(_minionStarter, "Shared rich cluster minion should not be started");
+    for (BaseServerStarter serverStarter : _serverStarters) {
+      PinotConfiguration serverConfig = serverStarter.getConfig();
+      assertEquals(serverConfig.getProperty(
+          Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads"), "1");
+      assertEquals(serverConfig.getProperty(Joiner.on(".")
+          .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+              Server.Upsert.DEFAULT_ENABLE_SNAPSHOT)), "true");
+      assertEquals(serverConfig.getProperty(Joiner.on(".")
+          .join(Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX, Server.Upsert.CONFIG_PREFIX,
+              Server.Upsert.DEFAULT_ENABLE_PRELOAD)), "true");
+    }
+  }
+
+  private void restoreSharedOwnerServerStarters() {
+    if (!isSharedRichClusterEnabled() || _sharedRichClusterTestSuite == null || _sharedRichClusterTestSuite == this) {
+      return;
+    }
+    _sharedRichClusterTestSuite._serverStarters.clear();
+    _sharedRichClusterTestSuite._serverStarters.addAll(_serverStarters);
+    _sharedRichClusterTestSuite._serverGrpcPort = _serverGrpcPort;
+    _sharedRichClusterTestSuite._serverAdminApiPort = _serverAdminApiPort;
+    _sharedRichClusterTestSuite._serverNettyPort = _serverNettyPort;
+    attachSharedRichCluster();
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String realtimeTableName = getRealtimeTableName();
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropSegmentsIfPresent(realtimeTableName);
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void dropSegmentsIfPresent(String realtimeTableName)
+      throws IOException {
+    List<String> segments = listSegments(realtimeTableName);
+    if (segments.isEmpty()) {
+      return;
+    }
+    for (String segment : segments) {
+      dropSegment(realtimeTableName, segment);
+    }
+    // NOTE: There is a delay to remove the segment from property store.
+    TestUtils.waitForCondition((aVoid) -> {
+      try {
+        return listSegments(realtimeTableName).isEmpty();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 60_000L, "Failed to drop the segments");
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void closeAdminClientInSharedMode()
+      throws IOException {
+    if (isSharedRichClusterEnabled()) {
+      getOrCreateAdminClient().close();
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }
