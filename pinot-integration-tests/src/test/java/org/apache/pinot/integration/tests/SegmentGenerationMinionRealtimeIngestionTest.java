@@ -34,22 +34,22 @@ import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterIntegrationTest {
+public class SegmentGenerationMinionRealtimeIngestionTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_REALTIME_TABLE_NAME = "segment_generation_minion_realtime_ingestion";
+  private static final String SEGMENT_GENERATION_AND_PUSH_TASK = "SegmentGenerationAndPushTask";
+
   private TableConfig _realtimeTableConfig;
-  private static final String REALTIME_TABLE_NAME = "mytable";
-  private static final String REALTIME_TABLE_NAME_WITH_TYPE = "mytable_REALTIME";
 
-  private static final String REALTIME_SCHEMA_NAME = "mytable";
-
-  @BeforeTest
+  @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
@@ -62,8 +62,9 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     startKafka();
     startMinion();
 
+    cleanupRealtimeTableAndSchema();
     Schema realtimeTableSchema = createSchema();
-    addSchemaWithCustomSchemaName(realtimeTableSchema, REALTIME_SCHEMA_NAME);
+    addSchemaWithCustomSchemaName(realtimeTableSchema, getTableName());
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
@@ -72,18 +73,37 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     addTableConfig(_realtimeTableConfig);
   }
 
-  @AfterTest
-  public void tearDown() {
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
     try {
-      stopMinion();
-      stopKafka();
-      stopServer();
-      stopBroker();
-      stopController();
-      stopZk();
+      cleanupTaskQueue();
+      cleanupRealtimeTableAndSchema();
     } finally {
-      FileUtils.deleteQuietly(_tempDir);
+      try {
+        if (_minionStarter != null) {
+          stopMinion();
+        }
+        stopKafka();
+        if (!_serverStarters.isEmpty()) {
+          stopServer();
+        }
+        if (!_brokerStarters.isEmpty()) {
+          stopBroker();
+        }
+        if (_controllerStarter != null) {
+          stopController();
+        }
+        stopZk();
+      } finally {
+        FileUtils.deleteQuietly(_tempDir);
+      }
     }
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_REALTIME_TABLE_NAME : super.getTableName();
   }
 
   private void addSchemaWithCustomSchemaName(Schema schema, String schemaName)
@@ -105,20 +125,20 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     taskConfigs.put(BatchConfigProperties.INPUT_FORMAT, "avro");
 
     AdhocTaskConfig adhocTaskConfig =
-        new AdhocTaskConfig("SegmentGenerationAndPushTask", REALTIME_TABLE_NAME, null, taskConfigs);
+        new AdhocTaskConfig(SEGMENT_GENERATION_AND_PUSH_TASK, getTableName(), null, taskConfigs);
 
     String url = getControllerBaseApiUrl() + "/tasks/execute";
     sendPostRequest(url, JsonUtils.objectToString(adhocTaskConfig),
         Collections.singletonMap("accept", "application/json"));
     TestUtils.waitForCondition(aVoid -> {
       try {
-        int totalDocs = getTotalDocs(REALTIME_TABLE_NAME);
+        int totalDocs = getTotalDocs(getTableName());
         return totalDocs == DEFAULT_COUNT_STAR_RESULT;
       } catch (Exception e) {
         return false;
       }
     }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents");
-    JsonNode result = postQuery("SELECT COUNT(*) FROM " + REALTIME_TABLE_NAME);
+    JsonNode result = postQuery("SELECT COUNT(*) FROM " + getTableName());
     assertEquals(result.get("numSegmentsQueried").asInt(), 14);
   }
 
@@ -134,27 +154,49 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     taskConfigs.put(BatchConfigProperties.INPUT_FORMAT, "avro");
 
     TableTaskConfig tableTaskConfig =
-        new TableTaskConfig(Collections.singletonMap("SegmentGenerationAndPushTask", taskConfigs));
+        new TableTaskConfig(Collections.singletonMap(SEGMENT_GENERATION_AND_PUSH_TASK, taskConfigs));
     BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(List.of(taskConfigs), "APPEND", "DAILY");
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
     _realtimeTableConfig.setIngestionConfig(ingestionConfig);
     _realtimeTableConfig.setTaskConfig(tableTaskConfig);
     updateTableConfig(_realtimeTableConfig);
-    String url = getControllerBaseApiUrl() + "/tasks/schedule?taskType=SegmentGenerationAndPushTask&tableName="
-        + REALTIME_TABLE_NAME_WITH_TYPE;
+    String url = getControllerBaseApiUrl() + "/tasks/schedule?taskType=" + SEGMENT_GENERATION_AND_PUSH_TASK
+        + "&tableName=" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
     sendPostRequest(url, null, Collections.singletonMap("accept", "application/json"));
     TestUtils.waitForCondition(aVoid -> {
       try {
-        int totalDocs = getTotalDocs(REALTIME_TABLE_NAME);
+        int totalDocs = getTotalDocs(getTableName());
         return totalDocs == DEFAULT_COUNT_STAR_RESULT;
       } catch (Exception e) {
         return false;
       }
     }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents");
-    JsonNode result = postQuery("SELECT COUNT(*) FROM " + REALTIME_TABLE_NAME);
+    JsonNode result = postQuery("SELECT COUNT(*) FROM " + getTableName());
     assertEquals(result.get("numSegmentsQueried").asInt(), 14);
+  }
+
+  private void cleanupTaskQueue() {
+    if (_controllerStarter == null) {
+      return;
+    }
+    if (_controllerStarter.getHelixTaskResourceManager().getTaskTypes().contains(SEGMENT_GENERATION_AND_PUSH_TASK)) {
+      _controllerStarter.getHelixTaskResourceManager().deleteTaskQueue(SEGMENT_GENERATION_AND_PUSH_TASK, false);
+    }
+  }
+
+  private void cleanupRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+    if (_helixResourceManager.hasRealtimeTable(getTableName())) {
+      dropRealtimeTable(getTableName());
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
   }
 
   private int getTotalDocs(String tableName)

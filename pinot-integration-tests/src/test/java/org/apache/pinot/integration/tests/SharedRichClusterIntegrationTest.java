@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,9 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     super.startZk();
     super.startKafkaWithoutTopic();
-    super.startController(super.getDefaultControllerConfiguration());
+    Map<String, Object> controllerConfig = super.getDefaultControllerConfiguration();
+    controllerConfig.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, true);
+    super.startController(controllerConfig);
     super.startBrokers(1);
     super.startServers(2);
     super.startMinion();
@@ -257,6 +260,16 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
       return;
     }
     super.startController(properties);
+  }
+
+  @Override
+  public void startControllerWithSwagger()
+      throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      attachSharedRichCluster();
+      return;
+    }
+    super.startControllerWithSwagger();
   }
 
   @Override

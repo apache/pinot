@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 /**
  * Tests that the controller, broker and server admin consoles return the expected pages.
  */
-public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
+public class AdminConsoleIntegrationTest extends SharedRichClusterIntegrationTest {
 
   @BeforeClass
   public void setUp()
