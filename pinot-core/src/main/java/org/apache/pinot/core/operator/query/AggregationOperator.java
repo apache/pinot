@@ -51,13 +51,20 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private final long _numTotalDocs;
 
   private int _numDocsScanned = 0;
+  protected final Object[] _preAggregatedResults;
 
   public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs) {
+    this(queryContext, aggregationInfo, numTotalDocs, null);
+  }
+
+  public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs,
+      Object[] preAggregatedResults) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _projectOperator = aggregationInfo.getProjectOperator();
     _useStarTree = aggregationInfo.isUseStarTree();
     _numTotalDocs = numTotalDocs;
+    _preAggregatedResults = preAggregatedResults;
   }
 
   @Override
@@ -67,7 +74,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     if (_useStarTree) {
       aggregationExecutor = new StarTreeAggregationExecutor(_aggregationFunctions);
     } else {
-      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions);
+      aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctions, _preAggregatedResults);
     }
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
