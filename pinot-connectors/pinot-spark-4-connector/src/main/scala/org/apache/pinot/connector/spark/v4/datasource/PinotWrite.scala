@@ -86,6 +86,9 @@ class PinotWrite(
         None
     }
     messages.foreach {
+      // Per Spark's BatchWrite.abort contract, the messages array may contain nulls for tasks
+      // that failed before producing a commit message; nothing to clean up for those.
+      case null =>
       case m: SuccessWriterCommitMessage =>
         val tarName = s"${m.segmentName}${Constants.TAR_GZ_FILE_EXT}"
         val destPath = new Path(s"$savePath/$tarName")
