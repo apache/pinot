@@ -272,6 +272,7 @@ instead of the main no-override suite:
 | Shared realtime rate-limiter suite | `./mvnw -pl pinot-integration-tests -Pshared-realtime-rate-limiter-cluster-integration-test-suite test` | 2 | 92.03s |
 | Shared Kafka partition suite | `./mvnw -pl pinot-integration-tests -Pshared-kafka-partition-cluster-integration-test-suite test` | 11 | 112.96s |
 | Shared exactly-once Kafka suite | `./mvnw -pl pinot-integration-tests -Pshared-exactly-once-kafka-cluster-integration-test-suite test` | 9 | 104.45s |
+| Shared realtime manager suite | `./mvnw -pl pinot-integration-tests -Pshared-realtime-manager-cluster-integration-test-suite test` | 2 | 87.81s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -310,6 +311,11 @@ tests passed in a single per-class lifecycle command in 205.87s, while the two
 shared profiles total 217.41s. The non-transactional partition/rebalance profile
 does share one setup across two classes; exactly-once remains separate because
 it starts transactional Kafka.
+
+The realtime manager suite preserves the 1-server/Kafka controller+server-config
+bucket for `RetentionManagerIntegrationTest` and `PinotLLCRealtimeSegmentManagerIntegrationTest`.
+The same 2 tests passed in a single per-class lifecycle command in 103.71s,
+while the shared profile passed in 87.81s, a 15.90s wall-clock reduction.
 
 Attempted but not included yet:
 
