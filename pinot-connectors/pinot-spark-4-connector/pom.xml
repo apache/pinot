@@ -174,11 +174,11 @@
       </testResource>
     </testResources>
     <plugins>
-      <!-- Hard-fail early with a clear message on JDK 17/11 or Scala 2.12 instead of letting an
-           obscure Maven resolution error leak through. The parent-pom module activation gates
-           this module out of older builds, but this enforcer catches someone invoking
-           `./mvnw -pl pinot-connectors/pinot-spark-4-connector` directly on an older JDK or
-           under -Pscala-2.12. -->
+      <!-- Hard-fail early with a clear message on any JDK below 21 or Scala 2.12 instead of
+           letting an obscure Maven resolution error leak through. The parent-pom module
+           activation gates this module out of older builds, but this enforcer catches someone
+           invoking `./mvnw -pl pinot-connectors/pinot-spark-4-connector` directly on an older
+           JDK or under -Pscala-2.12. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
