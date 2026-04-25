@@ -47,8 +47,13 @@ import org.testng.annotations.Test;
 public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationTest {
 
   protected static final Logger LOGGER = LoggerFactory.getLogger(DimensionTableIntegrationTest.class);
+  private static final String SHARED_TABLE_NAME = "dimension_table";
   private static final String LONG_COL = "longCol";
   private static final String INT_COL = "intCol";
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
 
   @Test
   public void testDelete()
@@ -59,15 +64,16 @@ public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationT
 
     dropOfflineTable(getTableName(), "-1d");
 
-    waitForEVToDisappear(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    waitForTableDataManagerRemoved(offlineTableName);
+    waitForEVToDisappear(offlineTableName);
 
-    Assert.assertNull(
-        DimensionTableDataManager.getInstanceByTableName(TableNameBuilder.OFFLINE.tableNameWithType(getTableName())));
+    Assert.assertNull(DimensionTableDataManager.getInstanceByTableName(offlineTableName));
   }
 
   @Override
   public String getTableName() {
-    return DEFAULT_TABLE_NAME;
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
   }
 
   @Override
@@ -92,7 +98,7 @@ public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationT
     ArrayList<File> files = new ArrayList<>();
 
     for (int fi = 0; fi < 2; fi++) {
-      File file = new File(_tempDir, "data" + fi + ".avro");
+      File file = new File(_classTempDir, "data" + fi + ".avro");
       try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
         writer.create(avroSchema, file);
         for (int i = 0; i < getCountStarResult() / 2; i++) {
@@ -116,14 +122,18 @@ public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationT
   public void setUp()
       throws Exception {
     LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     startZk();
     startController();
     startBroker();
     startServer();
 
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    cleanTableAndSchema();
+
     Schema schema = createSchema();
     addSchema(schema);
 
@@ -131,26 +141,29 @@ public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationT
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
 
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
 
     waitForAllDocsLoaded(60_000);
     LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
     LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
-    FileUtils.deleteDirectory(_tempDir);
-    deleteSchema(getTableName());
-
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
     LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Override
@@ -160,5 +173,66 @@ public class DimensionTableIntegrationTest extends SharedRichClusterIntegrationT
         .setDimensionTableConfig(new DimensionTableConfig(false, false))
         .setIsDimTable(true)
         .build();
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

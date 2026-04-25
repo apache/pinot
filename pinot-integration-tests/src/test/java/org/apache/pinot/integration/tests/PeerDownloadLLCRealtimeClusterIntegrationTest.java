@@ -26,9 +26,15 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -37,11 +43,13 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -71,14 +79,21 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final int NUM_SERVERS = 2;
+  private static final String SHARED_TABLE_NAME = "peer_download_llc_realtime";
+  private static final String SHARED_KAFKA_TOPIC = "peer_download_llc_realtime";
   public static final int UPLOAD_FAILURE_MOD = 5;
 
+  private final String _resourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
   private final boolean _isDirectAlloc = true; //Set as true; otherwise trigger indexing exception.
   private final boolean _isConsumerDirConfigured = true;
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
+  private File _classTempDir;
+  private String _previousMaxSegmentPreprocessParallelism;
+  private String _previousMaxSegmentStarTreePreprocessParallelism;
+  private boolean _clusterConfigOverridesApplied;
   private static File _pinotFsRootDir;
 
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   @Override
   public void setUp()
       throws Exception {
@@ -86,23 +101,75 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s%n",
         RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource);
 
-    _pinotFsRootDir = new File(FileUtils.getTempDirectoryPath() + File.separator + System.currentTimeMillis() + "/");
+    _classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
+    _pinotFsRootDir = getPinotFsRootDir();
+    FileUtils.deleteDirectory(_pinotFsRootDir);
     Preconditions.checkState(_pinotFsRootDir.mkdir(), "Failed to make a dir for " + _pinotFsRootDir.getPath());
 
     // Remove the consumer directory
-    File consumerDirectory = new File(CONSUMER_DIRECTORY);
+    File consumerDirectory = new File(getConsumerDirectory());
     if (consumerDirectory.exists()) {
       FileUtils.deleteDirectory(consumerDirectory);
     }
-    super.setUp();
+
+    startZk();
+    startKafkaWithoutTopic();
+    startController();
+    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
+
+    rememberClusterConfigOverrides();
+    HelixConfigScope scope = getClusterConfigScope();
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
+
+    startBroker();
+    startServer();
+
+    cleanRealtimeTableAndSchema();
+    resetKafkaTopic();
+
+    List<File> avroFiles = unpackAvroData(_classTempDir);
+
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    addTableConfig(tableConfig);
+    waitForAllRealtimePartitionsConsuming(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getRealtimePartitionsReadyTimeoutMs());
+
+    pushAvroIntoKafka(avroFiles);
+    createSegmentsAndUpload(avroFiles, schema, tableConfig);
+    setUpH2Connection(avroFiles);
+    setUpQueryGenerator(avroFiles);
+    runValidationJob(600_000);
+    waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   @Override
   public void tearDown()
       throws Exception {
-    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
-    super.tearDown();
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::restoreClusterConfigOverrides);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::deleteConsumerDirectory);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, this::stopServerIfStarted);
+      exception = runCleanup(exception, this::stopBrokerIfStarted);
+      exception = runCleanup(exception, this::stopControllerIfStarted);
+      exception = runCleanup(exception, this::stopKafkaIfStarted);
+      exception = runCleanup(exception, this::stopZk);
+    }
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Override
@@ -113,13 +180,13 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
     // Use the mock PinotFS as the PinotFS.
     properties.put("pinot.controller.storage.factory.class.mockfs",
         "org.apache.pinot.integration.tests.PeerDownloadLLCRealtimeClusterIntegrationTest$MockPinotFS");
+    getPinotFsRootDir();
   }
 
   @Override
   public void startController()
       throws Exception {
     super.startController();
-    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
   }
 
   @Override
@@ -165,13 +232,52 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
     configuration.setProperty(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY + ".protocols",
         "file,http");
     if (_isConsumerDirConfigured) {
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, getConsumerDirectory());
     }
+    getPinotFsRootDir();
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME + "_" + _resourceSuffix : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC + "_" + _resourceSuffix : super.getKafkaTopic();
+  }
+
+  @Override
+  protected void testQuery(String query)
+      throws Exception {
+    super.testQuery(rewriteSharedTableName(query));
+  }
+
+  @Override
+  protected void testQuery(String pinotQuery, String h2Query)
+      throws Exception {
+    super.testQuery(rewriteSharedTableName(pinotQuery), rewriteSharedTableName(h2Query));
+  }
+
+  @Override
+  protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
+      throws Exception {
+    super.testQueryWithMatchingRowCount(rewriteSharedTableName(pinotQuery), rewriteSharedTableName(h2Query));
   }
 
   @Test
   public void testConsumerDirectoryExists() {
-    File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
+    File consumerDirectory = new File(getConsumerDirectory(), getTableName() + "_REALTIME");
     assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
         "The off heap consumer directory does not exist");
   }
@@ -223,6 +329,191 @@ public class PeerDownloadLLCRealtimeClusterIntegrationTest extends BaseRealtimeC
             instanceState.getValue()));
       }
     }
+  }
+
+  private String rewriteSharedTableName(String query) {
+    return isSharedRichClusterEnabled() ? query.replace(DEFAULT_TABLE_NAME, getTableName()) : query;
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _resourceSuffix)
+        : _tempDir;
+  }
+
+  private String getConsumerDirectory() {
+    File classTempDir = _classTempDir != null ? _classTempDir : getClassTempDir();
+    return isSharedRichClusterEnabled()
+        ? new File(classTempDir, "consumer-test").getAbsolutePath()
+        : CONSUMER_DIRECTORY;
+  }
+
+  private File getPinotFsRootDir() {
+    if (_pinotFsRootDir == null) {
+      File classTempDir = _classTempDir != null ? _classTempDir : getClassTempDir();
+      _pinotFsRootDir = new File(classTempDir, "mockPinotFS");
+      Preconditions.checkState(_pinotFsRootDir.exists() || _pinotFsRootDir.mkdirs(),
+          "Failed to make a dir for " + _pinotFsRootDir.getPath());
+    }
+    return _pinotFsRootDir;
+  }
+
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void rememberClusterConfigOverrides() {
+    if (_clusterConfigOverridesApplied) {
+      return;
+    }
+    _previousMaxSegmentPreprocessParallelism =
+        getClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM);
+    _previousMaxSegmentStarTreePreprocessParallelism =
+        getClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM);
+    _clusterConfigOverridesApplied = true;
+  }
+
+  private void restoreClusterConfigOverrides()
+      throws Exception {
+    if (!_clusterConfigOverridesApplied) {
+      return;
+    }
+    restoreClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+        _previousMaxSegmentPreprocessParallelism);
+    restoreClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        _previousMaxSegmentStarTreePreprocessParallelism);
+    _clusterConfigOverridesApplied = false;
+  }
+
+  private String getClusterConfig(String key) {
+    return _helixManager.getConfigAccessor().get(getClusterConfigScope(), key);
+  }
+
+  private void restoreClusterConfig(String key, String value)
+      throws Exception {
+    if (value == null) {
+      deleteClusterConfig(key);
+    } else {
+      updateClusterConfig(Map.of(key, value));
+    }
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(getHelixClusterName()).build();
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void deleteConsumerDirectory()
+      throws IOException {
+    FileUtils.deleteDirectory(new File(getConsumerDirectory()));
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   // MockPinotFS is a localPinotFS whose root directory is configured as _basePath;

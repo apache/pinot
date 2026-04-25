@@ -251,6 +251,7 @@ instead of the main no-override suite:
 | Suite | Command | TestNG tests | Wall time |
 | --- | --- | ---: | ---: |
 | Shared MSE explain suite | `./mvnw -pl pinot-integration-tests -Pshared-mse-explain-cluster-integration-test-suite test` | 4 | 23.86s |
+| Shared no-override offline suite | `./mvnw -pl pinot-integration-tests -Pshared-no-override-offline-cluster-integration-test-suite test` | 18 | 89.63s |
 | Shared cursor memory suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-memory-cluster-integration-test-suite test` | 19 | 74.29s |
 | Shared cursor filesystem suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-fs-cluster-integration-test-suite test` | 15 | 30.30s |
 | Shared cursor cron cleanup suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-cron-cluster-integration-test-suite test` | 1 | 24.47s |
@@ -287,6 +288,7 @@ instead of the main no-override suite:
 | Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
 | Shared custom-tenant MSQ suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-stage-engine-custom-tenant-integration-test-suite test` | 91 | 55.35s |
 | Shared LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-llc-realtime-cluster-integration-test-suite test` | 18 | 167.30s |
+| Shared peer-download LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-peer-download-llc-realtime-cluster-integration-test-suite test` | 13 | 106.13s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -294,6 +296,12 @@ The same 41 tests passed in a single per-class lifecycle command in 112.06s,
 while the four shared profiles total 152.04s. They are suite-ready buckets for
 future tests with the same broker configuration rather than a speed win by
 themselves.
+
+The no-override offline suite preserves the 1-server/no-Kafka/no-minion setup
+for `DimensionTableIntegrationTest`, `HelixZNodeSizeLimitTest`,
+`QueryQuotaClusterIntegrationTest`, and `SegmentUploadIntegrationTest`. The
+same 18 tests passed per-class in 108.02s, while the shared profile passed in
+89.63s, an 18.39s wall-clock reduction.
 
 The broker service discovery, broker query limit, null handling, and MSQ without
 stats suites follow the same exact-config pattern. The same 72 tests passed in a
@@ -387,6 +395,13 @@ The LLC realtime suite preserves the 1-server/Kafka/no-minion controller and
 server config bucket used by `LLCRealtimeClusterIntegrationTest`. The same 18
 TestNG methods, including 2 expected skips, passed per-class in 175.39s and in
 the shared profile in 167.30s.
+
+The peer-download LLC realtime suite preserves the 2-server/Kafka/no-minion
+controller and server config bucket used by `PeerDownloadLLCRealtimeClusterIntegrationTest`.
+It owns the mock PinotFS controller/server setup, isolates its Kafka topic and
+realtime table, and restores cluster-level segment-preprocessing overrides. The
+same 13 TestNG methods, including 1 expected skip, passed per-class in 96.23s
+and in the shared profile in 106.13s.
 
 Attempted but not included yet:
 

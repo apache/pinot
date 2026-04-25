@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -61,13 +62,22 @@ import static org.testng.Assert.assertTrue;
  * tested as part of {@link HelixExternalViewBasedQueryQuotaManagerTest}
  */
 public class QueryQuotaClusterIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME = "query_quota";
+  private static final String SHARED_LOGICAL_TABLE_NAME = "query_quota_logical_table";
+
   private PinotClientTransport _pinotClientTransport;
   private String _brokerHostPort;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
     _httpClient = getHttpClient();
 
     // Start the Pinot cluster
@@ -79,6 +89,8 @@ public class QueryQuotaClusterIntegrationTest extends SharedRichClusterIntegrati
     // Wait for broker to be ready before getting port (avoid race condition)
     TestUtils.waitForCondition(aVoid -> !_brokerPorts.isEmpty(), 500, 30000, "Broker ports not available");
     _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
+
+    cleanupQueryQuotaResources();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -114,10 +126,15 @@ public class QueryQuotaClusterIntegrationTest extends SharedRichClusterIntegrati
     exception = runCleanup(exception, this::cleanupQueryQuotaResources);
     exception = runCleanup(exception, this::closePinotClients);
     exception = runCleanup(exception, this::stopCluster);
-    FileUtils.deleteQuietly(_tempDir);
+    exception = runCleanup(exception, this::cleanTempDirectory);
     if (exception != null) {
       throw exception;
     }
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
   }
 
   @AfterMethod
@@ -361,6 +378,25 @@ public class QueryQuotaClusterIntegrationTest extends SharedRichClusterIntegrati
     stopBroker();
     stopController();
     stopZk();
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private void cleanTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
   }
 
   private BaseBrokerStarter startExtraBroker()
@@ -647,7 +683,7 @@ public class QueryQuotaClusterIntegrationTest extends SharedRichClusterIntegrati
 
   @Override
   protected String getLogicalTableName() {
-    return "logical_table";
+    return isSharedRichClusterEnabled() ? SHARED_LOGICAL_TABLE_NAME : "logical_table";
   }
 
   private LogicalTableConfig getLogicalTableConfig() {
