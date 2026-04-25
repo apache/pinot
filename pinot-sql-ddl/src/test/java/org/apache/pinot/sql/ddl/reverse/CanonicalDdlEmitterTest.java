@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.sql.ddl.reverse;
 
+import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableCustomConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -114,7 +119,7 @@ public class CanonicalDdlEmitterTest {
         .setSchemaName("clicks")
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
-    java.util.Map<String, String> streamCfgs = new java.util.LinkedHashMap<>();
+    Map<String, String> streamCfgs = new LinkedHashMap<>();
     streamCfgs.put("stream.kafka.topic.name", "click_events");
     streamCfgs.put("stream.kafka.consumer.factory.class.name", "KafkaConsumerFactory");
     streamCfgs.put("realtime.segment.flush.threshold.rows", "500000");
@@ -174,7 +179,7 @@ public class CanonicalDdlEmitterTest {
     Schema schema = new Schema();
     schema.setSchemaName("t");
     MetricFieldSpec metric = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
-        new java.math.BigDecimal("1E+30"));
+        new BigDecimal("1E+30"));
     schema.addField(metric);
 
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
@@ -195,7 +200,7 @@ public class CanonicalDdlEmitterTest {
     Schema schema = new Schema();
     schema.setSchemaName("t");
     MetricFieldSpec metric = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
-        new java.math.BigDecimal("0.0"));
+        new BigDecimal("0.0"));
     schema.addField(metric);
 
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
@@ -316,14 +321,14 @@ public class CanonicalDdlEmitterTest {
         .setSchemaName("events")
         .addSingleValueDimension("id", DataType.INT)
         .build();
-    java.util.Map<String, java.util.Map<String, String>> tasks = new java.util.LinkedHashMap<>();
-    java.util.Map<String, String> rtoCfg = new java.util.LinkedHashMap<>();
+    Map<String, Map<String, String>> tasks = new LinkedHashMap<>();
+    Map<String, String> rtoCfg = new LinkedHashMap<>();
     rtoCfg.put("bucketTimePeriod", "1d");
     rtoCfg.put("maxNumRecordsPerSegment", "5000000");
     tasks.put("RealtimeToOfflineSegmentsTask", rtoCfg);
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("events")
-        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(tasks))
+        .setTaskConfig(new TableTaskConfig(tasks))
         .build();
 
     String emitted = CanonicalDdlEmitter.emit(schema, config);
@@ -341,7 +346,7 @@ public class CanonicalDdlEmitterTest {
         .build();
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
-        .setCustomConfig(new org.apache.pinot.spi.config.table.TableCustomConfig(
+        .setCustomConfig(new TableCustomConfig(
             Collections.singletonMap("mySpecialKey", "someValue")))
         .build();
 
@@ -374,7 +379,7 @@ public class CanonicalDdlEmitterTest {
         .build();
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
-        .setCustomConfig(new org.apache.pinot.spi.config.table.TableCustomConfig(
+        .setCustomConfig(new TableCustomConfig(
             Collections.singletonMap("ingestionConfig", "anything")))
         .build();
     try {
@@ -397,7 +402,7 @@ public class CanonicalDdlEmitterTest {
         .build();
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("t")
-        .setCustomConfig(new org.apache.pinot.spi.config.table.TableCustomConfig(
+        .setCustomConfig(new TableCustomConfig(
             Collections.singletonMap("task.MyTask.foo", "bar")))
         .build();
     try {
