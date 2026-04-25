@@ -225,6 +225,26 @@ public class CanonicalDdlEmitterTest {
   }
 
   /**
+   * Regression: BYTES non-natural-default emit must hex-encode the byte[] rather than fall
+   * through to value.toString() which would emit "[B@<addr>" identity-hash garbage.
+   */
+  @Test
+  public void bytesNonNaturalDefaultEmittedAsHex() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    DimensionFieldSpec dim = new DimensionFieldSpec("blob", DataType.BYTES, true);
+    dim.setDefaultNullValue("deadbeef");
+    schema.addField(dim);
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    assertTrue(emitted.contains("DEFAULT 'deadbeef'"),
+        "BYTES default must be emitted as quoted hex string; got:\n" + emitted);
+    assertFalse(emitted.contains("[B@"),
+        "BYTES default must not leak the JVM byte[] identity-hash form; got:\n" + emitted);
+  }
+
+  /**
    * Regression: TIMESTAMP DEFAULT emission must use UTC ISO-8601 form (Instant.toString)
    * rather than java.sql.Timestamp.toString, which formats in the JVM's default time zone
    * and would make canonical DDL emit different strings on different controllers.
