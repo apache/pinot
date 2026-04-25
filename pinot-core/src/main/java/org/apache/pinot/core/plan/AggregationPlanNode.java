@@ -115,17 +115,38 @@ public class AggregationPlanNode implements PlanNode {
 
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
+      DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+      for (int i = 0; i < aggregationFunctions.length; i++) {
+        List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
+        if (!inputExpressions.isEmpty()) {
+          String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
+          dataSources[i] = _indexSegment.getDataSource(column, _queryContext.getSchema());
+        }
+      }
+
       // Priority 2: Check if non-scan based aggregation is feasible
       if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan()) {
-        DataSource[] dataSources = new DataSource[aggregationFunctions.length];
+        return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
+      }
+
+      if (filterOperator.isResultMatchingAll()) {
+        boolean anyResolved = false;
+        Object[] preAggregatedResults = new Object[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
-          List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
-          if (!inputExpressions.isEmpty()) {
-            String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
-            dataSources[i] = _indexSegment.getDataSource(column, _queryContext.getSchema());
+          Object resolved = AggregationFunctionUtils.getAggregationResult(aggregationFunctions[i],
+              dataSources[i], numTotalDocs, NonScanBasedAggregationOperator.EXPLAIN_NAME);
+          if (resolved != null) {
+            preAggregatedResults[i] = resolved;
+            anyResolved = true;
           }
         }
-        return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
+
+        if (anyResolved) {
+          // build aggregation info for all functions (including those that cannot be resolved from metadata)
+          aggregationInfo = AggregationFunctionUtils.buildAggregationInfoWithoutStarTree(_segmentContext, _queryContext,
+              aggregationFunctions, filterOperator);
+          return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs, preAggregatedResults);
+        }
       }
 
       // Priority 3: Check if fast filtered count can be used
