@@ -245,16 +245,12 @@ public class PinotDdlRestletResource {
         .setTableConfig(toJson(create.getTableConfig()))
         .setWarnings(create.getWarnings());
 
-    // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
-    // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
-    // field configs referencing non-existent columns, task configs with bad column references,
-    // etc.) that the compiler alone cannot detect. Runs for both dry-run and live create.
-    // Validation runs BEFORE the existence check so that IF NOT EXISTS is a no-op only for
-    // semantically valid statements; invalid DDL is always rejected regardless of IF NOT EXISTS.
-    validateTableConfig(create.getSchema(), create.getTableConfig());
-
-    // Check existence for both live and dry-run paths: dry-run must faithfully predict conflicts
-    // so callers can use it for pre-deployment validation ("would this DDL succeed?").
+    // Existence check runs first so CREATE TABLE IF NOT EXISTS is a successful no-op when the
+    // table already exists, matching the SQL-standard semantics (PostgreSQL, MySQL, SQLite,
+    // Snowflake, Trino, BigQuery): a deployment script that re-runs the same DDL against an
+    // existing table must succeed even if the column list or properties have drifted from the
+    // current stored config. Without this ordering, idempotent provisioning scripts break the
+    // moment a config-validator rule changes between Pinot versions.
     if (_pinotHelixResourceManager.hasTable(tableNameWithType)) {
       if (create.isIfNotExists()) {
         response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
@@ -263,6 +259,12 @@ public class PinotDdlRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
     }
+
+    // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
+    // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
+    // field configs referencing non-existent columns, task configs with bad column references,
+    // etc.) that the compiler alone cannot detect. Runs for both dry-run and live create.
+    validateTableConfig(create.getSchema(), create.getTableConfig());
 
     if (dryRun) {
       response.setMessage("Dry run: validated CREATE TABLE without persisting.");
@@ -306,45 +308,32 @@ public class PinotDdlRestletResource {
       LOGGER.info("DDL created table {}", tableNameWithType);
       return Response.status(Response.Status.CREATED).entity(response).build();
     } catch (TableAlreadyExistsException e) {
-      // Race: another caller added the table between our hasTable check and addTable.
-      // Only roll back the schema we created here if no table for this raw name now exists —
-      // if another caller won the race and its table is live, removing the schema would
-      // orphan that table. Re-check existence with the winner's table still present before
-      // deciding to clean up.
-      if (schemaCreatedHere && !_pinotHelixResourceManager.hasTable(tableNameWithType)) {
-        rollbackSchemaIfCreated(schemaName, true);
-      }
+      // Race: another caller added the table between our hasTable check and addTable. Do NOT
+      // roll back the schema here — the winner of the race may be using the same shared schema
+      // (legitimate hybrid-pair pattern), and a hasTable re-check followed by deleteSchema is
+      // racy in the same way the generic-failure branch below is. Stale schemas can be removed
+      // via DELETE /schemas/{name} if needed.
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (SchemaAlreadyExistsException e) {
       // The override=false addSchema call lost a race with another schema writer. Surface 409.
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (Exception e) {
-      // Only roll back the schema if no table for this raw name now exists. A concurrent request
-      // may have added the sibling physical variant (OFFLINE vs REALTIME) between our addSchema()
-      // and this addTable() failure; deleting the schema would orphan that live table. Check both
-      // typed variants before deciding to remove the shared schema.
-      if (schemaCreatedHere) {
-        boolean offlineNowExists = _pinotHelixResourceManager.hasOfflineTable(schemaName);
-        boolean realtimeNowExists = _pinotHelixResourceManager.hasRealtimeTable(schemaName);
-        rollbackSchemaIfCreated(schemaName, !offlineNowExists && !realtimeNowExists);
-      }
+      // Intentionally do NOT roll back the schema on a generic addTable() failure. The two
+      // hasOfflineTable/hasRealtimeTable reads required to decide "is this schema orphaned?"
+      // are non-atomic, and a concurrent sibling CREATE that succeeds between the two reads
+      // would have its schema deleted out from under it — orphaning a live table. Pinot's
+      // existing /tables endpoint also leaves the schema in place when table creation fails,
+      // so the contract is consistent: schemas can outlive tables, and stale schemas can be
+      // removed via DELETE /schemas/{name}. Surface a hint so the operator knows the schema
+      // remains and how to clean it up if the failure is genuinely permanent.
+      String hint = schemaCreatedHere
+          ? " (schema '" + schemaName + "' was created and remains; remove via DELETE /schemas/"
+              + schemaName + " if the failure is permanent and no other variant uses it)"
+          : "";
       // ControllerApplicationException(LOGGER, ...) logs the exception, so don't double-log here.
       throw new ControllerApplicationException(LOGGER,
-          "Failed to create table " + tableNameWithType + ": " + e.getMessage(),
+          "Failed to create table " + tableNameWithType + ": " + e.getMessage() + hint,
           Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-  }
-
-  private void rollbackSchemaIfCreated(String schemaName, boolean schemaCreatedHere) {
-    if (!schemaCreatedHere) {
-      return;
-    }
-    try {
-      _pinotHelixResourceManager.deleteSchema(schemaName);
-      LOGGER.info("Rolled back schema {} after failed table create", schemaName);
-    } catch (Exception rollbackEx) {
-      LOGGER.error("Failed to roll back schema {} after failed table create; manual cleanup "
-          + "may be required", schemaName, rollbackEx);
     }
   }
 
@@ -436,9 +425,19 @@ public class PinotDdlRestletResource {
       TableConfigValidatorRegistry.validate(tableConfig, schema);
     } catch (ControllerApplicationException e) {
       throw e;
-    } catch (Exception e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      // The Pinot validators consistently raise these for user-facing config errors
+      // (upsert without primary keys, field configs referencing non-existent columns,
+      // bad task configs, etc.). Surface as 400 — the caller can fix their DDL.
       throw new ControllerApplicationException(LOGGER,
           "Table config validation failed: " + e.getMessage(), Response.Status.BAD_REQUEST, e);
+    } catch (Exception e) {
+      // Any other exception is unexpected — most likely a controller-side defect (e.g. NPE in
+      // a registry validator, ZK connectivity blip during validateTableTenantConfig). 400 would
+      // mislead the caller into "fix your DDL"; surface as 500 so monitoring picks it up.
+      throw new ControllerApplicationException(LOGGER,
+          "Internal error during table config validation: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -529,20 +528,32 @@ public class PinotDdlRestletResource {
     List<String> dropped = new ArrayList<>();
     List<String> failed = new ArrayList<>();
     Exception firstFailure = null;
+    Response.Status firstFailureStatus = null;
     for (String target : targets) {
       try {
         // Remove task schedules before deletion so tasks are not triggered during the drop.
+        // tableTasksCleanup may throw ControllerApplicationException (e.g. BAD_REQUEST when
+        // active tasks are still running). That status code carries actionable user-level
+        // information and must be preserved instead of being collapsed to 500 below.
         PinotTableRestletResource.tableTasksCleanup(target, false,
             _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         TableType type = TableNameBuilder.getTableTypeFromTableName(target);
         _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, type, null);
         dropped.add(target);
         LOGGER.info("DDL dropped table {}", target);
+      } catch (ControllerApplicationException e) {
+        LOGGER.error("Failed to drop table {} during DDL DROP TABLE", target, e);
+        failed.add(target);
+        if (firstFailure == null) {
+          firstFailure = e;
+          firstFailureStatus = Response.Status.fromStatusCode(e.getResponse().getStatus());
+        }
       } catch (Exception e) {
         LOGGER.error("Failed to drop table {} during DDL DROP TABLE", target, e);
         failed.add(target);
         if (firstFailure == null) {
           firstFailure = e;
+          firstFailureStatus = Response.Status.INTERNAL_SERVER_ERROR;
         }
       }
     }
@@ -556,13 +567,18 @@ public class PinotDdlRestletResource {
       return response;
     }
     // At least one target failed. Surface a structured error that names both what succeeded
-    // and what failed so the operator knows which variant needs manual cleanup.
+    // and what failed so the operator knows which variant needs manual cleanup. Preserve the
+    // first failure's status code so client-actionable failures (e.g. active tasks → 400)
+    // remain visible to the caller; only fall back to 500 for genuinely unexpected failures.
     String causeDesc = firstFailure.getMessage() != null
         ? firstFailure.getMessage() : firstFailure.getClass().getSimpleName();
-    String msg = "Partial DROP TABLE: dropped " + dropped + ", failed to drop " + failed
-        + ": " + causeDesc + ".";
+    String partialPrefix = dropped.isEmpty() ? "" : "Partial DROP TABLE: dropped " + dropped + ", ";
+    String msg = partialPrefix + "failed to drop " + failed + ": " + causeDesc
+        + (dropped.isEmpty() ? "" : ". The successfully-dropped variant must be re-created if "
+            + "the original DROP was unintended.");
     throw new ControllerApplicationException(LOGGER, msg,
-        Response.Status.INTERNAL_SERVER_ERROR, firstFailure);
+        firstFailureStatus == null ? Response.Status.INTERNAL_SERVER_ERROR : firstFailureStatus,
+        firstFailure);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -647,13 +663,24 @@ public class PinotDdlRestletResource {
     try {
       ddl = CanonicalDdlEmitter.emit(schema, tableConfig, database);
     } catch (IllegalArgumentException e) {
-      // SchemaEmitter.validateEmittable() throws IllegalArgumentException for unsupported column
-      // types (MAP, LIST, STRUCT, UNKNOWN) that the current DDL grammar cannot represent. Return
-      // 400 so the caller sees a deterministic client error rather than a 500.
+      // The emitter explicitly throws IllegalArgumentException to signal "this schema or config
+      // cannot be expressed in the current DDL grammar":
+      //   - SchemaEmitter.validateEmittable: unsupported column types (MAP, LIST, STRUCT, UNKNOWN)
+      //   - PropertyExtractor: TableCustomConfig key collides with a reserved DDL property name
+      // Both are caller-actionable: rename the offending column/property or use the JSON API for
+      // SHOW. Surface as 400 so the caller sees a deterministic client error rather than a 500.
       throw new ControllerApplicationException(LOGGER,
           "SHOW CREATE TABLE is not supported for table " + tableNameWithType
               + ": " + e.getMessage(),
           Response.Status.BAD_REQUEST, e);
+    } catch (RuntimeException e) {
+      // Anything else from emit() is an unexpected controller-side failure (NPE in extractor,
+      // JsonProcessingException wrapped as runtime, etc.). 400 would mislead the caller —
+      // surface as 500 so monitoring picks it up.
+      throw new ControllerApplicationException(LOGGER,
+          "Internal error rendering SHOW CREATE TABLE for " + tableNameWithType
+              + ": " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
     return new DdlExecutionResponse()

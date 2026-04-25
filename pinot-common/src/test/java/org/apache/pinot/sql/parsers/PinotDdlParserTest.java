@@ -317,6 +317,16 @@ public class PinotDdlParserTest {
   }
 
   @Test
+  public void createTableMissingPrimaryKeyParensRejected() {
+    // Without LPAREN after KEY, the LOOKAHEAD(3) gate must reject the optional PK clause and
+    // the parser must surface a clear "expected TABLE_TYPE" error rather than committing to
+    // the PinotPrimaryKeyList production and emitting a confusing inner-grammar error.
+    expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions(
+            "CREATE TABLE t (id INT) PRIMARY KEY id TABLE_TYPE = OFFLINE"));
+  }
+
+  @Test
   public void dimensionArrayParsedAsMultiValue() {
     SqlPinotCreateTable stmt = parseCreate(
         "CREATE TABLE t (tags STRING DIMENSION ARRAY, id INT DIMENSION) TABLE_TYPE = OFFLINE");
