@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.connector.spark.v3.datasource
 
+import java.net.URI
+
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.pinot.spi.data.Schema
+import org.apache.pinot.spi.ingestion.batch.spec.Constants
 import org.apache.spark.sql.connector.write.{BatchWrite, DataWriterFactory, LogicalWriteInfo, PhysicalWriteInfo, Write, WriterCommitMessage}
 import org.apache.spark.sql.types.StructType
 import org.slf4j.{Logger, LoggerFactory}
@@ -55,13 +60,52 @@ class PinotWrite(
     messages.foreach(m => logger.info("Spark write committed: {}", m))
   }
 
-  // TODO: on abort, delete the segment tar files at writeOptions.savePath that correspond to the
-  // successful tasks in `messages`. Currently, when one executor task fails the job aborts but
-  // leftover tars from already-succeeded tasks remain at savePath; on retry users get duplicate
-  // segments after the push step. The contract-level guard against silent overwrite is provided
-  // by PinotWriteBuilder.overwrite(...) (which fails fast); this runtime-level guard for partial
-  // failure is a separate gap tracked for follow-up. The same gap exists in the Spark 4 sibling.
+  /**
+   * Called by Spark on the driver when the write job fails. Best-effort: delete the segment tar
+   * files at {@code writeOptions.savePath} that correspond to the already-succeeded tasks in
+   * {@code messages}, so a retry does not duplicate them. We do not throw: the driver already
+   * has a failure to surface, and a cleanup miss is recoverable by the user.
+   *
+   * This is the runtime-level counterpart to the contract-level guard that
+   * {@link PinotWriteBuilder#overwrite} / {@code truncate} provide against silent overwrite —
+   * together they ensure partial-failure retries don't silently produce duplicate segments in
+   * the downstream controller push step.
+   */
   override def abort(messages: Array[WriterCommitMessage]): Unit = {
-    messages.foreach(m => logger.warn("Spark write aborted, leftover segment tar may remain: {}", m))
+    val savePath = writeOptions.savePath
+    if (savePath == null || savePath.isEmpty) {
+      messages.foreach(m => logger.warn("Spark write aborted and no savePath is set, cannot clean up: {}", m))
+      return
+    }
+    val fsOpt = try {
+      Some(FileSystem.get(new URI(savePath), new Configuration()))
+    } catch {
+      case t: Throwable =>
+        logger.warn("Spark write aborted; could not obtain Hadoop FileSystem for savePath={} " +
+          "— leftover segment tars may remain and be duplicated on retry.", savePath, t)
+        None
+    }
+    messages.foreach {
+      case m: SuccessWriterCommitMessage =>
+        val tarName = s"${m.segmentName}${Constants.TAR_GZ_FILE_EXT}"
+        val destPath = new Path(s"$savePath/$tarName")
+        fsOpt match {
+          case Some(fs) =>
+            try {
+              val deleted = fs.delete(destPath, /* recursive */ false)
+              logger.warn("Spark write aborted, cleaned up leftover segment tar at {} (deleted={})",
+                destPath, deleted.asInstanceOf[AnyRef])
+            } catch {
+              case t: Throwable =>
+                logger.warn("Spark write aborted; failed to clean up leftover segment tar at {}. " +
+                  "Manual cleanup may be required before retry to avoid duplicate segments.",
+                  destPath, t)
+            }
+          case None =>
+            logger.warn("Spark write aborted, leftover segment tar may remain at {}", destPath)
+        }
+      case other =>
+        logger.warn("Spark write aborted, unknown commit message type: {}", other)
+    }
   }
 }
