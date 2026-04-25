@@ -260,23 +260,14 @@ public class PinotDdlRestletResource {
           "Table " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
     }
 
-    // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
-    // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
-    // field configs referencing non-existent columns, task configs with bad column references,
-    // etc.) that the compiler alone cannot detect. Runs for both dry-run and live create.
-    validateTableConfig(create.getSchema(), create.getTableConfig());
-
-    if (dryRun) {
-      response.setMessage("Dry run: validated CREATE TABLE without persisting.");
-      return Response.ok(response).build();
-    }
-
-    // When a schema for this raw table name already exists (the common case when adding the
-    // second physical variant of a hybrid pair), verify the DDL column list is equivalent to
-    // the stored schema. Silently accepting a mismatched column list would create a table whose
-    // runtime schema differs from what the DDL described.
+    // Look up the stored schema first. When the second physical variant of a hybrid pair is
+    // created, the stored schema is the canonical source of metadata (primary keys, tags,
+    // null-handling) that the DDL column list does not itself express. Validating against the
+    // stored schema ensures upsert/dedup PK checks see the real PK list rather than a
+    // synthesized empty one from the DDL-compiled schema.
     Schema storedSchema = _pinotHelixResourceManager.getSchema(schemaName);
     boolean schemaPreexisted = storedSchema != null;
+
     if (schemaPreexisted) {
       // Compare only the column-shape attributes that the DDL column list actually controls.
       // Comparing full JSON would include schema-level metadata (primary keys, null-handling,
@@ -292,6 +283,22 @@ public class PinotDdlRestletResource {
                 + "table pair if the schema has genuinely changed.",
             Response.Status.CONFLICT);
       }
+    }
+
+    // Run the full schema/table validation stack that the existing /tables and /tableConfigs APIs
+    // apply before any ZK write. This catches invalid combinations (upsert without primary keys,
+    // field configs referencing non-existent columns, task configs with bad column references,
+    // etc.) that the compiler alone cannot detect. Runs for both dry-run and live create.
+    // When a stored schema exists (hybrid second-variant case), validate against the stored
+    // schema so the validators see the canonical PK list / null-handling / tags rather than the
+    // DDL's column-list-only projection — otherwise upsert/dedup tables would falsely fail PK
+    // validation when the DDL omits PRIMARY KEY in the second variant.
+    Schema schemaForValidation = schemaPreexisted ? storedSchema : create.getSchema();
+    validateTableConfig(schemaForValidation, create.getTableConfig());
+
+    if (dryRun) {
+      response.setMessage("Dry run: validated CREATE TABLE without persisting.");
+      return Response.ok(response).build();
     }
 
     boolean schemaCreatedHere = false;
@@ -552,10 +559,10 @@ public class PinotDdlRestletResource {
           firstFailureStatus = Response.Status.fromStatusCode(e.getResponse().getStatus());
         }
       } catch (Exception e) {
-        // Genuinely unexpected errors get full stack traces — the wrapping CAE below will also
-        // log, but for arbitrary RuntimeExceptions / Helix failures the duplicate is acceptable
-        // because the operator may need both the per-target context and the aggregated message.
-        LOGGER.error("DROP TABLE on {} failed unexpectedly", target, e);
+        // The wrapping CAE thrown after the loop will log the firstFailure with full stack;
+        // record only a one-line breadcrumb here so operators can correlate per-target context
+        // without seeing the same stack trace twice.
+        LOGGER.warn("DROP TABLE on {} failed unexpectedly: {}", target, e.toString());
         failed.add(target);
         if (firstFailure == null) {
           firstFailure = e;
@@ -616,46 +623,65 @@ public class PinotDdlRestletResource {
             "Table not found: " + tableNameWithType, Response.Status.NOT_FOUND);
       }
     } else {
-      // Authorize BOTH candidates before probing existence so the caller cannot infer which
-      // variant exists from a 403 vs 404 response, and so an auth failure on the realtime
-      // variant is not masked by a 404 produced before the check runs.
+      // Authorize ONLY the variant(s) we would actually surface, not both unconditionally.
+      // The previous "authorize both up-front" pattern caused a regression for the legitimate
+      // case where a caller has READ on OFFLINE only, the table exists only as OFFLINE, and
+      // the caller would have a valid 200 from `GET /tables/foo` — but the up-front REALTIME
+      // auth check threw 403, blocking a read they should be allowed to perform.
+      //
+      // The no-fingerprinting goal (don't let an unauthorized caller distinguish "exists but
+      // forbidden" from "not found") is preserved by:
+      //   - When neither variant exists, still run an auth check (against OFFLINE) before
+      //     returning 404 so an unauthorized caller gets 403 just like they would for an
+      //     existing-but-forbidden table.
+      //   - When both variants exist, authorize both before surfacing the disambiguation 400,
+      //     since the disambiguation message itself reveals the existence of both variants.
       String off = TableNameBuilder.OFFLINE.tableNameWithType(fullyQualifiedRaw);
       String rt = TableNameBuilder.REALTIME.tableNameWithType(fullyQualifiedRaw);
-      ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
-          AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
-      ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
-          AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
       boolean offExists = _pinotHelixResourceManager.hasTable(off);
       boolean rtExists = _pinotHelixResourceManager.hasTable(rt);
       if (offExists && rtExists) {
-        // Both variants exist; silently picking one would return DDL for the wrong variant.
-        // Require the caller to disambiguate with an explicit TYPE clause.
+        ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
+            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
+        ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
+            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         throw new ControllerApplicationException(LOGGER,
             "Table '" + fullyQualifiedRaw + "' has both OFFLINE and REALTIME variants. "
                 + "Use 'SHOW CREATE TABLE ... TYPE OFFLINE' or 'TYPE REALTIME' to specify which.",
             Response.Status.BAD_REQUEST);
       } else if (offExists) {
+        ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
+            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         tableNameWithType = off;
         resolvedType = TableType.OFFLINE;
       } else if (rtExists) {
+        ResourceUtils.checkPermissionAndAccess(rt, httpRequest, headers,
+            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         tableNameWithType = rt;
         resolvedType = TableType.REALTIME;
       } else {
+        // Neither variant exists. Run auth before 404 so an unauthorized probe returns 403
+        // (the same response they would have gotten for an existing-but-forbidden table) —
+        // no fingerprinting via 403-vs-404.
+        ResourceUtils.checkPermissionAndAccess(off, httpRequest, headers,
+            AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
         throw new ControllerApplicationException(LOGGER,
             "Table not found: " + fullyQualifiedRaw, Response.Status.NOT_FOUND);
       }
     }
 
-    org.apache.pinot.spi.config.table.TableConfig tableConfig =
-        _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
-      // Should not happen — hasTable just succeeded — but treat as not-found rather than 500.
+      // hasTable returned true but getTableConfig returned null. This indicates ZK inconsistency
+      // (torn write or concurrent delete between the two reads), not a missing table from the
+      // caller's perspective. Surface as 500 so monitoring catches the inconsistency rather than
+      // mislead the caller into thinking their reference is wrong.
       throw new ControllerApplicationException(LOGGER,
-          "Table " + tableNameWithType + " disappeared during SHOW CREATE.",
-          Response.Status.NOT_FOUND);
+          "Table " + tableNameWithType + " has IdealState but no TableConfig in ZK; "
+              + "possible torn write or concurrent delete.",
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
-    org.apache.pinot.spi.data.Schema schema =
-        _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+    Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
     if (schema == null) {
       throw new ControllerApplicationException(LOGGER,
           "Schema not found for " + tableNameWithType

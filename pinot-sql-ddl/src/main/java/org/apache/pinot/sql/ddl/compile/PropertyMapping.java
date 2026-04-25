@@ -350,7 +350,10 @@ public final class PropertyMapping {
       case "replicasperpartition":
         // TableConfigBuilder does not expose setReplicasPerPartition; DdlCompiler applies this
         // value post-build via tableConfig.getValidationConfig().setReplicasPerPartition().
-        // Return true to prevent fall-through to customConfigs.
+        // Validate as an integer here to fail fast at compile time with a clear error rather
+        // than letting a non-numeric value land in TableConfig and surface only at validation.
+        // Mirrors the eager parseInt validation done for "replication" above.
+        parseInt(lowerKey, value);
         return true;
       default:
         return false;
