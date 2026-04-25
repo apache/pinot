@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -177,13 +178,13 @@ public class PinotDdlRestletResourceUnitTest {
     Schema stored = new Schema();
     stored.setSchemaName("t");
     MetricFieldSpec storedSpec = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
-        new java.math.BigDecimal("1.0"));
+        new BigDecimal("1.0"));
     stored.addField(storedSpec);
 
     Schema compiled = new Schema();
     compiled.setSchemaName("t");
     MetricFieldSpec compiledSpec = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
-        new java.math.BigDecimal("1"));
+        new BigDecimal("1"));
     compiled.addField(compiledSpec);
 
     assertNull(PinotDdlRestletResource.describeColumnShapeMismatch(stored, compiled),

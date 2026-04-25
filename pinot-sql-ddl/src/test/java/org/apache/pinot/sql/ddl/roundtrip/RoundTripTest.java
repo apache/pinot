@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -114,9 +115,9 @@ public class RoundTripTest {
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("events")
         .setSortedColumn("country")
-        .setInvertedIndexColumns(java.util.Arrays.asList("city"))
-        .setNoDictionaryColumns(java.util.Arrays.asList("amount"))
-        .setBloomFilterColumns(java.util.Arrays.asList("country"))
+        .setInvertedIndexColumns(Arrays.asList("city"))
+        .setNoDictionaryColumns(Arrays.asList("amount"))
+        .setBloomFilterColumns(Arrays.asList("country"))
         .setNullHandlingEnabled(true)
         .build();
     assertRoundTrip(schema, config);
@@ -158,7 +159,7 @@ public class RoundTripTest {
     tasks.put("SegmentRefreshTask", refresh);
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("events")
-        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(tasks))
+        .setTaskConfig(new TableTaskConfig(tasks))
         .build();
     assertRoundTrip(schema, config);
   }
@@ -263,12 +264,12 @@ public class RoundTripTest {
         .setBrokerTenant("tenantA")
         .setServerTenant("tenantB")
         .setSortedColumn("country")
-        .setInvertedIndexColumns(java.util.Arrays.asList("city"))
-        .setNoDictionaryColumns(java.util.Arrays.asList("amount"))
-        .setOnHeapDictionaryColumns(java.util.Arrays.asList("country"))
-        .setVarLengthDictionaryColumns(java.util.Arrays.asList("city"))
-        .setBloomFilterColumns(java.util.Arrays.asList("country"))
-        .setRangeIndexColumns(java.util.Arrays.asList("amount"))
+        .setInvertedIndexColumns(Arrays.asList("city"))
+        .setNoDictionaryColumns(Arrays.asList("amount"))
+        .setOnHeapDictionaryColumns(Arrays.asList("country"))
+        .setVarLengthDictionaryColumns(Arrays.asList("city"))
+        .setBloomFilterColumns(Arrays.asList("country"))
+        .setRangeIndexColumns(Arrays.asList("amount"))
         .setNullHandlingEnabled(true)
         .setAggregateMetrics(true)
         .setPeerSegmentDownloadScheme("https")
@@ -276,7 +277,7 @@ public class RoundTripTest {
         .setSegmentVersion("v3")
         .setDeletedSegmentsRetentionPeriod("14d")
         .setDescription("a kitchen-sink test table")
-        .setTags(java.util.Arrays.asList("ourTeam", "metricsPipeline"))
+        .setTags(Arrays.asList("ourTeam", "metricsPipeline"))
         .build();
     assertRoundTrip(schema, config);
   }
