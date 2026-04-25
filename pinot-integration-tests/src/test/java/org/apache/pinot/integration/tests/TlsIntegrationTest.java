@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -48,6 +49,8 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
@@ -78,13 +81,14 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
 
 
-public class TlsIntegrationTest extends BaseClusterIntegrationTest {
+public class TlsIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final String PASSWORD = "changeit";
   private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
   private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
@@ -100,37 +104,40 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private int _internalBrokerPort;
   private int _externalBrokerPort;
   private javax.net.ssl.SSLContext _sslContext;
+  private File _classTempDir;
+
+  @Override
+  @BeforeSuite(alwaysRun = true)
+  public void setUpSharedRichClusterSuite()
+      throws Exception {
+    initializeTlsClients();
+    super.setUpSharedRichClusterSuite();
+  }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
-    java.security.KeyStore keyStore = java.security.KeyStore.getInstance(PKCS_12);
-    try (java.io.InputStream ksStream =
-        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
-      keyStore.load(ksStream, PASSWORD_CHAR);
+    initializeTlsClients();
+    _classTempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-data");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
+    if (!isSharedRichClusterEnabled()) {
+      TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
     }
-    java.security.KeyStore trustStore = java.security.KeyStore.getInstance(PKCS_12);
-    try (java.io.InputStream tsStream =
-        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
-      trustStore.load(tsStream, PASSWORD_CHAR);
-    }
-    _sslContext = org.apache.hc.core5.ssl.SSLContexts.custom()
-        .loadKeyMaterial(keyStore, PASSWORD_CHAR)
-        .loadTrustMaterial(trustStore, null)
-        .build();
-    TlsUtils.setSslContext(_sslContext);
-    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, _sslContext);
 
+    // Start Zookeeper and the exact Pinot topology required by this test. In shared mode these attach to the
+    // suite-owned TLS/auth cluster started above.
     startZk();
     startController();
     startBroker();
     startServer();
     startMinion();
-    startKafka();
+    attachTlsPortsFromSharedSuite();
+    resetKafkaTopic();
+
+    cleanUpTableSchemaAndLogicalTable();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload the schema and table config
     addSchema(createSchema());
@@ -148,19 +155,69 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(600_000L);
   }
 
+  private void initializeTlsClients()
+      throws Exception {
+    if (_sslContext != null) {
+      return;
+    }
+    java.security.KeyStore keyStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream ksStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      keyStore.load(ksStream, PASSWORD_CHAR);
+    }
+    java.security.KeyStore trustStore = java.security.KeyStore.getInstance(PKCS_12);
+    try (java.io.InputStream tsStream =
+        new java.io.FileInputStream(new File(Objects.requireNonNull(TLS_STORE_PKCS_12).toURI()))) {
+      trustStore.load(tsStream, PASSWORD_CHAR);
+    }
+    _sslContext = org.apache.hc.core5.ssl.SSLContexts.custom()
+        .loadKeyMaterial(keyStore, PASSWORD_CHAR)
+        .loadTrustMaterial(trustStore, null)
+        .build();
+    TlsUtils.setSslContext(_sslContext);
+    _httpClient = new HttpClient(HttpClientConfig.DEFAULT_HTTP_CLIENT_CONFIG, _sslContext);
+  }
+
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropLogicalTable(getLogicalTableName());
-    dropOfflineTable(getTableName());
-    dropRealtimeTable(getTableName());
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::cleanUpTableSchemaAndLogicalTable);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::stopMinionIfStarted);
+    exception = runCleanup(exception, this::stopServerIfStarted);
+    exception = runCleanup(exception, this::stopBrokerIfStarted);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopKafkaIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, () -> FileUtils.deleteDirectory(_tempDir));
+    }
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return true;
   }
 
   @Override
@@ -369,6 +426,151 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     } catch (Exception e) {
       throw new IOException(e);
     }
+  }
+
+  private void attachTlsPortsFromSharedSuite() {
+    if (!isSharedRichClusterEnabled() || _sharedRichClusterTestSuite == this) {
+      return;
+    }
+    if (!(_sharedRichClusterTestSuite instanceof TlsIntegrationTest)) {
+      throw new IllegalStateException("TlsIntegrationTest requires a TLS-configured shared rich cluster");
+    }
+    TlsIntegrationTest sharedSuite = (TlsIntegrationTest) _sharedRichClusterTestSuite;
+    _internalControllerPort = sharedSuite._internalControllerPort;
+    _externalControllerPort = sharedSuite._externalControllerPort;
+    _internalBrokerPort = sharedSuite._internalBrokerPort;
+    _externalBrokerPort = sharedSuite._externalBrokerPort;
+    _sslContext = sharedSuite._sslContext;
+  }
+
+  private void resetKafkaTopic() {
+    if (isSharedRichClusterEnabled()) {
+      attachSharedRichCluster();
+      deleteKafkaTopicIfPresent();
+      createKafkaTopic(getKafkaTopic());
+    } else {
+      startKafka();
+    }
+  }
+
+  private void cleanUpTableSchemaAndLogicalTable()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+    if (_helixResourceManager.getAllLogicalTableNames().contains(getLogicalTableName())) {
+      dropLogicalTable(getLogicalTableName());
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        getTableName())) {
+      dropOfflineTable(getTableName());
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(realtimeTableName) || _helixResourceManager.hasRealtimeTable(
+        getTableName())) {
+      dropRealtimeTable(getTableName());
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+
+    if (_helixResourceManager.getSchema(getLogicalTableName()) != null) {
+      deleteSchema(getLogicalTableName());
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopMinionIfStarted() {
+    if (_minionStarter != null) {
+      stopMinion();
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+      _classTempDir = null;
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   @Test

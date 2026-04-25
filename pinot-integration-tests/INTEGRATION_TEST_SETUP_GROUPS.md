@@ -277,6 +277,11 @@ instead of the main no-override suite:
 | Shared cursor auth suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-auth-cluster-integration-test-suite test` | 13 | 25.53s |
 | Shared timeseries suite | `./mvnw -pl pinot-integration-tests -Pshared-timeseries-cluster-integration-test-suite test` | 22 | 18.04s |
 | Shared timeseries auth suite | `./mvnw -pl pinot-integration-tests -Pshared-timeseries-auth-cluster-integration-test-suite test` | 22 | 19.11s |
+| Shared basic auth batch suite | `./mvnw -pl pinot-integration-tests -Pshared-basic-auth-batch-cluster-integration-test-suite test` | 5 | 25.76s |
+| Shared row-level security suite | `./mvnw -pl pinot-integration-tests -Pshared-row-level-security-cluster-integration-test-suite test` | 4 | 64.51s |
+| Shared TLS suite | `./mvnw -pl pinot-integration-tests -Pshared-tls-cluster-integration-test-suite test` | 21 | 52.14s |
+| Shared URL auth realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-url-auth-realtime-cluster-integration-test-suite test` | 2 | 47.64s |
+| Shared gRPC broker suite | `./mvnw -pl pinot-integration-tests -Pshared-grpc-broker-cluster-integration-test-suite test` | 2 | 53.04s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -331,6 +336,24 @@ The timeseries auth suite reuses the suite-aware `TimeSeriesIntegrationTest`
 lifecycle while owning a separate authenticated controller/broker/server setup.
 The same 22 tests passed per-class in 17.81s, while the shared profile passed in
 19.11s.
+
+The basic auth batch suite preserves the 1-server/no-Kafka/minion authenticated
+controller/broker/server/minion setup. The same 5 tests passed per-class in
+24.52s, while the shared profile passed in 25.76s.
+
+The row-level security suite preserves the 1-server/Kafka/no-minion
+authenticated controller/broker/server setup. The same 4 tests passed per-class
+in 65.41s, while the shared profile passed in 64.51s.
+
+The TLS and URL-auth realtime suites both use 1 server, Kafka, and a minion, but
+their process-level auth/TLS overrides are different, so they stay in separate
+exact-config profiles. TLS passed 21 tests per-class in 53.28s and in the shared
+profile in 52.14s. URL auth realtime passed 2 tests per-class in 47.21s and in
+the shared profile in 47.64s.
+
+The gRPC broker suite preserves the 2-server/Kafka/no-minion controller, broker,
+and server config bucket for gRPC request handling. The same 2 tests passed
+per-class in 51.18s, while the shared profile passed in 53.04s.
 
 Attempted but not included yet:
 
