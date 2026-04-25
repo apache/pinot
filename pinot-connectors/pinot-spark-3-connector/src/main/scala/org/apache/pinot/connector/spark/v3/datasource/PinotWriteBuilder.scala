@@ -26,11 +26,20 @@ import org.apache.spark.sql.sources.Filter
  *
  * The Pinot write path only ever appends new segments: it cannot drop or replace segments
  * matching an arbitrary filter as part of the same write job. Rather than silently dropping
- * the filters the caller supplies to {@code overwrite(...)} (which would leave existing rows
- * in place while new rows are appended, producing duplicate or stale query results), we fail
- * fast with a clear message. Users who need replacement semantics should drop the target
- * table first or use pinot-batch-ingestion-spark-3's segment push runners with REFRESH /
- * consistent-push enabled.
+ * the overwrite intent (which would leave existing rows in place while new rows are appended,
+ * producing duplicate or stale query results), we fail fast with a clear message on every
+ * overwrite entry point:
+ *
+ *   1. {@link SupportsOverwrite#overwrite(Array)} — filter-based overwrite.
+ *   2. {@link org.apache.spark.sql.connector.write.SupportsTruncate#truncate()} — in Spark 3.x
+ *      {@code SupportsOverwrite extends SupportsTruncate}, and the V2Writes analyzer rule
+ *      dispatches {@code df.write.mode("overwrite")} (overwrite-by-TRUE) to {@code truncate()}
+ *      rather than {@code overwrite([AlwaysTrue])}. The default {@code truncate()} returns
+ *      {@code this}, so without an explicit override the silent-append bug is reachable via
+ *      {@code mode("overwrite")} alone.
+ *
+ * Users who need replacement semantics should drop the target table first or use
+ * pinot-batch-ingestion-spark-3's segment push runners with REFRESH / consistent-push enabled.
  */
 class PinotWriteBuilder(logicalWriteInfo: LogicalWriteInfo)
   extends WriteBuilder with SupportsOverwrite {
@@ -44,5 +53,15 @@ class PinotWriteBuilder(logicalWriteInfo: LogicalWriteInfo)
         "replace existing data, drop the Pinot table via the controller REST API first, or use " +
         "pinot-batch-ingestion-spark-3's SparkSegment*PushJobRunner with REFRESH / " +
         "consistent-push enabled.")
+  }
+
+  override def truncate(): WriteBuilder = {
+    throw new UnsupportedOperationException(
+      "The Pinot Spark 3 connector does not support truncate / overwrite semantics: df.write " +
+        "always appends new segments. This error is typically triggered by " +
+        "df.write.mode(\"overwrite\").format(\"pinot\")... or an INSERT OVERWRITE. Use " +
+        "df.write.mode(\"append\") instead, or drop the Pinot table via the controller REST " +
+        "API first, or use pinot-batch-ingestion-spark-3's SparkSegment*PushJobRunner with " +
+        "REFRESH / consistent-push enabled.")
   }
 }
