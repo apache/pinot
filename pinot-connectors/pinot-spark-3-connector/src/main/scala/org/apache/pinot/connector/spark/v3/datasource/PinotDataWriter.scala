@@ -46,6 +46,13 @@ import java.util.regex.Pattern
  *
  *  Segment name generation is also executed here in order to make it possible for segment names which derive some
  *  parts from actual data (records), such as minTimestamp, maxTimestamp, etc.
+ *
+ *  Thread safety: NOT thread-safe. Per the Spark DataWriter contract, each instance is owned by
+ *  a single Spark task and the framework invokes write/commit/abort/close sequentially from the
+ *  task thread. Mutable state (`segmentOutputDir`, `bufferedRecordReader`, `startTime`,
+ *  `endTime`) therefore needs no synchronization. `commit()` and `abort()` are mutually
+ *  exclusive (Spark calls one or the other, not both); `close()` may be called after either
+ *  and is idempotent w.r.t. temp-dir cleanup and reader close.
  */
 class PinotDataWriter[InternalRow](
                                     partitionId: Int,
@@ -69,6 +76,12 @@ class PinotDataWriter[InternalRow](
   // and `abort()` can delete it. Without this, long-running executors accumulate uncompressed
   // segment build artifacts under the JVM tmpdir and can fill the disk.
   private var segmentOutputDir: File = _
+
+  // Tracks whether the writer's close-once resources (buffered reader, temp dir tracker) have
+  // already been released, so close() after abort() is a no-op rather than relying on
+  // PinotBufferedRecordReader.close() being idempotent. See the class-level Javadoc for the
+  // commit/abort/close ordering contract.
+  private var closed = false
 
   private var isTimeColumnNumeric = false
   if (timeColumnIndex > -1) {
@@ -289,18 +302,21 @@ class PinotDataWriter[InternalRow](
 
   override def abort(): Unit = {
     logger.info("Aborting writer")
-    bufferedRecordReader.close()
-    if (segmentOutputDir != null) {
-      FileUtils.deleteQuietly(segmentOutputDir)
-      segmentOutputDir = null
-    }
+    closeOnce()
   }
 
   override def close(): Unit = {
     logger.info("Closing writer")
+    closeOnce()
+  }
+
+  // Spark calls abort() and then close() on some error paths. Use a closed flag instead of
+  // relying on PinotBufferedRecordReader.close() being idempotent (it currently is, but the
+  // contract is not declared; pinning it here avoids future-binding the invariant).
+  private def closeOnce(): Unit = {
+    if (closed) return
+    closed = true
     bufferedRecordReader.close()
-    // Spark may call close() after abort() on some error paths; segmentOutputDir is idempotently
-    // null after commit() or abort() has already cleaned it up.
     if (segmentOutputDir != null) {
       FileUtils.deleteQuietly(segmentOutputDir)
       segmentOutputDir = null
