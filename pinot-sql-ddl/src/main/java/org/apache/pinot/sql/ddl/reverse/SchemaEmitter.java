@@ -20,7 +20,9 @@ package org.apache.pinot.sql.ddl.reverse;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -60,12 +62,18 @@ final class SchemaEmitter {
       validateEmittable(metric);
       out.add(emitColumn(metric));
     }
+    Set<String> dateTimeNames = new HashSet<>();
     for (DateTimeFieldSpec dt : schema.getDateTimeFieldSpecs()) {
+      dateTimeNames.add(dt.getName());
       out.add(emitColumn(dt));
     }
-    // Legacy time field: emit as a DATETIME column so the column is not silently dropped.
+    // Legacy time field: emit as a DATETIME column so the column is not silently dropped — but
+    // skip when a DateTimeFieldSpec already exists with the same column name. A schema mid-
+    // migration may carry both the legacy TimeFieldSpec and the modern DateTimeFieldSpec for
+    // the same logical column, and emitting both would yield a duplicate column declaration
+    // that fails to re-parse.
     TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
-    if (timeFieldSpec != null) {
+    if (timeFieldSpec != null && !dateTimeNames.contains(timeFieldSpec.getName())) {
       out.add(emitTimeColumn(timeFieldSpec));
     }
     return out;
