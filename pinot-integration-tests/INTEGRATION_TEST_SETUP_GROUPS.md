@@ -283,6 +283,7 @@ instead of the main no-override suite:
 | Shared URL auth realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-url-auth-realtime-cluster-integration-test-suite test` | 2 | 47.64s |
 | Shared gRPC broker suite | `./mvnw -pl pinot-integration-tests -Pshared-grpc-broker-cluster-integration-test-suite test` | 2 | 53.04s |
 | Shared hybrid suite | `./mvnw -pl pinot-integration-tests -Pshared-hybrid-cluster-integration-test-suite test` | 56 | 161.93s |
+| Shared controller periodic tasks suite | `./mvnw -pl pinot-integration-tests -Pshared-controller-periodic-tasks-cluster-integration-test-suite test` | 5 | 306.88s |
 | Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
 | Shared custom-tenant MSQ suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-stage-engine-custom-tenant-integration-test-suite test` | 91 | 55.35s |
 | Shared LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-llc-realtime-cluster-integration-test-suite test` | 18 | 167.30s |
@@ -364,6 +365,13 @@ server config bucket used by `HybridClusterIntegrationTest` and
 `DateTimeFieldSpecHybridClusterIntegrationTest`. The same 56 TestNG methods,
 including 9 expected skips, passed per-class in 192.56s and in the shared
 profile in 161.93s.
+
+The controller periodic tasks suite preserves the 4-server/Kafka/no-minion
+controller-config bucket used by `ControllerPeriodicTasksIntegrationTest`. The
+same 5 TestNG methods passed per-class in 200.74s and in the shared profile in
+306.88s. This profile is a setup-correctness bucket rather than a speed win
+because `testOfflineSegmentIntervalChecker` dominates runtime under the shared
+cluster.
 
 The offline suite preserves the 1-server/no-Kafka/no-minion setup and still
 exercises the destructive instance-decommission coverage by allowing it only for

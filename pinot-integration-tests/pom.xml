@@ -1068,6 +1068,31 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>shared-controller-periodic-tasks-cluster-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/shared-controller-periodic-tasks-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+              <systemPropertyVariables>
+                <pinot.integration.sharedRichCluster.enabled>true</pinot.integration.sharedRichCluster.enabled>
+                <pinot.integration.sharedRichCluster.numServers>4</pinot.integration.sharedRichCluster.numServers>
+                <pinot.integration.sharedRichCluster.startMinion>false</pinot.integration.sharedRichCluster.startMinion>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <dependencies>
