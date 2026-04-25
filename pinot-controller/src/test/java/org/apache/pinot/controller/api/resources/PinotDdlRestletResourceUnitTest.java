@@ -166,6 +166,30 @@ public class PinotDdlRestletResourceUnitTest {
         "matching BYTES defaults must not trip a content-vs-reference equality regression");
   }
 
+  /**
+   * Regression: BigDecimal.equals is scale-sensitive (1 != 1.0); the comparator must use
+   * compareTo so the same numeric default arriving via different literal forms is treated
+   * as equivalent. Without this fix, a hybrid second-variant CREATE on a BIG_DECIMAL column
+   * whose stored default arrived as "1.0" but DDL re-states "1" would falsely 409 CONFLICT.
+   */
+  @Test
+  public void acceptsScaleShiftedBigDecimalDefault() {
+    Schema stored = new Schema();
+    stored.setSchemaName("t");
+    MetricFieldSpec storedSpec = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
+        new java.math.BigDecimal("1.0"));
+    stored.addField(storedSpec);
+
+    Schema compiled = new Schema();
+    compiled.setSchemaName("t");
+    MetricFieldSpec compiledSpec = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
+        new java.math.BigDecimal("1"));
+    compiled.addField(compiledSpec);
+
+    assertNull(PinotDdlRestletResource.describeColumnShapeMismatch(stored, compiled),
+        "scale-shifted BIG_DECIMAL defaults must compare equal via compareTo");
+  }
+
   /** BYTES default mismatch must still be rejected with content-aware comparison. */
   @Test
   public void rejectsBytesDefaultNullValueMismatch() {

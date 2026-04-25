@@ -19,7 +19,7 @@
 package org.apache.pinot.sql.ddl.reverse;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -219,12 +219,13 @@ final class SchemaEmitter {
         }
         return value.toString();
       case TIMESTAMP:
-        // Pinot stores TIMESTAMP defaults as Long millis. Emit a quoted ISO timestamp string
-        // so canonical DDL is human-readable; FieldSpec.convertInternal accepts both ISO and
-        // numeric forms on re-parse, so the round-trip is preserved.
+        // Pinot stores TIMESTAMP defaults as Long millis. Emit a quoted UTC ISO-8601 string
+        // (Instant.toString) — NOT java.sql.Timestamp.toString, which formats in the JVM's
+        // default time zone and would make canonical DDL emit different strings on different
+        // controllers for the same input. ISO-8601 round-trips through TimestampUtils.
         if (value instanceof Number) {
           return SqlIdentifiers.quoteString(
-              new Timestamp(((Number) value).longValue()).toString());
+              Instant.ofEpochMilli(((Number) value).longValue()).toString());
         }
         return SqlIdentifiers.quoteString(value.toString());
       case BIG_DECIMAL:

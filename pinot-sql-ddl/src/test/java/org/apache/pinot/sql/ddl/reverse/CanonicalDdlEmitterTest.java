@@ -185,6 +185,67 @@ public class CanonicalDdlEmitterTest {
         "expected plain-string form of 1E+30; got:\n" + emitted);
   }
 
+  /**
+   * Regression: BIG_DECIMAL natural-default check must use compareTo rather than equals,
+   * so a stored BigDecimal("0.0") (scale 1) is treated as equivalent to BigDecimal.ZERO and
+   * canonical DDL elides the redundant DEFAULT clause.
+   */
+  @Test
+  public void bigDecimalAtNaturalDefaultDoesNotEmitDefault() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    MetricFieldSpec metric = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
+        new java.math.BigDecimal("0.0"));
+    schema.addField(metric);
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    assertFalse(emitted.contains("DEFAULT"),
+        "BIG_DECIMAL at scale-shifted natural default must not emit DEFAULT; got:\n" + emitted);
+  }
+
+  /**
+   * Regression: BOOLEAN columns store defaults internally as Integer 0/1; canonical DDL
+   * must emit the SQL literal form (TRUE/FALSE) so the output is grammar-standard.
+   */
+  @Test
+  public void booleanDefaultEmittedAsSqlLiteral() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    DimensionFieldSpec dim = new DimensionFieldSpec("flag", DataType.BOOLEAN, true);
+    dim.setDefaultNullValue(1);
+    schema.addField(dim);
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    assertTrue(emitted.contains("DEFAULT TRUE"),
+        "BOOLEAN default 1 must emit DEFAULT TRUE, got:\n" + emitted);
+    assertFalse(emitted.contains("DEFAULT 1") && !emitted.contains("DEFAULT TRUE"),
+        "must not emit raw integer encoding; got:\n" + emitted);
+  }
+
+  /**
+   * Regression: TIMESTAMP DEFAULT emission must use UTC ISO-8601 form (Instant.toString)
+   * rather than java.sql.Timestamp.toString, which formats in the JVM's default time zone
+   * and would make canonical DDL emit different strings on different controllers.
+   */
+  @Test
+  public void timestampDefaultEmittedInUtcIso() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    DimensionFieldSpec dim = new DimensionFieldSpec("ts", DataType.TIMESTAMP, true);
+    // 1700000000000 millis = 2023-11-14T22:13:20Z — pick a non-zero non-natural-default value
+    // so the DEFAULT clause is actually emitted.
+    dim.setDefaultNullValue(1700000000000L);
+    schema.addField(dim);
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    // Instant.ofEpochMilli(1700000000000L).toString() is "2023-11-14T22:13:20Z" — UTC ISO-8601.
+    assertTrue(emitted.contains("'2023-11-14T22:13:20Z'"),
+        "TIMESTAMP default must emit UTC ISO-8601 form (Instant.toString); got:\n" + emitted);
+  }
+
   @Test
   public void notNullAndDefaultEmittedExplicitly() {
     Schema schema = new Schema();
