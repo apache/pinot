@@ -391,15 +391,22 @@ public class PinotDdlRestletResource {
         return "column '" + columnName + "' NOT NULL flag differs (stored=" + storedSpec.isNotNull()
             + ", DDL=" + compiledSpec.isNotNull() + ")";
       }
-      // Compare typed default null value (after FieldSpec has parsed the string form into the
-      // column's data type). Comparing string forms produces false mismatches like "0" vs "0.0"
-      // when the same numeric default arrived via different literal forms (DDL "DEFAULT 0.0"
-      // vs JSON-API "defaultNullValue": 0); the typed projection collapses them.
+      // Compare typed default null value via DataType.equals, which delegates to Arrays.equals
+      // for BYTES (a fresh byte[] is allocated on every getDefaultNullValue() call, so a plain
+      // Objects.equals would do reference comparison and falsely flag every BYTES default as
+      // a mismatch). For other types, DataType.equals delegates to the boxed value's equals.
       Object storedDefault = storedSpec.getDefaultNullValue();
       Object compiledDefault = compiledSpec.getDefaultNullValue();
-      if (!Objects.equals(storedDefault, compiledDefault)) {
-        return "column '" + columnName + "' default null value differs (stored=" + storedDefault
-            + ", DDL=" + compiledDefault + ")";
+      boolean defaultsEqual;
+      if (storedDefault == null || compiledDefault == null) {
+        defaultsEqual = (storedDefault == null && compiledDefault == null);
+      } else {
+        defaultsEqual = storedSpec.getDataType().equals(storedDefault, compiledDefault);
+      }
+      if (!defaultsEqual) {
+        return "column '" + columnName + "' default null value differs (stored="
+            + storedSpec.getDefaultNullValueString()
+            + ", DDL=" + compiledSpec.getDefaultNullValueString() + ")";
       }
       if (storedSpec instanceof DateTimeFieldSpec && compiledSpec instanceof DateTimeFieldSpec) {
         DateTimeFieldSpec storedDt = (DateTimeFieldSpec) storedSpec;
