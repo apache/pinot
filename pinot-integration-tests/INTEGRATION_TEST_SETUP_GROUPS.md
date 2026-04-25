@@ -284,6 +284,7 @@ instead of the main no-override suite:
 | Shared gRPC broker suite | `./mvnw -pl pinot-integration-tests -Pshared-grpc-broker-cluster-integration-test-suite test` | 2 | 53.04s |
 | Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
 | Shared custom-tenant MSQ suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-stage-engine-custom-tenant-integration-test-suite test` | 91 | 55.35s |
+| Shared LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-llc-realtime-cluster-integration-test-suite test` | 18 | 167.30s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -366,6 +367,11 @@ The custom-tenant MSQ suite preserves the 1-server/no-Kafka/no-minion setup and
 cluster-level MSQ query-thread override used by
 `MultiStageEngineCustomTenantIntegrationTest`. The same 91 tests passed
 per-class in 56.34s, while the shared profile passed in 55.35s.
+
+The LLC realtime suite preserves the 1-server/Kafka/no-minion controller and
+server config bucket used by `LLCRealtimeClusterIntegrationTest`. The same 18
+TestNG methods, including 2 expected skips, passed per-class in 175.39s and in
+the shared profile in 167.30s.
 
 Attempted but not included yet:
 
