@@ -267,6 +267,9 @@ instead of the main no-override suite:
 | Shared CPU broker query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-cpu-broker-query-killing-cluster-integration-test-suite test` | 3 | 43.65s |
 | Shared CPU server query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-cpu-server-query-killing-cluster-integration-test-suite test` | 8 | 43.60s |
 | Shared memory server query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-memory-server-query-killing-cluster-integration-test-suite test` | 8 | 40.79s |
+| Shared MSQ small-buffer suite | `./mvnw -pl pinot-integration-tests -Pshared-msq-small-buffer-cluster-integration-test-suite test` | 50 | 34.42s |
+| Shared query workload suite | `./mvnw -pl pinot-integration-tests -Pshared-query-workload-cluster-integration-test-suite test` | 1 | 39.11s |
+| Shared realtime rate-limiter suite | `./mvnw -pl pinot-integration-tests -Pshared-realtime-rate-limiter-cluster-integration-test-suite test` | 2 | 92.03s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -293,6 +296,11 @@ exceptions; it passes when the profile uses the original 1-server topology. The
 same 58 tests passed in a single per-class lifecycle command in 147.11s, while
 the five exact profiles above total 191.07s. This batch is about getting the
 right setup buckets in place, not a wall-clock win yet.
+
+The MSQ small-buffer, query workload, and realtime rate-limiter suites are also
+exact topology/config buckets. The same 53 tests passed in a single per-class
+lifecycle command in 140.90s, while the three shared profiles total 165.56s.
+These profiles preserve required 4-server/no-Kafka and 1-server/Kafka shapes.
 
 Attempted but not included yet:
 
