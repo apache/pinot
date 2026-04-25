@@ -70,15 +70,16 @@ private[datasource] object PinotDataSource {
 
   // Probe for the Spark 3 connector's PinotDataSource by class name. We use Class.forName
   // rather than a static reference so this module does not develop a compile-time dependency
-  // on the Spark 3 connector. The probe runs once per JVM at first connector instantiation.
-  @volatile private var spark3Probed = false
-  @volatile private var spark3Conflict = false
+  // on the Spark 3 connector. The probe runs once per JVM via Scala `lazy val`, which the
+  // compiler implements with a synchronized initialization barrier — under concurrent
+  // construction every caller observes the fully-computed result rather than the default
+  // (`false`) value of a half-initialized var. The earlier two-flag @volatile pattern had
+  // a race window where a thread could read `spark3Probed=true` but `spark3Conflict=false`
+  // (default) before the probing thread wrote the real value.
+  private[datasource] lazy val spark3Conflict: Boolean =
+    isSpark3ConnectorOnClasspath(getClass.getClassLoader)
 
   def guardAgainstSpark3ConnectorOnClasspath(): Unit = {
-    if (!spark3Probed) {
-      spark3Probed = true
-      spark3Conflict = isSpark3ConnectorOnClasspath(getClass.getClassLoader)
-    }
     if (spark3Conflict) {
       throw new IllegalStateException(spark3ConflictMessage)
     }
