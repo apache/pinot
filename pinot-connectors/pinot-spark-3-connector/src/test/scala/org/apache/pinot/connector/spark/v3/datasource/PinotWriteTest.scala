@@ -103,6 +103,24 @@ class PinotWriteTest extends AnyFunSuite with Matchers {
     ex.getMessage should include("does not support overwrite")
     ex.getMessage should include("1")
   }
+
+  test("PinotWriteBuilder.truncate() rejects silent overwrite for df.write.mode(\"overwrite\")") {
+    // SupportsOverwrite extends SupportsTruncate in Spark 3.x; the V2Writes analyzer
+    // dispatches df.write.mode("overwrite") → truncate() rather than overwrite([AlwaysTrue]).
+    // Without an explicit override, truncate() returns `this` and build() silently appends —
+    // the very bug the overwrite() rejection is meant to prevent. This test pins the
+    // override so the truncate path fails fast too.
+    val info = new TestLogicalWriteInfo(
+      new CaseInsensitiveStringMap(Map.empty[String, String].asJava),
+      StructType(Seq(StructField("id", LongType))))
+    val builder = new PinotWriteBuilder(info)
+
+    val ex = intercept[UnsupportedOperationException] {
+      builder.truncate()
+    }
+    ex.getMessage should include("does not support truncate / overwrite")
+    ex.getMessage should include("df.write.mode(\"append\")")
+  }
 }
 
 class TestLogicalWriteInfo(
