@@ -177,7 +177,7 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 
 ### Current Draft Suite Timing
 
-The current draft suite moves twenty-three low-risk no-override source test classes
+The current draft suite moves twenty-four low-risk no-override source test classes
 behind the shared rich cluster. `ErrorCodesIntegrationTest` is represented by
 its four concrete inner TestNG classes:
 
@@ -206,20 +206,21 @@ its four concrete inner TestNG classes:
 - `LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest`
 - `PurgeMetadataPushMinionClusterIntegrationTest`
 - `RealtimeToOfflineSegmentsMinionClusterIntegrationTest`
+- `SimpleMinionClusterIntegrationTest`
 - `QueryQuotaClusterIntegrationTest`
 
-On this workstation, the same 202 TestNG tests passed in both modes:
+On this workstation, the same 205 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest,LogicalTableWithOneOfflineTableIntegrationTest,PurgeMetadataPushMinionClusterIntegrationTest,RealtimeToOfflineSegmentsMinionClusterIntegrationTest,QueryQuotaClusterIntegrationTest,LogicalTableWithTwoOfflineTablesIntegrationTest,LogicalTableWithTwelveOfflineTablesIntegrationTest,LogicalTableWithOneRealtimeTableIntegrationTest,LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwoRealtimeTableIntegrationTest,LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 780.87s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 501.50s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest,LogicalTableWithOneOfflineTableIntegrationTest,PurgeMetadataPushMinionClusterIntegrationTest,RealtimeToOfflineSegmentsMinionClusterIntegrationTest,QueryQuotaClusterIntegrationTest,LogicalTableWithTwoOfflineTablesIntegrationTest,LogicalTableWithTwelveOfflineTablesIntegrationTest,LogicalTableWithOneRealtimeTableIntegrationTest,LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwoRealtimeTableIntegrationTest,LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest,SimpleMinionClusterIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 768.15s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 519.27s |
 
-That is a 279.37s wall-clock reduction, about 36% for this draft batch.
+That is a 248.88s wall-clock reduction, about 32% for this draft batch.
 
-Previous validated checkpoint: 155 TestNG tests passed with a 597.19s per-class
-lifecycle and a 385.20s shared-rich-suite run, a 211.99s wall-clock reduction
-or about 35%.
+Previous validated checkpoint: 202 TestNG tests passed with a 780.87s per-class
+lifecycle and a 501.50s shared-rich-suite run, a 279.37s wall-clock reduction
+or about 36%.
 
 Attempted but not included yet:
 
@@ -236,6 +237,8 @@ Attempted but not included yet:
   timed out waiting for purged realtime records; it needs deeper realtime purge/task-state isolation.
 - `UpsertCompactMergeTaskIntegrationTest`: a shared-mode patch compiled, but the task generator skipped segments
   with empty download URLs and no task names were scheduled; segment download URL generation needs a targeted fix.
+- `MultiStageEngineIntegrationTest`, `MergeRollupMinionClusterIntegrationTest`: worker patch attempts were parked
+  before integration because the candidate edits still had compile/checkstyle issues and need a tighter follow-up pass.
 
 ### Suite Infrastructure
 
@@ -342,7 +345,6 @@ cleanup, unique names, sequential execution, or reset hooks before moving:
 - `LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest`: stateful logical-table time-boundary mutation.
 - `LogicalTableWithTwoRealtimeTableIntegrationTest`: fixed Kafka topic and per-instance counters.
 - `SegmentGenerationMinionClusterIntegrationTest`: drop all tables it creates.
-- `SimpleMinionClusterIntegrationTest`: global minion task state and cluster task config.
 - `MergeRollupMinionClusterIntegrationTest`: global task queues and generic table/topic names.
 - `PurgeMetadataPushMinionClusterIntegrationTest`: inherited setup creates extra tables/task state.
 - `PurgeMinionClusterIntegrationTest`: global `MinionContext` purger and generic table names.

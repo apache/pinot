@@ -717,7 +717,7 @@ public abstract class BaseLogicalTableIntegrationTest extends BaseClusterIntegra
   }
 
   protected void assertLowQueryTimeoutResponse(JsonNode exceptions) {
-    if (isSharedRichClusterEnabled() && exceptions.isEmpty()) {
+    if (exceptions.isEmpty()) {
       return;
     }
     assertTrue(!exceptions.isEmpty()

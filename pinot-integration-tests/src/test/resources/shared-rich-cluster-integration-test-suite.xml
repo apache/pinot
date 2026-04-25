@@ -47,6 +47,7 @@
       <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.PurgeMetadataPushMinionClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.RealtimeToOfflineSegmentsMinionClusterIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.QueryQuotaClusterIntegrationTest"/>
     </classes>
   </test>
