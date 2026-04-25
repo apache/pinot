@@ -301,14 +301,12 @@ public class PinotDdlRestletResource {
       return Response.ok(response).build();
     }
 
-    boolean schemaCreatedHere = false;
     try {
       // override=false: an existing schema with the same name is a precondition violation, not
       // something we silently overwrite. The other-typed table variant or another caller's
       // schema would otherwise be clobbered out from under them.
       if (!schemaPreexisted) {
         _pinotHelixResourceManager.addSchema(create.getSchema(), false, false);
-        schemaCreatedHere = true;
       }
       _pinotHelixResourceManager.addTable(create.getTableConfig());
       response.setMessage("Successfully created table " + tableNameWithType);
@@ -331,15 +329,16 @@ public class PinotDdlRestletResource {
       // would have its schema deleted out from under it — orphaning a live table. Pinot's
       // existing /tables endpoint also leaves the schema in place when table creation fails,
       // so the contract is consistent: schemas can outlive tables, and stale schemas can be
-      // removed via DELETE /schemas/{name}. Surface a hint so the operator knows the schema
-      // remains and how to clean it up if the failure is genuinely permanent.
-      String hint = schemaCreatedHere
-          ? " (schema '" + schemaName + "' was created and remains; remove via DELETE /schemas/"
-              + schemaName + " if the failure is permanent and no other variant uses it)"
-          : "";
+      // removed via DELETE /schemas/{name}.
+      //
+      // Don't append a "remove via DELETE /schemas" hint here: arbitrary RuntimeException /
+      // IOException from addTable can be a transient ZK or Helix blip, and pointing the
+      // operator at a destructive schema-deletion command in response to a transient failure
+      // would encourage premature cleanup. The error message is logged with the original
+      // cause so an operator can investigate via log/metrics.
       // ControllerApplicationException(LOGGER, ...) logs the exception, so don't double-log here.
       throw new ControllerApplicationException(LOGGER,
-          "Failed to create table " + tableNameWithType + ": " + e.getMessage() + hint,
+          "Failed to create table " + tableNameWithType + ": " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
@@ -543,7 +542,11 @@ public class PinotDdlRestletResource {
     List<String> dropped = new ArrayList<>();
     List<String> failed = new ArrayList<>();
     Exception firstFailure = null;
-    Response.Status firstFailureStatus = null;
+    // Track the integer status code rather than the Response.Status enum: the enum
+    // covers only the well-known IANA codes, and Response.Status.fromStatusCode() returns
+    // null for non-standard codes (422, 423, 451, etc.) — a null would silently fall back
+    // to 500 and hide the original 4xx information from the caller.
+    int firstFailureStatusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
     for (String target : targets) {
       try {
         // Remove task schedules before deletion so tasks are not triggered during the drop.
@@ -568,7 +571,7 @@ public class PinotDdlRestletResource {
         failed.add(target);
         if (firstFailure == null) {
           firstFailure = e;
-          firstFailureStatus = Response.Status.fromStatusCode(e.getResponse().getStatus());
+          firstFailureStatusCode = e.getResponse().getStatus();
         }
       } catch (Exception e) {
         // The wrapping CAE thrown after the loop will log the firstFailure with full stack;
@@ -578,7 +581,7 @@ public class PinotDdlRestletResource {
         failed.add(target);
         if (firstFailure == null) {
           firstFailure = e;
-          firstFailureStatus = Response.Status.INTERNAL_SERVER_ERROR;
+          firstFailureStatusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
         }
       }
     }
@@ -601,9 +604,7 @@ public class PinotDdlRestletResource {
     String msg = partialPrefix + "failed to drop " + failed + ": " + causeDesc
         + (dropped.isEmpty() ? "" : ". The successfully-dropped variant must be re-created if "
             + "the original DROP was unintended.");
-    throw new ControllerApplicationException(LOGGER, msg,
-        firstFailureStatus == null ? Response.Status.INTERNAL_SERVER_ERROR : firstFailureStatus,
-        firstFailure);
+    throw new ControllerApplicationException(LOGGER, msg, firstFailureStatusCode, firstFailure);
   }
 
   // -------------------------------------------------------------------------------------------
