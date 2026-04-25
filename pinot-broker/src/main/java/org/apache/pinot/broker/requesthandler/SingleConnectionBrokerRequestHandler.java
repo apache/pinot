@@ -108,13 +108,13 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     ScatterResult scatterResult = doScatter(requestId, rawTableName, route, timeoutMs, serverStats);
-    return doReduce(originalBrokerRequest, serverBrokerRequest, scatterResult.getDataTableMap(), scatterResult,
-        scatterGatherStartTimeNs, timeoutMs, rawTableName);
+    return doReduce(originalBrokerRequest, serverBrokerRequest, scatterResult, scatterGatherStartTimeNs, timeoutMs,
+        rawTableName);
   }
 
   /**
    * Executes scatter-gather: sends the query to servers and collects per-server DataTables.
-   * Subclasses may override to wrap or replace the scatter step (e.g., for cache integration).
+   * Subclasses may override to replace or augment the scatter step.
    */
   protected ScatterResult doScatter(long requestId, String rawTableName, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats)
@@ -142,19 +142,18 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         serversNotResponded.add(entry.getKey());
       }
     }
-    return new ScatterResult(dataTableMap, serversNotResponded, totalResponseSize, timedOut,
-        asyncQueryResponse.getException());
+    ScatterResultStats stats = new ScatterResultStats(
+        dataTableMap.size() + serversNotResponded.size(), dataTableMap.size(), totalResponseSize);
+    return new ScatterResult(dataTableMap, serversNotResponded, stats, timedOut, asyncQueryResponse.getException());
   }
 
   /**
-   * Executes the reduce step on the given dataTableMap and populates the response with scatter stats.
-   * Subclasses may pass a dataTableMap that differs from scatterResult.getDataTableMap() (e.g., with
-   * additional cached DataTables merged in), while scatterResult is always used for server stats so
-   * that cached entries are never counted as real servers queried.
+   * Executes the reduce step on the scatter result and populates the response with server stats.
+   * Subclasses may override to perform custom reduce logic, or construct a {@link ScatterResult}
+   * with a substituted data table map using {@link ScatterResultStats} to preserve server stats.
    */
   protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, ScatterResult scatterResult,
-      long scatterGatherStartTimeNs, long timeoutMs, String rawTableName)
+      ScatterResult scatterResult, long scatterGatherStartTimeNs, long timeoutMs, String rawTableName)
       throws Exception {
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
@@ -168,8 +167,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     long reduceStartTimeNs = System.nanoTime();
     long reduceTimeoutMs = timeoutMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - scatterGatherStartTimeNs);
     BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
-            reduceTimeoutMs, _brokerMetrics);
+        _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest,
+            scatterResult.getDataTableMap(), reduceTimeoutMs, _brokerMetrics);
     long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
 
@@ -200,6 +199,35 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   }
 
   /**
+   * Snapshot of server-side scatter statistics. Passed to {@link ScatterResult} so that server
+   * counts are always derived from the live scatter, not from a data table map that may have been
+   * augmented by a subclass.
+   */
+  public static final class ScatterResultStats {
+    private final int _numServersQueried;
+    private final int _numServersResponded;
+    private final long _totalResponseSize;
+
+    public ScatterResultStats(int numServersQueried, int numServersResponded, long totalResponseSize) {
+      _numServersQueried = numServersQueried;
+      _numServersResponded = numServersResponded;
+      _totalResponseSize = totalResponseSize;
+    }
+
+    public int getNumServersQueried() {
+      return _numServersQueried;
+    }
+
+    public int getNumServersResponded() {
+      return _numServersResponded;
+    }
+
+    public long getTotalResponseSize() {
+      return _totalResponseSize;
+    }
+  }
+
+  /**
    * Carries the scatter-gather result before the reduce step.
    */
   public static final class ScatterResult {
@@ -212,15 +240,15 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
     private final int _numServersResponded;
 
     public ScatterResult(Map<ServerRoutingInstance, DataTable> dataTableMap,
-        List<ServerRoutingInstance> serversNotResponded, long totalResponseSize, boolean timedOut,
-        Exception sendException) {
+        List<ServerRoutingInstance> serversNotResponded, ScatterResultStats stats,
+        boolean timedOut, Exception sendException) {
       _dataTableMap = dataTableMap;
       _serversNotResponded = serversNotResponded;
-      _totalResponseSize = totalResponseSize;
+      _totalResponseSize = stats.getTotalResponseSize();
       _timedOut = timedOut;
       _sendException = sendException;
-      _numServersQueried = dataTableMap.size() + serversNotResponded.size();
-      _numServersResponded = dataTableMap.size();
+      _numServersQueried = stats.getNumServersQueried();
+      _numServersResponded = stats.getNumServersResponded();
     }
 
     public Map<ServerRoutingInstance, DataTable> getDataTableMap() {
