@@ -42,7 +42,7 @@
 
   <build>
     <plugins>
-      <!-- Hard-fail early with a clear message on JDK 17/11 or Scala 2.12 instead of letting
+      <!-- Hard-fail early with a clear message on any JDK below 21 or Scala 2.12 instead of letting
            an obscure Maven resolution error leak through. The parent-pom module activation
            gates this module out of older builds, but this enforcer catches someone invoking
            `./mvnw -pl pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-4`

@@ -48,7 +48,12 @@
     <!-- Apache Spark 4 requires JDK 17+ and Scala 2.13 only. Register the Spark 4 batch
          ingestion plugin only when the active JDK is 21 or later; on JDK 11/17 the module is
          absent from the reactor entirely. Spark 3 users on older JDKs continue to build
-         pinot-batch-ingestion-spark-3 as before. -->
+         pinot-batch-ingestion-spark-3 as before.
+
+         Note: this profile is activated by JDK alone, so `-Ppinot-fastdev` on JDK 21 will also
+         build the Spark 4 batch ingestion plugin. Intentional — the module is small (4 runners
+         + tests) and its shade is disabled under `-Ppinot-fastdev` via the module's own
+         `pinot-fastdev` profile. To skip it explicitly pass `-P!pinot-batch-ingestion-spark-4`. -->
     <profile>
       <id>pinot-batch-ingestion-spark-4</id>
       <activation>
