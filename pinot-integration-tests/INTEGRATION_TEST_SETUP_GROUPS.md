@@ -276,6 +276,7 @@ instead of the main no-override suite:
 | Shared controller service discovery suite | `./mvnw -pl pinot-integration-tests -Pshared-controller-service-discovery-cluster-integration-test-suite test` | 1 | 16.50s |
 | Shared cursor auth suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-auth-cluster-integration-test-suite test` | 13 | 25.53s |
 | Shared timeseries suite | `./mvnw -pl pinot-integration-tests -Pshared-timeseries-cluster-integration-test-suite test` | 22 | 18.04s |
+| Shared timeseries auth suite | `./mvnw -pl pinot-integration-tests -Pshared-timeseries-auth-cluster-integration-test-suite test` | 22 | 19.11s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -325,6 +326,11 @@ three separate 1-server/no-Kafka/no-minion exact-config buckets. The same 36
 tests passed in per-class lifecycle commands totaling 61.97s, while the three
 shared profiles total 60.07s. These are mostly setup-correctness buckets today,
 with a small 1.90s combined wall-clock reduction.
+
+The timeseries auth suite reuses the suite-aware `TimeSeriesIntegrationTest`
+lifecycle while owning a separate authenticated controller/broker/server setup.
+The same 22 tests passed per-class in 17.81s, while the shared profile passed in
+19.11s.
 
 Attempted but not included yet:
 
