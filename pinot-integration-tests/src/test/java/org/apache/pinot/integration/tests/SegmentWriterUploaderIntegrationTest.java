@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -56,21 +57,30 @@ import org.testng.annotations.Test;
 public class SegmentWriterUploaderIntegrationTest extends SharedRichClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWriterUploaderIntegrationTest.class);
+  private static final String SHARED_TABLE_NAME = "segment_writer_uploader";
 
   private Schema _schema;
   private String _tableNameWithType;
   private List<File> _avroFiles;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
     startBroker();
     startServer();
+
+    cleanTableAndSchema();
 
     // Create and upload the schema
     _schema = createSchema();
@@ -84,13 +94,38 @@ public class SegmentWriterUploaderIntegrationTest extends SharedRichClusterInteg
   @Nullable
   protected IngestionConfig getIngestionConfig() {
     Map<String, String> batchConfigMap = new HashMap<>();
-    batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _tarDir.getAbsolutePath());
+    batchConfigMap.put(BatchConfigProperties.OUTPUT_DIR_URI, _classTarDir.getAbsolutePath());
     batchConfigMap.put(BatchConfigProperties.OVERWRITE_OUTPUT, "false");
     batchConfigMap.put(BatchConfigProperties.PUSH_CONTROLLER_URI, getControllerBaseApiUrl());
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setBatchIngestionConfig(
         new BatchIngestionConfig(Collections.singletonList(batchConfigMap), "APPEND", "HOURLY"));
     return ingestionConfig;
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
   }
 
   /**
@@ -105,49 +140,50 @@ public class SegmentWriterUploaderIntegrationTest extends SharedRichClusterInteg
     TableConfig offlineTableConfig = createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
 
-    SegmentWriter segmentWriter = new FileBasedSegmentWriter();
-    segmentWriter.init(offlineTableConfig, _schema);
     SegmentUploader segmentUploader = new SegmentUploaderDefault();
     segmentUploader.init(offlineTableConfig);
 
     GenericRow reuse = new GenericRow();
     long totalDocs = 0;
-    for (int i = 0; i < 3; i++) {
-      AvroRecordReader avroRecordReader = new AvroRecordReader();
-      avroRecordReader.init(_avroFiles.get(i), null, null);
+    try (SegmentWriter segmentWriter = new FileBasedSegmentWriter()) {
+      segmentWriter.init(offlineTableConfig, _schema);
+      for (int i = 0; i < 3; i++) {
+        long numDocsInSegment = 0;
+        try (AvroRecordReader avroRecordReader = new AvroRecordReader()) {
+          avroRecordReader.init(_avroFiles.get(i), null, null);
 
-      long numDocsInSegment = 0;
-      while (avroRecordReader.hasNext()) {
-        avroRecordReader.next(reuse);
-        segmentWriter.collect(reuse);
-        numDocsInSegment++;
-        totalDocs++;
+          while (avroRecordReader.hasNext()) {
+            avroRecordReader.next(reuse);
+            segmentWriter.collect(reuse);
+            numDocsInSegment++;
+            totalDocs++;
+          }
+        }
+        // flush to segment
+        URI segmentTarURI = segmentWriter.flush();
+        // upload
+        segmentUploader.uploadSegment(segmentTarURI, null);
+
+        // check num segments
+        Assert.assertEquals(getNumSegments(), i + 1);
+        // check numDocs in latest segment
+        Assert.assertEquals(getNumDocsInLatestSegment(), numDocsInSegment);
+        // check totalDocs in query
+        checkTotalDocsInQuery(totalDocs);
       }
-      // flush to segment
-      URI segmentTarURI = segmentWriter.flush();
-      // upload
-      segmentUploader.uploadSegment(segmentTarURI, null);
-
-      // check num segments
-      Assert.assertEquals(getNumSegments(), i + 1);
-      // check numDocs in latest segment
-      Assert.assertEquals(getNumDocsInLatestSegment(), numDocsInSegment);
-      // check totalDocs in query
-      checkTotalDocsInQuery(totalDocs);
     }
-    segmentWriter.close();
 
-    dropAllSegments(_tableNameWithType, TableType.OFFLINE);
+    dropAllSegments(getTableName(), TableType.OFFLINE);
     checkNumSegments(0);
 
     // upload all together using dir
-    segmentUploader.uploadSegmentsFromDir(_tarDir.toURI(), null);
+    segmentUploader.uploadSegmentsFromDir(_classTarDir.toURI(), null);
     // check num segments
     Assert.assertEquals(getNumSegments(), 3);
     // check totalDocs in query
     checkTotalDocsInQuery(totalDocs);
 
-    dropOfflineTable(_tableNameWithType);
+    cleanTableAndSchema();
   }
 
   private int getNumSegments()
@@ -206,15 +242,92 @@ public class SegmentWriterUploaderIntegrationTest extends SharedRichClusterInteg
     }, 100L, 120_000L, "Failed to load get num segments");
   }
 
-  @AfterClass
+  @Override
+  protected List<File> getAllAvroFiles()
+      throws Exception {
+    int numSegments = unpackAvroData(_classTempDir).size();
+
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_classTempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+
+    return avroFiles;
+  }
+
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    deleteSchema(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::cleanClassTempDirectory);
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
-    FileUtils.deleteDirectory(_tempDir);
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void cleanClassTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

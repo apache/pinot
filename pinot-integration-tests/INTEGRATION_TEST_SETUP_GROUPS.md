@@ -251,7 +251,7 @@ instead of the main no-override suite:
 | Suite | Command | TestNG tests | Wall time |
 | --- | --- | ---: | ---: |
 | Shared MSE explain suite | `./mvnw -pl pinot-integration-tests -Pshared-mse-explain-cluster-integration-test-suite test` | 4 | 23.86s |
-| Shared no-override offline suite | `./mvnw -pl pinot-integration-tests -Pshared-no-override-offline-cluster-integration-test-suite test` | 18 | 89.63s |
+| Shared no-override offline suite | `./mvnw -pl pinot-integration-tests -Pshared-no-override-offline-cluster-integration-test-suite test` | 47 | 122.42s |
 | Shared cursor memory suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-memory-cluster-integration-test-suite test` | 19 | 74.29s |
 | Shared cursor filesystem suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-fs-cluster-integration-test-suite test` | 15 | 30.30s |
 | Shared cursor cron cleanup suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-cron-cluster-integration-test-suite test` | 1 | 24.47s |
@@ -299,9 +299,11 @@ themselves.
 
 The no-override offline suite preserves the 1-server/no-Kafka/no-minion setup
 for `DimensionTableIntegrationTest`, `HelixZNodeSizeLimitTest`,
-`QueryQuotaClusterIntegrationTest`, and `SegmentUploadIntegrationTest`. The
-same 18 tests passed per-class in 108.02s, while the shared profile passed in
-89.63s, an 18.39s wall-clock reduction.
+`QueryQuotaClusterIntegrationTest`, `SegmentUploadIntegrationTest`,
+`SegmentWriterUploaderIntegrationTest`, `SparkSegmentMetadataPushIntegrationTest`,
+`StarTreeFunctionParametersIntegrationTest`, and `TPCHQueryIntegrationTest`. The
+same 47 tests passed with a combined per-class baseline of 181.21s, while the
+shared profile passed in 122.42s, a 58.79s wall-clock reduction.
 
 The broker service discovery, broker query limit, null handling, and MSQ without
 stats suites follow the same exact-config pattern. The same 72 tests passed in a

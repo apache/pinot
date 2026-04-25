@@ -26,6 +26,10 @@
       <class name="org.apache.pinot.integration.tests.HelixZNodeSizeLimitTest"/>
       <class name="org.apache.pinot.integration.tests.QueryQuotaClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.SegmentUploadIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.SegmentWriterUploaderIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.SparkSegmentMetadataPushIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.StarTreeFunctionParametersIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.tpch.TPCHQueryIntegrationTest"/>
     </classes>
   </test>
 </suite>

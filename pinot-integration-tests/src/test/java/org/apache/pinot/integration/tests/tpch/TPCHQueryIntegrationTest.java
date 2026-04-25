@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -39,6 +40,7 @@ import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.SharedRichClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.JarUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -56,15 +58,43 @@ import org.testng.annotations.Test;
  */
 public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 24;
+  private static final String SHARED_TABLE_NAME_PREFIX = "tpch_";
 
   // Pinot queries 15, 16, 17 fail due to lack of support for views.
   // Pinot queries 23 fail due to java heap space problem or timeout.
   private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(15, 16, 17, 23);
 
-  @BeforeClass
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
@@ -72,17 +102,19 @@ public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
     startBroker();
     startServer();
 
+    cleanTablesAndSchemas();
     setUpH2Connection();
     for (String tableName : Constants.TPCH_TABLE_NAMES) {
-      File tableSegmentDir = new File(_segmentDir, tableName);
-      File tarDir = new File(_tarDir, tableName);
+      String pinotTableName = getPinotTableName(tableName);
+      File tableSegmentDir = new File(_classSegmentDir, tableName);
+      File tarDir = new File(_classTarDir, tableName);
       String tableResourceFolder = Constants.getTableResourceFolder(tableName);
       URL resourceUrl = getClass().getClassLoader().getResource(tableResourceFolder);
       Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResourceFolder);
       File resourceFile;
       if ("jar".equals(resourceUrl.getProtocol())) {
         String[] splits = resourceUrl.getFile().split("!");
-        File tempUnpackDir = new File(_tempDir.getAbsolutePath() + File.separator + splits[1]);
+        File tempUnpackDir = new File(_classTempDir.getAbsolutePath() + File.separator + splits[1]);
         TestUtils.ensureDirectoriesExistAndEmpty(tempUnpackDir);
         JarUtils.copyResourcesToDirectory(splits[0], splits[1].substring(1), tempUnpackDir.getAbsolutePath());
         resourceFile = tempUnpackDir;
@@ -97,12 +129,14 @@ public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
       // Pinot
       TestUtils.ensureDirectoriesExistAndEmpty(tableSegmentDir, tarDir);
       Schema schema = createSchema(schemaFile);
+      schema.setSchemaName(pinotTableName);
       addSchema(schema);
       TableConfig tableConfig = createTableConfig(tableFile);
+      tableConfig.setTableName(pinotTableName);
       addTableConfig(tableConfig);
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
-      uploadSegments(tableName, tarDir);
+      uploadSegments(pinotTableName, tarDir);
       // H2
       ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
@@ -110,7 +144,7 @@ public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
 
   @Test(dataProvider = "QueryDataProvider")
   public void testTPCHQueries(String[] pinotAndH2Queries) throws Exception {
-    testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
+    testQueriesSucceed(rewriteTableNamesForPinot(pinotAndH2Queries[0]), pinotAndH2Queries[1]);
   }
 
   protected void testQueriesSucceed(String pinotQuery, String h2Query) throws Exception {
@@ -154,7 +188,8 @@ public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
 
   @Override
   protected long getCurrentCountStarResult() {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM orders").getResultSet(0).getLong(0);
+    return getPinotConnection().execute("SELECT COUNT(*) FROM " + getPinotTableName("orders")).getResultSet(0)
+        .getLong(0);
   }
 
   @Override
@@ -177,21 +212,132 @@ public class TPCHQueryIntegrationTest extends SharedRichClusterIntegrationTest {
     return timeoutProperties;
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    // unload all TPCH tables.
-    for (String table : Constants.TPCH_TABLE_NAMES) {
-      dropOfflineTable(table);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTablesAndSchemas);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServerIfStarted);
+    exception = runCleanup(exception, this::stopBrokerIfStarted);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private String getPinotTableName(String tableName) {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + tableName : tableName;
+  }
+
+  private String rewriteTableNamesForPinot(String query) {
+    if (!isSharedRichClusterEnabled()) {
+      return query;
     }
 
-    // stop components and clean up
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+    String rewrittenQuery = query;
+    for (String tableName : Constants.TPCH_TABLE_NAMES) {
+      rewrittenQuery = rewrittenQuery.replaceAll("\\b" + Pattern.quote(tableName) + "\\b",
+          getPinotTableName(tableName));
+    }
+    return rewrittenQuery;
+  }
 
-    FileUtils.deleteDirectory(_tempDir);
+  private void cleanTablesAndSchemas()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    for (String tableName : Constants.TPCH_TABLE_NAMES) {
+      String pinotTableName = getPinotTableName(tableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(pinotTableName);
+      if (_helixResourceManager.getTableConfig(offlineTableName) != null || _helixResourceManager.hasOfflineTable(
+          pinotTableName)) {
+        dropOfflineTable(pinotTableName);
+        waitForTableDataManagerRemoved(offlineTableName);
+        waitForEVToDisappear(offlineTableName);
+      }
+      if (_helixResourceManager.getSchema(pinotTableName) != null) {
+        deleteSchema(pinotTableName);
+      }
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   @DataProvider(name = "QueryDataProvider")

@@ -49,19 +49,55 @@ import static org.testng.Assert.assertFalse;
 
 
 public class StarTreeFunctionParametersIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME_PREFIX = "star_tree_function_parameters";
+
+  private final String _sharedResourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
   private TableConfig _tableConfig;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
   private String _originalMaxSegmentStarTreePreprocessParallelism;
   private String _originalMaxSegmentDownloadParallelism;
   private boolean _clusterConfigOverridesApplied;
 
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + _sharedResourceSuffix
+        : super.getTableName();
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
+    cleanTableAndSchema();
     HelixConfigScope scope = getClusterConfigScope();
     ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     _originalMaxSegmentStarTreePreprocessParallelism =
@@ -96,32 +132,28 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
     addTableConfig(_tableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, _tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, _tableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
 
     waitForAllDocsLoaded(600_000L);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    try {
-      cleanTableAndSchema();
-    } finally {
-      try {
-        restoreClusterConfigOverrides();
-      } finally {
-        // Stop the Pinot cluster
-        stopServer();
-        stopBroker();
-        stopController();
-
-        // Stop Zookeeper
-        stopZk();
-        FileUtils.deleteDirectory(_tempDir);
-      }
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::restoreClusterConfigOverrides);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
     }
   }
 
@@ -135,6 +167,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
     if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
         getTableName())) {
       dropOfflineTable(getTableName());
+      waitForTableDataManagerRemoved(offlineTableName);
       waitForEVToDisappear(offlineTableName);
     }
     if (_helixResourceManager.getSchema(getTableName()) != null) {
@@ -208,7 +241,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == 1);
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
+    reloadOfflineTable(getTableName());
 
     checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable "
             + "WHERE DistanceGroup > 1", distinctCountHllLog2m4);
@@ -228,7 +261,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs()
         .get(starTreeIndexConfigs.size() - 1).getAggregationConfigs().get(0).getFunctionParameters() == null);
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
+    reloadOfflineTable(getTableName());
 
     checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID) FROM mytable "
             + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
@@ -246,7 +279,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == 2);
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
+    reloadOfflineTable(getTableName());
 
     checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable WHERE DistanceGroup > 1",
         distinctCountHllLog2m4);
@@ -264,7 +297,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs()
         .get(starTreeIndexConfigs.size() - 1).getAggregationConfigs().get(0).getFunctionParameters()
         .get(Constants.HLL_LOG2M_KEY).equals("6"));
-    reloadOfflineTable(DEFAULT_TABLE_NAME);
+    reloadOfflineTable(getTableName());
 
     checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 6) FROM mytable "
             + "WHERE DistanceGroup > 1", distinctCountHllLog2m6);
@@ -294,7 +327,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
    * Helper method to assert that a query does not use a star-tree index.
    */
   private void checkQueryDoesNotUseStarTreeIndex(String query, int expectedResult) throws Exception {
-    JsonNode explainPlan = postQuery("EXPLAIN PLAN FOR " + query);
+    JsonNode explainPlan = postQueryForTable("EXPLAIN PLAN FOR " + query);
     assertFalse(explainPlan.toString().contains(StarTreeTest.FILTER_STARTREE_INDEX));
     assertEquals(getDistinctCountResult(query), expectedResult);
   }
@@ -309,7 +342,7 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
         (aVoid) -> {
           JsonNode result;
           try {
-            result = postQuery("EXPLAIN PLAN FOR " + query);
+            result = postQueryForTable("EXPLAIN PLAN FOR " + query);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -323,7 +356,48 @@ public class StarTreeFunctionParametersIntegrationTest extends SharedRichCluster
    * Helper method to return the int result of a distinct count query.
    */
   private int getDistinctCountResult(String query) throws Exception {
-    JsonNode result = postQuery(query);
+    JsonNode result = postQueryForTable(query);
     return result.get("resultTable").get("rows").get(0).get(0).asInt();
+  }
+
+  private JsonNode postQueryForTable(String query)
+      throws Exception {
+    return postQuery(query.replace(DEFAULT_TABLE_NAME, getTableName()));
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _sharedResourceSuffix)
+        : _tempDir;
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }
