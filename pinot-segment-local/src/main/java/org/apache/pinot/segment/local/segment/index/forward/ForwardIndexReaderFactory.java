@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVFo
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReaderV7;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
@@ -115,9 +116,21 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version >= FixedBytePower2ChunkSVForwardIndexReader.VERSION
-          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      if (version == FixedByteChunkSVForwardIndexReaderV7.VERSION) {
+        if (storedType != DataType.INT && storedType != DataType.LONG) {
+          throw new UnsupportedOperationException(
+              "V7 codec pipeline does not yet support " + storedType + " columns");
+        }
+        return new FixedByteChunkSVForwardIndexReaderV7(dataBuffer, storedType);
+      }
+      if (version == FixedBytePower2ChunkSVForwardIndexReader.VERSION) {
+        return new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType);
+      }
+      if (version < FixedBytePower2ChunkSVForwardIndexReader.VERSION) {
+        return new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      }
+      // Versions 5 and 6 are VarByte writer versions and do not apply to fixed-width SV indexes.
+      throw new UnsupportedOperationException("Unsupported fixed-byte SV forward index version: " + version);
     }
 
     if (version == VarByteChunkForwardIndexWriterV6.VERSION) {
