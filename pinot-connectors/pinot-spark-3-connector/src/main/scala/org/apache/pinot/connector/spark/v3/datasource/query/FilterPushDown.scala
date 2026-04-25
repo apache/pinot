@@ -86,13 +86,19 @@ private[pinot] object FilterPushDown {
   // verbatim under `LIKE ... ESCAPE '\'`. Backslash is doubled first to avoid double-escaping
   // the escapes added afterwards.
   //
+  // Caller contract: `value` must be non-null. `isFilterSupported` rejects null-valued
+  // StringStartsWith/EndsWith/Contains upstream, so this helper is only reached for non-null
+  // strings. We require non-null here rather than coercing to e.g. "null" so any future caller
+  // that bypasses `isFilterSupported` fails loudly instead of producing a `LIKE 'null%'`
+  // predicate that would silently match the literal four-character string "null".
+  //
   // Note: values containing literal backslashes are rejected upstream by `isFilterSupported`
-  // because Pinot's `likeToRegexpLike` does not round-trip `\\` correctly. The backslash branch
-  // here is kept defensively so this helper produces well-formed SQL even if called via a
-  // future code path that does not gate on `isFilterSupported`.
+  // because Pinot's `likeToRegexpLike` does not round-trip `\\` correctly. The backslash
+  // branch here is kept defensively so this helper produces well-formed SQL even if called
+  // via a future code path that does not gate on `isFilterSupported`.
   private def escapeLikeLiteral(value: String): String = {
-    if (value == null) null
-    else value
+    require(value != null, "escapeLikeLiteral requires a non-null value; gate on isFilterSupported")
+    value
       .replace("\\", "\\\\")
       .replace("%", "\\%")
       .replace("_", "\\_")
