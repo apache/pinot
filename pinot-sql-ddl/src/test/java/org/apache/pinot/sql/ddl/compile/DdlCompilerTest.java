@@ -199,6 +199,23 @@ public class DdlCompilerTest {
   }
 
   /**
+   * SMALLINT and TINYINT are explicitly rejected to keep the type contract narrow: silently
+   * widening to INT today would lock those DDLs into INT semantics if Pinot later adds
+   * INT8/INT16. Rejection at the boundary is reversible; silent promotion is not.
+   */
+  @Test
+  public void smallintTinyintRejectedExplicitly() {
+    DdlCompilationException ex1 = expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id SMALLINT) TABLE_TYPE = OFFLINE"));
+    assertTrue(ex1.getMessage() != null && ex1.getMessage().contains("SMALLINT"),
+        "expected error to name SMALLINT, got: " + ex1.getMessage());
+    DdlCompilationException ex2 = expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id TINYINT) TABLE_TYPE = OFFLINE"));
+    assertTrue(ex2.getMessage() != null && ex2.getMessage().contains("TINYINT"),
+        "expected error to name TINYINT, got: " + ex2.getMessage());
+  }
+
+  /**
    * DEFAULT NULL is semantically meaningless for Pinot's "default null value" concept (the
    * value used when the source row is null). A user writing it would get silently no-op
    * behavior under the previous implementation; we now reject explicitly so the user sees a
