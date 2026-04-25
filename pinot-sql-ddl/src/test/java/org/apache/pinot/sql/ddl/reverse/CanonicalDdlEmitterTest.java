@@ -220,8 +220,8 @@ public class CanonicalDdlEmitterTest {
     String emitted = CanonicalDdlEmitter.emit(schema, config);
     assertTrue(emitted.contains("DEFAULT TRUE"),
         "BOOLEAN default 1 must emit DEFAULT TRUE, got:\n" + emitted);
-    assertFalse(emitted.contains("DEFAULT 1") && !emitted.contains("DEFAULT TRUE"),
-        "must not emit raw integer encoding; got:\n" + emitted);
+    assertFalse(emitted.contains("DEFAULT 1"),
+        "must not emit raw integer encoding (DEFAULT 1); got:\n" + emitted);
   }
 
   /**
