@@ -1642,6 +1642,12 @@ public final class TableConfigUtils {
 
         // Validate DELTA / DELTADELTA compression codecs compatibility
         validateGorillaCompressionCodecIfPresent(fieldConfig, schema.getFieldSpecFor(column));
+
+        // Note: codecSpec is validated below via `indexType.validate(...)` once
+        // FieldIndexConfigsUtil has resolved the effective ForwardIndexConfig (merging the legacy
+        // `noDictionaryColumns` / `noDictionaryConfig` signals into the resolved encoding type).
+        // Validating the raw FieldConfig here would incorrectly reject legacy tables that express
+        // RAW via `noDictionaryColumns` while still setting codecSpec on FieldConfig.
       }
       validateIndexingConfigAndFieldConfigListCompatibility(indexingConfig, fieldConfigs);
     }
