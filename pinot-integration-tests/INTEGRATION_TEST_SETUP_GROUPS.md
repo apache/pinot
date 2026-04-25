@@ -255,6 +255,10 @@ instead of the main no-override suite:
 | Shared cursor filesystem suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-fs-cluster-integration-test-suite test` | 15 | 30.30s |
 | Shared cursor cron cleanup suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-cron-cluster-integration-test-suite test` | 1 | 24.47s |
 | Shared empty response suite | `./mvnw -pl pinot-integration-tests -Pshared-empty-response-cluster-integration-test-suite test` | 6 | 22.98s |
+| Shared broker service discovery suite | `./mvnw -pl pinot-integration-tests -Pshared-broker-service-discovery-cluster-integration-test-suite test` | 1 | 18.09s |
+| Shared broker query limit suite | `./mvnw -pl pinot-integration-tests -Pshared-broker-query-limit-cluster-integration-test-suite test` | 2 | 21.43s |
+| Shared null handling suite | `./mvnw -pl pinot-integration-tests -Pshared-null-handling-cluster-integration-test-suite test` | 68 | 23.00s |
+| Shared MSQ without stats suite | `./mvnw -pl pinot-integration-tests -Pshared-msq-without-stats-cluster-integration-test-suite test` | 1 | 21.59s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -262,6 +266,12 @@ The same 41 tests passed in a single per-class lifecycle command in 112.06s,
 while the four shared profiles total 152.04s. They are suite-ready buckets for
 future tests with the same broker configuration rather than a speed win by
 themselves.
+
+The broker service discovery, broker query limit, null handling, and MSQ without
+stats suites follow the same exact-config pattern. The same 72 tests passed in a
+single per-class lifecycle command in 40.31s, while these four shared profiles
+total 84.11s. They are separated because they exercise different broker/server
+process configuration overrides.
 
 Attempted but not included yet:
 

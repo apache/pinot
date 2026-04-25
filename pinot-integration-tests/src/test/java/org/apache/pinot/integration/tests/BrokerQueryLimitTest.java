@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,13 +43,15 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-// this test uses separate cluster because it needs to change broker configuration
-// which is only done once per suite
-public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
+public class BrokerQueryLimitTest extends SharedRichClusterIntegrationTest {
 
   protected static final Logger LOGGER = LoggerFactory.getLogger(BrokerQueryLimitTest.class);
   private static final String LONG_COLUMN = "longCol";
+  private static final String SHARED_TABLE_NAME = "broker_query_limit";
   public static final int DEFAULT_LIMIT = 5;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
 
   @Test
   public void testWhenLimitIsNOTSetExplicitlyThenDefaultLimitIsApplied()
@@ -97,7 +100,7 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
 
   @Override
   public String getTableName() {
-    return DEFAULT_TABLE_NAME;
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : DEFAULT_TABLE_NAME;
   }
 
   @Override
@@ -114,7 +117,7 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
         new org.apache.avro.Schema.Field(LONG_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
             null, null)));
 
-    File avroFile = new File(_tempDir, "data.avro");
+    File avroFile = new File(_classTempDir, "data.avro");
     try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       writer.create(avroSchema, avroFile);
       for (int i = 0; i < getCountStarResult(); i++) {
@@ -130,17 +133,19 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
   public void setUp()
       throws Exception {
     LOGGER.warn("Setting up integration test class: {}", getClass().getSimpleName());
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
-    LOGGER.warn("Start Kafka in the integration test class");
-    startKafka();
     startController();
     startBroker();
     startServer();
 
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    cleanTableAndSchema();
+
     // create & upload schema AND table config
     Schema schema = createSchema();
     addSchema(schema);
@@ -151,28 +156,76 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
     addTableConfig(tableConfig);
 
     // create & upload segments
-    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
 
     waitForAllDocsLoaded(60_000);
     LOGGER.warn("Finished setting up integration test class: {}", getClass().getSimpleName());
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
     LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
-    try {
-      dropOfflineTable(getTableName());
-      stopServer();
-      stopBroker();
-      stopController();
-      stopKafka();
-      stopZk();
-    } finally {
-      FileUtils.deleteQuietly(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::cleanTempDirectory);
+    if (exception != null) {
+      throw exception;
     }
     LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void cleanTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   @Override
