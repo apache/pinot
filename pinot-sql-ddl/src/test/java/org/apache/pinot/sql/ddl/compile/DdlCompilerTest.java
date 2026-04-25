@@ -198,6 +198,20 @@ public class DdlCompilerTest {
     assertEquals(defaultValue, "unknown");
   }
 
+  /**
+   * DEFAULT NULL is semantically meaningless for Pinot's "default null value" concept (the
+   * value used when the source row is null). A user writing it would get silently no-op
+   * behavior under the previous implementation; we now reject explicitly so the user sees a
+   * clear error and corrects their DDL.
+   */
+  @Test
+  public void defaultNullRejectedExplicitly() {
+    DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id INT DEFAULT NULL) TABLE_TYPE = OFFLINE"));
+    assertTrue(ex.getMessage() != null && ex.getMessage().contains("DEFAULT NULL"),
+        "expected error to name DEFAULT NULL, got: " + ex.getMessage());
+  }
+
   @Test
   public void numericDefaultRoundTripsCorrectly() {
     CompiledCreateTable c = compileCreate(

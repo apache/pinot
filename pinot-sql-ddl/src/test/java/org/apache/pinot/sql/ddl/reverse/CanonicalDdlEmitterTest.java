@@ -147,6 +147,44 @@ public class CanonicalDdlEmitterTest {
     assertFalse(emitted.contains("'loadMode'"), emitted);
   }
 
+  /**
+   * Regression: comparing default value vs natural default with Object.equals does reference
+   * equality on byte[], so a BYTES column at its natural default would always emit a redundant
+   * DEFAULT '<hex>' clause. The fix uses DataType.equals which delegates to Arrays.equals.
+   */
+  @Test
+  public void noDefaultEmittedForBytesAtNaturalDefault() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    schema.addField(new DimensionFieldSpec("blob", DataType.BYTES, true));
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    assertTrue(emitted.contains("blob BYTES DIMENSION"), emitted);
+    assertFalse(emitted.contains("DEFAULT"),
+        "BYTES column at natural default must not emit a DEFAULT clause; got:\n" + emitted);
+  }
+
+  /**
+   * Regression: BigDecimal.toString() can emit scientific notation (1E+30) which Calcite's
+   * Literal() rule does not accept. The fix routes BIG_DECIMAL defaults through toPlainString().
+   */
+  @Test
+  public void bigDecimalDefaultEmitsPlainString() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    MetricFieldSpec metric = new MetricFieldSpec("amount", DataType.BIG_DECIMAL,
+        new java.math.BigDecimal("1E+30"));
+    schema.addField(metric);
+
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    String emitted = CanonicalDdlEmitter.emit(schema, config);
+    assertFalse(emitted.contains("E+") || emitted.contains("E-"),
+        "BIG_DECIMAL default must not contain scientific notation; got:\n" + emitted);
+    assertTrue(emitted.contains("1000000000000000000000000000000"),
+        "expected plain-string form of 1E+30; got:\n" + emitted);
+  }
+
   @Test
   public void notNullAndDefaultEmittedExplicitly() {
     Schema schema = new Schema();
