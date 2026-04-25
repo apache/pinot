@@ -125,8 +125,8 @@ server config.
 
 | Component config override group | Runnable test classes |
 | --- | ---: |
-| none | 90 |
-| broker | 9 |
+| none | 91 |
+| broker | 8 |
 | server | 8 |
 | controller | 3 |
 | broker + server | 12 |
@@ -176,7 +176,7 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 
 ### Current Draft Suite Timing
 
-The current draft suite moves twenty-nine low-risk no-override source test classes
+The current draft suite moves thirty-one low-risk no-override source test classes
 behind the shared rich cluster. `ErrorCodesIntegrationTest` is represented by
 its four concrete inner TestNG classes:
 
@@ -184,6 +184,7 @@ its four concrete inner TestNG classes:
 - `IngestionConfigHybridIntegrationTest`
 - `TPCHQueryIntegrationTest`
 - `BaseDedupIntegrationTest`
+- `CommitTimeCompactionIntegrationTest`
 - `StaleSegmentCheckIntegrationTest`
 - `SegmentWriterUploaderIntegrationTest`
 - `SegmentGenerationMinionClusterIntegrationTest`
@@ -210,20 +211,23 @@ its four concrete inner TestNG classes:
 - `AdminConsoleIntegrationTest`
 - `QueryThreadContextIntegrationTest`
 - `SpoolIntegrationTest`
+- `OfflineTimestampIndexIntegrationTest`
 - `HelixZNodeSizeLimitTest`
 - `QueryQuotaClusterIntegrationTest`
 
-On this workstation, the same 236 TestNG tests passed in both modes:
+On this workstation, the same 252 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,SegmentGenerationMinionRealtimeIngestionTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest,LogicalTableWithOneOfflineTableIntegrationTest,PurgeMetadataPushMinionClusterIntegrationTest,RealtimeToOfflineSegmentsMinionClusterIntegrationTest,LogicalTableWithTwoOfflineTablesIntegrationTest,LogicalTableWithTwelveOfflineTablesIntegrationTest,LogicalTableWithOneRealtimeTableIntegrationTest,LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwoRealtimeTableIntegrationTest,LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest,SimpleMinionClusterIntegrationTest,AdminConsoleIntegrationTest,QueryThreadContextIntegrationTest,SpoolIntegrationTest,HelixZNodeSizeLimitTest,QueryQuotaClusterIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 805.58s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 529.75s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,CommitTimeCompactionIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,SegmentGenerationMinionRealtimeIngestionTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest,LogicalTableWithOneOfflineTableIntegrationTest,PurgeMetadataPushMinionClusterIntegrationTest,RealtimeToOfflineSegmentsMinionClusterIntegrationTest,LogicalTableWithTwoOfflineTablesIntegrationTest,LogicalTableWithTwelveOfflineTablesIntegrationTest,LogicalTableWithOneRealtimeTableIntegrationTest,LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwoRealtimeTableIntegrationTest,LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest,SimpleMinionClusterIntegrationTest,AdminConsoleIntegrationTest,QueryThreadContextIntegrationTest,SpoolIntegrationTest,OfflineTimestampIndexIntegrationTest,HelixZNodeSizeLimitTest,QueryQuotaClusterIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 886.69s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 563.98s |
 
-That is a 275.83s wall-clock reduction, about 34% for this draft batch.
+That is a 322.71s wall-clock reduction, about 36% for this draft batch.
 
 Previous validated checkpoints:
 
+- 236 TestNG tests passed with an 805.58s per-class lifecycle and a 529.75s shared-rich-suite run,
+  a 275.83s wall-clock reduction or about 34%.
 - 216 TestNG tests passed with a 796.30s per-class lifecycle and a 540.49s shared-rich-suite run,
   a 255.81s wall-clock reduction or about 32%.
 - 205 TestNG tests passed with a 768.15s per-class lifecycle and a 519.27s shared-rich-suite run,
@@ -236,6 +240,18 @@ the broker `KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN` override, but direct
 per-class runs passed after removing it, so they now fit the no-component-config
 bucket.
 
+`OfflineTimestampIndexIntegrationTest` previously carried the same broker explain
+override. It now asks servers for explain plans directly, so it also fits the
+no-component-config bucket.
+
+`MultiStageEngineExplainIntegrationTest` still needs broker explain-plan and
+planner-rule overrides, so it moved into a separate shared broker-config suite
+instead of the main no-override suite:
+
+| Suite | Command | TestNG tests | Wall time |
+| --- | --- | ---: | ---: |
+| Shared MSE explain suite | `./mvnw -pl pinot-integration-tests -Pshared-mse-explain-cluster-integration-test-suite test` | 4 | 23.86s |
+
 Attempted but not included yet:
 
 - `PauselessRealtimeIngestionWithDedupIntegrationTest`: intermittently hit unavailable realtime segments under
@@ -243,8 +259,6 @@ Attempted but not included yet:
 - `KafkaPartitionSubsetChaosIntegrationTest`: uses its own chaos topology with a control realtime table, three subset
   realtime tables, six Kafka partitions, pause/resume, force-commit, and server restart coverage; keep it in a
   separate setup bucket.
-- `CommitTimeCompactionIntegrationTest`: needs a complete conversion to unique per-method table/topic names and
-  cleanup; the first worker pass was intentionally parked before wiring it into the suite.
 - `PurgeMinionClusterIntegrationTest`: a shared-mode patch compiled, but `testRealtimeLastSegmentPreservation`
   timed out waiting for purged realtime records; it needs deeper realtime purge/task-state isolation.
 - `UpsertCompactMergeTaskIntegrationTest`: a shared-mode patch compiled, but the task generator skipped segments
@@ -385,7 +399,7 @@ the class changes at runtime.
 | --- | --- | --- |
 | `C=1 B=0 S=0 M=0` | none | `ControllerLeaderLocatorIntegrationTest` *(starts a second controller inside the method)*, `ServerStarterIntegrationTest` *(starts/stops short-lived servers inside methods)* |
 | `C=1 B=1 S=1 M=0` | none | `DimensionTableIntegrationTest`, `HelixZNodeSizeLimitTest`, `MultiStageEngineIntegrationTest`, `OfflineClusterIntegrationTest`, `QueryQuotaClusterIntegrationTest`, `SegmentUploadIntegrationTest`, `SegmentWriterUploaderIntegrationTest`, `SparkSegmentMetadataPushIntegrationTest`, `StarTreeFunctionParametersIntegrationTest`, `TPCHQueryIntegrationTest` |
-| `C=1 B=1 S=2 M=0` | none | `QueryThreadContextIntegrationTest`, `SpoolIntegrationTest` |
+| `C=1 B=1 S=2 M=0` | none | `OfflineTimestampIndexIntegrationTest`, `QueryThreadContextIntegrationTest`, `SpoolIntegrationTest` |
 | `C=1 B=1 S=4 M=0` | none | `CancelQueryIntegrationTests` |
 | `C=1 B=1 S=1 M=0` | Kafka | `IngestionConfigHybridIntegrationTest`, `PartialUpsertTableRebalanceIntegrationTest` *(adds temporary servers during methods)*, `SegmentPartitionLLCRealtimeClusterIntegrationTest` |
 | `C=1 B=1 S=2 M=0` | Kafka | `BaseDedupIntegrationTest`, `CommitTimeCompactionIntegrationTest`, `LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest`, `LogicalTableWithOneOfflineTableIntegrationTest`, `LogicalTableWithOneRealtimeTableIntegrationTest`, `LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest`, `LogicalTableWithTwelveOfflineTablesIntegrationTest`, `LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest`, `LogicalTableWithTwoOfflineTablesIntegrationTest`, `LogicalTableWithTwoRealtimeTableIntegrationTest`, `PauselessRealtimeIngestionWithDedupIntegrationTest` |
@@ -400,7 +414,7 @@ the class changes at runtime.
 | --- | --- | --- |
 | `C=1 B=1 S=0 M=0` | none | `BrokerServiceDiscoveryIntegrationTest` |
 | `C=1 B=1 S=1 M=0` | none | `CursorCronCleanupIntegrationTest`, `CursorFsIntegrationTest`, `CursorIntegrationTest`, `EmptyResponseIntegrationTest` |
-| `C=1 B=1 S=2 M=0` | none | `MultiStageEngineExplainIntegrationTest`, `OfflineTimestampIndexIntegrationTest` |
+| `C=1 B=1 S=2 M=0` | none | `MultiStageEngineExplainIntegrationTest` |
 | `C=1 B=1 S=1 M=0` | Kafka | `BrokerQueryLimitTest`, `NullHandlingIntegrationTest` |
 
 ### Server Config Overrides

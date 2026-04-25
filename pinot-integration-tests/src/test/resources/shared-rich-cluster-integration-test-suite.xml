@@ -52,7 +52,9 @@
       <class name="org.apache.pinot.integration.tests.AdminConsoleIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.QueryThreadContextIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.SpoolIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.OfflineTimestampIndexIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.HelixZNodeSizeLimitTest"/>
+      <class name="org.apache.pinot.integration.tests.CommitTimeCompactionIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.QueryQuotaClusterIntegrationTest"/>
     </classes>
   </test>
