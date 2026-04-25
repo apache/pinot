@@ -542,14 +542,20 @@ public class PinotDdlRestletResource {
         dropped.add(target);
         LOGGER.info("DDL dropped table {}", target);
       } catch (ControllerApplicationException e) {
-        LOGGER.error("Failed to drop table {} during DDL DROP TABLE", target, e);
+        // The CAE constructor already logs the underlying error at the appropriate level, and
+        // the wrapping CAE thrown after the loop will log again. A third log here would be
+        // redundant noise — record a one-line breadcrumb at WARN without the throwable.
+        LOGGER.warn("DROP TABLE on {} failed: {}", target, e.getMessage());
         failed.add(target);
         if (firstFailure == null) {
           firstFailure = e;
           firstFailureStatus = Response.Status.fromStatusCode(e.getResponse().getStatus());
         }
       } catch (Exception e) {
-        LOGGER.error("Failed to drop table {} during DDL DROP TABLE", target, e);
+        // Genuinely unexpected errors get full stack traces — the wrapping CAE below will also
+        // log, but for arbitrary RuntimeExceptions / Helix failures the duplicate is acceptable
+        // because the operator may need both the per-target context and the aggregated message.
+        LOGGER.error("DROP TABLE on {} failed unexpectedly", target, e);
         failed.add(target);
         if (firstFailure == null) {
           firstFailure = e;

@@ -320,10 +320,15 @@ public class PinotDdlParserTest {
   public void createTableMissingPrimaryKeyParensRejected() {
     // Without LPAREN after KEY, the LOOKAHEAD(3) gate must reject the optional PK clause and
     // the parser must surface a clear "expected TABLE_TYPE" error rather than committing to
-    // the PinotPrimaryKeyList production and emitting a confusing inner-grammar error.
-    expectThrows(SqlCompilationException.class,
+    // the PinotPrimaryKeyList production and emitting a confusing inner-grammar error. A
+    // regression that drops the LOOKAHEAD widening would commit to the PK production, fail at
+    // LPAREN, and surface "Encountered \"id\"" rather than the expected TABLE_TYPE token —
+    // verifying the message contains TABLE_TYPE locks in the desired behavior.
+    SqlCompilationException ex = expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToSqlNodeAndOptions(
             "CREATE TABLE t (id INT) PRIMARY KEY id TABLE_TYPE = OFFLINE"));
+    assertTrue(ex.getMessage() != null && ex.getMessage().contains("TABLE_TYPE"),
+        "expected error to point at the missing TABLE_TYPE token, got: " + ex.getMessage());
   }
 
   @Test
