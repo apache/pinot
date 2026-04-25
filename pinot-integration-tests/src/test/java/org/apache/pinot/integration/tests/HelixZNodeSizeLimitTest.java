@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
  * compression, it cannot be updated anymore. Somehow this test can also make sure in future we will support
  * large IdealStates
  */
-public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
+public class HelixZNodeSizeLimitTest extends SharedRichClusterIntegrationTest {
 
   @BeforeClass
   public void setUp()
@@ -60,10 +60,30 @@ public class HelixZNodeSizeLimitTest extends BaseClusterIntegrationTest {
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+    try {
+      cleanTableAndSchema();
+    } finally {
+      stopServer();
+      stopBroker();
+      stopController();
+      stopZk();
+    }
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+    String offlineTableName = getTableName() + "_OFFLINE";
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        getTableName())) {
+      dropOfflineTable(getTableName());
+    }
+    waitForEVToDisappear(offlineTableName);
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
   }
 
   @Test

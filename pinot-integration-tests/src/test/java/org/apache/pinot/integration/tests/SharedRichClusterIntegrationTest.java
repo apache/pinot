@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.util.TestUtils;
@@ -61,6 +62,8 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
     }
 
     LOGGER.warn("Setting up shared rich integration test suite");
+    System.setProperty(ZkSystemPropertyKeys.JUTE_MAXBUFFER, "4000000");
+    System.setProperty(ZkSystemPropertyKeys.ZK_SERIALIZER_ZNRECORD_WRITE_SIZE_LIMIT_BYTES, "4000000");
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     super.startZk();
     super.startKafkaWithoutTopic();
