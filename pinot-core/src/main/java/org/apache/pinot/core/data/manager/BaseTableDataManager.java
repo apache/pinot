@@ -28,6 +28,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -622,7 +623,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Reloading all segments with forceDownload: {}", forceDownload);
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      reloadSegmentDataManagers(segmentDataManagers, forceDownload, reloadJobId);
     }
     _logger.info("Reloaded all {} segments with forceDownload: {}", segmentDataManagers.size(), forceDownload);
   }
@@ -645,7 +646,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     if (!segmentDataManagers.isEmpty()) {
-      reloadSegments(segmentDataManagers, fetchIndexLoadingConfig(), forceDownload, reloadJobId);
+      reloadSegmentDataManagers(segmentDataManagers, forceDownload, reloadJobId);
     }
     if (missingSegments.isEmpty()) {
       _logger.info("Reloaded segments: {} with forceDownload: {}", segmentNames, forceDownload);
@@ -926,9 +927,30 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
+  /**
+   * Reloads the given segment data managers. Segments are reloaded in parallel.
+   * Immutable (offline) segment reload mutates {@link IndexLoadingConfig} (tier, etc.), so configs cannot be shared
+   * across concurrent tasks unless guarded. Table config is fetched once; one {@link IndexLoadingConfig} copy is kept
+   * per distinct current segment tier (typically a small set). Reloads for the same tier run serially on that shared
+   * config; different tiers reload in parallel. Realtime consuming segments only read table config from the template
+   * and do not mutate it, so they share the single fetched template safely.
+   */
+  private void reloadSegmentDataManagers(List<SegmentDataManager> segmentDataManagers,
       boolean forceDownload, String reloadJobId)
       throws Exception {
+    IndexLoadingConfig indexLoadingConfigTemplate = fetchIndexLoadingConfig();
+    Set<String> offlineTierKeys = new HashSet<>();
+    for (SegmentDataManager sdm : segmentDataManagers) {
+      if (!(sdm instanceof RealtimeSegmentDataManager)) {
+        offlineTierKeys.add(tierKeyForParallelReload(getSegmentCurrentTier(sdm.getSegmentName())));
+      }
+    }
+    Map<String, IndexLoadingConfig> indexLoadingConfigByTierKey = new HashMap<>();
+    for (String tierKey : offlineTierKeys) {
+      IndexLoadingConfig cfg = indexLoadingConfigTemplate.copy();
+      cfg.setSegmentTier(StringUtils.isEmpty(tierKey) ? null : tierKey);
+      indexLoadingConfigByTierKey.put(tierKey, cfg);
+    }
     List<String> failedSegments = new ArrayList<>();
     AtomicReference<Throwable> sampleException = new AtomicReference<>();
     CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(() -> {
@@ -936,7 +958,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
       try {
         _segmentReloadSemaphore.acquire(segmentName, _logger);
         try {
-          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
+          if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+            reloadSegment(segmentDataManager, indexLoadingConfigTemplate, forceDownload);
+          } else {
+            String tierKey = tierKeyForParallelReload(getSegmentCurrentTier(segmentName));
+            IndexLoadingConfig tierConfig =
+                Preconditions.checkNotNull(indexLoadingConfigByTierKey.get(tierKey),
+                    "Missing IndexLoadingConfig for tier key %s segment %s table %s", tierKey, segmentName,
+                    _tableNameWithType);
+            synchronized (tierConfig) {
+              reloadSegment(segmentDataManager, tierConfig, forceDownload);
+            }
+          }
         } finally {
           _segmentReloadSemaphore.release();
         }
@@ -1343,6 +1376,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return ((ImmutableSegment) segment.getSegment()).getTier();
     }
     return null;
+  }
+
+  /**
+   * Stable non-null key for grouping parallel reload {@link IndexLoadingConfig} copies by current segment tier.
+   */
+  private static String tierKeyForParallelReload(@Nullable String segmentTier) {
+    return segmentTier == null ? "" : segmentTier;
   }
 
   @VisibleForTesting

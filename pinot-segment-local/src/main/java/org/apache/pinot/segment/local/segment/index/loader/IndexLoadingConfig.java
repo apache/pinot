@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -117,6 +118,37 @@ public class IndexLoadingConfig {
    */
   public IndexLoadingConfig() {
     this(null, null, null);
+  }
+
+  /**
+   * Returns a new instance with the same table/schema/instance references and a full snapshot of all mutable state.
+   * Used when parallel work needs isolated configs without re-fetching ZK-backed table config.
+   */
+  public IndexLoadingConfig copy() {
+    IndexLoadingConfig c = new IndexLoadingConfig(_instanceDataManagerConfig, _tableConfig, _schema);
+    c._readMode = _readMode;
+    c._segmentVersion = _segmentVersion;
+    c._segmentTier = _segmentTier;
+    c._knownColumns = _knownColumns == null ? null : new HashSet<>(_knownColumns);
+    c._tableDataDir = _tableDataDir;
+    c._errorOnColumnBuildFailure = _errorOnColumnBuildFailure;
+    c._instanceId = _instanceId;
+    c._isRealtimeOffHeapAllocation = _isRealtimeOffHeapAllocation;
+    c._isDirectRealtimeOffHeapAllocation = _isDirectRealtimeOffHeapAllocation;
+    c._realtimeAvgMultiValueCount = _realtimeAvgMultiValueCount;
+    c._segmentStoreURI = _segmentStoreURI;
+    c._segmentDirectoryLoader = _segmentDirectoryLoader;
+    c._instanceTierConfigs = _instanceTierConfigs;
+    c._sortedColumns = _sortedColumns.isEmpty() ? Collections.emptyList() : new ArrayList<>(_sortedColumns);
+    c._columnMinMaxValueGeneratorMode = _columnMinMaxValueGeneratorMode;
+    c._enableDynamicStarTreeCreation = _enableDynamicStarTreeCreation;
+    c._starTreeIndexConfigs = _starTreeIndexConfigs == null ? null : new ArrayList<>(_starTreeIndexConfigs);
+    c._enableDefaultStarTree = _enableDefaultStarTree;
+    c._indexConfigsByColName =
+        _indexConfigsByColName == null ? new HashMap<>() : new HashMap<>(_indexConfigsByColName);
+    c._dirty = _dirty;
+    c._multiColTextIndexConfig = _multiColTextIndexConfig;
+    return c;
   }
 
   @Nullable

@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -245,5 +246,30 @@ public class IndexLoadingConfigTest {
     assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
     assertEquals(forwardIndexConfig.getTargetMaxChunkSize(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
     assertEquals(forwardIndexConfig.getTargetDocsPerChunk(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
+  }
+
+  @Test
+  public void testCopyPreservesMutableStateAndIndependentTier() {
+    InstanceDataManagerConfig idmCfg = mock(InstanceDataManagerConfig.class);
+    when(idmCfg.getConfig()).thenReturn(new PinotConfiguration());
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.INT)
+            .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    IndexLoadingConfig base = new IndexLoadingConfig(idmCfg, tableConfig, schema);
+    base.setTableDataDir("/tmp/table");
+    base.setSegmentTier("hot");
+    base.setReadMode(ReadMode.mmap);
+
+    IndexLoadingConfig copy = base.copy();
+    assertSame(copy.getTableConfig(), base.getTableConfig());
+    assertSame(copy.getSchema(), base.getSchema());
+    assertEquals(copy.getTableDataDir(), base.getTableDataDir());
+    assertEquals(copy.getReadMode(), base.getReadMode());
+    assertEquals(copy.getSegmentTier(), base.getSegmentTier());
+
+    copy.setSegmentTier("cold");
+    assertEquals(base.getSegmentTier(), "hot");
+    assertEquals(copy.getSegmentTier(), "cold");
   }
 }
