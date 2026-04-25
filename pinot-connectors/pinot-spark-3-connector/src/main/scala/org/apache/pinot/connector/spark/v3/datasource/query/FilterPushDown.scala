@@ -80,6 +80,12 @@ private[pinot] object FilterPushDown {
   // Escape backslash, SQL LIKE wildcards, and single-quote in a literal so it matches itself
   // verbatim under `LIKE ... ESCAPE '\'`. Backslash must be replaced first to avoid
   // double-escaping the escapes added afterwards.
+  //
+  // Caveat: Pinot's runtime LIKE-to-regex conversion (RegexpPatternConverterUtils#likeToRegexpLike)
+  // does not fully round-trip a literal `\` — `\\` in the LIKE pattern translates to a regex
+  // matching two backslashes rather than one. Strings containing backslashes will not match the
+  // way Spark callers expect until that conversion is fixed in pinot-common. The %, _, and `'`
+  // cases that this helper handles are unaffected.
   private def escapeLikeLiteral(value: String): String = {
     if (value == null) null
     else value
