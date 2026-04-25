@@ -29,6 +29,7 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -50,6 +51,7 @@ import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
@@ -61,13 +63,11 @@ import org.apache.pinot.controller.api.resources.ddl.DdlExecutionResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.controller.util.TaskConfigUtils;
+import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -136,6 +136,9 @@ public class PinotDdlRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerConf _controllerConf;
 
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
@@ -294,6 +297,11 @@ public class PinotDdlRestletResource {
     // DDL's column-list-only projection — otherwise upsert/dedup tables would falsely fail PK
     // validation when the DDL omits PRIMARY KEY in the second variant.
     Schema schemaForValidation = schemaPreexisted ? storedSchema : create.getSchema();
+    // Apply tuner configs before validation, mirroring POST /tables. Tuners may rewrite the
+    // table config (e.g. fill in defaulted index configs) and the validators must run against
+    // the post-tuner shape, otherwise a tuner-introduced setting bypasses validation.
+    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, create.getTableConfig(),
+        schemaForValidation, Collections.emptyMap());
     validateTableConfig(schemaForValidation, create.getTableConfig());
 
     if (dryRun) {
@@ -424,19 +432,16 @@ public class PinotDdlRestletResource {
   }
 
   /**
-   * Runs the same schema/table validation stack that {@code /tables} and {@code /tableConfigs}
-   * apply before any ZK write, so DDL-created configs are subject to the same rules as
-   * JSON-API-created configs (upsert/dedup primary-key requirements, field config column
-   * references, task config validation, registry-level semantic checks, etc.).
+   * Runs the same schema/table validation stack that {@code POST /tables} and
+   * {@code /tableConfigs} apply before any ZK write, so DDL-created configs are subject to the
+   * same rules as JSON-API-created configs. Delegates to {@link TableConfigValidationUtils} so
+   * the two endpoints share a single validation pipeline (min replicas, storage quota, hybrid
+   * pair compatibility, instance assignment, tenant tags, task configs, registry-level checks).
    */
   private void validateTableConfig(Schema schema, TableConfig tableConfig) {
     try {
-      TableConfigUtils.validateTableName(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema, null);
-      _pinotHelixResourceManager.validateTableTenantConfig(tableConfig);
-      _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(tableConfig);
-      TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, null);
-      TableConfigValidatorRegistry.validate(tableConfig, schema);
+      TableConfigValidationUtils.validateTableConfig(tableConfig, schema, null,
+          _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
     } catch (ControllerApplicationException e) {
       throw e;
     } catch (IllegalArgumentException | IllegalStateException e) {
