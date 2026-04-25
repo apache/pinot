@@ -46,6 +46,23 @@ This module sits next to [`pinot-spark-3-connector`](../pinot-spark-3-connector)
 (see the `pinot-spark-4-connector` profile in [`pinot-connectors/pom.xml`](../pom.xml)). It is
 automatically excluded when `-Pscala-2.12` is active because Apache Spark 4 is Scala 2.13 only.
 
+### Mutual exclusion with `pinot-spark-3-connector`
+
+Both connector jars register `"pinot"` as their Spark data-source short name. Spark resolves
+the format by walking `META-INF/services/org.apache.spark.sql.sources.DataSourceRegister` —
+when both jars are on the same classpath the resolution is non-deterministic and a Spark 4
+write may silently route through the V1 `SupportsOverwrite` path (or vice versa) with
+diverging overwrite/truncate semantics. To prevent this from being silent, the Spark 4
+`PinotDataSource` constructor probes for the Spark 3 connector class name via
+`Class.forName(...)` and throws `IllegalStateException` with a clear message if both jars are
+found together. Pick one jar per Spark application:
+
+- Use **only** `pinot-spark-4-connector-*.jar` for Spark 4.x deployments.
+- Use **only** `pinot-spark-3-connector-*.jar` for Spark 3.5.x deployments.
+
+If you ship a fat-jar that bundles your Spark application, ensure the bundle does not include
+both `pinot-connectors/pinot-spark-3-connector` and `pinot-connectors/pinot-spark-4-connector`.
+
 ### Runtime JVM flags
 
 Spark 4 requires the standard JDK 17+ `--add-opens` set. The module's tests already configure
