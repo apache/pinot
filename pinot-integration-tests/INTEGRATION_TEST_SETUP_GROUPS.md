@@ -266,9 +266,7 @@ instead of the main no-override suite:
 | Shared window accounting suite | `./mvnw -pl pinot-integration-tests -Pshared-window-accounting-cluster-integration-test-suite test` | 1 | 19.73s |
 | Shared offline gRPC suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-grpc-cluster-integration-test-suite test` | 26 | 35.50s |
 | Shared offline secure gRPC suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-secure-grpc-cluster-integration-test-suite test` | 13 | 27.53s |
-| Shared CPU broker query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-cpu-broker-query-killing-cluster-integration-test-suite test` | 3 | 43.65s |
-| Shared CPU server query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-cpu-server-query-killing-cluster-integration-test-suite test` | 8 | 43.60s |
-| Shared memory server query killing suite | `./mvnw -pl pinot-integration-tests -Pshared-memory-server-query-killing-cluster-integration-test-suite test` | 8 | 40.79s |
+| Query killing suite | `./mvnw -pl pinot-integration-tests -Pquery-killing-cluster-integration-test-suite test` | 7 | 58.11s |
 | Shared MSQ small-buffer suite | `./mvnw -pl pinot-integration-tests -Pshared-msq-small-buffer-cluster-integration-test-suite test` | 50 | 34.42s |
 | Shared query workload suite | `./mvnw -pl pinot-integration-tests -Pshared-query-workload-cluster-integration-test-suite test` | 1 | 39.11s |
 | Shared realtime rate-limiter suite | `./mvnw -pl pinot-integration-tests -Pshared-realtime-rate-limiter-cluster-integration-test-suite test` | 2 | 92.03s |
@@ -324,13 +322,12 @@ and original 13-test offline gRPC suites were also exact broker/server-config
 buckets. The same 20 tests passed in a single per-class lifecycle command in
 58.00s, while those four shared profiles totaled 94.53s.
 
-The expanded offline gRPC and query-killing buckets also show why component
-count matters. `CpuBasedServerQueryKillingIntegrationTest` failed with the
-default 2-server shared topology because both servers could return resource-limit
-exceptions; it passes when the profile uses the original 1-server topology. The
-same 58 tests passed in a single per-class lifecycle command in 147.11s, while
-the five exact profiles above total 191.07s. This batch is about getting the
-right setup buckets in place, not a wall-clock win yet.
+The expanded offline gRPC bucket also shows why component count matters. After
+rebasing on upstream, the CPU and memory query-killing cases are consolidated in
+`QueryKillingIntegrationTest`, which already runs all seven cases under one
+class-level `C=1 B=1 S=1 M=0` setup. The replacement suite passed in 58.11s;
+the prior three split query-killing profiles totaled 128.04s before the upstream
+consolidation.
 
 The MSQ small-buffer, query workload, and realtime rate-limiter suites are also
 exact topology/config buckets. The same 53 tests passed in a single per-class
@@ -643,7 +640,7 @@ the class changes at runtime.
 
 | Setup | External infra | Classes |
 | --- | --- | --- |
-| `C=1 B=1 S=1 M=0` | none | `CpuBasedBrokerQueryKillingIntegrationTest`, `CpuBasedServerQueryKillingIntegrationTest`, `JmxMetricsIntegrationTest`, `MemoryBasedServerQueryKillingIntegrationTest`, `OfflineGRPCServerIntegrationTest`, `OfflineGRPCServerMultiStageIntegrationTest`, `OfflineSecureGRPCServerIntegrationTest`, `WindowResourceAccountingTest` |
+| `C=1 B=1 S=1 M=0` | none | `JmxMetricsIntegrationTest`, `OfflineGRPCServerIntegrationTest`, `OfflineGRPCServerMultiStageIntegrationTest`, `OfflineSecureGRPCServerIntegrationTest`, `QueryKillingIntegrationTest`, `WindowResourceAccountingTest` |
 | `C=1 B=1 S=2 M=0` | none | `GroupByEnableTrimOptionIntegrationTest` |
 | `C=1 B=1 S=4 M=0` | none | `MultiStageEngineSmallBufferTest` |
 | `C=1 B=1 S=1 M=0` | Kafka | `QueryWorkloadIntegrationTest` |

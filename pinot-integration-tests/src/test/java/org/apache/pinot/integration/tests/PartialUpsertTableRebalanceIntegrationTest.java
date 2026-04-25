@@ -21,13 +21,20 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
@@ -54,29 +61,42 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
-public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterIntegrationTest {
+public class PartialUpsertTableRebalanceIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final int NUM_SERVERS = 1;
   private static final String PRIMARY_KEY_COL = "clientId";
-  private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME);
+  private static final String SHARED_TABLE_NAME = "partial_upsert_table_rebalance";
+  private static final String SHARED_KAFKA_TOPIC = "partial-upsert-table-rebalance";
 
   // Segment 1 contains records of pk value 100000 (partition 0)
-  private static final String UPLOADED_SEGMENT_1 = "mytable_10027_19736_0 %";
+  private static final String UPLOADED_SEGMENT_1_SUFFIX = "_10027_19736_0 %";
   // Segment 2 contains records of pk value 100001 (partition 1)
-  private static final String UPLOADED_SEGMENT_2 = "mytable_10072_19919_1 %";
+  private static final String UPLOADED_SEGMENT_2_SUFFIX = "_10072_19919_1 %";
   // Segment 3 contains records of pk value 100002 (partition 1)
-  private static final String UPLOADED_SEGMENT_3 = "mytable_10158_19938_2 %";
+  private static final String UPLOADED_SEGMENT_3_SUFFIX = "_10158_19938_2 %";
 
+  private final String _resourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
+  private final List<BaseServerStarter> _extraServerStarters = new ArrayList<>();
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
   private PinotHelixResourceManager _resourceManager;
   private TableRebalancer _tableRebalancer;
-  private static List<File> _avroFiles;
+  private List<File> _avroFiles;
   private TableConfig _tableConfig;
   private Schema _schema;
 
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     startZk();
     // Start Kafka
@@ -85,9 +105,13 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     startBroker();
     startServers(NUM_SERVERS);
 
+    validateSharedTopology();
+
     _resourceManager = _controllerStarter.getHelixResourceManager();
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
 
+    cleanRealtimeTableAndSchema();
+    resetKafkaTopic();
     createSchemaAndTable();
   }
 
@@ -105,10 +129,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     rebalanceConfig.setIncludeConsuming(true);
 
     // Add a new server
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
+    BaseServerStarter serverStarter1 = startExtraServer(NUM_SERVERS);
 
     // Now we trigger a rebalance operation
-    TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
+    TableConfig tableConfig = _resourceManager.getTableConfig(getRealtimeTableName());
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     // Check the number of servers after rebalancing
@@ -123,7 +147,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
 
     // Add a new server
-    BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
+    BaseServerStarter serverStarter2 = startExtraServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
@@ -147,13 +171,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
-    serverStarter1.stop();
-    serverStarter2.stop();
-    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
-    SegmentBuildTimeLeaseExtender.initExecutor();
-    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
-            && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
-        "Failed to drop servers");
+    cleanUpExtraServers();
   }
 
   @Test
@@ -171,10 +189,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     rebalanceConfig.setBatchSizePerServer(1);
 
     // Add a new server
-    BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
+    BaseServerStarter serverStarter1 = startExtraServer(NUM_SERVERS);
 
     // Now we trigger a rebalance operation
-    TableConfig tableConfig = _resourceManager.getTableConfig(REALTIME_TABLE_NAME);
+    TableConfig tableConfig = _resourceManager.getTableConfig(getRealtimeTableName());
     RebalanceResult rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     // Check the number of servers after rebalancing
@@ -189,7 +207,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     verifySegmentAssignment(rebalanceResult.getSegmentAssignment(), 5, finalServers);
 
     // Add a new server
-    BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 1);
+    BaseServerStarter serverStarter2 = startExtraServer(NUM_SERVERS + 1);
     rebalanceResult = _tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
 
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
@@ -213,13 +231,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
-    serverStarter1.stop();
-    serverStarter2.stop();
-    // Re-init the static executor because stopping servers shuts it down; required for subsequent operations.
-    SegmentBuildTimeLeaseExtender.initExecutor();
-    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
-            && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
-        "Failed to drop servers");
+    cleanUpExtraServers();
   }
 
   @Test
@@ -230,10 +242,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
     // consuming segments; RESTRICTED (default) skips force-commit and reload never completes.
+    String clusterConfigKey = CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE;
+    String originalClusterConfigValue = getClusterConfig(clusterConfigKey);
     try {
       updateClusterConfig(
-          Map.of(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE,
-              ConsumingSegmentConsistencyModeListener.Mode.PROTECTED.name()));
+          Map.of(clusterConfigKey, ConsumingSegmentConsistencyModeListener.Mode.PROTECTED.name()));
       Thread.sleep(5000); // Allow server to pick up cluster config from ZK
 
       String statusResponse = reloadRealtimeTable(getTableName());
@@ -246,33 +259,58 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       Map<String, Map<String, String>> reloadStatus =
           JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
           });
-      String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
+      String reloadJobId = reloadStatus.get(getRealtimeTableName()).get("reloadJobId");
       waitForReloadToComplete(reloadJobId, 600_000L);
       waitForAllDocsLoaded(600_000L, 300);
       verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
     } finally {
-      deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
+      restoreClusterConfig(clusterConfigKey, originalClusterConfigValue);
     }
   }
 
-  @AfterMethod
+  @AfterMethod(alwaysRun = true)
   public void afterMethod()
       throws Exception {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    Exception exception = null;
+    exception = runCleanup(exception, this::dropRealtimeTableIfPresent);
+    exception = runCleanup(exception, this::cleanUpExtraServers);
+    exception = runCleanup(exception, this::resetKafkaTopicIfStarted);
+    if (_tableConfig != null) {
+      exception = runCleanup(exception, () -> addTableConfig(_tableConfig));
+    }
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
+  private void dropRealtimeTableIfPresent()
+      throws Exception {
+    if (_resourceManager == null) {
+      return;
+    }
+    String realtimeTableName = getRealtimeTableName();
     // Drop the table entirely to clean up all segments and server-side upsert state.
     // This is more reliable than the pause/drop-segments/restart cycle because it uses
     // the standard table lifecycle and avoids issues with stale controller/server state.
+    if (_resourceManager.getTableConfig(realtimeTableName) == null
+        && !_resourceManager.hasRealtimeTable(getTableName())) {
+      return;
+    }
     dropRealtimeTable(getTableName());
     waitForTableDataManagerRemoved(realtimeTableName);
     waitForEVToDisappear(realtimeTableName);
+  }
 
-    // Delete and recreate the Kafka topic for a clean stream
-    deleteKafkaTopic(getKafkaTopic());
+  private void resetKafkaTopicIfStarted() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return;
+    }
+    resetKafkaTopic();
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
     createKafkaTopic(getKafkaTopic());
-
-    // Recreate the table — this triggers fresh consuming segment creation
-    addTableConfig(_tableConfig);
   }
 
   protected void verifySegmentAssignment(Map<String, Map<String, String>> segmentAssignment, int numSegmentsExpected,
@@ -321,15 +359,16 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   }
 
   protected void verifyIdealState(int numSegmentsExpected, int numInstancesExpected) {
-    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, REALTIME_TABLE_NAME);
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, getRealtimeTableName());
     verifySegmentAssignment(idealState.getRecord().getMapFields(), numSegmentsExpected, numInstancesExpected);
   }
 
   protected void populateTables()
       throws Exception {
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, _tableConfig, _schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), TableType.REALTIME, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, _tableConfig, _schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), TableType.REALTIME, _classTarDir);
 
     pushAvroIntoKafka(_avroFiles);
     // Wait for all documents loaded
@@ -339,7 +378,7 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   protected void createSchemaAndTable()
       throws Exception {
     // Unpack the Avro files
-    _avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload schema and table config
     _schema = createSchema();
@@ -355,16 +394,56 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     addTableConfig(_tableConfig);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
-      throws IOException {
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::cleanUpExtraServers);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::closeAdminClientInSharedMode);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, this::stopServerIfStarted);
+      exception = runCleanup(exception, this::stopBrokerIfStarted);
+      exception = runCleanup(exception, this::stopControllerIfStarted);
+      exception = runCleanup(exception, this::stopKafkaIfStarted);
+      exception = runCleanup(exception, this::stopZk);
+    }
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME + "_" + _resourceSuffix : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC + "-" + _resourceSuffix : super.getKafkaTopic();
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
   }
 
   @Override
@@ -400,15 +479,13 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   }
 
   private static int getSegmentPartitionId(String segmentName) {
-    switch (segmentName) {
-      case UPLOADED_SEGMENT_1:
-        return 0;
-      case UPLOADED_SEGMENT_2:
-      case UPLOADED_SEGMENT_3:
-        return 1;
-      default:
-        return new LLCSegmentName(segmentName).getPartitionGroupId();
+    if (segmentName.endsWith(UPLOADED_SEGMENT_1_SUFFIX)) {
+      return 0;
     }
+    if (segmentName.endsWith(UPLOADED_SEGMENT_2_SUFFIX) || segmentName.endsWith(UPLOADED_SEGMENT_3_SUFFIX)) {
+      return 1;
+    }
+    return new LLCSegmentName(segmentName).getPartitionGroupId();
   }
 
   protected void waitForRebalanceToComplete(RebalanceResult rebalanceResult, long timeoutMs)
@@ -487,5 +564,196 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       return resultSetGroup.getResultSet(0).getLong(0);
     }
     return 0;
+  }
+
+  private String getRealtimeTableName() {
+    return TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _resourceSuffix)
+        : _tempDir;
+  }
+
+  private void validateSharedTopology() {
+    if (!isSharedRichClusterEnabled()) {
+      return;
+    }
+    assertEquals(_brokerStarters.size(), 1, "Shared rich cluster broker count mismatch");
+    assertEquals(_serverStarters.size(), NUM_SERVERS, "Shared rich cluster server count mismatch");
+    assertNotNull(_controllerStarter, "Shared rich cluster controller is not started");
+    assertNotNull(_kafkaStarters, "Shared rich cluster Kafka is not started");
+    assertFalse(_kafkaStarters.isEmpty(), "Shared rich cluster Kafka is not started");
+    assertNull(_minionStarter, "Shared rich cluster minion should not be started");
+  }
+
+  private BaseServerStarter startExtraServer(int serverId)
+      throws Exception {
+    BaseServerStarter serverStarter = startOneServer(serverId);
+    _extraServerStarters.add(serverStarter);
+    return serverStarter;
+  }
+
+  private void cleanUpExtraServers()
+      throws Exception {
+    if (_extraServerStarters.isEmpty()) {
+      return;
+    }
+    Exception exception = null;
+    for (BaseServerStarter serverStarter : new ArrayList<>(_extraServerStarters)) {
+      Exception serverException = null;
+      serverException = runCleanup(serverException, serverStarter::stop);
+      SegmentBuildTimeLeaseExtender.initExecutor();
+      if (_resourceManager != null && isInstancePresent(serverStarter.getInstanceId())) {
+        serverException = runCleanup(serverException, () -> TestUtils.waitForCondition(
+            aVoid -> _resourceManager.dropInstance(serverStarter.getInstanceId()).isSuccessful(), 60_000L,
+            "Failed to drop server " + serverStarter.getInstanceId()));
+      }
+      if (serverException == null) {
+        _extraServerStarters.remove(serverStarter);
+      } else if (exception == null) {
+        exception = serverException;
+      } else {
+        exception.addSuppressed(serverException);
+      }
+    }
+    restoreSharedOwnerServerStarters();
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private boolean isInstancePresent(String instanceId) {
+    try {
+      return _helixAdmin != null && _helixAdmin.getInstancesInCluster(getHelixClusterName()).contains(instanceId);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void restoreSharedOwnerServerStarters() {
+    if (!isSharedRichClusterEnabled() || _sharedRichClusterTestSuite == null || _sharedRichClusterTestSuite == this) {
+      return;
+    }
+    _sharedRichClusterTestSuite._serverStarters.clear();
+    _sharedRichClusterTestSuite._serverStarters.addAll(_serverStarters);
+    _sharedRichClusterTestSuite._serverGrpcPort = _serverGrpcPort;
+    _sharedRichClusterTestSuite._serverAdminApiPort = _serverAdminApiPort;
+    _sharedRichClusterTestSuite._serverNettyPort = _serverNettyPort;
+    attachSharedRichCluster();
+  }
+
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    dropRealtimeTableIfPresent();
+    if (_resourceManager != null && _resourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void closeAdminClientInSharedMode()
+      throws IOException {
+    if (isSharedRichClusterEnabled()) {
+      getOrCreateAdminClient().close();
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private String getClusterConfig(String key) {
+    return _helixManager.getConfigAccessor().get(getClusterConfigScope(), key);
+  }
+
+  private void restoreClusterConfig(String key, String originalValue)
+      throws IOException {
+    if (originalValue == null) {
+      deleteClusterConfig(key);
+    } else {
+      updateClusterConfig(Map.of(key, originalValue));
+    }
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+        .build();
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

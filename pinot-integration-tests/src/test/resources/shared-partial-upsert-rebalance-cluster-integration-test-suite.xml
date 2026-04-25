@@ -19,10 +19,10 @@
 
 -->
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
-<suite name="SharedCpuServerQueryKillingClusterIntegrationTestSuite">
-  <test name="SharedCpuServerQueryKillingClusterIntegrationTests">
+<suite name="SharedPartialUpsertRebalanceClusterIntegrationTestSuite">
+  <test name="SharedPartialUpsertRebalanceClusterIntegrationTests">
     <classes>
-      <class name="org.apache.pinot.integration.tests.CpuBasedServerQueryKillingIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.PartialUpsertTableRebalanceIntegrationTest"/>
     </classes>
   </test>
 </suite>
