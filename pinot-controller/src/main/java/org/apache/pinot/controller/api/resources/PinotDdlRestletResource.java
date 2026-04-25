@@ -742,10 +742,16 @@ public class PinotDdlRestletResource {
     }
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
     if (schema == null) {
+      // Unlike a missing TableConfig (which would indicate a torn-write inconsistency since
+      // hasTable just returned true), a missing schema is reachable in normal operation:
+      // schemas can be deleted independently via DELETE /schemas/{name} while a table
+      // still references them. Surface as 404 rather than 500 so the operator sees an
+      // actionable user-error code rather than a phantom controller-bug code.
       throw new ControllerApplicationException(LOGGER,
-          "Schema not found for " + tableNameWithType
-              + "; SHOW CREATE TABLE requires both schema and config to exist.",
-          Response.Status.INTERNAL_SERVER_ERROR);
+          "Schema '" + tableNameWithType
+              + "' not found; SHOW CREATE TABLE requires the schema to exist. "
+              + "Re-create it via POST /schemas if it was deleted.",
+          Response.Status.NOT_FOUND);
     }
 
     // Use the resolved database (which incorporates the Database header) so the emitted DDL
