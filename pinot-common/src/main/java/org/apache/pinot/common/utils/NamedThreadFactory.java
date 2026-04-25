@@ -71,8 +71,7 @@ public class NamedThreadFactory implements ThreadFactory {
    * @param daemon if true, creates daemon threads
    */
   public NamedThreadFactory(String threadNamePrefix, boolean daemon) {
-    final SecurityManager s = System.getSecurityManager();
-    _group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+    _group = Thread.currentThread().getThreadGroup();
     _threadNamePrefix =
             String.format(NAME_PATTERN, checkPrefix(threadNamePrefix), THREAD_POOL_NUMBER.getAndIncrement());
     _daemon = daemon;
