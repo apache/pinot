@@ -259,6 +259,10 @@ instead of the main no-override suite:
 | Shared broker query limit suite | `./mvnw -pl pinot-integration-tests -Pshared-broker-query-limit-cluster-integration-test-suite test` | 2 | 21.43s |
 | Shared null handling suite | `./mvnw -pl pinot-integration-tests -Pshared-null-handling-cluster-integration-test-suite test` | 68 | 23.00s |
 | Shared MSQ without stats suite | `./mvnw -pl pinot-integration-tests -Pshared-msq-without-stats-cluster-integration-test-suite test` | 1 | 21.59s |
+| Shared group-by trim suite | `./mvnw -pl pinot-integration-tests -Pshared-group-by-trim-cluster-integration-test-suite test` | 2 | 20.59s |
+| Shared JMX metrics suite | `./mvnw -pl pinot-integration-tests -Pshared-jmx-metrics-cluster-integration-test-suite test` | 4 | 26.76s |
+| Shared window accounting suite | `./mvnw -pl pinot-integration-tests -Pshared-window-accounting-cluster-integration-test-suite test` | 1 | 19.73s |
+| Shared offline gRPC suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-grpc-cluster-integration-test-suite test` | 13 | 27.45s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -272,6 +276,11 @@ stats suites follow the same exact-config pattern. The same 72 tests passed in a
 single per-class lifecycle command in 40.31s, while these four shared profiles
 total 84.11s. They are separated because they exercise different broker/server
 process configuration overrides.
+
+The group-by trim, JMX metrics, window accounting, and offline gRPC suites are
+also exact broker/server-config buckets. The same 20 tests passed in a single
+per-class lifecycle command in 58.00s, while these four shared profiles total
+94.53s.
 
 Attempted but not included yet:
 
