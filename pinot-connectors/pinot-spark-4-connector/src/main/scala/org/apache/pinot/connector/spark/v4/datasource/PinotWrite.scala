@@ -22,10 +22,12 @@ import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.pinot.spi.data.Schema
 import org.apache.spark.sql.connector.write.{BatchWrite, DataWriterFactory, LogicalWriteInfo, PhysicalWriteInfo, Write, WriterCommitMessage}
 import org.apache.spark.sql.types.StructType
+import org.slf4j.{Logger, LoggerFactory}
 
 class PinotWrite(
                   logicalWriteInfo: LogicalWriteInfo
                 ) extends Write with BatchWrite {
+  private val logger: Logger = LoggerFactory.getLogger(classOf[PinotWrite])
   private[pinot] val writeOptions: PinotDataSourceWriteOptions = PinotDataSourceWriteOptions.from(logicalWriteInfo.options())
   private[pinot] val writeSchema: StructType = logicalWriteInfo.schema()
   private[pinot] val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(
@@ -50,10 +52,16 @@ class PinotWrite(
   override def toBatch: BatchWrite = this
 
   override def commit(messages: Array[WriterCommitMessage]): Unit = {
-    messages.foreach(println)
+    messages.foreach(m => logger.info("Spark write committed: {}", m))
   }
 
+  // TODO: on abort, delete the segment tar files at writeOptions.savePath that correspond to the
+  // successful tasks in `messages`. Currently, when one executor task fails the job aborts but
+  // leftover tars from already-succeeded tasks remain at savePath; on retry users get duplicate
+  // segments after the push step. The contract-level guard against silent overwrite is provided
+  // by PinotWriteBuilder.overwrite(...) (which fails fast); this runtime-level guard for partial
+  // failure is a separate gap tracked for follow-up. The same gap exists in the Spark 3 sibling.
   override def abort(messages: Array[WriterCommitMessage]): Unit = {
-    messages.foreach(println)
+    messages.foreach(m => logger.warn("Spark write aborted, leftover segment tar may remain: {}", m))
   }
 }
