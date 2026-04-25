@@ -36,8 +36,6 @@ public final class DataTypeMapper {
     Map<String, DataType> map = new HashMap<>();
     map.put("INT", DataType.INT);
     map.put("INTEGER", DataType.INT);
-    map.put("SMALLINT", DataType.INT);
-    map.put("TINYINT", DataType.INT);
     map.put("BIGINT", DataType.LONG);
     map.put("LONG", DataType.LONG);
     map.put("FLOAT", DataType.FLOAT);
@@ -69,6 +67,15 @@ public final class DataTypeMapper {
   public static DataType resolve(String sqlTypeName) {
     // Locale.ROOT: in Turkish locale "int".toUpperCase() yields "İNT" which fails the lookup.
     String upper = sqlTypeName.toUpperCase(Locale.ROOT);
+    // Reject SMALLINT / TINYINT explicitly rather than silently widening to INT. If Pinot
+    // ever adds sub-INT integer types (INT8/INT16), existing DDLs using SMALLINT/TINYINT
+    // would otherwise be locked into the wider type permanently. A rejected type can later
+    // become accepted; a silently-promoted type cannot be narrowed without breaking users.
+    if ("SMALLINT".equals(upper) || "TINYINT".equals(upper)) {
+      throw new DdlCompilationException("Pinot does not yet support sub-INT integer types ("
+          + sqlTypeName + "); use INT instead. This restriction is intentional so that future "
+          + "narrow-integer types can be added without breaking existing DDL.");
+    }
     DataType dt = NAME_TO_DATATYPE.get(upper);
     if (dt == null) {
       throw new DdlCompilationException("Unsupported column data type: " + sqlTypeName);

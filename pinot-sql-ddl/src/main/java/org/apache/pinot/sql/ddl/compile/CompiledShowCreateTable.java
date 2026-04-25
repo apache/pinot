@@ -47,8 +47,10 @@ public final class CompiledShowCreateTable extends CompiledDdl {
   }
 
   /**
-   * @return the requested type, or {@code null} when the controller should auto-pick (defaults
-   *     to OFFLINE when both variants exist).
+   * @return the requested type, or {@code null} when the user omitted the {@code TYPE} clause.
+   *     When null, the controller picks the variant that exists; when both OFFLINE and REALTIME
+   *     variants exist, the controller returns 400 BAD_REQUEST and the caller must specify
+   *     {@code TYPE OFFLINE} or {@code TYPE REALTIME} explicitly.
    */
   @Nullable
   public TableType getTableType() {

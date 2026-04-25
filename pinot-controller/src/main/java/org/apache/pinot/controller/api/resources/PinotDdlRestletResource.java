@@ -28,6 +28,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -402,18 +403,16 @@ public class PinotDdlRestletResource {
         return "column '" + columnName + "' NOT NULL flag differs (stored=" + storedSpec.isNotNull()
             + ", DDL=" + compiledSpec.isNotNull() + ")";
       }
-      // Compare typed default null value via DataType.equals, which delegates to Arrays.equals
-      // for BYTES (a fresh byte[] is allocated on every getDefaultNullValue() call, so a plain
-      // Objects.equals would do reference comparison and falsely flag every BYTES default as
-      // a mismatch). For other types, DataType.equals delegates to the boxed value's equals.
+      // Compare typed default null value. For BYTES, DataType.equals delegates to Arrays.equals
+      // (byte[] reference comparison would falsely flag every BYTES default as a mismatch).
+      // For BIG_DECIMAL, prefer compareTo over equals — BigDecimal.equals is scale-sensitive
+      // (new BigDecimal("1").equals(new BigDecimal("1.0")) is false), and the same numeric
+      // default arriving via different literal forms (DDL "1" vs JSON-API "1.0") would
+      // otherwise produce a phantom mismatch. For other types, DataType.equals delegates to
+      // the boxed value's equals.
       Object storedDefault = storedSpec.getDefaultNullValue();
       Object compiledDefault = compiledSpec.getDefaultNullValue();
-      boolean defaultsEqual;
-      if (storedDefault == null || compiledDefault == null) {
-        defaultsEqual = (storedDefault == null && compiledDefault == null);
-      } else {
-        defaultsEqual = storedSpec.getDataType().equals(storedDefault, compiledDefault);
-      }
+      boolean defaultsEqual = defaultValuesEqual(storedSpec.getDataType(), storedDefault, compiledDefault);
       if (!defaultsEqual) {
         return "column '" + columnName + "' default null value differs (stored="
             + storedSpec.getDefaultNullValueString()
@@ -433,6 +432,23 @@ public class PinotDdlRestletResource {
       }
     }
     return null;
+  }
+
+  /**
+   * Compares two default-null-values for content equality, accounting for type-specific
+   * gotchas: BYTES requires Arrays.equals (each getter allocates a fresh byte[]); BIG_DECIMAL
+   * requires compareTo so different scales of the same numeric value compare equal.
+   */
+  private static boolean defaultValuesEqual(FieldSpec.DataType dataType,
+      @Nullable Object storedDefault, @Nullable Object compiledDefault) {
+    if (storedDefault == null || compiledDefault == null) {
+      return storedDefault == null && compiledDefault == null;
+    }
+    if (dataType == FieldSpec.DataType.BIG_DECIMAL && storedDefault instanceof BigDecimal
+        && compiledDefault instanceof BigDecimal) {
+      return ((BigDecimal) storedDefault).compareTo((BigDecimal) compiledDefault) == 0;
+    }
+    return dataType.equals(storedDefault, compiledDefault);
   }
 
   /**
