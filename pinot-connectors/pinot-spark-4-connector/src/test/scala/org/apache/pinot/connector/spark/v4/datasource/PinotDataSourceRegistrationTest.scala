@@ -46,4 +46,26 @@ class PinotDataSourceRegistrationTest extends BaseTest {
     ds.shortName() shouldBe "pinot"
     ds.supportsExternalMetadata() shouldBe true
   }
+
+  test("isSpark3ConnectorOnClasspath returns false when the v3 connector class is absent") {
+    // The v3 PinotDataSource class is NOT a dependency of pinot-spark-4-connector, so the
+    // standard test ClassLoader should not see it. This pins the negative case so a future
+    // accidental dependency on pinot-spark-3-connector (which would defeat the conflict
+    // guard) fails this test.
+    PinotDataSource.isSpark3ConnectorOnClasspath(getClass.getClassLoader) shouldBe false
+  }
+
+  test("guardAgainstSpark3ConnectorOnClasspath does not throw when only v4 is on classpath") {
+    // The constructor of PinotDataSource invokes the guard; if the negative case starts
+    // throwing here it means the v3 class is unintentionally on this module's classpath.
+    noException should be thrownBy new PinotDataSource()
+  }
+
+  test("spark3ConflictMessage surfaces a clear instructional message") {
+    // The exact message text is part of the user-facing contract; a regression test pins it
+    // so an accidental change can't make the diagnostic less actionable.
+    PinotDataSource.spark3ConflictMessage should include("pinot-spark-4-connector")
+    PinotDataSource.spark3ConflictMessage should include("pinot-spark-3-connector")
+    PinotDataSource.spark3ConflictMessage should include("Remove")
+  }
 }
