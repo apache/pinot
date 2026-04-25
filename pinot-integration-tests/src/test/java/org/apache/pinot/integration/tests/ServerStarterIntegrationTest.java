@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -34,10 +33,30 @@ import static org.apache.pinot.spi.utils.CommonConstants.Server.CONFIG_OF_INSTAN
 import static org.testng.Assert.assertEquals;
 
 
-public class ServerStarterIntegrationTest extends ControllerTest {
+public class ServerStarterIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final String CUSTOM_INSTANCE_ID = "CustomInstance";
   private static final String CUSTOM_HOST = "CustomHost";
   private static final int CUSTOM_PORT = 10001;
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 0;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 0;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
 
   @BeforeClass
   public void setUp()

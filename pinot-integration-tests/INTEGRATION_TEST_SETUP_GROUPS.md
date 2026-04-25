@@ -292,6 +292,8 @@ instead of the main no-override suite:
 | Shared peer-download LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-peer-download-llc-realtime-cluster-integration-test-suite test` | 13 | 106.13s |
 | Shared Confluent schema-registry realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-confluent-schema-registry-realtime-cluster-integration-test-suite test` | 11 | blocked locally: no Docker |
 | Shared segment-completion suite | `./mvnw -pl pinot-integration-tests -Pshared-segment-completion-cluster-integration-test-suite test` | 1 | 19.41s |
+| Shared controller-only suite | `./mvnw -pl pinot-integration-tests -Pshared-controller-only-cluster-integration-test-suite test` | 7 | 109.46s |
+| Shared multi-nodes offline suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-nodes-offline-cluster-integration-test-suite test` | 137 | 119.99s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -424,6 +426,20 @@ no real Pinot server. The same 1 TestNG method passed per-class in 18.03s and in
 the shared profile in 19.41s. This is a setup-compatibility bucket rather than a
 wall-clock improvement by itself.
 
+The controller-only suite preserves the 1-controller/no-broker/no-server/no-Kafka/no-minion
+setup used by `ServerStarterIntegrationTest` and
+`ControllerLeaderLocatorIntegrationTest`. The same 7 TestNG methods passed with
+a combined per-class baseline of about 125.82s and in the shared profile in
+109.46s, a 16.36s wall-clock reduction.
+
+The multi-nodes offline suite preserves the 2-broker/3-server/no-Kafka/no-minion
+broker and server config bucket used by `MultiNodesOfflineClusterIntegrationTest`.
+The test adds and drops an extra broker and restarts one server, so the shared
+mode restores the baseline broker-port and server-starter state before suite
+teardown. The same 137 TestNG methods passed per-class in 119.01s and in the
+shared profile in 119.99s. This is a setup-correctness bucket as a single-class
+profile.
+
 Attempted but not included yet:
 
 - `PauselessRealtimeIngestionWithDedupIntegrationTest`: intermittently hit unavailable realtime segments under
@@ -435,6 +451,9 @@ Attempted but not included yet:
   timed out waiting for purged realtime records; it needs deeper realtime purge/task-state isolation.
 - `UpsertCompactMergeTaskIntegrationTest`: a shared-mode patch compiled, but the task generator skipped segments
   with empty download URLs and no task names were scheduled; segment download URL generation needs a targeted fix.
+- `CancelQueryIntegrationTests`: a shared-mode patch compiled, but both direct and shared runs hit the existing
+  client-query-id cancellation race. The broker repeatedly reported the client query id as unknown until the
+  single-stage query timed out, so this needs a targeted cancellation-test fix before it is suite-wired.
 - `MultiStageEngineIntegrationTest`, `MergeRollupMinionClusterIntegrationTest`: worker patch attempts were parked
   before integration because the candidate edits still had compile/checkstyle issues and need a tighter follow-up pass.
 
@@ -572,7 +591,7 @@ the class changes at runtime.
 
 | Setup | External infra | Classes |
 | --- | --- | --- |
-| `C=1 B=0 S=0 M=0` | none | `ControllerLeaderLocatorIntegrationTest` *(starts a second controller inside the method)*, `ServerStarterIntegrationTest` *(starts/stops short-lived servers inside methods)* |
+| `C=1 B=0 S=0 M=0` | none | `ControllerLeaderLocatorIntegrationTest` *(starts a second controller inside the method; moved to dedicated shared controller-only suite)*, `ServerStarterIntegrationTest` *(starts/stops short-lived servers inside methods; moved to dedicated shared controller-only suite)* |
 | `C=1 B=1 S=1 M=0` | none | `DimensionTableIntegrationTest`, `HelixZNodeSizeLimitTest`, `MultiStageEngineIntegrationTest`, `OfflineClusterIntegrationTest`, `QueryQuotaClusterIntegrationTest`, `SegmentUploadIntegrationTest`, `SegmentWriterUploaderIntegrationTest`, `SparkSegmentMetadataPushIntegrationTest`, `StarTreeFunctionParametersIntegrationTest`, `TPCHQueryIntegrationTest` |
 | `C=1 B=1 S=2 M=0` | none | `OfflineTimestampIndexIntegrationTest`, `QueryThreadContextIntegrationTest`, `SpoolIntegrationTest` |
 | `C=1 B=1 S=4 M=0` | none | `CancelQueryIntegrationTests` |
@@ -608,7 +627,7 @@ the class changes at runtime.
 | `C=1 B=1 S=2 M=0` | none | `GroupByEnableTrimOptionIntegrationTest` |
 | `C=1 B=1 S=4 M=0` | none | `MultiStageEngineSmallBufferTest` |
 | `C=1 B=1 S=1 M=0` | Kafka | `QueryWorkloadIntegrationTest` |
-| `C=1 B=2 S=3 M=0` | none | `MultiNodesOfflineClusterIntegrationTest` *(also adds/stops a broker and restarts a server inside methods)* |
+| `C=1 B=2 S=3 M=0` | none | `MultiNodesOfflineClusterIntegrationTest` *(also adds/stops a broker and restarts a server inside methods; moved to dedicated shared multi-nodes offline suite)* |
 
 ### Controller Config Overrides
 

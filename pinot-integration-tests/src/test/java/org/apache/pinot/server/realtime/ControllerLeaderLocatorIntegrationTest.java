@@ -26,7 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerStarter;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.integration.tests.SharedRichClusterIntegrationTest;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Controller;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -37,7 +37,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
+public class ControllerLeaderLocatorIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final long TIMEOUT_IN_MS = 10_000L;
   private HashMap<Integer, String> _partitionToTableMap;
 
@@ -46,6 +46,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
       throws Exception {
     startZk();
     startController();
+    resetLeadControllerResource();
 
     FakeControllerLeaderLocator.create(_helixManager);
 
@@ -57,50 +58,60 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
       throws Exception {
     Set<String> resultSet = new HashSet<>();
     FakeControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
+    ControllerStarter secondControllerStarter = null;
 
-    // Before enabling lead controller resource, helix leader should be used.
-    validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
+    try {
+      // Before enabling lead controller resource, helix leader should be used.
+      validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
-    // Enable lead controller resource
-    enableResourceConfigForLeadControllerResource(true);
+      // Enable lead controller resource
+      enableResourceConfigForLeadControllerResource(true);
 
-    // After resource config is enabled, use the lead controller in the resource.
-    validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
+      // After resource config is enabled, use the lead controller in the resource.
+      validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    // Use custom instance id
-    properties.put(Controller.CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
-    ControllerStarter secondControllerStarter = new ControllerStarter();
-    secondControllerStarter.init(new PinotConfiguration(properties));
-    secondControllerStarter.start();
+      Map<String, Object> properties = getDefaultControllerConfiguration();
+      // Use custom instance id
+      properties.put(Controller.CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
+      secondControllerStarter = new ControllerStarter();
+      secondControllerStarter.init(new PinotConfiguration(properties));
+      secondControllerStarter.start();
+      ControllerStarter startedSecondController = secondControllerStarter;
 
-    TestUtils
-        .waitForCondition(aVoid -> secondControllerStarter.getHelixResourceManager().getHelixZkManager().isConnected(),
-            TIMEOUT_IN_MS, "Failed to start the second controller");
+      TestUtils.waitForCondition(
+          aVoid -> startedSecondController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
+          "Failed to start the second controller");
 
-    // After starting a second controller, there should be two leaders for all the partitions.
-    validateResultSet(controllerLeaderLocator, resultSet, 2, "Failed to get two pairs of controllers.");
+      // After starting a second controller, there should be two leaders for all the partitions.
+      validateResultSet(controllerLeaderLocator, resultSet, 2, "Failed to get two pairs of controllers.");
 
-    // Disable lead controller resource
-    enableResourceConfigForLeadControllerResource(false);
+      // Disable lead controller resource
+      enableResourceConfigForLeadControllerResource(false);
 
-    // After disabling lead controller resource, only helix leader should be used.
-    validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
+      // After disabling lead controller resource, only helix leader should be used.
+      validateResultSet(controllerLeaderLocator, resultSet, 1, "Failed to get only one pair of controller");
 
-    // Mock time so it is beyond minimum time to invalidate leader cache
-    controllerLeaderLocator.setCurrentTimeMs(
-        controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
-    controllerLeaderLocator.invalidateCachedControllerLeader();
+      // Mock time so it is beyond minimum time to invalidate leader cache
+      controllerLeaderLocator.setCurrentTimeMs(
+          controllerLeaderLocator.getCurrentTimeMs() + 2 * controllerLeaderLocator.getMinInvalidateIntervalMs());
+      controllerLeaderLocator.invalidateCachedControllerLeader();
 
-    // All tables should have Helix leader as the controller leader
-    for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
-      Pair<String, Integer> hostnamePortPair = controllerLeaderLocator.getControllerLeader(_partitionToTableMap.get(i));
-      Assert.assertEquals(hostnamePortPair.getLeft(), ControllerTest.LOCAL_HOST);
-      Assert.assertEquals((int) hostnamePortPair.getRight(), getControllerPort());
+      // All tables should have Helix leader as the controller leader
+      for (int i = 0; i < Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+        Pair<String, Integer> hostnamePortPair =
+            controllerLeaderLocator.getControllerLeader(_partitionToTableMap.get(i));
+        Assert.assertEquals(hostnamePortPair.getLeft(), LOCAL_HOST);
+        Assert.assertEquals((int) hostnamePortPair.getRight(), getControllerPort());
+      }
+    } finally {
+      Exception exception = null;
+      exception = runCleanup(exception, this::resetLeadControllerResource);
+      ControllerStarter controllerToStop = secondControllerStarter;
+      exception = runCleanup(exception, () -> stopSecondController(controllerToStop));
+      if (exception != null) {
+        throw exception;
+      }
     }
-
-    // Stop the second controller.
-    secondControllerStarter.stop();
   }
 
   /**
@@ -139,10 +150,51 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     }, TIMEOUT_IN_MS, errorMessage);
   }
 
-  @AfterClass
-  public void tearDown() {
-    stopController();
-    stopZk();
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::resetLeadControllerResource);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private void resetLeadControllerResource() {
+    if (_helixManager != null) {
+      enableResourceConfigForLeadControllerResource(false);
+    }
+  }
+
+  private void stopSecondController(ControllerStarter secondControllerStarter) {
+    if (secondControllerStarter != null) {
+      secondControllerStarter.stop();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   static class FakeControllerLeaderLocator extends ControllerLeaderLocator {

@@ -70,6 +70,26 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   }
 
   @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return NUM_BROKERS;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     super.overrideBrokerConf(brokerConf);
 
@@ -102,64 +122,76 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   public void testUpdateBrokerResource()
       throws Exception {
     InstanceAdminClient instanceClient = getOrCreateAdminClient().getInstanceClient();
-    // Add a new broker to the cluster
-    BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
-
-    // Check if broker is added to all the tables in broker resource
+    int brokerPortCount = _brokerPorts.size();
     String clusterName = getHelixClusterName();
-    String brokerId = brokerStarter.getInstanceId();
-    IdealState brokerResourceIdealState =
-        _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-    for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
-      assertEquals(brokerAssignment.get(brokerId), BrokerResourceStateModel.ONLINE);
-    }
-    TestUtils.waitForCondition(aVoid -> {
-      ExternalView brokerResourceExternalView =
-          _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-      for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
-        if (!brokerAssignment.containsKey(brokerId)) {
-          return false;
-        }
-      }
-      return true;
-    }, 60_000L, "Failed to find broker in broker resource ExternalView");
 
-    // Stop the broker
-    brokerStarter.stop();
-    _brokerPorts.remove(_brokerPorts.size() - 1);
-
-    // Dropping the broker should fail because it is still in the broker resource
+    BaseBrokerStarter brokerStarter = null;
+    String brokerId = null;
+    boolean brokerDropped = false;
     try {
-      instanceClient.dropInstance(brokerId);
-      fail("Dropping instance should fail because it is still in the broker resource");
-    } catch (Exception e) {
-      // Expected
-    }
+      // Add a new broker to the cluster
+      brokerStarter = startOneBroker(NUM_BROKERS);
+      brokerId = brokerStarter.getInstanceId();
+      String extraBrokerId = brokerId;
 
-    // Untag the broker and update the broker resource so that it is removed from the broker resource
-    instanceClient.updateInstanceTags(brokerId, Collections.emptyList(), true);
-
-    // Check if broker is removed from all the tables in broker resource
-    brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-    for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
-      assertFalse(brokerAssignment.containsKey(brokerId));
-    }
-    TestUtils.waitForCondition(aVoid -> {
-      ExternalView brokerResourceExternalView =
-          _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-      for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
-        if (brokerAssignment.containsKey(brokerId)) {
-          return false;
-        }
+      // Check if broker is added to all the tables in broker resource
+      IdealState brokerResourceIdealState =
+          _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+      for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
+        assertEquals(brokerAssignment.get(extraBrokerId), BrokerResourceStateModel.ONLINE);
       }
-      return true;
-    }, 60_000L, "Failed to remove broker from broker resource ExternalView");
+      TestUtils.waitForCondition(aVoid -> {
+        ExternalView brokerResourceExternalView =
+            _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+        for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+          if (!brokerAssignment.containsKey(extraBrokerId)) {
+            return false;
+          }
+        }
+        return true;
+      }, 60_000L, "Failed to find broker in broker resource ExternalView");
 
-    // Dropping the broker should success now
-    instanceClient.dropInstance(brokerId);
+      // Stop the broker
+      brokerStarter.stop();
+      brokerStarter = null;
+      restoreBrokerPorts(brokerPortCount);
 
-    // Check if broker is dropped from the cluster
-    assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
+      // Dropping the broker should fail because it is still in the broker resource
+      try {
+        instanceClient.dropInstance(extraBrokerId);
+        fail("Dropping instance should fail because it is still in the broker resource");
+      } catch (Exception e) {
+        // Expected
+      }
+
+      // Untag the broker and update the broker resource so that it is removed from the broker resource
+      instanceClient.updateInstanceTags(extraBrokerId, Collections.emptyList(), true);
+
+      // Check if broker is removed from all the tables in broker resource
+      brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+      for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
+        assertFalse(brokerAssignment.containsKey(extraBrokerId));
+      }
+      TestUtils.waitForCondition(aVoid -> {
+        ExternalView brokerResourceExternalView =
+            _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+        for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+          if (brokerAssignment.containsKey(extraBrokerId)) {
+            return false;
+          }
+        }
+        return true;
+      }, 60_000L, "Failed to remove broker from broker resource ExternalView");
+
+      // Dropping the broker should success now
+      instanceClient.dropInstance(extraBrokerId);
+      brokerDropped = true;
+
+      // Check if broker is dropped from the cluster
+      assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(extraBrokerId));
+    } finally {
+      cleanupExtraBroker(instanceClient, clusterName, brokerStarter, brokerDropped ? null : brokerId, brokerPortCount);
+    }
   }
 
   @Test
@@ -184,7 +216,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     } finally {
       // Restart the failed server, and it should be included in the routing again
       serverStarter = restartServer(serverStarter);
-      _serverStarters.set(NUM_SERVERS - 1, serverStarter);
+      replaceServerStarter(NUM_SERVERS - 1, serverStarter);
       TestUtils.waitForCondition((aVoid) -> {
         try {
           JsonNode queryResult = postQuery("SELECT COUNT(*) FROM mytable");
@@ -195,6 +227,43 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
           throw new RuntimeException(e);
         }
       }, 10_000L, "Failed to include the restarted server into the routing. Other tests may be affected");
+    }
+  }
+
+  private void restoreBrokerPorts(int brokerPortCount) {
+    while (_brokerPorts.size() > brokerPortCount) {
+      _brokerPorts.remove(_brokerPorts.size() - 1);
+    }
+  }
+
+  private void cleanupExtraBroker(InstanceAdminClient instanceClient, String clusterName,
+      BaseBrokerStarter brokerStarter, String brokerId, int brokerPortCount)
+      throws Exception {
+    if (brokerStarter != null) {
+      brokerStarter.stop();
+    }
+    restoreBrokerPorts(brokerPortCount);
+    if (brokerId != null && _helixAdmin.getInstancesInCluster(clusterName).contains(brokerId)) {
+      instanceClient.updateInstanceTags(brokerId, Collections.emptyList(), true);
+      TestUtils.waitForCondition(aVoid -> {
+        ExternalView brokerResourceExternalView =
+            _helixAdmin.getResourceExternalView(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+        for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+          if (brokerAssignment.containsKey(brokerId)) {
+            return false;
+          }
+        }
+        return true;
+      }, 60_000L, "Failed to clean up broker from broker resource ExternalView");
+      instanceClient.dropInstance(brokerId);
+    }
+  }
+
+  private void replaceServerStarter(int serverIndex, BaseServerStarter serverStarter) {
+    _serverStarters.set(serverIndex, serverStarter);
+    if (isSharedRichClusterEnabled() && _sharedRichClusterTestSuite != null) {
+      _sharedRichClusterTestSuite._serverStarters.set(serverIndex, serverStarter);
+      attachSharedRichCluster();
     }
   }
 
