@@ -123,8 +123,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotDdlRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDdlRestletResource.class);
-  /** Maximum accepted SQL input length (256 KB) to prevent unbounded parser memory allocation. */
-  private static final int MAX_DDL_SQL_LENGTH = 256 * 1024;
+  /**
+   * Maximum accepted SQL input length, measured in {@link String#length() Java characters}
+   * (UTF-16 code units), to prevent unbounded parser memory allocation. Up to ~4× this value
+   * in UTF-8 wire bytes can be accepted by Jackson before the length check rejects; operators
+   * sizing reverse-proxy body limits should plan accordingly.
+   */
+  private static final int MAX_DDL_SQL_CHARS = 256 * 1024;
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -168,8 +173,8 @@ public class PinotDdlRestletResource {
     }
     // Guard against arbitrarily large inputs that would force the Calcite parser to allocate
     // excessive memory building the AST in-memory.
-    if (request.getSql().length() > MAX_DDL_SQL_LENGTH) {
-      throw badRequest("DDL statement exceeds maximum length of " + MAX_DDL_SQL_LENGTH + " characters.");
+    if (request.getSql().length() > MAX_DDL_SQL_CHARS) {
+      throw badRequest("DDL statement exceeds maximum length of " + MAX_DDL_SQL_CHARS + " characters.");
     }
 
     CompiledDdl compiled;
@@ -497,6 +502,13 @@ public class PinotDdlRestletResource {
     // Compute the candidate typed names BEFORE existence filtering so we can authorize against
     // the user's intent (not just whatever happens to exist now). This prevents an unauthorized
     // caller from probing existence via 200/404 vs 403.
+    //
+    // NB: the no-TYPE form (`DROP TABLE foo` without `TYPE OFFLINE | REALTIME`) authorizes
+    // BOTH variants up-front under access-control plugins that grant per-type permissions, so
+    // a caller with permission only on OFFLINE will receive 403 even if the REALTIME variant
+    // does not exist. This mirrors the SHOW CREATE TABLE no-TYPE policy and is intentional:
+    // "drop both variants atomically" requires authorization on both. Callers with partial
+    // permission must use the explicit `TYPE` clause to target a single variant.
     List<String> candidates = new ArrayList<>(2);
     if (drop.getTableType() == null || drop.getTableType() == TableType.OFFLINE) {
       candidates.add(TableNameBuilder.OFFLINE.tableNameWithType(fullyQualifiedRaw));
@@ -572,7 +584,13 @@ public class PinotDdlRestletResource {
     // null for non-standard codes (422, 423, 451, etc.) — a null would silently fall back
     // to 500 and hide the original 4xx information from the caller.
     int firstFailureStatusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
+    // Targets whose tableTasksCleanup succeeded (removing scheduled task triggers) but whose
+    // deleteTable subsequently failed. These tables remain in the cluster but will no longer
+    // run their scheduled tasks until the operator either retries the DROP successfully or
+    // restores the SCHEDULE_KEY entries on the surviving table config.
+    List<String> taskSchedulesCleared = new ArrayList<>();
     for (String target : targets) {
+      boolean tasksCleaned = false;
       try {
         // Remove task schedules before deletion so tasks are not triggered during the drop.
         // tableTasksCleanup may throw ControllerApplicationException (e.g. BAD_REQUEST when
@@ -580,6 +598,7 @@ public class PinotDdlRestletResource {
         // information and must be preserved instead of being collapsed to 500 below.
         PinotTableRestletResource.tableTasksCleanup(target, false,
             _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
+        tasksCleaned = true;
         // deleteTable(rawName, type, retention) takes the raw name and re-derives the typed
         // name internally via TableNameBuilder.forType(type).tableNameWithType(rawName); see
         // PinotHelixResourceManager.deleteTable. Pass `fullyQualifiedRaw` (DB-qualified raw
@@ -594,6 +613,9 @@ public class PinotDdlRestletResource {
         // redundant noise — record a one-line breadcrumb at WARN without the throwable.
         LOGGER.warn("DROP TABLE on {} failed: {}", target, e.getMessage());
         failed.add(target);
+        if (tasksCleaned) {
+          taskSchedulesCleared.add(target);
+        }
         if (firstFailure == null) {
           firstFailure = e;
           firstFailureStatusCode = e.getResponse().getStatus();
@@ -604,6 +626,9 @@ public class PinotDdlRestletResource {
         // without seeing the same stack trace twice.
         LOGGER.warn("DROP TABLE on {} failed unexpectedly: {}", target, e.toString());
         failed.add(target);
+        if (tasksCleaned) {
+          taskSchedulesCleared.add(target);
+        }
         if (firstFailure == null) {
           firstFailure = e;
           firstFailureStatusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
@@ -626,9 +651,14 @@ public class PinotDdlRestletResource {
     String causeDesc = firstFailure.getMessage() != null
         ? firstFailure.getMessage() : firstFailure.getClass().getSimpleName();
     String partialPrefix = dropped.isEmpty() ? "" : "Partial DROP TABLE: dropped " + dropped + ", ";
+    String taskScheduleHint = taskSchedulesCleared.isEmpty() ? ""
+        : ". Task schedules were already cleared for " + taskSchedulesCleared
+            + "; if those tables remain in service the operator must restore the schedule entries"
+            + " in their TableConfig taskTypeConfigsMap before scheduled tasks resume.";
+    String reCreateHint = dropped.isEmpty() ? ""
+        : ". The successfully-dropped variant must be re-created if the original DROP was unintended.";
     String msg = partialPrefix + "failed to drop " + failed + ": " + causeDesc
-        + (dropped.isEmpty() ? "" : ". The successfully-dropped variant must be re-created if "
-            + "the original DROP was unintended.");
+        + reCreateHint + taskScheduleHint;
     throw new ControllerApplicationException(LOGGER, msg, firstFailureStatusCode, firstFailure);
   }
 

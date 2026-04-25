@@ -66,9 +66,10 @@ import org.apache.pinot.sql.ddl.resolved.ResolvedTableDefinition;
  * <ol>
  *   <li>If the key (case-insensitive) is in the promoted catalog, set the corresponding
  *       {@link TableConfigBuilder} field directly.</li>
- *   <li>If the key starts with {@code stream.}, route into {@code IndexingConfig.streamConfigs}.
- *       The {@code stream.} prefix is stripped so existing Pinot stream property keys (e.g.
- *       {@code stream.kafka.topic.name}) round-trip cleanly. REALTIME-only.</li>
+ *   <li>If the key starts with {@code stream.} or {@code realtime.}, route the entry into
+ *       {@code IndexingConfig.streamConfigs} verbatim (the prefix is preserved, not stripped, so
+ *       the key matches existing Pinot stream config conventions like
+ *       {@code stream.kafka.topic.name}). REALTIME-only.</li>
  *   <li>If the key starts with {@code task.<taskType>.}, route the remainder into
  *       {@code TableTaskConfig.taskTypeConfigsMap[taskType]}.</li>
  *   <li>Otherwise, store verbatim in {@link TableCustomConfig#getCustomConfigs()}.
