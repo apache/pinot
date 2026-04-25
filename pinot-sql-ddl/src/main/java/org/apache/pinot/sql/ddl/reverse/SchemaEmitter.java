@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.ddl.reverse;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -66,6 +67,15 @@ final class SchemaEmitter {
     for (DateTimeFieldSpec dt : schema.getDateTimeFieldSpecs()) {
       dateTimeNames.add(dt.getName());
       out.add(emitColumn(dt));
+    }
+    // Reject COMPLEX columns explicitly: the DDL grammar does not yet have a syntax for nested
+    // STRUCT/LIST/MAP fields. Without this guard, ComplexFieldSpec columns would silently fall
+    // through emitColumns and the canonical DDL would re-parse into a schema missing them.
+    for (FieldSpec complexSpec : schema.getComplexFieldSpecs()) {
+      throw new IllegalArgumentException(
+          "SHOW CREATE TABLE cannot represent complex column '" + complexSpec.getName()
+              + "' in DDL; replay of the emitted DDL would silently drop this column. "
+              + "The DDL grammar does not yet support COMPLEX field type.");
     }
     // Legacy time field: emit as a DATETIME column so the column is not silently dropped — but
     // skip when a DateTimeFieldSpec already exists with the same column name. A schema mid-
@@ -115,15 +125,20 @@ final class SchemaEmitter {
     }
     // Only emit DEFAULT when the user-supplied value differs from the data-type's natural
     // default; this matches Pinot's own JSON serialization rule and keeps canonical output
-    // free of redundant defaults. Use DataType.equals(v1, v2) for content comparison —
-    // Object.equals on byte[] is reference equality and would falsely flag every BYTES
-    // column at natural default as needing an explicit DEFAULT clause.
+    // free of redundant defaults. For BYTES, use Arrays.equals via DataType.equals (byte[]
+    // reference equality would falsely flag every BYTES default as a mismatch). For
+    // BIG_DECIMAL, use compareTo so different scales of the same numeric value compare equal
+    // (BigDecimal.equals is scale-sensitive: new BigDecimal("0.0").equals(BigDecimal.ZERO)
+    // is false, which would make us emit a redundant DEFAULT 0.0).
     Object defaultValue = spec.getDefaultNullValue();
     Object naturalDefault =
         FieldSpec.getDefaultNullValue(spec.getFieldType(), spec.getDataType(), null);
     boolean atNaturalDefault;
     if (defaultValue == null || naturalDefault == null) {
       atNaturalDefault = (defaultValue == null && naturalDefault == null);
+    } else if (spec.getDataType() == DataType.BIG_DECIMAL && defaultValue instanceof BigDecimal
+        && naturalDefault instanceof BigDecimal) {
+      atNaturalDefault = ((BigDecimal) defaultValue).compareTo((BigDecimal) naturalDefault) == 0;
     } else {
       atNaturalDefault = spec.getDataType().equals(defaultValue, naturalDefault);
     }
@@ -191,8 +206,27 @@ final class SchemaEmitter {
       case LONG:
       case FLOAT:
       case DOUBLE:
-      case BOOLEAN:
         return value.toString();
+      case BOOLEAN:
+        // Pinot stores BOOLEAN values internally as Integer 0/1; emit the SQL literal form
+        // (TRUE/FALSE) so canonical DDL is grammar-standard rather than exposing the internal
+        // encoding.
+        if (value instanceof Number) {
+          return ((Number) value).intValue() == 1 ? "TRUE" : "FALSE";
+        }
+        if (value instanceof Boolean) {
+          return ((Boolean) value) ? "TRUE" : "FALSE";
+        }
+        return value.toString();
+      case TIMESTAMP:
+        // Pinot stores TIMESTAMP defaults as Long millis. Emit a quoted ISO timestamp string
+        // so canonical DDL is human-readable; FieldSpec.convertInternal accepts both ISO and
+        // numeric forms on re-parse, so the round-trip is preserved.
+        if (value instanceof Number) {
+          return SqlIdentifiers.quoteString(
+              new Timestamp(((Number) value).longValue()).toString());
+        }
+        return SqlIdentifiers.quoteString(value.toString());
       case BIG_DECIMAL:
         // BigDecimal.toString() can emit scientific notation (e.g. "1E+10") for large or
         // small magnitudes, which Calcite's Literal() rule does not accept. toPlainString()
