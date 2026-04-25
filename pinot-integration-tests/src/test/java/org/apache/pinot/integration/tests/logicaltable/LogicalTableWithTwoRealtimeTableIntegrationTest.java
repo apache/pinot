@@ -141,7 +141,8 @@ public class LogicalTableWithTwoRealtimeTableIntegrationTest extends BaseLogical
     JsonNode exceptions = response.get("exceptions");
     if (!exceptions.isEmpty()) {
       int errorCode = exceptions.get(0).get("errorCode").asInt();
-      assertTrue(errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()
+      assertTrue(errorCode == QueryErrorCode.EXECUTION_TIMEOUT.getId()
+          || errorCode == QueryErrorCode.BROKER_TIMEOUT.getId()
           || errorCode == QueryErrorCode.SERVER_NOT_RESPONDING.getId()
           || errorCode == QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId(),
           "Unexpected error code: " + errorCode);

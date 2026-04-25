@@ -177,7 +177,7 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 
 ### Current Draft Suite Timing
 
-The current draft suite moves twenty low-risk no-override source test classes
+The current draft suite moves twenty-three low-risk no-override source test classes
 behind the shared rich cluster. `ErrorCodesIntegrationTest` is represented by
 its four concrete inner TestNG classes:
 
@@ -201,29 +201,33 @@ its four concrete inner TestNG classes:
 - `LogicalTableWithTwelveOfflineTablesIntegrationTest`
 - `LogicalTableWithOneRealtimeTableIntegrationTest`
 - `LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest`
+- `LogicalTableWithTwoRealtimeTableIntegrationTest`
+- `LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest`
+- `LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest`
 - `PurgeMetadataPushMinionClusterIntegrationTest`
 - `RealtimeToOfflineSegmentsMinionClusterIntegrationTest`
 - `QueryQuotaClusterIntegrationTest`
 
-On this workstation, the same 155 TestNG tests passed in both modes:
+On this workstation, the same 202 TestNG tests passed in both modes:
 
 | Mode | Command | Wall time |
 | --- | --- | ---: |
-| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest,LogicalTableWithOneOfflineTableIntegrationTest,PurgeMetadataPushMinionClusterIntegrationTest,RealtimeToOfflineSegmentsMinionClusterIntegrationTest,QueryQuotaClusterIntegrationTest,LogicalTableWithTwoOfflineTablesIntegrationTest,LogicalTableWithTwelveOfflineTablesIntegrationTest,LogicalTableWithOneRealtimeTableIntegrationTest,LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 597.19s |
-| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 385.20s |
+| Per-class lifecycle | `./mvnw -pl pinot-integration-tests -Dtest=SegmentUploadIntegrationTest,IngestionConfigHybridIntegrationTest,TPCHQueryIntegrationTest,BaseDedupIntegrationTest,StaleSegmentCheckIntegrationTest,SegmentWriterUploaderIntegrationTest,SegmentGenerationMinionClusterIntegrationTest,DimensionTableIntegrationTest,SparkSegmentMetadataPushIntegrationTest,StarTreeFunctionParametersIntegrationTest,SegmentPartitionLLCRealtimeClusterIntegrationTest,ErrorCodesIntegrationTest,LogicalTableWithOneOfflineTableIntegrationTest,PurgeMetadataPushMinionClusterIntegrationTest,RealtimeToOfflineSegmentsMinionClusterIntegrationTest,QueryQuotaClusterIntegrationTest,LogicalTableWithTwoOfflineTablesIntegrationTest,LogicalTableWithTwelveOfflineTablesIntegrationTest,LogicalTableWithOneRealtimeTableIntegrationTest,LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwoRealtimeTableIntegrationTest,LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest,LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` | 780.87s |
+| Shared rich suite | `./mvnw -pl pinot-integration-tests -Pshared-rich-cluster-integration-test-suite test` | 501.50s |
 
-That is a 211.99s wall-clock reduction, about 35% for this draft batch.
+That is a 279.37s wall-clock reduction, about 36% for this draft batch.
 
-Previous validated checkpoint: 95 TestNG tests passed with a 398.38s per-class
-lifecycle and a 250.84s shared-rich-suite run, a 147.54s wall-clock reduction
-or about 37%.
+Previous validated checkpoint: 155 TestNG tests passed with a 597.19s per-class
+lifecycle and a 385.20s shared-rich-suite run, a 211.99s wall-clock reduction
+or about 35%.
 
 Attempted but not included yet:
 
 - `PauselessRealtimeIngestionWithDedupIntegrationTest`: intermittently hit unavailable realtime segments under
   strict replica-group routing in the shared run.
-- Remaining logical-table classes: each still needs validation for table/topic naming, time-boundary mutations, and
-  query-timeout behavior before adding the batch.
+- `KafkaPartitionSubsetChaosIntegrationTest`: uses its own chaos topology with a control realtime table, three subset
+  realtime tables, six Kafka partitions, pause/resume, force-commit, and server restart coverage; keep it in a
+  separate setup bucket.
 - `SegmentGenerationMinionRealtimeIngestionTest`: uses `@BeforeTest` and creates `mytable_REALTIME` before earlier
   suite classes; it needs class-scoped setup or unique table/topic names before sharing.
 - `CommitTimeCompactionIntegrationTest`: needs a complete conversion to unique per-method table/topic names and

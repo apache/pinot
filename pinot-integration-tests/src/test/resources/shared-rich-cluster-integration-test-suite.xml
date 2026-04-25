@@ -42,6 +42,9 @@
       <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwelveOfflineTablesIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithOneRealtimeTableIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwoRealtimeTableIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.logicaltable.LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.PurgeMetadataPushMinionClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.RealtimeToOfflineSegmentsMinionClusterIntegrationTest"/>
       <class name="org.apache.pinot.integration.tests.QueryQuotaClusterIntegrationTest"/>
