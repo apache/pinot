@@ -109,17 +109,31 @@ class FilterPushDownTest extends BaseTest {
 
   test("LIKE pushdowns should escape SQL and LIKE wildcard characters in the value") {
     // Literal %, _, and single-quote in the user-supplied string would change the Pinot
-    // predicate meaning (or break the SQL) if they leaked through unescaped. Backslash
-    // itself also needs doubling so the LIKE ESCAPE clause matches a literal backslash.
+    // predicate meaning (or break the SQL) if they leaked through unescaped.
     val filters = Array[Filter](
-      StringStartsWith("name", "50%_off'sale\\2024"),
-      StringEndsWith("name", "10%_off'sale\\2024"),
-      StringContains("name", "%_'\\")
+      StringStartsWith("name", "50%_off'sale"),
+      StringEndsWith("name", "10%_off'sale"),
+      StringContains("name", "%_'")
     )
     val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(filters)
     whereClause.get shouldEqual
-      """("name" LIKE '50\%\_off''sale\\2024%' ESCAPE '\') AND """ +
-        """("name" LIKE '%10\%\_off''sale\\2024' ESCAPE '\') AND """ +
-        """("name" LIKE '%\%\_''\\%' ESCAPE '\')"""
+      """("name" LIKE '50\%\_off''sale%' ESCAPE '\') AND """ +
+        """("name" LIKE '%10\%\_off''sale' ESCAPE '\') AND """ +
+        """("name" LIKE '%\%\_''%' ESCAPE '\')"""
+  }
+
+  test("LIKE pushdowns with backslash in the value should fall back to post-scan") {
+    // Pinot's likeToRegexpLike does not round-trip `\\` correctly (it emits a regex that
+    // matches two backslashes instead of one), so the connector rejects pushdown for these
+    // and lets Spark evaluate them on the driver side. Once the runtime conversion is fixed,
+    // this test should be revisited to push these down again.
+    val filters = Array[Filter](
+      StringStartsWith("name", "a\\b"),
+      StringEndsWith("name", "x\\y"),
+      StringContains("name", "p\\q")
+    )
+    val (accepted, postScan) = FilterPushDown.acceptFilters(filters)
+    accepted shouldBe empty
+    postScan should contain theSameElementsAs filters
   }
 }
