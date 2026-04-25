@@ -25,11 +25,20 @@ import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
+/// Extracts Pinot rows from Avro [org.apache.avro.generic.GenericRecord]s materialized by parquet-avro.
+///
+/// The reader sets `parquet.avro.add-list-element-records=false` in the Hadoop configuration, which tells
+/// parquet-avro to flatten the standard Parquet 3-level LIST encoding
+/// (`<list-rep> group <name> (LIST) { repeated group list { <elem-type> element; } }`) directly to an Avro
+/// `array<elem-type>`. This matches Apache Arrow's Parquet reader behavior and means there is no LIST wrapper
+/// to strip on the Pinot side — user-defined records like `array<record<UserTag, [element]>>` round-trip
+/// cleanly because the file's Avro schema is honored as-is, and hand-authored Parquet `LIST<T>` surfaces as
+/// flat values without a wrapper artifact.
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
 
   @Override
   public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-   super.init(fields, recordExtractorConfig);
+    super.init(fields, recordExtractorConfig);
   }
 
   @Override
