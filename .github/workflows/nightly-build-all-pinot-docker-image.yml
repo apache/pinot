@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java-version: ["11", "17", "21", "25"]
+        java-version: ["21", "25"]
     name: Compile JDK-${{ matrix.java-version }} Pinot
     needs: [generate-build-info]
     steps:
@@ -71,7 +71,7 @@ jobs:
       fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["11", "17", "21", "25"]
+        java-version: ["21", "25"]
         arch: ["amd64", "arm64"]
         include:
           - arch: amd64
@@ -104,7 +104,7 @@ jobs:
       fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["11", "17", "21", "25"]
+        java-version: ["21", "25"]
     name: Create ${{ matrix.java-disto }}-${{ matrix.java-version }} Multi-Arch Manifest
     needs: [generate-build-info, package-pinot-docker-image]
     steps:

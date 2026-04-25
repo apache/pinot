@@ -33,6 +33,10 @@ on:
         description: "The docker image name, default to 'apachepinot/pinot'."
         default: "apachepinot/pinot"
         required: true
+      jdkVersion:
+        description: "The JDK version to use for the Pinot build and runtime image."
+        default: "21"
+        required: true
       tags:
         description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"
         default: ""
@@ -58,5 +62,6 @@ jobs:
         DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
         BUILD_PLATFORM: ${{ github.event.inputs.platform }}
         PINOT_GIT_REF: ${{ github.event.inputs.commit }}
+        JDK_VERSION: ${{ github.event.inputs.jdkVersion }}
         TAGS: ${{ github.event.inputs.tags }}
       run: .github/workflows/scripts/docker/.pinot_docker_image_build_and_push.sh
