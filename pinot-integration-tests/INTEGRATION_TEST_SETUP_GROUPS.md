@@ -282,6 +282,7 @@ instead of the main no-override suite:
 | Shared TLS suite | `./mvnw -pl pinot-integration-tests -Pshared-tls-cluster-integration-test-suite test` | 21 | 52.14s |
 | Shared URL auth realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-url-auth-realtime-cluster-integration-test-suite test` | 2 | 47.64s |
 | Shared gRPC broker suite | `./mvnw -pl pinot-integration-tests -Pshared-grpc-broker-cluster-integration-test-suite test` | 2 | 53.04s |
+| Shared hybrid suite | `./mvnw -pl pinot-integration-tests -Pshared-hybrid-cluster-integration-test-suite test` | 56 | 161.93s |
 | Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
 | Shared custom-tenant MSQ suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-stage-engine-custom-tenant-integration-test-suite test` | 91 | 55.35s |
 | Shared LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-llc-realtime-cluster-integration-test-suite test` | 18 | 167.30s |
@@ -357,6 +358,12 @@ the shared profile in 47.64s.
 The gRPC broker suite preserves the 2-server/Kafka/no-minion controller, broker,
 and server config bucket for gRPC request handling. The same 2 tests passed
 per-class in 51.18s, while the shared profile passed in 53.04s.
+
+The hybrid suite preserves the 2-server/Kafka/no-minion controller, broker, and
+server config bucket used by `HybridClusterIntegrationTest` and
+`DateTimeFieldSpecHybridClusterIntegrationTest`. The same 56 TestNG methods,
+including 9 expected skips, passed per-class in 192.56s and in the shared
+profile in 161.93s.
 
 The offline suite preserves the 1-server/no-Kafka/no-minion setup and still
 exercises the destructive instance-decommission coverage by allowing it only for

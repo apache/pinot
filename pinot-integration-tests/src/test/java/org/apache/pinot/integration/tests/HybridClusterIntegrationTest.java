@@ -19,14 +19,29 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -34,6 +49,9 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
+import org.testng.SkipException;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -42,9 +60,160 @@ import static org.testng.Assert.fail;
 
 
 public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTest {
+  private static final int NUM_SHARED_OFFLINE_SEGMENTS = 8;
+  private static final int NUM_SHARED_REALTIME_SEGMENTS = 6;
+
+  private static final String SHARED_TABLE_NAME_PREFIX = "hybrid_cluster";
+  private static final String SHARED_KAFKA_TOPIC_PREFIX = "hybrid_cluster";
+  private static final String SHARED_TENANT_NAME_PREFIX = "HybridClusterTenant";
+
+  private final String _sharedResourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
+  private final Map<String, String> _originalClusterConfigValues = new LinkedHashMap<>();
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+  private boolean _clusterConfigOverrideApplied;
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + _sharedResourceSuffix
+        : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC_PREFIX + "_" + _sharedResourceSuffix
+        : super.getKafkaTopic();
+  }
+
+  @Override
+  protected String getBrokerTenant() {
+    return isSharedRichClusterEnabled() ? SHARED_TENANT_NAME_PREFIX : super.getBrokerTenant();
+  }
+
+  @Override
+  protected String getServerTenant() {
+    return isSharedRichClusterEnabled() ? SHARED_TENANT_NAME_PREFIX : super.getServerTenant();
+  }
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
+        TagNameUtils.getBrokerTagForTenant(getBrokerTenant()));
+  }
+
+  @BeforeClass(alwaysRun = true)
+  @Override
+  public void setUp()
+      throws Exception {
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
+
+    startHybridCluster();
+    cleanTableAndSchema();
+    createServerTenant(getServerTenant(), NUM_SERVERS_OFFLINE, NUM_SERVERS_REALTIME);
+    resetKafkaTopic();
+
+    List<File> avroFiles = getClassAvroFiles();
+    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_SHARED_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_SHARED_REALTIME_SEGMENTS);
+
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    addTableConfig(offlineTableConfig);
+    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0,
+        _classSegmentDir, _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
+
+    pushAvroIntoKafka(realtimeAvroFiles);
+    setUpH2Connection(avroFiles);
+    setUpQueryGenerator(avroFiles);
+    waitForAllDocsLoaded(600_000L);
+  }
+
+  @Override
+  protected void startHybridCluster()
+      throws Exception {
+    startZk();
+    startController();
+    applyClusterConfigOverrides();
+    startBroker();
+    startServers(NUM_SERVERS);
+    startKafkaWithoutTopic();
+  }
+
+  @AfterClass(alwaysRun = true)
+  @Override
+  public void tearDown()
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::restoreClusterConfigOverrides);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, this::stopServer);
+      exception = runCleanup(exception, this::stopBroker);
+      exception = runCleanup(exception, this::stopController);
+      exception = runCleanup(exception, this::stopKafka);
+      exception = runCleanup(exception, this::stopZk);
+    }
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  @Override
+  protected void testQuery(@Language("sql") String query)
+      throws Exception {
+    super.testQuery(rewriteDefaultTableName(query));
+  }
+
+  @Override
+  protected void testQuery(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
+      throws Exception {
+    super.testQuery(rewriteDefaultTableName(pinotQuery), rewriteDefaultTableName(h2Query));
+  }
+
+  private String rewriteDefaultTableName(String query) {
+    return isSharedRichClusterEnabled() ? query.replace(DEFAULT_TABLE_NAME, getTableName()) : query;
+  }
+
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      throw new SkipException("Skipping broker add/drop coverage in shared rich cluster mode");
+    }
+
     // Add a new broker to the cluster
     BaseBrokerStarter brokerStarter = startOneBroker(1);
 
@@ -342,6 +511,24 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   @Test(dataProvider = "useBothQueryEngines")
   public void testVirtualColumnQueries(boolean useMultiStageQueryEngine)
       throws Exception {
+    if (isSharedRichClusterEnabled()) {
+      ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from " + getTableName());
+      for (int i = 0; i < resultSetGroup.getResultSet(0).getColumnCount(); i++) {
+        assertFalse(resultSetGroup.getResultSet(0).getColumnName(i).startsWith("$"));
+      }
+      getPinotConnection()
+          .execute("select $docId, $segmentName, $hostName, $partitionId from " + getTableName());
+      getPinotConnection().execute(
+          "select $docId, $segmentName, $hostName, $partitionId from " + getTableName()
+              + " where $docId < 5 limit 50");
+      getPinotConnection().execute(
+          "select $docId, $segmentName, $hostName, $partitionId from " + getTableName()
+              + " where $docId = 5 limit 50");
+      getPinotConnection().execute(
+          "select $docId, $segmentName, $hostName, $partitionId from " + getTableName()
+              + " where $docId > 19998 limit 50");
+      return;
+    }
     super.testVirtualColumnQueries();
   }
 
@@ -394,5 +581,169 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
     response = postQueryToController(query);
     QueryAssert.assertThat(response).firstException().hasErrorCode(QueryErrorCode.TABLE_DOES_NOT_EXIST)
         .containsMessage("TableDoesNotExistError");
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _sharedResourceSuffix)
+        : _tempDir;
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private List<File> getClassAvroFiles()
+      throws Exception {
+    int numSegments = unpackAvroData(_classTempDir).size();
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_classTempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(offlineTableName) != null
+        || _helixResourceManager.hasOfflineTable(tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void applyClusterConfigOverrides() {
+    HelixConfigScope scope = getClusterConfigScope();
+    Map<String, String> configOverrides = new LinkedHashMap<>();
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(10));
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        Integer.toString(6));
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(12));
+
+    try {
+      _clusterConfigOverrideApplied = true;
+      configOverrides.forEach((key, value) -> {
+        _originalClusterConfigValues.put(key, _helixManager.getConfigAccessor().get(scope, key));
+        _helixManager.getConfigAccessor().set(scope, key, value);
+      });
+    } catch (RuntimeException e) {
+      restoreClusterConfigOverrides();
+      throw e;
+    }
+  }
+
+  private void restoreClusterConfigOverrides() {
+    if ((!_clusterConfigOverrideApplied && _originalClusterConfigValues.isEmpty()) || _helixManager == null) {
+      return;
+    }
+
+    HelixConfigScope scope = getClusterConfigScope();
+    _originalClusterConfigValues.forEach((key, originalValue) -> {
+      if (originalValue == null) {
+        _helixManager.getConfigAccessor().remove(scope, key);
+      } else {
+        _helixManager.getConfigAccessor().set(scope, key, originalValue);
+      }
+    });
+    _originalClusterConfigValues.clear();
+    _clusterConfigOverrideApplied = false;
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+        .build();
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+    _queryGenerator = null;
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }
