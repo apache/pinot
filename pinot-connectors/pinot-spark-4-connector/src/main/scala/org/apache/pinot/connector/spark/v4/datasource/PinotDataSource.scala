@@ -91,6 +91,12 @@ private[datasource] object PinotDataSource {
       true
     } catch {
       case _: ClassNotFoundException => false
+      // Class.forName can also throw LinkageError / NoClassDefFoundError if the v3 jar is on
+      // the classpath but partially shadowed (e.g., a transitive dependency is missing). We
+      // conservatively treat that as "not present" so the constructor does not leak an
+      // unrelated bytecode-resolution error to the user; the worst case is the conflict guard
+      // is bypassed and the user falls back to Spark's own multi-source error message.
+      case _: LinkageError => false
     }
   }
 
