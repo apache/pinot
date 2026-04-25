@@ -142,6 +142,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected SegmentReloadSemaphore _segmentReloadSemaphore;
+  /**
+   * @deprecated Use {@link #_segmentReloadExecutor} or {@link #_segmentRefreshExecutor} instead. Kept for binary
+   * compatibility with downstream extensions; refers to the shared underlying executor pool.
+   */
+  @Deprecated
+  protected ExecutorService _segmentReloadRefreshExecutor;
   protected ExecutorService _segmentReloadExecutor;
   protected ExecutorService _segmentRefreshExecutor;
   @Nullable
@@ -189,6 +195,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
+    _segmentReloadRefreshExecutor = segmentReloadRefreshExecutor;
     // These two executors are using the same underlying thread pool, only that they're wrapped with different decorator
     _segmentReloadExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
         SegmentOperationsTaskType.RELOAD, tableConfig.getTableName());
