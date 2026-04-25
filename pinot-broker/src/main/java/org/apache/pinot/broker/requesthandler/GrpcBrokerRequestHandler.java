@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import com.google.protobuf.ByteString;
 import io.grpc.ConnectivityState;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -32,7 +30,6 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -106,7 +103,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   /**
    * Executes scatter: sends the query to servers and collects per-server streaming response iterators.
-   * Subclasses may override to wrap or replace the scatter step (e.g., for cache integration).
+   * Subclasses may override to replace or augment the scatter step.
    */
   protected Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> doScatter(long requestId, TableRouteInfo route,
       RequestContext requestContext) {
@@ -132,8 +129,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   /**
    * Executes the reduce step on the given responseMap.
-   * Subclasses may pass a responseMap that differs from the live scatter result (e.g., with cached
-   * entries injected as synthetic streaming iterators).
+   * Subclasses may override to perform custom reduce logic or augment the responseMap.
    */
   protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, long timeoutMs)
@@ -143,24 +139,6 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
         _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
     brokerResponse.setBrokerReduceTimeMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - reduceStartTimeNs));
     return brokerResponse;
-  }
-
-  /**
-   * Wraps a {@link DataTable} as a single-element {@code Iterator<Server.ServerResponse>}.
-   * This allows cached DataTables to be injected into the streaming reduce pipeline without
-   * any changes to {@link StreamingReduceService}: it deserialises each
-   * {@code ServerResponse.payload} via {@code DataTableFactory.getDataTable()}, so round-tripping
-   * through {@code DataTable.toBytes()} / {@code ByteString} is sufficient.
-   *
-   * @throws java.io.IOException if the DataTable cannot be serialised; callers should record a
-   *     processing exception on the broker response rather than silently dropping the cached entry.
-   */
-  protected static Iterator<Server.ServerResponse> dataTableToStreamingIterator(DataTable dataTable)
-      throws java.io.IOException {
-    Server.ServerResponse response = Server.ServerResponse.newBuilder()
-        .setPayload(ByteString.copyFrom(dataTable.toBytes()))
-        .build();
-    return Collections.singleton(response).iterator();
   }
 
   /**
