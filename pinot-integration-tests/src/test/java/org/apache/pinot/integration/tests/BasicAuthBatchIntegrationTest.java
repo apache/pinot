@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -33,6 +34,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerato
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.BootstrapTableTool;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -48,12 +50,15 @@ import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
  * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
  * minion functionality.
  */
-public class BasicAuthBatchIntegrationTest extends ClusterTest {
+public class BasicAuthBatchIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final String BOOTSTRAP_DATA_DIR = "/examples/batch/baseballStats";
+  private static final String TABLE_NAME = "baseballStats";
   private static final String SCHEMA_FILE = "baseballStats_schema.json";
   private static final String CONFIG_FILE = "baseballStats_offline_table_config.json";
   private static final String DATA_FILE = "baseballStats_data.csv";
   private static final String JOB_FILE = "ingestionJobSpec.yaml";
+
+  private File _quickstartTmpDir;
 
   @BeforeClass
   public void setUp()
@@ -65,16 +70,24 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     startBroker();
     startServer();
     startMinion();
+
+    cleanUpTableAndSchema();
   }
 
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanUpTableAndSchema);
+    exception = runCleanup(exception, this::cleanUpQuickstartTmpDir);
+    exception = runCleanup(exception, this::stopMinionIfStarted);
+    exception = runCleanup(exception, this::stopServerIfStarted);
+    exception = runCleanup(exception, this::stopBrokerIfStarted);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Override
@@ -95,6 +108,31 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Override
   protected void overrideMinionConf(PinotConfiguration minionConf) {
     BasicAuthTestUtils.addMinionConfiguration(minionConf);
+  }
+
+  @Override
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return AUTH_HEADER;
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return true;
   }
 
   @Test
@@ -139,51 +177,129 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
   @Test
   public void testIngestionBatch()
       throws Exception {
-    File quickstartTmpDir = new File(FileUtils.getTempDirectory(), String.valueOf(System.currentTimeMillis()));
-    FileUtils.forceDeleteOnExit(quickstartTmpDir);
+    cleanUpQuickstartTmpDir();
+    _quickstartTmpDir =
+        new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + System.currentTimeMillis());
+    FileUtils.forceDeleteOnExit(_quickstartTmpDir);
 
-    File baseDir = new File(quickstartTmpDir, "baseballStats");
+    File baseDir = new File(_quickstartTmpDir, TABLE_NAME);
     File dataDir = new File(baseDir, "rawdata");
     File schemaFile = new File(baseDir, SCHEMA_FILE);
     File configFile = new File(baseDir, CONFIG_FILE);
     File dataFile = new File(dataDir, DATA_FILE);
     File jobFile = new File(baseDir, JOB_FILE);
-    Preconditions.checkState(dataDir.mkdirs());
-
-    FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + SCHEMA_FILE), schemaFile);
-    FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + CONFIG_FILE), configFile);
-    FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/rawdata/" + DATA_FILE), dataFile);
-    FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + JOB_FILE), jobFile);
-
-    // patch ingestion job file
-    String jobFileContents = IOUtils.toString(new FileInputStream(jobFile));
-    IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(getControllerPort())),
-        new FileOutputStream(jobFile));
-
-    new BootstrapTableTool("http", "localhost", getControllerPort(), baseDir.getAbsolutePath(),
-        AuthProviderUtils.makeAuthProvider(AUTH_TOKEN)).execute();
-
-    Thread.sleep(5000);
-
-    // admin with full access
-    JsonNode response = JsonUtils.stringToJsonNode(
-        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
-            "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER));
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
-        "must return result with LONG value");
-    Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "count(*)",
-        "must return column name 'count(*)");
-    Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 97889,
-        "must return row count 97889");
-    Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
-
-    // user with valid auth but no table access - must return 403
     try {
-      sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
-          "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER);
-    } catch (IOException e) {
-      HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
-      Assert.assertEquals(httpErrorStatusException.getStatusCode(), 403, "must return 403");
+      Preconditions.checkState(dataDir.mkdirs());
+
+      FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + SCHEMA_FILE), schemaFile);
+      FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + CONFIG_FILE), configFile);
+      FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/rawdata/" + DATA_FILE), dataFile);
+      FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + JOB_FILE), jobFile);
+
+      // patch ingestion job file
+      String jobFileContents;
+      try (FileInputStream inputStream = new FileInputStream(jobFile)) {
+        jobFileContents = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+      }
+      try (FileOutputStream outputStream = new FileOutputStream(jobFile)) {
+        IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(getControllerPort())), outputStream,
+            StandardCharsets.UTF_8);
+      }
+
+      new BootstrapTableTool("http", "localhost", getControllerPort(), baseDir.getAbsolutePath(),
+          AuthProviderUtils.makeAuthProvider(AUTH_TOKEN)).execute();
+
+      Thread.sleep(5000);
+
+      // admin with full access
+      JsonNode response = JsonUtils.stringToJsonNode(
+          sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
+              "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER));
+      Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "LONG",
+          "must return result with LONG value");
+      Assert.assertEquals(response.get("resultTable").get("dataSchema").get("columnNames").get(0).asText(), "count(*)",
+          "must return column name 'count(*)");
+      Assert.assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 97889,
+          "must return row count 97889");
+      Assert.assertTrue(response.get("exceptions").isEmpty(), "must not return exception");
+
+      // user with valid auth but no table access - must return 403
+      try {
+        sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql",
+            "{\"sql\":\"SELECT count(*) FROM baseballStats\"}", AUTH_HEADER_USER);
+      } catch (IOException e) {
+        HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
+        Assert.assertEquals(httpErrorStatusException.getStatusCode(), 403, "must return 403");
+      }
+    } finally {
+      cleanUpQuickstartTmpDir();
     }
+  }
+
+  private void cleanUpTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        TABLE_NAME)) {
+      dropOfflineTable(TABLE_NAME);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(TABLE_NAME) != null) {
+      deleteSchema(TABLE_NAME);
+    }
+  }
+
+  private void cleanUpQuickstartTmpDir()
+      throws IOException {
+    if (_quickstartTmpDir != null) {
+      FileUtils.deleteDirectory(_quickstartTmpDir);
+      _quickstartTmpDir = null;
+    }
+  }
+
+  private void stopMinionIfStarted() {
+    if (_minionStarter != null) {
+      stopMinion();
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

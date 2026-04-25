@@ -842,6 +842,56 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>shared-basic-auth-batch-cluster-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/shared-basic-auth-batch-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+              <systemPropertyVariables>
+                <pinot.integration.sharedRichCluster.enabled>true</pinot.integration.sharedRichCluster.enabled>
+                <pinot.integration.sharedRichCluster.numServers>1</pinot.integration.sharedRichCluster.numServers>
+                <pinot.integration.sharedRichCluster.startKafka>false</pinot.integration.sharedRichCluster.startKafka>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>shared-row-level-security-cluster-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/shared-row-level-security-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+              <systemPropertyVariables>
+                <pinot.integration.sharedRichCluster.enabled>true</pinot.integration.sharedRichCluster.enabled>
+                <pinot.integration.sharedRichCluster.numServers>1</pinot.integration.sharedRichCluster.numServers>
+                <pinot.integration.sharedRichCluster.startMinion>false</pinot.integration.sharedRichCluster.startMinion>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <dependencies>

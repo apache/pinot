@@ -20,16 +20,20 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,14 +49,39 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest {
+public class RowLevelSecurityIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final String AUTH_TOKEN_USER_2 = "Basic dXNlcjI6bm90U29TZWNyZXQ";
   public static final Map<String, String> AUTH_HEADER_USER_2 = Map.of("Authorization", AUTH_TOKEN_USER_2);
   private static final String DEFAULT_TABLE_NAME_2 = "mytable2";
   private static final String DEFAULT_TABLE_NAME_3 = "mytable3";
+  private static final List<String> TABLE_NAMES = List.of(DEFAULT_TABLE_NAME, DEFAULT_TABLE_NAME_2,
+      DEFAULT_TABLE_NAME_3);
 
   protected List<File> _avroFiles;
   private static final Logger LOGGER = LoggerFactory.getLogger(RowLevelSecurityIntegrationTest.class);
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -117,23 +146,30 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     return _pinotConnection;
   }
 
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
+
     startZk();
     startController();
     startBroker();
     startServer();
+    startKafkaWithoutTopic();
 
-    startKafka();
-    _avroFiles = unpackAvroData(_tempDir);
+    cleanTablesAndSchemas();
+    resetKafkaTopic();
+
+    _avroFiles = unpackAvroData(_classTempDir);
     pushAvroIntoKafka(_avroFiles);
 
     // Set up a table for testing different principals.
-    setupTable(DEFAULT_TABLE_NAME);
-    setupTable(DEFAULT_TABLE_NAME_2);
-    setupTable(DEFAULT_TABLE_NAME_3);
+    for (String tableName : TABLE_NAMES) {
+      setupTable(tableName);
+    }
   }
 
   private void setupTable(String tableName)
@@ -151,17 +187,23 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     waitForAllDocsLoaded(tableName, 600_000L);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
-      throws IOException {
+      throws Exception {
     LOGGER.info("Tearing down...");
-    dropRealtimeTable(getTableName());
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTablesAndSchemas);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServerIfOwned);
+    exception = runCleanup(exception, this::stopBrokerIfOwned);
+    exception = runCleanup(exception, this::stopControllerIfOwned);
+    exception = runCleanup(exception, this::stopKafkaIfOwned);
+    exception = runCleanup(exception, this::stopZkIfOwned);
+    exception = runCleanup(exception, this::cleanTempDirectory);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Test
@@ -286,6 +328,120 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     return response;
   }
 
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private void cleanTablesAndSchemas()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+    for (String tableName : TABLE_NAMES) {
+      cleanRealtimeTableAndSchema(tableName);
+    }
+  }
+
+  private void cleanRealtimeTableAndSchema(String tableName)
+      throws Exception {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopServerIfOwned() {
+    if (!isSharedRichClusterEnabled() && !_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfOwned() {
+    if (!isSharedRichClusterEnabled() && !_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfOwned() {
+    if (!isSharedRichClusterEnabled() && _controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfOwned() {
+    if (!isSharedRichClusterEnabled() && _kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void stopZkIfOwned() {
+    if (!isSharedRichClusterEnabled()) {
+      stopZk();
+    }
+  }
+
+  private void cleanTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
   private boolean compareRows(JsonNode adminQueryResponse, JsonNode userQueryResponse) {
     // No filters should get applied for admin response
     assertFalse(adminQueryResponse.get("rlsFiltersApplied").asBoolean());
@@ -317,5 +473,10 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
       }
     }
     return true;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }
