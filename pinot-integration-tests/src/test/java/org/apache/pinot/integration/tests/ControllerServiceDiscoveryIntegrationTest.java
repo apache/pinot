@@ -47,18 +47,22 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
     properties.put(CommonConstants.Controller.CONTROLLER_SERVICE_AUTO_DISCOVERY, true);
   }
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
     brokerConf.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    if (!isSharedRichClusterEnabled()) {
+      TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    }
 
     // Start the Pinot cluster
     startZk();
@@ -67,14 +71,20 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
     startServer();
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopZk);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, () -> FileUtils.deleteDirectory(_tempDir));
+    }
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Test
@@ -84,5 +94,22 @@ public class ControllerServiceDiscoveryIntegrationTest extends BaseClusterIntegr
     Assert.assertEquals(response, "doge");
     response = sendGetRequest(getBrokerBaseApiUrl() + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

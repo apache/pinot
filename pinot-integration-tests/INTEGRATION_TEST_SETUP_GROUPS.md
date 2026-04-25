@@ -273,6 +273,9 @@ instead of the main no-override suite:
 | Shared Kafka partition suite | `./mvnw -pl pinot-integration-tests -Pshared-kafka-partition-cluster-integration-test-suite test` | 11 | 112.96s |
 | Shared exactly-once Kafka suite | `./mvnw -pl pinot-integration-tests -Pshared-exactly-once-kafka-cluster-integration-test-suite test` | 9 | 104.45s |
 | Shared realtime manager suite | `./mvnw -pl pinot-integration-tests -Pshared-realtime-manager-cluster-integration-test-suite test` | 2 | 87.81s |
+| Shared controller service discovery suite | `./mvnw -pl pinot-integration-tests -Pshared-controller-service-discovery-cluster-integration-test-suite test` | 1 | 16.50s |
+| Shared cursor auth suite | `./mvnw -pl pinot-integration-tests -Pshared-cursor-auth-cluster-integration-test-suite test` | 13 | 25.53s |
+| Shared timeseries suite | `./mvnw -pl pinot-integration-tests -Pshared-timeseries-cluster-integration-test-suite test` | 22 | 18.04s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -316,6 +319,12 @@ The realtime manager suite preserves the 1-server/Kafka controller+server-config
 bucket for `RetentionManagerIntegrationTest` and `PinotLLCRealtimeSegmentManagerIntegrationTest`.
 The same 2 tests passed in a single per-class lifecycle command in 103.71s,
 while the shared profile passed in 87.81s, a 15.90s wall-clock reduction.
+
+The controller service discovery, cursor auth, and timeseries suites preserve
+three separate 1-server/no-Kafka/no-minion exact-config buckets. The same 36
+tests passed in per-class lifecycle commands totaling 61.97s, while the three
+shared profiles total 60.07s. These are mostly setup-correctness buckets today,
+with a small 1.90s combined wall-clock reduction.
 
 Attempted but not included yet:
 
