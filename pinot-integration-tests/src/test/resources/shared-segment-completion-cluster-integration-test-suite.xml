@@ -19,12 +19,10 @@
 
 -->
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
-<suite name="SharedLLCRealtimeClusterIntegrationTestSuite">
-  <test name="SharedLLCRealtimeClusterIntegrationTests">
+<suite name="SharedSegmentCompletionClusterIntegrationTestSuite">
+  <test name="SharedSegmentCompletionClusterIntegrationTests">
     <classes>
-      <class name="org.apache.pinot.integration.tests.LLCRealtimeClusterIntegrationTest"/>
-      <class name="org.apache.pinot.integration.tests.LLCRealtimeKafka3ClusterIntegrationTest"/>
-      <class name="org.apache.pinot.integration.tests.LLCRealtimeKafka4ClusterIntegrationTest"/>
+      <class name="org.apache.pinot.integration.tests.SegmentCompletionIntegrationTest"/>
     </classes>
   </test>
 </suite>

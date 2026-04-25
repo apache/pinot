@@ -169,7 +169,8 @@ Keep these no-override tests out of the first shared-rich-cluster pass:
 - `CancelQueryIntegrationTests`: requires 4 servers.
 - `PartialUpsertTableRebalanceIntegrationTest`, `KafkaPartitionSubsetChaosIntegrationTest`,
   `UpsertTableSegmentUploadIntegrationTest`: add, remove, or restart servers during methods.
-- `SegmentCompletionIntegrationTest`: uses a fake Helix server participant.
+- `SegmentCompletionIntegrationTest`: uses a fake Helix server participant; migrated to a dedicated special-topology
+  shared suite instead of the first shared-rich-cluster pass.
 - `KinesisShardChangeTest`, `RealtimeKinesisIntegrationTest`: Docker LocalStack/Kinesis.
 - `MultiClusterIntegrationTest`, `SameTableNameMultiClusterIntegrationTest`: two isolated clusters plus extra broker.
 - `UdfTest`: manual UDF cluster with known non-daemon thread caveat.
@@ -287,8 +288,10 @@ instead of the main no-override suite:
 | Shared controller periodic tasks suite | `./mvnw -pl pinot-integration-tests -Pshared-controller-periodic-tasks-cluster-integration-test-suite test` | 5 | 306.88s |
 | Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
 | Shared custom-tenant MSQ suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-stage-engine-custom-tenant-integration-test-suite test` | 91 | 55.35s |
-| Shared LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-llc-realtime-cluster-integration-test-suite test` | 18 | 167.30s |
+| Shared LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-llc-realtime-cluster-integration-test-suite test` | 54 | 462.10s |
 | Shared peer-download LLC realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-peer-download-llc-realtime-cluster-integration-test-suite test` | 13 | 106.13s |
+| Shared Confluent schema-registry realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-confluent-schema-registry-realtime-cluster-integration-test-suite test` | 11 | blocked locally: no Docker |
+| Shared segment-completion suite | `./mvnw -pl pinot-integration-tests -Pshared-segment-completion-cluster-integration-test-suite test` | 1 | 19.41s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -394,9 +397,11 @@ cluster-level MSQ query-thread override used by
 per-class in 56.34s, while the shared profile passed in 55.35s.
 
 The LLC realtime suite preserves the 1-server/Kafka/no-minion controller and
-server config bucket used by `LLCRealtimeClusterIntegrationTest`. The same 18
-TestNG methods, including 2 expected skips, passed per-class in 175.39s and in
-the shared profile in 167.30s.
+server config bucket used by `LLCRealtimeClusterIntegrationTest`,
+`LLCRealtimeKafka3ClusterIntegrationTest`, and
+`LLCRealtimeKafka4ClusterIntegrationTest`. The same 54 TestNG methods,
+including 6 expected skips, passed with a combined per-class baseline of
+508.83s and in the shared profile in 462.10s, a 46.73s wall-clock reduction.
 
 The peer-download LLC realtime suite preserves the 2-server/Kafka/no-minion
 controller and server config bucket used by `PeerDownloadLLCRealtimeClusterIntegrationTest`.
@@ -404,6 +409,20 @@ It owns the mock PinotFS controller/server setup, isolates its Kafka topic and
 realtime table, and restores cluster-level segment-preprocessing overrides. The
 same 13 TestNG methods, including 1 expected skip, passed per-class in 96.23s
 and in the shared profile in 106.13s.
+
+The Confluent schema-registry realtime suite preserves the 1-server/Kafka/no-minion
+server-config bucket plus the Testcontainers-backed schema registry used by
+`KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegrationTest`.
+The class compiles in shared mode, but runtime validation is blocked on this
+workstation because Testcontainers cannot find a valid Docker environment. The
+standalone command failed during setup after 14.86s with 1 failure and 10 skipped
+methods for the same Docker reason.
+
+The segment-completion suite preserves the fake-server special topology used by
+`SegmentCompletionIntegrationTest`: 1 controller, 1 broker, Kafka, no minion, and
+no real Pinot server. The same 1 TestNG method passed per-class in 18.03s and in
+the shared profile in 19.41s. This is a setup-compatibility bucket rather than a
+wall-clock improvement by itself.
 
 Attempted but not included yet:
 
@@ -537,7 +556,8 @@ These should not be moved into the first shared-rich-cluster suite:
 - `CancelQueryIntegrationTests`: requires 4 servers.
 - `PartialUpsertTableRebalanceIntegrationTest`: starts from 1 server and adds/stops servers with exact assertions.
 - `KafkaPartitionSubsetChaosIntegrationTest`: restarts shared servers and has fixed topic/table state.
-- `SegmentCompletionIntegrationTest`: fake Helix server participant, no real Pinot server.
+- `SegmentCompletionIntegrationTest`: fake Helix server participant, no real Pinot server; migrated to a dedicated
+  special-topology shared suite.
 - `KinesisShardChangeTest`, `RealtimeKinesisIntegrationTest`: Docker LocalStack/Kinesis.
 - `MultiClusterIntegrationTest`, `SameTableNameMultiClusterIntegrationTest`: two isolated clusters plus extra broker.
 - `UdfTest`: manual UDF cluster with non-daemon thread caveat.

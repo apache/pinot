@@ -89,6 +89,7 @@ import static org.testng.Assert.assertTrue;
  */
 public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String SHARED_CONSUMER_DIRECTORY = "llc-realtime-consumer";
   private static final String SHARED_TABLE_NAME = "llc_realtime";
   private static final String SHARED_KAFKA_TOPIC = "llc_realtime";
   private static final long RANDOM_SEED = System.currentTimeMillis();
@@ -96,7 +97,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
   private final String _resourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
   private final boolean _isDirectAlloc = RANDOM.nextBoolean();
-  private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
+  private final boolean _consumerDirConfigured = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
   private final long _startTime = System.currentTimeMillis();
 
@@ -126,7 +127,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   protected void overrideServerConf(PinotConfiguration configuration) {
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
-    if (_isConsumerDirConfigured) {
+    if (isConsumerDirConfigured()) {
       configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR,
           getConsumerDirectory().getAbsolutePath());
     }
@@ -287,7 +288,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     System.out.println(String.format(
         "Using random seed: %s, isDirectAlloc: %s, isConsumerDirConfigured: %s, enableLeadControllerResource: %s",
-        RANDOM_SEED, _isDirectAlloc, _isConsumerDirConfigured, _enableLeadControllerResource));
+        RANDOM_SEED, _isDirectAlloc, isConsumerDirConfigured(), _enableLeadControllerResource));
 
     _classTempDir = getClassTempDir();
     TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
@@ -404,7 +405,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   public void testConsumerDirectoryExists() {
     File consumerDirectory =
         new File(getConsumerDirectory(), TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
-    assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
+    assertEquals(consumerDirectory.exists(), isConsumerDirConfigured(),
         "The off heap consumer directory does not exist");
   }
 
@@ -728,8 +729,12 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
   private File getConsumerDirectory() {
     return isSharedRichClusterEnabled()
-        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-consumer-" + _resourceSuffix)
+        ? new File(FileUtils.getTempDirectory(), SHARED_CONSUMER_DIRECTORY)
         : new File(CONSUMER_DIRECTORY);
+  }
+
+  private boolean isConsumerDirConfigured() {
+    return isSharedRichClusterEnabled() || _consumerDirConfigured;
   }
 
   private void cleanRealtimeTableAndSchema()

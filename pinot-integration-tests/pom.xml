@@ -1095,6 +1095,56 @@
       </build>
     </profile>
     <profile>
+      <id>shared-confluent-schema-registry-realtime-cluster-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/shared-confluent-schema-registry-realtime-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+              <systemPropertyVariables>
+                <pinot.integration.sharedRichCluster.enabled>true</pinot.integration.sharedRichCluster.enabled>
+                <pinot.integration.sharedRichCluster.numServers>1</pinot.integration.sharedRichCluster.numServers>
+                <pinot.integration.sharedRichCluster.startMinion>false</pinot.integration.sharedRichCluster.startMinion>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>shared-segment-completion-cluster-integration-test-suite</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <skipTests>false</skipTests>
+              <suiteXmlFiles>
+                <suiteXmlFile>src/test/resources/shared-segment-completion-cluster-integration-test-suite.xml</suiteXmlFile>
+              </suiteXmlFiles>
+              <systemPropertyVariables>
+                <pinot.integration.sharedRichCluster.enabled>true</pinot.integration.sharedRichCluster.enabled>
+                <pinot.integration.sharedRichCluster.numServers>0</pinot.integration.sharedRichCluster.numServers>
+                <pinot.integration.sharedRichCluster.startMinion>false</pinot.integration.sharedRichCluster.startMinion>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
       <id>shared-hybrid-cluster-integration-test-suite</id>
       <activation>
         <activeByDefault>false</activeByDefault>

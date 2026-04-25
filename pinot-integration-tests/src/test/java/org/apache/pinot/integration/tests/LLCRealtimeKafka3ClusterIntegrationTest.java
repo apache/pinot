@@ -34,6 +34,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.testng.annotations.AfterClass;
 
 import static org.testng.Assert.assertTrue;
 
@@ -42,6 +43,39 @@ import static org.testng.Assert.assertTrue;
  * Integration test for low-level Kafka3 consumer.
  */
 public class LLCRealtimeKafka3ClusterIntegrationTest extends LLCRealtimeClusterIntegrationTest {
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @AfterClass(alwaysRun = true)
+  @Override
+  public void tearDown()
+      throws Exception {
+    try {
+      super.tearDown();
+    } finally {
+      if (!isSharedRichClusterEnabled()) {
+        ExceptingKafka3ConsumerFactory.reset();
+      }
+    }
+  }
 
   @Override
   protected Map<String, String> getStreamConfigMap() {
@@ -70,6 +104,12 @@ public class LLCRealtimeKafka3ClusterIntegrationTest extends LLCRealtimeClusterI
       _helixAdmin = helixAdmin;
       _helixClusterName = helixClusterName;
       _tableName = tableName;
+    }
+
+    private static void reset() {
+      _helixAdmin = null;
+      _helixClusterName = null;
+      _tableName = null;
     }
 
     @Override
