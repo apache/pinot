@@ -34,6 +34,7 @@ import java.io.File
 import java.net.URI
 import java.nio.file.{Files, Paths}
 import scala.io.Source
+import scala.jdk.CollectionConverters._
 
 class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter {
 
@@ -191,6 +192,83 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
 
       segmentName shouldBe expected
     }
+  }
+
+  test("commit() cleans up the per-partition temp build dir") {
+    tmpDir = Files.createTempDirectory("pinot-spark-connector-test").toFile
+    val writer = newTestWriter(tmpDir)
+    writer.write(new TestInternalRow(Array[Any]("Alice", 30, 1234567890L, "Alice".getBytes)))
+
+    // Invoke the package-private generateSegment so we can capture the temp dir, then call
+    // the rest of commit's pipeline via an explicit `writer.commit()` which owns cleanup.
+    val tmpSnapshotBefore = listPinotWriterTempDirs()
+    writer.commit()
+    val tmpSnapshotAfter = listPinotWriterTempDirs()
+
+    // The commit() finally-block must delete whatever temp dir generateSegment created.
+    // We assert conservatively: every pinot-spark-writer tmp dir that exists afterwards also
+    // existed before, i.e., this commit() added no leftovers.
+    tmpSnapshotAfter.diff(tmpSnapshotBefore) shouldBe empty
+  }
+
+  test("abort() cleans up the per-partition temp build dir when a segment was generated") {
+    tmpDir = Files.createTempDirectory("pinot-spark-connector-test").toFile
+    val writer = newTestWriter(tmpDir)
+    writer.write(new TestInternalRow(Array[Any]("Alice", 30, 1234567890L, "Alice".getBytes)))
+    val segmentDir = writer.generateSegment("partial-segment")
+    segmentDir.exists() shouldBe true
+
+    writer.abort()
+
+    segmentDir.exists() shouldBe false
+  }
+
+  test("close() after abort() is idempotent and does not throw") {
+    tmpDir = Files.createTempDirectory("pinot-spark-connector-test").toFile
+    val writer = newTestWriter(tmpDir)
+    writer.write(new TestInternalRow(Array[Any]("Alice", 30, 1234567890L, "Alice".getBytes)))
+    val segmentDir = writer.generateSegment("partial-segment")
+
+    writer.abort()
+    // close() on the same writer after abort must not throw (Spark's DataWriter contract
+    // permits this sequence, and both methods touch the temp-dir tracking field).
+    noException should be thrownBy writer.close()
+    segmentDir.exists() shouldBe false
+  }
+
+  private def newTestWriter(savePathDir: File): PinotDataWriter[InternalRow] = {
+    val writeOptions = PinotDataSourceWriteOptions(
+      tableName = "testTable",
+      savePath = savePathDir.getAbsolutePath,
+      timeColumnName = "ts",
+      timeFormat = "EPOCH|SECONDS",
+      timeGranularity = "1:SECONDS",
+      segmentNameFormat = "{table}_{startTime}_{endTime}_{partitionId:03}",
+      invertedIndexColumns = Array("name"),
+      noDictionaryColumns = Array("age"),
+      bloomFilterColumns = Array("name"),
+      rangeIndexColumns = Array())
+    val writeSchema = StructType(Seq(
+      StructField("name", StringType, nullable = false),
+      StructField("age", IntegerType, nullable = false),
+      StructField("ts", LongType, nullable = false),
+      StructField("bin", BinaryType, nullable = false)))
+    val pinotSchema = SparkToPinotTypeTranslator.translate(
+      writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+      writeOptions.timeFormat, writeOptions.timeGranularity)
+    new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
+  }
+
+  // Lists all java.io.tmpdir entries whose name begins with the prefix that
+  // Files.createTempDirectory uses inside PinotDataWriter.generateSegment, i.e. the writer's
+  // fully-qualified class name. Used to detect leftover temp dirs across commit()/abort().
+  private def listPinotWriterTempDirs(): Set[String] = {
+    val prefix = classOf[PinotDataWriter[_]].getName
+    val root = Paths.get(System.getProperty("java.io.tmpdir"))
+    if (!Files.exists(root)) return Set.empty
+    val stream = Files.newDirectoryStream(root, s"$prefix*")
+    try stream.iterator().asScala.map(_.getFileName.toString).toSet
+    finally stream.close()
   }
 }
 

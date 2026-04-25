@@ -308,7 +308,7 @@ class PinotDataWriter[InternalRow](
   }
 }
 
-class SuccessWriterCommitMessage(segmentName: String) extends WriterCommitMessage {
+class SuccessWriterCommitMessage(val segmentName: String) extends WriterCommitMessage {
   override def toString: String = {
     "SuccessWriterCommitMessage{" +
       "segmentName='" + segmentName + '\'' +
