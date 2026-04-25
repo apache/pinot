@@ -337,6 +337,17 @@ public final class DdlCompiler {
       spec.setNotNull(true);
     }
     if (col.getDefaultValue() != null) {
+      // Validate type compatibility at DDL compile time. FieldSpec.setDefaultNullValue stores
+      // the string lazily; without this check, "INT col DEFAULT 'abc'" would compile cleanly
+      // and then fail at first ingestion with a less-specific error from the segment generator.
+      // Failing here gives the user a 400 with the column name and the offending literal.
+      try {
+        col.getDataType().convert(col.getDefaultValue());
+      } catch (RuntimeException e) {
+        throw new DdlCompilationException("DEFAULT value '" + col.getDefaultValue()
+            + "' is not compatible with column '" + col.getName() + "' of type "
+            + col.getDataType() + ": " + e.getMessage(), e);
+      }
       spec.setDefaultNullValue(col.getDefaultValue());
     }
     return spec;

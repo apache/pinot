@@ -138,6 +138,16 @@ public final class CanonicalDdlEmitter {
   }
 
   private static String emitTableType(TableType tableType) {
-    return tableType == TableType.OFFLINE ? "OFFLINE" : "REALTIME";
+    // Exhaustive switch so a future TableType (e.g. UNIFIED) is rejected at the emit boundary
+    // rather than silently rendered as REALTIME. The throw maps to the 500 path the controller
+    // resource already handles for RuntimeException from emit().
+    switch (tableType) {
+      case OFFLINE:
+        return "OFFLINE";
+      case REALTIME:
+        return "REALTIME";
+      default:
+        throw new IllegalArgumentException("Unsupported TableType for DDL emission: " + tableType);
+    }
   }
 }

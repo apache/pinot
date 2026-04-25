@@ -199,6 +199,38 @@ public class DdlCompilerTest {
   }
 
   /**
+   * TABLE_TYPE parsing is case-insensitive (parseTableType uses equalsIgnoreCase), but the
+   * compiled TableConfig always stores the canonical uppercase form. Lock in the
+   * lowercase-input → uppercase-output behavior so a future grammar tightening cannot silently
+   * regress to case-sensitive matching.
+   */
+  @Test
+  public void lowercaseTableTypeAcceptedAndCanonicalized() {
+    CompiledCreateTable lowerCase = compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = offline");
+    assertEquals(lowerCase.getTableConfig().getTableType(), TableType.OFFLINE);
+
+    CompiledCreateTable mixedCase = compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = ReAlTiMe");
+    assertEquals(mixedCase.getTableConfig().getTableType(), TableType.REALTIME);
+  }
+
+  /**
+   * DEFAULT literals must be compatible with the column's declared data type. Non-numeric
+   * defaults on numeric columns must be rejected at compile time with a clear error rather
+   * than failing at first ingestion with a downstream-layer error.
+   */
+  @Test
+  public void defaultLiteralWrongTypeRejected() {
+    DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id INT DEFAULT 'abc') TABLE_TYPE = OFFLINE"));
+    assertTrue(ex.getMessage() != null && ex.getMessage().contains("'abc'"),
+        "expected error to name the offending literal, got: " + ex.getMessage());
+    assertTrue(ex.getMessage().contains("id"),
+        "expected error to name the column, got: " + ex.getMessage());
+  }
+
+  /**
    * SMALLINT and TINYINT are explicitly rejected to keep the type contract narrow: silently
    * widening to INT today would lock those DDLs into INT semantics if Pinot later adds
    * INT8/INT16. Rejection at the boundary is reversible; silent promotion is not.
