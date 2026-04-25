@@ -283,6 +283,7 @@ instead of the main no-override suite:
 | Shared URL auth realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-url-auth-realtime-cluster-integration-test-suite test` | 2 | 47.64s |
 | Shared gRPC broker suite | `./mvnw -pl pinot-integration-tests -Pshared-grpc-broker-cluster-integration-test-suite test` | 2 | 53.04s |
 | Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
+| Shared custom-tenant MSQ suite | `./mvnw -pl pinot-integration-tests -Pshared-multi-stage-engine-custom-tenant-integration-test-suite test` | 91 | 55.35s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -360,6 +361,11 @@ The offline suite preserves the 1-server/no-Kafka/no-minion setup and still
 exercises the destructive instance-decommission coverage by allowing it only for
 the suite owner. The same 134 tests passed per-class in 111.29s, while the
 shared profile passed in 103.43s, a 7.86s wall-clock reduction.
+
+The custom-tenant MSQ suite preserves the 1-server/no-Kafka/no-minion setup and
+cluster-level MSQ query-thread override used by
+`MultiStageEngineCustomTenantIntegrationTest`. The same 91 tests passed
+per-class in 56.34s, while the shared profile passed in 55.35s.
 
 Attempted but not included yet:
 
