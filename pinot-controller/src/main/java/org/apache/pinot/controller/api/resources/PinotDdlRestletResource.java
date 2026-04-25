@@ -391,11 +391,12 @@ public class PinotDdlRestletResource {
         return "column '" + columnName + "' NOT NULL flag differs (stored=" + storedSpec.isNotNull()
             + ", DDL=" + compiledSpec.isNotNull() + ")";
       }
-      // Compare default null value by its string form: the DDL always sets defaults from a
-      // string literal, and FieldSpec normalizes the stored representation to a typed value.
-      // The string form is the stable projection that survives both serialization round trips.
-      String storedDefault = storedSpec.getDefaultNullValueString();
-      String compiledDefault = compiledSpec.getDefaultNullValueString();
+      // Compare typed default null value (after FieldSpec has parsed the string form into the
+      // column's data type). Comparing string forms produces false mismatches like "0" vs "0.0"
+      // when the same numeric default arrived via different literal forms (DDL "DEFAULT 0.0"
+      // vs JSON-API "defaultNullValue": 0); the typed projection collapses them.
+      Object storedDefault = storedSpec.getDefaultNullValue();
+      Object compiledDefault = compiledSpec.getDefaultNullValue();
       if (!Objects.equals(storedDefault, compiledDefault)) {
         return "column '" + columnName + "' default null value differs (stored=" + storedDefault
             + ", DDL=" + compiledDefault + ")";
@@ -544,6 +545,10 @@ public class PinotDdlRestletResource {
         // information and must be preserved instead of being collapsed to 500 below.
         PinotTableRestletResource.tableTasksCleanup(target, false,
             _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
+        // deleteTable(rawName, type, retention) takes the raw name and re-derives the typed
+        // name internally via TableNameBuilder.forType(type).tableNameWithType(rawName); see
+        // PinotHelixResourceManager.deleteTable. Pass `fullyQualifiedRaw` (DB-qualified raw
+        // name) and the type extracted from `target` so the call is unambiguous.
         TableType type = TableNameBuilder.getTableTypeFromTableName(target);
         _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, type, null);
         dropped.add(target);

@@ -135,7 +135,7 @@ SqlNode SqlPinotCreateTable() :
     [ LOOKAHEAD(3) <IF> <NOT> <EXISTS> { ifNotExists = true; } ]
     name = CompoundIdentifier()
     columns = PinotColumnList()
-    [ LOOKAHEAD(3) <PRIMARY> <KEY> <LPAREN> primaryKeyColumns = PinotPrimaryKeyList() ]
+    [ LOOKAHEAD(3) primaryKeyColumns = PinotPrimaryKeyList() ]
     <TABLE_TYPE> <EQ>
     tableType = PinotTableTypeLiteral()
     [ <PROPERTIES> properties = PinotPropertyList() ]
