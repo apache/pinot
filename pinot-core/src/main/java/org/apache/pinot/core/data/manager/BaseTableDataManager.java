@@ -722,7 +722,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void closeSegment(SegmentDataManager segmentDataManager) {
+  protected void closeSegment(SegmentDataManager segmentDataManager) {
     String segmentName = segmentDataManager.getSegmentName();
     _logger.info("Closing segment: {}", segmentName);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, -1L);
@@ -926,7 +926,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
+  protected void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
       boolean forceDownload, String reloadJobId)
       throws Exception {
     List<String> failedSegments = new ArrayList<>();
@@ -956,7 +956,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegment(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig,
+  protected void reloadSegment(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig,
       boolean forceDownload)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
@@ -1083,12 +1083,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Reloaded segment: {}", segmentName);
   }
 
-  private boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
+  protected boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
     return zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
         || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
-  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
+  protected boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
       SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
@@ -1282,7 +1282,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File untarSegment(String segmentName, File segmentTarFile, File tempRootDir)
+  protected File untarSegment(String segmentName, File segmentTarFile, File tempRootDir)
       throws IOException {
     File untarDir = new File(tempRootDir, segmentName);
     _logger.info("Untarring segment: {} from: {} to: {}", segmentName, segmentTarFile, untarDir);
@@ -1298,7 +1298,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File moveSegment(String segmentName, File untarredSegmentDir)
+  protected File moveSegment(String segmentName, File untarredSegmentDir)
       throws IOException {
     File indexDir = getSegmentDataDir(segmentName);
     try {
@@ -1337,7 +1337,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  private String getSegmentCurrentTier(String segmentName) {
+  protected String getSegmentCurrentTier(String segmentName) {
     SegmentDataManager segment = _segmentDataManagerMap.get(segmentName);
     if (segment != null && segment.getSegment() instanceof ImmutableSegment) {
       return ((ImmutableSegment) segment.getSegment()).getTier();
@@ -1363,7 +1363,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * The original index directory is restored lazily, as depending on the conditions,
    * it may be restored from the backup directory or segment downloaded from deep store.
    */
-  private void createBackup(File indexDir) {
+  protected void createBackup(File indexDir) {
     if (!indexDir.exists()) {
       return;
     }
@@ -1380,7 +1380,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * When we rename the segment backup directory to segment temporary directory, we know the reload
    * already succeeded, so that we can safely delete the segment temporary directory.
    */
-  private void removeBackup(File indexDir)
+  protected void removeBackup(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
@@ -1470,7 +1470,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  private SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
@@ -1786,7 +1786,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return new StaleSegment(segmentName, false, null);
   }
 
-  private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
@@ -1811,7 +1811,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
   // useDataCRC.
-  private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+  protected static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
       return true;
     }
@@ -1821,7 +1821,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }
 
-  private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {
+  protected static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {
     try {
       LoaderUtils.reloadFailureRecovery(indexDir);
     } catch (Exception e) {
@@ -1830,7 +1830,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private static void closeSegmentDirectoryQuietly(SegmentDirectory segmentDirectory) {
+  protected static void closeSegmentDirectoryQuietly(SegmentDirectory segmentDirectory) {
     if (segmentDirectory != null) {
       try {
         segmentDirectory.close();
