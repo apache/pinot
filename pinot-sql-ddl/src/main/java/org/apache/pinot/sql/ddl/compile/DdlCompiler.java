@@ -234,11 +234,24 @@ public final class DdlCompiler {
       throw new DdlCompilationException(
           "DEFAULT requires a literal value; got: " + literal.getClass().getSimpleName());
     }
+    SqlLiteral sqlLiteral = (SqlLiteral) literal;
+    String value;
     try {
-      return ((SqlLiteral) literal).toValue();
+      value = sqlLiteral.toValue();
     } catch (UnsupportedOperationException e) {
       throw new DdlCompilationException("Unsupported DEFAULT literal: " + literal, e);
     }
+    if (value == null) {
+      // SqlLiteral.toValue() returns null for SqlLiteral.createNull(...). Treat DEFAULT NULL as
+      // an explicit error rather than a silent no-op: in Pinot's model the column's
+      // defaultNullValue is the value used WHEN the source row is null, so DEFAULT NULL is
+      // semantically meaningless. Surface a clear error so the user fixes their DDL instead of
+      // wondering why their default doesn't apply.
+      throw new DdlCompilationException(
+          "DEFAULT NULL is not a valid Pinot default null value; omit the DEFAULT clause to "
+              + "use the type's natural default.");
+    }
+    return value;
   }
 
   private static ColumnRole inferRole(SqlPinotColumnDeclaration col, DataType dt) {

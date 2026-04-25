@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.reverse;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -106,11 +107,19 @@ final class SchemaEmitter {
     }
     // Only emit DEFAULT when the user-supplied value differs from the data-type's natural
     // default; this matches Pinot's own JSON serialization rule and keeps canonical output
-    // free of redundant defaults.
+    // free of redundant defaults. Use DataType.equals(v1, v2) for content comparison —
+    // Object.equals on byte[] is reference equality and would falsely flag every BYTES
+    // column at natural default as needing an explicit DEFAULT clause.
     Object defaultValue = spec.getDefaultNullValue();
     Object naturalDefault =
         FieldSpec.getDefaultNullValue(spec.getFieldType(), spec.getDataType(), null);
-    if (defaultValue != null && !defaultValue.equals(naturalDefault)) {
+    boolean atNaturalDefault;
+    if (defaultValue == null || naturalDefault == null) {
+      atNaturalDefault = (defaultValue == null && naturalDefault == null);
+    } else {
+      atNaturalDefault = spec.getDataType().equals(defaultValue, naturalDefault);
+    }
+    if (defaultValue != null && !atNaturalDefault) {
       sb.append(" DEFAULT ").append(emitDefault(defaultValue, spec.getDataType()));
     }
     if (spec instanceof DateTimeFieldSpec) {
@@ -174,9 +183,13 @@ final class SchemaEmitter {
       case LONG:
       case FLOAT:
       case DOUBLE:
-      case BIG_DECIMAL:
       case BOOLEAN:
         return value.toString();
+      case BIG_DECIMAL:
+        // BigDecimal.toString() can emit scientific notation (e.g. "1E+10") for large or
+        // small magnitudes, which Calcite's Literal() rule does not accept. toPlainString()
+        // always produces the decimal form so the round-trip stays grammar-legal.
+        return value instanceof BigDecimal ? ((BigDecimal) value).toPlainString() : value.toString();
       default:
         return SqlIdentifiers.quoteString(value.toString());
     }
