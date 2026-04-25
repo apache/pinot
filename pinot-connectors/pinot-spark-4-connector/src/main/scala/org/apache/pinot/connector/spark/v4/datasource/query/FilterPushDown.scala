@@ -130,6 +130,14 @@ private[pinot] object FilterPushDown {
       case GreaterThanOrEqual(attr, value) => s"${escapeAttr(attr)} >= ${compileValue(value)}"
       case IsNull(attr) => s"${escapeAttr(attr)} IS NULL"
       case IsNotNull(attr) => s"${escapeAttr(attr)} IS NOT NULL"
+      // Cross-module invariant: the escape character emitted here ('\') must equal the
+      // hardcoded escape in pinot-common's RegexpPatternConverterUtils.likeToRegexpLike.
+      // Pinot's RequestContextUtils.toFilterContext currently ignores the SQL ESCAPE
+      // operand and always treats '\' as the escape character, so this clause is
+      // semantically a no-op on the broker side today — but emitting it explicitly
+      // documents intent and defends against a future Pinot fix that does honor ESCAPE.
+      // If the escape character above is ever changed, escapeLikeLiteral and the LIKE
+      // patterns must be updated together.
       case StringStartsWith(attr, value) =>
         s"${escapeAttr(attr)} LIKE '${escapeLikeLiteral(value)}%' ESCAPE '\\'"
       case StringEndsWith(attr, value) =>
