@@ -50,6 +50,8 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
       "pinot.integration.sharedRichCluster.numServers";
   public static final String SHARED_RICH_CLUSTER_START_MINION_PROPERTY =
       "pinot.integration.sharedRichCluster.startMinion";
+  public static final String SHARED_RICH_CLUSTER_ALLOW_INSTANCE_DECOMMISSION_PROPERTY =
+      "pinot.integration.sharedRichCluster.allowInstanceDecommission";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SharedRichClusterIntegrationTest.class);
   private static final String SHARED_CLUSTER_NAME = "SharedRichClusterIntegrationTestSuite";
@@ -82,6 +84,7 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
     Map<String, Object> controllerConfig = super.getDefaultControllerConfiguration();
     controllerConfig.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, true);
     super.startController(controllerConfig);
+    configureSharedClusterBeforeStartingInstances();
     super.startBrokers(getSharedNumBrokers());
     super.startServers(getSharedNumServers());
     if (shouldStartSharedMinion()) {
@@ -145,6 +148,13 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
 
   protected boolean shouldStartSharedMinion() {
     return getSharedBooleanProperty(SHARED_RICH_CLUSTER_START_MINION_PROPERTY, true);
+  }
+
+  protected boolean allowSharedRichClusterInstanceDecommission() {
+    return getSharedBooleanProperty(SHARED_RICH_CLUSTER_ALLOW_INSTANCE_DECOMMISSION_PROPERTY, false);
+  }
+
+  protected void configureSharedClusterBeforeStartingInstances() {
   }
 
   private boolean getSharedBooleanProperty(String propertyName, boolean defaultValue) {
@@ -409,6 +419,27 @@ public abstract class SharedRichClusterIntegrationTest extends BaseClusterIntegr
   protected void stopServer() {
     if (!isSharedRichClusterEnabled()) {
       super.stopServer();
+    }
+  }
+
+  protected void stopServerForInstanceDecommission() {
+    if (isSharedRichClusterEnabled()) {
+      assertSharedInstanceDecommissionAllowed();
+    }
+    super.stopServer();
+  }
+
+  protected void stopBrokerForInstanceDecommission() {
+    if (isSharedRichClusterEnabled()) {
+      assertSharedInstanceDecommissionAllowed();
+    }
+    super.stopBroker();
+  }
+
+  private void assertSharedInstanceDecommissionAllowed() {
+    if (!isSharedRichClusterOwner() || !allowSharedRichClusterInstanceDecommission()) {
+      throw new IllegalStateException("Shared rich cluster instance decommission is only allowed for the suite owner "
+          + "when " + SHARED_RICH_CLUSTER_ALLOW_INSTANCE_DECOMMISSION_PROPERTY + " is true");
     }
   }
 

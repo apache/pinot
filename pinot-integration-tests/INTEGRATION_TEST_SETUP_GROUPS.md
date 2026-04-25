@@ -282,6 +282,7 @@ instead of the main no-override suite:
 | Shared TLS suite | `./mvnw -pl pinot-integration-tests -Pshared-tls-cluster-integration-test-suite test` | 21 | 52.14s |
 | Shared URL auth realtime suite | `./mvnw -pl pinot-integration-tests -Pshared-url-auth-realtime-cluster-integration-test-suite test` | 2 | 47.64s |
 | Shared gRPC broker suite | `./mvnw -pl pinot-integration-tests -Pshared-grpc-broker-cluster-integration-test-suite test` | 2 | 53.04s |
+| Shared offline suite | `./mvnw -pl pinot-integration-tests -Pshared-offline-cluster-integration-test-suite test` | 134 | 103.43s |
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
@@ -354,6 +355,11 @@ the shared profile in 47.64s.
 The gRPC broker suite preserves the 2-server/Kafka/no-minion controller, broker,
 and server config bucket for gRPC request handling. The same 2 tests passed
 per-class in 51.18s, while the shared profile passed in 53.04s.
+
+The offline suite preserves the 1-server/no-Kafka/no-minion setup and still
+exercises the destructive instance-decommission coverage by allowing it only for
+the suite owner. The same 134 tests passed per-class in 111.29s, while the
+shared profile passed in 103.43s, a 7.86s wall-clock reduction.
 
 Attempted but not included yet:
 
@@ -482,7 +488,8 @@ These should not be moved into the first shared-rich-cluster suite:
 
 - `ControllerLeaderLocatorIntegrationTest`: controller-only flow, starts a second controller inside the method.
 - `ServerStarterIntegrationTest`: controller-only flow, starts/stops short-lived servers inside methods.
-- `OfflineClusterIntegrationTest`: destructive instance decommission and exact private-cluster assertions.
+- `OfflineClusterIntegrationTest`: moved to a dedicated exact shared suite; it keeps destructive instance decommission
+  gated to the suite owner.
 - `CancelQueryIntegrationTests`: requires 4 servers.
 - `PartialUpsertTableRebalanceIntegrationTest`: starts from 1 server and adds/stops servers with exact assertions.
 - `KafkaPartitionSubsetChaosIntegrationTest`: restarts shared servers and has fixed topic/table state.
