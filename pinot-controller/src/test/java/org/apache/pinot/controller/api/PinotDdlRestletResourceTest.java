@@ -311,7 +311,7 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
     // Any SQL that exceeds 256 KB must be rejected before parsing to prevent unbounded allocations.
     String oversized = "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE /* " + StringUtils.repeat("x", 256 * 1024) + " */";
     int status = postDdlExpectFailure(oversized);
-    assertEquals(status, 400, "Expected 400 for input exceeding MAX_DDL_SQL_LENGTH");
+    assertEquals(status, 400, "Expected 400 for input exceeding MAX_DDL_SQL_CHARS");
   }
 
   // -------------------------------------------------------------------------------------------
