@@ -302,6 +302,10 @@ public class PinotDdlRestletResource {
     // the post-tuner shape, otherwise a tuner-introduced setting bypasses validation.
     TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, create.getTableConfig(),
         schemaForValidation, Collections.emptyMap());
+    // Refresh the response's tableConfig snapshot now that tuners have run; otherwise the
+    // response advertises a pre-tuner config while ZK persists the post-tuner shape (and dry-run
+    // would mis-predict what a real CREATE would write).
+    response.setTableConfig(toJson(create.getTableConfig()));
     validateTableConfig(schemaForValidation, create.getTableConfig());
 
     if (dryRun) {

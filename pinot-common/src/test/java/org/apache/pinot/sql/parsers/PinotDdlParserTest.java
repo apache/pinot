@@ -322,10 +322,14 @@ public class PinotDdlParserTest {
     // commits to PinotPrimaryKeyList on seeing <PRIMARY> <KEY> and then fails at the missing
     // LPAREN — which gives a more accurate error than LOOKAHEAD(3) would (the latter would
     // backtrack and surface a misleading "expected TABLE_TYPE" message for what is clearly an
-    // attempted PRIMARY KEY clause).
-    expectThrows(SqlCompilationException.class,
+    // attempted PRIMARY KEY clause). Pin the expected-LPAREN behaviour so a future grammar
+    // change cannot regress to a different (potentially less helpful) error path silently.
+    SqlCompilationException ex = expectThrows(SqlCompilationException.class,
         () -> CalciteSqlParser.compileToSqlNodeAndOptions(
             "CREATE TABLE t (id INT) PRIMARY KEY id TABLE_TYPE = OFFLINE"));
+    String message = ex.getMessage() == null ? "" : ex.getMessage();
+    assertTrue(message.contains("(") || message.toUpperCase(java.util.Locale.ROOT).contains("LPAREN"),
+        "expected error to indicate the missing LPAREN, got: " + message);
   }
 
   @Test
