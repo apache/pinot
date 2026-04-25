@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.connector.spark.v4.datasource
 
+import java.io.File
+import java.nio.file.Files
+
 import org.apache.pinot.spi.data.Schema
-import org.apache.spark.sql.connector.write.LogicalWriteInfo
+import org.apache.pinot.spi.ingestion.batch.spec.Constants
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriterCommitMessage}
 import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.scalatest.funsuite.AnyFunSuite
@@ -127,11 +131,6 @@ class PinotWriteTest extends AnyFunSuite with Matchers {
   // a write job aborts (one or more tasks failed). The branches exercised are: missing
   // savePath, malformed scheme (FileSystem.get throws), the happy path (delete succeeds for
   // SuccessWriterCommitMessage), null entries from Spark, and unknown subclasses.
-
-  import java.io.File
-  import java.nio.file.{Files, Paths}
-  import org.apache.pinot.spi.ingestion.batch.spec.Constants
-  import org.apache.spark.sql.connector.write.WriterCommitMessage
 
   private def writeWithSavePath(savePath: String): PinotWrite = {
     val options = Map(
