@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -233,6 +234,15 @@ final class SchemaEmitter {
         // small magnitudes, which Calcite's Literal() rule does not accept. toPlainString()
         // always produces the decimal form so the round-trip stays grammar-legal.
         return value instanceof BigDecimal ? ((BigDecimal) value).toPlainString() : value.toString();
+      case BYTES:
+        // Pinot stores BYTES defaults internally as byte[]. byte[].toString() returns the JVM
+        // identity-hash form (e.g. "[B@1f32e575") which would emit structurally invalid DDL.
+        // Convert to hex matching FieldSpec.getDefaultNullValueString and toJsonObject so the
+        // canonical DDL re-parses back to the same byte content via FieldSpec.setDefaultNullValue.
+        if (value instanceof byte[]) {
+          return SqlIdentifiers.quoteString(BytesUtils.toHexString((byte[]) value));
+        }
+        return SqlIdentifiers.quoteString(value.toString());
       default:
         return SqlIdentifiers.quoteString(value.toString());
     }
