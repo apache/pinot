@@ -143,6 +143,49 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("NOT NULL flag"), msg);
   }
 
+  /**
+   * BYTES columns produce a fresh byte[] on each getDefaultNullValue() call. Equality must be
+   * by content, not reference, otherwise every hybrid second-variant CREATE on a BYTES schema
+   * with a custom default would falsely trip the column-shape mismatch.
+   */
+  @Test
+  public void acceptsMatchingBytesDefaultNullValue() {
+    Schema stored = new Schema();
+    stored.setSchemaName("t");
+    FieldSpec storedSpec = new DimensionFieldSpec("blob", DataType.BYTES, true);
+    storedSpec.setDefaultNullValue("deadbeef");
+    stored.addField(storedSpec);
+
+    Schema compiled = new Schema();
+    compiled.setSchemaName("t");
+    FieldSpec compiledSpec = new DimensionFieldSpec("blob", DataType.BYTES, true);
+    compiledSpec.setDefaultNullValue("deadbeef");
+    compiled.addField(compiledSpec);
+
+    assertNull(PinotDdlRestletResource.describeColumnShapeMismatch(stored, compiled),
+        "matching BYTES defaults must not trip a content-vs-reference equality regression");
+  }
+
+  /** BYTES default mismatch must still be rejected with content-aware comparison. */
+  @Test
+  public void rejectsBytesDefaultNullValueMismatch() {
+    Schema stored = new Schema();
+    stored.setSchemaName("t");
+    FieldSpec storedSpec = new DimensionFieldSpec("blob", DataType.BYTES, true);
+    storedSpec.setDefaultNullValue("deadbeef");
+    stored.addField(storedSpec);
+
+    Schema compiled = new Schema();
+    compiled.setSchemaName("t");
+    FieldSpec compiledSpec = new DimensionFieldSpec("blob", DataType.BYTES, true);
+    compiledSpec.setDefaultNullValue("cafebabe");
+    compiled.addField(compiledSpec);
+
+    String msg = PinotDdlRestletResource.describeColumnShapeMismatch(stored, compiled);
+    assertNotNull(msg);
+    assertTrue(msg.contains("default null value"), msg);
+  }
+
   /** Default-null-value mismatch must be rejected. */
   @Test
   public void rejectsDefaultNullValueMismatch() {
