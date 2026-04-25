@@ -1732,6 +1732,106 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       fail("Should pass since inverted index has explicit dictionary config, but got: " + e.getMessage());
     }
+
+    // codecSpec is configured under the modern indexes.forward block (the only supported path) and
+    // must be validated by the resolved ForwardIndexConfig.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    {
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      ObjectNode forward = JsonUtils.newObjectNode();
+      forward.put("codecSpec", "CODEC(DELTA,ZSTD(3))");
+      indexes.set("forward", forward);
+      FieldConfig nestedCodecSpecConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, List.of(), null, null, indexes,
+              null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(nestedCodecSpecConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    FieldConfig stringCompressionCodecSpec = rawFieldConfigWithCodecSpec("myCol1", "SNAPPY");
+    FieldConfig mvCompressionCodecSpec = rawFieldConfigWithCodecSpec("myCol2", "LZ4");
+    tableConfig.setFieldConfigList(Arrays.asList(stringCompressionCodecSpec, mvCompressionCodecSpec));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      FieldConfig mvTransformCodecSpec = rawFieldConfigWithCodecSpec("myCol2", "CODEC(DELTA,LZ4)");
+      tableConfig.setFieldConfigList(Arrays.asList(mvTransformCodecSpec));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for transform codecSpec on multi-value column");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("only supports single-value columns")
+              && e.getMessage().contains("myCol2"),
+          "Unexpected error: " + e.getMessage());
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      ObjectNode forward = JsonUtils.newObjectNode();
+      forward.put("codecSpec", "CODEC(DELTA,UNKNOWN)");
+      indexes.set("forward", forward);
+      FieldConfig nestedCodecSpecConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, List.of(), null, null, indexes,
+              null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(nestedCodecSpecConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for unknown codec inside indexes.forward.codecSpec");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Unknown codec"), "Unexpected error: " + e.getMessage());
+    }
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      ObjectNode forward = JsonUtils.newObjectNode();
+      forward.put("codecSpec", "LZ4");
+      indexes.set("forward", forward);
+      FieldConfig nestedCodecSpecConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, null, List.of(), null, null,
+              indexes, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(nestedCodecSpecConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for codecSpec on dictionary-encoded forward index");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "codecSpec requires RAW forward-index encoding for column: intCol");
+    }
+
+    // Regression: codecSpec validation now runs via `IndexType.validate(...)` after
+    // `FieldIndexConfigsUtil` resolves overrides — not by the prior early raw-FieldConfig pre-pass.
+    // A column whose RAW encoding is resolved from `noDictionaryColumns`, with codecSpec set under
+    // `indexes.forward`, must pass validation.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(Arrays.asList("intCol"));
+    FieldConfig rawWithCodecSpec = rawFieldConfigWithCodecSpec("intCol", "CODEC(DELTA,LZ4)");
+    tableConfig.setFieldConfigList(Arrays.asList(rawWithCodecSpec));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Chained value-transforms + compression are valid (CODEC(DELTA,DELTADELTA,LZ4)).
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(
+        Arrays.asList(rawFieldConfigWithCodecSpec("intCol", "CODEC(DELTA,DELTADELTA,LZ4)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // A value-transform → packing transform → compression chain is valid (CODEC(DELTA,T64,LZ4)).
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    tableConfig.setFieldConfigList(
+        Arrays.asList(rawFieldConfigWithCodecSpec("intCol", "CODEC(DELTA,T64,LZ4)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Regression: a transform after a packing transform must be rejected (T64 output is not a
+    // typed value array, so DELTA cannot consume it).
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      tableConfig.setFieldConfigList(
+          Arrays.asList(rawFieldConfigWithCodecSpec("intCol", "CODEC(T64,DELTA,LZ4)")));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail when a transform follows a packing transform");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("must operate on column values"),
+          "Unexpected error: " + e.getMessage());
+    }
   }
 
   @Test
@@ -4453,5 +4553,18 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("metrics$v2"));
     }
+  }
+
+  /// Builds a RAW FieldConfig whose codecSpec is configured via the modern `indexes.forward` block
+  /// (the only supported path; there is no top-level FieldConfig.codecSpec field).
+  private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", codecSpec);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 }

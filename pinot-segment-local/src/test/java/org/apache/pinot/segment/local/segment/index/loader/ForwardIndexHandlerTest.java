@@ -37,7 +37,10 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.io.codec.CodecPipelineExecutor;
+import org.apache.pinot.segment.local.io.codec.CodecRegistry;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriterV7;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
@@ -48,6 +51,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.codec.CodecContext;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -1416,17 +1420,14 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  /**
-   * Symmetric "disable dictionary on a column with a range index" scenario, under the new contract that a range
-   * index always requires a dictionary. The valid migration path is to drop the range index in the same reload as
-   * the dictionary; otherwise the table-config validation rejects the change.
-   *
-   * <p>This test asserts the handler chain for the supported flow: starting from a dict-encoded column with a
-   * range index, removing the column from both the dictionary set and the {@code rangeIndexColumns} set causes
-   * {@code ForwardIndexHandler.DISABLE_DICTIONARY} to drop the dictionary and (via
-   * {@code removeDictRelatedIndexes}) the now-stale range index. {@code RangeIndexHandler} then sees the column
-   * is no longer requested and stays a no-op.
-   */
+  /// Symmetric "disable dictionary on a column with a range index" scenario, under the new contract that a range
+  /// index always requires a dictionary. The valid migration path is to drop the range index in the same reload as
+  /// the dictionary; otherwise the table-config validation rejects the change.
+  ///
+  /// This test asserts the handler chain for the supported flow: starting from a dict-encoded column with a
+  /// range index, removing the column from both the dictionary set and the `rangeIndexColumns` set causes
+  /// `ForwardIndexHandler.DISABLE_DICTIONARY` to drop the dictionary and (via `removeDictRelatedIndexes`) the
+  /// now-stale range index. `RangeIndexHandler` then sees the column is no longer requested and stays a no-op.
   @Test
   public void testDisableDictionaryAndRangeIndexTogether()
       throws Exception {
@@ -1506,15 +1507,13 @@ public class ForwardIndexHandlerTest {
     }
   }
 
-  /**
-   * Pins down the handler-ordering contract documented on InvertedIndexHandler: the dictionary file (created by
-   * ForwardIndexHandler under the ENABLE_DICTIONARY operation for a RAW forward column with an inverted index)
-   * must already exist on disk before InvertedIndexHandler attempts to build the dict-id-based inverted index.
-   *
-   * <p>If a future change reorders handlers so InvertedIndexHandler runs before ForwardIndexHandler, the
-   * Preconditions.checkState(columnMetadata.hasDictionary(), ...) inside InvertedIndexHandler.createInvertedIndex
-   * ForColumn fires and this test catches the regression.
-   */
+  /// Pins down the handler-ordering contract documented on InvertedIndexHandler: the dictionary file (created by
+  /// ForwardIndexHandler under the ENABLE_DICTIONARY operation for a RAW forward column with an inverted index)
+  /// must already exist on disk before InvertedIndexHandler attempts to build the dict-id-based inverted index.
+  ///
+  /// If a future change reorders handlers so InvertedIndexHandler runs before ForwardIndexHandler, the
+  /// `Preconditions.checkState(columnMetadata.hasDictionary(), ...)` inside
+  /// `InvertedIndexHandler.createInvertedIndexForColumn` fires and this test catches the regression.
   @Test
   public void testHandlerOrderingForwardBeforeInvertedOnRawWithDictRequired()
       throws Exception {
@@ -2838,6 +2837,202 @@ public class ForwardIndexHandlerTest {
         assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
       }
     }
+  }
+
+  /// Rollback test: when a V7 codec-pipeline forward index exists on disk but the table config
+  /// is reverted to a legacy `compressionCodec` (no `codecSpec`), `shouldChangeRawCompressionType()` must schedule
+  /// [ForwardIndexHandler.Operation#CHANGE_INDEX_COMPRESSION_TYPE] so the segment is rewritten back to the legacy
+  /// format — enabling rollback to pre-V7 servers.
+  @Test
+  public void testComputeOperationChangeCompressionForV7CodecPipelineRollbackToLegacyCompressionCodec()
+      throws Exception {
+    // Step 1: write a minimal V7 forward index over the existing DIM_LZ4_INTEGER column.
+    // DIM_LZ4_INTEGER is SV INT RAW with 1000 docs — exactly what V7 supports.
+    int totalDocs = TEST_DATA.size(); // 1000
+    File v7TempFile = new File(TEMP_DIR, "v7_temp_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(
+        "LZ4", new CodecContext(DataType.INT), CodecRegistry.DEFAULT);
+    try (FixedByteChunkForwardIndexWriterV7 writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store, replacing the legacy LZ4 index.
+    try (SegmentDirectory segDir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segWriter = segDir.createWriter()) {
+      segWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segWriter.save();
+    }
+
+    // Step 3: with the V7 index in place, configure a legacy compressionCodec (no codecSpec).
+    // This represents a rollback scenario — operator removes codecSpec and reverts to a legacy
+    // compressionCodec. The handler must schedule a rewrite back to the legacy format so the
+    // segment can be read by servers that do not support the V7 codec pipeline.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_LZ4_INTEGER,
+          new FieldConfig(DIM_LZ4_INTEGER, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.SNAPPY, null));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_LZ4_INTEGER),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE to be scheduled when config reverts from codecSpec to legacy "
+              + "compressionCodec on a V7 segment (rollback path)");
+      assertTrue(ops.get(DIM_LZ4_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE operation but got: " + ops.get(DIM_LZ4_INTEGER));
+    }
+  }
+
+  /// Regression test: codec-pipeline (V7) forward indexes that have a different stored codec spec than the one
+  /// currently configured in the table config MUST schedule
+  /// [ForwardIndexHandler.Operation#CHANGE_INDEX_COMPRESSION_TYPE] so that the segment is rewritten.
+  @Test
+  public void testComputeOperationChangeCompressionForV7CodecSpecChange()
+      throws Exception {
+    // Step 1: write a V7 forward index with LZ4 spec over DIM_LZ4_INTEGER.
+    int totalDocs = TEST_DATA.size(); // 1000
+    File v7TempFile = new File(TEMP_DIR, "v7_codecspec_change_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(
+        "LZ4", new CodecContext(DataType.INT), CodecRegistry.DEFAULT);
+    try (FixedByteChunkForwardIndexWriterV7 writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store.
+    try (SegmentDirectory segDir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segWriter = segDir.createWriter()) {
+      segWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segWriter.save();
+    }
+
+    // Step 3: configure a different codecSpec (ZSTD(3)) and verify that a rewrite IS scheduled.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      // Build a FieldConfig with codecSpec=ZSTD(3), which should now be represented by raw ZSTANDARD compression.
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "ZSTD(3)"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_LZ4_INTEGER),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE for V7 column with different codecSpec, but no operation scheduled");
+      assertTrue(ops.get(DIM_LZ4_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE in operations for DIM_LZ4_INTEGER, but got: "
+              + ops.get(DIM_LZ4_INTEGER));
+    }
+  }
+
+  /// Regression test: compression-only V7 forward indexes should be rewritten to the legacy-compatible raw
+  /// compression format, even when the configured codec spec is unchanged.
+  @Test
+  public void testComputeOperationCompressionOnlyV7CodecSpecRewritesToLegacyRaw()
+      throws Exception {
+    // Step 1: write a V7 forward index with ZSTD(3) spec over DIM_LZ4_INTEGER.
+    int totalDocs = TEST_DATA.size(); // 1000
+    File v7TempFile = new File(TEMP_DIR, "v7_same_codecspec_fwd_idx");
+    FileUtils.deleteQuietly(v7TempFile);
+
+    CodecPipelineExecutor executor = CodecPipelineExecutor.create(
+        "ZSTD(3)", new CodecContext(DataType.INT), CodecRegistry.DEFAULT);
+    try (FixedByteChunkForwardIndexWriterV7 writer =
+        new FixedByteChunkForwardIndexWriterV7(v7TempFile, executor, totalDocs, 1024, Integer.BYTES)) {
+      for (int i = 0; i < totalDocs; i++) {
+        writer.putInt(i);
+      }
+    }
+
+    // Step 2: inject the V7 file into the segment's v3 store.
+    try (SegmentDirectory segDir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer segWriter = segDir.createWriter()) {
+      segWriter.removeIndex(DIM_LZ4_INTEGER, StandardIndexes.forward());
+      LoaderUtils.writeIndexToV3Format(segWriter, DIM_LZ4_INTEGER, v7TempFile, StandardIndexes.forward());
+      segWriter.save();
+    }
+
+    // Step 3: configure the same compression-only codecSpec and verify a rewrite is scheduled back to raw
+    // ChunkCompressionType.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      // ZSTD(3) is compression-only, so the handler should rewrite this V7 file to raw ZSTANDARD compression.
+      _fieldConfigMap.put(DIM_LZ4_INTEGER, rawFieldConfigWithCodecSpec(DIM_LZ4_INTEGER, "ZSTD(3)"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_LZ4_INTEGER)
+              && ops.get(DIM_LZ4_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE so compression-only codecSpec is rewritten from V7 to raw "
+              + "compression, but got: " + ops.get(DIM_LZ4_INTEGER));
+    }
+  }
+
+  /// Regression test: switching a legacy `compressionCodec` column to an equivalent compression-only `codecSpec`
+  /// must not rewrite the segment when the on-disk [ChunkCompressionType] already matches.
+  @Test
+  public void testComputeOperationLegacyToCompressionOnlyCodecSpecSameCompressionNoRewrite()
+      throws Exception {
+    // DIM_SNAPPY_INTEGER is an existing SV INT RAW column compressed with legacy SNAPPY (pre-V7).
+    // When the table config is updated to codecSpec="SNAPPY", the existing raw format is already correct.
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_SNAPPY_INTEGER, rawFieldConfigWithCodecSpec(DIM_SNAPPY_INTEGER, "SNAPPY"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertFalse(ops.containsKey(DIM_SNAPPY_INTEGER),
+          "Expected no operation when legacy SNAPPY already matches codecSpec='SNAPPY', but got: "
+              + ops.get(DIM_SNAPPY_INTEGER));
+    }
+  }
+
+  /// Regression test: switching a legacy `compressionCodec` column to a different compression-only `codecSpec`
+  /// should rewrite the segment using the existing raw forward-index format, not V7.
+  @Test
+  public void testComputeOperationLegacyToCompressionOnlyCodecSpecDifferentCompressionRewrites()
+      throws Exception {
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+
+      _fieldConfigMap.put(DIM_SNAPPY_INTEGER, rawFieldConfigWithCodecSpec(DIM_SNAPPY_INTEGER, "ZSTD(3)"));
+
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertTrue(ops.containsKey(DIM_SNAPPY_INTEGER)
+              && ops.get(DIM_SNAPPY_INTEGER).contains(ForwardIndexHandler.Operation.CHANGE_INDEX_COMPRESSION_TYPE),
+          "Expected CHANGE_INDEX_COMPRESSION_TYPE when config switches from legacy SNAPPY to codecSpec='ZSTD(3)', "
+              + "but got: " + ops.get(DIM_SNAPPY_INTEGER));
+    }
+  }
+
+  /// Builds a RAW FieldConfig whose codecSpec is configured via the modern `indexes.forward` block
+  /// (the only supported path; there is no top-level FieldConfig.codecSpec field).
+  private static FieldConfig rawFieldConfigWithCodecSpec(String column, String codecSpec) {
+    ObjectNode forward = JsonUtils.newObjectNode();
+    forward.put("codecSpec", codecSpec);
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return new FieldConfig.Builder(column)
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
   }
 
   private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {
