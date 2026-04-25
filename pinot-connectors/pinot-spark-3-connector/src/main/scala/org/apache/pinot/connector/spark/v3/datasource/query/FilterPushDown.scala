@@ -61,9 +61,14 @@ private[pinot] object FilterPushDown {
     case _: GreaterThanOrEqual => true
     case _: IsNull => true
     case _: IsNotNull => true
-    case _: StringStartsWith => true
-    case _: StringEndsWith => true
-    case _: StringContains => true
+    // LIKE pushdowns are only safe when the value contains no literal backslash. Pinot's
+    // RegexpPatternConverterUtils#likeToRegexpLike does not round-trip `\\` correctly (it
+    // emits a regex that matches two backslashes rather than one), so any value with a
+    // backslash would produce silently wrong results even with proper SQL-level escaping.
+    // Fall back to Spark post-scan evaluation in that case.
+    case StringStartsWith(_, value) => value != null && !value.contains("\\")
+    case StringEndsWith(_, value) => value != null && !value.contains("\\")
+    case StringContains(_, value) => value != null && !value.contains("\\")
     // Compound filters are supported only when every child is also supported. Declaring
     // Or/And/Not as unconditionally supported would cause Spark to drop them from its
     // residual filter list while compileFilter silently returns None for filters whose
@@ -78,14 +83,13 @@ private[pinot] object FilterPushDown {
     if (value == null) null else value.replace("'", "''")
 
   // Escape backslash, SQL LIKE wildcards, and single-quote in a literal so it matches itself
-  // verbatim under `LIKE ... ESCAPE '\'`. Backslash must be replaced first to avoid
-  // double-escaping the escapes added afterwards.
+  // verbatim under `LIKE ... ESCAPE '\'`. Backslash is doubled first to avoid double-escaping
+  // the escapes added afterwards.
   //
-  // Caveat: Pinot's runtime LIKE-to-regex conversion (RegexpPatternConverterUtils#likeToRegexpLike)
-  // does not fully round-trip a literal `\` — `\\` in the LIKE pattern translates to a regex
-  // matching two backslashes rather than one. Strings containing backslashes will not match the
-  // way Spark callers expect until that conversion is fixed in pinot-common. The %, _, and `'`
-  // cases that this helper handles are unaffected.
+  // Note: values containing literal backslashes are rejected upstream by `isFilterSupported`
+  // because Pinot's `likeToRegexpLike` does not round-trip `\\` correctly. The backslash branch
+  // here is kept defensively so this helper produces well-formed SQL even if called via a
+  // future code path that does not gate on `isFilterSupported`.
   private def escapeLikeLiteral(value: String): String = {
     if (value == null) null
     else value
