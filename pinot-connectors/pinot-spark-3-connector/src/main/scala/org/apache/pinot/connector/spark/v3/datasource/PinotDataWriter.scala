@@ -248,7 +248,15 @@ class PinotDataWriter[InternalRow](
     val gr = new GenericRow()
 
     writeSchema.fields.zipWithIndex foreach { case(field, idx) =>
-      field.dataType match {
+      // Honor `record.isNullAt(idx)` before calling any typed accessor: Spark's primitive
+      // accessors (`getInt`, `getLong`, etc.) silently return zero values for null cells,
+      // which would corrupt the segment with synthetic zeros; `getString`/`getDecimal`
+      // would NPE. Mark the field null on the GenericRow so the segment driver can apply
+      // the column's defaultNullValue per Pinot's null-handling contract.
+      if (record.isNullAt(idx)) {
+        gr.putValue(field.name, null)
+        gr.addNullValueField(field.name)
+      } else field.dataType match {
         case org.apache.spark.sql.types.StringType =>
           gr.putValue(field.name, record.getString(idx))
         case org.apache.spark.sql.types.IntegerType =>
