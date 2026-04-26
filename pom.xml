@@ -236,7 +236,7 @@
          the modules are registered in their parent reactors only under a JDK-21+ profile
          activation (see pinot-connectors/pom.xml and
          pinot-plugins/pinot-batch-ingestion/pom.xml). -->
-    <spark4.version>4.0.0</spark4.version>
+    <spark4.version>4.1.1</spark4.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
