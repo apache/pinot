@@ -148,6 +148,25 @@ class FilterPushDownTest extends BaseTest {
     postScan should contain only f
   }
 
+  test("Comparison filters with a null value fall back to post-scan") {
+    // Symmetric closure of the null-leaf gap with EqualNullSafe(_, null) and IN(_, [..., null, ...]):
+    // EqualTo / LessThan(OrEqual) / GreaterThan(OrEqual) with a null literal would render
+    // as `attr <op> null` via `compileValue`'s fallback branch — Pinot would parse the literal
+    // token `null` syntactically rather than as a Spark NULL. Catalyst usually constant-folds
+    // these out, but the connector defensively rejects them so the symmetric three-valued-logic
+    // guarantee holds for every comparison operator.
+    val filters = Array[Filter](
+      EqualTo("a", null),
+      LessThan("b", null),
+      LessThanOrEqual("c", null),
+      GreaterThan("d", null),
+      GreaterThanOrEqual("e", null)
+    )
+    val (accepted, postScan) = FilterPushDown.acceptFilters(filters)
+    accepted shouldBe empty
+    postScan should contain theSameElementsAs filters
+  }
+
   test("IN with a null array element falls back to post-scan") {
     // Same problem as EqualNullSafe(_, null) but for IN: a null entry would render as
     // `IN (1, null, 3)` and break Spark's null semantics. An all-non-null IN is fine.

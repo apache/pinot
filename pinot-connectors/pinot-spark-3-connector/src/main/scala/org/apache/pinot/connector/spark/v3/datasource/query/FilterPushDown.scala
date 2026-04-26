@@ -52,12 +52,16 @@ private[pinot] object FilterPushDown {
   }
 
   private def isFilterSupported(filter: Filter): Boolean = filter match {
+    // Comparison filters with a null literal value would render as `attr <op> null` via
+    // `compileValue`'s fallback branch — Pinot would parse the literal token `null`
+    // syntactically rather than as a Spark NULL. Catalyst usually constant-folds these out
+    // upstream, but defensively reject them so the symmetric three-valued-logic guarantee
+    // we provide for EqualNullSafe / IN holds for every operator. Compound gating ensures
+    // the rejection propagates to enclosing And/Or/Not. We use `v == null` rather than the
+    // `case _(_, null)` extractor to be robust against typed-null wrappers.
+    case EqualTo(_, v) if v == null => false
     case _: EqualTo => true
-    // EqualNullSafe with a null value would render the literal string `null` into SQL via
-    // `compileValue`'s fallback branch — Pinot would receive `attr != null` rather than
-    // `attr IS NULL`. Reject and let Spark evaluate it post-scan with proper three-valued
-    // logic. Compound gating ensures this rejection propagates to enclosing And/Or/Not.
-    case EqualNullSafe(_, null) => false
+    case EqualNullSafe(_, v) if v == null => false
     case _: EqualNullSafe => true
     // IN with a null array element similarly leaks the literal `null` into the IN list, which
     // Pinot would interpret syntactically rather than as a Spark NULL. Reject so Spark
@@ -66,9 +70,13 @@ private[pinot] object FilterPushDown {
     // `value.isEmpty` and would NPE.
     case In(_, value) if value == null || value.contains(null) => false
     case _: In => true
+    case LessThan(_, v) if v == null => false
     case _: LessThan => true
+    case LessThanOrEqual(_, v) if v == null => false
     case _: LessThanOrEqual => true
+    case GreaterThan(_, v) if v == null => false
     case _: GreaterThan => true
+    case GreaterThanOrEqual(_, v) if v == null => false
     case _: GreaterThanOrEqual => true
     case _: IsNull => true
     case _: IsNotNull => true
