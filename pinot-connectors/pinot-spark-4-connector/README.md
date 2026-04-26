@@ -63,6 +63,15 @@ found together. Pick one jar per Spark application:
 If you ship a fat-jar that bundles your Spark application, ensure the bundle does not include
 both `pinot-connectors/pinot-spark-3-connector` and `pinot-connectors/pinot-spark-4-connector`.
 
+**Escape hatch.** Advanced users who genuinely need both connectors on the same JVM (e.g., a
+long-running Spark application reading from a Spark 3 Pinot deployment and writing to a
+Spark 4 deployment) can disable the fail-fast guard by setting the Java system property
+`-Dpinot.spark.connector.skip-conflict-guard=true` on the Spark driver and executors. The
+guard then logs a WARN once instead of throwing. This is unsupported — Spark's
+`DataSource.lookupDataSource` resolves `format("pinot")` non-deterministically, so writes
+may silently route through the wrong overwrite contract — but the option exists for users
+who accept that risk.
+
 ### Runtime JVM flags
 
 Spark 4 requires the standard JDK 17+ `--add-opens` set. The module's tests already configure
@@ -87,6 +96,24 @@ spark-submit \
     --add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED" \
   ...
 ```
+
+## Write semantics
+
+> ⚠️ **Overwrite/truncate writes are not supported and fail fast.** Pinot's write path can
+> only append new segments — it cannot drop or replace segments matching an arbitrary Spark
+> predicate as part of a single write job. Both V2 paths reject the request with
+> `UnsupportedOperationException`:
+>
+> - `df.write.mode("overwrite").format("pinot")…` — Spark routes this through
+>   `SupportsTruncate#truncate()`, which the connector overrides to throw.
+> - `df.writeTo(...).overwrite(<predicate>)` — `SupportsOverwriteV2#overwrite(...)` throws
+>   with the predicate count in the message.
+> - SQL `INSERT OVERWRITE …` — same `truncate()` path as `mode("overwrite")`.
+>
+> To replace existing data, drop the Pinot table via the controller REST API first, or use
+> `pinot-batch-ingestion-spark-4`'s `SparkSegment*PushJobRunner` with `REFRESH` /
+> consistent-push enabled. Use `mode("append")` for additive writes — that is the only
+> supported batch-write mode.
 
 ## Features
 - Query realtime, offline or hybrid tables
