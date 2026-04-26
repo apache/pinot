@@ -36,22 +36,24 @@ object SparkToPinotTypeTranslator {
       val sparkType = field.dataType
       val pinotType = translateType(sparkType)
 
-      if (pinotType != null) {
-        (fieldName, sparkType) match {
-          case (`timeColumn`, _) =>
-            schemaBuilder.addDateTime(fieldName, pinotType, timeFormat, timeGranularity);
-          case (_, _: ArrayType) =>
-            schemaBuilder.addMultiValueDimension(fieldName, pinotType)
-          case _ =>
-            schemaBuilder.addSingleValueDimension(fieldName, pinotType)
-        }
+      (fieldName, sparkType) match {
+        case (`timeColumn`, _) =>
+          schemaBuilder.addDateTime(fieldName, pinotType, timeFormat, timeGranularity)
+        case (_, _: ArrayType) =>
+          schemaBuilder.addMultiValueDimension(fieldName, pinotType)
+        case _ =>
+          schemaBuilder.addSingleValueDimension(fieldName, pinotType)
       }
-      else throw new UnsupportedOperationException("Unsupported data type: " + sparkType)
     }
 
     schemaBuilder.build
   }
 
+  // Throws UnsupportedOperationException for types the connector cannot translate, so the
+  // failure surfaces at schema-build time (driver) rather than mid-write (executor) and the
+  // stack trace points at the offending type. Returning null and letting the caller rethrow
+  // would scatter the error site and risk silent propagation if a future caller forgets the
+  // null-check (the previous behavior).
   private def translateType(sparkType: DataType): FieldSpec.DataType = sparkType match {
     case _: StringType => FieldSpec.DataType.STRING
     case _: IntegerType => FieldSpec.DataType.INT
@@ -63,8 +65,19 @@ object SparkToPinotTypeTranslator {
     case _: BinaryType => FieldSpec.DataType.BYTES
     case _: TimestampType => FieldSpec.DataType.LONG
     case _: DateType => FieldSpec.DataType.INT
+    // Pinot does not support multi-value BYTES or multi-value BIG_DECIMAL on the segment
+    // build path: ArrayType(BinaryType) would emit a multi-value BYTES dimension that the
+    // segment driver rejects, and ArrayType(DecimalType) similarly has no MV BIG_DECIMAL
+    // support. Reject up-front so the user sees a clear translator-time error rather than
+    // a confusing segment-build failure on the executor.
+    case ArrayType(_: BinaryType, _) =>
+      throw new UnsupportedOperationException(
+        "Multi-value BYTES (ArrayType(BinaryType)) is not supported by the Pinot writer")
+    case ArrayType(_: DecimalType, _) =>
+      throw new UnsupportedOperationException(
+        "Multi-value BIG_DECIMAL (ArrayType(DecimalType)) is not supported by the Pinot writer")
     case ArrayType(elementType, _) => translateType(elementType)
-    case _ =>
-      null
+    case other =>
+      throw new UnsupportedOperationException(s"Unsupported Spark data type: $other")
   }
 }
