@@ -30,14 +30,17 @@ updates:
     # These artifacts are pinned in pinot-spi/pom.xml (maven-dependency-plugin artifactItems) because
     # ClassLoaderTest asserts plugin realm isolation against known artifact contents. Dependabot's
     # `versions` filter is matched against the *target* version of an update, so we use range filters
-    # (">= <next>") to block every bump to a newer version for these coordinates.
+    # (">= <next>") to block every bump to a newer version for these coordinates. The rules apply
+    # repo-wide by coordinate, which is fine here because pinot-dropwizard / pinot-yammer /
+    # com.yammer.metrics:metrics-core are not referenced anywhere else.
     #
-    # Caveat: these rules apply repo-wide by coordinate. pinot-dropwizard / pinot-yammer /
-    # com.yammer.metrics:metrics-core are not referenced anywhere else, so locking them is safe.
-    # commons-io:commons-io is also consumed in the top-level pom.xml at a newer version, so it is
-    # intentionally NOT locked here; Dependabot may still open PRs that also modify the hardcoded
-    # 2.11.0 in pinot-spi/pom.xml — reviewers must revert that part manually (see the DO NOT BUMP
-    # comment next to the <version>2.11.0</version> entry in pinot-spi/pom.xml).
+    # The ClassLoaderTest also pins commons-io 2.11.0, but that coordinate is consumed at a newer
+    # version elsewhere (top-level pom.xml), so we cannot block it here. Instead, the fixture is
+    # resolved via maven-dependency-plugin's `dependency:get` goal in pinot-spi/pom.xml using a
+    # single-string <artifact>commons-io:commons-io:2.11.0</artifact> parameter — Dependabot's
+    # Maven updater scans structured groupId+artifactId+version triples inside <dependency>,
+    # <plugin>, and <artifactItem> blocks, not single-string <artifact> values in plugin
+    # configuration, so no ignore rule for commons-io is needed.
     - dependency-name: "org.apache.pinot:pinot-dropwizard"
       versions: [">= 0.10.1"]
     - dependency-name: "org.apache.pinot:pinot-yammer"

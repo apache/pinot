@@ -62,10 +62,10 @@
 
                  DO NOT BUMP the hardcoded versions below. They are intentionally pinned test fixtures used by
                  ClassLoaderTest to validate plugin realm isolation against known artifact contents. Corresponding
-                 ignore rules live in .github/dependabot.yml, but Dependabot cannot always distinguish these locked
-                 references from other uses of the same coordinate elsewhere in the repo (e.g., commons-io is also
-                 consumed at a newer version in the top-level pom.xml), so Dependabot may still open PRs that touch
-                 this file. Reviewers: reject any change to the versions below.
+                 ignore rules live in .github/dependabot.yml. (commons-io 2.11.0, which is also consumed at a newer
+                 version in the top-level pom.xml, is fetched via the separate `fetch-classloadertest-commons-io-fixture`
+                 / `copy-classloadertest-commons-io-fixture` executions below to keep its coordinate off Dependabot's
+                 scanner without blocking legitimate commons-io upgrades.)
             -->
             <phase>generate-test-resources</phase>
             <goals>
@@ -95,18 +95,42 @@
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
                 </artifactItem>
                 <artifactItem>
-                  <groupId>commons-io</groupId>
-                  <artifactId>commons-io</artifactId>
-                  <version>2.11.0</version> <!-- PINNED test fixture: DO NOT BUMP (asserted by ClassLoaderTest) -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
-                </artifactItem>
-                <artifactItem>
                   <groupId>com.yammer.metrics</groupId>
                   <artifactId>metrics-core</artifactId>
                   <version>2.1.5</version> <!-- PINNED test fixture: DO NOT BUMP -->
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
                 </artifactItem>
               </artifactItems>
+            </configuration>
+          </execution>
+          <execution>
+            <id>fetch-classloadertest-commons-io-fixture</id>
+            <!-- Resolve commons-io 2.11.0 into the local Maven repository for the ClassLoaderTest fixture.
+                 Why this two-step (dependency:get + antrun copy) and not an <artifactItem> in copy-pinot-plugins?
+                 commons-io is also consumed at a newer version in the top-level pom.xml. Putting 2.11.0 in an
+                 <artifactItem> exposes the coordinate to Dependabot's Maven updater, which would open repeated
+                 PRs trying to "upgrade" the pinned test fixture. A repo-wide ignore is not viable because it
+                 would also block legitimate commons-io upgrades for the production version.
+
+                 dependency:get takes a single-string <artifact>groupId:artifactId:version</artifact> parameter
+                 — Dependabot's Maven updater scans <dependency>/<plugin>/<artifactItem> blocks for structured
+                 groupId+artifactId+version triples, NOT single-string <artifact> parameters in plugin
+                 configuration. Resolution still goes through Maven's normal chain (local cache, configured
+                 mirrors, authenticated repos, SHA-1 checksum validation), so offline/mirrored builds keep
+                 working and the fixture jar's integrity is verified.
+
+                 The companion `copy-classloadertest-commons-io-fixture` antrun execution copies the resolved
+                 jar from ${settings.localRepository} to target/test-classes/plugins, where ClassLoaderTest
+                 expects it. The destination filename MUST remain commons-io-2.11.0.jar (asserted by
+                 ClassLoaderTest.assemblyBasedRealm via CodeSource.getLocation().getPath().endsWith(...)).
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>get</goal>
+            </goals>
+            <configuration>
+              <artifact>commons-io:commons-io:2.11.0</artifact>
+              <transitive>false</transitive>
             </configuration>
           </execution>
           <execution>
@@ -134,6 +158,36 @@
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
                 </artifactItem>
               </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-classloadertest-commons-io-fixture</id>
+            <!-- Companion to the `fetch-classloadertest-commons-io-fixture` execution above: copies the
+                 resolved commons-io 2.11.0 jar from ${settings.localRepository} into target/test-classes,
+                 where ClassLoaderTest expects it. See the rationale comment on that execution for why the
+                 fixture is fetched via dependency:get rather than as an <artifactItem>.
+
+                 Ordering: this execution must run AFTER `fetch-classloadertest-commons-io-fixture`. Both
+                 are bound to the generate-test-resources phase; cross-plugin executions in the same phase
+                 run in plugin declaration order, so maven-dependency-plugin must remain declared before
+                 maven-antrun-plugin in <build><plugins> for this to work.
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin"/>
+                <copy file="${settings.localRepository}/commons-io/commons-io/2.11.0/commons-io-2.11.0.jar"
+                      tofile="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/commons-io-2.11.0.jar"/>
+              </target>
             </configuration>
           </execution>
         </executions>
