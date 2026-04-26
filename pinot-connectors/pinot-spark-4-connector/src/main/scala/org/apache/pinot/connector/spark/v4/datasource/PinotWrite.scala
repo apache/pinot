@@ -95,9 +95,14 @@ class PinotWrite(
         fsOpt match {
           case Some(fs) =>
             try {
-              val deleted = fs.delete(destPath, /* recursive */ false)
-              logger.warn("Spark write aborted, cleaned up leftover segment tar at {} (deleted={})",
-                destPath, deleted.asInstanceOf[AnyRef])
+              if (fs.delete(destPath, /* recursive */ false)) {
+                logger.warn("Spark write aborted, cleaned up leftover segment tar at {}", destPath)
+              } else {
+                // FileSystem.delete returns false when the path doesn't exist. That's not a
+                // success signal — it usually means a previous abort already cleaned up, the
+                // upload itself never happened, or an out-of-band process moved the file.
+                logger.info("Spark write aborted, no leftover segment tar found at {}", destPath)
+              }
             } catch {
               case t: Throwable =>
                 logger.warn("Spark write aborted; failed to clean up leftover segment tar at {}. " +
