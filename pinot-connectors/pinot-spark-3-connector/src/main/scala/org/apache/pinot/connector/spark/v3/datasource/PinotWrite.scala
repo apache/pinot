@@ -29,6 +29,8 @@ import org.apache.spark.sql.connector.write.{BatchWrite, DataWriterFactory, Logi
 import org.apache.spark.sql.types.StructType
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.util.control.NonFatal
+
 class PinotWrite(
                   logicalWriteInfo: LogicalWriteInfo
                 ) extends Write with BatchWrite {
@@ -80,7 +82,7 @@ class PinotWrite(
     val fsOpt = try {
       Some(FileSystem.get(new URI(savePath), new Configuration()))
     } catch {
-      case t: Throwable =>
+      case NonFatal(t) =>
         logger.warn("Spark write aborted; could not obtain Hadoop FileSystem for savePath={} " +
           "— leftover segment tars may remain and be duplicated on retry.", savePath, t)
         None
@@ -104,7 +106,7 @@ class PinotWrite(
                 logger.info("Spark write aborted, no leftover segment tar found at {}", destPath)
               }
             } catch {
-              case t: Throwable =>
+              case NonFatal(t) =>
                 logger.warn("Spark write aborted; failed to clean up leftover segment tar at {}. " +
                   "Manual cleanup may be required before retry to avoid duplicate segments.",
                   destPath, t)
