@@ -53,12 +53,15 @@ private[pinot] object FilterPushDown {
 
   private def isFilterSupported(filter: Filter): Boolean = filter match {
     // Comparison filters with a null literal value would render as `attr <op> null` via
-    // `compileValue`'s fallback branch — Pinot would parse the literal token `null`
-    // syntactically rather than as a Spark NULL. Catalyst usually constant-folds these out
-    // upstream, but defensively reject them so the symmetric three-valued-logic guarantee
-    // we provide for EqualNullSafe / IN holds for every operator. Compound gating ensures
-    // the rejection propagates to enclosing And/Or/Not. We use `v == null` rather than the
-    // `case _(_, null)` extractor to be robust against typed-null wrappers.
+    // `compileValue`'s fallback branch. Catalyst usually constant-folds these out upstream,
+    // and Pinot's Calcite-based parser does treat the lowercase `null` token as SQL NULL —
+    // but `attr = NULL`, `attr < NULL`, etc. are SQL-equivalent to FALSE/UNKNOWN regardless,
+    // so pushing them down is at best a no-op result and at worst diverges from Spark's
+    // three-valued-logic semantics across edge cases. Reject defensively so the same
+    // post-scan-fallback guarantee we already provide for EqualNullSafe / IN holds for
+    // every operator. Compound gating ensures the rejection propagates to enclosing
+    // And/Or/Not. We use `v == null` rather than the `case _(_, null)` extractor to be
+    // robust against typed-null wrappers.
     case EqualTo(_, v) if v == null => false
     case _: EqualTo => true
     case EqualNullSafe(_, v) if v == null => false
