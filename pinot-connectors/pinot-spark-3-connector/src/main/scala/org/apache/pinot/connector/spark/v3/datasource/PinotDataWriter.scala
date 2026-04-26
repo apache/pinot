@@ -107,6 +107,12 @@ class PinotDataWriter[InternalRow](
       val time = writeSchema.fields(timeColumnIndex).dataType match {
         case org.apache.spark.sql.types.IntegerType => record.getInt(timeColumnIndex).toLong
         case org.apache.spark.sql.types.LongType => record.getLong(timeColumnIndex)
+        // The match is total under the current `isTimeColumnNumeric` predicate (Int|Long).
+        // If a future contributor extends `isTimeColumnNumeric` to ShortType / ByteType /
+        // TimestampType without updating this branch, surface it as a clear failure rather
+        // than a mysterious MatchError mid-task.
+        case other => throw new IllegalStateException(
+          s"Unhandled numeric time-column type: $other; update PinotDataWriter.write to match.")
       }
       startTime = Math.min(startTime, time)
       endTime = Math.max(endTime, time)
@@ -163,7 +169,13 @@ class PinotDataWriter[InternalRow](
     while (matcher.find()) {
       val variableName = matcher.group(1)
       val formatSpecifier = matcher.group(2)
-      val value = variables(variableName)
+      // Use Map#get so an unknown placeholder produces a clear job-submission-time error
+      // listing the supported names, rather than a `NoSuchElementException: key not found`
+      // surfacing only at commit() time after the segment was already built.
+      val value = variables.getOrElse(variableName,
+        throw new IllegalArgumentException(
+          s"Unknown segmentNameFormat placeholder '{$variableName}'; supported: " +
+            s"${variables.keys.toSeq.sorted.mkString(", ")}"))
 
       val formattedValue = formatSpecifier match {
         case null => value.toString
