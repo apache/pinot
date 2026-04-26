@@ -57,9 +57,14 @@ public class SparkSegmentGenerationJobRunnerTest {
   public void setup() {
     // Spark 4's web UI (Jetty 12 / Jakarta Servlet) conflicts with Pinot's transitive Jersey 2.x
     // on the test classpath. The UI is not needed for these tests, so disable it.
+    // Pin the driver to 127.0.0.1 so the test does not depend on hostname resolution (macOS
+    // CI hosts often return a hostname that does not resolve back to a bindable address,
+    // producing "Can't assign requested address" with Spark 4.1+).
     SparkConf conf = new SparkConf().setMaster("local")
         .setAppName(SparkSegmentGenerationJobRunnerTest.class.getName())
-        .set("spark.ui.enabled", "false");
+        .set("spark.ui.enabled", "false")
+        .set("spark.driver.bindAddress", "127.0.0.1")
+        .set("spark.driver.host", "127.0.0.1");
     _sparkContext = new SparkContext(conf);
   }
 
