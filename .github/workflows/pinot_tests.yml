@@ -105,13 +105,73 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-      # Build the PR branch's module to get a new JAR to compare
-      - name: Build SPI on PR branch
+      # Build the PR branch's Java 11 artifact surface to get new JARs to validate and compare
+      - name: Build Java 11 artifacts on PR branch
         timeout-minutes: 120
         run: |
-          for mod in pinot-spi pinot-segment-spi; do
-            mvn clean package -T1C -pl $mod -am -DskipTests -Dproject.build.finalName="$mod"
-          done
+          JAVA11_MODULES=(
+            pinot-spi
+            pinot-segment-spi
+            pinot-common
+            pinot-timeseries/pinot-timeseries-spi
+            pinot-clients/pinot-java-client
+            pinot-clients/pinot-jdbc-client
+          )
+          mvn clean package -T1C -pl "$(IFS=,; echo "${JAVA11_MODULES[*]}")" -am -DskipTests -DskipShade
+      - name: Validate Java 11 artifact bytecode
+        run: |
+          python3 - <<'PY'
+          import glob
+          import os
+          import struct
+          import sys
+          import zipfile
+
+          modules = {
+              "pinot-spi": "pinot-spi",
+              "pinot-segment-spi": "pinot-segment-spi",
+              "pinot-common": "pinot-common",
+              "pinot-timeseries/pinot-timeseries-spi": "pinot-timeseries-spi",
+              "pinot-clients/pinot-java-client": "pinot-java-client",
+              "pinot-clients/pinot-jdbc-client": "pinot-jdbc-client",
+          }
+          max_major = 55
+          violations = []
+
+          def main_artifact(module, artifact_id):
+              candidates = []
+              for path in glob.glob(f"{module}/target/{artifact_id}-*.jar"):
+                  name = os.path.basename(path)
+                  if name.startswith("original-"):
+                      continue
+                  if name.endswith(("-sources.jar", "-javadoc.jar", "-tests.jar", "-shaded.jar")):
+                      continue
+                  candidates.append(path)
+              if len(candidates) != 1:
+                  raise RuntimeError(f"Expected one main artifact for {module}, found: {candidates}")
+              return candidates[0]
+
+          for module, artifact_id in modules.items():
+              jar_path = main_artifact(module, artifact_id)
+              print(f"Validating {jar_path}")
+              with zipfile.ZipFile(jar_path) as jar:
+                  for entry in jar.namelist():
+                      if not entry.endswith(".class"):
+                          continue
+                      data = jar.read(entry)[:8]
+                      magic, _minor, major = struct.unpack(">IHH", data)
+                      if magic != 0xCAFEBABE:
+                          violations.append(f"{jar_path}!/{entry}: invalid classfile magic")
+                      elif major > max_major:
+                          violations.append(f"{jar_path}!/{entry}: classfile major {major} > {max_major}")
+
+          if violations:
+              print("Found classes above Java 11 bytecode:", file=sys.stderr)
+              print("\n".join(violations[:100]), file=sys.stderr)
+              if len(violations) > 100:
+                  print(f"... and {len(violations) - 100} more", file=sys.stderr)
+              sys.exit(1)
+          PY
       - name: Checkout master into a subfolder
         uses: actions/checkout@v6
         with:

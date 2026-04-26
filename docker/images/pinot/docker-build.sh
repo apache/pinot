@@ -51,4 +51,9 @@ fi
 
 echo "Trying to build Pinot docker image on git ref: [ ${PINOT_GIT_REF} ] and tag it as: [ ${DOCKER_TAG} ]. Kafka Dependencies: [ ${KAFKA_VERSION} ]. Java Version: [ ${JAVA_VERSION} ]."
 
-docker build --no-cache -t ${DOCKER_TAG} --build-arg PINOT_GIT_REF=${PINOT_GIT_REF} --build-arg KAFKA_VERSION=${KAFKA_VERSION} --build-arg JAVA_VERSION=${JAVA_VERSION} -f Dockerfile .
+docker build --no-cache -t ${DOCKER_TAG} \
+  --build-arg PINOT_GIT_REF=${PINOT_GIT_REF} \
+  --build-arg KAFKA_VERSION=${KAFKA_VERSION} \
+  --build-arg JDK_VERSION=${JAVA_VERSION} \
+  --build-arg PINOT_BASE_IMAGE_TAG=${JAVA_VERSION}-amazoncorretto \
+  -f Dockerfile .
