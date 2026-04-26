@@ -91,6 +91,85 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     writeBuffer.hasNext shouldBe false
   }
 
+  test("Null cells in nullable columns are propagated as null + addNullValueField, not zeros") {
+    // Spark's primitive accessors silently return 0 / false for null cells in UnsafeRow,
+    // and getString / getDecimal NPE on null. The writer must consult isNullAt before the
+    // typed accessor and mark the field via addNullValueField so the segment driver applies
+    // the column's defaultNullValue per Pinot's null-handling contract — not synthesize
+    // zeros into the segment.
+    val writeOptions = PinotDataSourceWriteOptions(
+      tableName = "nullTest",
+      savePath = "/tmp/pinot",
+      timeColumnName = "ts",
+      timeFormat = "EPOCH|SECONDS",
+      timeGranularity = "1:SECONDS",
+      segmentNameFormat = "{table}_{partitionId}",
+      invertedIndexColumns = Array(),
+      noDictionaryColumns = Array(),
+      bloomFilterColumns = Array(),
+      rangeIndexColumns = Array())
+    val writeSchema = StructType(Seq(
+      StructField("name", StringType, nullable = true),
+      StructField("age", IntegerType, nullable = true),
+      StructField("salary", LongType, nullable = true),
+      StructField("ts", LongType, nullable = false)))
+    val pinotSchema = SparkToPinotTypeTranslator.translate(
+      writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+      writeOptions.timeFormat, writeOptions.timeGranularity)
+    val writer = new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
+
+    // First column null (String), second null (Int), third null (Long), fourth populated.
+    writer.write(new TestInternalRow(Array[Any](null, null, null, 1000L)))
+
+    val gr = writer.bufferedRecordReader.next()
+    gr.getValue("name") shouldBe null
+    gr.getValue("age") shouldBe null
+    gr.getValue("salary") shouldBe null
+    gr.getValue("ts") shouldBe 1000L
+    val nullFields = gr.getNullValueFields
+    nullFields.contains("name") shouldBe true
+    nullFields.contains("age") shouldBe true
+    nullFields.contains("salary") shouldBe true
+    nullFields.contains("ts") shouldBe false
+
+    writer.close()
+  }
+
+  test("Time-column tracking is null-safe and type-correct for IntegerType time columns") {
+    // The previous time-tracking branch called record.getLong(timeColumnIndex) without an
+    // isNullAt check (corrupts startTime to 0 on null cells) and without dispatching on
+    // the actual Spark type (UnsafeRow's getLong on an IntegerType slot reads 8 bytes from
+    // a 4-byte field). This test pins both fixes for an IntegerType time column with one
+    // null and one populated row.
+    val writeOptions = PinotDataSourceWriteOptions(
+      tableName = "intTimeTable",
+      savePath = "/tmp/pinot",
+      timeColumnName = "ts",
+      timeFormat = "EPOCH|SECONDS",
+      timeGranularity = "1:SECONDS",
+      segmentNameFormat = "{table}_{startTime}_{endTime}_{partitionId}",
+      invertedIndexColumns = Array(),
+      noDictionaryColumns = Array(),
+      bloomFilterColumns = Array(),
+      rangeIndexColumns = Array())
+    val writeSchema = StructType(Seq(
+      StructField("name", StringType, nullable = false),
+      StructField("ts", IntegerType, nullable = true)))
+    val pinotSchema = SparkToPinotTypeTranslator.translate(
+      writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+      writeOptions.timeFormat, writeOptions.timeGranularity)
+    val writer = new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
+
+    writer.write(new TestInternalRow(Array[Any]("Alice", null)))            // null cell — must be skipped
+    writer.write(new TestInternalRow(Array[Any]("Bob", 1234567890)))        // Int (not Long)
+
+    // The segment-name placeholders should reflect only the populated row, with the Int
+    // value preserved verbatim — not 0 (synthetic null) or garbage from a misaligned read.
+    writer.getSegmentName shouldBe "intTimeTable_1234567890_1234567890_0"
+
+    writer.close()
+  }
+
   test("Should create segment file on commit") {
     // create tmp directory with test name
     tmpDir = Files.createTempDirectory("pinot-spark-connector-test").toFile
