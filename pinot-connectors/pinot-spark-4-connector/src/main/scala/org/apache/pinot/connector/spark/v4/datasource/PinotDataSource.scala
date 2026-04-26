@@ -76,8 +76,19 @@ private[datasource] object PinotDataSource {
   // (`false`) value of a half-initialized var. The earlier two-flag @volatile pattern had
   // a race window where a thread could read `spark3Probed=true` but `spark3Conflict=false`
   // (default) before the probing thread wrote the real value.
-  private[datasource] lazy val spark3Conflict: Boolean =
-    isSpark3ConnectorOnClasspath(getClass.getClassLoader)
+  //
+  // We probe both `getClass.getClassLoader` (the loader that loaded this Spark 4 connector)
+  // and `Thread.currentThread.getContextClassLoader` (what Spark's
+  // `DataSource.lookupDataSource` uses to discover DataSourceRegister candidates). In a
+  // typical Spark deployment with `--packages` and isolated executor classloaders, the v3
+  // jar may be visible only via the context classloader — probing only our own would let
+  // the conflict slip through.
+  private[datasource] lazy val spark3Conflict: Boolean = {
+    val ownLoader = getClass.getClassLoader
+    val ctxLoader = Thread.currentThread.getContextClassLoader
+    isSpark3ConnectorOnClasspath(ownLoader) ||
+      (ctxLoader != null && (ctxLoader ne ownLoader) && isSpark3ConnectorOnClasspath(ctxLoader))
+  }
 
   def guardAgainstSpark3ConnectorOnClasspath(): Unit = {
     if (spark3Conflict) {
