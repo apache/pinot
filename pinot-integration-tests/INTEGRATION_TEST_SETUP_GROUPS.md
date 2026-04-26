@@ -304,12 +304,12 @@ the existing GitHub Actions integration lanes.
 
 Set 1 runs these shared profiles after its reduced alphabetical pass:
 
+- `shared-rich-cluster-integration-test-suite`
 - `shared-hybrid-cluster-integration-test-suite`
 - `shared-llc-realtime-cluster-integration-test-suite`
 
 Set 2 runs these shared profiles after its reduced alphabetical pass:
 
-- `shared-rich-cluster-integration-test-suite`
 - `shared-realtime-manager-cluster-integration-test-suite`
 - `shared-controller-only-cluster-integration-test-suite`
 - `shared-offline-cluster-integration-test-suite`
@@ -324,6 +324,10 @@ setup-correctness buckets and would increase CI wall time if wired immediately.
 covers those eight no-override offline classes plus a larger validated batch:
 252 TestNG tests passed in 563.98s shared versus 886.69s with per-class
 lifecycles.
+
+The rich suite is wired into Set 1 instead of Set 2 because the first GitHub
+Actions attempt showed Set 1 finishing with enough headroom, while Set 2 became
+the critical path when it owned the larger rich profile.
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
