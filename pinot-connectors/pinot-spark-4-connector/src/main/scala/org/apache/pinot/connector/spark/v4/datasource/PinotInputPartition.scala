@@ -28,6 +28,10 @@ import org.apache.spark.sql.types.StructType
  * from Spark master to executors. This class is serialized and sent across the network so it should
  * be kept lean for good performance.
  *
+ * Thread safety: immutable after construction. Spark serializes one instance on the driver and
+ * deserializes a copy per executor task; instances are not shared across threads at runtime.
+ * Adding mutable state to this class would break that contract.
+ *
  * @param schema        Schema for the scan/read operation. This can be a subset of the tables schema
  * @param partitionId   Integer which is used as requestId when sending query to Pinot servers
  * @param pinotSplit    An instance of PinotSplit which encapsulates segment and query information
