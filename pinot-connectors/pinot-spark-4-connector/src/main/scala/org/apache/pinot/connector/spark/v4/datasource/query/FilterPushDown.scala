@@ -53,7 +53,16 @@ private[pinot] object FilterPushDown {
 
   private def isFilterSupported(filter: Filter): Boolean = filter match {
     case _: EqualTo => true
+    // EqualNullSafe with a null value would render the literal string `null` into SQL via
+    // `compileValue`'s fallback branch — Pinot would receive `attr != null` rather than
+    // `attr IS NULL`. Reject and let Spark evaluate it post-scan with proper three-valued
+    // logic. Compound gating ensures this rejection propagates to enclosing And/Or/Not.
+    case EqualNullSafe(_, null) => false
     case _: EqualNullSafe => true
+    // IN with a null array element similarly leaks the literal `null` into the IN list, which
+    // Pinot would interpret syntactically rather than as a Spark NULL. Reject so Spark
+    // applies the predicate post-scan; an array of all non-null values is fine to push down.
+    case In(_, value) if value != null && value.contains(null) => false
     case _: In => true
     case _: LessThan => true
     case _: LessThanOrEqual => true
@@ -113,8 +122,19 @@ private[pinot] object FilterPushDown {
     case _ => value
   }
 
+  // Recognises an already-escaped, dotted, double-quoted identifier (e.g.
+  // "col", "schema"."table"."col"). Each segment must be `"<chars-without-quote>"` with
+  // optional `.` separators between segments.
+  private val ALREADY_ESCAPED_ATTR = """"[^"]+"(?:\."[^"]+")*""".r.pattern
+
+  // Wrap an attribute name in double-quotes so it round-trips as a single SQL identifier.
+  // Names that already match the dotted-quoted pattern are passed through unchanged. Names
+  // that contain a stray `"` (e.g. "weird\"col") would produce malformed SQL or, worse, an
+  // injection point if rendered raw — escape inner quotes by doubling so the result is a
+  // single well-formed quoted identifier.
   private def escapeAttr(attr: String): String = {
-    if (attr.contains("\"")) attr else s""""$attr""""
+    if (ALREADY_ESCAPED_ATTR.matcher(attr).matches()) attr
+    else s""""${attr.replace("\"", "\"\"")}""""
   }
 
   private def compileFilter(filter: Filter): Option[String] = {
