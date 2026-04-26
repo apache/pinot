@@ -19,7 +19,9 @@
 package org.apache.pinot.connector.spark.v3.datasource.query
 
 import java.sql.{Date, Timestamp}
+import java.util.regex.Pattern
 
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils
 import org.apache.pinot.connector.spark.v3.datasource.BaseTest
 import org.apache.spark.sql.sources._
 
@@ -210,5 +212,57 @@ class FilterPushDownTest extends BaseTest {
     val (accepted, postScan) = FilterPushDown.acceptFilters(Array[Filter](f))
     accepted shouldBe empty
     postScan should contain only f
+  }
+
+  test("LIKE escape contract round-trips through Pinot's RegexpPatternConverterUtils") {
+    // Cross-module invariant: the LIKE patterns emitted by FilterPushDown.compileFilter
+    // must round-trip via Pinot's RegexpPatternConverterUtils.likeToRegexpLike — i.e. the
+    // resulting regex must match the original user-supplied literal value (and reject
+    // strings that were not in the user's intent). The connector's escapeLikeLiteral and
+    // Pinot's likeToRegexpLike both hardcode `\` as the escape character; this test pins
+    // the contract so a future change on either side (e.g. switching escape characters
+    // or adding new metacharacters) fails at build time rather than producing silently
+    // wrong WHERE-clause results in production.
+    val literals = Seq(
+      "plain",                  // no special chars
+      "50%_off",                // SQL LIKE wildcards in the literal
+      "x''y",                   // single-quote already doubled by user (rare but legal)
+      "a'b",                    // unescaped single quote — SQL escaping doubles it
+      "100%complete",           // % alone
+      "snake_case",             // _ alone
+      "%_'"                     // all three special chars together
+    )
+
+    for (literal <- literals) {
+      // StringContains produces `col LIKE '%<escaped>%' ESCAPE '\\'`. After SQL parsing,
+      // the pattern Pinot's broker sees has SQL `''` collapsed back to `'`, and the
+      // surrounding single quotes stripped — so we mimic that here by reading the SQL
+      // fragment and reverting the SQL escape.
+      val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(
+        Array[Filter](StringContains("col", literal))).get
+      val pattern = sqlLikePatternFrom(whereClause)
+      val regex = RegexpPatternConverterUtils.likeToRegexpLike(pattern)
+      val compiled = Pattern.compile(regex)
+
+      // Pinot evaluates the regex via Matcher#find (see RegexpLikeConstFunctions), so the
+      // regex must MATCH-AS-SUBSTRING the original literal (and reject strings that don't
+      // contain it). We use find() in the assertion to mirror Pinot's runtime behavior.
+      compiled.matcher(literal).find() shouldBe true
+      compiled.matcher(s"prefix-$literal-suffix").find() shouldBe true
+      compiled.matcher("definitely-no-such-content-here").find() shouldBe false
+    }
+  }
+
+  // Strip the SQL `LIKE '...' ESCAPE '\'` framing and undo SQL `''` → `'` escaping to
+  // recover the LIKE pattern that Pinot's broker would observe after SQL parsing.
+  private def sqlLikePatternFrom(sql: String): String = {
+    val likeMarker = " LIKE '"
+    // Scala string `' ESCAPE '\\'` is the literal SQL `' ESCAPE '\'` (one backslash).
+    val escapeMarker = "' ESCAPE '\\'"
+    val start = sql.indexOf(likeMarker) + likeMarker.length
+    val end = sql.indexOf(escapeMarker, start)
+    require(start > likeMarker.length - 1 && end > start,
+      s"could not find LIKE pattern in: $sql")
+    sql.substring(start, end).replace("''", "'")
   }
 }
