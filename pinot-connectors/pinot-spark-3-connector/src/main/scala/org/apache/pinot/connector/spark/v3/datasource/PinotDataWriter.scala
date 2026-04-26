@@ -313,13 +313,19 @@ class PinotDataWriter[InternalRow](
   // Spark calls abort() and then close() on some error paths. Use a closed flag instead of
   // relying on PinotBufferedRecordReader.close() being idempotent (it currently is, but the
   // contract is not declared; pinning it here avoids future-binding the invariant).
+  // Wrap the reader close in try/finally so the temp-dir cleanup still runs if a future
+  // PinotBufferedRecordReader.close() implementation throws — otherwise the closed flag
+  // would already be set and the segmentOutputDir would leak on disk.
   private def closeOnce(): Unit = {
     if (closed) return
     closed = true
-    bufferedRecordReader.close()
-    if (segmentOutputDir != null) {
-      FileUtils.deleteQuietly(segmentOutputDir)
-      segmentOutputDir = null
+    try {
+      bufferedRecordReader.close()
+    } finally {
+      if (segmentOutputDir != null) {
+        FileUtils.deleteQuietly(segmentOutputDir)
+        segmentOutputDir = null
+      }
     }
   }
 }
