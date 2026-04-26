@@ -160,6 +160,10 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       ("{partitionId:05}_{table}", "00012_airlineStats"),
       ("{table}_20240805", "airlineStats_20240805"),
       ("{table}_{startTime}_{endTime}_{partitionId:03}", "airlineStats_1234567890_1234567891_012"),
+      // Width spec on a non-numeric variable (`table`) is rendered with %Ns rather than %Nd
+      // so it does not crash the entire write task at commit time. The Javadoc advertises
+      // {partitionId:05} alongside `{table}`, so a user reasonably might try {table:NN}.
+      ("{table:20}_{partitionId:03}", "        airlineStats_012"),
     )
 
     testCases.foreach { case (format, expected) =>
