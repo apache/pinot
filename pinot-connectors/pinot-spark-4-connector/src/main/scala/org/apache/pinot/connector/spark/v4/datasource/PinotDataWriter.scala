@@ -159,7 +159,14 @@ class PinotDataWriter[InternalRow](
 
       val formattedValue = formatSpecifier match {
         case null => value.toString
-        case spec => String.format(s"%${spec}d", value.asInstanceOf[Number])
+        // Numeric variables (`partitionId`, `startTime`, `endTime`) get a width-padded
+        // decimal format; non-numeric ones (`table`) use a width-padded string format.
+        // Without this branch, `{table:N}` would crash with `String cannot be cast to
+        // java.lang.Number` and fail the entire write task at commit time.
+        case spec => value match {
+          case n: Number => String.format(s"%${spec}d", n)
+          case other => String.format(s"%${spec}s", other.toString)
+        }
       }
 
       matcher.appendReplacement(buffer, formattedValue)
@@ -254,28 +261,52 @@ class PinotDataWriter[InternalRow](
           gr.putValue(field.name, record.getBinary(idx))
         case org.apache.spark.sql.types.ShortType =>
           gr.putValue(field.name, record.getShort(idx))
+        case org.apache.spark.sql.types.TimestampType =>
+          // Spark stores TimestampType as microseconds-since-epoch in InternalRow. Pinot
+          // stores it as LONG (per SparkToPinotTypeTranslator); the unit (microseconds) is
+          // the user's responsibility to track when querying back.
+          gr.putValue(field.name, record.getLong(idx))
+        case org.apache.spark.sql.types.DateType =>
+          // Spark stores DateType as days-since-epoch in InternalRow as Int. Pinot stores
+          // as INT.
+          gr.putValue(field.name, record.getInt(idx))
+        case dt: org.apache.spark.sql.types.DecimalType =>
+          gr.putValue(field.name, record.getDecimal(idx, dt.precision, dt.scale).toJavaBigDecimal)
         case org.apache.spark.sql.types.ArrayType(elementType, _) =>
+          // Use ArrayData's type-specific accessors instead of `.array`, which only works on
+          // GenericArrayData (test scaffolding) and throws on the UnsafeArrayData that Spark
+          // uses in real workloads. The previous `.array.map(_.asInstanceOf[T])` would
+          // ClassCastException on real workloads, with a particularly bad failure for
+          // StringType (UTF8String → String cast).
+          val arrayData = record.getArray(idx)
           elementType match {
             case org.apache.spark.sql.types.StringType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[String]))
+              // ArrayData stores StringType elements as UTF8String, not Java String.
+              val n = arrayData.numElements()
+              val out = new Array[String](n)
+              var i = 0
+              while (i < n) {
+                val s = arrayData.getUTF8String(i)
+                out(i) = if (s == null) null else s.toString
+                i += 1
+              }
+              gr.putValue(field.name, out)
             case org.apache.spark.sql.types.IntegerType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Int]))
+              gr.putValue(field.name, arrayData.toIntArray())
             case org.apache.spark.sql.types.LongType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Long]))
+              gr.putValue(field.name, arrayData.toLongArray())
             case org.apache.spark.sql.types.FloatType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Float]))
+              gr.putValue(field.name, arrayData.toFloatArray())
             case org.apache.spark.sql.types.DoubleType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Double]))
+              gr.putValue(field.name, arrayData.toDoubleArray())
             case org.apache.spark.sql.types.BooleanType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Boolean]))
+              gr.putValue(field.name, arrayData.toBooleanArray())
             case org.apache.spark.sql.types.ByteType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Byte]))
-            case org.apache.spark.sql.types.BinaryType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Array[Byte]]))
+              gr.putValue(field.name, arrayData.toByteArray())
             case org.apache.spark.sql.types.ShortType =>
-              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
+              gr.putValue(field.name, arrayData.toShortArray())
             case _ =>
-              throw new UnsupportedOperationException(s"Unsupported data type: Array[${elementType}]")
+              throw new UnsupportedOperationException(s"Unsupported array element type: $elementType")
           }
         case _ =>
           throw new UnsupportedOperationException("Unsupported data type: " + field.dataType)
