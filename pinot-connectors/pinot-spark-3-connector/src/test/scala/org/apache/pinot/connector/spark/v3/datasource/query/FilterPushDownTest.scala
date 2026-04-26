@@ -49,7 +49,6 @@ class FilterPushDownTest extends BaseTest {
     StringEndsWith("attr17", "pinot2"),
     EqualTo("attr18", Timestamp.valueOf("2020-01-01 00:00:15")),
     LessThan("attr19", Date.valueOf("2020-01-01")),
-    EqualTo("attr21", Seq(1, 2)),
     EqualTo("attr22", 10.5d)
   )
 
@@ -68,7 +67,7 @@ class FilterPushDownTest extends BaseTest {
         s"""(("attr10" = 'hello') OR ("attr11" >= 13)) AND ("attr12" LIKE '%pinot%' ESCAPE '\\') AND ("attr13" IN (10, 20)) AND """ +
         s"""(NOT ("attr20" != '123' OR "attr20" IS NULL OR '123' IS NULL) OR ("attr20" IS NULL AND '123' IS NULL)) AND """ +
         s"""("attr14" IS NULL) AND ("attr15" IS NOT NULL) AND ("attr16" LIKE 'pinot1%' ESCAPE '\\') AND ("attr17" LIKE '%pinot2' ESCAPE '\\') AND """ +
-        s"""("attr18" = '2020-01-01 00:00:15.0') AND ("attr19" < '2020-01-01') AND ("attr21" = List(1, 2)) AND """ +
+        s"""("attr18" = '2020-01-01 00:00:15.0') AND ("attr19" < '2020-01-01') AND """ +
         s"""("attr22" = 10.5)"""
 
     whereClause.get shouldEqual expectedOutput
@@ -212,6 +211,23 @@ class FilterPushDownTest extends BaseTest {
     val (accepted, postScan) = FilterPushDown.acceptFilters(Array[Filter](f))
     accepted shouldBe empty
     postScan should contain only f
+  }
+
+  test("Filters with collection-shaped or unrecognized literal values fall back to post-scan") {
+    // Spark Catalyst typically passes Java-boxed primitives, Strings, java.sql.Timestamp/
+    // Date, or Array[Any]. Anything else (Seq/List/Vector/Set/Map, or arbitrary case
+    // classes) would render via `value.toString` in compileValue's catchall — for `Seq(1,2)`
+    // that produces `attr = List(1, 2)`, malformed SQL Pinot would either reject or
+    // misparse. The connector instead rejects so Spark applies the predicate post-scan.
+    val unrecognized = Array[Filter](
+      EqualTo("a", Seq(1, 2)),                  // List rendering
+      EqualTo("b", Map("k" -> 1)),              // Map rendering
+      LessThan("c", Vector(1, 2, 3)),           // Vector rendering
+      In("d", Array[Any](Seq(1), Seq(2)))       // IN with non-pushable elements
+    )
+    val (accepted, postScan) = FilterPushDown.acceptFilters(unrecognized)
+    accepted shouldBe empty
+    postScan should contain theSameElementsAs unrecognized
   }
 
   test("LIKE escape contract round-trips through Pinot's RegexpPatternConverterUtils") {
