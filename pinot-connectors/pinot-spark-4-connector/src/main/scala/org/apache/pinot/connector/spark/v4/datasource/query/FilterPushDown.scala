@@ -51,6 +51,18 @@ private[pinot] object FilterPushDown {
     filters.partition(isFilterSupported)
   }
 
+  // Recognized literal value types for filter pushdown. Anything else (Seq, custom case
+  // classes, Map, Spark's GenericRowWithSchema, etc.) would fall into `compileValue`'s
+  // catchall branch and render via `value.toString` — for `Seq(1, 2)` that produces
+  // `attr = List(1, 2)`, which is malformed SQL Pinot would either reject (best case) or
+  // misparse (worst case). Reject up-front so Spark applies the predicate post-scan.
+  private def isPushableValue(v: Any): Boolean = v match {
+    case null => false
+    case _: String | _: Number | _: java.lang.Boolean
+       | _: Timestamp | _: Date | _: Array[Byte] => true
+    case _ => false
+  }
+
   private def isFilterSupported(filter: Filter): Boolean = filter match {
     // Comparison filters with a null literal value would render as `attr <op> null` via
     // `compileValue`'s fallback branch. Catalyst usually constant-folds these out upstream,
@@ -60,27 +72,21 @@ private[pinot] object FilterPushDown {
     // three-valued-logic semantics across edge cases. Reject defensively so the same
     // post-scan-fallback guarantee we already provide for EqualNullSafe / IN holds for
     // every operator. Compound gating ensures the rejection propagates to enclosing
-    // And/Or/Not. We use `v == null` rather than the `case _(_, null)` extractor to be
-    // robust against typed-null wrappers.
-    case EqualTo(_, v) if v == null => false
-    case _: EqualTo => true
-    case EqualNullSafe(_, v) if v == null => false
-    case _: EqualNullSafe => true
+    // And/Or/Not. The `isPushableValue` gate also rejects collection-shaped literals
+    // (Seq, Map, etc.) that would render as `value.toString`.
+    case EqualTo(_, v) => isPushableValue(v)
+    case EqualNullSafe(_, v) => isPushableValue(v)
     // IN with a null array element similarly leaks the literal `null` into the IN list, which
     // Pinot would interpret syntactically rather than as a Spark NULL. Reject so Spark
     // applies the predicate post-scan; an array of all non-null values is fine to push down.
     // A null `value` array itself is also rejected — `compileFilter` for `In` calls
-    // `value.isEmpty` and would NPE.
-    case In(_, value) if value == null || value.contains(null) => false
-    case _: In => true
-    case LessThan(_, v) if v == null => false
-    case _: LessThan => true
-    case LessThanOrEqual(_, v) if v == null => false
-    case _: LessThanOrEqual => true
-    case GreaterThan(_, v) if v == null => false
-    case _: GreaterThan => true
-    case GreaterThanOrEqual(_, v) if v == null => false
-    case _: GreaterThanOrEqual => true
+    // `value.isEmpty` and would NPE. Also require every element be a pushable value type.
+    case In(_, value) =>
+      value != null && !value.contains(null) && value.forall(isPushableValue)
+    case LessThan(_, v) => isPushableValue(v)
+    case LessThanOrEqual(_, v) => isPushableValue(v)
+    case GreaterThan(_, v) => isPushableValue(v)
+    case GreaterThanOrEqual(_, v) => isPushableValue(v)
     case _: IsNull => true
     case _: IsNotNull => true
     // LIKE pushdowns are only safe when the value contains no literal backslash. Pinot's
