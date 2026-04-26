@@ -56,10 +56,13 @@ private[pinot] object FilterPushDown {
   // catchall branch and render via `value.toString` — for `Seq(1, 2)` that produces
   // `attr = List(1, 2)`, which is malformed SQL Pinot would either reject (best case) or
   // misparse (worst case). Reject up-front so Spark applies the predicate post-scan.
+  //
+  // BinaryType (Array[Byte]) is intentionally NOT pushable: Spark Catalyst rarely passes
+  // raw byte[] literals here, and `compileValue` has no `bytes → X'<hex>'` branch — gating
+  // it through would produce `attr = [B@<hashcode>` SQL.
   private def isPushableValue(v: Any): Boolean = v match {
     case null => false
-    case _: String | _: Number | _: java.lang.Boolean
-       | _: Timestamp | _: Date | _: Array[Byte] => true
+    case _: String | _: Number | _: java.lang.Boolean | _: Timestamp | _: Date => true
     case _ => false
   }
 
