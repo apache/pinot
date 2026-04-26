@@ -115,6 +115,118 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     return 1_200_000L;
   }
 
+  /**
+   * Diagnostic override of the inherited "wait for COUNT(*) to converge" loop. The base
+   * implementation polls every 100 ms and, on timeout, only reports the assertion message
+   * "Failed to load N documents" with no progress information -- so the silent 20-minute
+   * gap that has been the dominant flake on CI is impossible to triage from the surefire
+   * log. This override does the same convergence wait but prints periodic progress lines
+   * (current count, kafka log-end-offsets per partition, kafka read_committed count) and,
+   * on timeout, dumps a thread-stack snapshot for every Kafka / Pinot consumer thread
+   * before throwing the same AssertionError shape the inherited code produced.
+   *
+   * Note: pure observability change. No retry, no behavior change on the success path.
+   */
+  @Override
+  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
+    long expected = getCountStarResult();
+    long start = System.currentTimeMillis();
+    long deadline = start + timeoutMs;
+    long lastProgressLog = 0L;
+    long lastChangeAt = start;
+    long lastSeenCount = -1L;
+    long lastCount = -1L;
+    int iterations = 0;
+    LOGGER.info("[diag] waitForAllDocsLoaded start: table={} expected={} timeoutMs={}", tableName, expected, timeoutMs);
+    while (System.currentTimeMillis() < deadline) {
+      iterations++;
+      try {
+        lastCount = getCurrentCountStarResult(tableName);
+      } catch (Exception e) {
+        LOGGER.debug("[diag] count query error", e);
+      }
+      if (lastCount == expected) {
+        LOGGER.info("[diag] Pinot COUNT(*) converged: count={} elapsed={}ms iterations={}", lastCount,
+            System.currentTimeMillis() - start, iterations);
+        return;
+      }
+      long now = System.currentTimeMillis();
+      if (lastCount != lastSeenCount) {
+        lastSeenCount = lastCount;
+        lastChangeAt = now;
+      }
+      // Print a progress line every 5 s so the silent gap is no longer silent.
+      if (now - lastProgressLog >= 5_000L) {
+        long sinceChangeMs = now - lastChangeAt;
+        long uncommittedKafka = -1L;
+        long committedKafka = -1L;
+        try {
+          uncommittedKafka = countRecords(getKafkaBrokerList(), "read_uncommitted");
+          committedKafka = countRecords(getKafkaBrokerList(), "read_committed");
+        } catch (Exception e) {
+          LOGGER.debug("[diag] kafka diagnostic count failed", e);
+        }
+        LOGGER.warn(
+            "[diag] elapsed={}ms pinotCount={} expected={} stallMs={} kafkaCommitted={} kafkaUncommitted={} iter={}",
+            now - start, lastCount, expected, sinceChangeMs, committedKafka, uncommittedKafka, iterations);
+        lastProgressLog = now;
+      }
+      try {
+        Thread.sleep(500L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    long elapsed = System.currentTimeMillis() - start;
+    LOGGER.error("[diag] waitForAllDocsLoaded timed out: table={} expected={} lastCount={} elapsed={}ms", tableName,
+        expected, lastCount, elapsed);
+    long kafkaCommittedFinal = -1L;
+    long kafkaUncommittedFinal = -1L;
+    try {
+      kafkaCommittedFinal = countRecords(getKafkaBrokerList(), "read_committed");
+      kafkaUncommittedFinal = countRecords(getKafkaBrokerList(), "read_uncommitted");
+    } catch (Exception ignored) {
+      // best-effort
+    }
+    LOGGER.error("[diag] kafka final state: read_committed={} read_uncommitted={}", kafkaCommittedFinal,
+        kafkaUncommittedFinal);
+    dumpRelevantThreadStacks();
+    throw new AssertionError(String.format(
+        "Failed to load %d documents (lastCount=%d, kafkaCommitted=%d, kafkaUncommitted=%d, elapsed=%dms)", expected,
+        lastCount, kafkaCommittedFinal, kafkaUncommittedFinal, elapsed));
+  }
+
+  /**
+   * Dump stack traces for threads whose names suggest they are part of the Pinot realtime
+   * consumer pipeline or the Kafka consumer pool. Helps identify whether the stall is in
+   * fetch, segment commit, GC, or somewhere unexpected.
+   */
+  private void dumpRelevantThreadStacks() {
+    Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
+    int dumped = 0;
+    for (Map.Entry<Thread, StackTraceElement[]> entry : all.entrySet()) {
+      Thread t = entry.getKey();
+      String name = t.getName();
+      if (name == null) {
+        continue;
+      }
+      boolean interesting = name.contains("RealtimeSegment") || name.contains("kafka") || name.contains("Kafka")
+          || name.contains("HelixTaskExecutor") || name.contains("PartitionConsumer") || name.contains("mytable__");
+      if (!interesting) {
+        continue;
+      }
+      StringBuilder sb = new StringBuilder();
+      sb.append("[diag] thread '").append(name).append("' state=").append(t.getState());
+      for (StackTraceElement el : entry.getValue()) {
+        sb.append("\n    at ").append(el);
+      }
+      LOGGER.error(sb.toString());
+      dumped++;
+    }
+    LOGGER.error("[diag] thread dump: dumped {} of {} total threads", dumped, all.size());
+  }
+
   @Override
   protected void pushAvroIntoKafka(List<File> avroFiles)
       throws Exception {
