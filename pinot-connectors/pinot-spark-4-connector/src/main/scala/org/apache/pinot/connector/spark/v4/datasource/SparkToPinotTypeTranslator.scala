@@ -63,8 +63,26 @@ object SparkToPinotTypeTranslator {
     case _: DecimalType => FieldSpec.DataType.BIG_DECIMAL
     case _: BooleanType => FieldSpec.DataType.BOOLEAN
     case _: BinaryType => FieldSpec.DataType.BYTES
-    case _: TimestampType => FieldSpec.DataType.LONG
-    case _: DateType => FieldSpec.DataType.INT
+    // TimestampType / DateType are rejected because the unit semantics do not round-trip:
+    // Spark stores TimestampType as microseconds-since-epoch and DateType as days-since-epoch
+    // in `InternalRow`, while Pinot's broker convention for time columns is millis-since-epoch
+    // (see TimestampUtils#toMillisSinceEpoch). Mapping straight to LONG / INT would silently
+    // produce values that look 1000× too large (timestamps) or look like a small integer for
+    // a date column. The safe path is to require the user to convert upstream — e.g.
+    // `df.withColumn("ts", (col("ts").cast("long") / 1000))` for millis-since-epoch — and
+    // declare the column as LongType / StringType in the Spark schema. Until a faithful
+    // round-trip is defined (and registered as a DATE_TIME field), reject.
+    case _: TimestampType =>
+      throw new UnsupportedOperationException(
+        "TimestampType is not directly supported by the Pinot writer because the unit (Spark " +
+          "uses microseconds-since-epoch) does not match Pinot's millis-since-epoch convention. " +
+          "Cast to LongType (millis) before writing, e.g. `df.withColumn(\"ts\", " +
+          "(col(\"ts\").cast(\"long\") / 1000))`.")
+    case _: DateType =>
+      throw new UnsupportedOperationException(
+        "DateType is not directly supported by the Pinot writer because Pinot has no native " +
+          "date column convention. Cast to StringType (`yyyy-MM-dd`) or LongType (millis) " +
+          "before writing, e.g. `df.withColumn(\"d\", date_format(col(\"d\"), \"yyyy-MM-dd\"))`.")
     // Pinot does not support multi-value BYTES or multi-value BIG_DECIMAL on the segment
     // build path: ArrayType(BinaryType) would emit a multi-value BYTES dimension that the
     // segment driver rejects, and ArrayType(DecimalType) similarly has no MV BIG_DECIMAL
