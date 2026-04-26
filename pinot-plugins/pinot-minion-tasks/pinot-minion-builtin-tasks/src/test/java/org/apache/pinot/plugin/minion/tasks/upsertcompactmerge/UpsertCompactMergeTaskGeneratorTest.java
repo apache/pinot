@@ -596,7 +596,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     // Step 2: filterSegmentsPastRetention with 5d buffer (effective retention = 25d) filters out oldSegment
     List<SegmentZKMetadata> filtered =
-        MinionTaskUtils.filterSegmentsPastRetention(candidates, tableConfig, taskConfigs, nowMs);
+        MinionTaskUtils.filterSegmentsPastRetention(candidates, tableConfig, taskConfigs, nowMs, false);
     Assert.assertEquals(filtered.size(), 1, "Retention filter with buffer should remove the old segment");
     Assert.assertEquals(filtered.get(0).getSegmentName(), "testTable__0__0__100");
   }

@@ -39,18 +39,26 @@ public class RetentionUtilsTest {
     return segment;
   }
 
+  private static SegmentZKMetadata makeSegmentWithCreationTime(long endTimeMs, long creationTimeMs) {
+    SegmentZKMetadata segment = new SegmentZKMetadata("seg");
+    segment.setEndTime(endTimeMs);
+    segment.setTimeUnit(TimeUnit.MILLISECONDS);
+    segment.setCreationTime(creationTimeMs);
+    return segment;
+  }
+
   @Test
   public void testExpiredSegmentIsPurgeable() {
     long now = System.currentTimeMillis();
     SegmentZKMetadata segment = makeSegment(now - 10 * ONE_DAY_MS);
-    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now));
+    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
   }
 
   @Test
   public void testRecentSegmentIsNotPurgeable() {
     long now = System.currentTimeMillis();
     SegmentZKMetadata segment = makeSegment(now - 2 * ONE_DAY_MS);
-    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now));
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
   }
 
   @Test
@@ -58,14 +66,14 @@ public class RetentionUtilsTest {
     // strict greater-than: segment at exactly retentionMs old should NOT be purgeable
     long now = System.currentTimeMillis();
     SegmentZKMetadata segment = makeSegment(now - RETENTION_MS);
-    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now));
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
   }
 
   @Test
   public void testOneMsPastBoundaryIsPurgeable() {
     long now = System.currentTimeMillis();
     SegmentZKMetadata segment = makeSegment(now - RETENTION_MS - 1);
-    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now));
+    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
   }
 
   @Test
@@ -74,15 +82,49 @@ public class RetentionUtilsTest {
     SegmentZKMetadata segment = new SegmentZKMetadata("seg");
     segment.setEndTime(-1);
     segment.setTimeUnit(TimeUnit.MILLISECONDS);
-    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now));
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
   }
 
   @Test
   public void testFarFutureEndTimeIsNotPurgeable() {
     long now = System.currentTimeMillis();
-    // end time 200 years in the future — outside valid range
     long farFuture = now + TimeUnit.DAYS.toMillis(365 * 200L);
     SegmentZKMetadata segment = makeSegment(farFuture);
-    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now));
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
+  }
+
+  @Test
+  public void testInvalidEndTimeFallbackDisabledIsNotPurgeable() {
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithCreationTime(-1, now - 10 * ONE_DAY_MS);
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, false));
+  }
+
+  @Test
+  public void testInvalidEndTimeOldCreationTimeFallbackEnabledIsPurgeable() {
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithCreationTime(-1, now - 10 * ONE_DAY_MS);
+    assertTrue(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, true));
+  }
+
+  @Test
+  public void testInvalidEndTimeRecentCreationTimeFallbackEnabledIsNotPurgeable() {
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithCreationTime(-1, now - 2 * ONE_DAY_MS);
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, true));
+  }
+
+  @Test
+  public void testInvalidEndTimeInvalidCreationTimeFallbackEnabledIsNotPurgeable() {
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithCreationTime(-1, -1);
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, true));
+  }
+
+  @Test
+  public void testValidEndTimeTakesPriorityOverCreationTimeFallback() {
+    long now = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithCreationTime(now - 2 * ONE_DAY_MS, now - 10 * ONE_DAY_MS);
+    assertFalse(RetentionUtils.isPurgeable(TABLE_NAME, segment, RETENTION_MS, now, true));
   }
 }

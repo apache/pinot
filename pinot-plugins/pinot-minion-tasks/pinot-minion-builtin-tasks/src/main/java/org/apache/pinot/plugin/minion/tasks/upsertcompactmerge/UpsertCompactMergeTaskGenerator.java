@@ -125,6 +125,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MinionConstants.UpsertCompactMergeTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    boolean useCreationTimeFallback = MinionTaskUtils.isCreationTimeFallbackEnabled(_clusterInfoAccessor);
     for (TableConfig tableConfig : tableConfigs) {
 
       String tableNameWithType = tableConfig.getTableName();
@@ -154,7 +155,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       // Complements the bufferTimePeriod filter above: getCandidateSegments ensures freshness (don't compact
       // segments still being written), while this filter excludes segments nearing deletion by RetentionManager.
       candidateSegments =
-          MinionTaskUtils.filterSegmentsPastRetention(candidateSegments, tableConfig, taskConfigs, currentTimeMs);
+          MinionTaskUtils.filterSegmentsPastRetention(candidateSegments, tableConfig, taskConfigs, currentTimeMs,
+              useCreationTimeFallback);
 
       if (candidateSegments.isEmpty()) {
         LOGGER.info("No segments were eligible for compactMerge task for table: {}", tableNameWithType);

@@ -43,6 +43,7 @@ import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
@@ -102,6 +103,19 @@ public class MinionTaskUtils {
   public static final String RETENTION_EXPIRY_BUFFER_PERIOD_KEY = "retentionExpiryBufferPeriod";
 
   private MinionTaskUtils() {
+  }
+
+  /**
+   * Reads the creation-time fallback flag from Helix cluster config. This is the same config that
+   * {@code RetentionManager} reacts to via {@code onChange()}, so the filter stays aligned with what
+   * RetentionManager will actually delete.
+   */
+  public static boolean isCreationTimeFallbackEnabled(ClusterInfoAccessor clusterInfoAccessor) {
+    String raw = clusterInfoAccessor.getClusterConfig(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK);
+    return raw != null
+        ? Boolean.parseBoolean(raw)
+        : ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK;
   }
 
   /**
@@ -496,16 +510,21 @@ public class MinionTaskUtils {
    * current callers ({@code UpsertCompactMergeTaskGenerator.getCandidateSegments},
    * {@code MergeRollupTaskGenerator.getNonConsumingSegmentsZKMetadataForRealtimeTable}) already guarantee this.
    *
-   * @param segments      the candidate segments to filter (must not be null)
-   * @param tableConfig   the table config containing retention settings
-   * @param taskConfigs   task-level configs; may contain {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY}. Null if
-   *                      unavailable.
-   * @param currentTimeMs the current time in milliseconds (pass {@code System.currentTimeMillis()})
+   * @param segments                    the candidate segments to filter (must not be null)
+   * @param tableConfig                 the table config containing retention settings
+   * @param taskConfigs                 task-level configs; may contain {@link #RETENTION_EXPIRY_BUFFER_PERIOD_KEY}.
+   *                                    Null if unavailable.
+   * @param currentTimeMs               the current time in milliseconds (pass {@code System.currentTimeMillis()})
+   * @param useCreationTimeFallback     when true, segments with invalid end times are evaluated against their
+   *                                    creation time; must match
+   *                                    {@code controller.retentionManager.enableCreationTimeFallback} so this
+   *                                    filter stays aligned with what RetentionManager will actually delete
    * @return filtered list excluding segments past effective retention; returns the original list if retention is not
    *         configured or cannot be parsed
    */
   public static List<SegmentZKMetadata> filterSegmentsPastRetention(List<SegmentZKMetadata> segments,
-      TableConfig tableConfig, @Nullable Map<String, String> taskConfigs, long currentTimeMs) {
+      TableConfig tableConfig, @Nullable Map<String, String> taskConfigs, long currentTimeMs,
+      boolean useCreationTimeFallback) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
     String retentionTimeValue = validationConfig.getRetentionTimeValue();
@@ -557,7 +576,8 @@ public class MinionTaskUtils {
     List<SegmentZKMetadata> filtered = new ArrayList<>();
     int excludedCount = 0;
     for (SegmentZKMetadata segment : segments) {
-      if (RetentionUtils.isPurgeable(tableNameWithType, segment, effectiveRetentionMs, currentTimeMs)) {
+      if (RetentionUtils.isPurgeable(tableNameWithType, segment, effectiveRetentionMs, currentTimeMs,
+          useCreationTimeFallback)) {
         excludedCount++;
       } else {
         filtered.add(segment);

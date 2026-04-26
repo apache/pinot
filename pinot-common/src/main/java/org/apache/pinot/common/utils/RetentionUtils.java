@@ -34,27 +34,44 @@ public class RetentionUtils {
   }
 
   /**
-   * Returns whether the given segment should be considered expired under the given retention period.
-   * Uses the same strict greater-than comparison as {@code TimeRetentionStrategy}: a segment is expired when
-   * {@code currentTimeMs - endTimeMs > retentionMs}.
-   * <p>
-   * If the segment's end time is invalid, the segment is treated as not expired (fail-open).
-   * Callers that need to handle incomplete segments must do so before calling this method.
+   * Implements the time-comparison and creation-time fallback logic used by {@code TimeRetentionStrategy} for
+   * completed segments. Does NOT check segment completion status — callers must guarantee that only completed
+   * segments (DONE or UPLOADED) are passed in.
+   * <ul>
+   *   <li>If end time is valid: expired when {@code currentTimeMs - endTimeMs > retentionMs}.</li>
+   *   <li>If end time is invalid and {@code useCreationTimeFallback} is true and creation time is valid:
+   *       expired when {@code currentTimeMs - creationTimeMs > retentionMs}.</li>
+   *   <li>Otherwise: not expired (fail-open).</li>
+   * </ul>
    *
-   * @param tableNameWithType table name with type suffix, used for logging
-   * @param segmentZKMetadata segment metadata
-   * @param retentionMs       retention period in milliseconds (must be positive)
-   * @param currentTimeMs     current wall-clock time in milliseconds
+   * @param tableNameWithType        table name with type suffix, used for logging
+   * @param segmentZKMetadata        segment metadata
+   * @param retentionMs              retention period in milliseconds (must be positive)
+   * @param currentTimeMs            current wall-clock time in milliseconds
+   * @param useCreationTimeFallback  when true, fall back to creation time if end time is invalid
+   *                                 (must match {@code controller.retentionManager.enableCreationTimeFallback})
    * @return true if the segment is past the retention boundary, false otherwise
    */
   public static boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, long retentionMs,
-      long currentTimeMs) {
+      long currentTimeMs, boolean useCreationTimeFallback) {
+    String segmentName = segmentZKMetadata.getSegmentName();
     long endTimeMs = segmentZKMetadata.getEndTimeMs();
-    if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
-      LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}", segmentZKMetadata.getSegmentName(),
-          tableNameWithType, endTimeMs);
-      return false;
+    if (TimeUtils.timeValueInValidRange(endTimeMs)) {
+      return currentTimeMs - endTimeMs > retentionMs;
     }
-    return currentTimeMs - endTimeMs > retentionMs;
+    if (useCreationTimeFallback) {
+      long creationTimeMs = segmentZKMetadata.getCreationTime();
+      if (TimeUtils.timeValueInValidRange(creationTimeMs)) {
+        LOGGER.debug("Segment: {} of table: {} has invalid end time: {}. Using creation time: {} as fallback",
+            segmentName, tableNameWithType, endTimeMs, creationTimeMs);
+        return currentTimeMs - creationTimeMs > retentionMs;
+      }
+      LOGGER.warn("Segment: {} of table: {} has invalid end time: {} and invalid creation time: {}. "
+          + "Cannot determine retention, skipping", segmentName, tableNameWithType, endTimeMs, creationTimeMs);
+    } else {
+      LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}. "
+          + "Creation time fallback is disabled", segmentName, tableNameWithType, endTimeMs);
+    }
+    return false;
   }
 }

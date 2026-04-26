@@ -154,6 +154,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MergeRollupTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    boolean useCreationTimeFallback = MinionTaskUtils.isCreationTimeFallbackEnabled(_clusterInfoAccessor);
     for (TableConfig tableConfig : tableConfigs) {
       if (!validate(tableConfig, taskType)) {
         continue;
@@ -191,7 +192,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       // will be purged by RetentionManager regardless.
       long currentTimeMs = System.currentTimeMillis();
       preSelectedSegments = MinionTaskUtils.filterSegmentsPastRetention(preSelectedSegments, tableConfig, taskConfigs,
-          currentTimeMs);
+          currentTimeMs, useCreationTimeFallback);
 
       if (preSelectedSegments.isEmpty()) {
         // Reset the watermark time if no segment found. This covers the case where the table is newly created or
