@@ -23,9 +23,9 @@
 Spark connector to read from and write to Pinot, built for **Apache Spark 4.x on JDK 21**.
 
 If you are on Spark 3.5.x or an older JDK, use
-[pinot-spark-3-connector](../../pinot-connectors/pinot-spark-3-connector/) instead. Both
+[pinot-spark-3-connector](../pinot-spark-3-connector/) instead. Both
 connectors share the underlying infrastructure via
-[pinot-spark-common](../../pinot-connectors/pinot-spark-common/).
+[pinot-spark-common](../pinot-spark-common/).
 
 Detailed read-model documentation: [Spark-Pinot Connector Read Model](documentation/read_model.md).
 Detailed write-model documentation: [Spark-Pinot Connector Write Model](documentation/write_model.md).
