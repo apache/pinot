@@ -367,7 +367,7 @@ docker run --rm \
 |---|---|---|
 | `table` | ✅ | Pinot raw table name |
 | `tableType` | ✅ | `OFFLINE` (REALTIME is not supported on write) |
-| `segmentNameFormat` | ✅ | Template; `{table}`, `{partitionId:NNN}`, `{timestamp}` placeholders |
+| `segmentNameFormat` | ✅ | Template; `{table}`, `{partitionId:NNN}`, `{startTime}`, `{endTime}` placeholders (the latter two require `timeColumnName`) |
 | `timeColumnName` | ✅ if the table is time-partitioned | Must match the table's schema |
 | `timeFormat` | ✅ if `timeColumnName` is set | e.g. `EPOCH|MILLISECONDS`, `SIMPLE_DATE_FORMAT|yyyyMMdd` |
 | `timeGranularity` | ✅ if `timeColumnName` is set | e.g. `1:MILLISECONDS` |
