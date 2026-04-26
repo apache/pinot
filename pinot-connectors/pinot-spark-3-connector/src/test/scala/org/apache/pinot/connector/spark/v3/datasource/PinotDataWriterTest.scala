@@ -160,10 +160,6 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       ("{partitionId:05}_{table}", "00012_airlineStats"),
       ("{table}_20240805", "airlineStats_20240805"),
       ("{table}_{startTime}_{endTime}_{partitionId:03}", "airlineStats_1234567890_1234567891_012"),
-      // Width spec on a non-numeric variable (`table`) is rendered with %Ns rather than %Nd
-      // so it does not crash the entire write task at commit time. The Javadoc advertises
-      // {partitionId:05} alongside `{table}`, so a user reasonably might try {table:NN}.
-      ("{table:20}_{partitionId:03}", "        airlineStats_012"),
     )
 
     testCases.foreach { case (format, expected) =>
@@ -196,6 +192,35 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
 
       segmentName shouldBe expected
     }
+  }
+
+  test("getSegmentName rejects width spec on non-numeric variables with a clear message") {
+    // `{table:N}` is not a documented format and would otherwise produce path-hostile
+    // whitespace inside the segment name, or — under the previous implementation —
+    // ClassCastException at commit time. Reject early at job submission with a clear hint.
+    val writeOptions = PinotDataSourceWriteOptions(
+      tableName = "airlineStats",
+      savePath = "/tmp/pinot",
+      timeColumnName = "ts",
+      timeFormat = "EPOCH|SECONDS",
+      timeGranularity = "1:SECONDS",
+      segmentNameFormat = "{table:20}_{partitionId:03}",
+      invertedIndexColumns = Array("name"),
+      noDictionaryColumns = Array("age"),
+      bloomFilterColumns = Array("name"),
+      rangeIndexColumns = Array())
+    val writeSchema = StructType(Seq(
+      StructField("name", StringType, nullable = false),
+      StructField("age", IntegerType, nullable = false),
+      StructField("ts", LongType, nullable = false)))
+    val pinotSchema = SparkToPinotTypeTranslator.translate(
+      writeSchema, writeOptions.tableName, writeOptions.timeColumnName,
+      writeOptions.timeFormat, writeOptions.timeGranularity)
+    val writer = new PinotDataWriter[InternalRow](12, 0, writeOptions, writeSchema, pinotSchema)
+
+    val ex = intercept[IllegalArgumentException] { writer.getSegmentName }
+    ex.getMessage should include("only supported on numeric variables")
+    ex.getMessage should include("table")
   }
 
   test("commit() cleans up the per-partition temp build dir") {
