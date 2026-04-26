@@ -96,6 +96,28 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
+    } else {
+      // No records were returned to the application by this poll, but the underlying
+      // KafkaConsumer's internal position may still have advanced past offsets that were
+      // filtered out -- most commonly when read_committed isolation skips an aborted
+      // transactional batch. If we leave _lastFetchedOffset at its prior value (e.g. -1
+      // on the first poll), the seek-on-mismatch check at the top of fetchMessages will
+      // re-seek to startOffset on every subsequent call and we will never make progress
+      // past the aborted region. Track the consumer's actual position so the next call
+      // resumes from there.
+      long currentPosition;
+      try {
+        currentPosition = _consumer.position(_topicPartition);
+      } catch (Exception e) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Failed to read consumer position after empty poll on {}", _topicPartition, e);
+        }
+        currentPosition = startOffset;
+      }
+      if (currentPosition > startOffset) {
+        _lastFetchedOffset = currentPosition - 1;
+        offsetOfNextBatch = currentPosition;
+      }
     }
 
     // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
