@@ -67,6 +67,24 @@ The Spark 4 module requires Spark 4.0.x and JDK 21+.
 > 3 job that depended on the (incorrect) silent-append behavior; those jobs must be migrated
 > to `mode("append")` (or one of the alternatives above) before upgrading.
 
+> ⚠️ **`SparkToPinotTypeTranslator` now rejects unit-mismatched / unsupported types.** The
+> previous version mapped Spark `TimestampType` → Pinot `LONG` and Spark `DateType` → Pinot
+> `INT` directly. Spark stores `TimestampType` as **microseconds-since-epoch** in
+> `InternalRow`, while Pinot's broker convention for time columns is **milliseconds-since-
+> epoch** (`TimestampUtils#toMillisSinceEpoch`) — so the prior mapping silently produced
+> values 1000× too large. The translator now throws `UnsupportedOperationException` with a
+> hint to cast upstream:
+> ```scala
+> df.withColumn("ts", (col("ts").cast("long") / 1000))   // micros → millis, before write
+> df.withColumn("d",  date_format(col("d"), "yyyy-MM-dd")) // DateType → STRING
+> ```
+> The translator also rejects `ArrayType(BinaryType)` and `ArrayType(DecimalType)` (Pinot's
+> segment-build path has no multi-value BYTES / BIG_DECIMAL writer support), and replaces
+> the previous `null` return for unknown types with an explicit
+> `UnsupportedOperationException`. **Existing pipelines that wrote `TimestampType`
+> columns will fail at translation time on upgrade** — validate your schema and add the
+> upstream cast before bumping the connector jar.
+
 ## Features
 - Query realtime, offline or hybrid tables
 - Distributed, parallel scan
