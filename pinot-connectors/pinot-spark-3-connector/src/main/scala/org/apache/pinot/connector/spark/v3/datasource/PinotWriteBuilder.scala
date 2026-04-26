@@ -31,14 +31,15 @@ import org.apache.spark.sql.sources.Filter
  * overwrite entry point:
  *
  *   1. {@link SupportsOverwrite#overwrite(Array)} — filter-based overwrite.
- *   2. {@link org.apache.spark.sql.connector.write.SupportsTruncate#truncate()} — in Spark 3.x
- *      {@code SupportsOverwrite extends SupportsTruncate}, and the V2Writes analyzer rule
- *      dispatches {@code df.write.mode("overwrite")} (overwrite-by-TRUE) to {@code truncate()}
- *      rather than {@code overwrite([AlwaysTrue])}. In Spark 3.5.x the default
- *      {@code truncate()} happens to delegate to {@code overwrite([AlwaysTrue])} so the
- *      override above would already throw, but we override {@code truncate()} explicitly to
- *      (a) emit an error message tailored to the {@code df.write.mode("overwrite")} entry
- *      point and (b) defend against future Spark default-implementation changes.
+ *   2. {@link org.apache.spark.sql.connector.write.SupportsTruncate#truncate()} — in Spark 3.5.x
+ *      {@code SupportsOverwrite extends SupportsOverwriteV2}, which in turn extends
+ *      {@code SupportsTruncate}. The V2Writes analyzer rule dispatches
+ *      {@code df.write.mode("overwrite")} (overwrite-by-TRUE) to {@code truncate()} rather
+ *      than {@code overwrite([AlwaysTrue])}. In Spark 3.5.x the default {@code truncate()}
+ *      happens to delegate to {@code overwrite([AlwaysTrue])} so the override above would
+ *      already throw, but we override {@code truncate()} explicitly to (a) emit an error
+ *      message tailored to the {@code df.write.mode("overwrite")} entry point and
+ *      (b) defend against future Spark default-implementation changes.
  *
  * Users who need replacement semantics should drop the target table first or use
  * pinot-batch-ingestion-spark-3's segment push runners with REFRESH / consistent-push enabled.
