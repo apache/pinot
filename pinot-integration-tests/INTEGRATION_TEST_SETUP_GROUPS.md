@@ -296,6 +296,29 @@ instead of the main no-override suite:
 | Shared upsert preload suite | `./mvnw -pl pinot-integration-tests -Pshared-upsert-preload-cluster-integration-test-suite test` | 1 | 27.68s |
 | Disabled manual suite | `./mvnw -pl pinot-integration-tests -Pdisabled-manual-cluster-integration-test-suite test` | 0 | 12.14s |
 
+### GitHub Actions Wiring
+
+The first CI wiring pass keeps the regular alphabetical integration sets, but
+excludes the most profitable migrated classes from those sets and runs them in
+the existing GitHub Actions integration lanes.
+
+Set 1 runs these shared profiles after its reduced alphabetical pass:
+
+- `shared-hybrid-cluster-integration-test-suite`
+- `shared-llc-realtime-cluster-integration-test-suite`
+
+Set 2 runs these shared profiles after its reduced alphabetical pass:
+
+- `shared-no-override-offline-cluster-integration-test-suite`
+- `shared-realtime-manager-cluster-integration-test-suite`
+- `shared-controller-only-cluster-integration-test-suite`
+- `shared-offline-cluster-integration-test-suite`
+
+The six selected shared profiles total 17.45 minutes locally versus 20.39 minutes
+for the same per-class lifecycles. This is intentionally the profitable subset
+rather than every shared profile; several exact-config profiles are
+setup-correctness buckets and would increase CI wall time if wired immediately.
+
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
 The same 41 tests passed in a single per-class lifecycle command in 112.06s,

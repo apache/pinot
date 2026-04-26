@@ -103,6 +103,26 @@
                 <include>**/org/apache/pinot/integration/tests/M*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
               </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/DimensionTableIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HelixZNodeSizeLimitTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka3ClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka4ClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/QueryQuotaClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/RetentionManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SegmentUploadIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/ServerStarterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SparkSegmentMetadataPushIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/StarTreeFunctionParametersIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/tpch/TPCHQueryIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/server/realtime/ControllerLeaderLocatorIntegrationTest.java</exclude>
+              </excludes>
             </configuration>
           </plugin>
         </plugins>
@@ -136,6 +156,26 @@
                 <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
                 <include>**/org/apache/pinot/server/realtime/**</include>
               </includes>
+              <excludes>
+                <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/DimensionTableIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HelixZNodeSizeLimitTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka3ClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka4ClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/QueryQuotaClusterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/RetentionManagerIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SegmentUploadIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/ServerStarterIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/SparkSegmentMetadataPushIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/StarTreeFunctionParametersIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/integration/tests/tpch/TPCHQueryIntegrationTest.java</exclude>
+                <exclude>**/org/apache/pinot/server/realtime/ControllerLeaderLocatorIntegrationTest.java</exclude>
+              </excludes>
             </configuration>
           </plugin>
         </plugins>
