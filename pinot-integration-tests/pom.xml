@@ -104,45 +104,22 @@
                 <include>**/org/apache/pinot/integration/tests/N*Test.java</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/AdminConsoleIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/BaseDedupIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/CommitTimeCompactionIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/DimensionTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/ErrorCodesIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/HelixZNodeSizeLimitTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka3ClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka4ClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/OfflineTimestampIndexIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/PurgeMetadataPushMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/QueryQuotaClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/RealtimeToOfflineSegmentsMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/RetentionManagerIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SegmentGenerationMinionClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SegmentGenerationMinionRealtimeIngestionTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SegmentPartitionLLCRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/SegmentUploadIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/ServerStarterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SimpleMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/SparkSegmentMetadataPushIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/StaleSegmentCheckIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/StarTreeFunctionParametersIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithOneOfflineTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwelveOfflineTablesIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwoOfflineTablesIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwoRealtimeTableIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/tpch/TPCHQueryIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/server/realtime/ControllerLeaderLocatorIntegrationTest.java</exclude>
               </excludes>
@@ -180,45 +157,22 @@
                 <include>**/org/apache/pinot/server/realtime/**</include>
               </includes>
               <excludes>
-                <exclude>**/org/apache/pinot/integration/tests/AdminConsoleIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/BaseDedupIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/CommitTimeCompactionIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/DateTimeFieldSpecHybridClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/DimensionTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/ErrorCodesIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/HelixZNodeSizeLimitTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/HybridClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/IngestionConfigHybridIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka3ClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/LLCRealtimeKafka4ClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/OfflineClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/OfflineTimestampIndexIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/PinotLLCRealtimeSegmentManagerIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/PurgeMetadataPushMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/QueryQuotaClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/QueryThreadContextIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/RealtimeToOfflineSegmentsMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/RetentionManagerIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SegmentGenerationMinionClusterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SegmentGenerationMinionRealtimeIngestionTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SegmentPartitionLLCRealtimeClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/SegmentUploadIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/SegmentWriterUploaderIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/ServerStarterIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SimpleMinionClusterIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/SparkSegmentMetadataPushIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/SpoolIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/StaleSegmentCheckIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/StarTreeFunctionParametersIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithOneOfflineOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithOneOfflineTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwelveOfflineOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwelveOfflineTablesIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwoOfflineOneRealtimeTableIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwoOfflineTablesIntegrationTest.java</exclude>
-                <exclude>**/org/apache/pinot/integration/tests/logicaltable/LogicalTableWithTwoRealtimeTableIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/integration/tests/tpch/TPCHQueryIntegrationTest.java</exclude>
                 <exclude>**/org/apache/pinot/server/realtime/ControllerLeaderLocatorIntegrationTest.java</exclude>
               </excludes>

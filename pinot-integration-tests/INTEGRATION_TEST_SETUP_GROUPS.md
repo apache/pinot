@@ -309,21 +309,15 @@ Set 1 runs these shared profiles after its reduced alphabetical pass:
 
 Set 2 runs these shared profiles after its reduced alphabetical pass:
 
-- `shared-rich-cluster-integration-test-suite`
+- `shared-no-override-offline-cluster-integration-test-suite`
 - `shared-realtime-manager-cluster-integration-test-suite`
 - `shared-controller-only-cluster-integration-test-suite`
 - `shared-offline-cluster-integration-test-suite`
 
-The six selected shared profiles total 24.81 minutes locally versus 32.15 minutes
+The six selected shared profiles total 17.45 minutes locally versus 20.39 minutes
 for the same per-class lifecycles. This is intentionally the profitable subset
 rather than every shared profile; several exact-config profiles are
 setup-correctness buckets and would increase CI wall time if wired immediately.
-
-`shared-rich-cluster-integration-test-suite` replaces the narrower
-`shared-no-override-offline-cluster-integration-test-suite` in CI because it
-covers those eight no-override offline classes plus a larger validated batch:
-252 TestNG tests passed in 563.98s shared versus 886.69s with per-class
-lifecycles.
 
 The four cursor/empty-response broker-config suites are exact-config buckets, so
 they are not yet a wall-clock improvement when run as four separate profiles.
