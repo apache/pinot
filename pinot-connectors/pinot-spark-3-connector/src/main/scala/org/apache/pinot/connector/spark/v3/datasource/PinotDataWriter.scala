@@ -97,9 +97,17 @@ class PinotDataWriter[InternalRow](
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
 
-    // Tracking startTime and endTime for segment name generation purposes
-    if (timeColumnIndex > -1 && isTimeColumnNumeric) {
-      val time = record.getLong(timeColumnIndex)
+    // Track startTime / endTime for segment name generation. Honor `isNullAt` first:
+    // Spark's primitive accessors return 0 for null cells, which would silently collapse
+    // startTime to 0 and corrupt the `{startTime}` / `{endTime}` segmentNameFormat
+    // placeholders. Also dispatch on the column's actual Spark type — `getLong` on an
+    // IntegerType column reads 8 bytes from a 4-byte slot in UnsafeRow and returns
+    // garbage from the next field.
+    if (timeColumnIndex > -1 && isTimeColumnNumeric && !record.isNullAt(timeColumnIndex)) {
+      val time = writeSchema.fields(timeColumnIndex).dataType match {
+        case org.apache.spark.sql.types.IntegerType => record.getInt(timeColumnIndex).toLong
+        case org.apache.spark.sql.types.LongType => record.getLong(timeColumnIndex)
+      }
       startTime = Math.min(startTime, time)
       endTime = Math.max(endTime, time)
     }
