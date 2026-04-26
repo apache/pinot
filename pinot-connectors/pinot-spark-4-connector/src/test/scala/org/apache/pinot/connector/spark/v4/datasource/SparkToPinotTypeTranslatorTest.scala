@@ -34,9 +34,7 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       (DoubleType, FieldSpec.DataType.DOUBLE),
       (DecimalType(38, 18), FieldSpec.DataType.BIG_DECIMAL),
       (BooleanType, FieldSpec.DataType.BOOLEAN),
-      (BinaryType, FieldSpec.DataType.BYTES),
-      (TimestampType, FieldSpec.DataType.LONG),
-      (DateType, FieldSpec.DataType.INT)
+      (BinaryType, FieldSpec.DataType.BYTES)
     )
 
     for ((sparkType, expectedPinotType) <- typeMappings) {
@@ -68,9 +66,7 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       (ArrayType(LongType), FieldSpec.DataType.LONG),
       (ArrayType(FloatType), FieldSpec.DataType.FLOAT),
       (ArrayType(DoubleType), FieldSpec.DataType.DOUBLE),
-      (ArrayType(BooleanType), FieldSpec.DataType.BOOLEAN),
-      (ArrayType(TimestampType), FieldSpec.DataType.LONG),
-      (ArrayType(DateType), FieldSpec.DataType.INT)
+      (ArrayType(BooleanType), FieldSpec.DataType.BOOLEAN)
     )
 
     for ((sparkArrayType, expectedPinotType) <- arrayTypeMappings) {
@@ -98,6 +94,26 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
       }
       assert(ex.getMessage.contains("not supported"))
     }
+  }
+
+  test("Reject TimestampType and DateType — unit semantics do not round-trip") {
+    // Spark's TimestampType (microseconds-since-epoch) and DateType (days-since-epoch)
+    // do not match Pinot's millis-since-epoch convention, so naively mapping to LONG/INT
+    // would silently produce wrong-by-1000 timestamps. Reject so the user is forced to
+    // cast to LongType (millis) or StringType upstream.
+    val timestampSchema = StructType(Array(StructField("ts", TimestampType)))
+    val tsEx = intercept[UnsupportedOperationException] {
+      SparkToPinotTypeTranslator.translate(timestampSchema, "table", null, null, null)
+    }
+    assert(tsEx.getMessage.contains("TimestampType"))
+    assert(tsEx.getMessage.contains("Cast to LongType"))
+
+    val dateSchema = StructType(Array(StructField("d", DateType)))
+    val dEx = intercept[UnsupportedOperationException] {
+      SparkToPinotTypeTranslator.translate(dateSchema, "table", null, null, null)
+    }
+    assert(dEx.getMessage.contains("DateType"))
+    assert(dEx.getMessage.contains("Cast to StringType") || dEx.getMessage.contains("LongType"))
   }
 
   test("Reject unknown Spark types with a clear error at translation time") {
