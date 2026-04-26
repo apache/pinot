@@ -24,6 +24,7 @@ import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.util
 
@@ -66,7 +67,7 @@ class PinotDataSource extends TableProvider with DataSourceRegister {
 }
 
 private[datasource] object PinotDataSource {
-  private val LOGGER: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(classOf[PinotDataSource])
+  private val LOGGER: Logger = LoggerFactory.getLogger(classOf[PinotDataSource])
   private val SPARK_3_DATASOURCE_FQN = "org.apache.pinot.connector.spark.v3.datasource.PinotDataSource"
   // Escape hatch: when set to "true", the classpath-collision detection logs a WARN and
   // continues instead of throwing. Useful for advanced users who genuinely need both
