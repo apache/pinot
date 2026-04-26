@@ -20,6 +20,7 @@ package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructField, StructType, BinaryType}
 import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.scalatest.matchers.should.Matchers
@@ -140,7 +141,10 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     // isNullAt check (corrupts startTime to 0 on null cells) and without dispatching on
     // the actual Spark type (UnsafeRow's getLong on an IntegerType slot reads 8 bytes from
     // a 4-byte field). This test pins both fixes for an IntegerType time column with one
-    // null and one populated row.
+    // null and one populated row, and converts the populated row through UnsafeProjection
+    // so the type-dispatch fix is what's actually exercised on the read path — without it,
+    // UnsafeRow.getLong would read garbage from the next slot and the segment-name
+    // placeholders would not match the int value.
     val writeOptions = PinotDataSourceWriteOptions(
       tableName = "intTimeTable",
       savePath = "/tmp/pinot",
@@ -160,11 +164,21 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
       writeOptions.timeFormat, writeOptions.timeGranularity)
     val writer = new PinotDataWriter[InternalRow](0, 0, writeOptions, writeSchema, pinotSchema)
 
-    writer.write(new TestInternalRow(Array[Any]("Alice", null)))            // null cell — must be skipped
-    writer.write(new TestInternalRow(Array[Any]("Bob", 1234567890)))        // Int (not Long)
+    // Build an UnsafeRow for the populated row so the typed-accessor dispatch is exercised
+    // on the same memory layout Spark uses in real workloads. The null-row stays as
+    // GenericInternalRow since UnsafeProjection cannot encode a null in a non-nullable slot.
+    val toUnsafe = UnsafeProjection.create(writeSchema)
+    val nullRow = new TestInternalRow(Array[Any]("Alice", null))
+    val populatedRow =
+      toUnsafe.apply(new TestInternalRow(Array[Any](
+        org.apache.spark.unsafe.types.UTF8String.fromString("Bob"),
+        java.lang.Integer.valueOf(1234567890)))).copy()
 
-    // The segment-name placeholders should reflect only the populated row, with the Int
-    // value preserved verbatim — not 0 (synthetic null) or garbage from a misaligned read.
+    writer.write(nullRow)        // null cell — must be skipped (no synthetic-zero startTime)
+    writer.write(populatedRow)   // UnsafeRow with IntegerType slot — exercises type-dispatch
+
+    // Segment-name placeholders should reflect only the populated row, with the Int value
+    // preserved verbatim — not 0 (synthetic null) or garbage from a misaligned read.
     writer.getSegmentName shouldBe "intTimeTable_1234567890_1234567890_0"
 
     writer.close()
