@@ -66,7 +66,14 @@ class PinotDataSource extends TableProvider with DataSourceRegister {
 }
 
 private[datasource] object PinotDataSource {
+  private val LOGGER: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(classOf[PinotDataSource])
   private val SPARK_3_DATASOURCE_FQN = "org.apache.pinot.connector.spark.v3.datasource.PinotDataSource"
+  // Escape hatch: when set to "true", the classpath-collision detection logs a WARN and
+  // continues instead of throwing. Useful for advanced users who genuinely need both
+  // connector jars (e.g., reading from a Spark 3 Pinot deployment and writing to a Spark 4
+  // deployment in the same long-running Spark application). The default (unset / false)
+  // preserves the safer fail-fast behavior.
+  private[datasource] val SKIP_CONFLICT_GUARD_PROP = "pinot.spark.connector.skip-conflict-guard"
 
   // Probe for the Spark 3 connector's PinotDataSource by class name. We use Class.forName
   // rather than a static reference so this module does not develop a compile-time dependency
@@ -92,7 +99,13 @@ private[datasource] object PinotDataSource {
 
   def guardAgainstSpark3ConnectorOnClasspath(): Unit = {
     if (spark3Conflict) {
-      throw new IllegalStateException(spark3ConflictMessage)
+      if (java.lang.Boolean.getBoolean(SKIP_CONFLICT_GUARD_PROP)) {
+        LOGGER.warn(
+          "{} (escape hatch -D{}=true was set, continuing anyway)",
+          spark3ConflictMessage, SKIP_CONFLICT_GUARD_PROP)
+      } else {
+        throw new IllegalStateException(spark3ConflictMessage)
+      }
     }
   }
 
