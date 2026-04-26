@@ -136,4 +136,34 @@ class FilterPushDownTest extends BaseTest {
     accepted shouldBe empty
     postScan should contain theSameElementsAs filters
   }
+
+  test("EqualNullSafe with a null value falls back to post-scan") {
+    // Pushing this down would render the literal SQL `attr != null` (Pinot's `compileValue`
+    // null branch falls through to `value.toString`), which Pinot would parse syntactically
+    // rather than as a NULL test. Spark must evaluate post-scan so three-valued logic is
+    // honored.
+    val f = EqualNullSafe("name", null)
+    val (accepted, postScan) = FilterPushDown.acceptFilters(Array(f))
+    accepted shouldBe empty
+    postScan should contain only f
+  }
+
+  test("IN with a null array element falls back to post-scan") {
+    // Same problem as EqualNullSafe(_, null) but for IN: a null entry would render as
+    // `IN (1, null, 3)` and break Spark's null semantics. An all-non-null IN is fine.
+    val withNull = In("attr", Array[Any]("a", null, "b"))
+    val withoutNull = In("attr", Array[Any]("a", "b", "c"))
+    val (accepted, postScan) =
+      FilterPushDown.acceptFilters(Array[Filter](withNull, withoutNull))
+    accepted should contain only withoutNull
+    postScan should contain only withNull
+  }
+
+  test("escapeAttr properly quotes a column name containing a stray double-quote") {
+    val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(
+      Array(EqualTo("weird\"col", 1)))
+    // Inner `"` doubled, outer wrapping quotes preserved → single well-formed quoted
+    // identifier. Without the fix, the result was `weird"col = 1` (raw, broken SQL).
+    whereClause.get shouldEqual "(\"weird\"\"col\" = 1)"
+  }
 }
