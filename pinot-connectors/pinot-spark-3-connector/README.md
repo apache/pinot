@@ -25,6 +25,19 @@ Spark-pinot connector to read data from Pinot.
 Detailed read model documentation is here; [Spark-Pinot Connector Read Model](documentation/read_model.md)
 
 
+## Behavior changes since the previous release
+
+> ⚠️ **Overwrite/truncate writes now fail fast.** `df.write.mode("overwrite").format("pinot")…`
+> and SQL `INSERT OVERWRITE` previously *appeared* to succeed but silently appended new
+> segments without replacing existing rows — leaving stale data queryable and producing
+> duplicate segments on retry. The connector now rejects both the V1 `SupportsOverwrite#overwrite`
+> and the `SupportsTruncate#truncate` paths with `UnsupportedOperationException` and a message
+> pointing at the supported alternatives. To replace data, drop the Pinot table via the
+> controller REST API first, or use `pinot-batch-ingestion-spark-3`'s `SparkSegment*PushJobRunner`
+> with `REFRESH` / consistent-push enabled. This is a breaking change for any existing Spark
+> 3 job that depended on the (incorrect) silent-append behavior; those jobs must be migrated
+> to `mode("append")` (or one of the alternatives above) before upgrading.
+
 ## Features
 - Query realtime, offline or hybrid tables
 - Distributed, parallel scan
