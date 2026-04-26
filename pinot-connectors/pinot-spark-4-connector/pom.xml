@@ -214,7 +214,7 @@
         </configuration>
       </plugin>
       <!-- enable scalatest. The argLine below follows Spark 4's required JVM options for JDK 17+.
-           See https://spark.apache.org/docs/4.0.0/index.html#downloading for the canonical list. -->
+           See https://spark.apache.org/docs/4.1.1/index.html#downloading for the canonical list. -->
       <plugin>
         <groupId>org.scalatest</groupId>
         <artifactId>scalatest-maven-plugin</artifactId>

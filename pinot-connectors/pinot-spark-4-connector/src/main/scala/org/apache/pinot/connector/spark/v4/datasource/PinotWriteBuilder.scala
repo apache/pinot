@@ -38,7 +38,7 @@ import org.apache.spark.sql.connector.write.{LogicalWriteInfo, SupportsOverwrite
  *   2. {@link org.apache.spark.sql.connector.write.SupportsTruncate#truncate()} — invoked by
  *      the V2Writes analyzer rule for the common {@code df.write.mode("overwrite")} path,
  *      which lowers to an overwrite-by-TRUE and is dispatched to {@code truncate()} because
- *      {@code SupportsOverwriteV2} extends {@code SupportsTruncate}. In Spark 4.0.0 the default
+ *      {@code SupportsOverwriteV2} extends {@code SupportsTruncate}. In Spark 4.x the default
  *      {@code truncate()} happens to delegate to {@code overwrite([AlwaysTrue])} so the
  *      override above would already throw, but we override {@code truncate()} explicitly to
  *      (a) emit an error message tailored to the {@code df.write.mode("overwrite")} entry

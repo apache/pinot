@@ -21,8 +21,9 @@
 # Spark 4 ↔ Pinot — End-to-end Docker Tutorial
 
 This walkthrough brings up Apache Pinot in Docker, builds the Pinot Spark 4 connector, and
-exercises both the **read** and **write** paths from a Spark 4 driver. Every step below was
-validated against `apachepinot/pinot:latest` + `apache/spark:4.0.0`.
+exercises both the **read** and **write** paths from a Spark 4 driver. The connector compiles
+against Apache Spark `4.1.1` (the latest 4.x release at the time of writing); a matching
+`apache/spark:4.1.1` runtime is published with a Scala 2.13 + Java 21 variant ready to use.
 
 If you only need the one-liner: point Spark 4 at a running Pinot cluster, drop the shaded
 connector jar on the classpath, prepend a recent `commons-lang3`, and use
@@ -40,9 +41,10 @@ why behind each switch.
 | Maven wrapper | bundled (`./mvnw`) | `-pl pinot-connectors/pinot-spark-4-connector` |
 
 **Why JDK 21.** The Pinot Spark 4 connector is compiled with `--release 21` (class file 65).
-Apache Spark 4's default Docker image (`apache/spark:4.0.0`) ships **JDK 17**, which cannot load
-class-file-65 bytecode (`UnsupportedClassVersionError`). Either use `apache/spark:4.0.0-java21`
-when available, or bake a custom image (shown below) that adds JDK 21.
+The default `apache/spark:4.1.1` image ships **JDK 17**, which cannot load class-file-65
+bytecode (`UnsupportedClassVersionError`). Use the JDK 21 variant
+`apache/spark:4.1.1-scala2.13-java21-python3-ubuntu` (or its short alias
+`apache/spark:4.1.1-java21-python3`); the rest of this tutorial assumes that image.
 
 ---
 
@@ -99,7 +101,7 @@ curl -fLSs -o /tmp/pinot-spark4-demo/commons-lang3-3.20.0.jar \
   https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar
 ```
 
-**Why the extra `commons-lang3`.** Spark 4.0.0 bundles an older `commons-lang3` that lacks
+**Why the extra `commons-lang3`.** Spark 4.x bundles an older `commons-lang3` that lacks
 `ObjectUtils.getIfNull(...)`, a method Pinot calls during connector startup. Without the newer
 jar, the read path crashes inside `PinotServerDataFetcher` during the first executor task. The
 mitigation below (`spark.{driver,executor}.extraClassPath`) is the simplest fix; see *Known
@@ -107,26 +109,18 @@ gotchas* at the bottom for the longer-term options.
 
 ---
 
-## 4. Build a Spark 4 + JDK 21 image
+## 4. Pull the Spark 4 + JDK 21 image
 
-Skip this section if you already have a `apache/spark:4.0.0-java21` image or an equivalent.
-Otherwise, a 4-line Dockerfile does it:
+The official Apache Spark 4.1.1 image ships a JDK 21 variant, so no custom build is needed —
+just pull:
 
 ```bash
-cat > /tmp/pinot-spark4-demo/Dockerfile <<'EOF'
-FROM apache/spark:4.0.0
-USER root
-RUN apt-get update && apt-get install -y openjdk-21-jdk-headless --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
-ENV PATH=$JAVA_HOME/bin:$PATH
-USER spark
-EOF
-
-docker build -t spark4-jdk21:local /tmp/pinot-spark4-demo/
+docker pull apache/spark:4.1.1-scala2.13-java21-python3-ubuntu
+docker tag apache/spark:4.1.1-scala2.13-java21-python3-ubuntu spark4-jdk21:local
 ```
 
-(On x86_64 replace `java-21-openjdk-arm64` with `java-21-openjdk-amd64`.)
+(The `spark4-jdk21:local` tag is purely cosmetic; the rest of this tutorial uses it so you can
+swap the underlying image without re-editing every command.)
 
 ---
 
@@ -392,8 +386,9 @@ rm -rf /tmp/pinot-spark4-demo
 ## Known gotchas (things that tripped me up while validating this)
 
 1. **`UnsupportedClassVersionError` on JDK 17 Spark images.** The Pinot shaded jar is class file
-   65 (JDK 21). `apache/spark:4.0.0` uses JDK 17. Use `apache/spark:4.0.0-java21` or add JDK 21
-   yourself as shown in §4.
+   65 (JDK 21). The default `apache/spark:4.1.1` tag uses JDK 17. Use the JDK 21 variant
+   `apache/spark:4.1.1-scala2.13-java21-python3-ubuntu` (or `apache/spark:4.1.1-java21-python3`)
+   instead, as shown in §4.
 2. **`NoSuchMethodError: ObjectUtils.getIfNull(...)` during the first executor task.** Spark 4's
    bundled `commons-lang3` is older than what Pinot expects. Prepend `commons-lang3:3.20.0` (or
    newer) to `spark.{driver,executor}.extraClassPath`. A follow-up PR can relocate

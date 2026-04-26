@@ -35,7 +35,7 @@ Detailed write-model documentation: [Spark-Pinot Connector Write Model](document
 | Pinot module                 | Spark | Scala       | JDK (build & runtime) |
 |------------------------------|-------|-------------|------------------------|
 | `pinot-spark-3-connector`    | 3.5.x | 2.12 / 2.13 | 8 / 11 / 17            |
-| `pinot-spark-4-connector`    | 4.0.x | 2.13 only   | **21 only**            |
+| `pinot-spark-4-connector`    | 4.1.x | 2.13 only   | **21 only**            |
 
 The produced jar is compiled with `--release 21` (class file major version 65), so it will
 not load on a JDK 17 runtime despite Spark 4 itself supporting JDK 17. If JDK 17 runtime is
