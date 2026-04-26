@@ -90,6 +90,14 @@ private[datasource] object PinotDataSource {
   // typical Spark deployment with `--packages` and isolated executor classloaders, the v3
   // jar may be visible only via the context classloader — probing only our own would let
   // the conflict slip through.
+  //
+  // Limitation: the lazy val is computed exactly once at first construction, so a v3 jar
+  // added later in the same JVM (e.g., via spark-shell `:require`, a custom plugin loader,
+  // or any post-startup classpath mutation) will NOT be detected. Users who dynamically
+  // load both connectors in the same session should set
+  // `-Dpinot.spark.connector.skip-conflict-guard=true` and accept the silent-overwrite-
+  // contract risk explicitly, or restart the JVM with both jars present so the probe runs
+  // against the final classpath.
   private[datasource] lazy val spark3Conflict: Boolean = {
     val ownLoader = getClass.getClassLoader
     val ctxLoader = Thread.currentThread.getContextClassLoader
