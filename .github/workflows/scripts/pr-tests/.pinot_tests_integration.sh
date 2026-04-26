@@ -79,7 +79,7 @@ if [ "$RUN_TEST_SET" == "2" ]; then
       -DargLine="-Xms1g -Xmx2g -Dlog4j2.configurationFile=log4j2.xml"
   # Keep this lane to the shared profiles that have shown a local wall-clock win.
   shared_profiles=(
-    shared-no-override-offline-cluster-integration-test-suite
+    shared-rich-cluster-integration-test-suite
     shared-realtime-manager-cluster-integration-test-suite
     shared-controller-only-cluster-integration-test-suite
     shared-offline-cluster-integration-test-suite
