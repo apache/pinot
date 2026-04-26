@@ -166,4 +166,30 @@ class FilterPushDownTest extends BaseTest {
     // identifier. Without the fix, the result was `weird"col = 1` (raw, broken SQL).
     whereClause.get shouldEqual "(\"weird\"\"col\" = 1)"
   }
+
+  test("Null-leaf rejection propagates through enclosing And/Or/Not compounds") {
+    // Compound gating composes via `isFilterSupported(f1) && isFilterSupported(f2)`. When a
+    // null-bearing leaf (EqualNullSafe(_, null) or IN(_, [..., null, ...])) is wrapped in
+    // And/Or/Not, the whole compound must fall through to post-scan — otherwise the
+    // null-leak we just fixed would re-emerge through compound predicates.
+    val nullLeaf1 = EqualNullSafe("a", null)
+    val nullLeaf2 = In("b", Array[Any]("x", null))
+    val compounds = Array[Filter](
+      And(EqualTo("c", 1), nullLeaf1),
+      Or(EqualTo("c", 1), nullLeaf2),
+      Not(nullLeaf1),
+      Not(nullLeaf2),
+      And(Or(nullLeaf1, EqualTo("c", 2)), EqualTo("d", 3)) // nested
+    )
+    val (accepted, postScan) = FilterPushDown.acceptFilters(compounds)
+    accepted shouldBe empty
+    postScan should contain theSameElementsAs compounds
+  }
+
+  test("In with a null `value` array itself is rejected (would NPE in compileFilter.isEmpty)") {
+    val f = In("attr", null)
+    val (accepted, postScan) = FilterPushDown.acceptFilters(Array[Filter](f))
+    accepted shouldBe empty
+    postScan should contain only f
+  }
 }
