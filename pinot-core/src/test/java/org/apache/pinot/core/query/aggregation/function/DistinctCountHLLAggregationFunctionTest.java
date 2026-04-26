@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Literal;
@@ -89,7 +90,10 @@ public class DistinctCountHLLAggregationFunctionTest {
         List.of(ExpressionContext.forIdentifier("col"),
             ExpressionContext.forLiteral(Literal.intValue(12))));
 
-    DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary).addDictIds(dictIds, dictIds.length);
+    BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
+    for (int dictId : dictIds) {
+      bitSet.set(dictId);
+    }
 
     HyperLogLog result = function.extractAggregationResult(holder);
     // With log2m=12 the expected error is ~1.6%; allow 5% to be safe
@@ -121,7 +125,10 @@ public class DistinctCountHLLAggregationFunctionTest {
         List.of(ExpressionContext.forIdentifier("col"),
             ExpressionContext.forLiteral(Literal.intValue(14))));
 
-    DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary).addDictIds(dictIds, dictIds.length);
+    BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
+    for (int dictId : dictIds) {
+      bitSet.set(dictId);
+    }
 
     HyperLogLog result = function.extractAggregationResult(holder);
     // log2m=14 gives ~0.8% error; allow 5%
@@ -152,14 +159,21 @@ public class DistinctCountHLLAggregationFunctionTest {
     for (int i = 0; i < 100; i++) {
       batch1[i] = i;
     }
-    DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary).addDictIds(batch1, batch1.length);
+    BitSet bitSet = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
+    for (int dictId : batch1) {
+      bitSet.set(dictId);
+    }
 
-    // Batch 2: dict IDs 100–199 (using the same holder — wrapper must be reused)
+    // Batch 2: dict IDs 100–199 (using the same holder — wrapper must be reused, same BitSet instance)
     int[] batch2 = new int[100];
     for (int i = 0; i < 100; i++) {
       batch2[i] = 100 + i;
     }
-    DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary).addDictIds(batch2, batch2.length);
+    BitSet bitSet2 = DistinctCountHLLAggregationFunction.getDictIdBitSet(holder, dictionary);
+    Assert.assertSame(bitSet, bitSet2, "getDictIdBitSet must return the same BitSet on subsequent calls");
+    for (int dictId : batch2) {
+      bitSet2.set(dictId);
+    }
 
     HyperLogLog result = function.extractAggregationResult(holder);
     Assert.assertEquals(result.cardinality(), numDistinct, numDistinct * 0.05,

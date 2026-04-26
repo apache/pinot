@@ -119,7 +119,10 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      getDictIdBitSet(aggregationResultHolder, dictionary).addDictIds(dictIds, length);
+      BitSet bitSet = getDictIdBitSet(aggregationResultHolder, dictionary);
+      for (int i = 0; i < length; i++) {
+        bitSet.set(dictIds[i]);
+      }
       return;
     }
 
@@ -167,9 +170,11 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
-      DictIdsWrapper dictIdsWrapper = getDictIdBitSet(aggregationResultHolder, dictionary);
+      BitSet bitSet = getDictIdBitSet(aggregationResultHolder, dictionary);
       for (int i = 0; i < length; i++) {
-        dictIdsWrapper.addDictIds(dictIds[i]);
+        for (int dictId : dictIds[i]) {
+          bitSet.set(dictId);
+        }
       }
       return;
     }
@@ -638,30 +643,30 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   }
 
   /**
-   * Returns the {@link GroupByDictIdsWrapper} for the given group key, creating a new one if absent.
-   * Uses a {@link RoaringBitmap} (sparse) so memory scales with distinct values per group, not dictionary size.
+   * Returns the {@link RoaringBitmap} for the given group key, creating a new {@link GroupByDictIdsWrapper} if absent.
+   * Uses a sparse bitmap so memory scales with distinct values per group, not dictionary size.
    */
-  protected static GroupByDictIdsWrapper getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
+  protected static RoaringBitmap getDictIdBitmap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
     GroupByDictIdsWrapper wrapper = groupByResultHolder.getResult(groupKey);
     if (wrapper == null) {
       wrapper = new GroupByDictIdsWrapper(dictionary);
       groupByResultHolder.setValueForKey(groupKey, wrapper);
     }
-    return wrapper;
+    return wrapper._dictIdBitmap;
   }
 
   /**
-   * Returns the {@link DictIdsWrapper} from the result holder, creating a new one if absent.
+   * Returns the {@link BitSet} from the result holder, creating a new {@link DictIdsWrapper} if absent.
    */
-  protected static DictIdsWrapper getDictIdBitSet(AggregationResultHolder aggregationResultHolder,
+  protected static BitSet getDictIdBitSet(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
     DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
     if (dictIdsWrapper == null) {
       dictIdsWrapper = new DictIdsWrapper(dictionary);
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
-    return dictIdsWrapper;
+    return dictIdsWrapper._bitSet;
   }
 
   /**
@@ -735,22 +740,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       _dictionary = dictionary;
       _bitSet = new BitSet(dictionary.length());
     }
-
-    void set(int dictId) {
-      _bitSet.set(dictId);
-    }
-
-    void addDictIds(int[] dictIds) {
-      for (int dictId : dictIds) {
-        _bitSet.set(dictId);
-      }
-    }
-
-    void addDictIds(int[] dictIds, int length) {
-      for (int i = 0; i < length; i++) {
-        _bitSet.set(dictIds[i]);
-      }
-    }
   }
 
   /**
@@ -767,14 +756,6 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     GroupByDictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
       _dictIdBitmap = new RoaringBitmap();
-    }
-
-    void add(int dictId) {
-      _dictIdBitmap.add(dictId);
-    }
-
-    void add(int[] dictIds) {
-      _dictIdBitmap.add(dictIds);
     }
   }
 }
