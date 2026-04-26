@@ -159,13 +159,19 @@ class PinotDataWriter[InternalRow](
 
       val formattedValue = formatSpecifier match {
         case null => value.toString
-        // Numeric variables (`partitionId`, `startTime`, `endTime`) get a width-padded
-        // decimal format; non-numeric ones (`table`) use a width-padded string format.
-        // Without this branch, `{table:N}` would crash with `String cannot be cast to
-        // java.lang.Number` and fail the entire write task at commit time.
+        // Width spec is only well-defined on numeric variables (`partitionId`, `startTime`,
+        // `endTime`) where it zero-pads the digit count. On a non-numeric variable like
+        // `{table}`, %Ns would emit leading whitespace inside the segment name (path-hostile
+        // for Hadoop FS, controller URLs, listings) and %-Ns would emit trailing whitespace —
+        // neither matches the documented analogue `{partitionId:05}`. Reject early with a
+        // clear message so the user sees the issue at job submission rather than at commit.
         case spec => value match {
           case n: Number => String.format(s"%${spec}d", n)
-          case other => String.format(s"%${spec}s", other.toString)
+          case _ =>
+            throw new IllegalArgumentException(
+              s"segmentNameFormat width spec ':$spec' is only supported on numeric variables " +
+                s"(partitionId, startTime, endTime); '$variableName' is not numeric. " +
+                s"Use '{$variableName}' without a width spec.")
         }
       }
 
@@ -261,15 +267,6 @@ class PinotDataWriter[InternalRow](
           gr.putValue(field.name, record.getBinary(idx))
         case org.apache.spark.sql.types.ShortType =>
           gr.putValue(field.name, record.getShort(idx))
-        case org.apache.spark.sql.types.TimestampType =>
-          // Spark stores TimestampType as microseconds-since-epoch in InternalRow. Pinot
-          // stores it as LONG (per SparkToPinotTypeTranslator); the unit (microseconds) is
-          // the user's responsibility to track when querying back.
-          gr.putValue(field.name, record.getLong(idx))
-        case org.apache.spark.sql.types.DateType =>
-          // Spark stores DateType as days-since-epoch in InternalRow as Int. Pinot stores
-          // as INT.
-          gr.putValue(field.name, record.getInt(idx))
         case dt: org.apache.spark.sql.types.DecimalType =>
           gr.putValue(field.name, record.getDecimal(idx, dt.precision, dt.scale).toJavaBigDecimal)
         case org.apache.spark.sql.types.ArrayType(elementType, _) =>
