@@ -93,12 +93,17 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     return true;
   }
 
-  @Override
-  protected Properties getKafkaExtraProperties() {
-    Properties props = new Properties();
-    props.setProperty("log.flush.interval.messages", "1");
-    return props;
-  }
+  // No getKafkaExtraProperties override. The previous override set
+  // log.flush.interval.messages=1 on the embedded broker, which forced a per-record fsync
+  // on every partition log. Each setUp pushes ~115 545 records * 2 transactions ~= 231 k
+  // records, so the broker's I/O thread was buried under hundreds of thousands of fsync
+  // calls on the CI runner's shared disk. The transaction COMMIT marker writes
+  // (WriteTxnMarkers requests from the coordinator -> data-partition leaders) ride the
+  // same per-partition I/O queue, so they were stuck behind the fsync backlog -- the LSO
+  // never advanced, and read_committed consumers (the test's verification consumer plus
+  // the Pinot server) saw nothing within the 120 s budget. Kafka's transactional protocol
+  // already provides durability via acks=all and transaction.state.log.replication.factor=3,
+  // so the forced fsync was redundant. Removing it eliminates both observed stall modes.
 
   @Override
   protected int getNumKafkaBrokers() {
@@ -145,16 +150,25 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
       LOGGER.info("Committed batch: {} records", committedCount);
     }
 
-    // After producer is closed, verify data visibility with independent consumers
-    LOGGER.info("Producer closed. Verifying data visibility...");
-    waitForCommittedRecordsVisible(kafkaBrokerList);
+    // After producer is closed, verify the topic actually exposes ALL expected records to
+    // an independent read_committed consumer. This is stricter than the previous
+    // "any record visible" check: it confirms transaction markers have been fully
+    // propagated for every committed record, which is the actual exactly-once contract,
+    // and surfaces partial-commit bugs that the old check would have hidden.
+    LOGGER.info("Producer closed. Verifying that all {} committed records are readable from Kafka...",
+        getCountStarResult());
+    waitForAllCommittedRecordsVisible(kafkaBrokerList, getCountStarResult());
   }
 
   /**
-   * Wait for committed records to be visible to a read_committed consumer.
-   * This ensures transaction markers have been fully propagated before returning.
+   * Wait until an independent read_committed consumer can read exactly {@code expected}
+   * records from the topic. Throws an {@link AssertionError} if the count never matches
+   * within 120 s, or if it overshoots (which would indicate the aborted batch leaked
+   * through). Reaching this method's "ok" return is the gate that the rest of setUp
+   * relies on -- the caller (the inherited setUp in {@link BaseRealtimeClusterIntegrationTest})
+   * then waits for Pinot's COUNT(*) to converge on the same count.
    */
-  private void waitForCommittedRecordsVisible(String brokerList) {
+  private void waitForAllCommittedRecordsVisible(String brokerList, long expected) {
     long deadline = System.currentTimeMillis() + 120_000L;
     int lastCommitted = 0;
     int lastUncommitted = 0;
@@ -163,15 +177,21 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     while (System.currentTimeMillis() < deadline) {
       iteration++;
       lastCommitted = countRecords(brokerList, "read_committed");
-      if (lastCommitted > 0) {
+      if (lastCommitted == expected) {
         LOGGER.info("Verification OK: read_committed={} after {} iterations", lastCommitted, iteration);
         return;
       }
-      // Check if data reached Kafka at all
+      if (lastCommitted > expected) {
+        // Aborted batch leaked through, or the test pushed more records than getCountStarResult().
+        lastUncommitted = countRecords(brokerList, "read_uncommitted");
+        throw new AssertionError(String.format(
+            "[ExactlyOnce] read_committed count overshot expected on broker %s: read_committed=%d, expected=%d, "
+                + "read_uncommitted=%d", brokerList, lastCommitted, expected, lastUncommitted));
+      }
       if (iteration == 1 || iteration % 5 == 0) {
         lastUncommitted = countRecords(brokerList, "read_uncommitted");
-        LOGGER.info("Verification iteration {}: read_committed={}, read_uncommitted={}", iteration, lastCommitted,
-            lastUncommitted);
+        LOGGER.info("Verification iteration {}: read_committed={}/{}, read_uncommitted={}", iteration, lastCommitted,
+            expected, lastUncommitted);
       }
       try {
         Thread.sleep(2_000L);
@@ -181,13 +201,12 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
       }
     }
 
-    // Final diagnostic dump
     lastUncommitted = countRecords(brokerList, "read_uncommitted");
-    LOGGER.error("VERIFICATION FAILED after 120s: read_committed={}, read_uncommitted={}", lastCommitted,
+    LOGGER.error("VERIFICATION FAILED after 120s: read_committed={}/{}, read_uncommitted={}", lastCommitted, expected,
         lastUncommitted);
-    throw new AssertionError("[ExactlyOnce] Transaction markers were not propagated within 120s; "
-        + "committed records are not visible to read_committed consumers. "
-        + "read_committed=" + lastCommitted + ", read_uncommitted=" + lastUncommitted);
+    throw new AssertionError(String.format(
+        "[ExactlyOnce] Kafka topic did not expose all %d committed records within 120s; "
+            + "read_committed=%d, read_uncommitted=%d", expected, lastCommitted, lastUncommitted));
   }
 
   /**
