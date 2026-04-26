@@ -126,6 +126,21 @@ class PinotWriteTest extends AnyFunSuite with Matchers {
     ex.getMessage should include("df.write.mode(\"append\")")
   }
 
+  test("PinotWriteBuilder.canOverwrite returns false to surface rejection at the analyzer") {
+    // The default SupportsOverwrite#canOverwrite returns true, which advertises support
+    // that overwrite()/truncate() then immediately reject. Override to false so Spark's
+    // V2Writes analyzer fails the plan earlier and defends against future analyzer changes
+    // that might gate dispatch on this method.
+    import org.apache.spark.sql.sources.{EqualTo, Filter}
+    val info = new TestLogicalWriteInfo(
+      new CaseInsensitiveStringMap(Map.empty[String, String].asJava),
+      StructType(Seq(StructField("id", LongType))))
+    val builder = new PinotWriteBuilder(info)
+
+    builder.canOverwrite(Array.empty[Filter]) shouldBe false
+    builder.canOverwrite(Array[Filter](EqualTo("id", 1L))) shouldBe false
+  }
+
   // -------- abort() runtime cleanup tests --------
   // These cover the new best-effort leftover-tar deletion path that runs on the driver when
   // a write job aborts (one or more tasks failed). The branches exercised are: missing

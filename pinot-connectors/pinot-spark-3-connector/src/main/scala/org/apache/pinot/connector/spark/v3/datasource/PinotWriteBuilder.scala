@@ -49,6 +49,13 @@ class PinotWriteBuilder(logicalWriteInfo: LogicalWriteInfo)
 
   override def build(): Write = new PinotWrite(logicalWriteInfo)
 
+  // The default SupportsOverwrite#canOverwrite returns true, which advertises support that
+  // overwrite()/truncate() then immediately reject. Returning false instead lets Spark's
+  // V2Writes analyzer surface its own rejection earlier, before reaching our throw — and
+  // defends against future Spark analyzer changes that might trust this method to gate the
+  // dispatch to overwrite()/truncate().
+  override def canOverwrite(filters: Array[Filter]): Boolean = false
+
   override def overwrite(filters: Array[Filter]): WriteBuilder = {
     throw new UnsupportedOperationException(
       "The Pinot Spark 3 connector does not support overwrite semantics: df.write always " +
