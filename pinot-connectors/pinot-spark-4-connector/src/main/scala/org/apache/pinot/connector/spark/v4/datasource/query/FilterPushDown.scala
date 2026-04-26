@@ -62,7 +62,9 @@ private[pinot] object FilterPushDown {
     // IN with a null array element similarly leaks the literal `null` into the IN list, which
     // Pinot would interpret syntactically rather than as a Spark NULL. Reject so Spark
     // applies the predicate post-scan; an array of all non-null values is fine to push down.
-    case In(_, value) if value != null && value.contains(null) => false
+    // A null `value` array itself is also rejected — `compileFilter` for `In` calls
+    // `value.isEmpty` and would NPE.
+    case In(_, value) if value == null || value.contains(null) => false
     case _: In => true
     case _: LessThan => true
     case _: LessThanOrEqual => true
@@ -141,9 +143,13 @@ private[pinot] object FilterPushDown {
     val whereCondition = filter match {
       case EqualTo(attr, value) => s"${escapeAttr(attr)} = ${compileValue(value)}"
       case EqualNullSafe(attr, value) =>
-        s"NOT (${escapeAttr(attr)} != ${compileValue(value)} OR ${escapeAttr(attr)} IS NULL OR " +
-          s"${compileValue(value)} IS NULL) OR " +
-          s"(${escapeAttr(attr)} IS NULL AND ${compileValue(value)} IS NULL)"
+        // Bind once: compileValue is currently pure for the supported types, but multiple
+        // calls would diverge if it ever became effectful. The post-scan rejection of
+        // EqualNullSafe(_, null) means `value` is guaranteed non-null here.
+        val escAttr = escapeAttr(attr)
+        val escVal = compileValue(value)
+        s"NOT ($escAttr != $escVal OR $escAttr IS NULL OR $escVal IS NULL) OR " +
+          s"($escAttr IS NULL AND $escVal IS NULL)"
       case LessThan(attr, value) => s"${escapeAttr(attr)} < ${compileValue(value)}"
       case GreaterThan(attr, value) => s"${escapeAttr(attr)} > ${compileValue(value)}"
       case LessThanOrEqual(attr, value) => s"${escapeAttr(attr)} <= ${compileValue(value)}"
