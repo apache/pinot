@@ -2237,6 +2237,29 @@ public class CommonConstants {
     public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS =
         "pinot.query.multistage.dispatch.channel.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Minimum interval, in milliseconds, between client gRPC keep-alive pings that the MSE
+    /// [org.apache.pinot.query.service.server.QueryServer] will accept. Pings arriving more frequently than this are
+    /// counted as "bad pings"; once the server's internal threshold is exceeded it sends `GOAWAY(ENHANCE_YOUR_CALM)`
+    /// with `too_many_pings` debug data and closes the connection.
+    ///
+    /// Defaults to 5 minutes to match Netty's gRPC server default. Operators tuning down the broker dispatch
+    /// `keepAliveTime` (see [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS]) for faster silent-peer detection MUST set
+    /// this to a value less than or equal to the configured client keep-alive time, otherwise the server will tear
+    /// down the dispatch channel. A non-positive value leaves Netty's gRPC server default (currently 5 minutes) in
+    /// place.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.query.server.permit.keep.alive.time.ms";
+    public static final int DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// Whether the MSE [org.apache.pinot.query.service.server.QueryServer] permits client gRPC keep-alive pings when
+    /// there are no active RPCs on the connection. Defaults to `false` to match Netty's gRPC server default. Must be
+    /// set to `true` if brokers configure
+    /// [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS] to `true`, otherwise the server will close idle channels
+    /// with `GOAWAY(ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
   }
 
   public static class NullValuePlaceHolder {
