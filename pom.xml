@@ -1000,6 +1000,19 @@
         <version>${prometheus.metrics.version}</version>
         <scope>test</scope>
       </dependency>
+      <!--
+        Pin prometheus-metrics-model to the same version as prometheus-metrics-core. The JMX
+        exporter (io.prometheus.jmx:collector) brings in an older prometheus-metrics-model
+        transitively, and a model/core version skew causes IllegalArgumentException at metric
+        registration time (the older model still rejects names ending in '_total', which the
+        newer core's Counter builder now passes through unstripped).
+      -->
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>prometheus-metrics-model</artifactId>
+        <version>${prometheus.metrics.version}</version>
+        <scope>test</scope>
+      </dependency>
 
       <!-- netty BOM -->
       <dependency>
