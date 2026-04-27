@@ -166,7 +166,8 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
         } catch (Exception e) {
           LOGGER.debug("[diag] kafka diagnostic count failed", e);
         }
-        LOGGER.warn(
+        // ERROR (not WARN) so the periodic line passes the test BurstFilter that DENIES below-ERROR.
+        LOGGER.error(
             "[diag] elapsed={}ms pinotCount={} expected={} stallMs={} kafkaCommitted={} kafkaUncommitted={} iter={}",
             now - start, lastCount, expected, sinceChangeMs, committedKafka, uncommittedKafka, iterations);
         lastProgressLog = now;

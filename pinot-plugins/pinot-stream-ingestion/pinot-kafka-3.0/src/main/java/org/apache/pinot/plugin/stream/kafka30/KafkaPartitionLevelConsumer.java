@@ -96,7 +96,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
       if (_consecutiveEmptyPolls > 0) {
-        LOGGER.warn("[kafka-consumer-diag] {} records received on {} after {} consecutive empty polls",
+        // ERROR (not WARN) so this passes the test BurstFilter that DENIES below-ERROR.
+        LOGGER.error("[kafka-consumer-diag] {} records received on {} after {} consecutive empty polls",
             records.size(), _topicPartition, _consecutiveEmptyPolls);
         _consecutiveEmptyPolls = 0;
       }
@@ -148,7 +149,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         _lastFetchedOffset = startOffset - 1;
       }
       if (_consecutiveEmptyPolls == 1 || _consecutiveEmptyPolls % 50 == 0) {
-        LOGGER.warn(
+        // ERROR (not WARN) so this passes the test BurstFilter that DENIES below-ERROR.
+        LOGGER.error(
             "[kafka-consumer-diag] empty poll #{} on {} startOffset={} consumerPosition={} lastFetchedOffset={}{}",
             _consecutiveEmptyPolls, _topicPartition, startOffset, currentPosition, _lastFetchedOffset,
             positionEx == null ? "" : (" positionError=" + positionEx));
