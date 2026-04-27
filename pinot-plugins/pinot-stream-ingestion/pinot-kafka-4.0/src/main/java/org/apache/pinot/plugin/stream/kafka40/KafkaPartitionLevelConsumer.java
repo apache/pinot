@@ -47,6 +47,9 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   private long _lastFetchedOffset = -1;
+  // Diagnostic counter: consecutive fetch calls that returned no records. Logged at WARN
+  // every ~50 empty polls so a long stall surfaces in CI surefire output without spam.
+  private int _consecutiveEmptyPolls = 0;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -78,6 +81,11 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     StreamMessageMetadata lastMessageMetadata = null;
     long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
+      if (_consecutiveEmptyPolls > 0) {
+        LOGGER.warn("[kafka-consumer-diag] {} records received on {} after {} consecutive empty polls",
+            records.size(), _topicPartition, _consecutiveEmptyPolls);
+        _consecutiveEmptyPolls = 0;
+      }
       firstOffset = records.get(0).offset();
       _lastFetchedOffset = records.get(records.size() - 1).offset();
       offsetOfNextBatch = _lastFetchedOffset + 1;
@@ -100,23 +108,30 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       // No records were returned to the application by this poll, but the underlying
       // KafkaConsumer's internal position may still have advanced past offsets that were
       // filtered out -- most commonly when read_committed isolation skips an aborted
-      // transactional batch. If we leave _lastFetchedOffset at its prior value (e.g. -1
-      // on the first poll), the seek-on-mismatch check at the top of fetchMessages will
-      // re-seek to startOffset on every subsequent call and we will never make progress
-      // past the aborted region. Track the consumer's actual position so the next call
-      // resumes from there.
+      // transactional batch. Track the consumer's actual position so the next call
+      // resumes from there. If position has not advanced either, still mark
+      // _lastFetchedOffset so the seek-check at the top of the next call skips the
+      // redundant re-seek.
       long currentPosition;
+      Exception positionEx = null;
       try {
         currentPosition = _consumer.position(_topicPartition);
       } catch (Exception e) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Failed to read consumer position after empty poll on {}", _topicPartition, e);
-        }
+        positionEx = e;
         currentPosition = startOffset;
       }
+      _consecutiveEmptyPolls++;
       if (currentPosition > startOffset) {
         _lastFetchedOffset = currentPosition - 1;
         offsetOfNextBatch = currentPosition;
+      } else {
+        _lastFetchedOffset = startOffset - 1;
+      }
+      if (_consecutiveEmptyPolls == 1 || _consecutiveEmptyPolls % 50 == 0) {
+        LOGGER.warn(
+            "[kafka-consumer-diag] empty poll #{} on {} startOffset={} consumerPosition={} lastFetchedOffset={}{}",
+            _consecutiveEmptyPolls, _topicPartition, startOffset, currentPosition, _lastFetchedOffset,
+            positionEx == null ? "" : (" positionError=" + positionEx));
       }
     }
 
