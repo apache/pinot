@@ -34,13 +34,15 @@ import static org.testng.Assert.assertTrue;
 
 /**
  * Verifies that {@link ForwardIndexConfig} Jackson serialization uses the curated
- * {@code @JsonValue toJsonObject()} method and emits each field only when it differs from its
- * class default.
+ * {@code @JsonValue toJsonObject()} method and emits non-cluster-tunable fields only when they
+ * differ from their class default.
  *
- * <p>Particular attention to the cluster-tunable static defaults
- * ({@code _defaultRawIndexWriterVersion}, {@code _defaultTargetMaxChunkSize},
- * {@code _defaultTargetDocsPerChunk}): the serializer must read these at call time so that the
- * serialized form tracks live cluster config.
+ * <p>Particular attention to the cluster-tunable trio ({@code rawIndexWriterVersion},
+ * {@code targetMaxChunkSize}, {@code targetDocsPerChunk}): these are <i>always</i> materialized
+ * regardless of how they relate to the JVM-local static defaults, because
+ * {@code ServiceStartableUtils.initForwardIndexConfig} mutates those statics per-instance from
+ * instance config. Slim-omitting them would let the same ZK payload resolve to different
+ * forward-index settings on different nodes during a rolling upgrade or mismatched-config window.
  */
 public class ForwardIndexConfigSerializationTest {
 
@@ -56,14 +58,23 @@ public class ForwardIndexConfigSerializationTest {
     ForwardIndexConfig.setDefaultTargetDocsPerChunk(_savedTargetDocsPerChunk);
   }
 
+  // The cluster-tunable trio is always materialized by the slim serializer (see class Javadoc).
+  // The keys are: rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk.
+  private static final String[] ALWAYS_EMITTED = {
+      "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk"
+  };
+
   @Test
-  public void testDefaultPojoSerializesToEmptyJson()
+  public void testDefaultPojoSerializesOnlyClusterTunableTrio()
       throws Exception {
     ForwardIndexConfig config = ForwardIndexConfig.getDefault();
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node);
+    assertOnlyKeys(node, ALWAYS_EMITTED);
+    assertEquals(node.get("rawIndexWriterVersion").asInt(), ForwardIndexConfig.getDefaultRawWriterVersion());
+    assertEquals(node.get("targetMaxChunkSize").asText(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
+    assertEquals(node.get("targetDocsPerChunk").asInt(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   @Test
@@ -73,7 +84,9 @@ public class ForwardIndexConfigSerializationTest {
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node, "disabled");
+    // getDisabled() builds via the explicit ctor with all-null settings, so the cluster-tunable
+    // trio is materialized to live defaults.
+    assertOnlyKeys(node, "disabled", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk");
     assertTrue(node.get("disabled").asBoolean());
   }
 
@@ -85,7 +98,7 @@ public class ForwardIndexConfigSerializationTest {
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node, "compressionCodec");
+    assertOnlyKeys(node, "compressionCodec", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk");
     assertEquals(node.get("compressionCodec").asText(), "SNAPPY");
   }
 
@@ -97,7 +110,7 @@ public class ForwardIndexConfigSerializationTest {
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node, "deriveNumDocsPerChunk");
+    assertOnlyKeys(node, "deriveNumDocsPerChunk", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk");
     assertTrue(node.get("deriveNumDocsPerChunk").asBoolean());
   }
 
@@ -110,35 +123,33 @@ public class ForwardIndexConfigSerializationTest {
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node, "rawIndexWriterVersion");
     assertEquals(node.get("rawIndexWriterVersion").asInt(), nonDefault);
   }
 
   /**
-   * The cluster-tunable static {@code _defaultRawIndexWriterVersion} is read at call time, so a
-   * config matching the live cluster default must serialize as empty even after the static is
-   * mutated.
+   * The cluster-tunable trio must be persisted regardless of whether the live JVM-local default
+   * matches the resolved value, so that a node with a different local default does not silently
+   * read a different effective forward-index setting from the same ZK payload. This test pins the
+   * "always materialize" contract: mutating the static after construction does not change what is
+   * emitted — both the original and mutated runs emit the value the POJO is carrying.
    */
   @Test
-  public void testClusterTunableDefaultReadAtCallTime()
+  public void testClusterTunableTrioAlwaysMaterialized()
       throws Exception {
     int original = ForwardIndexConfig.getDefaultRawWriterVersion();
     ForwardIndexConfig config = new ForwardIndexConfig.Builder()
         .withRawIndexWriterVersion(original).build();
 
-    // Sanity: equal to live default, so omitted.
-    assertOnlyKeys(serializeToNode(config));
+    JsonNode firstNode = serializeToNode(config);
+    assertTrue(firstNode.has("rawIndexWriterVersion"),
+        "Cluster-tunable rawIndexWriterVersion must always be materialized: " + firstNode);
+    assertEquals(firstNode.get("rawIndexWriterVersion").asInt(), original);
 
-    // Mutate live default; the same instance now differs from the live default.
-    int mutated = original + 1;
-    ForwardIndexConfig.setDefaultRawIndexWriterVersion(mutated);
+    // Mutating the live default must not affect what is emitted by the same instance.
+    ForwardIndexConfig.setDefaultRawIndexWriterVersion(original + 1);
     JsonNode mutatedNode = serializeToNode(config);
-    assertEquals(mutatedNode.get("rawIndexWriterVersion").asInt(), original);
-
-    // Restore so a config built at the new default again serializes empty.
-    ForwardIndexConfig matchingNewDefault = new ForwardIndexConfig.Builder()
-        .withRawIndexWriterVersion(mutated).build();
-    assertOnlyKeys(serializeToNode(matchingNewDefault));
+    assertEquals(mutatedNode.get("rawIndexWriterVersion").asInt(), original,
+        "Serialized value must be the POJO's stored value, not the (mutated) live default: " + mutatedNode);
   }
 
   @Test
@@ -155,7 +166,7 @@ public class ForwardIndexConfigSerializationTest {
   }
 
   @Test
-  public void testFatJsonStillDeserializes()
+  public void testFatJsonStillDeserializesAndReSerializesWithTrio()
       throws Exception {
     String fat = "{"
         + "\"disabled\":false,"
@@ -168,7 +179,8 @@ public class ForwardIndexConfigSerializationTest {
 
     ForwardIndexConfig config = JsonUtils.stringToObject(fat, ForwardIndexConfig.class);
 
-    assertOnlyKeys(serializeToNode(config));
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, ALWAYS_EMITTED);
   }
 
   @Test

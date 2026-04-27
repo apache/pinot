@@ -255,9 +255,18 @@ public class ForwardIndexConfig extends IndexConfig {
   /**
    * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
    *
-   * <p>Emits each field only when it differs from its class default. The three writer-version /
-   * chunk-size defaults are cluster-tunable statics, so they are read at call time (not captured)
-   * to keep the serialized form consistent with the live cluster default.
+   * <p>Emits {@code disabled}, {@code compressionCodec}, and {@code deriveNumDocsPerChunk} only
+   * when they differ from their class default.
+   *
+   * <p>The three cluster-tunable fields {@code rawIndexWriterVersion}, {@code targetMaxChunkSize},
+   * and {@code targetDocsPerChunk} are <i>always</i> materialized — their underlying defaults
+   * ({@link #_defaultRawIndexWriterVersion}, {@link #_defaultTargetMaxChunkSize},
+   * {@link #_defaultTargetDocsPerChunk}) are JVM-local statics that
+   * {@code ServiceStartableUtils.initForwardIndexConfig} mutates per-instance from instance config
+   * at startup. If we omitted these keys when they matched the writing node's local default, the
+   * same ZK payload would resolve to different forward-index settings on a node whose local
+   * default differs (rolling upgrades, mismatched instance configs). Always emitting them keeps
+   * the persisted shape stable across the cluster — matching the pre-slim contract.
    *
    * <p>Deprecated input keys {@code chunkCompressionType} and {@code dictIdCompressionType} are
    * intentionally not emitted — their getters were already {@code @JsonIgnore}, so the slim form
@@ -276,16 +285,10 @@ public class ForwardIndexConfig extends IndexConfig {
     if (_deriveNumDocsPerChunk) {
       node.put("deriveNumDocsPerChunk", true);
     }
-    // Read cluster-tunable statics at call time so the serialized form tracks the live default.
-    if (_rawIndexWriterVersion != _defaultRawIndexWriterVersion) {
-      node.put("rawIndexWriterVersion", _rawIndexWriterVersion);
-    }
-    if (!Objects.equals(_targetMaxChunkSize, _defaultTargetMaxChunkSize)) {
-      node.put("targetMaxChunkSize", _targetMaxChunkSize);
-    }
-    if (_targetDocsPerChunk != _defaultTargetDocsPerChunk) {
-      node.put("targetDocsPerChunk", _targetDocsPerChunk);
-    }
+    // Always materialize the cluster-tunable trio (see Javadoc above).
+    node.put("rawIndexWriterVersion", _rawIndexWriterVersion);
+    node.put("targetMaxChunkSize", _targetMaxChunkSize);
+    node.put("targetDocsPerChunk", _targetDocsPerChunk);
     return node;
   }
 

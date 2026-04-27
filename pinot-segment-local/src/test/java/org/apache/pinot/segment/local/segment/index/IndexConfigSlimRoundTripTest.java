@@ -28,7 +28,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -49,9 +49,6 @@ public class IndexConfigSlimRoundTripTest extends AbstractSerdeIndexContract {
   @DataProvider(name = "slimConfigs")
   public static Object[][] slimConfigs() {
     return new Object[][] {
-        // forward
-        {"forward", "{\"compressionCodec\":\"SNAPPY\"}", "ForwardIndexConfig"},
-        {"forward", "{\"deriveNumDocsPerChunk\":true}", "ForwardIndexConfig"},
         // dictionary
         {"dictionary", "{\"onHeap\":true}", "DictionaryIndexConfig"},
         {"dictionary", "{\"useVarLengthDictionary\":true}", "DictionaryIndexConfig"},
@@ -69,7 +66,10 @@ public class IndexConfigSlimRoundTripTest extends AbstractSerdeIndexContract {
         {"h3", "{\"resolution\":[5,6]}", "H3IndexConfig"},
         // disabled (universal)
         {"bloom", "{\"disabled\":true}", "BloomFilterConfig"},
-        {"forward", "{\"disabled\":true}", "ForwardIndexConfig"},
+        // NOTE: forward is intentionally excluded from this data provider because
+        // ForwardIndexConfig always materializes its cluster-tunable trio
+        // (rawIndexWriterVersion / targetMaxChunkSize / targetDocsPerChunk) regardless of input.
+        // It has its own dedicated tests below.
     };
   }
 
@@ -100,12 +100,14 @@ public class IndexConfigSlimRoundTripTest extends AbstractSerdeIndexContract {
   }
 
   /**
-   * Sanity guard: ensure no resolved config emits a known "fattening" key when the slim
-   * input omitted it. This is a strict subset of the round-trip assertion above but
-   * fails with a clearer message when a serializer regresses.
+   * ForwardIndexConfig deliberately does <i>not</i> participate in the universal slim round-trip
+   * because its cluster-tunable trio ({@code rawIndexWriterVersion}, {@code targetMaxChunkSize},
+   * {@code targetDocsPerChunk}) is always materialized — see
+   * {@code ForwardIndexConfig.toJsonObject()} Javadoc and the discussion on apache/pinot#18317.
+   * This test pins that contract end-to-end through {@code IndexType.getConfig(...)}.
    */
   @Test
-  public void slimForwardConfigDoesNotEmitClusterTunableDefaults()
+  public void slimForwardConfigAlwaysMaterializesClusterTunableTrio()
       throws IOException {
     addFieldIndexConfig("{"
         + "\"name\": \"dimInt\","
@@ -115,12 +117,14 @@ public class IndexConfigSlimRoundTripTest extends AbstractSerdeIndexContract {
     IndexConfig resolved = getActualConfig("dimInt", StandardIndexes.forward());
     JsonNode slim = JsonUtils.stringToJsonNode(JsonUtils.objectToString(resolved));
 
-    assertFalse(slim.has("rawIndexWriterVersion"),
-        "Cluster-tunable default rawIndexWriterVersion must not leak into slim output: " + slim);
-    assertFalse(slim.has("targetMaxChunkSize"),
-        "Cluster-tunable default targetMaxChunkSize must not leak into slim output: " + slim);
-    assertFalse(slim.has("targetDocsPerChunk"),
-        "Cluster-tunable default targetDocsPerChunk must not leak into slim output: " + slim);
+    assertTrue(slim.has("rawIndexWriterVersion"),
+        "Cluster-tunable rawIndexWriterVersion must always be materialized: " + slim);
+    assertTrue(slim.has("targetMaxChunkSize"),
+        "Cluster-tunable targetMaxChunkSize must always be materialized: " + slim);
+    assertTrue(slim.has("targetDocsPerChunk"),
+        "Cluster-tunable targetDocsPerChunk must always be materialized: " + slim);
+    // The user-supplied non-default field must still survive the round-trip.
+    assertEquals(slim.get("compressionCodec").asText(), "SNAPPY");
   }
 
   // ---- Helpers ----
