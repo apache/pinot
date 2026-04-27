@@ -213,6 +213,15 @@ class FilterPushDownTest extends BaseTest {
     postScan should contain only f
   }
 
+  test("In with an empty value array compiles to a CASE expression mirroring SQL semantics") {
+    // SQL `x IN ()` is FALSE for non-null x and NULL for null x. Pinot does not parse `IN ()`
+    // syntactically, so the connector emits a CASE that reproduces that contract.
+    val whereClause = FilterPushDown.compileFiltersToSqlWhereClause(
+      Array[Filter](In("attr", Array.empty[Any])))
+    whereClause.get shouldEqual
+      """(CASE WHEN "attr" IS NULL THEN NULL ELSE FALSE END)"""
+  }
+
   test("Filters with collection-shaped or unrecognized literal values fall back to post-scan") {
     // Spark Catalyst typically passes Java-boxed primitives, Strings, java.sql.Timestamp/
     // Date, or Array[Any]. Anything else (Seq/List/Vector/Set/Map, or arbitrary case
