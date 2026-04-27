@@ -276,6 +276,7 @@ public class DriverUtils {
           return numVal;
         }
       } catch (NumberFormatException e) {
+        // Not a Long, try the next format
       }
 
       try {
@@ -284,6 +285,7 @@ public class DriverUtils {
           return numVal;
         }
       } catch (NumberFormatException e) {
+        // Not a Double, try the next format
       }
 
       Boolean boolVal = Boolean.valueOf(str.toLowerCase());

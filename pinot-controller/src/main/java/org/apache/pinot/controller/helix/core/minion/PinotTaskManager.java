@@ -890,7 +890,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
             if (lock != null) {
               acquiredTaskLocks.put(tableName, lock);
             }
-          } catch (RuntimeException ignore) {
+          } catch (RuntimeException e) {
+            LOGGER.warn("Failed to acquire task lock for task type: {} on table: {}", taskType, tableName, e);
           }
         }
 

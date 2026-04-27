@@ -212,7 +212,8 @@ public class S3Config {
     try {
       // try format like '1hr20s'
       return Duration.ofMillis(TimeUtils.convertPeriodToMillis(durStr));
-    } catch (Exception ignore) {
+    } catch (Exception e) {
+      // Not a period format, try ISO-8601 duration format
     }
     try {
       // try format like 'PT1H20S'
