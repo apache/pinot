@@ -293,6 +293,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         multiClusterRoutingContext);
   }
 
+  /**
+   * Override to supply a custom {@link MultiStageBrokerRequestHandler} subclass (e.g. one that
+   * overrides {@code onQueryCompletion(RequestContext, BrokerResponse)} for async query logging).
+   * The default implementation returns a plain {@link MultiStageBrokerRequestHandler}.
+   */
+  protected MultiStageBrokerRequestHandler createMultiStageBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      MultiStageQueryThrottler multiStageQueryThrottler, FailureDetector failureDetector,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager) {
+    return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
+        threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
+  }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
@@ -507,7 +524,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         multiClusterWorkerManager = workerManager;
       }
       multiStageBrokerRequestHandler =
-          new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createMultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;
