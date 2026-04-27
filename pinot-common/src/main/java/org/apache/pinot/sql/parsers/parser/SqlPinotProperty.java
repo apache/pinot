@@ -30,15 +30,13 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
-/**
- * One {@code 'key' = 'value'} entry inside a {@code PROPERTIES (...)} clause.
- *
- * <p>Both key and value are parsed as quoted string literals to keep the property surface area
- * uniform and forward-compatible. This lets stream/minion-task configs (whose keys evolve outside
- * the DDL grammar) be passed through verbatim without grammar changes.
- *
- * <p>This class is not thread-safe; instances should not be mutated after construction.
- */
+/// One `'key' = 'value'` entry inside a `PROPERTIES (...)` clause.
+///
+/// Both key and value are parsed as quoted string literals to keep the property surface area
+/// uniform and forward-compatible. This lets stream/minion-task configs (whose keys evolve outside
+/// the DDL grammar) be passed through verbatim without grammar changes.
+///
+/// This class is not thread-safe; instances should not be mutated after construction.
 public class SqlPinotProperty extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("PROPERTY", SqlKind.OTHER);

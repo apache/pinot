@@ -31,12 +31,10 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
-/**
- * Pinot-native {@code SHOW TABLES [FROM db]} DDL statement. Lists tables in the given database
- * (or the default database when none is specified).
- *
- * <p>This class is not thread-safe; instances should not be mutated after construction.
- */
+/// Pinot-native `SHOW TABLES [FROM db]` DDL statement. Lists tables in the given database
+/// (or the default database when none is specified).
+///
+/// This class is not thread-safe; instances should not be mutated after construction.
 public class SqlPinotShowTables extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("SHOW_TABLES", SqlKind.OTHER_DDL);
@@ -48,9 +46,7 @@ public class SqlPinotShowTables extends SqlCall {
     _database = database;
   }
 
-  /**
-   * @return the explicit database identifier when {@code FROM <db>} is supplied, else {@code null}.
-   */
+  /// @return the explicit database identifier when ``FROM db`` is supplied, else `null`.
   @Nullable
   public SqlIdentifier getDatabase() {
     return _database;

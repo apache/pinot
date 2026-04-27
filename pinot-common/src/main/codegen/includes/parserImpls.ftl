@@ -45,10 +45,8 @@ SqlNodeList DataFileDefList() :
     }
 }
 
-/**
- * INSERT INTO [db_name.]table_name
- *   FROM [ FILE | ARCHIVE ] 'file_uri' [, [ FILE | ARCHIVE ] 'file_uri' ]
- */
+/// INSERT INTO [db_name.]table_name
+/// FROM [ FILE | ARCHIVE ] 'file_uri' [, [ FILE | ARCHIVE ] 'file_uri' ]
 SqlInsertFromFile SqlInsertFromFile() :
 {
     SqlParserPos pos;
@@ -110,15 +108,13 @@ SqlNode SqlPhysicalExplain() :
     }
 }
 
-/**
- * CREATE TABLE [IF NOT EXISTS] [db.]name (
- *   col TYPE [NULL | NOT NULL] [DEFAULT literal]
- *     [ DIMENSION | METRIC | DATETIME FORMAT 'fmt' GRANULARITY 'gran' ],
- *   ...
- * )
- * TABLE_TYPE = OFFLINE | REALTIME
- * [ PROPERTIES ( 'k' = 'v', ... ) ]
- */
+/// CREATE TABLE [IF NOT EXISTS] [db.]name (
+/// col TYPE [NULL | NOT NULL] [DEFAULT literal]
+/// [ DIMENSION | METRIC | DATETIME FORMAT 'fmt' GRANULARITY 'gran' ],
+/// ...
+/// )
+/// TABLE_TYPE = OFFLINE | REALTIME
+/// [ PROPERTIES ( 'k' = 'v', ... ) ]
 SqlNode SqlPinotCreateTable() :
 {
     SqlParserPos pos;
@@ -263,9 +259,7 @@ SqlPinotProperty PinotProperty() :
     }
 }
 
-/**
- * DROP TABLE [IF EXISTS] [db.]name [TYPE OFFLINE | REALTIME]
- */
+/// DROP TABLE [IF EXISTS] [db.]name [TYPE OFFLINE | REALTIME]
 SqlNode SqlPinotDropTable() :
 {
     SqlParserPos pos;
@@ -284,14 +278,12 @@ SqlNode SqlPinotDropTable() :
     }
 }
 
-/**
- * SHOW TABLES [FROM db]
- *  | SHOW CREATE TABLE [db.]name [TYPE OFFLINE | REALTIME]
- *
- * Both grammar branches share a leading <SHOW> token; combining them into a single entry point
- * keeps the JavaCC choice unambiguous (no need for LOOKAHEAD across multiple statementParser
- * methods that all start with SHOW).
- */
+/// SHOW TABLES [FROM db]
+/// | SHOW CREATE TABLE [db.]name [TYPE OFFLINE | REALTIME]
+///
+/// Both grammar branches share a leading `SHOW` token; combining them into a single entry point
+/// keeps the JavaCC choice unambiguous (no need for LOOKAHEAD across multiple statementParser
+/// methods that all start with SHOW).
 SqlNode SqlPinotShow() :
 {
     SqlParserPos pos;

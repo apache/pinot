@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-/** Discriminator for the operation a {@link CompiledDdl} represents. */
+/// Discriminator for the operation a [CompiledDdl] represents.
 public enum DdlOperation {
   CREATE_TABLE,
   DROP_TABLE,

@@ -23,13 +23,11 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 
 
-/**
- * Result of compiling {@code SHOW CREATE TABLE [db.]name [TYPE OFFLINE | REALTIME]}.
- *
- * <p>This is a lookup-only compile result: it carries the target identifier and (optional)
- * type filter; the controller is responsible for fetching the persisted Schema + TableConfig and
- * running them through the canonical DDL emitter.
- */
+/// Result of compiling `SHOW CREATE TABLE [db.]name [TYPE OFFLINE | REALTIME]`.
+///
+/// This is a lookup-only compile result: it carries the target identifier and (optional)
+/// type filter; the controller is responsible for fetching the persisted Schema + TableConfig and
+/// running them through the canonical DDL emitter.
 public final class CompiledShowCreateTable extends CompiledDdl {
   private final String _rawTableName;
   private final TableType _tableType;
@@ -41,17 +39,15 @@ public final class CompiledShowCreateTable extends CompiledDdl {
     _tableType = tableType;
   }
 
-  /** Bare table name with no database prefix and no _OFFLINE/_REALTIME suffix. */
+  /// Bare table name with no database prefix and no _OFFLINE/_REALTIME suffix.
   public String getRawTableName() {
     return _rawTableName;
   }
 
-  /**
-   * @return the requested type, or {@code null} when the user omitted the {@code TYPE} clause.
-   *     When null, the controller picks the variant that exists; when both OFFLINE and REALTIME
-   *     variants exist, the controller returns 400 BAD_REQUEST and the caller must specify
-   *     {@code TYPE OFFLINE} or {@code TYPE REALTIME} explicitly.
-   */
+  /// @return the requested type, or `null` when the user omitted the `TYPE` clause.
+  /// When null, the controller picks the variant that exists; when both OFFLINE and REALTIME
+  /// variants exist, the controller returns 400 BAD_REQUEST and the caller must specify
+  /// `TYPE OFFLINE` or `TYPE REALTIME` explicitly.
   @Nullable
   public TableType getTableType() {
     return _tableType;

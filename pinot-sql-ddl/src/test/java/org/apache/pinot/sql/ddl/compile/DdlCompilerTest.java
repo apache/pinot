@@ -37,7 +37,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/** End-to-end compiler tests: SQL → CompiledDdl → Schema + TableConfig. */
+/// End-to-end compiler tests: SQL → CompiledDdl → Schema + TableConfig.
 public class DdlCompilerTest {
 
   // -------------------------------------------------------------------------------------------
@@ -167,14 +167,17 @@ public class DdlCompilerTest {
             + "  ts LONG DATETIME FORMAT '1:MILLISECONDS:EPOCH' GRANULARITY '1:MILLISECONDS'"
             + ") TABLE_TYPE = REALTIME PROPERTIES ("
             + "  'timeColumnName' = 'ts',"
+            + "  'streamtype' = 'kafka',"
             + "  'stream.kafka.topic.name' = 'orders',"
             + "  'stream.kafka.consumer.factory.class.name' = 'KafkaConsumerFactory',"
             + "  'realtime.segment.flush.threshold.rows' = '500000'"
             + ")");
     Map<String, String> stream = c.getTableConfig().getIndexingConfig().getStreamConfigs();
     assertNotNull(stream);
-    // Both "stream.*" and "realtime.*" prefixes route to streamConfigs because that is where
+    // "streamType", "stream.*", and "realtime.*" route to streamConfigs because that is where
     // Pinot actually reads them; routing elsewhere would make them silently inert.
+    assertEquals(stream.get("streamType"), "kafka");
+    assertFalse(stream.containsKey("streamtype"));
     assertEquals(stream.get("stream.kafka.topic.name"), "orders");
     assertEquals(stream.get("stream.kafka.consumer.factory.class.name"), "KafkaConsumerFactory");
     assertEquals(stream.get("realtime.segment.flush.threshold.rows"), "500000");
@@ -198,12 +201,10 @@ public class DdlCompilerTest {
     assertEquals(defaultValue, "unknown");
   }
 
-  /**
-   * TABLE_TYPE parsing is case-insensitive (parseTableType uses equalsIgnoreCase), but the
-   * compiled TableConfig always stores the canonical uppercase form. Lock in the
-   * lowercase-input → uppercase-output behavior so a future grammar tightening cannot silently
-   * regress to case-sensitive matching.
-   */
+  /// TABLE_TYPE parsing is case-insensitive (parseTableType uses equalsIgnoreCase), but the
+  /// compiled TableConfig always stores the canonical uppercase form. Lock in the
+  /// lowercase-input → uppercase-output behavior so a future grammar tightening cannot silently
+  /// regress to case-sensitive matching.
   @Test
   public void lowercaseTableTypeAcceptedAndCanonicalized() {
     CompiledCreateTable lowerCase = compileCreate(
@@ -215,11 +216,9 @@ public class DdlCompilerTest {
     assertEquals(mixedCase.getTableConfig().getTableType(), TableType.REALTIME);
   }
 
-  /**
-   * DEFAULT literals must be compatible with the column's declared data type. Non-numeric
-   * defaults on numeric columns must be rejected at compile time with a clear error rather
-   * than failing at first ingestion with a downstream-layer error.
-   */
+  /// DEFAULT literals must be compatible with the column's declared data type. Non-numeric
+  /// defaults on numeric columns must be rejected at compile time with a clear error rather
+  /// than failing at first ingestion with a downstream-layer error.
   @Test
   public void defaultLiteralWrongTypeRejected() {
     DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
@@ -230,11 +229,9 @@ public class DdlCompilerTest {
         "expected error to name the column, got: " + ex.getMessage());
   }
 
-  /**
-   * SMALLINT and TINYINT are explicitly rejected to keep the type contract narrow: silently
-   * widening to INT today would lock those DDLs into INT semantics if Pinot later adds
-   * INT8/INT16. Rejection at the boundary is reversible; silent promotion is not.
-   */
+  /// SMALLINT and TINYINT are explicitly rejected to keep the type contract narrow: silently
+  /// widening to INT today would lock those DDLs into INT semantics if Pinot later adds
+  /// INT8/INT16. Rejection at the boundary is reversible; silent promotion is not.
   @Test
   public void smallintTinyintRejectedExplicitly() {
     DdlCompilationException ex1 = expectThrows(DdlCompilationException.class, () -> compileCreate(
@@ -247,12 +244,10 @@ public class DdlCompilerTest {
         "expected error to name TINYINT, got: " + ex2.getMessage());
   }
 
-  /**
-   * DEFAULT NULL is semantically meaningless for Pinot's "default null value" concept (the
-   * value used when the source row is null). A user writing it would get silently no-op
-   * behavior under the previous implementation; we now reject explicitly so the user sees a
-   * clear error and corrects their DDL.
-   */
+  /// DEFAULT NULL is semantically meaningless for Pinot's "default null value" concept (the
+  /// value used when the source row is null). A user writing it would get silently no-op
+  /// behavior under the previous implementation; we now reject explicitly so the user sees a
+  /// clear error and corrects their DDL.
   @Test
   public void defaultNullRejectedExplicitly() {
     DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
@@ -331,9 +326,28 @@ public class DdlCompilerTest {
   }
 
   @Test
-  public void metricRoleRequiresNumericType() {
-    expectThrows(DdlCompilationException.class, () -> compileCreate(
+  public void queryOptionsRejected() {
+    DdlCompilationException setOption = expectThrows(DdlCompilationException.class, () -> DdlCompiler.compile(
+        "SET timeoutMs = '1'; CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE"));
+    assertTrue(setOption.getMessage().contains("query options"), setOption.getMessage());
+
+    DdlCompilationException legacyOption = expectThrows(DdlCompilationException.class, () -> DdlCompiler.compile(
+        "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE OPTION(timeoutMs = '1')"));
+    assertTrue(legacyOption.getMessage().contains("query options"), legacyOption.getMessage());
+  }
+
+  @Test
+  public void metricRoleRequiresMetricCompatibleType() {
+    DdlCompilationException e = expectThrows(DdlCompilationException.class, () -> compileCreate(
         "CREATE TABLE t (s STRING METRIC) TABLE_TYPE = OFFLINE"));
+    assertTrue(e.getMessage().contains("metric-compatible"), e.getMessage());
+  }
+
+  @Test
+  public void bytesMetricRoleIsAccepted() {
+    CompiledCreateTable c = compileCreate("CREATE TABLE t (digest BYTES METRIC) TABLE_TYPE = OFFLINE");
+    assertTrue(c.getSchema().getFieldSpecFor("digest") instanceof MetricFieldSpec);
+    assertEquals(c.getSchema().getFieldSpecFor("digest").getDataType(), DataType.BYTES);
   }
 
   @Test
@@ -347,6 +361,12 @@ public class DdlCompilerTest {
     expectThrows(DdlCompilationException.class, () -> compileCreate(
         "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE PROPERTIES ("
             + "  'stream.kafka.topic.name' = 'orders')"));
+  }
+
+  @Test
+  public void streamTypePropertyOnOfflineTableRejected() {
+    expectThrows(DdlCompilationException.class, () -> compileCreate(
+        "CREATE TABLE t (id INT) TABLE_TYPE = OFFLINE PROPERTIES ('streamType' = 'kafka')"));
   }
 
   @Test

@@ -33,29 +33,27 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
-/**
- * Pinot-native {@code CREATE TABLE} DDL statement.
- *
- * <p>Syntax:
- * <pre>{@code
- *   CREATE TABLE [IF NOT EXISTS] [db.]name (
- *     col TYPE [NULL | NOT NULL] [DEFAULT literal] [DIMENSION | METRIC],
- *     col TYPE DATETIME FORMAT 'fmt' GRANULARITY 'gran',
- *     ...
- *   )
- *   [PRIMARY KEY (col, ...)]
- *   TABLE_TYPE = OFFLINE | REALTIME
- *   PROPERTIES (
- *     'key' = 'value',
- *     ...
- *   )
- * }</pre>
- *
- * <p>This is a parse-time AST node only. Semantic validation (data type recognition, role
- * inference, property mapping) happens in {@code DdlCompiler} in the {@code pinot-sql-ddl} module.
- *
- * <p>This class is not thread-safe; instances should not be mutated after construction.
- */
+/// Pinot-native `CREATE TABLE` DDL statement.
+///
+/// Syntax:
+/// ```
+///   CREATE TABLE [IF NOT EXISTS] [db.]name (
+///     col TYPE [NULL | NOT NULL] [DEFAULT literal] [DIMENSION | METRIC],
+///     col TYPE DATETIME FORMAT 'fmt' GRANULARITY 'gran',
+///     ...
+///   )
+///   [PRIMARY KEY (col, ...)]
+///   TABLE_TYPE = OFFLINE | REALTIME
+///   PROPERTIES (
+///     'key' = 'value',
+///     ...
+///   )
+/// ```
+///
+/// This is a parse-time AST node only. Semantic validation (data type recognition, role
+/// inference, property mapping) happens in `DdlCompiler` in the `pinot-sql-ddl` module.
+///
+/// This class is not thread-safe; instances should not be mutated after construction.
 public class SqlPinotCreateTable extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("CREATE_TABLE", SqlKind.CREATE_TABLE);

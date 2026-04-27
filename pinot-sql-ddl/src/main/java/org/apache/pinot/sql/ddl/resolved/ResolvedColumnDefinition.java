@@ -22,12 +22,10 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Normalized column definition produced by the DDL compiler. Independent of the Calcite parse
- * tree so downstream stages (Schema generation, reverse compilation) do not depend on the parser.
- *
- * <p>Immutable; instances are safe to share across threads.
- */
+/// Normalized column definition produced by the DDL compiler. Independent of the Calcite parse
+/// tree so downstream stages (Schema generation, reverse compilation) do not depend on the parser.
+///
+/// Immutable; instances are safe to share across threads.
 public final class ResolvedColumnDefinition {
   private final String _name;
   private final DataType _dataType;

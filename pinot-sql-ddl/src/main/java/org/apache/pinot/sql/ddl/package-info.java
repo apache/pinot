@@ -17,59 +17,51 @@
  * under the License.
  */
 
-/**
- * Apache Pinot SQL DDL feature: compile and reverse-emit DDL statements.
- *
- * <h2>Module layering</h2>
- * The grammar (FreeMarker {@code parserImpls.ftl}) and the AST nodes ({@code SqlPinotCreateTable},
- * {@code SqlPinotDropTable}, etc.) live in {@code pinot-common} so the controller can invoke the
- * Calcite parser without pulling this module. This module ({@code pinot-sql-ddl}) contains the
- * Pinot-specific compile/resolve/reverse-emit logic that turns parser AST nodes into
- * {@link org.apache.pinot.spi.config.table.TableConfig} / {@link org.apache.pinot.spi.data.Schema}
- * pairs and back. Dependencies: {@code pinot-spi} + {@code pinot-common} + {@code calcite-core}.
- *
- * <h2>Sub-packages</h2>
- * <ul>
- *   <li>{@link org.apache.pinot.sql.ddl.compile} — forward path: parser AST → compiled DDL
- *       artifact ({@code CompiledCreateTable}, {@code CompiledDropTable}, etc.). The entry point
- *       is {@link org.apache.pinot.sql.ddl.compile.DdlCompiler#compile(String)}.</li>
- *   <li>{@link org.apache.pinot.sql.ddl.resolved} — typed intermediate representation of resolved
- *       column declarations and table metadata, consumed only by the compiler.</li>
- *   <li>{@link org.apache.pinot.sql.ddl.reverse} — reverse path: stored {@code Schema} +
- *       {@code TableConfig} → canonical DDL string. Used by {@code SHOW CREATE TABLE}.</li>
- * </ul>
- *
- * <h2>Thread safety</h2>
- * All compiler / emitter classes are stateless and safe for concurrent use. The compiled artifacts
- * ({@code CompiledCreateTable} etc.) are immutable views over freshly-constructed {@code Schema}
- * and {@code TableConfig} objects; callers are responsible for not mutating them after compilation.
- *
- * <h2>Exception → HTTP-status contract</h2>
- * The DDL compiler signals errors via two exception types, which the REST resource translates as:
- * <ul>
- *   <li>{@link org.apache.pinot.sql.ddl.compile.DdlCompilationException}: caller-actionable
- *       compile-time errors (unsupported types, malformed property values, type-incompatible
- *       defaults, reserved keys). Surfaced as HTTP 400.</li>
- *   <li>{@link java.lang.IllegalArgumentException} from {@code CanonicalDdlEmitter.emit(...)}:
- *       canonical DDL grammar cannot represent the schema/config (e.g. unsupported column types
- *       like MAP/LIST/STRUCT, or TableCustomConfig keys that collide with reserved DDL property
- *       names). Surfaced as HTTP 400.</li>
- *   <li>Any other {@link java.lang.RuntimeException} from emit/compile is treated as a controller
- *       defect and surfaced as HTTP 500.</li>
- * </ul>
- *
- * <h2>Evolution policy</h2>
- * Adding a new TableConfig property:
- * <ol>
- *   <li>If it has a builder setter and round-trips as a single string, add it to
- *       {@link org.apache.pinot.sql.ddl.compile.PropertyMapping#applyPromoted} (forward path) and
- *       {@link org.apache.pinot.sql.ddl.reverse.PropertyExtractor} (reverse path).</li>
- *   <li>Add the lowercase key to {@code RESERVED_ROUND_TRIP_KEYS} so user-supplied
- *       {@code TableCustomConfig} entries cannot shadow the promoted name.</li>
- *   <li>Cover the round-trip in {@code RoundTripTest}.</li>
- * </ol>
- * Adding a new column attribute (e.g. a new role beyond DIMENSION/METRIC/DATETIME) requires
- * coordinated changes to {@code parserImpls.ftl}, {@code SqlPinotColumnDeclaration},
- * {@code DdlCompiler.toFieldSpec}, and {@code SchemaEmitter.emitColumn} — keep them in sync.
- */
+/// Apache Pinot SQL DDL feature: compile and reverse-emit DDL statements.
+///
+/// ## Module layering
+/// The grammar (FreeMarker `parserImpls.ftl`) and the AST nodes (`SqlPinotCreateTable`,
+/// `SqlPinotDropTable`, etc.) live in `pinot-common` so the controller can invoke the
+/// Calcite parser without pulling this module. This module (`pinot-sql-ddl`) contains the
+/// Pinot-specific compile/resolve/reverse-emit logic that turns parser AST nodes into
+/// [org.apache.pinot.spi.config.table.TableConfig] / [org.apache.pinot.spi.data.Schema]
+/// pairs and back. Dependencies: `pinot-spi` + `pinot-common` + `calcite-core`.
+///
+/// ## Sub-packages
+/// - [org.apache.pinot.sql.ddl.compile] — forward path: parser AST → compiled DDL
+/// artifact (`CompiledCreateTable`, `CompiledDropTable`, etc.). The entry point
+/// is [org.apache.pinot.sql.ddl.compile.DdlCompiler#compile(String)].
+/// - [org.apache.pinot.sql.ddl.resolved] — typed intermediate representation of resolved
+/// column declarations and table metadata, consumed only by the compiler.
+/// - [org.apache.pinot.sql.ddl.reverse] — reverse path: stored `Schema` +
+/// `TableConfig` → canonical DDL string. Used by `SHOW CREATE TABLE`.
+///
+/// ## Thread safety
+/// All compiler / emitter classes are stateless and safe for concurrent use. The compiled artifacts
+/// (`CompiledCreateTable` etc.) are immutable views over freshly-constructed `Schema`
+/// and `TableConfig` objects; callers are responsible for not mutating them after compilation.
+///
+/// ## Exception → HTTP-status contract
+/// The DDL compiler signals errors via two exception types, which the REST resource translates as:
+/// - [org.apache.pinot.sql.ddl.compile.DdlCompilationException]: caller-actionable
+/// compile-time errors (unsupported types, malformed property values, type-incompatible
+/// defaults, reserved keys). Surfaced as HTTP 400.
+/// - [java.lang.IllegalArgumentException] from `CanonicalDdlEmitter.emit(...)`:
+/// canonical DDL grammar cannot represent the schema/config (e.g. unsupported column types
+/// like MAP/LIST/STRUCT, or TableCustomConfig keys that collide with reserved DDL property
+/// names). Surfaced as HTTP 400.
+/// - Any other [java.lang.RuntimeException] from emit/compile is treated as a controller
+/// defect and surfaced as HTTP 500.
+///
+/// ## Evolution policy
+/// Adding a new TableConfig property:
+/// 1. If it has a builder setter and round-trips as a single string, add it to
+/// [org.apache.pinot.sql.ddl.compile.PropertyMapping#applyPromoted] (forward path) and
+/// [org.apache.pinot.sql.ddl.reverse.PropertyExtractor] (reverse path).
+/// 1. Add the lowercase key to `RESERVED_ROUND_TRIP_KEYS` so user-supplied
+/// `TableCustomConfig` entries cannot shadow the promoted name.
+/// 1. Cover the round-trip in `RoundTripTest`.
+/// Adding a new column attribute (e.g. a new role beyond DIMENSION/METRIC/DATETIME) requires
+/// coordinated changes to `parserImpls.ftl`, `SqlPinotColumnDeclaration`,
+/// `DdlCompiler.toFieldSpec`, and `SchemaEmitter.emitColumn` — keep them in sync.
 package org.apache.pinot.sql.ddl;

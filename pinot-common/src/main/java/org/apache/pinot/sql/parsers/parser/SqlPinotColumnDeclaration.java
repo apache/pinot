@@ -33,29 +33,27 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
-/**
- * Single column declaration inside the column list of a Pinot {@link SqlPinotCreateTable}.
- *
- * <p>Grammar:
- * <pre>{@code
- *   col_name DATA_TYPE [NULL | NOT NULL] [DEFAULT literal]
- *     [ DIMENSION | METRIC | DATETIME FORMAT 'fmt' GRANULARITY 'gran' ]
- * }</pre>
- *
- * <p>The {@code role} field is one of "DIMENSION", "METRIC", "DATETIME", or {@code null}
- * (unspecified, defer inference to the compiler). When {@code role} is "DATETIME", the
- * {@code dateTimeFormat} and {@code dateTimeGranularity} string literals are required.
- * When {@code role} is "DIMENSION", the optional {@code ARRAY} suffix marks the column as
- * multi-value (Pinot MV dimension).
- *
- * <p><b>DEFAULT semantics</b>: the {@code DEFAULT literal} clause maps to Pinot's
- * {@code FieldSpec.defaultNullValue}, NOT to standard SQL's "value substituted on insert when
- * column is omitted". Pinot's defaultNullValue is applied at ingestion time when the source
- * record contains a null/missing value for the column. Users coming from standard SQL should
- * not expect this clause to interact with INSERT statements.
- *
- * <p>This class is not thread-safe; instances should not be mutated after construction.
- */
+/// Single column declaration inside the column list of a Pinot [SqlPinotCreateTable].
+///
+/// Grammar:
+/// ```
+///   col_name DATA_TYPE [NULL | NOT NULL] [DEFAULT literal]
+///     [ DIMENSION | METRIC | DATETIME FORMAT 'fmt' GRANULARITY 'gran' ]
+/// ```
+///
+/// The `role` field is one of "DIMENSION", "METRIC", "DATETIME", or `null`
+/// (unspecified, defer inference to the compiler). When `role` is "DATETIME", the
+/// `dateTimeFormat` and `dateTimeGranularity` string literals are required.
+/// When `role` is "DIMENSION", the optional `ARRAY` suffix marks the column as
+/// multi-value (Pinot MV dimension).
+///
+/// **DEFAULT semantics**: the `DEFAULT literal` clause maps to Pinot's
+/// `FieldSpec.defaultNullValue`, NOT to standard SQL's "value substituted on insert when
+/// column is omitted". Pinot's defaultNullValue is applied at ingestion time when the source
+/// record contains a null/missing value for the column. Users coming from standard SQL should
+/// not expect this clause to interact with INSERT statements.
+///
+/// This class is not thread-safe; instances should not be mutated after construction.
 public class SqlPinotColumnDeclaration extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("COLUMN_DECL", SqlKind.COLUMN_DECL);
@@ -106,9 +104,7 @@ public class SqlPinotColumnDeclaration extends SqlCall {
     return _defaultValue;
   }
 
-  /**
-   * @return one of "DIMENSION", "METRIC", "DATETIME", or {@code null} when unspecified.
-   */
+  /// @return one of "DIMENSION", "METRIC", "DATETIME", or `null` when unspecified.
   @Nullable
   public String getRole() {
     return _role;
@@ -124,7 +120,7 @@ public class SqlPinotColumnDeclaration extends SqlCall {
     return _dateTimeGranularity;
   }
 
-  /** Returns true if this is a multi-value dimension (declared with {@code DIMENSION ARRAY}). */
+  /// Returns true if this is a multi-value dimension (declared with `DIMENSION ARRAY`).
   public boolean isMultiValue() {
     return _multiValue;
   }

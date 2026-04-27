@@ -32,15 +32,13 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
-/**
- * Pinot-native {@code SHOW CREATE TABLE [db.]name [TYPE OFFLINE | REALTIME]} DDL statement.
- *
- * <p>Parse-time AST node only. The optional {@code TYPE OFFLINE | REALTIME} clause carries the
- * caller's explicit preference; absence leaves the choice to the executor. Disambiguation policy
- * for the both-variants-exist case is the controller's responsibility, not the parser's.
- *
- * <p>This class is not thread-safe; instances should not be mutated after construction.
- */
+/// Pinot-native `SHOW CREATE TABLE [db.]name [TYPE OFFLINE | REALTIME]` DDL statement.
+///
+/// Parse-time AST node only. The optional `TYPE OFFLINE | REALTIME` clause carries the
+/// caller's explicit preference; absence leaves the choice to the executor. Disambiguation policy
+/// for the both-variants-exist case is the controller's responsibility, not the parser's.
+///
+/// This class is not thread-safe; instances should not be mutated after construction.
 public class SqlPinotShowCreateTable extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("SHOW_CREATE_TABLE", SqlKind.OTHER_DDL);
@@ -58,9 +56,7 @@ public class SqlPinotShowCreateTable extends SqlCall {
     return _name;
   }
 
-  /**
-   * @return the explicit table type ("OFFLINE" or "REALTIME") if specified, else {@code null}.
-   */
+  /// @return the explicit table type ("OFFLINE" or "REALTIME") if specified, else `null`.
   @Nullable
   public SqlLiteral getTableType() {
     return _tableType;

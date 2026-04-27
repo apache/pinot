@@ -38,12 +38,10 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * End-to-end integration tests for {@code POST /sql/ddl}.
- *
- * <p>Each test uses a unique table name prefix so failures do not cascade through the shared
- * controller test instance.
- */
+/// End-to-end integration tests for `POST /sql/ddl`.
+///
+/// Each test uses a unique table name prefix so failures do not cascade through the shared
+/// controller test instance.
 public class PinotDdlRestletResourceTest extends ControllerTest {
 
   private static final String TBL_BASIC = "ddlBasicOffline";

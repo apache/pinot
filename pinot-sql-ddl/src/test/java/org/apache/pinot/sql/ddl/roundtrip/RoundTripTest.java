@@ -21,6 +21,7 @@ package org.apache.pinot.sql.ddl.roundtrip;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -48,23 +49,22 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
-/**
- * Round-trip suite: original (Schema, TableConfig) → canonical DDL → re-parse → re-compile →
- * round-tripped (Schema, TableConfig). Each test asserts the round-tripped pair is semantically
- * equivalent to the original — same Schema (column shape, datetime format, primary keys) and
- * same TableConfig fields.
- *
- * <p>Semantic equivalence is computed by comparing JSON serializations rather than direct
- * .equals(): TableConfig and Schema do not implement equals() reliably across all nested
- * configs, but their JSON representations are what eventually persist to ZK and what callers
- * actually compare.
- *
- * <p>Fixtures here are synthetic so the test is hermetic and does not depend on examples in
- * other modules. The set deliberately exercises every routing rule
- * ({@code stream.*}, {@code task.*}, JSON blob, custom config, promoted scalar, CSV list).
- */
+/// Round-trip suite: original (Schema, TableConfig) → canonical DDL → re-parse → re-compile →
+/// round-tripped (Schema, TableConfig). Each test asserts the round-tripped pair is semantically
+/// equivalent to the original — same Schema (column shape, datetime format, primary keys) and
+/// same TableConfig fields.
+///
+/// Semantic equivalence is computed by comparing JSON serializations rather than direct
+/// .equals(): TableConfig and Schema do not implement equals() reliably across all nested
+/// configs, but their JSON representations are what eventually persist to ZK and what callers
+/// actually compare.
+///
+/// Fixtures here are synthetic so the test is hermetic and does not depend on examples in
+/// other modules. The set deliberately exercises every routing rule
+/// (`streamType`, `stream.*`, `task.*`, JSON blob, custom config, promoted scalar, CSV list).
 public class RoundTripTest {
 
   // -------------------------------------------------------------------------------------------
@@ -131,6 +131,7 @@ public class RoundTripTest {
         .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
     Map<String, String> streamCfgs = new LinkedHashMap<>();
+    streamCfgs.put("streamType", "kafka");
     streamCfgs.put("stream.kafka.topic.name", "click_events");
     streamCfgs.put("stream.kafka.consumer.factory.class.name", "KafkaConsumerFactory");
     streamCfgs.put("realtime.segment.flush.threshold.rows", "500000");
@@ -210,6 +211,15 @@ public class RoundTripTest {
     schema.addField(name);
     MetricFieldSpec score = new MetricFieldSpec("score", DataType.DOUBLE, 42.0);
     schema.addField(score);
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
+    assertRoundTrip(schema, config);
+  }
+
+  @Test
+  public void bytesMetricRoundTrips() {
+    Schema schema = new Schema();
+    schema.setSchemaName("t");
+    schema.addField(new MetricFieldSpec("digest", DataType.BYTES));
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE).setTableName("t").build();
     assertRoundTrip(schema, config);
   }
@@ -373,11 +383,88 @@ public class RoundTripTest {
     assertRoundTrip(schema, config);
   }
 
+  @Test
+  public void unsupportedValidationConfigFieldFailsFastInsteadOfSilentLoss() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .build();
+    config.getValidationConfig().setReplacedSegmentsRetentionPeriod("3d");
+    assertUnsupportedShowCreate(schema, config, "segmentsConfig.replacedSegmentsRetentionPeriod");
+  }
+
+  @Test
+  public void unsupportedIndexingConfigFieldFailsFastInsteadOfSilentLoss() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .build();
+    config.getIndexingConfig().setNoDictionaryConfig(Collections.singletonMap("id", "RAW"));
+    assertUnsupportedShowCreate(schema, config, "tableIndexConfig.noDictionaryConfig");
+  }
+
+  @Test
+  public void unsupportedSchemaMetadataFailsFastInsteadOfSilentLoss() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .setEnableColumnBasedNullHandling(true)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .build();
+    assertUnsupportedShowCreate(schema, config, "enableColumnBasedNullHandling");
+  }
+
+  @Test
+  public void csvPropertyValueWithCommaFailsFastInsteadOfSilentSplit() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("country,city", DataType.STRING)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .setSortedColumn("country,city")
+        .build();
+    assertUnsupportedShowCreate(schema, config, "sortedColumn");
+  }
+
+  @Test
+  public void tagValueWithCommaFailsFastInsteadOfSilentSplit() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .setTags(Arrays.asList("team,one", "critical"))
+        .build();
+    assertUnsupportedShowCreate(schema, config, "tags");
+  }
+
   // -------------------------------------------------------------------------------------------
   // Equivalence machinery
   // -------------------------------------------------------------------------------------------
 
-  /** Asserts that emit -> parse -> compile produces a semantically equivalent (schema, config). */
+  private static void assertUnsupportedShowCreate(Schema schema, TableConfig config,
+      String expectedField) {
+    try {
+      CanonicalDdlEmitter.emit(schema, config);
+      fail("Expected SHOW CREATE TABLE emission to reject unsupported field " + expectedField);
+    } catch (IllegalArgumentException expected) {
+      assertTrue(expected.getMessage().contains(expectedField),
+          "Expected unsupported-field error to mention " + expectedField + " but got: "
+              + expected.getMessage());
+    }
+  }
+
+  /// Asserts that emit -> parse -> compile produces a semantically equivalent (schema, config).
   private static void assertRoundTrip(Schema originalSchema, TableConfig originalConfig) {
     String ddl = CanonicalDdlEmitter.emit(originalSchema, originalConfig);
     CompiledCreateTable round = (CompiledCreateTable) DdlCompiler.compile(ddl);
@@ -404,11 +491,9 @@ public class RoundTripTest {
         + "\nExpected: " + aJson + "\nActual:   " + bJson);
   }
 
-  /**
-   * Removes fields that are not meaningful for semantic comparison. Empty maps in TableCustomConfig
-   * compare-equal whether the field is null, missing, or {}, so we strip them. Same for
-   * empty lists added by builders that are not user-meaningful.
-   */
+  /// Removes fields that are not meaningful for semantic comparison. Empty maps in TableCustomConfig
+  /// compare-equal whether the field is null, missing, or {}, so we strip them. Same for
+  /// empty lists added by builders that are not user-meaningful.
   private static JsonNode stripVolatile(JsonNode node) {
     if (node == null || !node.isObject()) {
       return node;

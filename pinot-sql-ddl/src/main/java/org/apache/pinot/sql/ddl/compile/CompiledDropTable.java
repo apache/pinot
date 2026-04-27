@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 
 
-/** Result of compiling {@code DROP TABLE ...}. */
+/// Result of compiling `DROP TABLE ...`.
 public final class CompiledDropTable extends CompiledDdl {
   private final String _rawTableName;
   private final TableType _tableType;
@@ -37,15 +37,13 @@ public final class CompiledDropTable extends CompiledDdl {
     _ifExists = ifExists;
   }
 
-  /** Bare table name with no database prefix and no _OFFLINE/_REALTIME suffix. */
+  /// Bare table name with no database prefix and no _OFFLINE/_REALTIME suffix.
   public String getRawTableName() {
     return _rawTableName;
   }
 
-  /**
-   * @return the requested type to drop, or {@code null} when both OFFLINE and REALTIME variants
-   *     should be dropped.
-   */
+  /// @return the requested type to drop, or `null` when both OFFLINE and REALTIME variants
+  /// should be dropped.
   @Nullable
   public TableType getTableType() {
     return _tableType;

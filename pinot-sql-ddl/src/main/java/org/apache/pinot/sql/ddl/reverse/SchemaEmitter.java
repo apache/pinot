@@ -34,26 +34,22 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
-/**
- * Emits a list of canonical column-declaration strings from a Pinot {@link Schema}. Each
- * declaration is formatted to match the grammar consumed by {@code SqlPinotColumnDeclaration}.
- *
- * <p>Column ordering follows the schema's natural ordering: dimensions first (insertion order),
- * then metrics, then date-time columns. This mirrors what users see in JSON config and is stable
- * across emit/parse round-trips.
- */
+/// Emits a list of canonical column-declaration strings from a Pinot [Schema]. Each
+/// declaration is formatted to match the grammar consumed by `SqlPinotColumnDeclaration`.
+///
+/// Column ordering follows the schema's natural ordering: dimensions first (insertion order),
+/// then metrics, then date-time columns. This mirrors what users see in JSON config and is stable
+/// across emit/parse round-trips.
 final class SchemaEmitter {
 
   private SchemaEmitter() {
   }
 
-  /**
-   * Returns canonical column declarations for all fields in {@code schema}.
-   *
-   * <p>Fails fast with {@link IllegalArgumentException} for MAP/LIST/STRUCT columns because those
-   * types have no DDL representation yet; emitting incomplete DDL for them would produce a
-   * statement that silently drops part of the schema on replay.
-   */
+  /// Returns canonical column declarations for all fields in `schema`.
+  ///
+  /// Fails fast with [IllegalArgumentException] for MAP/LIST/STRUCT columns because those
+  /// types have no DDL representation yet; emitting incomplete DDL for them would produce a
+  /// statement that silently drops part of the schema on replay.
   static List<String> emitColumns(Schema schema) {
     List<String> out = new ArrayList<>();
     for (DimensionFieldSpec dim : schema.getDimensionFieldSpecs()) {
@@ -163,11 +159,9 @@ final class SchemaEmitter {
     return sb.toString();
   }
 
-  /**
-   * Maps a Pinot {@link DataType} to the canonical SQL keyword we emit. We pick the
-   * Pinot-native names (LONG, BIG_DECIMAL, STRING, BYTES) where they exist so the round-trip
-   * matches what a human would write.
-   */
+  /// Maps a Pinot [DataType] to the canonical SQL keyword we emit. We pick the
+  /// Pinot-native names (LONG, BIG_DECIMAL, STRING, BYTES) where they exist so the round-trip
+  /// matches what a human would write.
   private static String emitDataType(DataType dt) {
     switch (dt) {
       case INT:

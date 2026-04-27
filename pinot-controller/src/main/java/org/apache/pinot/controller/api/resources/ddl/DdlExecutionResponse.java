@@ -25,19 +25,15 @@ import javax.annotation.Nullable;
 import org.apache.pinot.sql.ddl.compile.DdlOperation;
 
 
-/**
- * Response body for {@code POST /sql/ddl}.
- *
- * <p>The shape of the response varies by operation. {@link JsonInclude.Include#NON_NULL} keeps
- * the wire payload focused on the fields that actually apply to the operation that ran.
- *
- * <ul>
- *   <li>CREATE_TABLE: {@code tableName, tableType, schema, tableConfig, ifNotExists, warnings}</li>
- *   <li>DROP_TABLE: {@code tableName, tableType, deletedTables, ifExists}</li>
- *   <li>SHOW_TABLES: {@code tableNames}</li>
- *   <li>SHOW_CREATE_TABLE: {@code tableName, tableType, ddl}</li>
- * </ul>
- */
+/// Response body for `POST /sql/ddl`.
+///
+/// The shape of the response varies by operation. [JsonInclude.Include#NON_NULL] keeps
+/// the wire payload focused on the fields that actually apply to the operation that ran.
+///
+/// - CREATE_TABLE: `tableName, tableType, schema, tableConfig, ifNotExists, warnings`
+/// - DROP_TABLE: `tableName, tableType, deletedTables, ifExists`
+/// - SHOW_TABLES: `tableNames`
+/// - SHOW_CREATE_TABLE: `tableName, tableType, ddl`
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DdlExecutionResponse {
   private DdlOperation _operation;
@@ -178,7 +174,7 @@ public class DdlExecutionResponse {
     return _ddl;
   }
 
-  /** Canonical CREATE TABLE statement returned by {@code SHOW CREATE TABLE}. */
+  /// Canonical CREATE TABLE statement returned by `SHOW CREATE TABLE`.
   public DdlExecutionResponse setDdl(@Nullable String ddl) {
     _ddl = ddl;
     return this;

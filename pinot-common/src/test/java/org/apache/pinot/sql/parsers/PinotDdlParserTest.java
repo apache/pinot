@@ -37,11 +37,9 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
-/**
- * Parser-layer tests for the new Pinot DDL grammar (CREATE TABLE / DROP TABLE / SHOW TABLES).
- * Verifies that statements parse, produce the expected AST shape, and that {@link CalciteSqlParser}
- * classifies them as {@link PinotSqlType#DDL}.
- */
+/// Parser-layer tests for the new Pinot DDL grammar (CREATE TABLE / DROP TABLE / SHOW TABLES).
+/// Verifies that statements parse, produce the expected AST shape, and that [CalciteSqlParser]
+/// classifies them as [PinotSqlType#DDL].
 public class PinotDdlParserTest {
 
   // -------------------------------------------------------------------------------------------

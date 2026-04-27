@@ -33,7 +33,6 @@ import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -59,41 +58,37 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.ddl.resolved.ResolvedTableDefinition;
 
 
-/**
- * Routes Pinot DDL {@code PROPERTIES (...)} entries onto a {@link TableConfigBuilder}.
- *
- * <p>Routing rules (applied in order):
- * <ol>
- *   <li>If the key (case-insensitive) is in the promoted catalog, set the corresponding
- *       {@link TableConfigBuilder} field directly.</li>
- *   <li>If the key starts with {@code stream.} or {@code realtime.}, route the entry into
- *       {@code IndexingConfig.streamConfigs} verbatim (the prefix is preserved, not stripped, so
- *       the key matches existing Pinot stream config conventions like
- *       {@code stream.kafka.topic.name}). REALTIME-only.</li>
- *   <li>If the key starts with {@code task.<taskType>.}, route the remainder into
- *       {@code TableTaskConfig.taskTypeConfigsMap[taskType]}.</li>
- *   <li>Otherwise, store verbatim in {@link TableCustomConfig#getCustomConfigs()}.
- *       This guarantees no silent loss of meaningful config: every DDL property survives the
- *       compile / persist round-trip, even when the DDL grammar is older than the property.</li>
- * </ol>
- *
- * <p>The free-form pass-through (rules 2-4) is the forward-compatibility hook: stream and minion
- * task config schemas evolve independently and need not be in lock-step with the DDL grammar.
- */
+/// Routes Pinot DDL `PROPERTIES (...)` entries onto a [TableConfigBuilder].
+///
+/// Routing rules (applied in order):
+/// 1. If the key (case-insensitive) is in the promoted catalog, set the corresponding
+/// [TableConfigBuilder] field directly.
+/// 1. If the key is `streamType` or starts with `stream.` or `realtime.`, route the entry into
+/// `IndexingConfig.streamConfigs` verbatim (the prefix is preserved, not stripped, so
+/// the key matches existing Pinot stream config conventions like `streamType` and
+/// `stream.kafka.topic.name`). REALTIME-only.
+/// 1. If the key starts with `task.<taskType>.`, route the remainder into
+/// `TableTaskConfig.taskTypeConfigsMap[taskType]`.
+/// 1. Otherwise, store verbatim in [TableCustomConfig#getCustomConfigs()].
+/// This guarantees no silent loss of meaningful config: every DDL property survives the
+/// compile / persist round-trip, even when the DDL grammar is older than the property.
+///
+/// The free-form pass-through (rules 2-4) is the forward-compatibility hook: stream and minion
+/// task config schemas evolve independently and need not be in lock-step with the DDL grammar.
 public final class PropertyMapping {
 
   private static final String STREAM_PREFIX = "stream.";
+  private static final String STREAM_TYPE_PROPERTY = "streamType";
+  private static final String STREAM_TYPE_KEY = "streamtype";
   private static final String REALTIME_PREFIX = "realtime.";
   private static final String TASK_PREFIX = "task.";
 
-  /** Property keys that carry table-type semantics, handled separately by the caller. */
+  /// Property keys that carry table-type semantics, handled separately by the caller.
   static final Set<String> RESERVED_KEYS = ImmutableSet.of("tabletype", "tablename", "ifnotexists");
 
-  /**
-   * Lowercase property keys that have a dedicated PropertyMapping handler (promoted scalar or
-   * JSON-blob deserialization). Used by the reverse compiler to detect TableCustomConfig keys
-   * that would shadow a reserved key on round-trip and reject them up front.
-   */
+  /// Lowercase property keys that have a dedicated PropertyMapping handler (promoted scalar or
+  /// JSON-blob deserialization). Used by the reverse compiler to detect TableCustomConfig keys
+  /// that would shadow a reserved key on round-trip and reject them up front.
   private static final Set<String> RESERVED_ROUND_TRIP_KEYS;
   static {
     Set<String> keys = new HashSet<>();
@@ -150,20 +145,19 @@ public final class PropertyMapping {
     RESERVED_ROUND_TRIP_KEYS = Collections.unmodifiableSet(keys);
   }
 
-  /**
-   * Returns {@code true} if {@code lowerKey} (already lower-cased) is consumed by a dedicated
-   * PropertyMapping handler — i.e. it would not round-trip safely as a TableCustomConfig entry.
-   *
-   * <p>Catches both exact-match keys (promoted scalars + JSON-blob keys) and the
-   * prefix-routed paths ({@code stream.}, {@code realtime.}, {@code task.}). A custom-config
-   * entry with a key like {@code task.MinionTask.foo} would otherwise be silently routed into
-   * {@code TableTaskConfig} on re-parse.
-   */
+  /// Returns `true` if `lowerKey` (already lower-cased) is consumed by a dedicated
+  /// PropertyMapping handler — i.e. it would not round-trip safely as a TableCustomConfig entry.
+  ///
+  /// Catches both exact-match keys (promoted scalars + JSON-blob keys) and the
+  /// prefix-routed paths (`streamType`, `stream.`, `realtime.`, `task.`). A custom-config
+  /// entry with a key like `task.MinionTask.foo` would otherwise be silently routed into
+  /// `TableTaskConfig` on re-parse.
   public static boolean isReservedRoundTripKey(String lowerKey) {
     if (RESERVED_ROUND_TRIP_KEYS.contains(lowerKey)) {
       return true;
     }
-    return lowerKey.startsWith(STREAM_PREFIX)
+    return STREAM_TYPE_KEY.equals(lowerKey)
+        || lowerKey.startsWith(STREAM_PREFIX)
         || lowerKey.startsWith(REALTIME_PREFIX)
         || lowerKey.startsWith(TASK_PREFIX);
   }
@@ -171,17 +165,15 @@ public final class PropertyMapping {
   private PropertyMapping() {
   }
 
-  /**
-   * Applies all properties from {@code definition} onto {@code builder}.
-   *
-   * <p>Returns the full list of sorted columns parsed from the {@code sortedColumn} property so
-   * the caller can apply them directly to {@link IndexingConfig#setSortedColumn(List)} after
-   * {@code builder.build()}. The builder's {@code setSortedColumn(String)} only stores a single
-   * value; using the returned list avoids silently dropping all but the first sort column.
-   *
-   * @throws DdlCompilationException if a promoted key has a non-coercible value (e.g. non-integer
-   *     replication).
-   */
+  /// Applies all properties from `definition` onto `builder`.
+  ///
+  /// Returns the full list of sorted columns parsed from the `sortedColumn` property so
+  /// the caller can apply them directly to [IndexingConfig#setSortedColumn(List)] after
+  /// `builder.build()`. The builder's `setSortedColumn(String)` only stores a single
+  /// value; using the returned list avoids silently dropping all but the first sort column.
+  ///
+  /// @throws DdlCompilationException if a promoted key has a non-coercible value (e.g. non-integer
+  /// replication).
   public static List<String> apply(ResolvedTableDefinition definition, TableConfigBuilder builder) {
     Map<String, String> streamConfigs = new LinkedHashMap<>();
     Map<String, Map<String, String>> taskConfigs = new LinkedHashMap<>();
@@ -223,8 +215,9 @@ public final class PropertyMapping {
         continue;
       }
 
-      if (lower.startsWith(STREAM_PREFIX) || lower.startsWith(REALTIME_PREFIX)) {
-        // Both "stream.*" (Pinot stream connection configs) and "realtime.*" (e.g.
+      if (STREAM_TYPE_KEY.equals(lower) || lower.startsWith(STREAM_PREFIX)
+          || lower.startsWith(REALTIME_PREFIX)) {
+        // "streamType", "stream.*" (Pinot stream connection configs), and "realtime.*" (e.g.
         // realtime.segment.flush.threshold.rows / .size / .segment.size) live in
         // IndexingConfig.streamConfigs in real Pinot table configs. Routing them anywhere else
         // makes them silently inert.
@@ -233,9 +226,10 @@ public final class PropertyMapping {
           throw new DdlCompilationException(
               kind + " property '" + rawKey + "' is only valid for REALTIME tables.");
         }
-        // Preserve the original key (including its prefix) so existing Pinot stream configs
-        // round-trip identically.
-        streamConfigs.put(rawKey, value);
+        // Preserve ordinary stream keys verbatim so existing Pinot stream configs round-trip
+        // identically. Canonicalize the special un-prefixed streamType key because Pinot's stream
+        // config readers use that exact casing.
+        streamConfigs.put(STREAM_TYPE_KEY.equals(lower) ? STREAM_TYPE_PROPERTY : rawKey, value);
         continue;
       }
 
@@ -268,7 +262,7 @@ public final class PropertyMapping {
     return sortedColumns;
   }
 
-  /** Returns true if {@code lowerKey} matched a promoted property and was applied. */
+  /// Returns true if `lowerKey` matched a promoted property and was applied.
   private static boolean applyPromoted(String lowerKey, String value, TableConfigBuilder builder) {
     switch (lowerKey) {
       case "timecolumnname":
@@ -361,11 +355,9 @@ public final class PropertyMapping {
     }
   }
 
-  /**
-   * Recognizes JSON-blob property keys for complex nested TableConfig fields and deserializes
-   * them back into the right setter on {@link TableConfigBuilder}. Returns true when the key
-   * was handled (regardless of value validity — invalid JSON throws so the user sees a 400).
-   */
+  /// Recognizes JSON-blob property keys for complex nested TableConfig fields and deserializes
+  /// them back into the right setter on [TableConfigBuilder]. Returns true when the key
+  /// was handled (regardless of value validity — invalid JSON throws so the user sees a 400).
   private static boolean applyJsonBlob(String rawKey, String lowerKey, String value,
       TableConfigBuilder builder) {
     try {

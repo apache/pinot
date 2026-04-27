@@ -24,16 +24,14 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 
-/** Quoting helpers used by the canonical DDL emitter. */
+/// Quoting helpers used by the canonical DDL emitter.
 final class SqlIdentifiers {
 
-  /**
-   * SQL identifiers that need double-quoting because they conflict with the Pinot DDL grammar
-   * (reserved or context-sensitive keywords) or because they are not safe bare identifiers.
-   *
-   * <p>This set is intentionally over-cautious: a few extra quotes never break round-trip,
-   * but a missing quote would cause a re-parse to misinterpret the identifier as a keyword.
-   */
+  /// SQL identifiers that need double-quoting because they conflict with the Pinot DDL grammar
+  /// (reserved or context-sensitive keywords) or because they are not safe bare identifiers.
+  ///
+  /// This set is intentionally over-cautious: a few extra quotes never break round-trip,
+  /// but a missing quote would cause a re-parse to misinterpret the identifier as a keyword.
   private static final Set<String> ALWAYS_QUOTE = ImmutableSet.of(
       // grammar keywords introduced by Pinot DDL that could appear as user identifiers
       "DIMENSION", "METRIC", "DATETIME", "FORMAT", "GRANULARITY", "OFFLINE", "REALTIME",
@@ -53,10 +51,8 @@ final class SqlIdentifiers {
   private SqlIdentifiers() {
   }
 
-  /**
-   * Returns {@code identifier} ready to embed in canonical DDL: double-quoted if required,
-   * bare otherwise. Embedded double quotes are escaped per SQL convention ({@code "} → {@code ""}).
-   */
+  /// Returns `identifier` ready to embed in canonical DDL: double-quoted if required,
+  /// bare otherwise. Embedded double quotes are escaped per SQL convention (`"` → `""`).
   static String quote(String identifier) {
     if (mustQuote(identifier)) {
       return "\"" + identifier.replace("\"", "\"\"") + "\"";
@@ -64,10 +60,8 @@ final class SqlIdentifiers {
     return identifier;
   }
 
-  /**
-   * Returns a single-quoted SQL string literal for {@code value}; embedded single quotes are
-   * doubled per SQL convention.
-   */
+  /// Returns a single-quoted SQL string literal for `value`; embedded single quotes are
+  /// doubled per SQL convention.
   static String quoteString(String value) {
     return "'" + value.replace("'", "''") + "'";
   }

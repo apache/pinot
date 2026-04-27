@@ -31,8 +31,10 @@ import io.swagger.annotations.SwaggerDefinition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -48,6 +50,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -74,6 +77,7 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -93,24 +97,20 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE,
- * DROP TABLE, SHOW TABLES, and SHOW CREATE TABLE.
- *
- * <p>Pipeline:
- * <ol>
- *   <li>{@link DdlCompiler} parses + compiles the SQL into a {@link CompiledDdl}.</li>
- *   <li>Database/table names are translated through {@link DatabaseUtils#translateTableName}
- *       so the {@code Database} HTTP header is honoured uniformly.</li>
- *   <li>Authorization is invoked based on the operation type.</li>
- *   <li>Execution either persists via {@link PinotHelixResourceManager} or, when {@code dryRun}
- *       is true, returns the compiled artifacts without mutating cluster state.</li>
- * </ol>
- *
- * <p>The endpoint is intentionally a single POST that dispatches by operation. This keeps the
- * client surface area small and matches the canonical {@code POST /sql/ddl} contract from the
- * design.
- */
+/// Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE,
+/// DROP TABLE, SHOW TABLES, and SHOW CREATE TABLE.
+///
+/// Pipeline:
+/// 1. [DdlCompiler] parses + compiles the SQL into a [CompiledDdl].
+/// 1. Database/table names are translated through [DatabaseUtils#translateTableName]
+/// so the `Database` HTTP header is honoured uniformly.
+/// 1. Authorization is invoked based on the operation type.
+/// 1. Execution either persists via [PinotHelixResourceManager] or, when `dryRun`
+/// is true, returns the compiled artifacts without mutating cluster state.
+///
+/// The endpoint is intentionally a single POST that dispatches by operation. This keeps the
+/// client surface area small and matches the canonical `POST /sql/ddl` contract from the
+/// design.
 @Api(tags = "SQL DDL", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -123,12 +123,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotDdlRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDdlRestletResource.class);
-  /**
-   * Maximum accepted SQL input length, measured in {@link String#length() Java characters}
-   * (UTF-16 code units), to prevent unbounded parser memory allocation. Up to ~4× this value
-   * in UTF-8 wire bytes can be accepted by Jackson before the length check rejects; operators
-   * sizing reverse-proxy body limits should plan accordingly.
-   */
+  /// Maximum accepted SQL input length, measured in [Java characters][String#length()]
+  /// (UTF-16 code units), to prevent unbounded parser memory allocation. Up to ~4× this value
+  /// in UTF-8 wire bytes can be accepted by Jackson before the length check rejects; operators
+  /// sizing reverse-proxy body limits should plan accordingly.
   private static final int MAX_DDL_SQL_CHARS = 256 * 1024;
 
   @Inject
@@ -222,7 +220,7 @@ public class PinotDdlRestletResource {
       boolean dryRun, HttpHeaders headers, Request httpRequest) {
     // The compiled TableConfig.tableName carries the SQL `db.tbl` qualifier when one was given;
     // translateTableName then reconciles it against the Database header (and rejects conflicts).
-    String tableNameWithType = DatabaseUtils.translateTableName(
+    String tableNameWithType = translateTableNameForDdl(
         TableNameBuilder.forType(create.getTableConfig().getTableType())
             .tableNameWithType(create.getTableConfig().getTableName()), headers);
     create.getTableConfig().setTableName(tableNameWithType);
@@ -234,7 +232,7 @@ public class PinotDdlRestletResource {
     String dottedSchemaName = create.getDatabaseName() == null
         ? compiledSchemaName
         : create.getDatabaseName() + "." + compiledSchemaName;
-    String schemaName = DatabaseUtils.translateTableName(dottedSchemaName, headers);
+    String schemaName = translateTableNameForDdl(dottedSchemaName, headers);
     create.getSchema().setSchemaName(schemaName);
 
     // Authorize against the FULLY-QUALIFIED, post-translation table name. Checking the bare
@@ -278,7 +276,8 @@ public class PinotDdlRestletResource {
     boolean schemaPreexisted = storedSchema != null;
 
     if (schemaPreexisted) {
-      // Compare only the column-shape attributes that the DDL column list actually controls.
+      // Compare only the column-shape attributes that the DDL column list actually controls, plus
+      // schema metadata that was explicitly supplied in this DDL statement (currently PRIMARY KEY).
       // Comparing full JSON would include schema-level metadata (primary keys, null-handling,
       // tags, description) that the DDL does not express when a column list is given for the
       // second hybrid variant — e.g. a DDL without PRIMARY KEY would spuriously conflict with
@@ -303,6 +302,7 @@ public class PinotDdlRestletResource {
     // DDL's column-list-only projection — otherwise upsert/dedup tables would falsely fail PK
     // validation when the DDL omits PRIMARY KEY in the second variant.
     Schema schemaForValidation = schemaPreexisted ? storedSchema : create.getSchema();
+    response.setSchema(toJson(schemaForValidation));
     // Apply tuner configs before validation, mirroring POST /tables. Tuners may rewrite the
     // table config (e.g. fill in defaulted index configs) and the validators must run against
     // the post-tuner shape, otherwise a tuner-introduced setting bypasses validation.
@@ -313,6 +313,7 @@ public class PinotDdlRestletResource {
     // would mis-predict what a real CREATE would write).
     response.setTableConfig(toJson(create.getTableConfig()));
     validateTableConfig(schemaForValidation, create.getTableConfig());
+    PinotTableRestletResource.tableTasksValidation(create.getTableConfig(), _pinotHelixTaskResourceManager);
 
     if (dryRun) {
       response.setMessage("Dry run: validated CREATE TABLE without persisting.");
@@ -336,10 +337,18 @@ public class PinotDdlRestletResource {
       // (legitimate hybrid-pair pattern), and a hasTable re-check followed by deleteSchema is
       // racy in the same way the generic-failure branch below is. Stale schemas can be removed
       // via DELETE /schemas/{name} if needed.
+      if (create.isIfNotExists() && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        response.setMessage("Table " + tableNameWithType
+            + " already exists; CREATE IF NOT EXISTS is a no-op.");
+        return Response.ok(response).build();
+      }
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
     } catch (SchemaAlreadyExistsException e) {
-      // The override=false addSchema call lost a race with another schema writer. Surface 409.
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+      // The override=false addSchema call lost a race with another schema writer. If the table was
+      // concurrently created and the statement is idempotent, honour IF NOT EXISTS. Otherwise,
+      // verify the raced schema is compatible and continue with addTable(), matching the normal
+      // pre-existing-schema hybrid path.
+      return retryCreateAfterSchemaRace(create, response, schemaName, tableNameWithType, e);
     } catch (Exception e) {
       // Intentionally do NOT roll back the schema on a generic addTable() failure. The two
       // hasOfflineTable/hasRealtimeTable reads required to decide "is this schema orphaned?"
@@ -361,16 +370,54 @@ public class PinotDdlRestletResource {
     }
   }
 
-  /**
-   * Compares two schemas by the column-shape attributes that a DDL column list actually controls
-   * (column name, data type, field type, single/multi-value, NOT NULL, default null value, and —
-   * for DATETIME columns — format and granularity) and returns a human-readable description of
-   * the first mismatch, or {@code null} if the shapes are equivalent. Schema-level metadata that
-   * a DDL column list does not express ({@code primaryKeyColumns}, {@code tags},
-   * {@code enableColumnBasedNullHandling}, {@code description}) is intentionally ignored so the
-   * second hybrid variant can be created via DDL without restating metadata set by the first
-   * variant.
-   */
+  private Response retryCreateAfterSchemaRace(CompiledCreateTable create, DdlExecutionResponse response,
+      String schemaName, String tableNameWithType, SchemaAlreadyExistsException schemaFailure) {
+    if (create.isIfNotExists() && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      response.setMessage("Table " + tableNameWithType + " already exists; CREATE IF NOT EXISTS is a no-op.");
+      return Response.ok(response).build();
+    }
+    Schema racedSchema = _pinotHelixResourceManager.getSchema(schemaName);
+    if (racedSchema == null) {
+      throw new ControllerApplicationException(LOGGER, schemaFailure.getMessage(), Response.Status.CONFLICT,
+          schemaFailure);
+    }
+    String mismatch = describeColumnShapeMismatch(racedSchema, create.getSchema());
+    if (mismatch != null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema '" + schemaName + "' was concurrently created and does not match the column list in the DDL: "
+              + mismatch,
+          Response.Status.CONFLICT, schemaFailure);
+    }
+    response.setSchema(toJson(racedSchema));
+    validateTableConfig(racedSchema, create.getTableConfig());
+    PinotTableRestletResource.tableTasksValidation(create.getTableConfig(), _pinotHelixTaskResourceManager);
+    try {
+      _pinotHelixResourceManager.addTable(create.getTableConfig());
+      response.setMessage("Successfully created table " + tableNameWithType);
+      LOGGER.info("DDL created table {} after concurrent schema create", tableNameWithType);
+      return Response.status(Response.Status.CREATED).entity(response).build();
+    } catch (TableAlreadyExistsException e) {
+      if (create.isIfNotExists() && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        response.setMessage("Table " + tableNameWithType
+            + " already exists; CREATE IF NOT EXISTS is a no-op.");
+        return Response.ok(response).build();
+      }
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to create table " + tableNameWithType + " after concurrent schema create: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /// Compares two schemas by the column-shape attributes that a DDL column list actually controls
+  /// (column name, data type, field type, single/multi-value, NOT NULL, default null value, and —
+  /// for DATETIME columns — format and granularity) and schema metadata explicitly supplied by
+  /// DDL (`PRIMARY KEY`) and returns a human-readable description of the first mismatch, or `null`
+  /// if the shapes are equivalent. Schema-level metadata that a DDL column list does not express
+  /// (`tags`, `enableColumnBasedNullHandling`, `description`, and omitted primary keys) is
+  /// intentionally ignored so the second hybrid variant can be created via DDL without restating
+  /// metadata set by the first variant.
   // Package-private for unit testing.
   @Nullable
   static String describeColumnShapeMismatch(Schema stored, Schema compiled) {
@@ -436,14 +483,18 @@ public class PinotDdlRestletResource {
         }
       }
     }
+    List<String> compiledPrimaryKeys = compiled.getPrimaryKeyColumns();
+    if (compiledPrimaryKeys != null && !compiledPrimaryKeys.isEmpty()
+        && !Objects.equals(stored.getPrimaryKeyColumns(), compiledPrimaryKeys)) {
+      return "PRIMARY KEY columns differ (stored=" + stored.getPrimaryKeyColumns()
+          + ", DDL=" + compiledPrimaryKeys + ")";
+    }
     return null;
   }
 
-  /**
-   * Compares two default-null-values for content equality, accounting for type-specific
-   * gotchas: BYTES requires Arrays.equals (each getter allocates a fresh byte[]); BIG_DECIMAL
-   * requires compareTo so different scales of the same numeric value compare equal.
-   */
+  /// Compares two default-null-values for content equality, accounting for type-specific
+  /// gotchas: BYTES requires Arrays.equals (each getter allocates a fresh byte[]); BIG_DECIMAL
+  /// requires compareTo so different scales of the same numeric value compare equal.
   private static boolean defaultValuesEqual(FieldSpec.DataType dataType,
       @Nullable Object storedDefault, @Nullable Object compiledDefault) {
     if (storedDefault == null || compiledDefault == null) {
@@ -456,13 +507,11 @@ public class PinotDdlRestletResource {
     return dataType.equals(storedDefault, compiledDefault);
   }
 
-  /**
-   * Runs the same schema/table validation stack that {@code POST /tables} and
-   * {@code /tableConfigs} apply before any ZK write, so DDL-created configs are subject to the
-   * same rules as JSON-API-created configs. Delegates to {@link TableConfigValidationUtils} so
-   * the two endpoints share a single validation pipeline (min replicas, storage quota, hybrid
-   * pair compatibility, instance assignment, tenant tags, task configs, registry-level checks).
-   */
+  /// Runs the same schema/table validation stack that `POST /tables` and
+  /// `/tableConfigs` apply before any ZK write, so DDL-created configs are subject to the
+  /// same rules as JSON-API-created configs. Delegates to [TableConfigValidationUtils] so
+  /// the two endpoints share a single validation pipeline (min replicas, storage quota, hybrid
+  /// pair compatibility, instance assignment, tenant tags, task configs, registry-level checks).
   private void validateTableConfig(Schema schema, TableConfig tableConfig) {
     try {
       TableConfigValidationUtils.validateTableConfig(tableConfig, schema, null,
@@ -497,7 +546,7 @@ public class PinotDdlRestletResource {
     String dottedRaw = drop.getDatabaseName() == null
         ? drop.getRawTableName()
         : drop.getDatabaseName() + "." + drop.getRawTableName();
-    String fullyQualifiedRaw = DatabaseUtils.translateTableName(dottedRaw, headers);
+    String fullyQualifiedRaw = translateTableNameForDdl(dottedRaw, headers);
 
     // Compute the candidate typed names BEFORE existence filtering so we can authorize against
     // the user's intent (not just whatever happens to exist now). This prevents an unauthorized
@@ -523,7 +572,8 @@ public class PinotDdlRestletResource {
 
     List<String> targets = new ArrayList<>(2);
     for (String candidate : candidates) {
-      if (_pinotHelixResourceManager.hasTable(candidate)) {
+      if (_pinotHelixResourceManager.hasTable(candidate)
+          || _pinotHelixResourceManager.getTableConfig(candidate) != null) {
         targets.add(candidate);
       }
     }
@@ -552,13 +602,50 @@ public class PinotDdlRestletResource {
         .setTableType(drop.getTableType() == null ? null : drop.getTableType().toString())
         .setDeletedTables(targets);
 
+    // Reject drop if any target is referenced by a logical table, matching the safeguard in
+    // the existing /tables and /tableConfigs DELETE endpoints.
+    assertNoLogicalTableReferences(targets);
+    assertNoActiveTasksBeforeDrop(targets);
+
     if (dryRun) {
       response.setMessage("Dry run: " + targets.size() + " table(s) would be dropped.");
       return response;
     }
 
-    // Reject drop if any target is referenced by a logical table, matching the safeguard in
-    // the existing /tables and /tableConfigs DELETE endpoints.
+    List<String> dropped = new ArrayList<>();
+    for (String target : targets) {
+      boolean tasksCleaned = false;
+      try {
+        cleanupTableTasksBeforeDrop(target);
+        tasksCleaned = true;
+        // deleteTable(rawName, type, retention) takes the raw name and re-derives the typed
+        // name internally via TableNameBuilder.forType(type).tableNameWithType(rawName); see
+        // PinotHelixResourceManager.deleteTable. Pass `fullyQualifiedRaw` (DB-qualified raw
+        // name) and the type extracted from `target` so the call is unambiguous.
+        TableType type = TableNameBuilder.getTableTypeFromTableName(target);
+        _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, type, null);
+        dropped.add(target);
+        LOGGER.info("DDL dropped table {}", target);
+      } catch (ControllerApplicationException e) {
+        LOGGER.warn("DROP TABLE on {} failed: {}", target, e.getMessage());
+        throw dropFailed(target, dropped, tasksCleaned, e.getResponse().getStatus(), e);
+      } catch (Exception e) {
+        LOGGER.warn("DROP TABLE on {} failed unexpectedly: {}", target, e.toString());
+        throw dropFailed(target, dropped, tasksCleaned,
+            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
+      }
+    }
+    // Intentionally do NOT delete the shared schema when the last physical variant is removed.
+    // This matches the existing `/tables/{name}` DELETE contract, which also leaves the schema
+    // intact. Two doors into the same state machine must have the same side effects; a caller
+    // who wants to remove the schema can issue an explicit DELETE /schemas/{name} afterwards.
+    response.setDeletedTables(dropped);
+    response.setMessage("Dropped " + dropped.size() + " table metadata target(s).");
+    LOGGER.info("DDL dropped tables {}", dropped);
+    return response;
+  }
+
+  private void assertNoLogicalTableReferences(List<String> targets) {
     List<LogicalTableConfig> allLogicalTableConfigs =
         ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
     for (String target : targets) {
@@ -571,95 +658,174 @@ public class PinotDdlRestletResource {
         }
       }
     }
+  }
 
-    // Drop each target individually and track outcomes. A failure on one variant should not
-    // prevent the response from reporting what was already deleted — partial deletes on a hybrid
-    // table are expensive to recover from, so we surface per-target status instead of surfacing
-    // only the first failure and hiding the rest.
-    List<String> dropped = new ArrayList<>();
-    List<String> failed = new ArrayList<>();
-    Exception firstFailure = null;
-    // Track the integer status code rather than the Response.Status enum: the enum
-    // covers only the well-known IANA codes, and Response.Status.fromStatusCode() returns
-    // null for non-standard codes (422, 423, 451, etc.) — a null would silently fall back
-    // to 500 and hide the original 4xx information from the caller.
-    int firstFailureStatusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
-    // Targets whose tableTasksCleanup succeeded (removing scheduled task triggers) but whose
-    // deleteTable subsequently failed. These tables remain in the cluster but will no longer
-    // run their scheduled tasks until the operator either retries the DROP successfully or
-    // restores the SCHEDULE_KEY entries on the surviving table config.
-    List<String> taskSchedulesCleared = new ArrayList<>();
+  private void assertNoActiveTasksBeforeDrop(List<String> targets) {
+    List<String> pendingTasks = new ArrayList<>();
     for (String target : targets) {
-      boolean tasksCleaned = false;
-      try {
-        // Remove task schedules before deletion so tasks are not triggered during the drop.
-        // tableTasksCleanup may throw ControllerApplicationException (e.g. BAD_REQUEST when
-        // active tasks are still running). That status code carries actionable user-level
-        // information and must be preserved instead of being collapsed to 500 below.
-        PinotTableRestletResource.tableTasksCleanup(target, false,
-            _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
-        tasksCleaned = true;
-        // deleteTable(rawName, type, retention) takes the raw name and re-derives the typed
-        // name internally via TableNameBuilder.forType(type).tableNameWithType(rawName); see
-        // PinotHelixResourceManager.deleteTable. Pass `fullyQualifiedRaw` (DB-qualified raw
-        // name) and the type extracted from `target` so the call is unambiguous.
-        TableType type = TableNameBuilder.getTableTypeFromTableName(target);
-        _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, type, null);
-        dropped.add(target);
-        LOGGER.info("DDL dropped table {}", target);
-      } catch (ControllerApplicationException e) {
-        // The CAE constructor already logs the underlying error at the appropriate level, and
-        // the wrapping CAE thrown after the loop will log again. A third log here would be
-        // redundant noise — record a one-line breadcrumb at WARN without the throwable.
-        LOGGER.warn("DROP TABLE on {} failed: {}", target, e.getMessage());
-        failed.add(target);
-        if (tasksCleaned) {
-          taskSchedulesCleared.add(target);
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(target);
+      if (tableConfig == null || tableConfig.getTaskConfig() == null) {
+        continue;
+      }
+      for (String taskType : tableConfig.getTaskConfig().getTaskTypeConfigsMap().keySet()) {
+        Map<String, TaskState> taskStates;
+        try {
+          taskStates = _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, target);
+        } catch (IllegalArgumentException e) {
+          LOGGER.info(e.getMessage());
+          continue;
         }
-        if (firstFailure == null) {
-          firstFailure = e;
-          firstFailureStatusCode = e.getResponse().getStatus();
-        }
-      } catch (Exception e) {
-        // The wrapping CAE thrown after the loop will log the firstFailure with full stack;
-        // record only a one-line breadcrumb here so operators can correlate per-target context
-        // without seeing the same stack trace twice.
-        LOGGER.warn("DROP TABLE on {} failed unexpectedly: {}", target, e.toString());
-        failed.add(target);
-        if (tasksCleaned) {
-          taskSchedulesCleared.add(target);
-        }
-        if (firstFailure == null) {
-          firstFailure = e;
-          firstFailureStatusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
+        for (Map.Entry<String, TaskState> taskState : taskStates.entrySet()) {
+          String taskName = taskState.getKey();
+          if (TaskState.IN_PROGRESS.equals(taskState.getValue())
+              && _pinotHelixTaskResourceManager.getTaskCount(taskName).getRunning() > 0) {
+            pendingTasks.add(taskName);
+          }
         }
       }
     }
-    // Intentionally do NOT delete the shared schema when the last physical variant is removed.
-    // This matches the existing `/tables/{name}` DELETE contract, which also leaves the schema
-    // intact. Two doors into the same state machine must have the same side effects; a caller
-    // who wants to remove the schema can issue an explicit DELETE /schemas/{name} afterwards.
-    if (failed.isEmpty()) {
-      response.setMessage("Dropped " + dropped.size() + " table(s).");
-      LOGGER.info("DDL dropped tables {}", dropped);
-      return response;
+    if (!pendingTasks.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER,
+          "DROP TABLE blocked because active running tasks exist: " + pendingTasks
+              + ". No table metadata was changed by this DDL preflight; retry once the tasks finish.",
+          Response.Status.BAD_REQUEST);
     }
-    // At least one target failed. Surface a structured error that names both what succeeded
-    // and what failed so the operator knows which variant needs manual cleanup. Preserve the
-    // first failure's status code so client-actionable failures (e.g. active tasks → 400)
-    // remain visible to the caller; only fall back to 500 for genuinely unexpected failures.
-    String causeDesc = firstFailure.getMessage() != null
-        ? firstFailure.getMessage() : firstFailure.getClass().getSimpleName();
+  }
+
+  private void cleanupTableTasksBeforeDrop(String tableWithType)
+      throws Exception {
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableWithType);
+    if (tableConfig == null || tableConfig.getTaskConfig() == null) {
+      return;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
+    Set<String> taskTypes = new HashSet<>(taskTypeConfigsMap.keySet());
+    TaskCleanupScan scan = scanTasksBeforeDrop(tableWithType, taskTypes);
+    if (!scan._pendingTasks.isEmpty()) {
+      throw activeTasksBlocked(scan._pendingTasks, "No table metadata was changed by this DDL preflight");
+    }
+
+    Map<String, String> removedSchedules = new HashMap<>();
+    for (String taskType : taskTypes) {
+      String schedule = taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY);
+      if (schedule != null) {
+        removedSchedules.put(taskType, schedule);
+      }
+    }
+    boolean schedulesPersisted = persistTaskScheduleRemoval(tableConfig, removedSchedules);
+    try {
+      scan = scanTasksBeforeDrop(tableWithType, taskTypes);
+      if (!scan._pendingTasks.isEmpty()) {
+        if (schedulesPersisted) {
+          restoreTaskSchedules(tableWithType, tableConfig, removedSchedules);
+        }
+        throw activeTasksBlocked(scan._pendingTasks,
+            "Task schedules were restored because active tasks appeared during DROP TABLE preflight");
+      }
+      for (String taskName : scan._deletableTasks) {
+        _pinotHelixTaskResourceManager.deleteTask(taskName, true);
+      }
+    } catch (ControllerApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      if (schedulesPersisted) {
+        try {
+          restoreTaskSchedules(tableWithType, tableConfig, removedSchedules);
+        } catch (ControllerApplicationException restoreFailure) {
+          e.addSuppressed(restoreFailure);
+        }
+      }
+      throw e;
+    }
+  }
+
+  private boolean persistTaskScheduleRemoval(TableConfig tableConfig, Map<String, String> removedSchedules) {
+    if (removedSchedules.isEmpty()) {
+      return false;
+    }
+    try {
+      _pinotHelixResourceManager.updateTableConfig(tableConfig);
+      return true;
+    } catch (Exception e) {
+      restoreTaskSchedulesInMemory(tableConfig, removedSchedules);
+      LOGGER.warn("Unable to remove task schedules before DROP TABLE on {}. "
+              + "Proceeding with table deletion because no active tasks were found. Reason: {}",
+          tableConfig.getTableName(), e.getMessage());
+      return false;
+    }
+  }
+
+  private void restoreTaskSchedules(String tableWithType, TableConfig tableConfig,
+      Map<String, String> removedSchedules) {
+    restoreTaskSchedulesInMemory(tableConfig, removedSchedules);
+    try {
+      _pinotHelixResourceManager.updateTableConfig(tableConfig);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "DROP TABLE detected active tasks after clearing task schedules for " + tableWithType
+              + " and failed to restore those schedules: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  private static void restoreTaskSchedulesInMemory(TableConfig tableConfig,
+      Map<String, String> removedSchedules) {
+    Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
+    for (Map.Entry<String, String> removedSchedule : removedSchedules.entrySet()) {
+      taskTypeConfigsMap.get(removedSchedule.getKey())
+          .put(PinotTaskManager.SCHEDULE_KEY, removedSchedule.getValue());
+    }
+  }
+
+  private TaskCleanupScan scanTasksBeforeDrop(String tableWithType, Set<String> taskTypes) {
+    TaskCleanupScan scan = new TaskCleanupScan();
+    for (String taskType : taskTypes) {
+      Map<String, TaskState> taskStates;
+      try {
+        taskStates = _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableWithType);
+      } catch (IllegalArgumentException e) {
+        LOGGER.info(e.getMessage());
+        continue;
+      }
+      for (Map.Entry<String, TaskState> taskState : taskStates.entrySet()) {
+        String taskName = taskState.getKey();
+        if (TaskState.IN_PROGRESS.equals(taskState.getValue())
+            && _pinotHelixTaskResourceManager.getTaskCount(taskName).getRunning() > 0) {
+          scan._pendingTasks.add(taskName);
+        } else {
+          scan._deletableTasks.add(taskName);
+        }
+      }
+    }
+    return scan;
+  }
+
+  private ControllerApplicationException activeTasksBlocked(List<String> pendingTasks, String mutationContext) {
+    return new ControllerApplicationException(LOGGER,
+        "DROP TABLE blocked because active running tasks exist: " + pendingTasks
+            + ". " + mutationContext + "; retry once the tasks finish.",
+        Response.Status.BAD_REQUEST);
+  }
+
+  private static final class TaskCleanupScan {
+    private final List<String> _pendingTasks = new ArrayList<>();
+    private final List<String> _deletableTasks = new ArrayList<>();
+  }
+
+  private ControllerApplicationException dropFailed(String target, List<String> dropped,
+      boolean taskSchedulesCleared, int statusCode, Exception cause) {
+    String causeDesc = cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
     String partialPrefix = dropped.isEmpty() ? "" : "Partial DROP TABLE: dropped " + dropped + ", ";
-    String taskScheduleHint = taskSchedulesCleared.isEmpty() ? ""
-        : ". Task schedules were already cleared for " + taskSchedulesCleared
-            + "; if those tables remain in service the operator must restore the schedule entries"
-            + " in their TableConfig taskTypeConfigsMap before scheduled tasks resume.";
     String reCreateHint = dropped.isEmpty() ? ""
         : ". The successfully-dropped variant must be re-created if the original DROP was unintended.";
-    String msg = partialPrefix + "failed to drop " + failed + ": " + causeDesc
-        + reCreateHint + taskScheduleHint;
-    throw new ControllerApplicationException(LOGGER, msg, firstFailureStatusCode, firstFailure);
+    String taskScheduleHint = taskSchedulesCleared
+        ? ". Task schedules were already cleared for " + target
+            + "; if that table remains in service the operator must restore the schedule entries"
+            + " in its TableConfig taskTypeConfigsMap before scheduled tasks resume."
+        : "";
+    return new ControllerApplicationException(LOGGER,
+        partialPrefix + "failed to drop " + target + ": " + causeDesc + reCreateHint + taskScheduleHint,
+        statusCode, cause);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -675,7 +841,7 @@ public class PinotDdlRestletResource {
     String dottedRaw = show.getDatabaseName() == null
         ? show.getRawTableName()
         : show.getDatabaseName() + "." + show.getRawTableName();
-    String fullyQualifiedRaw = DatabaseUtils.translateTableName(dottedRaw, headers);
+    String fullyQualifiedRaw = translateTableNameForDdl(dottedRaw, headers);
 
     // Resolve which typed variant to render. Explicit TYPE clause wins; otherwise check both.
     // Authorize BEFORE existence checks so an unauthorized caller cannot distinguish
@@ -818,18 +984,22 @@ public class PinotDdlRestletResource {
   // Helpers
   // -------------------------------------------------------------------------------------------
 
-  /**
-   * Returns the database name to use for this request. Precedence: explicit {@code db.name} in
-   * the SQL statement → {@code Database} HTTP header → {@code null} (default database).
-   */
+  /// Returns the database name to use for this request. Precedence: explicit `db.name` in
+  /// the SQL statement → `Database` HTTP header → `null` (default database).
   private static String resolveDatabase(String fromSql, HttpHeaders headers) {
+    String fromHeader = headers == null ? null : headers.getHeaderString(DATABASE);
     if (fromSql != null) {
+      if (StringUtils.isNotEmpty(fromHeader) && !fromSql.equals(fromHeader)
+          && !(CommonConstants.DEFAULT_DATABASE.equalsIgnoreCase(fromSql)
+          && CommonConstants.DEFAULT_DATABASE.equalsIgnoreCase(fromHeader))) {
+        throw new ControllerApplicationException(LOGGER,
+            "Database name '" + fromSql + "' from SQL does not match database name '"
+                + fromHeader + "' from header",
+            Response.Status.BAD_REQUEST);
+      }
       return fromSql;
     }
-    if (headers == null) {
-      return null;
-    }
-    return headers.getHeaderString(DATABASE);
+    return fromHeader;
   }
 
   private static JsonNode toJson(Object obj) {
@@ -844,5 +1014,15 @@ public class PinotDdlRestletResource {
 
   private static ControllerApplicationException badRequest(String message) {
     return new ControllerApplicationException(LOGGER, message, Response.Status.BAD_REQUEST);
+  }
+
+  private static String translateTableNameForDdl(String tableName, HttpHeaders headers) {
+    try {
+      return DatabaseUtils.translateTableName(tableName, headers);
+    } catch (DatabaseConflictException | IllegalArgumentException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid database/table reference '" + tableName + "': " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    }
   }
 }

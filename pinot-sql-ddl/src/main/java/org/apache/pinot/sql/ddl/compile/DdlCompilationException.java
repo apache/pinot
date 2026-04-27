@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.sql.ddl.compile;
 
-/**
- * Runtime exception raised when Pinot DDL compilation fails (parse errors, semantic errors,
- * unsupported syntax, conflicting clauses, etc.). The controller surfaces the message verbatim
- * to the API caller.
- */
+/// Runtime exception raised when Pinot DDL compilation fails (parse errors, semantic errors,
+/// unsupported syntax, conflicting clauses, etc.). The controller surfaces the message verbatim
+/// to the API caller.
 public class DdlCompilationException extends RuntimeException {
   public DdlCompilationException(String message) {
     super(message);
