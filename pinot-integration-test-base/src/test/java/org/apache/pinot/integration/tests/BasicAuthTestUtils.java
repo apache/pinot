@@ -33,6 +33,15 @@ public final class BasicAuthTestUtils {
   public static final BasicHeader AUTH_HEADER_BASIC = new BasicHeader("Authorization", AUTH_TOKEN);
   public static final Map<String, String> AUTH_HEADER_USER = Map.of("Authorization", AUTH_TOKEN_USER);
 
+  /**
+   * Applies BasicAuth configuration for the controller component.
+   *
+   * <p>The segment fetcher auth token uses the {@code pinot.controller.segment.fetcher.*} prefix,
+   * consistent with {@code CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY}.
+   * Note: the previously documented key {@code controller.segment.fetcher.auth.token} (without the
+   * {@code pinot.} prefix) was never functional — it was silently ignored by the controller's
+   * segment fetcher factory.
+   */
   public static void addControllerConfiguration(Map<String, Object> properties) {
     properties.put("pinot.controller.segment.fetcher.auth.token", AUTH_TOKEN);
     properties.put("controller.admin.access.control.factory.class",
@@ -60,6 +69,20 @@ public final class BasicAuthTestUtils {
     serverConf.setProperty("pinot.server.instance.auth.token", AUTH_TOKEN);
   }
 
+  /**
+   * Applies BasicAuth configuration for the minion component.
+   *
+   * <p>Two auth token keys are set:
+   * <ul>
+   *   <li>{@code pinot.minion.segment.fetcher.auth.token} — used by the segment fetcher factory
+   *       ({@code CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY}).</li>
+   *   <li>{@code pinot.minion.task.auth.token} — used by minion tasks to call protected controller
+   *       APIs ({@code CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE}).</li>
+   * </ul>
+   * Note: the previous keys {@code segment.fetcher.auth.token} and {@code task.auth.token}
+   * (without the {@code pinot.minion.} prefix) are deprecated. Existing deployments using those
+   * keys will still work but will receive a deprecation warning at startup.
+   */
   public static void addMinionConfiguration(PinotConfiguration minionConf) {
     minionConf.setProperty("pinot.minion.segment.fetcher.auth.token", AUTH_TOKEN);
     minionConf.setProperty("pinot.minion.task.auth.token", AUTH_TOKEN);

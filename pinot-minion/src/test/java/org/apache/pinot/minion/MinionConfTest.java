@@ -72,4 +72,51 @@ public class MinionConfTest {
     Assert.assertEquals(subcfg.subset("class").getProperty("nooppinotcrypter"),
         "org.apache.pinot.core.crypt.NoOpPinotCrypter");
   }
+
+  /**
+   * Verifies backward compatibility for the task auth namespace rename.
+   *
+   * <p>Prior to this change, minion task auth was configured under the {@code task.auth} namespace
+   * (e.g. {@code task.auth.token=Basic ...}). It has been renamed to
+   * {@code pinot.minion.task.auth} for consistency with other component prefixes.
+   *
+   * <p>This test checks that:
+   * <ul>
+   *   <li>The old {@code task.auth.*} keys are NOT picked up under the new namespace, so existing
+   *       configs that have not yet been migrated are detectable.</li>
+   *   <li>The new {@code pinot.minion.task.auth.*} keys ARE resolved under the new namespace.</li>
+   * </ul>
+   *
+   * <p>The runtime fallback that reads {@code DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE} when the new
+   * namespace is empty is exercised in {@link org.apache.pinot.minion.BaseMinionStarter}.
+   */
+  @Test
+  public void testDeprecatedTaskAuthNamespace()
+      throws ConfigurationException {
+    // Old config: task.auth.token (deprecated namespace, no pinot.minion prefix)
+    PropertiesConfiguration oldRaw = CommonsConfigurationUtils.fromPath(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-old-minion.properties")
+            .getFile());
+    MinionConf oldConfig = new MinionConf(new PinotConfiguration(oldRaw).toMap());
+
+    // The deprecated "task.auth" namespace resolves the token.
+    Assert.assertFalse(oldConfig.subset(CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE).isEmpty(),
+        "Deprecated task.auth namespace must resolve in old-style config");
+    // The new "pinot.minion.task.auth" namespace does NOT find the token (migration is pending).
+    Assert.assertTrue(oldConfig.subset(CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE).isEmpty(),
+        "New pinot.minion.task.auth namespace must be empty for old-style config");
+
+    // New config: pinot.minion.task.auth.token (current namespace)
+    PropertiesConfiguration newRaw = CommonsConfigurationUtils.fromPath(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-new-minion.properties")
+            .getFile());
+    MinionConf newConfig = new MinionConf(new PinotConfiguration(newRaw).toMap());
+
+    // The new "pinot.minion.task.auth" namespace resolves the token.
+    Assert.assertFalse(newConfig.subset(CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE).isEmpty(),
+        "New pinot.minion.task.auth namespace must resolve in new-style config");
+    // The deprecated "task.auth" namespace is empty (no stale keys).
+    Assert.assertTrue(newConfig.subset(CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE).isEmpty(),
+        "Deprecated task.auth namespace must be empty for new-style config");
+  }
 }
