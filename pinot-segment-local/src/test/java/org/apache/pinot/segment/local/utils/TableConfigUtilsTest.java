@@ -274,6 +274,34 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void validateDimensionTableWithReplicaGroupStrategy() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+
+    // Dimension table with replica group strategy should fail
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME) 
+        .setIsDimTable(true)
+        .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for dimension table with replica group strategy");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("has segmentAssignmentStrategy: 'replicagroup'"));
+      assertTrue(e.getMessage().contains("dimension tables automatically use 'allservers' strategy"));
+    }
+
+    // Valid dimension table without segment assignment strategy should pass
+    TableConfig validTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .build();
+    TableConfigUtils.validate(validTableConfig, schema);
+}
+
+  @Test
   public void validateIngestionConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
     // null ingestion config
