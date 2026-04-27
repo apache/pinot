@@ -47,8 +47,14 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   private long _lastFetchedOffset = -1;
-  // Diagnostic counter: consecutive fetch calls that returned no records. Logged at WARN
-  // every ~50 empty polls so a long stall surfaces in CI surefire output without spam.
+  // True once the consumer has been positioned (via seek or assign) for the current
+  // startOffset and has had at least one poll attempt. Tracked separately from
+  // _lastFetchedOffset because, with read_committed isolation, the very first poll can
+  // legitimately return zero records (all records were aborted) and we must NOT re-seek
+  // on the next call -- doing so would undo the consumer's internal advance through the
+  // aborted region and wedge us forever at startOffset = 0.
+  private long _lastSeekedStartOffset = Long.MIN_VALUE;
+  // Diagnostic counter: consecutive fetch calls that returned no records.
   private int _consecutiveEmptyPolls = 0;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
@@ -66,11 +72,19 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Polling partition: {}, startOffset: {}, timeout: {}ms", _topicPartition, startOffset, timeoutMs);
     }
-    if (_lastFetchedOffset < 0 || _lastFetchedOffset != startOffset - 1) {
+    // Seek if (a) we've never positioned the consumer for this startOffset, OR (b) the
+    // caller's startOffset moved off the position we last tracked. _lastFetchedOffset < 0
+    // alone is NOT a sufficient seek trigger because, with read_committed, an empty
+    // first poll keeps _lastFetchedOffset at its initial -1 even though the consumer's
+    // internal position has moved past aborted records; re-seeking on every empty poll
+    // would undo that progress and wedge consumption forever at startOffset.
+    boolean firstSeekForThisOffset = _lastSeekedStartOffset != startOffset;
+    if (firstSeekForThisOffset || _lastFetchedOffset != startOffset - 1) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Seeking to offset: {}", startOffset);
       }
       _consumer.seek(_topicPartition, startOffset);
+      _lastSeekedStartOffset = startOffset;
     }
 
     ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
