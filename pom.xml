@@ -320,7 +320,7 @@
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <junit-jupiter-api.version>5.14.3</junit-jupiter-api.version>
+    <junit-jupiter-api.version>5.14.4</junit-jupiter-api.version>
     <mockito-core.version>5.23.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
