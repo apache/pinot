@@ -34,6 +34,8 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -46,9 +48,13 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.BeforeClass;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
@@ -61,6 +67,66 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   private static final Duration COUNT_RECORDS_POSITION_TIMEOUT = Duration.ofSeconds(5);
   private static final Duration COUNT_RECORDS_PRIMING_POLL_TIMEOUT = Duration.ofMillis(200);
   private static final Duration COUNT_RECORDS_POLL_TIMEOUT = Duration.ofSeconds(2);
+
+  /**
+   * Override the inherited setUp ordering to push and verify all transactional records to
+   * Kafka BEFORE creating the realtime table. The base ordering is:
+   *   addTableConfig -> waitForAllRealtimePartitionsConsuming -> pushAvroIntoKafka -> waitForAllDocsLoaded
+   * which means the Pinot consumer is established (and starts polling) while pushAvroIntoKafka
+   * is still emitting batches and the broker's LSO is mid-advance. With read_committed
+   * isolation and ~115 k aborted records first, the consumer's incremental-fetch session can
+   * latch onto a stale LSO and never advance even after the LSO fully moves to log-end --
+   * the dominant CI flake mode for this test (mode "b").
+   *
+   * Reordering to push -> verify-kafka -> add-table makes the consumer's first fetch see a
+   * fully-stable Kafka log with the LSO already at log-end, so no stale-LSO session is
+   * ever established. Kafka's exactly-once contract is unchanged; the Pinot consumer still
+   * reads via read_committed and skips the aborted batch via the broker.
+   */
+  @BeforeClass
+  @Override
+  public void setUp()
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+
+    startZk();
+    startKafka();
+    startController();
+
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
+
+    startBroker();
+    startServer();
+
+    List<File> avroFiles = unpackAvroData(_tempDir);
+
+    Schema schema = createSchema();
+    addSchema(schema);
+
+    // Phase 1: push to Kafka and verify ALL committed records are readable from a
+    // standalone read_committed consumer BEFORE creating the realtime table.
+    pushAvroIntoKafka(avroFiles);
+
+    // Phase 2: create the realtime table. The Pinot consumer will start polling against
+    // a Kafka log that is already fully populated and has its LSO at log-end, so the
+    // session-stale-LSO wedge cannot be established.
+    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    addTableConfig(tableConfig);
+    waitForAllRealtimePartitionsConsuming(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getRealtimePartitionsReadyTimeoutMs());
+
+    setUpH2Connection(avroFiles);
+    setUpQueryGenerator(avroFiles);
+    runValidationJob(600_000);
+
+    waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+  }
 
   @Override
   public void addTableConfig(TableConfig tableConfig)
