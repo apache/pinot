@@ -47,6 +47,16 @@ import org.apache.spark.sql.sources.Filter
 class PinotWriteBuilder(logicalWriteInfo: LogicalWriteInfo)
   extends WriteBuilder with SupportsOverwrite {
 
+  // Backward-compatible auxiliary constructor: prior releases of this connector exposed
+  // PinotWriteBuilder(filters: Array[Filter], logicalWriteInfo: LogicalWriteInfo). The
+  // `filters` parameter was unused (build() ignored it). Removing it would be a binary
+  // break for any external embedder that called this constructor directly. The connector
+  // itself only ever instantiates the 1-arg form (see PinotTable#newWriteBuilder), so the
+  // 2-arg form is purely for source/binary compatibility during the spark-3 deprecation
+  // window — `filters` are still ignored at build time, and overwrite()/truncate() throw.
+  @deprecated("filters parameter is ignored; use the 1-arg constructor", "1.6.0")
+  def this(filters: Array[Filter], logicalWriteInfo: LogicalWriteInfo) = this(logicalWriteInfo)
+
   override def build(): Write = new PinotWrite(logicalWriteInfo)
 
   // The default SupportsOverwrite#canOverwrite returns true, which advertises support that
