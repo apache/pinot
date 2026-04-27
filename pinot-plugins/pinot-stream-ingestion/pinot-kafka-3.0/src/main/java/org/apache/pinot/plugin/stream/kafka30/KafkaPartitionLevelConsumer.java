@@ -46,14 +46,16 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
-  private long _lastFetchedOffset = -1;
-  // Tracks the startOffset for which we've already issued a seek. With read_committed
-  // isolation, the very first poll can legitimately return zero records (all records were
-  // aborted) and _lastFetchedOffset stays at its initial -1; if we then re-seek on every
-  // subsequent call (because _lastFetchedOffset < 0), we undo the consumer's internal
-  // advance through the aborted region and wedge consumption at startOffset. This field
-  // disambiguates "we've never seeked" from "we seeked but got an empty result".
-  private long _lastSeekedStartOffset = Long.MIN_VALUE;
+  // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
+  // positioned for any caller-requested startOffset yet (we have not issued a seek).
+  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch (e.g.
+  // read_committed filtered the batch as aborted), this is the consumer's actual
+  // KafkaConsumer.position(), which may have advanced past the caller's startOffset even
+  // though zero records were returned. RealtimeSegmentDataManager only advances its own
+  // _currentOffset on non-empty batches, so the next call typically passes the same
+  // startOffset back; comparing startOffset against _nextReadOffset (rather than re-seeking
+  // unconditionally) is what lets the consumer make progress through aborted regions.
+  private long _nextReadOffset = -1;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -70,32 +72,33 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Polling partition: {}, startOffset: {}, timeout: {}ms", _topicPartition, startOffset, timeoutMs);
     }
-    // Seek if (a) we've never positioned the consumer, OR (b) the caller's startOffset
-    // moved off the position we last tracked. _lastFetchedOffset < 0 alone is NOT a
-    // sufficient seek trigger because, with read_committed, an empty first poll keeps
-    // _lastFetchedOffset at its initial -1 even though the consumer's internal position
-    // has moved past aborted records; re-seeking on every empty poll would undo that
-    // progress and wedge consumption forever at startOffset.
-    boolean firstSeekForThisOffset = _lastSeekedStartOffset != startOffset;
-    if (firstSeekForThisOffset || _lastFetchedOffset != startOffset - 1) {
+    // Seek when:
+    //   (a) we have not yet positioned the consumer (initial state), OR
+    //   (b) the caller's startOffset is BEYOND _nextReadOffset (caller advanced or
+    //       reset to a different fetch position).
+    // We do NOT seek when startOffset <= _nextReadOffset. With read_committed isolation an
+    // empty poll legitimately advances _nextReadOffset past the caller's startOffset (the
+    // batch was filtered as aborted) while RealtimeSegmentDataManager keeps passing the
+    // same startOffset on the next call (it only advances on non-empty batches). Seeking
+    // back to startOffset would undo the consumer's progress through the aborted region
+    // and wedge consumption forever; this was the dominant CI flake mode.
+    if (_nextReadOffset < 0 || startOffset > _nextReadOffset) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Seeking to offset: {}", startOffset);
       }
       _consumer.seek(_topicPartition, startOffset);
-      _lastSeekedStartOffset = startOffset;
+      _nextReadOffset = startOffset;
     }
 
     ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
     List<BytesStreamMessage> filteredRecords = new ArrayList<>(records.size());
     long firstOffset = -1;
-    long offsetOfNextBatch = startOffset;
     StreamMessageMetadata lastMessageMetadata = null;
     long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
       firstOffset = records.get(0).offset();
-      _lastFetchedOffset = records.get(records.size() - 1).offset();
-      offsetOfNextBatch = _lastFetchedOffset + 1;
+      _nextReadOffset = records.get(records.size() - 1).offset() + 1;
       for (ConsumerRecord<Bytes, Bytes> record : records) {
         StreamMessageMetadata messageMetadata = extractMessageMetadata(record);
         Bytes message = record.value();
@@ -112,14 +115,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         lastMessageMetadata = messageMetadata;
       }
     } else {
-      // No records were returned to the application by this poll, but the underlying
-      // KafkaConsumer's internal position may still have advanced past offsets that were
-      // filtered out -- most commonly when read_committed isolation skips an aborted
-      // transactional batch. Track the consumer's actual position so the next call resumes
-      // from there. If position has not advanced either, set _lastFetchedOffset to
-      // startOffset - 1 so the seek-check at the top of the next call (in combination with
-      // _lastSeekedStartOffset) skips the redundant re-seek -- otherwise we'd undo the
-      // consumer's internal progress through the aborted region.
+      // No records returned, but the underlying KafkaConsumer's internal position may have
+      // advanced past offsets filtered out by isolation level (most commonly read_committed
+      // skipping an aborted transactional batch). Snap _nextReadOffset to the consumer's
+      // actual position so a future call with a stale startOffset (RealtimeSegmentDataManager
+      // doesn't advance _currentOffset on empty batches) resumes from where the broker left
+      // us, not from startOffset.
       long currentPosition;
       try {
         currentPosition = _consumer.position(_topicPartition);
@@ -127,15 +128,13 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Failed to read consumer position after empty poll on {}", _topicPartition, e);
         }
-        currentPosition = startOffset;
+        currentPosition = _nextReadOffset;
       }
-      if (currentPosition > startOffset) {
-        _lastFetchedOffset = currentPosition - 1;
-        offsetOfNextBatch = currentPosition;
-      } else {
-        _lastFetchedOffset = startOffset - 1;
+      if (currentPosition > _nextReadOffset) {
+        _nextReadOffset = currentPosition;
       }
     }
+    long offsetOfNextBatch = _nextReadOffset;
     // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
     // TODO: A better solution would be to fetch earliest offset from topic and see if it is greater than startOffset.
     // However, this would require and additional call to Kafka which we want to avoid.
