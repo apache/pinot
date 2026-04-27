@@ -123,7 +123,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       updateTableConfigMetrics(tableNameWithType, tableConfig, context);
       updateSegmentMetrics(tableNameWithType, tableConfig, context);
-      updateTableSizeMetrics(tableNameWithType);
+      // Skip table size aggregation for disabled tables. Servers do not load segments for disabled tables, so the
+      // /table/{name}/size scatter-gather would otherwise return 404 from every server and flood controller logs
+      // with ERROR-level entries. updateSegmentMetrics has already populated context._disabledTables.
+      if (!context._disabledTables.contains(tableNameWithType)) {
+        updateTableSizeMetrics(tableNameWithType);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table

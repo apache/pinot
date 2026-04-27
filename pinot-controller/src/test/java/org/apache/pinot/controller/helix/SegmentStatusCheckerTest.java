@@ -60,10 +60,13 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -147,7 +150,8 @@ public class SegmentStatusCheckerTest {
     return segmentZKMetadata;
   }
 
-  private void runSegmentStatusChecker(PinotHelixResourceManager resourceManager, int waitForPushTimeInSeconds) {
+  private TableSizeReader runSegmentStatusChecker(PinotHelixResourceManager resourceManager,
+      int waitForPushTimeInSeconds) {
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     ControllerConf controllerConf = mock(ControllerConf.class);
@@ -158,6 +162,7 @@ public class SegmentStatusCheckerTest {
             tableSizeReader);
     segmentStatusChecker.start();
     segmentStatusChecker.run();
+    return tableSizeReader;
   }
 
   private void verifyControllerMetrics(String tableNameWithType, int expectedReplicationFromConfig,
@@ -689,7 +694,8 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void disabledTableTest() {
+  public void disabledTableTest()
+      throws Exception {
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
     // disable table in idealstate
     idealState.enable(false);
@@ -703,9 +709,12 @@ public class SegmentStatusCheckerTest {
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
 
-    runSegmentStatusChecker(resourceManager, 0);
+    TableSizeReader tableSizeReader = runSegmentStatusChecker(resourceManager, 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT), 1);
     verifyControllerMetricsNotExist();
+    // Disabled tables should not trigger the size scatter-gather: servers do not load segments for disabled tables,
+    // so calling /table/{name}/size would return 404 from every server and flood logs (issue #14279).
+    verify(tableSizeReader, never()).getTableSizeDetails(anyString(), anyInt(), anyBoolean());
   }
 
   @Test
