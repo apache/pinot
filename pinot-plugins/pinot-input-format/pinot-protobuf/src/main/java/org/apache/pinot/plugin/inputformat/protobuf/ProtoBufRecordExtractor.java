@@ -235,10 +235,11 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   @Override
   protected Object convertSingleValue(Object value) {
     Object fieldValue = ((ProtoBufFieldInfo) value).getFieldValue();
+    if (fieldValue instanceof Number || fieldValue instanceof Boolean) {
+      return fieldValue;
+    }
     if (fieldValue instanceof ByteString) {
       return ((ByteString) fieldValue).toByteArray();
-    } else if (fieldValue instanceof Number) {
-      return fieldValue;
     }
     return fieldValue.toString();
   }

@@ -59,12 +59,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -269,13 +271,11 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     // Pick the column created from complex type
     ColumnMetadata campaignInner2Metadata = segmentMetadata.getColumnMetadataFor("campaign.inner1.inner2");
     // Verify we see a specific value parsed from the complexType
-    Assert.assertEquals(campaignInner2Metadata.getMinValue().compareTo("inner2v"), 0);
+    assertEquals(campaignInner2Metadata.getMinValue(), "inner2v");
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
-    Assert.assertEquals(
-        campaignMetadata.getMinValue().compareTo("{\"inner1\":{\"inner2\":\"inner2v\"},\"inner\":\"innerv\"}"), 0);
-
+    assertEquals(campaignMetadata.getMinValue(), "{\"inner\":\"innerv\",\"inner1\":{\"inner2\":\"inner2v\"}}");
     ColumnMetadata listMetadata = segmentMetadata.getColumnMetadataFor("targetusers.user");
-    Assert.assertEquals(listMetadata.getMinValue().compareTo("barfoo"), 0);
+    assertEquals(listMetadata.getMinValue(), "barfoo");
   }
 
   @Test

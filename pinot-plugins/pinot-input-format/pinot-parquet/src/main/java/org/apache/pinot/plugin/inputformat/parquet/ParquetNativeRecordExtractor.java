@@ -114,6 +114,8 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
     if (fieldType.isPrimitive()) {
       PrimitiveType.PrimitiveTypeName primitiveTypeName = fieldType.asPrimitiveType().getPrimitiveTypeName();
       switch (primitiveTypeName) {
+        case BOOLEAN:
+          return from.getBoolean(fieldIndex, index);
         case INT32:
           int intValue = from.getInteger(fieldIndex, index);
           if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
@@ -130,15 +132,13 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
             return BigDecimal.valueOf(longValue, decimalLogicalTypeAnnotation.getScale());
           }
           return longValue;
+        case INT96:
+          Binary int96 = from.getInt96(fieldIndex, index);
+          return convertInt96ToLong(int96.getBytes());
         case FLOAT:
           return from.getFloat(fieldIndex, index);
         case DOUBLE:
           return from.getDouble(fieldIndex, index);
-        case BOOLEAN:
-          return from.getValueToString(fieldIndex, index);
-        case INT96:
-          Binary int96 = from.getInt96(fieldIndex, index);
-          return convertInt96ToLong(int96.getBytes());
         case BINARY:
         case FIXED_LEN_BYTE_ARRAY:
           if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {

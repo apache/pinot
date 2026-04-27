@@ -621,7 +621,7 @@ public class DataBlockBuilder {
   private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, Map value)
       throws IOException {
     writeVarOffsetInFixed(fixedSize, varSize);
-    byte[] bytes = MapUtils.serializeMap(value);
+    byte[] bytes = MapUtils.serializeMap(value, false);
     fixedSize.putInt(bytes.length);
     varSize.write(bytes);
   }

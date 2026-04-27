@@ -53,7 +53,6 @@ public abstract class AbstractRecordReaderTest {
   protected List<Object[]> _primaryKeys;
   protected org.apache.pinot.spi.data.Schema _pinotSchema;
   protected Set<String> _sourceFields;
-  protected RecordReader _recordReader;
 
   protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
     List<Map<String, Object>> records = new ArrayList<>();
@@ -207,8 +206,6 @@ public abstract class AbstractRecordReaderTest {
     _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
     // Write generated random records to file
     writeRecordsToFile(_records);
-    // Create and init RecordReader
-    _recordReader = createRecordReader();
   }
 
   @AfterClass
@@ -220,9 +217,11 @@ public abstract class AbstractRecordReaderTest {
   @Test
   public void testRecordReader()
       throws Exception {
-    checkValue(_recordReader, _records, _primaryKeys);
-    _recordReader.rewind();
-    checkValue(_recordReader, _records, _primaryKeys);
+    try (RecordReader recordReader = createRecordReader()) {
+      checkValue(recordReader, _records, _primaryKeys);
+      recordReader.rewind();
+      checkValue(recordReader, _records, _primaryKeys);
+    }
   }
 
   @Test

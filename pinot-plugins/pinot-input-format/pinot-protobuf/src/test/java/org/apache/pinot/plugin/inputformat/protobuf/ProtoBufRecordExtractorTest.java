@@ -31,9 +31,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.testng.Assert.assertSame;
 
 
 /**
@@ -73,6 +76,23 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     return Arrays.asList(createExplicitOptionalDefaultRecord(), createOptionalDefaultRecordWithNulls());
   }
 
+  /// Verify that protobuf primitive types come back as their native Java boxed types — Boolean stays Boolean, ints stay
+  /// Integer, etc. — rather than being stringified by `convertSingleValue`.
+  @Test
+  public void testPrimitiveTypePreservation()
+      throws IOException {
+    try (RecordReader reader = createRecordReader(_sourceFieldNames)) {
+      GenericRow row = new GenericRow();
+      reader.next(row);
+      assertSame(row.getValue(BOOL_FIELD).getClass(), Boolean.class, "proto bool → Boolean");
+      assertSame(row.getValue(INT_FIELD).getClass(), Integer.class, "proto int32 → Integer");
+      assertSame(row.getValue(LONG_FIELD).getClass(), Long.class, "proto int64 → Long");
+      assertSame(row.getValue(FLOAT_FIELD).getClass(), Float.class, "proto float → Float");
+      assertSame(row.getValue(DOUBLE_FIELD).getClass(), Double.class, "proto double → Double");
+      assertSame(row.getValue(BYTES_FIELD).getClass(), byte[].class, "proto bytes → byte[]");
+    }
+  }
+
   @Override
   protected Set<String> getSourceFields() {
     return Sets.newHashSet(STRING_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, FLOAT_FIELD, BOOL_FIELD, BYTES_FIELD,
@@ -105,7 +125,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
       messageBuilder.setLongField((Long) inputRecord.get(LONG_FIELD));
       messageBuilder.setDoubleField((Double) inputRecord.get(DOUBLE_FIELD));
       messageBuilder.setFloatField((Float) inputRecord.get(FLOAT_FIELD));
-      messageBuilder.setBoolField(Boolean.parseBoolean((String) inputRecord.get(BOOL_FIELD)));
+      messageBuilder.setBoolField((Boolean) inputRecord.get(BOOL_FIELD));
       messageBuilder.setBytesField(ByteString.copyFrom((byte[]) inputRecord.get(BYTES_FIELD)));
 
       if (inputRecord.get(NULLABLE_STRING_FIELD) != null) {
@@ -124,7 +144,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
         messageBuilder.setNullableFloatField((Float) inputRecord.get(NULLABLE_FLOAT_FIELD));
       }
       if (inputRecord.get(NULLABLE_BOOL_FIELD) != null) {
-        messageBuilder.setNullableBoolField(Boolean.parseBoolean((String) inputRecord.get(NULLABLE_BOOL_FIELD)));
+        messageBuilder.setNullableBoolField((Boolean) inputRecord.get(NULLABLE_BOOL_FIELD));
       }
       if (inputRecord.get(NULLABLE_BYTES_FIELD) != null) {
         messageBuilder.setNullableBytesField(ByteString.copyFrom((byte[]) inputRecord.get(NULLABLE_BYTES_FIELD)));
@@ -170,7 +190,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(LONG_FIELD, 100L);
     record.put(DOUBLE_FIELD, 1.1);
     record.put(FLOAT_FIELD, 2.2f);
-    record.put(BOOL_FIELD, "true");
+    record.put(BOOL_FIELD, true);
     record.put(BYTES_FIELD, "hello world!".getBytes(UTF_8));
     // These optional fields are explicitly set to proto defaults and expect
     // to see these values preserved (not treated as null).
@@ -179,7 +199,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(NULLABLE_LONG_FIELD, 0L);
     record.put(NULLABLE_DOUBLE_FIELD, 0.0);
     record.put(NULLABLE_FLOAT_FIELD, 0.0f);
-    record.put(NULLABLE_BOOL_FIELD, "false");
+    record.put(NULLABLE_BOOL_FIELD, false);
     record.put(NULLABLE_BYTES_FIELD, "".getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("aaa", "bbb", "ccc"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 9));
@@ -204,7 +224,7 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(LONG_FIELD, 200L);
     record.put(DOUBLE_FIELD, 3.3);
     record.put(FLOAT_FIELD, 4.4f);
-    record.put(BOOL_FIELD, "true");
+    record.put(BOOL_FIELD, true);
     record.put(BYTES_FIELD, "goodbye world!".getBytes(UTF_8));
     record.put(NULLABLE_STRING_FIELD, null);
     record.put(NULLABLE_INT_FIELD, null);

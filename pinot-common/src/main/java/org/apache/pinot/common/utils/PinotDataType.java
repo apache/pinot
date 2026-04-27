@@ -820,38 +820,36 @@ public enum PinotDataType {
 
   MAP {
     @Override
+    public String toString(Object value) {
+      //noinspection unchecked
+      return MapUtils.toString((Map<String, Object>) value);
+    }
+
+    @Override
+    public String toJson(Object value) {
+      //noinspection unchecked
+      return MapUtils.toString((Map<String, Object>) value);
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      //noinspection unchecked
+      return MapUtils.serializeMap((Map<String, Object>) value);
+    }
+
+    @Override
     public Object convert(Object value, PinotDataType sourceType) {
       switch (sourceType) {
         case STRING:
-          try {
-            return JsonUtils.stringToObject(value.toString(), Map.class);
-          } catch (Exception e) {
-            throw new RuntimeException("Unable to convert String to Map. Input value: " + value, e);
-          }
+          return MapUtils.fromString(value.toString());
         case BYTES:
           return MapUtils.deserializeMap((byte[]) value);
-        case OBJECT:
         case MAP:
-          if (value instanceof Map) {
-            return value;
-          } else {
-            throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
-                sourceType, value.getClass()));
-          }
+          return value;
         default:
           throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
               sourceType, value.getClass()));
       }
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public byte[] toBytes(Object value) {
-      if (!(value instanceof Map)) {
-        throw new UnsupportedOperationException("Cannot convert non-Map value to BYTES for MAP type: "
-            + (value == null ? "null" : value.getClass()));
-      }
-      return MapUtils.serializeMap((Map<String, Object>) value);
     }
   },
 

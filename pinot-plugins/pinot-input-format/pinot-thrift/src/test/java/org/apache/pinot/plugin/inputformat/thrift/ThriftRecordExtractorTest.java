@@ -30,10 +30,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertSame;
 
 
 /**
@@ -61,6 +65,21 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
   @Override
   protected List<Map<String, Object>> getInputRecords() {
     return Arrays.asList(createRecord1(), createRecord2());
+  }
+
+  /// Verify that thrift primitive types come back as their native Java boxed types — Boolean stays Boolean, ints stay
+  /// Integer, etc. — rather than being stringified by `convertSingleValue`.
+  @Test
+  public void testPrimitiveTypePreservation()
+      throws IOException {
+    try (RecordReader reader = createRecordReader(_sourceFieldNames)) {
+      GenericRow row = new GenericRow();
+      reader.next(row);
+      assertSame(row.getValue(BOOL_FIELD).getClass(), Boolean.class, "thrift bool → Boolean");
+      assertSame(row.getValue(INT_FIELD).getClass(), Integer.class, "thrift i32 → Integer");
+      assertSame(row.getValue(LONG_FIELD).getClass(), Long.class, "thrift i64 → Long");
+      assertSame(row.getValue(DOUBLE_FIELD).getClass(), Double.class, "thrift double → Double");
+    }
   }
 
   @Override
@@ -113,7 +132,7 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
       }
 
       thriftRecord.setComplexListField(nestedTypeList);
-      thriftRecord.setBooleanField(Boolean.valueOf((String) inputRecord.get(BOOL_FIELD)));
+      thriftRecord.setBooleanField((Boolean) inputRecord.get(BOOL_FIELD));
       thriftRecord.setDoubleField((Double) inputRecord.get(DOUBLE_FIELD));
       thriftRecord.setStringField((String) inputRecord.get(STRING_FIELD));
       thriftRecord.setEnumField(TestEnum.valueOf((String) inputRecord.get(ENUM_FIELD)));
@@ -145,7 +164,7 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(INT_FIELD, 10);
     record.put(LONG_FIELD, 1000L);
     record.put(DOUBLE_FIELD, 1.0);
-    record.put(BOOL_FIELD, "false");
+    record.put(BOOL_FIELD, false);
     record.put(ENUM_FIELD, TestEnum.DELTA.toString());
     record.put(NESTED_STRUCT_FIELD, createNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 5));
     record.put(SIMPLE_LIST, Arrays.asList("aaa", "bbb", "ccc"));
@@ -165,7 +184,7 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(INT_FIELD, 20);
     record.put(LONG_FIELD, 2000L);
     record.put(DOUBLE_FIELD, 2.0);
-    record.put(BOOL_FIELD, "false");
+    record.put(BOOL_FIELD, false);
     record.put(ENUM_FIELD, TestEnum.GAMMA.toString());
     record.put(NESTED_STRUCT_FIELD, createNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 5));
     record.put(SIMPLE_LIST, Arrays.asList("aaa", "bbb", "ccc"));

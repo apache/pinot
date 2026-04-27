@@ -237,6 +237,36 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     Assert.assertEquals(genericRow.getValue(timestampMicrosColName).getClass().getSimpleName(), "Timestamp");
   }
 
+  /// Verify that avro primitive types come back as their native Java boxed types — Boolean stays Boolean (was
+  /// previously stringified by `convertSingleValue`).
+  @Test
+  public void testPrimitiveTypePreservation() {
+    Schema avroSchema = createRecord("PrimitiveRecord", null, null, false);
+    avroSchema.setFields(Lists.newArrayList(
+        new Schema.Field("boolField", create(Type.BOOLEAN), null, null),
+        new Schema.Field("intField", create(Type.INT), null, null),
+        new Schema.Field("longField", create(Type.LONG), null, null),
+        new Schema.Field("floatField", create(Type.FLOAT), null, null),
+        new Schema.Field("doubleField", create(Type.DOUBLE), null, null)));
+    GenericRecord genericRecord = new GenericData.Record(avroSchema);
+    genericRecord.put("boolField", true);
+    genericRecord.put("intField", 42);
+    genericRecord.put("longField", 42L);
+    genericRecord.put("floatField", 1.5f);
+    genericRecord.put("doubleField", 1.5);
+
+    AvroRecordExtractor extractor = new AvroRecordExtractor();
+    extractor.init(null, null);
+    GenericRow row = new GenericRow();
+    extractor.extract(genericRecord, row);
+
+    Assert.assertSame(row.getValue("boolField").getClass(), Boolean.class, "avro boolean → Boolean");
+    Assert.assertSame(row.getValue("intField").getClass(), Integer.class, "avro int → Integer");
+    Assert.assertSame(row.getValue("longField").getClass(), Long.class, "avro long → Long");
+    Assert.assertSame(row.getValue("floatField").getClass(), Float.class, "avro float → Float");
+    Assert.assertSame(row.getValue("doubleField").getClass(), Double.class, "avro double → Double");
+  }
+
   @Test
   public void testReusedByteBuffer() {
     byte[] content = new byte[100];

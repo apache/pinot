@@ -105,6 +105,33 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     }
   }
 
+  /// CSV is fundamentally untyped — every cell is a String regardless of how it could be interpreted. This locks in
+  /// that behavior: numeric and boolean-looking cells must come out as String, not parsed into Integer/Boolean.
+  @Test
+  public void testPrimitiveTypePreservation()
+      throws IOException {
+    File typeFile = new File(_tempDir, "types.csv");
+    try (BufferedWriter w = new BufferedWriter(new FileWriter(typeFile))) {
+      w.write("boolField,intField,doubleField,stringField\n");
+      w.write("true,42,1.5,hello");
+    }
+    CSVRecordReader reader = new CSVRecordReader();
+    HashSet<String> fields = new HashSet<>();
+    fields.add("boolField");
+    fields.add("intField");
+    fields.add("doubleField");
+    fields.add("stringField");
+    reader.init(typeFile, fields, new CSVRecordReaderConfig());
+    GenericRow row = new GenericRow();
+    reader.next(row);
+    reader.close();
+
+    Assert.assertSame(row.getValue("boolField").getClass(), String.class, "CSV cells stay String — no bool parsing");
+    Assert.assertSame(row.getValue("intField").getClass(), String.class, "CSV cells stay String — no int parsing");
+    Assert.assertSame(row.getValue("doubleField").getClass(), String.class, "CSV cells stay String — no num parsing");
+    Assert.assertSame(row.getValue("stringField").getClass(), String.class);
+  }
+
   @Test
   public void testRemovingSurroundingSpaces() throws IOException {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();

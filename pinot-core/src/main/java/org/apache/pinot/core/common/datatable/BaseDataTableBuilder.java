@@ -107,7 +107,7 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     if (value == null) {
       _currentRowDataByteBuffer.putInt(0);
     } else {
-      byte[] bytes = MapUtils.serializeMap(value);
+      byte[] bytes = MapUtils.serializeMap(value, false);
       _currentRowDataByteBuffer.putInt(bytes.length);
       _variableSizeDataByteArrayOutputStream.write(bytes);
     }

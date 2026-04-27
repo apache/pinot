@@ -425,7 +425,7 @@ public class ParquetCollectionAndEquivalenceTest {
     assertEquals(row.getValue("longField"), 1234567890123L);
     assertEquals(row.getValue("floatField"), 1.5F);
     assertEquals(row.getValue("doubleField"), 2.25D);
-    assertEquals(row.getValue("boolField"), "true");
+    assertEquals(row.getValue("boolField"), true);
     assertEquals(row.getValue("stringField"), "hello parquet");
     assertEquals(row.getValue("decimalField"), new BigDecimal("123.45"));
     assertEquals(row.getValue("dateField"), 19723);
