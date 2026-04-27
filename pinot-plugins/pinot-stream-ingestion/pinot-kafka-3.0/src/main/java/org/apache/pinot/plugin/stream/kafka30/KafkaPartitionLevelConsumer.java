@@ -56,6 +56,11 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   private long _lastSeekedStartOffset = Long.MIN_VALUE;
   // Diagnostic counter: consecutive fetch calls that returned no records.
   private int _consecutiveEmptyPolls = 0;
+  // Force a re-seek after this many consecutive empty polls to invalidate any stale
+  // incremental-fetch session state on the broker side. Empirically the consumer can get
+  // wedged (no position advance, no records) when the broker's LSO has moved but the
+  // session was never updated, so we periodically reset to force fresh metadata.
+  private static final int FORCE_RESEEK_AFTER_EMPTY_POLLS = 100;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -148,7 +153,24 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         // otherwise wipe whatever progress the next poll makes.
         _lastFetchedOffset = startOffset - 1;
       }
-      if (_consecutiveEmptyPolls == 1 || _consecutiveEmptyPolls % 50 == 0) {
+      // If the consumer is wedged (many consecutive empty polls with no position advance),
+      // its incremental fetch session may have stale LSO state -- force a re-seek to the
+      // current position to invalidate that session and trigger a metadata-fresh fetch on
+      // the next poll. With read_committed, this is the recovery path when the broker side
+      // has advanced the LSO but the consumer's session was never told about it.
+      if (_consecutiveEmptyPolls > 0 && _consecutiveEmptyPolls % FORCE_RESEEK_AFTER_EMPTY_POLLS == 0) {
+        long resumeOffset = currentPosition > startOffset ? currentPosition : startOffset;
+        LOGGER.error(
+            "[kafka-consumer-diag] forcing reseek to {} on {} after {} consecutive empty polls",
+            resumeOffset, _topicPartition, _consecutiveEmptyPolls);
+        try {
+          _consumer.seek(_topicPartition, resumeOffset);
+          _lastSeekedStartOffset = resumeOffset;
+          _lastFetchedOffset = resumeOffset - 1;
+        } catch (Exception e) {
+          LOGGER.error("[kafka-consumer-diag] forced reseek failed on {}", _topicPartition, e);
+        }
+      } else if (_consecutiveEmptyPolls == 1 || _consecutiveEmptyPolls % 50 == 0) {
         // ERROR (not WARN) so this passes the test BurstFilter that DENIES below-ERROR.
         LOGGER.error(
             "[kafka-consumer-diag] empty poll #{} on {} startOffset={} consumerPosition={} lastFetchedOffset={}{}",
