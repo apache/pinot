@@ -37,6 +37,8 @@ import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -228,8 +230,10 @@ public class TimeBoundaryManagerTest extends ControllerTest {
   }
 
   private TableConfig getTableConfig(String rawTableName, String pushFrequency) {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, null, pushFrequency));
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTimeColumnName(TIME_COLUMN)
-        .setSegmentPushFrequency(pushFrequency).build();
+        .setIngestionConfig(ingestionConfig).build();
   }
 
   private void setSchemaTimeFieldSpec(String rawTableName, TimeUnit timeUnit) {
