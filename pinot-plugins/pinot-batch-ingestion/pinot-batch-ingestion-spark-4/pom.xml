@@ -38,11 +38,21 @@
          in pinot-batch-ingestion/pom.xml. The property here hardens the compile target if
          someone invokes this module directly. -->
     <jdk.version>21</jdk.version>
-    <!-- Spark 4.1+ depends on netty 4.2.x (io.netty.channel.kqueue.KQueueIoHandler etc. are
-         new APIs introduced in 4.2). Pinot-wide netty.version is pinned to 4.1.x; locally
-         override it for this module so the embedded SparkContext in
-         SparkSegmentGenerationJobRunnerTest can construct its NettyRpcEnv without
-         NoClassDefFoundError on macOS (kqueue) / Linux (epoll). -->
+    <!-- Spark 4.1+ depends on netty 4.2.x (io.netty.channel.kqueue.KQueueIoHandler and
+         io.netty.channel.epoll.EpollIoHandler are new APIs introduced in 4.2). Pinot-wide
+         netty.version is pinned to 4.1.x for the rest of the build; locally override it for
+         this module so:
+           (a) the embedded SparkContext in SparkSegmentGenerationJobRunnerTest can construct
+               its NettyRpcEnv without NoClassDefFoundError on macOS (kqueue) / Linux (epoll);
+           (b) the production shaded jar (assembled by pinot-distribution/pinot-assembly.xml
+               under `plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-4/`)
+               carries netty 4.2.x at runtime, matching what Spark 4.1+ on the user's cluster
+               itself bundles — so the shaded plugin and Spark agree on a single netty.
+         Validated against spark4.version=4.1.1 (which depends on netty-all:4.2.7.Final). If
+         spark4.version is bumped, re-validate that the new Spark patch's transitive netty is
+         still in the 4.2.x line; the SparkVersionAlignmentTest assertion in this module's
+         tests pins the major.minor pair so a future bump that goes to 4.3.x or back to 4.1.x
+         fails the build immediately. -->
     <netty.version>4.2.7.Final</netty.version>
   </properties>
 
