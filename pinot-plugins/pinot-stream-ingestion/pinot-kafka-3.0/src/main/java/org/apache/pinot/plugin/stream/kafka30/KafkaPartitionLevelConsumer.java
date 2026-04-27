@@ -47,20 +47,13 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   private long _lastFetchedOffset = -1;
-  // True once the consumer has been positioned (via seek or assign) for the current
-  // startOffset and has had at least one poll attempt. Tracked separately from
-  // _lastFetchedOffset because, with read_committed isolation, the very first poll can
-  // legitimately return zero records (all records were aborted) and we must NOT re-seek
-  // on the next call -- doing so would undo the consumer's internal advance through the
-  // aborted region and wedge us forever at startOffset = 0.
+  // Tracks the startOffset for which we've already issued a seek. With read_committed
+  // isolation, the very first poll can legitimately return zero records (all records were
+  // aborted) and _lastFetchedOffset stays at its initial -1; if we then re-seek on every
+  // subsequent call (because _lastFetchedOffset < 0), we undo the consumer's internal
+  // advance through the aborted region and wedge consumption at startOffset. This field
+  // disambiguates "we've never seeked" from "we seeked but got an empty result".
   private long _lastSeekedStartOffset = Long.MIN_VALUE;
-  // Diagnostic counter: consecutive fetch calls that returned no records.
-  private int _consecutiveEmptyPolls = 0;
-  // Force a re-seek after this many consecutive empty polls to invalidate any stale
-  // incremental-fetch session state on the broker side. Empirically the consumer can get
-  // wedged (no position advance, no records) when the broker's LSO has moved but the
-  // session was never updated, so we periodically reset to force fresh metadata.
-  private static final int FORCE_RESEEK_AFTER_EMPTY_POLLS = 100;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -100,12 +93,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     StreamMessageMetadata lastMessageMetadata = null;
     long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
-      if (_consecutiveEmptyPolls > 0) {
-        // ERROR (not WARN) so this passes the test BurstFilter that DENIES below-ERROR.
-        LOGGER.error("[kafka-consumer-diag] {} records received on {} after {} consecutive empty polls",
-            records.size(), _topicPartition, _consecutiveEmptyPolls);
-        _consecutiveEmptyPolls = 0;
-      }
       firstOffset = records.get(0).offset();
       _lastFetchedOffset = records.get(records.size() - 1).offset();
       offsetOfNextBatch = _lastFetchedOffset + 1;
@@ -128,63 +115,25 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       // No records were returned to the application by this poll, but the underlying
       // KafkaConsumer's internal position may still have advanced past offsets that were
       // filtered out -- most commonly when read_committed isolation skips an aborted
-      // transactional batch. If we leave _lastFetchedOffset at its prior value (e.g. -1
-      // on the first poll), the seek-on-mismatch check at the top of fetchMessages will
-      // re-seek to startOffset on every subsequent call and we will never make progress
-      // past the aborted region. Track the consumer's actual position so the next call
-      // resumes from there. If position has not advanced either, still mark
-      // _lastFetchedOffset so the seek-check skips the redundant re-seek -- the consumer
-      // can then make progress on subsequent polls without being reset.
+      // transactional batch. Track the consumer's actual position so the next call resumes
+      // from there. If position has not advanced either, set _lastFetchedOffset to
+      // startOffset - 1 so the seek-check at the top of the next call (in combination with
+      // _lastSeekedStartOffset) skips the redundant re-seek -- otherwise we'd undo the
+      // consumer's internal progress through the aborted region.
       long currentPosition;
-      Exception positionEx = null;
       try {
         currentPosition = _consumer.position(_topicPartition);
       } catch (Exception e) {
-        positionEx = e;
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Failed to read consumer position after empty poll on {}", _topicPartition, e);
+        }
         currentPosition = startOffset;
       }
-      _consecutiveEmptyPolls++;
       if (currentPosition > startOffset) {
         _lastFetchedOffset = currentPosition - 1;
         offsetOfNextBatch = currentPosition;
       } else {
-        // Consumer's internal position is still at startOffset. Mark _lastFetchedOffset so
-        // the seek-check at the top of the next call skips the redundant seek that would
-        // otherwise wipe whatever progress the next poll makes.
         _lastFetchedOffset = startOffset - 1;
-      }
-      // If the consumer is wedged (many consecutive empty polls with no position advance),
-      // its incremental fetch session may have stale LSO state -- force a re-seek to the
-      // current position to invalidate that session and trigger a metadata-fresh fetch on
-      // the next poll. With read_committed, this is the recovery path when the broker side
-      // has advanced the LSO but the consumer's session was never told about it.
-      if (_consecutiveEmptyPolls > 0 && _consecutiveEmptyPolls % FORCE_RESEEK_AFTER_EMPTY_POLLS == 0) {
-        long resumeOffset = currentPosition > startOffset ? currentPosition : startOffset;
-        LOGGER.error(
-            "[kafka-consumer-diag] forcing partition re-assignment + seek to {} on {} after {} consecutive empty"
-                + " polls",
-            resumeOffset, _topicPartition, _consecutiveEmptyPolls);
-        try {
-          // assign(emptyList()) drops the partition assignment which terminates the
-          // broker-side incremental fetch session for this partition. assign() with the
-          // partition again starts a fresh session, and seek() positions us where we
-          // want to resume. seek() alone does NOT invalidate the broker session, only
-          // moves the consumer-side position, which is why the previous reseek attempts
-          // (which kept hitting the same wedged offset) didn't recover.
-          _consumer.assign(java.util.Collections.emptyList());
-          _consumer.assign(java.util.Collections.singletonList(_topicPartition));
-          _consumer.seek(_topicPartition, resumeOffset);
-          _lastSeekedStartOffset = resumeOffset;
-          _lastFetchedOffset = resumeOffset - 1;
-        } catch (Exception e) {
-          LOGGER.error("[kafka-consumer-diag] forced reseek failed on {}", _topicPartition, e);
-        }
-      } else if (_consecutiveEmptyPolls == 1 || _consecutiveEmptyPolls % 50 == 0) {
-        // ERROR (not WARN) so this passes the test BurstFilter that DENIES below-ERROR.
-        LOGGER.error(
-            "[kafka-consumer-diag] empty poll #{} on {} startOffset={} consumerPosition={} lastFetchedOffset={}{}",
-            _consecutiveEmptyPolls, _topicPartition, startOffset, currentPosition, _lastFetchedOffset,
-            positionEx == null ? "" : (" positionError=" + positionEx));
       }
     }
     // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
