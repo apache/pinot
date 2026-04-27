@@ -348,7 +348,7 @@ public final class TableConfigUtils {
    *
    * 2. For OFFLINE table
    * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
-   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies 
+   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
    *
    * 3. Checks peerDownloadSchema
    * 4. Checks time column existence if null handling for time column is enabled
@@ -373,12 +373,13 @@ public final class TableConfigUtils {
           "Dimension table must have primary key[s]");
       // Check for incompatible segment assignment strategies
       String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
-      if (segmentAssignmentStrategy != null &&
-          AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(segmentAssignmentStrategy)) {
+      if (segmentAssignmentStrategy != null
+          && AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(segmentAssignmentStrategy)) {
         throw new IllegalStateException(
             "Dimension table '" + tableConfig.getTableName() + "' has segmentAssignmentStrategy: 'replicagroup', "
             + "but dimension tables automatically use 'allservers' strategy and replica group configurations "
-            + "have no meaning for dimension tables. Remove segmentAssignmentStrategy from dimension table configuration.");
+            + "have no meaning for dimension tables. Remove segmentAssignmentStrategy from dimension table "
+            + "configuration.");
       }
     }
 
