@@ -154,9 +154,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       if (_consecutiveEmptyPolls > 0 && _consecutiveEmptyPolls % FORCE_RESEEK_AFTER_EMPTY_POLLS == 0) {
         long resumeOffset = currentPosition > startOffset ? currentPosition : startOffset;
         LOGGER.error(
-            "[kafka-consumer-diag] forcing reseek to {} on {} after {} consecutive empty polls",
+            "[kafka-consumer-diag] forcing partition re-assignment + seek to {} on {} after {} consecutive empty"
+                + " polls",
             resumeOffset, _topicPartition, _consecutiveEmptyPolls);
         try {
+          _consumer.assign(java.util.Collections.emptyList());
+          _consumer.assign(java.util.Collections.singletonList(_topicPartition));
           _consumer.seek(_topicPartition, resumeOffset);
           _lastSeekedStartOffset = resumeOffset;
           _lastFetchedOffset = resumeOffset - 1;

@@ -161,9 +161,18 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       if (_consecutiveEmptyPolls > 0 && _consecutiveEmptyPolls % FORCE_RESEEK_AFTER_EMPTY_POLLS == 0) {
         long resumeOffset = currentPosition > startOffset ? currentPosition : startOffset;
         LOGGER.error(
-            "[kafka-consumer-diag] forcing reseek to {} on {} after {} consecutive empty polls",
+            "[kafka-consumer-diag] forcing partition re-assignment + seek to {} on {} after {} consecutive empty"
+                + " polls",
             resumeOffset, _topicPartition, _consecutiveEmptyPolls);
         try {
+          // assign(emptyList()) drops the partition assignment which terminates the
+          // broker-side incremental fetch session for this partition. assign() with the
+          // partition again starts a fresh session, and seek() positions us where we
+          // want to resume. seek() alone does NOT invalidate the broker session, only
+          // moves the consumer-side position, which is why the previous reseek attempts
+          // (which kept hitting the same wedged offset) didn't recover.
+          _consumer.assign(java.util.Collections.emptyList());
+          _consumer.assign(java.util.Collections.singletonList(_topicPartition));
           _consumer.seek(_topicPartition, resumeOffset);
           _lastSeekedStartOffset = resumeOffset;
           _lastFetchedOffset = resumeOffset - 1;
