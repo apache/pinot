@@ -281,7 +281,7 @@ public class TableConfigUtilsTest {
         .build();
 
     // Dimension table with replica group strategy should fail
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME) 
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
         .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
         .build();
