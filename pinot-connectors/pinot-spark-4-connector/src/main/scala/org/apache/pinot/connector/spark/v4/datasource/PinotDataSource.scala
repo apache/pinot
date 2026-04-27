@@ -117,11 +117,21 @@ private[datasource] object PinotDataSource {
     } catch {
       case _: ClassNotFoundException => false
       // Class.forName can also throw LinkageError / NoClassDefFoundError if the v3 jar is on
-      // the classpath but partially shadowed (e.g., a transitive dependency is missing). We
-      // conservatively treat that as "not present" so the constructor does not leak an
-      // unrelated bytecode-resolution error to the user; the worst case is the conflict guard
-      // is bypassed and the user falls back to Spark's own multi-source error message.
-      case _: LinkageError => false
+      // the classpath but partially shadowed (e.g., a transitive dependency is missing). The
+      // v3 class IS resolvable to the loader at this point — the linkage failure means the
+      // class is "on the classpath but cannot run." Treating that as "absent" would let the
+      // exact failure mode this guard exists to prevent (Spark resolving non-deterministically
+      // across two `pinot` DataSourceRegister entries with diverging overwrite contracts) slip
+      // through. Bias the guard toward fail-closed: log the linkage detail and report the v3
+      // connector as present. Users who genuinely need both jars and accept the risk can set
+      // `-Dpinot.spark.connector.skip-conflict-guard=true` to bypass.
+      case e: LinkageError =>
+        LOGGER.warn(
+          "Spark 3 PinotDataSource is on the classpath but failed to link ({}); " +
+            "treating as a conflict to preserve the fail-fast guarantee. " +
+            "Set -D{}=true to bypass.",
+          e.getMessage, SKIP_CONFLICT_GUARD_PROP)
+        true
     }
   }
 
