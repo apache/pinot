@@ -374,7 +374,7 @@ public final class TableConfigUtils {
       // Check for incompatible segment assignment strategies
       String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
       if (segmentAssignmentStrategy != null
-          && AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(segmentAssignmentStrategy)) {
+          && CommonConstants.Segment.AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(segmentAssignmentStrategy)) {
         throw new IllegalStateException(
             "Dimension table '" + tableConfig.getTableName() + "' has segmentAssignmentStrategy: 'replicagroup', "
             + "but dimension tables automatically use 'allservers' strategy and replica group configurations "
