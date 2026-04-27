@@ -226,6 +226,15 @@ public class RequestUtils {
     return getLiteral(object.toString());
   }
 
+  /**
+   * Converts a parsed SQL literal to a thrift {@link Literal} for broker-to-server transport.
+   *
+   * <p>Non-integer decimal literals (e.g. {@code 3.14}) are encoded as {@code DOUBLE_VALUE} for
+   * backward compatibility with servers that predate the {@code BIG_DECIMAL_VALUE} thrift field.
+   * The server side ({@link org.apache.pinot.common.request.context.LiteralContext}) already
+   * handles {@code BIG_DECIMAL_VALUE}; switch to {@code setBigDecimalValue()} in the next release
+   * once all servers have been upgraded.
+   */
   public static Literal getLiteral(SqlLiteral node) {
     Literal literal = new Literal();
     if (node instanceof SqlNumericLiteral) {
@@ -242,7 +251,9 @@ public class RequestUtils {
           literal.setLongValue(longValue);
         }
       } else {
-        // TODO: Support exact decimal value
+        // TODO: Switch to setBigDecimalValue() in the next release to preserve full decimal
+        //       precision. Kept as DOUBLE_VALUE for backward compatibility with older servers
+        //       that do not yet handle the BIG_DECIMAL_VALUE thrift field.
         literal.setDoubleValue(bigDecimalValue.doubleValue());
       }
     } else {

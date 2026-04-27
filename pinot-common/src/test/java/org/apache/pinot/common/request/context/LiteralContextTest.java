@@ -222,4 +222,41 @@ public class LiteralContextTest {
     assertFalse(literalContext.isNull());
     assertEquals(literalContext.toString(), "'deadbeef'");
   }
+
+  /**
+   * Verifies that {@link LiteralContext} correctly deserializes a {@code BIG_DECIMAL_VALUE} thrift
+   * literal with full precision. The broker currently sends {@code DOUBLE_VALUE} for backward
+   * compatibility, but the server must be ready so the broker-side switch can happen in a future
+   * release without a coordinated upgrade.
+   */
+  @Test
+  public void testBigDecimalValueThriftLiteralHandledByServer() {
+    BigDecimal exactValue = new BigDecimal("123456789.123456789");
+
+    // Simulate a future broker sending BIG_DECIMAL_VALUE
+    Literal literal = new Literal();
+    literal.setBigDecimalValue(BigDecimalUtils.serialize(exactValue));
+
+    LiteralContext literalContext = new LiteralContext(literal);
+    assertEquals(literalContext.getType(), DataType.BIG_DECIMAL);
+    assertEquals(literalContext.getBigDecimalValue(), exactValue);
+    assertEquals(literalContext.getStringValue(), exactValue.toPlainString());
+    assertFalse(literalContext.isNull());
+  }
+
+  /**
+   * Verifies that a {@code DOUBLE_VALUE} thrift literal (the current broker encoding for decimal
+   * SQL literals) is correctly handled by the server, confirming backward compatibility.
+   */
+  @Test
+  public void testDoubleValueThriftLiteralHandledByServer() {
+    Literal literal = new Literal();
+    literal.setDoubleValue(3.14);
+
+    LiteralContext literalContext = new LiteralContext(literal);
+    assertEquals(literalContext.getType(), DataType.DOUBLE);
+    assertEquals(literalContext.getDoubleValue(), 3.14, 1e-9);
+    assertEquals(literalContext.getBigDecimalValue(), new BigDecimal("3.14"));
+    assertFalse(literalContext.isNull());
+  }
 }
