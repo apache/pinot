@@ -39,11 +39,9 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Golden-output unit tests for {@link CanonicalDdlEmitter}. Every test asserts the exact emitted
- * string so the canonical form is locked in: any drift requires updating both the emitter and
- * the golden expectation in the same PR.
- */
+/// Golden-output unit tests for [CanonicalDdlEmitter]. Every test asserts the exact emitted
+/// string so the canonical form is locked in: any drift requires updating both the emitter and
+/// the golden expectation in the same PR.
 public class CanonicalDdlEmitterTest {
 
   @Test
@@ -152,11 +150,9 @@ public class CanonicalDdlEmitterTest {
     assertFalse(emitted.contains("'loadMode'"), emitted);
   }
 
-  /**
-   * Regression: comparing default value vs natural default with Object.equals does reference
-   * equality on byte[], so a BYTES column at its natural default would always emit a redundant
-   * DEFAULT '<hex>' clause. The fix uses DataType.equals which delegates to Arrays.equals.
-   */
+  /// Regression: comparing default value vs natural default with Object.equals does reference
+  /// equality on byte[], so a BYTES column at its natural default would always emit a redundant
+  /// DEFAULT '<hex>' clause. The fix uses DataType.equals which delegates to Arrays.equals.
   @Test
   public void noDefaultEmittedForBytesAtNaturalDefault() {
     Schema schema = new Schema();
@@ -170,10 +166,8 @@ public class CanonicalDdlEmitterTest {
         "BYTES column at natural default must not emit a DEFAULT clause; got:\n" + emitted);
   }
 
-  /**
-   * Regression: BigDecimal.toString() can emit scientific notation (1E+30) which Calcite's
-   * Literal() rule does not accept. The fix routes BIG_DECIMAL defaults through toPlainString().
-   */
+  /// Regression: BigDecimal.toString() can emit scientific notation (1E+30) which Calcite's
+  /// Literal() rule does not accept. The fix routes BIG_DECIMAL defaults through toPlainString().
   @Test
   public void bigDecimalDefaultEmitsPlainString() {
     Schema schema = new Schema();
@@ -190,11 +184,9 @@ public class CanonicalDdlEmitterTest {
         "expected plain-string form of 1E+30; got:\n" + emitted);
   }
 
-  /**
-   * Regression: BIG_DECIMAL natural-default check must use compareTo rather than equals,
-   * so a stored BigDecimal("0.0") (scale 1) is treated as equivalent to BigDecimal.ZERO and
-   * canonical DDL elides the redundant DEFAULT clause.
-   */
+  /// Regression: BIG_DECIMAL natural-default check must use compareTo rather than equals,
+  /// so a stored BigDecimal("0.0") (scale 1) is treated as equivalent to BigDecimal.ZERO and
+  /// canonical DDL elides the redundant DEFAULT clause.
   @Test
   public void bigDecimalAtNaturalDefaultDoesNotEmitDefault() {
     Schema schema = new Schema();
@@ -209,10 +201,8 @@ public class CanonicalDdlEmitterTest {
         "BIG_DECIMAL at scale-shifted natural default must not emit DEFAULT; got:\n" + emitted);
   }
 
-  /**
-   * Regression: BOOLEAN columns store defaults internally as Integer 0/1; canonical DDL
-   * must emit the SQL literal form (TRUE/FALSE) so the output is grammar-standard.
-   */
+  /// Regression: BOOLEAN columns store defaults internally as Integer 0/1; canonical DDL
+  /// must emit the SQL literal form (TRUE/FALSE) so the output is grammar-standard.
   @Test
   public void booleanDefaultEmittedAsSqlLiteral() {
     Schema schema = new Schema();
@@ -229,10 +219,8 @@ public class CanonicalDdlEmitterTest {
         "must not emit raw integer encoding (DEFAULT 1); got:\n" + emitted);
   }
 
-  /**
-   * Regression: BYTES non-natural-default emit must hex-encode the byte[] rather than fall
-   * through to value.toString() which would emit "[B@<addr>" identity-hash garbage.
-   */
+  /// Regression: BYTES non-natural-default emit must hex-encode the byte[] rather than fall
+  /// through to value.toString() which would emit "[B@<addr>" identity-hash garbage.
   @Test
   public void bytesNonNaturalDefaultEmittedAsHex() {
     Schema schema = new Schema();
@@ -249,11 +237,9 @@ public class CanonicalDdlEmitterTest {
         "BYTES default must not leak the JVM byte[] identity-hash form; got:\n" + emitted);
   }
 
-  /**
-   * Regression: TIMESTAMP DEFAULT emission must use UTC ISO-8601 form (Instant.toString)
-   * rather than java.sql.Timestamp.toString, which formats in the JVM's default time zone
-   * and would make canonical DDL emit different strings on different controllers.
-   */
+  /// Regression: TIMESTAMP DEFAULT emission must use UTC ISO-8601 form (Instant.toString)
+  /// rather than java.sql.Timestamp.toString, which formats in the JVM's default time zone
+  /// and would make canonical DDL emit different strings on different controllers.
   @Test
   public void timestampDefaultEmittedInUtcIso() {
     Schema schema = new Schema();

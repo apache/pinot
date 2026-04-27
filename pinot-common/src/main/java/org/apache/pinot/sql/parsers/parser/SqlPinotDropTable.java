@@ -32,16 +32,14 @@ import org.apache.calcite.sql.SqlWriter;
 import org.apache.calcite.sql.parser.SqlParserPos;
 
 
-/**
- * Pinot-native {@code DROP TABLE} DDL statement.
- *
- * <p>Syntax: {@code DROP TABLE [IF EXISTS] [db.]name [TYPE OFFLINE | REALTIME]}
- *
- * <p>The optional {@code TYPE} clause restricts the drop to one physical table when the logical
- * name has both OFFLINE and REALTIME variants. When absent, both variants are dropped.
- *
- * <p>This class is not thread-safe; instances should not be mutated after construction.
- */
+/// Pinot-native `DROP TABLE` DDL statement.
+///
+/// Syntax: `DROP TABLE [IF EXISTS] [db.]name [TYPE OFFLINE | REALTIME]`
+///
+/// The optional `TYPE` clause restricts the drop to one physical table when the logical
+/// name has both OFFLINE and REALTIME variants. When absent, both variants are dropped.
+///
+/// This class is not thread-safe; instances should not be mutated after construction.
 public class SqlPinotDropTable extends SqlCall {
   private static final SqlSpecialOperator OPERATOR =
       new SqlSpecialOperator("DROP_TABLE", SqlKind.DROP_TABLE);
@@ -66,10 +64,8 @@ public class SqlPinotDropTable extends SqlCall {
     return _ifExists;
   }
 
-  /**
-   * @return the explicit table type ("OFFLINE" or "REALTIME") if specified, or {@code null} for
-   *     "drop both variants".
-   */
+  /// @return the explicit table type ("OFFLINE" or "REALTIME") if specified, or `null` for
+  /// "drop both variants".
   @Nullable
   public SqlLiteral getTableType() {
     return _tableType;

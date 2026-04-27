@@ -37,7 +37,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-/** End-to-end compiler tests: SQL → CompiledDdl → Schema + TableConfig. */
+/// End-to-end compiler tests: SQL → CompiledDdl → Schema + TableConfig.
 public class DdlCompilerTest {
 
   // -------------------------------------------------------------------------------------------
@@ -198,12 +198,10 @@ public class DdlCompilerTest {
     assertEquals(defaultValue, "unknown");
   }
 
-  /**
-   * TABLE_TYPE parsing is case-insensitive (parseTableType uses equalsIgnoreCase), but the
-   * compiled TableConfig always stores the canonical uppercase form. Lock in the
-   * lowercase-input → uppercase-output behavior so a future grammar tightening cannot silently
-   * regress to case-sensitive matching.
-   */
+  /// TABLE_TYPE parsing is case-insensitive (parseTableType uses equalsIgnoreCase), but the
+  /// compiled TableConfig always stores the canonical uppercase form. Lock in the
+  /// lowercase-input → uppercase-output behavior so a future grammar tightening cannot silently
+  /// regress to case-sensitive matching.
   @Test
   public void lowercaseTableTypeAcceptedAndCanonicalized() {
     CompiledCreateTable lowerCase = compileCreate(
@@ -215,11 +213,9 @@ public class DdlCompilerTest {
     assertEquals(mixedCase.getTableConfig().getTableType(), TableType.REALTIME);
   }
 
-  /**
-   * DEFAULT literals must be compatible with the column's declared data type. Non-numeric
-   * defaults on numeric columns must be rejected at compile time with a clear error rather
-   * than failing at first ingestion with a downstream-layer error.
-   */
+  /// DEFAULT literals must be compatible with the column's declared data type. Non-numeric
+  /// defaults on numeric columns must be rejected at compile time with a clear error rather
+  /// than failing at first ingestion with a downstream-layer error.
   @Test
   public void defaultLiteralWrongTypeRejected() {
     DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(
@@ -230,11 +226,9 @@ public class DdlCompilerTest {
         "expected error to name the column, got: " + ex.getMessage());
   }
 
-  /**
-   * SMALLINT and TINYINT are explicitly rejected to keep the type contract narrow: silently
-   * widening to INT today would lock those DDLs into INT semantics if Pinot later adds
-   * INT8/INT16. Rejection at the boundary is reversible; silent promotion is not.
-   */
+  /// SMALLINT and TINYINT are explicitly rejected to keep the type contract narrow: silently
+  /// widening to INT today would lock those DDLs into INT semantics if Pinot later adds
+  /// INT8/INT16. Rejection at the boundary is reversible; silent promotion is not.
   @Test
   public void smallintTinyintRejectedExplicitly() {
     DdlCompilationException ex1 = expectThrows(DdlCompilationException.class, () -> compileCreate(
@@ -247,12 +241,10 @@ public class DdlCompilerTest {
         "expected error to name TINYINT, got: " + ex2.getMessage());
   }
 
-  /**
-   * DEFAULT NULL is semantically meaningless for Pinot's "default null value" concept (the
-   * value used when the source row is null). A user writing it would get silently no-op
-   * behavior under the previous implementation; we now reject explicitly so the user sees a
-   * clear error and corrects their DDL.
-   */
+  /// DEFAULT NULL is semantically meaningless for Pinot's "default null value" concept (the
+  /// value used when the source row is null). A user writing it would get silently no-op
+  /// behavior under the previous implementation; we now reject explicitly so the user sees a
+  /// clear error and corrects their DDL.
   @Test
   public void defaultNullRejectedExplicitly() {
     DdlCompilationException ex = expectThrows(DdlCompilationException.class, () -> compileCreate(

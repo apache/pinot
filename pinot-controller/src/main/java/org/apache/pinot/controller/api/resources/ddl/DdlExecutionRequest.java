@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-/** Request body for {@code POST /sql/ddl}. */
+/// Request body for `POST /sql/ddl`.
 public class DdlExecutionRequest {
   private final String _sql;
 

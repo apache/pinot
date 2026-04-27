@@ -23,11 +23,9 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 
-/**
- * Base type for the result of compiling a Pinot DDL statement. Concrete subtypes carry the
- * operation-specific payload (Schema/TableConfig for {@code CREATE}, target name for {@code DROP},
- * etc.). The controller dispatches on {@link #getOperation()}.
- */
+/// Base type for the result of compiling a Pinot DDL statement. Concrete subtypes carry the
+/// operation-specific payload (Schema/TableConfig for `CREATE`, target name for `DROP`,
+/// etc.). The controller dispatches on [#getOperation()].
 public abstract class CompiledDdl {
   private final DdlOperation _operation;
   private final String _databaseName;
@@ -43,13 +41,13 @@ public abstract class CompiledDdl {
     return _operation;
   }
 
-  /** Database name from {@code db.table} or {@code SHOW TABLES FROM db}; may be {@code null}. */
+  /// Database name from `db.table` or `SHOW TABLES FROM db`; may be `null`.
   @Nullable
   public String getDatabaseName() {
     return _databaseName;
   }
 
-  /** Non-fatal compile-time warnings (e.g. unknown property routed to TableCustomConfig). */
+  /// Non-fatal compile-time warnings (e.g. unknown property routed to TableCustomConfig).
   public List<String> getWarnings() {
     return _warnings;
   }

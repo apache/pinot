@@ -54,33 +54,29 @@ import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 
 
-/**
- * Compiles a Pinot SQL DDL statement into an executable {@link CompiledDdl}.
- *
- * <p>Top-level pipeline:
- * <pre>
- *   SQL String
- *     → CalciteSqlParser (in pinot-common, generated parser)
- *     → SqlNode (one of SqlPinot{CreateTable,DropTable,ShowTables})
- *     → ResolvedTableDefinition (CREATE only)
- *     → Schema + TableConfig (CREATE only) via {@link PropertyMapping}
- *     → CompiledDdl
- * </pre>
- *
- * <p>Stateless and thread-safe. All entry points are static.
- */
+/// Compiles a Pinot SQL DDL statement into an executable [CompiledDdl].
+///
+/// Top-level pipeline:
+/// ```
+///   SQL String
+///     → CalciteSqlParser (in pinot-common, generated parser)
+///     → SqlNode (one of SqlPinot{CreateTable,DropTable,ShowTables})
+///     → ResolvedTableDefinition (CREATE only)
+///     → Schema + TableConfig (CREATE only) via [PropertyMapping]
+///     → CompiledDdl
+/// ```
+///
+/// Stateless and thread-safe. All entry points are static.
 public final class DdlCompiler {
 
   private DdlCompiler() {
   }
 
-  /**
-   * Parses and compiles a DDL statement.
-   *
-   * @param sql the raw SQL string (single statement)
-   * @return a {@link CompiledDdl} subclass appropriate for the operation
-   * @throws DdlCompilationException for parse failures or semantic errors
-   */
+  /// Parses and compiles a DDL statement.
+  ///
+  /// @param sql the raw SQL string (single statement)
+  /// @return a [CompiledDdl] subclass appropriate for the operation
+  /// @throws DdlCompilationException for parse failures or semantic errors
   public static CompiledDdl compile(String sql) {
     SqlNode node = parse(sql);
     if (node instanceof SqlPinotCreateTable) {
@@ -213,15 +209,13 @@ public final class DdlCompiler {
     return result;
   }
 
-  /**
-   * Extracts the bare string value of a {@link SqlLiteral} (e.g. {@code 'foo'} → {@code foo},
-   * {@code 0.0} → {@code "0.0"}). Uses {@link SqlLiteral#toValue()} which strips the SQL-wire
-   * quoting that {@code toString()} would otherwise leak into Pinot's defaultNullValue field.
-   *
-   * <p>Calcite's {@code toValue()} throws {@link UnsupportedOperationException} for binary
-   * string and interval literals; we catch and surface a typed {@link DdlCompilationException}
-   * so the caller sees a 400 with a useful message rather than a 500.
-   */
+  /// Extracts the bare string value of a [SqlLiteral] (e.g. `'foo'` → `foo`,
+  /// `0.0` → `"0.0"`). Uses [SqlLiteral#toValue()] which strips the SQL-wire
+  /// quoting that `toString()` would otherwise leak into Pinot's defaultNullValue field.
+  ///
+  /// Calcite's `toValue()` throws [UnsupportedOperationException] for binary
+  /// string and interval literals; we catch and surface a typed [DdlCompilationException]
+  /// so the caller sees a 400 with a useful message rather than a 500.
   private static String extractLiteralValue(@Nullable SqlNode literal) {
     if (literal == null) {
       return null;
@@ -384,10 +378,8 @@ public final class DdlCompiler {
     return tableConfig;
   }
 
-  /**
-   * Cross-checks resolved fields against the produced TableConfig (e.g. {@code timeColumnName}
-   * must reference a DATETIME column). Adds advisory warnings for missing-but-recommended fields.
-   */
+  /// Cross-checks resolved fields against the produced TableConfig (e.g. `timeColumnName`
+  /// must reference a DATETIME column). Adds advisory warnings for missing-but-recommended fields.
   private static void validateConsistency(ResolvedTableDefinition resolved, Schema schema,
       TableConfig tableConfig, List<String> warnings) {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -447,7 +439,7 @@ public final class DdlCompiler {
     throw new DdlCompilationException("Unknown table type: " + value);
   }
 
-  /** Splits a parser identifier into (databaseName, tableName). */
+  /// Splits a parser identifier into (databaseName, tableName).
   private static QualifiedName parseQualifiedName(SqlIdentifier identifier) {
     List<String> names = identifier.names;
     if (names.size() == 1) {

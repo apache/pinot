@@ -24,11 +24,9 @@ import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * Maps SQL data type names to Pinot {@link DataType} values. Recognizes both standard SQL names
- * (BIGINT, VARCHAR, etc.) and Pinot-native aliases (LONG, STRING, BIG_DECIMAL, BYTES) that the
- * Calcite grammar already exposes via {@code config.fmpp}.
- */
+/// Maps SQL data type names to Pinot [DataType] values. Recognizes both standard SQL names
+/// (BIGINT, VARCHAR, etc.) and Pinot-native aliases (LONG, STRING, BIG_DECIMAL, BYTES) that the
+/// Calcite grammar already exposes via `config.fmpp`.
 public final class DataTypeMapper {
   private static final Map<String, DataType> NAME_TO_DATATYPE;
 
@@ -59,11 +57,9 @@ public final class DataTypeMapper {
   private DataTypeMapper() {
   }
 
-  /**
-   * Resolves a SQL type name (case-insensitive) to a Pinot {@link DataType}.
-   *
-   * @throws DdlCompilationException if the type is not supported.
-   */
+  /// Resolves a SQL type name (case-insensitive) to a Pinot [DataType].
+  ///
+  /// @throws DdlCompilationException if the type is not supported.
   public static DataType resolve(String sqlTypeName) {
     // Locale.ROOT: in Turkish locale "int".toUpperCase() yields "İNT" which fails the lookup.
     String upper = sqlTypeName.toUpperCase(Locale.ROOT);

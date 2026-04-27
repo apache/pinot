@@ -24,7 +24,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-/** Result of compiling {@code CREATE TABLE ...}. */
+/// Result of compiling `CREATE TABLE ...`.
 public final class CompiledCreateTable extends CompiledDdl {
   private final Schema _schema;
   private final TableConfig _tableConfig;

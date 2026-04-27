@@ -18,15 +18,13 @@
  */
 package org.apache.pinot.sql.ddl.resolved;
 
-/**
- * Schema role for a resolved DDL column. This drives which Pinot {@code FieldSpec} subclass the
- * column compiles to (DimensionFieldSpec / MetricFieldSpec / DateTimeFieldSpec).
- */
+/// Schema role for a resolved DDL column. This drives which Pinot `FieldSpec` subclass the
+/// column compiles to (DimensionFieldSpec / MetricFieldSpec / DateTimeFieldSpec).
 public enum ColumnRole {
-  /** Maps to {@code DimensionFieldSpec}. Filterable / groupable column. */
+  /// Maps to `DimensionFieldSpec`. Filterable / groupable column.
   DIMENSION,
-  /** Maps to {@code MetricFieldSpec}. Aggregatable numeric column. */
+  /// Maps to `MetricFieldSpec`. Aggregatable numeric column.
   METRIC,
-  /** Maps to {@code DateTimeFieldSpec}. Requires explicit format and granularity. */
+  /// Maps to `DateTimeFieldSpec`. Requires explicit format and granularity.
   DATETIME
 }

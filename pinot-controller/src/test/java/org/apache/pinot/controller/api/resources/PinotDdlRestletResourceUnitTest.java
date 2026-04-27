@@ -34,16 +34,14 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Unit tests for {@link PinotDdlRestletResource#describeColumnShapeMismatch}. This is the
- * hybrid-table CREATE gate that decides whether a DDL-compiled schema is compatible with the
- * schema already stored in ZK for a hybrid pair's sibling variant. The comparator must accept
- * differences in schema-level metadata a DDL column list cannot express (primary keys, tags,
- * null-handling) and reject differences in per-column attributes that the DDL does control.
- */
+/// Unit tests for [PinotDdlRestletResource#describeColumnShapeMismatch]. This is the
+/// hybrid-table CREATE gate that decides whether a DDL-compiled schema is compatible with the
+/// schema already stored in ZK for a hybrid pair's sibling variant. The comparator must accept
+/// differences in schema-level metadata a DDL column list cannot express (primary keys, tags,
+/// null-handling) and reject differences in per-column attributes that the DDL does control.
 public class PinotDdlRestletResourceUnitTest {
 
-  /** Compiled DDL with matching columns but no primary keys must accept a stored schema that has them. */
+  /// Compiled DDL with matching columns but no primary keys must accept a stored schema that has them.
   @Test
   public void acceptsMatchingColumnsWhenStoredHasExtraPrimaryKeyMetadata() {
     Schema stored = new Schema();
@@ -60,7 +58,7 @@ public class PinotDdlRestletResourceUnitTest {
         "schema-level metadata the DDL column list cannot express must not drive a mismatch");
   }
 
-  /** A missing or extra column must be rejected with a named column set in the message. */
+  /// A missing or extra column must be rejected with a named column set in the message.
   @Test
   public void rejectsColumnSetDifference() {
     Schema stored = new Schema();
@@ -78,7 +76,7 @@ public class PinotDdlRestletResourceUnitTest {
         "message should call out the offending column set difference: " + msg);
   }
 
-  /** Different data type for the same column must be rejected. */
+  /// Different data type for the same column must be rejected.
   @Test
   public void rejectsDataTypeMismatch() {
     Schema stored = new Schema();
@@ -94,7 +92,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("data type differs"), msg);
   }
 
-  /** DIMENSION vs METRIC for the same column must be rejected. */
+  /// DIMENSION vs METRIC for the same column must be rejected.
   @Test
   public void rejectsFieldTypeMismatch() {
     Schema stored = new Schema();
@@ -110,7 +108,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("field type differs"), msg);
   }
 
-  /** Single-value vs multi-value mismatch must be rejected. */
+  /// Single-value vs multi-value mismatch must be rejected.
   @Test
   public void rejectsSingleValuedFlagMismatch() {
     Schema stored = new Schema();
@@ -126,7 +124,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("single-valued flag"), msg);
   }
 
-  /** NOT NULL flag mismatch must be rejected. */
+  /// NOT NULL flag mismatch must be rejected.
   @Test
   public void rejectsNotNullFlagMismatch() {
     Schema stored = new Schema();
@@ -144,11 +142,9 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("NOT NULL flag"), msg);
   }
 
-  /**
-   * BYTES columns produce a fresh byte[] on each getDefaultNullValue() call. Equality must be
-   * by content, not reference, otherwise every hybrid second-variant CREATE on a BYTES schema
-   * with a custom default would falsely trip the column-shape mismatch.
-   */
+  /// BYTES columns produce a fresh byte[] on each getDefaultNullValue() call. Equality must be
+  /// by content, not reference, otherwise every hybrid second-variant CREATE on a BYTES schema
+  /// with a custom default would falsely trip the column-shape mismatch.
   @Test
   public void acceptsMatchingBytesDefaultNullValue() {
     Schema stored = new Schema();
@@ -167,12 +163,10 @@ public class PinotDdlRestletResourceUnitTest {
         "matching BYTES defaults must not trip a content-vs-reference equality regression");
   }
 
-  /**
-   * Regression: BigDecimal.equals is scale-sensitive (1 != 1.0); the comparator must use
-   * compareTo so the same numeric default arriving via different literal forms is treated
-   * as equivalent. Without this fix, a hybrid second-variant CREATE on a BIG_DECIMAL column
-   * whose stored default arrived as "1.0" but DDL re-states "1" would falsely 409 CONFLICT.
-   */
+  /// Regression: BigDecimal.equals is scale-sensitive (1 != 1.0); the comparator must use
+  /// compareTo so the same numeric default arriving via different literal forms is treated
+  /// as equivalent. Without this fix, a hybrid second-variant CREATE on a BIG_DECIMAL column
+  /// whose stored default arrived as "1.0" but DDL re-states "1" would falsely 409 CONFLICT.
   @Test
   public void acceptsScaleShiftedBigDecimalDefault() {
     Schema stored = new Schema();
@@ -191,7 +185,7 @@ public class PinotDdlRestletResourceUnitTest {
         "scale-shifted BIG_DECIMAL defaults must compare equal via compareTo");
   }
 
-  /** BYTES default mismatch must still be rejected with content-aware comparison. */
+  /// BYTES default mismatch must still be rejected with content-aware comparison.
   @Test
   public void rejectsBytesDefaultNullValueMismatch() {
     Schema stored = new Schema();
@@ -211,7 +205,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("default null value"), msg);
   }
 
-  /** Default-null-value mismatch must be rejected. */
+  /// Default-null-value mismatch must be rejected.
   @Test
   public void rejectsDefaultNullValueMismatch() {
     Schema stored = new Schema();
@@ -231,7 +225,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("default null value"), msg);
   }
 
-  /** DATETIME format mismatch must be rejected. */
+  /// DATETIME format mismatch must be rejected.
   @Test
   public void rejectsDateTimeFormatMismatch() {
     Schema stored = new Schema();
@@ -249,7 +243,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("DATETIME format"), msg);
   }
 
-  /** DATETIME granularity mismatch must be rejected. */
+  /// DATETIME granularity mismatch must be rejected.
   @Test
   public void rejectsDateTimeGranularityMismatch() {
     Schema stored = new Schema();
@@ -267,7 +261,7 @@ public class PinotDdlRestletResourceUnitTest {
     assertTrue(msg.contains("DATETIME granularity"), msg);
   }
 
-  /** Matching multi-column, multi-type schemas must be accepted. */
+  /// Matching multi-column, multi-type schemas must be accepted.
   @Test
   public void acceptsMatchingMixedColumnSchema() {
     Schema stored = new Schema();

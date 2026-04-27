@@ -93,24 +93,20 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-/**
- * Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE,
- * DROP TABLE, SHOW TABLES, and SHOW CREATE TABLE.
- *
- * <p>Pipeline:
- * <ol>
- *   <li>{@link DdlCompiler} parses + compiles the SQL into a {@link CompiledDdl}.</li>
- *   <li>Database/table names are translated through {@link DatabaseUtils#translateTableName}
- *       so the {@code Database} HTTP header is honoured uniformly.</li>
- *   <li>Authorization is invoked based on the operation type.</li>
- *   <li>Execution either persists via {@link PinotHelixResourceManager} or, when {@code dryRun}
- *       is true, returns the compiled artifacts without mutating cluster state.</li>
- * </ol>
- *
- * <p>The endpoint is intentionally a single POST that dispatches by operation. This keeps the
- * client surface area small and matches the canonical {@code POST /sql/ddl} contract from the
- * design.
- */
+/// Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE,
+/// DROP TABLE, SHOW TABLES, and SHOW CREATE TABLE.
+///
+/// Pipeline:
+/// 1. [DdlCompiler] parses + compiles the SQL into a [CompiledDdl].
+/// 1. Database/table names are translated through [DatabaseUtils#translateTableName]
+/// so the `Database` HTTP header is honoured uniformly.
+/// 1. Authorization is invoked based on the operation type.
+/// 1. Execution either persists via [PinotHelixResourceManager] or, when `dryRun`
+/// is true, returns the compiled artifacts without mutating cluster state.
+///
+/// The endpoint is intentionally a single POST that dispatches by operation. This keeps the
+/// client surface area small and matches the canonical `POST /sql/ddl` contract from the
+/// design.
 @Api(tags = "SQL DDL", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
@@ -123,12 +119,10 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotDdlRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotDdlRestletResource.class);
-  /**
-   * Maximum accepted SQL input length, measured in {@link String#length() Java characters}
-   * (UTF-16 code units), to prevent unbounded parser memory allocation. Up to ~4× this value
-   * in UTF-8 wire bytes can be accepted by Jackson before the length check rejects; operators
-   * sizing reverse-proxy body limits should plan accordingly.
-   */
+  /// Maximum accepted SQL input length, measured in [Java characters][String#length()]
+  /// (UTF-16 code units), to prevent unbounded parser memory allocation. Up to ~4× this value
+  /// in UTF-8 wire bytes can be accepted by Jackson before the length check rejects; operators
+  /// sizing reverse-proxy body limits should plan accordingly.
   private static final int MAX_DDL_SQL_CHARS = 256 * 1024;
 
   @Inject
@@ -361,16 +355,14 @@ public class PinotDdlRestletResource {
     }
   }
 
-  /**
-   * Compares two schemas by the column-shape attributes that a DDL column list actually controls
-   * (column name, data type, field type, single/multi-value, NOT NULL, default null value, and —
-   * for DATETIME columns — format and granularity) and returns a human-readable description of
-   * the first mismatch, or {@code null} if the shapes are equivalent. Schema-level metadata that
-   * a DDL column list does not express ({@code primaryKeyColumns}, {@code tags},
-   * {@code enableColumnBasedNullHandling}, {@code description}) is intentionally ignored so the
-   * second hybrid variant can be created via DDL without restating metadata set by the first
-   * variant.
-   */
+  /// Compares two schemas by the column-shape attributes that a DDL column list actually controls
+  /// (column name, data type, field type, single/multi-value, NOT NULL, default null value, and —
+  /// for DATETIME columns — format and granularity) and returns a human-readable description of
+  /// the first mismatch, or `null` if the shapes are equivalent. Schema-level metadata that
+  /// a DDL column list does not express (`primaryKeyColumns`, `tags`,
+  /// `enableColumnBasedNullHandling`, `description`) is intentionally ignored so the
+  /// second hybrid variant can be created via DDL without restating metadata set by the first
+  /// variant.
   // Package-private for unit testing.
   @Nullable
   static String describeColumnShapeMismatch(Schema stored, Schema compiled) {
@@ -439,11 +431,9 @@ public class PinotDdlRestletResource {
     return null;
   }
 
-  /**
-   * Compares two default-null-values for content equality, accounting for type-specific
-   * gotchas: BYTES requires Arrays.equals (each getter allocates a fresh byte[]); BIG_DECIMAL
-   * requires compareTo so different scales of the same numeric value compare equal.
-   */
+  /// Compares two default-null-values for content equality, accounting for type-specific
+  /// gotchas: BYTES requires Arrays.equals (each getter allocates a fresh byte[]); BIG_DECIMAL
+  /// requires compareTo so different scales of the same numeric value compare equal.
   private static boolean defaultValuesEqual(FieldSpec.DataType dataType,
       @Nullable Object storedDefault, @Nullable Object compiledDefault) {
     if (storedDefault == null || compiledDefault == null) {
@@ -456,13 +446,11 @@ public class PinotDdlRestletResource {
     return dataType.equals(storedDefault, compiledDefault);
   }
 
-  /**
-   * Runs the same schema/table validation stack that {@code POST /tables} and
-   * {@code /tableConfigs} apply before any ZK write, so DDL-created configs are subject to the
-   * same rules as JSON-API-created configs. Delegates to {@link TableConfigValidationUtils} so
-   * the two endpoints share a single validation pipeline (min replicas, storage quota, hybrid
-   * pair compatibility, instance assignment, tenant tags, task configs, registry-level checks).
-   */
+  /// Runs the same schema/table validation stack that `POST /tables` and
+  /// `/tableConfigs` apply before any ZK write, so DDL-created configs are subject to the
+  /// same rules as JSON-API-created configs. Delegates to [TableConfigValidationUtils] so
+  /// the two endpoints share a single validation pipeline (min replicas, storage quota, hybrid
+  /// pair compatibility, instance assignment, tenant tags, task configs, registry-level checks).
   private void validateTableConfig(Schema schema, TableConfig tableConfig) {
     try {
       TableConfigValidationUtils.validateTableConfig(tableConfig, schema, null,
@@ -818,10 +806,8 @@ public class PinotDdlRestletResource {
   // Helpers
   // -------------------------------------------------------------------------------------------
 
-  /**
-   * Returns the database name to use for this request. Precedence: explicit {@code db.name} in
-   * the SQL statement → {@code Database} HTTP header → {@code null} (default database).
-   */
+  /// Returns the database name to use for this request. Precedence: explicit `db.name` in
+  /// the SQL statement → `Database` HTTP header → `null` (default database).
   private static String resolveDatabase(String fromSql, HttpHeaders headers) {
     if (fromSql != null) {
       return fromSql;

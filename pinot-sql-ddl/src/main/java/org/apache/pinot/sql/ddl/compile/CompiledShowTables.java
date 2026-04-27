@@ -22,7 +22,7 @@ import java.util.Collections;
 import javax.annotation.Nullable;
 
 
-/** Result of compiling {@code SHOW TABLES [FROM db]}. Carries no payload beyond the database. */
+/// Result of compiling `SHOW TABLES [FROM db]`. Carries no payload beyond the database.
 public final class CompiledShowTables extends CompiledDdl {
   public CompiledShowTables(@Nullable String databaseName) {
     super(DdlOperation.SHOW_TABLES, databaseName, Collections.emptyList());

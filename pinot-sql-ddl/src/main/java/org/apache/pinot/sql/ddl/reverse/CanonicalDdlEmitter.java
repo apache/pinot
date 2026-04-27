@@ -27,22 +27,18 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-/**
- * Renders a {@code CREATE TABLE} statement in canonical Pinot DDL form from a {@link Schema} and
- * {@link TableConfig}. Designed so that {@code parse(emit(schema, config))} round-trips back to
- * a semantically-equivalent (Schema, TableConfig) pair.
- *
- * <p>Canonical formatting rules:
- * <ul>
- *   <li>Two-space indentation, one column per line, trailing comma between entries.</li>
- *   <li>Clause order: column block, {@code TABLE_TYPE}, {@code PROPERTIES}.</li>
- *   <li>Property keys in lexicographic order (provided by {@link PropertyExtractor}).</li>
- *   <li>Identifiers double-quoted only when required (reserved words, special chars).</li>
- *   <li>String literals always single-quoted; embedded single quotes doubled.</li>
- * </ul>
- *
- * <p>Stateless and thread-safe.
- */
+/// Renders a `CREATE TABLE` statement in canonical Pinot DDL form from a [Schema] and
+/// [TableConfig]. Designed so that `parse(emit(schema, config))` round-trips back to
+/// a semantically-equivalent (Schema, TableConfig) pair.
+///
+/// Canonical formatting rules:
+/// - Two-space indentation, one column per line, trailing comma between entries.
+/// - Clause order: column block, `TABLE_TYPE`, `PROPERTIES`.
+/// - Property keys in lexicographic order (provided by [PropertyExtractor]).
+/// - Identifiers double-quoted only when required (reserved words, special chars).
+/// - String literals always single-quoted; embedded single quotes doubled.
+///
+/// Stateless and thread-safe.
 public final class CanonicalDdlEmitter {
 
   private static final String INDENT = "  ";
@@ -50,24 +46,21 @@ public final class CanonicalDdlEmitter {
   private CanonicalDdlEmitter() {
   }
 
-  /**
-   * Renders the canonical DDL for the given schema + table config.
-   *
-   * @param schema the table's schema; column declarations are derived from its field specs.
-   * @param config the table config; the table name (with type suffix stripped) and all
-   *     non-default settings are emitted.
-   * @return canonical DDL ending with a semicolon and trailing newline.
-   */
+  /// Renders the canonical DDL for the given schema + table config.
+  ///
+  /// @param schema the table's schema; column declarations are derived from its field specs.
+  /// @param config the table config; the table name (with type suffix stripped) and all
+  /// non-default settings are emitted.
+  /// @return canonical DDL ending with a semicolon and trailing newline.
   public static String emit(Schema schema, TableConfig config) {
     return emit(schema, config, null);
   }
 
-  /**
-   * Renders the canonical DDL, scoped under {@code databaseName} when non-null. The database name
-   * is rendered as a leading {@code db.} qualifier on the table name; this matches the parser's
-   * {@code [db.]name} grammar.
-   */
+  /// Renders the canonical DDL, scoped under `databaseName` when non-null. The database name
+  /// is rendered as a leading `db.` qualifier on the table name; this matches the parser's
+  /// `[db.]name` grammar.
   public static String emit(Schema schema, TableConfig config, @Nullable String databaseName) {
+    rejectUnsupportedSchemaMetadata(schema);
     StringBuilder sb = new StringBuilder(512);
 
     String rawTableName = TableNameBuilder.extractRawTableName(config.getTableName());
@@ -135,6 +128,25 @@ public final class CanonicalDdlEmitter {
     }
     sb.append(";\n");
     return sb.toString();
+  }
+
+  private static void rejectUnsupportedSchemaMetadata(Schema schema) {
+    if (schema.getDescription() != null && !schema.getDescription().isEmpty()) {
+      rejectUnsupportedSchemaField("description");
+    }
+    List<String> tags = schema.getTags();
+    if (tags != null && !tags.isEmpty()) {
+      rejectUnsupportedSchemaField("tags");
+    }
+    if (schema.isEnableColumnBasedNullHandling()) {
+      rejectUnsupportedSchemaField("enableColumnBasedNullHandling");
+    }
+  }
+
+  private static void rejectUnsupportedSchemaField(String field) {
+    throw new IllegalArgumentException("SHOW CREATE TABLE cannot emit schema field '" + field
+        + "' in canonical DDL yet; replaying the emitted DDL would silently drop that setting. "
+        + "Use the JSON schema API for this table until the DDL grammar supports it.");
   }
 
   private static String emitTableType(TableType tableType) {

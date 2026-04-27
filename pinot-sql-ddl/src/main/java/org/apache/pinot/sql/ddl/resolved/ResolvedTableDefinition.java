@@ -26,15 +26,13 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableType;
 
 
-/**
- * Normalized {@code CREATE TABLE} definition produced by the DDL compiler. Independent of the
- * Calcite parse tree.
- *
- * <p>Properties retain insertion order via a {@link LinkedHashMap} so that downstream reverse
- * compilation can produce deterministic canonical DDL.
- *
- * <p>Immutable; instances are safe to share across threads.
- */
+/// Normalized `CREATE TABLE` definition produced by the DDL compiler. Independent of the
+/// Calcite parse tree.
+///
+/// Properties retain insertion order via a [LinkedHashMap] so that downstream reverse
+/// compilation can produce deterministic canonical DDL.
+///
+/// Immutable; instances are safe to share across threads.
 public final class ResolvedTableDefinition {
   private final String _databaseName;
   private final String _rawTableName;
@@ -53,13 +51,13 @@ public final class ResolvedTableDefinition {
     _properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
   }
 
-  /** Returns the database name when one was supplied via {@code db.tableName}, else {@code null}. */
+  /// Returns the database name when one was supplied via `db.tableName`, else `null`.
   @Nullable
   public String getDatabaseName() {
     return _databaseName;
   }
 
-  /** Returns the bare table name (no database prefix, no _OFFLINE/_REALTIME suffix). */
+  /// Returns the bare table name (no database prefix, no _OFFLINE/_REALTIME suffix).
   public String getRawTableName() {
     return _rawTableName;
   }
@@ -76,7 +74,7 @@ public final class ResolvedTableDefinition {
     return _columns;
   }
 
-  /** Returns property map in declaration order. */
+  /// Returns property map in declaration order.
   public Map<String, String> getProperties() {
     return _properties;
   }
