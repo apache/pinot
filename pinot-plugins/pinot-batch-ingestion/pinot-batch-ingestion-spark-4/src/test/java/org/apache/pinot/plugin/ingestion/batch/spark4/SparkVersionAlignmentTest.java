@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.ingestion.batch.spark4;
 
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -51,10 +50,17 @@ public class SparkVersionAlignmentTest {
               + "either update the netty.version override in pom.xml or revert the bump.");
     }
 
-    // Same shape, but for the netty common module — different jar, same expectation.
-    // Class.forName throws ClassNotFoundException if the class is missing, so a successful
-    // return is sufficient evidence; assertNotNull is a courtesy belt-and-suspenders.
+    // Same shape, but for the netty-common module — different jar, same expectation.
+    // Cross-check the version recorded in netty-common against the kqueue version above so
+    // both jars agree (a partial mix would be the actual failure mode if a future Spark bump
+    // pulled some 4.1 and some 4.2 transitively).
     Class<?> nettyCommon = Class.forName("io.netty.util.Version");
-    assertNotNull(nettyCommon, "io.netty.util.Version must resolve on the test classpath");
+    String nettyCommonVersion = nettyCommon.getPackage().getImplementationVersion();
+    if (nettyCommonVersion != null) {
+      assertTrue(nettyCommonVersion.startsWith("4.2."),
+          "Expected netty-common 4.2.x on the spark-4 batch-ingestion test classpath, got "
+              + nettyCommonVersion + ". A mixed-version netty (some 4.1, some 4.2) is the "
+              + "actual failure mode this test is designed to catch.");
+    }
   }
 }
