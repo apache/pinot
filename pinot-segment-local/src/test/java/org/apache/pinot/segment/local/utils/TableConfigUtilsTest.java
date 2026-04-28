@@ -78,6 +78,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
@@ -86,7 +87,6 @@ import org.mockito.Mockito;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -284,7 +284,7 @@ public class TableConfigUtilsTest {
     // Dimension table with replica group strategy should fail
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
-        .setSegmentAssignmentStrategy(REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+        .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
         .build();
 
     try {
