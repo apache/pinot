@@ -86,6 +86,7 @@ import org.mockito.Mockito;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -283,9 +284,7 @@ public class TableConfigUtilsTest {
     // Dimension table with replica group strategy should fail
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
-        .setSegmentAssignmentStrategy(
-          CommonConstants.Segment.AssignmentStrategy
-            .REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
+        .setSegmentAssignmentStrategy(REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
         .build();
 
     try {
