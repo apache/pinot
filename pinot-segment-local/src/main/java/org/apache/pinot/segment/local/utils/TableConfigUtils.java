@@ -372,15 +372,15 @@ public final class TableConfigUtils {
           "Dimension table must be of OFFLINE table type.");
       Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
           "Dimension table must have primary key[s]");
-      // Check for incompatible segment assignment strategies
+
       String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
       if (segmentAssignmentStrategy != null
-          && AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(segmentAssignmentStrategy)) {
+          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
         throw new IllegalStateException(
-            "Dimension table '" + tableConfig.getTableName()
-              + "' has segmentAssignmentStrategy: 'replicagroup', but dimension tables automatically "
-              + "use 'allservers' strategy and replica group configurations have no meaning for "
-              + "dimension tables. Remove segmentAssignmentStrategy from dimension table configuration.");
+            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
+              tableConfig.getTableName(),
+              CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
+              segmentAssignmentStrategy));
       }
     }
 
