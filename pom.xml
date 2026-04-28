@@ -206,7 +206,7 @@
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.6.0</prometheus.metrics.version>
+    <prometheus.metrics.version>1.6.1</prometheus.metrics.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
