@@ -29,7 +29,7 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 
 | Skill | Purpose | Rough time |
 |---|---|---|
-| [`/lint`](lint/SKILL.md) | Run all pre-commit quality checks (formatting, license, style, compiler warnings via `-Xlint:all`) on only the modules touched by the diff. | 30–120s warm, up to 5min cold |
+| [`/precommit`](precommit/SKILL.md) | Run the mandatory pre-commit checks (`spotless:apply`, `license:format`, `checkstyle:check`, `license:check`) plus compiler warning checks (`-Xlint:all`) on only the modules touched by the diff. | 30–120s warm, up to 5min cold |
 | [`/run-test <Class>`](run-test/SKILL.md) | Resolve a test class name to its module and run the single-test Maven invocation. Auto-adds integration-test flags. | 30s–15min depending on test |
 | [`/quickstart [mode]`](quickstart/SKILL.md) | Launch a local Pinot quickstart cluster (`batch`, `hybrid`, `streaming`, `upsert-streaming`, `auth`, …) in the background. | ~30s to ready |
 | [`/bench-compare <Benchmark> [<ref>]`](bench-compare/SKILL.md) | Run a `pinot-perf` JMH benchmark against a baseline ref and the current tree and diff the JMH tables. Uses a git worktree. | 10min – days (see below) |
@@ -37,7 +37,7 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 
 ---
 
-## `/lint`
+## `/precommit`
 
 **What it does.** Detects modified files (staged + unstaged + new untracked `.java` / `.xml` / etc.), maps them to their owning Maven modules by walking up to the nearest `pom.xml`, then runs five checks in order on only those modules: formatting, license headers, style validation, and compiler warnings (via `-Xlint:all`).
 
@@ -46,7 +46,7 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 - `license:format` — inserts the ASF header into new files that don't have it. Governed by `HEADER` at repo root.
 - `checkstyle:check` — `config/checkstyle.xml`. Top offenders: `LineLength` (120), `AvoidStarImport`, `AvoidStaticImport`, `HideUtilityClassConstructor`, `NeedBraces`.
 - `license:check` — final gate confirming every touched file has a header.
-- `test-compile -Xlint:all` — compiles both `src/main/` and `src/test/` with all compiler warnings enabled (deprecation, unchecked casts, raw types, fallthrough, etc.). Warnings are filtered to only changed files. Uses `-am` because compilation needs upstream deps.
+- `clean test-compile -Xlint:all` — recompiles both `src/main/` and `src/test/` with all compiler warnings enabled (deprecation, unchecked casts, raw types, fallthrough, etc.). Uses `clean` to ensure warnings are always emitted. Warnings are filtered to only lines added in the diff (not just by file). Uses `-am` because compilation needs upstream deps.
 
 **Example scenarios:**
 
@@ -54,21 +54,21 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 - **Unused import** → `spotless:check` fails with a coloured diff; `spotless:apply` removes it. *Note:* removal leaves a cosmetic double blank line where the import used to be. Checkstyle does not flag this; the user can clean it up manually if desired.
 - **Missing ASF header on new file** → `license:check` fails with `Some files do not have the expected license header`; `license:format` inserts the ASF header at the top of the file. No manual intervention needed.
 - **Line >120 chars** → `checkstyle:check` fails with `[WARNING] src/.../File.java:[NN] (sizes) LineLength: Line is longer than 120 characters (found NNN).` Skill reports file:line; user must fix manually.
-- **Deprecated API usage** → `test-compile -Xlint:all` emits `[WARNING] File.java:[line,col] method X has been deprecated`. Skill reports the warning and the non-deprecated replacement. Never suppress with `@SuppressWarnings`.
+- **Deprecated API usage** → `test-compile -Xlint:all` emits `[WARNING] File.java:[line,col] method X has been deprecated`. Skill reports the warning and the non-deprecated replacement. Prefer the replacement; suppress with `@SuppressWarnings` only with a justifying comment.
 - **Multi-module diff** → modules are joined with commas into one `-pl <m1>,<m2>,...` argument. All goals run once per step, scoped to the union.
 - **Nested plugin module** (e.g. `pinot-plugins/pinot-input-format/pinot-csv/...`) → skill walks up past the `pinot-input-format/pom.xml` aggregator (it has no `src/`) and stops at `pinot-csv/pom.xml`. That's the correct module.
 
 **Usage:**
-- `/lint` — default, scoped to diff vs. HEAD + untracked.
-- `/lint staged` — staged changes only.
-- `/lint branch` — diff vs. `upstream/master` (useful before a PR).
-- `/lint all` — run on the entire repo; slow (several minutes).
+- `/precommit` — default, scoped to diff vs. HEAD + untracked.
+- `/precommit staged` — staged changes only.
+- `/precommit branch` — diff vs. `upstream/master` (useful before a PR).
+- `/precommit all` — run on the entire repo; slow (several minutes).
 
 **Known quirks:**
 - Steps 1–4 don't need `-am`. Only step 5 (compile) uses `-am` because javac needs upstream jars on the classpath.
 - Spotless sometimes reformats files you hadn't touched if they were non-compliant to begin with. Review the auto-fix diff before staging.
 - Violations in `pinot-controller/src/main/resources/` (the React UI) are not handled by the Maven plugins — skip that tree.
-- Compiler warnings are filtered to changed files only — pre-existing warnings in unchanged code are not reported.
+- Compiler warnings are filtered to added lines in the diff only — pre-existing warnings, even in files you touched, are not reported.
 
 ---
 
