@@ -111,15 +111,10 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 - Preserve backward compatibility across mixed-version broker/server/controller.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
+- Never use deprecated classes, methods, or fields. Before using any API, verify it is not marked `@Deprecated`. Always use the current non-deprecated replacement.
 
 ## Pre-commit checks
-Before pushing a commit, always run the following checks on the affected modules and fix any failures:
-1. `./mvnw spotless:apply -pl <module>` — auto-format code.
-2. `./mvnw checkstyle:check -pl <module>` — validate style conformance.
-3. `./mvnw license:format -pl <module>` — add missing license headers to new files.
-4. `./mvnw license:check -pl <module>` — verify all files have correct license headers.
-
-Do not push until all four checks pass cleanly.
+Before pushing a commit, run `/lint` on the affected modules. It auto-detects modules from the diff, auto-fixes formatting and license headers, validates style, and checks for compiler warnings (deprecation, unchecked casts, raw types, etc.). Do not push until `/lint` reports all checks green.
 
 ## Change guidance
 - **Query changes** often touch broker planning and server execution; verify both.
