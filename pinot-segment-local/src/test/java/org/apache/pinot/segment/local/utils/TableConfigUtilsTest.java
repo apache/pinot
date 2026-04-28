@@ -303,8 +303,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       fail("Should fail with invalid segment assignment strategy for dimension table");
     } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("can only use '" +
-          AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
+      assertTrue(e.getMessage().contains("can only use '"
+          + AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
     }
 }
 
