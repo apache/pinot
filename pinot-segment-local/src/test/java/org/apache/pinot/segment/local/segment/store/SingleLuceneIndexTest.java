@@ -88,40 +88,29 @@ public class SingleLuceneIndexTest implements PinotBuffersAfterMethodCheckRule {
   public void testMultipleSingleColumnIndexes()
       throws IOException {
     TextIndexConfig config = new TextIndexConfigBuilder().build();
-    int numColumns = 200;
-    int numRows = 1000;
 
-    // Build each single-column index in turn and close it before moving on. The previous
-    // shape held all 200 LuceneTextIndexCreators open while iterating over them and
-    // running forceMerge() during seal(); on slow CI runners that combination
-    // (200 concurrent IndexWriters + 200 forceMerges) exhausted file descriptors and
-    // caused the test to hang past the surefire job timeout. Sequential build keeps the
-    // peak resource footprint to a single open IndexWriter at a time.
-    for (int col = 0; col < numColumns; col++) {
-      try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator("column_" + col, TEMP_DIR, true, false, null,
-          null, config)) {
-        for (int row = 0; row < numRows; row++) {
+    List<LuceneTextIndexCreator> creators = new ArrayList<>();
+    for (int i = 0; i < 200; i++) {
+      creators.add(new LuceneTextIndexCreator("column_" + i, TEMP_DIR, true, false, null, null, config));
+    }
+
+    try {
+      for (int col = 0; col < creators.size(); col++) {
+        LuceneTextIndexCreator creator = creators.get(col);
+        for (int row = 0; row < 1000; row++) {
           creator.add("row: " + row + "col: " + col + " value: " + (row * col));
         }
         creator.seal();
       }
-    }
 
-    // Assert that each column produced a non-empty per-column index directory. The exact
-    // file count per directory is an implementation detail of Lucene (compound vs
-    // multi-file segments, commit-point file, etc.) and varies depending on whether the
-    // creator was closed before listing -- using a structural check is sufficient here.
-    File[] dirs = TEMP_DIR.listFiles();
-    Assert.assertNotNull(dirs);
-    Assert.assertEquals(dirs.length, numColumns);
-    int totalFiles = 0;
-    for (File dir : dirs) {
-      File[] files = dir.listFiles();
-      Assert.assertNotNull(files, "expected files in " + dir);
-      Assert.assertTrue(files.length > 0, "expected non-empty index dir " + dir);
-      totalFiles += files.length;
+      ArrayList<String> indexFiles = getIndexFiles();
+      logFiles(indexFiles);
+      Assert.assertEquals(indexFiles.size(), 1000);
+    } finally {
+      for (int col = 0; col < creators.size(); col++) {
+        creators.get(col).close();
+      }
     }
-    System.out.println("Index file count: " + totalFiles + " across " + dirs.length + " directories");
   }
 
   private void logFiles(List<String> allFiles) {
