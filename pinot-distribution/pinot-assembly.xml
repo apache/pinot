@@ -90,14 +90,6 @@
         plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-3/pinot-batch-ingestion-spark-3-${project.version}-shaded.jar
       </destName>
     </file>
-    <file>
-      <source>
-        ${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-4/target/pinot-batch-ingestion-spark-4-${project.version}-shaded.jar
-      </source>
-      <destName>
-        plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-4/pinot-batch-ingestion-spark-4-${project.version}-shaded.jar
-      </destName>
-    </file>
     <!-- End Include Pinot Batch Ingestion Plugins-->
     <!-- Start Include Pinot File System Plugins-->
     <file>
@@ -279,6 +271,18 @@
       <directory>${pinot.root}/pinot-tools/target/pinot-tools-pkg/bin</directory>
       <outputDirectory>bin</outputDirectory>
       <fileMode>0755</fileMode>
+    </fileSet>
+    <!-- pinot-batch-ingestion-spark-4 builds by default but the user can opt out via
+         `-P!pinot-batch-ingestion-spark-4` (see pinot-plugins/pinot-batch-ingestion/pom.xml).
+         Use a <fileSet> rather than a top-level <file> entry so the bin-dist build silently
+         skips the jar when it is absent (opted-out, partial build, etc.) instead of failing
+         hard with "source file does not exist". -->
+    <fileSet>
+      <directory>${pinot.root}/pinot-plugins/pinot-batch-ingestion/pinot-batch-ingestion-spark-4/target</directory>
+      <outputDirectory>plugins-external/pinot-batch-ingestion/pinot-batch-ingestion-spark-4</outputDirectory>
+      <includes>
+        <include>pinot-batch-ingestion-spark-4-${project.version}-shaded.jar</include>
+      </includes>
     </fileSet>
   </fileSets>
 </assembly>

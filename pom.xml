@@ -231,10 +231,10 @@
          load errors. New users should adopt pinot-spark-4-connector. See the spark-3
          module READMEs for the migration path. -->
     <spark3.version>3.5.8</spark3.version>
-    <!-- Spark 4.x requires Java 17+. Pinot compiles the Spark 4 modules with release=21 and
-         the modules are registered in their parent reactors only under a JDK-21+ profile
-         activation (see pinot-connectors/pom.xml and
-         pinot-plugins/pinot-batch-ingestion/pom.xml). -->
+    <!-- Spark 4.x requires Java 17+. Pinot compiles the Spark 4 modules with release=21.
+         JDK 21+ is enforced cluster-wide by the root pom's requireJavaVersion rule below,
+         so the Spark 4 modules build unconditionally as part of the default reactor (see
+         pinot-connectors/pom.xml and pinot-plugins/pinot-batch-ingestion/pom.xml). -->
     <spark4.version>4.1.1</spark4.version>
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
