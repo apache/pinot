@@ -114,16 +114,21 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
-    } else {
-      // No records returned, but the underlying KafkaConsumer's internal position may have
-      // advanced past offsets filtered out by isolation level (most commonly read_committed
-      // skipping an aborted transactional batch). Snap _nextReadOffset to the consumer's
-      // actual position so a future call with a stale startOffset (RealtimeSegmentDataManager
-      // doesn't advance _currentOffset on empty batches) resumes from where the broker left
-      // us, not from startOffset.
+    } else if (isReadCommitted()) {
+      // No records returned. With read_committed isolation, the underlying KafkaConsumer's
+      // internal position may still have advanced past offsets filtered out as aborted
+      // transactional records, so snap _nextReadOffset to the consumer's actual position.
+      // RealtimeSegmentDataManager doesn't advance _currentOffset on empty batches and will
+      // call us again with the same startOffset; without this update the seek-check would
+      // re-seek to startOffset and undo the consumer's progress through the aborted region.
+      //
+      // For read_uncommitted (the default), empty polls can never advance the internal
+      // position past records that didn't exist, so we skip the position() call in the
+      // hot path. The call is bounded by the same timeout as poll() so a sick broker
+      // can't stall this loop unbounded.
       long currentPosition;
       try {
-        currentPosition = _consumer.position(_topicPartition);
+        currentPosition = _consumer.position(_topicPartition, Duration.ofMillis(timeoutMs));
       } catch (Exception e) {
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Failed to read consumer position after empty poll on {}", _topicPartition, e);
@@ -146,6 +151,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     }
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
         hasDataLoss, batchSizeInBytes);
+  }
+
+  private boolean isReadCommitted() {
+    String level = _config.getKafkaIsolationLevel();
+    return level != null
+        && !level.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<Bytes, Bytes> record) {
