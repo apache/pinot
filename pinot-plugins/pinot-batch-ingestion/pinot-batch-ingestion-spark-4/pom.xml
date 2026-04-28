@@ -50,6 +50,21 @@
          artifactVersion so a future bump that goes to 4.3.x or back to 4.1.x fails the
          build immediately. -->
     <netty.version>4.2.7.Final</netty.version>
+    <!-- Spark 4 uses Jakarta EE 9 namespace (jakarta.servlet.* package). The root pom pins
+         jakarta.servlet-api to 4.0.4 (Jakarta EE 8, still in javax.servlet.* namespace, marked
+         DO NOT UPGRADE for the rest of the build). Locally override the property so the
+         test dependency below picks up 5.0.0 from the inherited <dependencyManagement>
+         resolution — declaring the version inline trips Pinot's custom dependency rule.
+         The override is module-scoped; the rest of Pinot stays on 4.0.4. -->
+    <jakarta.servlet-api.version>5.0.0</jakarta.servlet-api.version>
+    <!-- The root pom's <dependencyManagement> pins org.apache.spark:* to ${spark3.version}
+         (currently 3.5.8). For this Spark 4 module we need 4.1.1; rather than redeclare each
+         spark-* dependency with an inline <version> (which trips PinotCustomDependencyVersionRule),
+         override the spark3.version property locally so the inherited <dependencyManagement>
+         resolution picks up 4.1.1 for spark-core / spark-sql / spark-launcher / etc. The
+         property name is a misnomer here but the alternative (forking the dependencyManagement
+         block in the root pom or one-off-overriding each artifact) is worse. -->
+    <spark3.version>${spark4.version}</spark3.version>
   </properties>
 
   <build>
@@ -92,7 +107,6 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.compat.version}</artifactId>
-      <version>${spark4.version}</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
@@ -113,12 +127,9 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- Explicit spark-launcher override to prevent the root pom's Spark-3 dependencyManagement
-         pin from forcing spark-launcher back to 3.5.8 alongside spark-core 4.x. -->
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-      <version>${spark4.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -134,14 +145,14 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- Spark 4 uses Jakarta EE 9 namespace (jakarta.servlet.*). The root pom pins
-         jakarta.servlet-api to 4.0.4 (Jakarta EE 8, still in javax.servlet.* namespace) for the
-         rest of the Pinot build. Required even though the Spark UI is disabled in tests, because
-         Spark's MetricsServlet loads jakarta.servlet.Servlet unconditionally during startup. -->
+    <!-- Spark 4 uses Jakarta EE 9 namespace (jakarta.servlet.*). Required even though the
+         Spark UI is disabled in tests, because Spark's MetricsServlet loads
+         jakarta.servlet.Servlet unconditionally during startup. The version (5.0.0) comes
+         from the local jakarta.servlet-api.version property override in <properties> above —
+         declaring it inline here would trip PinotCustomDependencyVersionRule. -->
     <dependency>
       <groupId>jakarta.servlet</groupId>
       <artifactId>jakarta.servlet-api</artifactId>
-      <version>5.0.0</version>
       <scope>test</scope>
     </dependency>
 
