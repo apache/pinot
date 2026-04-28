@@ -28,7 +28,7 @@ The five checks (in order):
 2. `./mvnw license:format -pl <modules>` — adds ASF headers to any new files.
 3. `./mvnw checkstyle:check -pl <modules>` — validates style; fails hard.
 4. `./mvnw license:check -pl <modules>` — validates headers; fails hard.
-5. `./mvnw compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'` — compiles and checks for deprecation, unchecked casts, raw types, fallthrough, etc. Warnings are filtered to only changed files.
+5. `./mvnw test-compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'` — compiles and checks for deprecation, unchecked casts, raw types, fallthrough, etc. Warnings are filtered to only changed files.
 
 Steps 1 and 2 are auto-fixers. Steps 3 and 4 are validators. Step 5 is a compiler check — if it produces warnings in changed files, report them and stop. Do not try to suppress warnings with `@SuppressWarnings`; fix the underlying issue or ask the user.
 
@@ -61,7 +61,7 @@ Steps 1 and 2 are auto-fixers. Steps 3 and 4 are validators. Step 5 is a compile
 
 6. **Run the compiler check.**
    ```
-   ./mvnw compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'
+   ./mvnw test-compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'
    ```
    This is the only step that uses `-am` — compilation needs upstream dependencies built, unlike the other steps. Parse the output for `[WARNING]` lines. **Filter to only changed `.java` files** — ignore warnings from upstream modules or unchanged code. Track each warning with file:line and category (deprecation, unchecked, rawtypes, etc.).
 
@@ -78,7 +78,7 @@ Steps 1 and 2 are auto-fixers. Steps 3 and 4 are validators. Step 5 is a compile
    | license:format   | OK     | 0 files needed headers         |
    | checkstyle:check | PASS   |                                |
    | license:check    | PASS   |                                |
-   | compile -Xlint   | FAIL   | 2 warnings in changed files    |
+   | test-compile -Xlint   | FAIL   | 2 warnings in changed files    |
 
    ### Auto-fixed (review before staging)
    - spotless reformatted: File1.java, File2.java
@@ -110,7 +110,7 @@ Knowing this matters for diagnosing failures:
 - **`license:check/format`**: the ASF header from `HEADER` (repo root), applied to `.java`, `.xml`, `.js`, `.sh`, `.md`, etc. Many file types are excluded — see the `licenseSets/excludes` block in the parent `pom.xml`.
 - **`checkstyle:check`**: rules from `config/checkstyle.xml`. The common ones contributors trip: `LineLength` (120 chars), `AvoidStarImport`, `AvoidStaticImport`, `HideUtilityClassConstructor`, `NeedBraces`. Output format is `[WARNING] <file>:[<line>] (<group>) <RuleName>: <message>` — parse that when surfacing violations.
 - **`license:check`** runs after `license:format` to confirm every touched file now has the header, including files the user only renamed (the plugin keys off content, not git status).
-- **`compile -Xlint:all`**: the Java compiler flags any reference to `@Deprecated` classes/methods/fields from any dependency (Pinot internal or third-party jars), plus unchecked casts, raw types, fallthrough in switch, and other warning categories. Output format: `[WARNING] /path/File.java:[line,col] <message>`. Warnings are filtered to changed files only to avoid noise from existing code.
+- **`test-compile -Xlint:all`**: uses `test-compile` (not `compile`) so both `src/main/` and `src/test/` sources are checked. The Java compiler flags any reference to `@Deprecated` classes/methods/fields from any dependency (Pinot internal or third-party jars), plus unchecked casts, raw types, fallthrough in switch, and other warning categories. Output format: `[WARNING] /path/File.java:[line,col] <message>`. Warnings are filtered to changed files only to avoid noise from existing code.
 
 ## Notes
 

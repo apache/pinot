@@ -46,7 +46,7 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 - `license:format` — inserts the ASF header into new files that don't have it. Governed by `HEADER` at repo root.
 - `checkstyle:check` — `config/checkstyle.xml`. Top offenders: `LineLength` (120), `AvoidStarImport`, `AvoidStaticImport`, `HideUtilityClassConstructor`, `NeedBraces`.
 - `license:check` — final gate confirming every touched file has a header.
-- `compile -Xlint:all` — compiles with all compiler warnings enabled (deprecation, unchecked casts, raw types, fallthrough, etc.). Warnings are filtered to only changed files. Uses `-am` because compilation needs upstream deps.
+- `test-compile -Xlint:all` — compiles both `src/main/` and `src/test/` with all compiler warnings enabled (deprecation, unchecked casts, raw types, fallthrough, etc.). Warnings are filtered to only changed files. Uses `-am` because compilation needs upstream deps.
 
 **Example scenarios:**
 
@@ -54,7 +54,7 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 - **Unused import** → `spotless:check` fails with a coloured diff; `spotless:apply` removes it. *Note:* removal leaves a cosmetic double blank line where the import used to be. Checkstyle does not flag this; the user can clean it up manually if desired.
 - **Missing ASF header on new file** → `license:check` fails with `Some files do not have the expected license header`; `license:format` inserts the ASF header at the top of the file. No manual intervention needed.
 - **Line >120 chars** → `checkstyle:check` fails with `[WARNING] src/.../File.java:[NN] (sizes) LineLength: Line is longer than 120 characters (found NNN).` Skill reports file:line; user must fix manually.
-- **Deprecated API usage** → `compile -Xlint:all` emits `[WARNING] File.java:[line,col] method X has been deprecated`. Skill reports the warning and the non-deprecated replacement. Never suppress with `@SuppressWarnings`.
+- **Deprecated API usage** → `test-compile -Xlint:all` emits `[WARNING] File.java:[line,col] method X has been deprecated`. Skill reports the warning and the non-deprecated replacement. Never suppress with `@SuppressWarnings`.
 - **Multi-module diff** → modules are joined with commas into one `-pl <m1>,<m2>,...` argument. All goals run once per step, scoped to the union.
 - **Nested plugin module** (e.g. `pinot-plugins/pinot-input-format/pinot-csv/...`) → skill walks up past the `pinot-input-format/pom.xml` aggregator (it has no `src/`) and stops at `pinot-csv/pom.xml`. That's the correct module.
 
