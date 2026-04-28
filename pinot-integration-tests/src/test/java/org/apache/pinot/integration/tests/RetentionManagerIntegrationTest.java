@@ -24,7 +24,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
@@ -33,6 +39,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -42,11 +49,22 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest {
+public class RetentionManagerIntegrationTest extends SharedRichClusterIntegrationTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManagerIntegrationTest.class);
+  private static final String SHARED_TABLE_NAME_PREFIX = "retention_manager";
+  private static final String SHARED_KAFKA_TOPIC_PREFIX = "retention-manager";
+  private static final String ORPHAN_SEGMENT_PREFIX = "orphan_segment";
+  private static final String ENABLE_UNTRACKED_SEGMENT_DELETION_CONFIG =
+      ControllerConf.ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION;
 
+  private final String _sharedResourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
   protected List<File> _avroFiles;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+  private String _previousUntrackedSegmentDeletionConfig;
+  private boolean _untrackedSegmentDeletionConfigCaptured;
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
@@ -68,22 +86,49 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
     }
   }
 
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + _sharedResourceSuffix
+        : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC_PREFIX + "-" + _sharedResourceSuffix
+        : super.getKafkaTopic();
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
+
     startZk();
-    startKafka();
+    if (isSharedRichClusterEnabled()) {
+      startKafkaWithoutTopic();
+    } else {
+      startKafka();
+    }
     startController();
+    captureUntrackedSegmentDeletionConfig();
     startBroker();
     startServer();
+
+    if (isSharedRichClusterEnabled()) {
+      cleanRealtimeTableAndSchema();
+      resetKafkaTopic();
+      deleteFakeSegments();
+    }
     setupTable();
     waitForAllDocsLoaded(600_000L);
   }
 
   protected void setupTable()
       throws Exception {
-    _avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = unpackAvroData(_classTempDir);
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();
@@ -97,18 +142,22 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
     waitForAllDocsLoaded(600_000L);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    try {
-      dropRealtimeTable(getTableName());
-      stopServer();
-      stopBroker();
-      stopController();
-      stopKafka();
-      stopZk();
-    } finally {
-      FileUtils.deleteQuietly(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::deleteFakeSegments);
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::restoreUntrackedSegmentDeletionConfig);
+    exception = runCleanup(exception, this::stopServerIfDirectMode);
+    exception = runCleanup(exception, this::stopBrokerIfDirectMode);
+    exception = runCleanup(exception, this::stopControllerIfDirectMode);
+    exception = runCleanup(exception, this::stopKafkaIfDirectMode);
+    exception = runCleanup(exception, this::stopZkIfDirectMode);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
     }
   }
 
@@ -116,9 +165,10 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
   public void testClusterConfigChangeListener()
       throws IOException, URISyntaxException {
     // Disable orphan segment deletion to ensure orphan segments are not cleaned up
-    updateClusterConfig(Map.of(ControllerConf.ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, "false"));
+    updateClusterConfig(Map.of(ENABLE_UNTRACKED_SEGMENT_DELETION_CONFIG, "false"));
+    waitForUntrackedSegmentDeletionEnabled(false);
 
-    createFakeSegments(_controllerConfig.getDataDir(), getTableName(), "orphan_segment", 4);
+    createFakeSegments(_controllerConfig.getDataDir(), getTableName(), ORPHAN_SEGMENT_PREFIX, 4);
 
     _controllerStarter.getRetentionManager().run();
 
@@ -135,11 +185,10 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
     }, 5000, 10000, "Expected 6 segments (2 CONSUMING + 4 orphan) but found different count");
 
     // Enable orphan segment deletion
-    updateClusterConfig(Map.of(ControllerConf.ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, "true"));
+    updateClusterConfig(Map.of(ENABLE_UNTRACKED_SEGMENT_DELETION_CONFIG, "true"));
 
     // Wait for the config change to take effect
-    TestUtils.waitForCondition((aVoid) -> _controllerStarter.getRetentionManager().isUntrackedSegmentDeletionEnabled(),
-        1000, 10000, "UntrackedSegmentDeletionEnabled is still false. Should have been set to true");
+    waitForUntrackedSegmentDeletionEnabled(true);
 
     _controllerStarter.getRetentionManager().run();
 
@@ -154,6 +203,166 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
     }, 5000, 100000, "Expected 2 CONSUMING segments after orphan cleanup but found different count");
   }
 
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _sharedResourceSuffix)
+        : _tempDir;
+  }
+
+  private void captureUntrackedSegmentDeletionConfig() {
+    if (!_untrackedSegmentDeletionConfigCaptured) {
+      _previousUntrackedSegmentDeletionConfig = getClusterConfig(ENABLE_UNTRACKED_SEGMENT_DELETION_CONFIG);
+      _untrackedSegmentDeletionConfigCaptured = true;
+    }
+  }
+
+  private String getClusterConfig(String key) {
+    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(getHelixClusterName()).build();
+    return _helixManager.getConfigAccessor().get(scope, key);
+  }
+
+  private void restoreUntrackedSegmentDeletionConfig()
+      throws Exception {
+    if (!_untrackedSegmentDeletionConfigCaptured || _controllerStarter == null) {
+      return;
+    }
+
+    if (_previousUntrackedSegmentDeletionConfig == null) {
+      deleteClusterConfig(ENABLE_UNTRACKED_SEGMENT_DELETION_CONFIG);
+      waitForUntrackedSegmentDeletionEnabled(
+          ControllerConf.ControllerPeriodicTasksConf.DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION);
+    } else {
+      updateClusterConfig(Map.of(ENABLE_UNTRACKED_SEGMENT_DELETION_CONFIG, _previousUntrackedSegmentDeletionConfig));
+      if ("true".equalsIgnoreCase(_previousUntrackedSegmentDeletionConfig)
+          || "false".equalsIgnoreCase(_previousUntrackedSegmentDeletionConfig)) {
+        waitForUntrackedSegmentDeletionEnabled(Boolean.parseBoolean(_previousUntrackedSegmentDeletionConfig));
+      }
+    }
+    _untrackedSegmentDeletionConfigCaptured = false;
+  }
+
+  private void waitForUntrackedSegmentDeletionEnabled(boolean expectedValue) {
+    TestUtils.waitForCondition(
+        (aVoid) -> _controllerStarter.getRetentionManager().isUntrackedSegmentDeletionEnabled() == expectedValue,
+        1000, 10000, "UntrackedSegmentDeletionEnabled did not become " + expectedValue);
+  }
+
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(getTableName())) {
+      dropRealtimeTable(getTableName());
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void deleteFakeSegments()
+      throws IOException {
+    if (_controllerConfig == null) {
+      return;
+    }
+
+    URI tableDataUri = URIUtils.getUri(_controllerConfig.getDataDir(), getTableName());
+    PinotFS pinotFS = PinotFSFactory.create(tableDataUri.getScheme());
+    String[] fileList;
+    try {
+      fileList = pinotFS.listFiles(tableDataUri, false);
+    } catch (Exception e) {
+      return;
+    }
+    for (String filePath : fileList) {
+      String segmentName = URIUtils.getLastPart(filePath);
+      if (segmentName.startsWith(ORPHAN_SEGMENT_PREFIX)) {
+        pinotFS.delete(URIUtils.getUri(filePath), false);
+      }
+    }
+  }
+
+  private void stopServerIfDirectMode() {
+    if (!isSharedRichClusterEnabled() && !_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfDirectMode() {
+    if (!isSharedRichClusterEnabled() && !_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfDirectMode() {
+    if (!isSharedRichClusterEnabled() && _controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfDirectMode() {
+    if (!isSharedRichClusterEnabled() && _kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void stopZkIfDirectMode() {
+    if (!isSharedRichClusterEnabled()) {
+      stopZk();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
   private void createFakeSegments(String dataDir, String tableName, String orphanSegmentPrefix,
       int numberOfOrphanSegment)
       throws URISyntaxException, IOException {
@@ -166,5 +375,10 @@ public class RetentionManagerIntegrationTest extends BaseClusterIntegrationTest 
         LOGGER.warn("Failed to set last modified time for file: {}", segmentPath);
       }
     }
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

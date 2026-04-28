@@ -20,23 +20,30 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.ConfigChangeListenerConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -54,7 +61,7 @@ import static org.testng.Assert.assertTrue;
  * - Raw index writers
  * - Different data types
  */
-public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationTest {
+public class CommitTimeCompactionIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
   private static final String CSV_DELIMITER = ",";
@@ -64,7 +71,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
   private static final List<String> COLUMNS_TO_COMPARE =
       List.of("name", "game", "score", "timestampInEpoch", "deleted");
-  private String _kafkaTopicName;
+  private final String _resourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
+  private final Set<String> _tablesToCleanup = new LinkedHashSet<>();
+  private final Set<String> _schemasToCleanup = new LinkedHashSet<>();
+  private final Set<String> _kafkaTopicsToCleanup = new LinkedHashSet<>();
 
   @BeforeClass
   public void setUp()
@@ -79,9 +89,11 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
     // Start Kafka
     startKafkaWithoutTopic();
+
+    clearQueryQuotaState();
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws IOException {
     // Note: Individual tests clean up their own tables in their test methods
@@ -94,27 +106,80 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     FileUtils.deleteDirectory(_tempDir);
   }
 
+  @AfterMethod(alwaysRun = true)
+  public void cleanUpMethodResources() {
+    cleanupTablesAndSchemas(new ArrayList<>(_tablesToCleanup), new ArrayList<>(_schemasToCleanup));
+    cleanupKafkaTopics(new ArrayList<>(_kafkaTopicsToCleanup));
+    _tablesToCleanup.clear();
+    _schemasToCleanup.clear();
+    _kafkaTopicsToCleanup.clear();
+  }
+
+  private String getTestTableName(String baseName) {
+    String tableName = isSharedRichClusterEnabled() ? baseName + "_" + _resourceSuffix : baseName;
+    _tablesToCleanup.add(tableName);
+    _schemasToCleanup.add(tableName);
+    return tableName;
+  }
+
+  private String getTestKafkaTopicName(String suffix) {
+    String kafkaTopicName = getKafkaTopic() + "-" + suffix;
+    if (isSharedRichClusterEnabled()) {
+      kafkaTopicName += "-" + _resourceSuffix;
+    }
+    _kafkaTopicsToCleanup.add(kafkaTopicName);
+    return kafkaTopicName;
+  }
+
+  private void clearQueryQuotaState()
+      throws Exception {
+    deleteClusterConfig(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND);
+    deleteClusterConfig(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
+
+    String controllerBaseUrl = getOrCreateAdminClient().getControllerBaseUrl();
+    HttpClient.wrapAndThrowHttpException(getHttpClient().sendPostRequest(
+        new URI(controllerBaseUrl + "/databases/default/quotas"), null, null));
+    HttpClient.wrapAndThrowHttpException(getHttpClient().sendPostRequest(
+        new URI(controllerBaseUrl + "/applicationQuotas/default"), null, null));
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        double dbQuota = Double.parseDouble(sendGetRequest(getBrokerBaseApiUrl()
+            + "/debug/databases/queryQuota/default"));
+        double appQuota = Double.parseDouble(sendGetRequest(getBrokerBaseApiUrl()
+            + "/debug/applicationQuotas/default"));
+        return isUnlimitedQuota(dbQuota) && isUnlimitedQuota(appQuota);
+      } catch (Exception e) {
+        return false;
+      }
+    }, 10_000L, "Failed to clear query quota state");
+  }
+
+  private static boolean isUnlimitedQuota(double quota) {
+    return quota == 0 || quota == Long.MAX_VALUE;
+  }
+
   @Test
   public void testCommitTimeCompactionComparison()
       throws Exception {
     // Enhanced test to validate that enableCommitTimeCompaction=true removes invalid records
     // compared to enableCommitTimeCompaction=false, with comprehensive verification
     // Now includes testing commit-time compaction with column-major segment builder
-    String kafkaTopicName = getKafkaTopic() + "-compaction-comparison";
+    String kafkaTopicName = getTestKafkaTopicName("compaction-comparison");
     setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline)
-    String tableNameWithoutCompaction = "gameScoresCommitTimeCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("gameScoresCommitTimeCompactionDisabled");
     createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
         UpsertConfig.Mode.FULL, false, false);
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build
-    String tableNameWithCompaction = "gameScoresCommitTimeCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("gameScoresCommitTimeCompactionEnabled");
     createUpsertTable(tableNameWithCompaction, kafkaTopicName,
         UpsertConfig.Mode.FULL, true, false);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build
-    String tableNameWithCompactionColumnMajor = "gameScoresCommitTimeCompactionColumnMajor";
+    String tableNameWithCompactionColumnMajor = getTestTableName("gameScoresCommitTimeCompactionColumnMajor");
     createUpsertTable(tableNameWithCompactionColumnMajor, kafkaTopicName,
         UpsertConfig.Mode.FULL, true, true);
 
@@ -161,25 +226,28 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // containing a mix of common primitive data types, specifically including a sorted column.
 
     // Create schemas for both tables
-    String kafkaTopicName = getKafkaTopic() + "-sorted-column";
+    String kafkaTopicName = getTestKafkaTopicName("sorted-column");
     setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
+    String tableNameWithCompaction = getTestTableName("sortedCompactionEnabled");
+    String tableNameWithoutCompaction = getTestTableName("sortedCompactionDisabled");
+    String tableNameWithCompactionAndColumnMajor = getTestTableName("sortedCompactionEnabledAndColumnMajor");
+
     Schema schema = createSchema();
-    schema.setSchemaName("sortedCompactionEnabled");
+    schema.setSchemaName(tableNameWithCompaction);
     addSchema(schema);
 
     Schema schema2 = createSchema();
-    schema2.setSchemaName("sortedCompactionDisabled");
+    schema2.setSchemaName(tableNameWithoutCompaction);
     addSchema(schema2);
 
     Schema schema3 = createSchema();
-    schema3.setSchemaName("sortedCompactionEnabledAndColumnMajor");
+    schema3.setSchemaName(tableNameWithCompactionAndColumnMajor);
     addSchema(schema3);
 
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
 
     // TABLE 1: With commit-time compaction ENABLED AND sorted column configured BEFORE data ingestion
-    String tableNameWithCompaction = "sortedCompactionEnabled";
     UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
 
@@ -191,7 +259,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithCompaction);
 
     // TABLE 2: With commit-time compaction DISABLED but also with sorted column
-    String tableNameWithoutCompaction = "sortedCompactionDisabled";
     UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
 
@@ -204,7 +271,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
     // TABLE 3: With commit-time compaction ENABLED, with Column Major Build AND sorted column configured BEFORE data
     // ingestion
-    String tableNameWithCompactionAndColumnMajor = "sortedCompactionEnabledAndColumnMajor";
     TableConfig tableConfigWithCompactionAndColumnMajor =
         createCSVUpsertTableConfig(tableNameWithCompactionAndColumnMajor, kafkaTopicName, getNumKafkaPartitions(),
             csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
@@ -267,24 +333,24 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // (raw storage) on standard schema columns.
 
     // TABLE 1: With commit-time compaction ENABLED
-    String kafkaTopicName = getKafkaTopic() + "-no-dictonary";
+    String kafkaTopicName = getTestKafkaTopicName("no-dictonary");
     setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
-    String tableNameWithCompaction = "rawIndexCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("rawIndexCompactionEnabled");
     TableConfig tableConfigWithCompaction = createUpsertTable(tableNameWithCompaction, kafkaTopicName,
         UpsertConfig.Mode.FULL, true, false);
     tableConfigWithCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "game"));
     updateTableConfig(tableConfigWithCompaction);
 
     // TABLE 2: With commit-time compaction DISABLED
-    String tableNameWithoutCompaction = "rawIndexCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("rawIndexCompactionDisabled");
     TableConfig tableConfigWithoutCompaction = createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
         UpsertConfig.Mode.FULL, false, false);
     tableConfigWithCompaction.getIndexingConfig().setNoDictionaryColumns(List.of("name", "game"));
     updateTableConfig(tableConfigWithoutCompaction);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build
-    String tableNameWithCompactionAndColumnMajor = "rawIndexCompactionAndColumnMajor";
+    String tableNameWithCompactionAndColumnMajor = getTestTableName("rawIndexCompactionAndColumnMajor");
     TableConfig tableConfigWithCompactionAndColumnMajor =
         createUpsertTable(tableNameWithCompactionAndColumnMajor, kafkaTopicName,
             UpsertConfig.Mode.FULL, true, true);
@@ -342,11 +408,11 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "200,Player200Updated,game1,90.0,1681154200000,false,action;fps",
         "201,Player201Updated,game2,95.0,1681154300000,false,strategy;rts");
 
-    String kafkaTopicName = getKafkaTopic() + "-multivalue";
+    String kafkaTopicName = getTestKafkaTopicName("multivalue");
     createKafkaTopic(kafkaTopicName);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline)
-    String tableNameWithoutCompaction = "gameScoresMVCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("gameScoresMVCompactionDisabled");
     Schema mvSchemaBaseline = createSchema();
     mvSchemaBaseline.setSchemaName(tableNameWithoutCompaction);
     mvSchemaBaseline.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
@@ -367,7 +433,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build
-    String tableNameWithCompaction = "gameScoresMVCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("gameScoresMVCompactionEnabled");
     Schema mvSchemaCompacted = createSchema();
     mvSchemaCompacted.setSchemaName(tableNameWithCompaction);
     mvSchemaCompacted.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
@@ -387,7 +453,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithCompaction);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build
-    String tableNameWithCompactionColumnMajor = "gameScoresMVCompactionColumnMajor";
+    String tableNameWithCompactionColumnMajor = getTestTableName("gameScoresMVCompactionColumnMajor");
     Schema mvSchemaColumnMajor = createSchema();
     mvSchemaColumnMajor.setSchemaName(tableNameWithCompactionColumnMajor);
     mvSchemaColumnMajor.addField(new DimensionFieldSpec("tags", FieldSpec.DataType.STRING, false));
@@ -439,7 +505,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
     // TABLE 1: With commit-time compaction DISABLED and PARTIAL upsert mode (baseline)
 
-    String kafkaTopicName = getKafkaTopic() + "-partial-upsert";
+    String kafkaTopicName = getTestKafkaTopicName("partial-upsert");
     setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
@@ -454,7 +520,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         .setPrimaryKeyColumns(Collections.singletonList("playerId"));
 
     // Create schema for partial upsert - make game multi-value to support UNION strategy
-    String tableNameWithoutCompaction = "gameScoresPartialCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("gameScoresPartialCompactionDisabled");
     Schema partialUpsertSchemaBaseline = schemaBuilder.setSchemaName(tableNameWithoutCompaction).build();
     addSchema(partialUpsertSchemaBaseline);
 
@@ -470,7 +536,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build and PARTIAL upsert mode
-    String tableNameWithCompaction = "gameScoresPartialCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("gameScoresPartialCompactionEnabled");
     Schema partialUpsertSchemaCompacted = schemaBuilder.setSchemaName(tableNameWithCompaction).build();
     addSchema(partialUpsertSchemaCompacted);
     UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
@@ -485,7 +551,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithCompaction);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build and PARTIAL upsert mode
-    String tableNameWithCompactionColumnMajor = "gameScoresPartialCompactionColumnMajor";
+    String tableNameWithCompactionColumnMajor = getTestTableName("gameScoresPartialCompactionColumnMajor");
     Schema partialUpsertSchemaColumnMajor = schemaBuilder.setSchemaName(tableNameWithCompactionColumnMajor).build();
     addSchema(partialUpsertSchemaColumnMajor);
     UpsertConfig upsertConfigWithCompactionColumnMajor = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
@@ -570,7 +636,8 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // - Different data types (String, Long, multi-value)
     // - Raw index writers for specific columns
 
-    String kafkaTopicName = getKafkaTopic() + "-mixed-compaction-comparison";
+    String kafkaTopicName = getTestKafkaTopicName("mixed-compaction-comparison");
+    createKafkaTopic(kafkaTopicName, 1);
 
     // Create test data with diverse column types
     // Use semicolon-separated format for multi-value fields in CSV
@@ -585,7 +652,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     pushCsvIntoKafka(testRecords, kafkaTopicName, 0);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline)
-    String tableNameWithoutCompaction = "gameScoresMixedCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("gameScoresMixedCompactionDisabled");
 
     Schema mixedSchemaBaseline = createSchema();
     mixedSchemaBaseline.setSchemaName(tableNameWithoutCompaction);
@@ -615,7 +682,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build
-    String tableNameWithCompaction = "gameScoresMixedCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("gameScoresMixedCompactionEnabled");
 
     // Create enhanced schema with various column types
     Schema mixedSchemaCompacted = createSchema();
@@ -643,7 +710,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithCompaction);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build
-    String tableNameWithCompactionColumnMajor = "gameScoresMixedCompactionColumnMajor";
+    String tableNameWithCompactionColumnMajor = getTestTableName("gameScoresMixedCompactionColumnMajor");
 
     Schema mixedSchemaColumnMajor = createSchema();
     mixedSchemaColumnMajor.setSchemaName(tableNameWithCompactionColumnMajor);
@@ -704,7 +771,8 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // from obsolete records that should be excluded during compaction.
     // Now includes testing commit-time compaction with column-major segment builder
 
-    String kafkaTopicName = getKafkaTopic() + "-map-compaction-comparison";
+    String kafkaTopicName = getTestKafkaTopicName("map-compaction-comparison");
+    createKafkaTopic(kafkaTopicName);
 
     // Create test data with MAP columns - using simplified JSON format for map values
     // Format: "playerId,name,game,score,timestampInEpoch,deleted,userAttributes"
@@ -727,7 +795,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     pushCsvIntoKafka(testRecords, kafkaTopicName, 0);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline)
-    String tableNameWithoutCompaction = "gameScoresMapCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("gameScoresMapCompactionDisabled");
 
     // Create schema for baseline table
     Schema mapSchemaBaseline = createSchema();
@@ -748,7 +816,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build
-    String tableNameWithCompaction = "gameScoresMapCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("gameScoresMapCompactionEnabled");
 
     // Create schema with MAP column
     Schema mapSchemaCompacted = createSchema();
@@ -769,7 +837,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithCompaction);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build
-    String tableNameWithCompactionColumnMajor = "gameScoresMapCompactionColumnMajor";
+    String tableNameWithCompactionColumnMajor = getTestTableName("gameScoresMapCompactionColumnMajor");
 
     // Create schema for column-major table
     Schema mapSchemaColumnMajor = createSchema();
@@ -1217,16 +1285,32 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
   protected void cleanupTablesAndSchemas(List<String> tableNames, List<String> schemaNames) {
     tableNames.forEach(name -> {
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(name);
       try {
-        dropRealtimeTable(name);
-      } catch (IOException ignored) {
+        if (_helixResourceManager == null || _helixResourceManager.getAllTables().contains(realtimeTableName)) {
+          dropRealtimeTable(name);
+          waitForTableDataManagerRemoved(realtimeTableName);
+          waitForEVToDisappear(realtimeTableName);
+        }
+      } catch (Exception ignored) {
       }
     });
 
     schemaNames.forEach(name -> {
       try {
-        deleteSchema(name);
-      } catch (IOException ignored) {
+        if (_helixResourceManager == null || _helixResourceManager.getSchema(name) != null) {
+          deleteSchema(name);
+        }
+      } catch (Exception ignored) {
+      }
+    });
+  }
+
+  private void cleanupKafkaTopics(List<String> kafkaTopicNames) {
+    kafkaTopicNames.forEach(name -> {
+      try {
+        deleteKafkaTopic(name);
+      } catch (Exception ignored) {
       }
     });
   }
@@ -1259,11 +1343,11 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // compaction as this could lead to data inconsistency issues.
     // Now includes testing commit-time compaction with column-major segment builder
 
-    String kafkaTopicName = getKafkaTopic() + "-deleted-records-preservation";
+    String kafkaTopicName = getTestKafkaTopicName("deleted-records-preservation");
     setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
 
     // TABLE 1: With commit-time compaction DISABLED (baseline) and delete record column configured
-    String tableNameWithoutCompaction = "gameScoresDeletedRecordsCompactionDisabled";
+    String tableNameWithoutCompaction = getTestTableName("gameScoresDeletedRecordsCompactionDisabled");
     TableConfig tableConfigWithoutCompaction = createUpsertTable(tableNameWithoutCompaction, kafkaTopicName,
         UpsertConfig.Mode.FULL, false, false);
     // Configure delete record column for soft deletes
@@ -1271,7 +1355,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     updateTableConfig(tableConfigWithoutCompaction);
 
     // TABLE 2: With commit-time compaction ENABLED + row-major build and delete record column configured
-    String tableNameWithCompaction = "gameScoresDeletedRecordsCompactionEnabled";
+    String tableNameWithCompaction = getTestTableName("gameScoresDeletedRecordsCompactionEnabled");
     TableConfig tableConfigWithCompaction = createUpsertTable(tableNameWithCompaction, kafkaTopicName,
         UpsertConfig.Mode.FULL, true, false);
     // Configure delete record column for soft deletes
@@ -1279,7 +1363,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     updateTableConfig(tableConfigWithCompaction);
 
     // TABLE 3: With commit-time compaction ENABLED + column-major build and delete record column configured
-    String tableNameWithCompactionColumnMajor = "gameScoresDeletedRecordsCompactionColumnMajor";
+    String tableNameWithCompactionColumnMajor = getTestTableName("gameScoresDeletedRecordsCompactionColumnMajor");
     TableConfig tableConfigWithCompactionColumnMajor = createUpsertTable(tableNameWithCompactionColumnMajor,
         kafkaTopicName, UpsertConfig.Mode.FULL, true, true);
     // Configure delete record column for soft deletes

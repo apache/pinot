@@ -35,25 +35,34 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    super.overrideBrokerConf(brokerConf);
     brokerConf.setProperty(CommonConstants.Broker.BROKER_SERVICE_AUTO_DISCOVERY, true);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    if (!isSharedRichClusterEnabled()) {
+      TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    }
     startZk();
     startController();
     startBroker();
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    stopBroker();
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopZk);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, () -> FileUtils.deleteDirectory(_tempDir));
+    }
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Test
@@ -61,5 +70,22 @@ public class BrokerServiceDiscoveryIntegrationTest extends BaseClusterIntegratio
       throws Exception {
     String response = sendGetRequest(getBrokerBaseApiUrl() + "/test/echo/doge");
     Assert.assertEquals(response, "doge");
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

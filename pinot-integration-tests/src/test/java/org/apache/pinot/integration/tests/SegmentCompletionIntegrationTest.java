@@ -19,8 +19,11 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -33,6 +36,8 @@ import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -54,35 +59,79 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest {
+public class SegmentCompletionIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME_PREFIX = "segment_completion";
+  private static final String SHARED_KAFKA_TOPIC_PREFIX = "segment-completion";
   private static final int NUM_KAFKA_PARTITIONS = 1;
 
+  private final String _sharedResourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
+
+  private File _classTempDir;
   private String _serverInstance;
   private HelixManager _serverHelixManager;
-  private String _currentSegment;
+  private volatile String _currentSegment;
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 0;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + _sharedResourceSuffix
+        : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC_PREFIX + "-" + _sharedResourceSuffix
+        : super.getKafkaTopic();
+  }
 
   @Override
   protected int getNumKafkaPartitions() {
     return NUM_KAFKA_PARTITIONS;
   }
 
-  @BeforeClass
+  @BeforeClass(alwaysRun = true)
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    _classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
 
-    // Start the Pinot cluster
     startZk();
     startController();
     startBroker();
     startFakeServer();
-
-    // Start Kafka
-    startKafka();
+    startKafkaWithoutTopic();
 
     // Create and upload the schema and table config
+    cleanRealtimeTableAndSchema();
+    resetKafkaTopic();
+    _currentSegment = null;
     addSchema(createSchema());
     addTableConfig(createRealtimeTableConfig(null));
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _sharedResourceSuffix)
+        : _tempDir;
   }
 
   /**
@@ -92,8 +141,11 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
    */
   private void startFakeServer()
       throws Exception {
-    _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtils.getHostAddress() + "_"
-        + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+    int fakeServerPort = isSharedRichClusterEnabled() ? NetUtils.findOpenPort(_nextServerPort)
+        : CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+    _nextServerPort = fakeServerPort + 1;
+    _serverInstance =
+        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtils.getHostAddress() + "_" + fakeServerPort;
 
     // Create server instance with the fake server state model
     _serverHelixManager = HelixManagerFactory
@@ -191,20 +243,132 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
     }, 60_000L, "Failed to get a new segment reaching CONSUMING state");
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
-      throws IOException {
-    dropRealtimeTable(getTableName());
-    stopFakeServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::stopAndDropFakeServer);
+    if (!isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, this::stopBrokerIfStarted);
+      exception = runCleanup(exception, this::stopControllerIfStarted);
+      exception = runCleanup(exception, this::stopKafkaIfStarted);
+      exception = runCleanup(exception, this::stopZk);
+    }
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
-  private void stopFakeServer() {
-    _serverHelixManager.disconnect();
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void stopAndDropFakeServer() {
+    if (_serverHelixManager != null) {
+      _serverHelixManager.disconnect();
+      _serverHelixManager = null;
+    }
+    if (_serverInstance != null && _helixResourceManager != null && isFakeServerInstancePresent()) {
+      TestUtils.waitForCondition(
+          aVoid -> _helixResourceManager.dropInstance(_serverInstance).isSuccessful(),
+          60_000L, "Failed to drop fake server instance: " + _serverInstance);
+    }
+    _serverInstance = null;
+    _currentSegment = null;
+  }
+
+  private boolean isFakeServerInstancePresent() {
+    try {
+      return _helixAdmin != null && _helixAdmin.getInstancesInCluster(getHelixClusterName()).contains(_serverInstance);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   public class FakeServerSegmentStateModelFactory extends StateModelFactory<StateModel> {

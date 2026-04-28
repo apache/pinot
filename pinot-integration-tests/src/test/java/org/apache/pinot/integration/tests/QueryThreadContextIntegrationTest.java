@@ -27,8 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -36,7 +34,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTest
+public class QueryThreadContextIntegrationTest extends SharedRichClusterIntegrationTest
     implements ExplainIntegrationTestTrait {
 
   @BeforeClass
@@ -49,6 +47,8 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
     startController();
     startBroker();
     startServers(2);
+
+    cleanTableAndSchema();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -65,11 +65,6 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-  }
-
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    String property = CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN;
-    brokerConf.setProperty(property, "true");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -209,10 +204,10 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
         "Unexpected stageId post GROUP BY");
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
+    cleanTableAndSchema();
 
     stopServer();
     stopBroker();
@@ -220,5 +215,21 @@ public class QueryThreadContextIntegrationTest extends BaseClusterIntegrationTes
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+    String offlineTableName = DEFAULT_TABLE_NAME + "_OFFLINE";
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        DEFAULT_TABLE_NAME)) {
+      dropOfflineTable(DEFAULT_TABLE_NAME);
+    }
+    waitForEVToDisappear(offlineTableName);
+    if (_helixResourceManager.getSchema(DEFAULT_TABLE_NAME) != null) {
+      deleteSchema(DEFAULT_TABLE_NAME);
+    }
   }
 }

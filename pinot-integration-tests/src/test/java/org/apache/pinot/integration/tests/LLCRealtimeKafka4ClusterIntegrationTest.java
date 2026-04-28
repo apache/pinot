@@ -34,6 +34,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
+import org.testng.annotations.AfterClass;
 
 import static org.testng.Assert.assertTrue;
 
@@ -44,6 +45,26 @@ import static org.testng.Assert.assertTrue;
 public class LLCRealtimeKafka4ClusterIntegrationTest extends LLCRealtimeClusterIntegrationTest {
 
   @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
   protected Map<String, String> getStreamConfigMap() {
     Map<String, String> streamConfigMap = super.getStreamConfigMap();
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(
@@ -51,6 +72,19 @@ public class LLCRealtimeKafka4ClusterIntegrationTest extends LLCRealtimeClusterI
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), ExceptingKafka4ConsumerFactory.class.getName());
     ExceptingKafka4ConsumerFactory.init(getHelixClusterName(), _helixAdmin, getTableName());
     return streamConfigMap;
+  }
+
+  @AfterClass(alwaysRun = true)
+  @Override
+  public void tearDown()
+      throws Exception {
+    try {
+      super.tearDown();
+    } finally {
+      if (!isSharedRichClusterEnabled()) {
+        ExceptingKafka4ConsumerFactory.clear();
+      }
+    }
   }
 
   public static class ExceptingKafka4ConsumerFactory extends KafkaConsumerFactory {
@@ -70,6 +104,12 @@ public class LLCRealtimeKafka4ClusterIntegrationTest extends LLCRealtimeClusterI
       _helixAdmin = helixAdmin;
       _helixClusterName = helixClusterName;
       _tableName = tableName;
+    }
+
+    private static void clear() {
+      _helixAdmin = null;
+      _helixClusterName = null;
+      _tableName = null;
     }
 
     @Override

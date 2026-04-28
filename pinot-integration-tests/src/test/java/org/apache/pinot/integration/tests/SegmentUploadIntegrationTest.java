@@ -55,8 +55,13 @@ import org.testng.annotations.Test;
  * Currently only tests METADATA push type.
  * todo: add test for URI push
  */
-public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
-  private static String _tableNameSuffix;
+public class SegmentUploadIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME_PREFIX = "segment_upload";
+
+  private String _tableName;
+  private File _testTempDir;
+  private File _testSegmentDir;
+  private File _testTarDir;
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -91,8 +96,13 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeMethod
   public void setUpTest()
       throws IOException {
-    _tableNameSuffix = RandomStringUtils.randomAlphabetic(12);
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    String tableNameSuffix = RandomStringUtils.randomAlphabetic(12);
+    _tableName = isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + tableNameSuffix
+        : DEFAULT_TABLE_NAME + tableNameSuffix;
+    _testTempDir = getTestTempDir(tableNameSuffix);
+    _testSegmentDir = isSharedRichClusterEnabled() ? new File(_testTempDir, "segmentDir") : _segmentDir;
+    _testTarDir = isSharedRichClusterEnabled() ? new File(_testTempDir, "tarDir") : _tarDir;
+    TestUtils.ensureDirectoriesExistAndEmpty(_testTempDir, _testSegmentDir, _testTarDir);
   }
 
   @BeforeClass
@@ -121,7 +131,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create 1 segment, for METADATA push WITH move to final location
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, "_with_move",
-        _segmentDir, _tarDir);
+        _testSegmentDir, _testTarDir);
 
     SegmentMetadataPushJobRunner runner = new SegmentMetadataPushJobRunner();
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
@@ -133,7 +143,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
-    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    jobSpec.setOutputDirURI(_testTarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
     tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableName());
@@ -147,7 +157,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Not present in dataDir, only present in sourceDir
     Assert.assertFalse(dataDirSegments.exists());
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     runner.init(jobSpec);
     runner.run();
@@ -155,7 +165,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Segment should be seen in dataDir
     Assert.assertTrue(dataDirSegments.exists());
     Assert.assertEquals(dataDirSegments.listFiles().length, 1);
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     // test segment loaded
     JsonNode segmentsList = getSegmentsList();
@@ -166,28 +176,28 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     testCountStar(numDocs);
 
     // Clear segment and tar dir
-    for (File segment : _segmentDir.listFiles()) {
+    for (File segment : _testSegmentDir.listFiles()) {
       FileUtils.deleteQuietly(segment);
     }
-    for (File tar : _tarDir.listFiles()) {
+    for (File tar : _testTarDir.listFiles()) {
       FileUtils.deleteQuietly(tar);
     }
 
     // Create 1 segment, for METADATA push WITHOUT move to final location
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, "_without_move",
-        _segmentDir, _tarDir);
+        _testSegmentDir, _testTarDir);
     jobSpec.setPushJobSpec(new PushJobSpec());
     runner = new SegmentMetadataPushJobRunner();
 
     Assert.assertEquals(dataDirSegments.listFiles().length, 1);
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     runner.init(jobSpec);
     runner.run();
 
     // should not see new segments in dataDir
     Assert.assertEquals(dataDirSegments.listFiles().length, 1);
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     // test segment loaded
     segmentsList = getSegmentsList();
@@ -218,7 +228,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Create the list of segments
     for (int segNum = 0; segNum < 12; segNum++) {
       ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(segNum), offlineTableConfig, schema,
-          "_seg" + segNum, _segmentDir, _tarDir);
+          "_seg" + segNum, _testSegmentDir, _testTarDir);
     }
 
     SegmentMetadataPushJobRunner runner = new SegmentMetadataPushJobRunner();
@@ -232,7 +242,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
-    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    jobSpec.setOutputDirURI(_testTarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName() + "_OFFLINE");
     tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableName());
@@ -246,7 +256,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Not present in dataDir, only present in sourceDir
     Assert.assertFalse(dataDirSegments.exists());
-    Assert.assertEquals(_tarDir.listFiles().length, 12);
+    Assert.assertEquals(_testTarDir.listFiles().length, 12);
 
     runner.init(jobSpec);
     runner.run();
@@ -254,7 +264,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Segment should be seen in dataDir
     Assert.assertTrue(dataDirSegments.exists());
     Assert.assertEquals(dataDirSegments.listFiles().length, 12);
-    Assert.assertEquals(_tarDir.listFiles().length, 12);
+    Assert.assertEquals(_testTarDir.listFiles().length, 12);
 
     // test segment loaded
     JsonNode segmentsList = getSegmentsList();
@@ -266,10 +276,10 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     testCountStar(numDocs);
 
     // Clear segment and tar dir
-    for (File segment : _segmentDir.listFiles()) {
+    for (File segment : _testSegmentDir.listFiles()) {
       FileUtils.deleteQuietly(segment);
     }
-    for (File tar : _tarDir.listFiles()) {
+    for (File tar : _testTarDir.listFiles()) {
       FileUtils.deleteQuietly(tar);
     }
   }
@@ -293,7 +303,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     String firstTimeStamp = Long.toString(System.currentTimeMillis());
 
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema, firstTimeStamp,
-        _segmentDir, _tarDir);
+        _testSegmentDir, _testTarDir);
 
     // First test standalone metadata push job runner
     BaseSegmentPushJobRunner runner = new SegmentMetadataPushJobRunner();
@@ -305,7 +315,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
-    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    jobSpec.setOutputDirURI(_testTarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
     tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableName());
@@ -317,7 +327,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     File dataDir = new File(_controllerConfig.getDataDir());
     File dataDirSegments = new File(dataDir, getTableName());
 
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     runner.init(jobSpec);
     runner.run();
@@ -325,7 +335,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Segment should be seen in dataDir
     Assert.assertTrue(dataDirSegments.exists());
     Assert.assertEquals(dataDirSegments.listFiles().length, 1);
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     // test segment loaded
     JsonNode segmentsList = getSegmentsList();
@@ -346,29 +356,29 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertTrue(segmentLineageResponse.contains("\"segmentsTo\":[\"" + firstSegmentName + "\"]"));
 
     // Clear segment and tar dir
-    for (File segment : _segmentDir.listFiles()) {
+    for (File segment : _testSegmentDir.listFiles()) {
       FileUtils.deleteQuietly(segment);
     }
-    for (File tar : _tarDir.listFiles()) {
+    for (File tar : _testTarDir.listFiles()) {
       FileUtils.deleteQuietly(tar);
     }
 
     String secondTimeStamp = Long.toString(System.currentTimeMillis());
 
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(1), offlineTableConfig, schema, secondTimeStamp,
-        _segmentDir, _tarDir);
+        _testSegmentDir, _testTarDir);
     jobSpec.setPushJobSpec(new PushJobSpec());
 
     // Now test standalone tar push job runner
     runner = new SegmentTarPushJobRunner();
 
     Assert.assertEquals(dataDirSegments.listFiles().length, 1);
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     runner.init(jobSpec);
     runner.run();
 
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     // test segment loaded
     segmentsList = getSegmentsList();
@@ -424,22 +434,95 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
 
   @Override
   public String getTableName() {
-    return DEFAULT_TABLE_NAME + _tableNameSuffix;
+    return _tableName != null ? _tableName : isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX
+        : DEFAULT_TABLE_NAME;
   }
 
-  @AfterMethod
+  @Override
+  protected List<File> getAllAvroFiles()
+      throws Exception {
+    int numSegments = unpackAvroData(_testTempDir).size();
+
+    List<File> avroFiles = Lists.newArrayListWithCapacity(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_testTempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  private File getTestTempDir(String tableNameSuffix) {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + tableNameSuffix)
+        : _tempDir;
+  }
+
+  @AfterMethod(alwaysRun = true)
   public void tearDownTest()
-      throws IOException {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    dropOfflineTable(offlineTableName);
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::cleanTestDirectory);
+    _tableName = null;
+    _testTempDir = null;
+    _testSegmentDir = null;
+    _testTarDir = null;
+    if (exception != null) {
+      throw exception;
+    }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+    Exception exception = null;
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopZk);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null || _tableName == null) {
+      return;
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(offlineTableName)
+        || _helixResourceManager.hasOfflineTable(getTableName())) {
+      dropOfflineTable(getTableName());
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void cleanTestDirectory()
+      throws IOException {
+    if (isSharedRichClusterEnabled() && _testTempDir != null) {
+      FileUtils.deleteDirectory(_testTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

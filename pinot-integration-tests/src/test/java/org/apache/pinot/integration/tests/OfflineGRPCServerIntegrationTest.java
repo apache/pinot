@@ -51,6 +51,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -62,22 +63,33 @@ import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
-public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
+public class OfflineGRPCServerIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME = "offline_grpc_server";
+
   private static final ExecutorService EXECUTOR_SERVICE =
       QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT =
       new DataTableReducerContext(EXECUTOR_SERVICE, 2, 10000, 10000, 5000, 128);
 
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
     startBroker();
     startServer();
+
+    cleanTableAndSchema();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -86,11 +98,12 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     addTableConfig(tableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
 
     // Set up the H2 connection
     setUpH2Connection(avroFiles);
@@ -100,6 +113,20 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+    waitForGrpcServerSegmentsLoaded(600_000L);
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
+
+  @Override
+  protected int getNumReplicas() {
+    if (isSharedRichClusterEnabled()) {
+      return Math.max(super.getNumReplicas(), _serverStarters.size());
+    }
+    return super.getNumReplicas();
   }
 
   @Override
@@ -135,26 +162,26 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @Test
   public void testGrpcQueryServer()
       throws Exception {
-    ServerGrpcQueryClient queryClient = getGrpcQueryClient();
-    String sql = "SELECT * FROM mytable_OFFLINE LIMIT 1000000 OPTION(timeoutMs=30000)";
-    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
-    List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
+    try (ServerGrpcQueryClient queryClient = getGrpcQueryClient()) {
+      String sql = "SELECT * FROM " + getOfflineTableName() + " LIMIT 1000000 OPTION(timeoutMs=30000)";
+      BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(sql);
+      List<String> segments = _helixResourceManager.getSegmentsFor(getOfflineTableName(), true);
 
-    ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSegments(segments);
-    testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
-    testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+      ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSegments(segments);
+      testNonStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+      testNonStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
 
-    requestBuilder.setEnableStreaming(true);
-    testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
-    testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
-    queryClient.close();
+      requestBuilder.setEnableStreaming(true);
+      testStreamingRequest(queryClient.submit(requestBuilder.setSql(sql).build()));
+      testStreamingRequest(queryClient.submit(requestBuilder.setBrokerRequest(brokerRequest).build()));
+    }
   }
 
   @Test(dataProvider = "provideSqlTestCases")
   public void testQueryingGrpcServer(String sql)
       throws Exception {
     try (ServerGrpcQueryClient queryClient = getGrpcQueryClient()) {
-      List<String> segments = _helixResourceManager.getSegmentsFor("mytable_OFFLINE", true);
+      List<String> segments = _helixResourceManager.getSegmentsFor(getOfflineTableName(), true);
       ServerGrpcRequestBuilder requestBuilder = new ServerGrpcRequestBuilder().setSql(sql).setSegments(segments);
       DataTable dataTable = collectNonStreamingRequestResult(queryClient.submit(requestBuilder.build()));
       collectAndCompareResult(sql, queryClient.submit(requestBuilder.setEnableStreaming(true).build()), dataTable);
@@ -164,35 +191,36 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   @DataProvider(name = "provideSqlTestCases")
   public Object[][] provideSqlAndResultRowsAndNumDocScanTestCases() {
     List<Object[]> entries = new ArrayList<>();
+    String offlineTableName = getOfflineTableName();
 
     // select only
-    entries.add(new Object[]{"SELECT * FROM mytable_OFFLINE LIMIT 10000000"});
-    entries.add(new Object[]{"SELECT * FROM mytable_OFFLINE WHERE DaysSinceEpoch > 16312 LIMIT 10000000"});
+    entries.add(new Object[]{"SELECT * FROM " + offlineTableName + " LIMIT 10000000"});
+    entries.add(new Object[]{"SELECT * FROM " + offlineTableName + " WHERE DaysSinceEpoch > 16312 LIMIT 10000000"});
     entries.add(new Object[]{
-        "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable_OFFLINE LIMIT 10000000"
+        "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM " + offlineTableName + " LIMIT 10000000"
     });
 
     // select only with early termination
-    entries.add(new Object[]{"SELECT * FROM mytable_OFFLINE LIMIT 10"});
+    entries.add(new Object[]{"SELECT * FROM " + offlineTableName + " LIMIT 10"});
 
     // aggregate
-    entries.add(new Object[]{"SELECT count(*) FROM mytable_OFFLINE"});
-    entries.add(new Object[]{"SELECT SUM(ArrTime) FROM mytable_OFFLINE"});
+    entries.add(new Object[]{"SELECT count(*) FROM " + offlineTableName});
+    entries.add(new Object[]{"SELECT SUM(ArrTime) FROM " + offlineTableName});
 
     // group-by
-    entries.add(new Object[]{"SELECT count(*) FROM mytable_OFFLINE GROUP BY arrayLength(DivAirports)"});
-    entries.add(new Object[]{"SELECT DISTINCTCOUNT(AirlineID) FROM mytable_OFFLINE GROUP BY Carrier"});
-    entries.add(new Object[]{"SELECT count(*), sum(ArrTime) FROM mytable_OFFLINE GROUP BY AirlineID"});
+    entries.add(new Object[]{"SELECT count(*) FROM " + offlineTableName + " GROUP BY arrayLength(DivAirports)"});
+    entries.add(new Object[]{"SELECT DISTINCTCOUNT(AirlineID) FROM " + offlineTableName + " GROUP BY Carrier"});
+    entries.add(new Object[]{"SELECT count(*), sum(ArrTime) FROM " + offlineTableName + " GROUP BY AirlineID"});
 
     // distinct
-    entries.add(new Object[]{"SELECT DISTINCT(AirlineID) FROM mytable_OFFLINE LIMIT 1000000"});
+    entries.add(new Object[]{"SELECT DISTINCT(AirlineID) FROM " + offlineTableName + " LIMIT 1000000"});
     entries.add(new Object[]{
-        "SELECT AirlineID, ArrTime FROM mytable_OFFLINE GROUP BY AirlineID, ArrTime LIMIT 1000000"
+        "SELECT AirlineID, ArrTime FROM " + offlineTableName + " GROUP BY AirlineID, ArrTime LIMIT 1000000"
     });
 
     // order by
     entries.add(new Object[]{
-        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable_OFFLINE "
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM " + offlineTableName + " "
             + "ORDER BY DaysSinceEpoch limit 1000000"
     });
 
@@ -237,13 +265,13 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         BrokerResponseNative streamingBrokerResponse = new BrokerResponseNative();
         try (QueryThreadContext ignore = useMultiStageQueryEngine() ? QueryThreadContext.openForMseTest()
             : QueryThreadContext.openForSseTest()) {
-          reducer.reduceAndSetResults("mytable_OFFLINE", cachedDataSchema, dataTableMap, streamingBrokerResponse,
+          reducer.reduceAndSetResults(getOfflineTableName(), cachedDataSchema, dataTableMap, streamingBrokerResponse,
               DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
         }
         BrokerResponseNative nonStreamBrokerResponse = new BrokerResponseNative();
         try (QueryThreadContext ignore = useMultiStageQueryEngine() ? QueryThreadContext.openForMseTest()
             : QueryThreadContext.openForSseTest()) {
-          reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
+          reducer.reduceAndSetResults(getOfflineTableName(), nonStreamResultDataTable.getDataSchema(),
               Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
               DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
         }
@@ -297,16 +325,120 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
     }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropOfflineTable(getTableName());
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::cleanTempDirectory);
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
 
-    FileUtils.deleteDirectory(_tempDir);
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private String getOfflineTableName() {
+    return TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+  }
+
+  private void waitForGrpcServerSegmentsLoaded(long timeoutMs) {
+    if (_serverStarters.isEmpty()) {
+      return;
+    }
+
+    String offlineTableName = getOfflineTableName();
+    String serverInstance = _serverStarters.get(0).getInstanceId();
+    List<String> expectedSegments = _helixResourceManager.getSegmentsFor(offlineTableName, true);
+    TestUtils.waitForCondition(aVoid -> {
+      Map<String, List<String>> onlineSegmentsMap =
+          _helixResourceManager.getServerToOnlineSegmentsMapFromEV(offlineTableName, true);
+      List<String> onlineSegments = onlineSegmentsMap.get(serverInstance);
+      return onlineSegments != null && onlineSegments.containsAll(expectedSegments);
+    }, timeoutMs, "Failed to load all segments for table: " + offlineTableName + " on server: " + serverInstance);
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = getOfflineTableName();
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void cleanTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

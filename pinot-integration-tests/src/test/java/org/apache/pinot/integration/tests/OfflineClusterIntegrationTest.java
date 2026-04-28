@@ -174,16 +174,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private TableConfig _tableConfig;
   private Schema _schema;
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+  private final Map<String, String> _originalClusterConfigValues = new LinkedHashMap<>();
+  private boolean _clusterConfigOverrideApplied;
 
   // Store the table size. Table size is platform dependent because of the native library used by the ChunkCompressor.
   // Once this value is set, assert that table size always gets back to this value after removing the added indices.
   private long _tableSize;
 
   protected int getNumBrokers() {
+    if (isSharedRichClusterEnabled() && !_brokerStarters.isEmpty()) {
+      return _brokerStarters.size();
+    }
     return NUM_BROKERS;
   }
 
   protected int getNumServers() {
+    if (isSharedRichClusterEnabled() && !_serverStarters.isEmpty()) {
+      return _serverStarters.size();
+    }
     return NUM_SERVERS;
   }
 
@@ -199,28 +210,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = getClassSegmentDir();
+    _classTarDir = getClassTarDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    // Set hyperloglog log2m value to 12.
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-    // Set max segment preprocess parallelism to 8 to test that all segments can be processed
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
-    // Set max segment startree preprocess parallelism to 6 to test that all segments can be processed
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
-    // Set max segment download parallelism to 8 to test that all segments can be processed
-    _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(8));
+    if (!isSharedRichClusterEnabled()) {
+      applyClusterConfigOverrides();
+    }
     startBrokers();
     startServers();
+
+    cleanTableAndSchema();
 
     // Create and upload the schema and table config
     _schema = createSchema();
@@ -229,17 +233,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     addTableConfig(_tableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload segments. For exhaustive testing, concurrently upload multiple segments with the same name
     // and validate correctness with parallel push protection enabled.
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, _tableConfig, _schema, 0, _segmentDir, _tarDir);
-    // Create a copy of _tarDir to create multiple segments with the same name.
-    File tarDir2 = new File(_tempDir, "tarDir2");
-    FileUtils.copyDirectory(_tarDir, tarDir2);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, _tableConfig, _schema, 0, _classSegmentDir,
+        _classTarDir);
+    // Create a copy of _classTarDir to create multiple segments with the same name.
+    File tarDir2 = new File(_classTempDir, "tarDir2");
+    FileUtils.copyDirectory(_classTarDir, tarDir2);
 
     List<File> tarDirs = new ArrayList<>();
-    tarDirs.add(_tarDir);
+    tarDirs.add(_classTarDir);
     tarDirs.add(tarDir2);
     try {
       uploadSegments(getTableName(), TableType.OFFLINE, tarDirs);
@@ -253,7 +258,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertTrue(e.getMessage().contains("Another segment upload is in progress for segment") || e.getMessage()
           .contains("Failed to create ZK metadata for segment") || e.getMessage()
           .contains("java.nio.file.FileAlreadyExistsException"), e.getMessage());
-      uploadSegments(getTableName(), _tarDir);
+      uploadSegments(getTableName(), _classTarDir);
     }
 
     // Set up the H2 connection
@@ -281,6 +286,70 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   protected void startServers()
       throws Exception {
     startServers(getNumServers());
+  }
+
+  @Override
+  protected void configureSharedClusterBeforeStartingInstances() {
+    applyClusterConfigOverrides();
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, getClass().getSimpleName()) : _tempDir;
+  }
+
+  private File getClassSegmentDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "segmentDir") : _segmentDir;
+  }
+
+  private File getClassTarDir() {
+    return isSharedRichClusterEnabled() ? new File(_classTempDir, "tarDir") : _tarDir;
+  }
+
+  private void applyClusterConfigOverrides() {
+    HelixConfigScope scope = getClusterConfigScope();
+    Map<String, String> configOverrides = new LinkedHashMap<>();
+    // Set hyperloglog log2m value to 12.
+    configOverrides.put(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+    // Set max segment preprocess parallelism to 8 to test that all segments can be processed.
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    // Set max segment startree preprocess parallelism to 6 to test that all segments can be processed.
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        Integer.toString(6));
+    // Set max segment download parallelism to 8 to test that all segments can be processed.
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(8));
+
+    try {
+      _clusterConfigOverrideApplied = true;
+      configOverrides.forEach((key, value) -> {
+        _originalClusterConfigValues.put(key, _helixManager.getConfigAccessor().get(scope, key));
+        _helixManager.getConfigAccessor().set(scope, key, value);
+      });
+    } catch (RuntimeException e) {
+      restoreClusterConfigOverrides();
+      throw e;
+    }
+  }
+
+  private void restoreClusterConfigOverrides() {
+    if ((!_clusterConfigOverrideApplied && _originalClusterConfigValues.isEmpty()) || _helixManager == null) {
+      return;
+    }
+
+    HelixConfigScope scope = getClusterConfigScope();
+    _originalClusterConfigValues.forEach((key, originalValue) -> {
+      if (originalValue == null) {
+        _helixManager.getConfigAccessor().remove(scope, key);
+      } else {
+        _helixManager.getConfigAccessor().set(scope, key, originalValue);
+      }
+    });
+    _originalClusterConfigValues.clear();
+    _clusterConfigOverrideApplied = false;
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+        .build();
   }
 
   private void registerCallbackHandlers() {
@@ -436,7 +505,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Refresh time is when the segment gets refreshed (existing segment)
     long refreshTime = segmentZKMetadata.getRefreshTime();
 
-    uploadSegments(offlineTableName, _tarDir);
+    uploadSegments(offlineTableName, _classTarDir);
     for (SegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager.getSegmentsZKMetadata(
         offlineTableName)) {
       // Only check one segment
@@ -468,7 +537,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
     addTableConfig(segmentUploadTestTableConfig);
     String offlineTableName = segmentUploadTestTableConfig.getTableName();
-    File[] segmentTarFiles = _tarDir.listFiles();
+    File[] segmentTarFiles = _classTarDir.listFiles();
     assertNotNull(segmentTarFiles);
     int numSegments = segmentTarFiles.length;
     assertTrue(numSegments > 0);
@@ -3149,16 +3218,100 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 3);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    // Test instance decommission before tearing down
-    testInstanceDecommission();
+    Exception exception = null;
+    if (isSharedRichClusterEnabled() && allowSharedRichClusterInstanceDecommission()) {
+      // The dedicated offline shared profile owns the suite cluster, so it can still run this destructive coverage.
+      exception = runCleanup(exception, this::testInstanceDecommission);
+      exception = runCleanup(exception, this::cleanTableAndSchema);
+    } else if (isSharedRichClusterEnabled()) {
+      exception = runCleanup(exception, this::cleanTableAndSchema);
+    } else {
+      // Test instance decommission before tearing down. This intentionally drops the table and stops brokers/servers.
+      exception = runCleanup(exception, this::testInstanceDecommission);
+    }
+    exception = runCleanup(exception, this::restoreClusterConfigOverrides);
+    if (!isSharedRichClusterEnabled()) {
+      // Brokers and servers have been stopped by the decommission test.
+      exception = runCleanup(exception, this::stopController);
+      exception = runCleanup(exception, this::stopZk);
+    }
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::cleanTempDirectory);
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
-    // Brokers and servers has been stopped
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    cleanOfflineTableAndSchema(getTableName());
+    cleanOfflineTableAndSchema(SEGMENT_UPLOAD_TEST_TABLE);
+  }
+
+  private void cleanOfflineTableAndSchema(String tableName)
+      throws Exception {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+    _queryGenerator = null;
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void cleanTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   private void testInstanceDecommission()
@@ -3199,7 +3352,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Stop servers
-    stopServer();
+    stopServerForInstanceDecommission();
 
     // Try to delete a server whose information is still on the ideal state
     try {
@@ -3225,7 +3378,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Stop brokers
-    stopBroker();
+    stopBrokerForInstanceDecommission();
 
     // TODO: Add test to delete broker instance. Currently, stopBroker() does not work correctly.
 
@@ -4215,8 +4368,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testSegmentReload() {
     try {
       // Reload a single segment in the offline table
-      String segmentName = listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0);
-      String response = reloadOfflineSegment(DEFAULT_TABLE_NAME + "_OFFLINE", segmentName, true);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+      String segmentName = listSegments(offlineTableName).get(0);
+      String response = reloadOfflineSegment(offlineTableName, segmentName, true);
       JsonNode responseJson = JsonUtils.stringToJsonNode(response);
 
       // Single segment reload response: status is a string, parse manually
@@ -4239,7 +4393,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   public void testVirtualColumnWithPartialReload() throws Exception {
-    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    Schema oldSchema = getSchema(getTableName());
     // Pick any existing INT column name for the “valid” cases
     String validColumnName = oldSchema.getAllFieldSpecs().stream()
         .filter(fs -> fs.getDataType() == DataType.INT)
@@ -4255,9 +4409,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         SELECT_STAR_QUERY + " WHERE " + validColumnName + " > 0 LIMIT 10000",
         SELECT_STAR_QUERY + " ORDER BY " + validColumnName + " LIMIT 10000",
         SELECT_STAR_QUERY + " ORDER BY " + newColumn + " LIMIT 10000",
-        "SELECT " + newColumn + " FROM " + DEFAULT_TABLE_NAME
+        "SELECT " + newColumn + " FROM " + getTableName()
     );
-    for (String query: queries) {
+    for (String query : queries) {
       try {
         // Build new schema with the extra column
         Schema newSchema = new Schema();
@@ -4270,24 +4424,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         updateSchema(newSchema);
 
         // Partially reload one segment
-        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE",
-            listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+        reloadAndWait(offlineTableName, listSegments(offlineTableName).get(0));
         // Column should show since it would be added as a virtual column
         runQueryAndAssert(query, newColumn, newFieldSpec);
         // Now do a full reload and the column should still be there, indicating there is no regression
-        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+        reloadAndWait(offlineTableName, null);
         runQueryAndAssert(query, newColumn, newFieldSpec);
       } finally {
         // Reset back to the original schema for the next iteration
         forceUpdateSchema(oldSchema);
-        reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+        reloadAndWait(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), null);
       }
     }
   }
 
   @Test
   public void testVirtualColumnAfterReloadForDifferentDataTypes() throws Exception {
-    Schema oldSchema = getSchema(DEFAULT_SCHEMA_NAME);
+    Schema oldSchema = getSchema(getTableName());
     try {
       // Build a new schema: copy everything, then add one virtual column per DataType.
       Schema newSchema = new Schema();
@@ -4307,9 +4461,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       updateSchema(newSchema);
 
       // Reload segment.
-      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", listSegments(DEFAULT_TABLE_NAME + "_OFFLINE").get(0));
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+      reloadAndWait(offlineTableName, listSegments(offlineTableName).get(0));
 
-      JsonNode res = postQuery("SELECT * FROM " + DEFAULT_TABLE_NAME + " LIMIT 5000");
+      JsonNode res = postQuery("SELECT * FROM " + getTableName() + " LIMIT 5000");
       assertNoError(res);
       JsonNode rows = res.get("resultTable").get("rows");
       DataSchema resultSchema =
@@ -4342,7 +4497,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } finally {
       // Clean up the schema to the original state
       forceUpdateSchema(oldSchema);
-      reloadAndWait(DEFAULT_TABLE_NAME + "_OFFLINE", null);
+      reloadAndWait(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), null);
     }
   }
 

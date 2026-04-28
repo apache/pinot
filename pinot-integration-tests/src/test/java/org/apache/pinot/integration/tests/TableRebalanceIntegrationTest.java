@@ -19,15 +19,27 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.Response;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.client.admin.PinotAdminNotFoundException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
@@ -60,12 +72,17 @@ import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -74,11 +91,561 @@ import static org.testng.Assert.*;
 
 public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
   private final static int FORCE_COMMIT_REBALANCE_TIMEOUT_MS = 600_000;
+  private static final int NUM_SHARED_OFFLINE_SEGMENTS = 8;
+  private static final int NUM_SHARED_REALTIME_SEGMENTS = 6;
+  private static final String SHARED_TABLE_NAME_PREFIX = "table_rebalance";
+  private static final String SHARED_KAFKA_TOPIC_PREFIX = "table-rebalance";
+  private static final String SHARED_TENANT_NAME_PREFIX = "TableRebalanceTenant";
+
+  private final String _sharedResourceSuffix = Long.toUnsignedString(RANDOM.nextLong(), Character.MAX_RADIX);
+  private final List<BaseServerStarter> _extraServerStarters = new ArrayList<>();
+  private final Map<String, String> _originalClusterConfigValues = new LinkedHashMap<>();
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+  private TableConfig _sharedBaselineOfflineTableConfig;
+  private TableConfig _sharedBaselineRealtimeTableConfig;
+  private String _sharedBaselineSchemaJson;
+  private boolean _clusterConfigOverrideApplied;
+  private boolean _sharedBaselineCaptured;
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     super.overrideControllerConf(properties);
     properties.put(ControllerConf.CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK, 2);
+  }
+
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
+        TagNameUtils.getBrokerTagForTenant(getBrokerTenant()));
+  }
+
+  @Override
+  @BeforeClass(alwaysRun = true)
+  public void setUp()
+      throws Exception {
+    if (!isSharedRichClusterEnabled()) {
+      super.setUp();
+      return;
+    }
+
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
+
+    startHybridCluster();
+    validateSharedClusterConfiguration();
+    cleanTableAndSchema();
+    resetKafkaTopic();
+
+    List<File> avroFiles = getClassAvroFiles();
+    List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_SHARED_OFFLINE_SEGMENTS);
+    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_SHARED_REALTIME_SEGMENTS);
+
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    addTableConfig(offlineTableConfig);
+    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0,
+        _classSegmentDir, _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
+
+    pushAvroIntoKafka(realtimeAvroFiles);
+    setUpH2Connection(avroFiles);
+    setUpQueryGenerator(avroFiles);
+    waitForAllDocsLoaded(600_000L);
+    captureSharedBaselineState();
+  }
+
+  @Override
+  protected void startHybridCluster()
+      throws Exception {
+    if (!isSharedRichClusterEnabled()) {
+      super.startHybridCluster();
+      return;
+    }
+
+    startZk();
+    startController();
+    applyClusterConfigOverrides();
+    startBroker();
+    startServers(NUM_SERVERS);
+    startKafkaWithoutTopic();
+    createOrUpdateServerTenant(getServerTenant(), NUM_SERVERS_OFFLINE, NUM_SERVERS_REALTIME);
+  }
+
+  @Override
+  protected void configureSharedClusterBeforeStartingInstances() {
+    if (isSharedRichClusterEnabled()) {
+      applyClusterConfigOverrides();
+    }
+  }
+
+  @AfterMethod(alwaysRun = true)
+  public void restoreSharedStateAfterMethod() {
+    if (!isSharedRichClusterEnabled() || !_sharedBaselineCaptured) {
+      return;
+    }
+    Exception exception = null;
+    exception = runCleanup(exception, this::stopAndDropTrackedExtraServers);
+    exception = runCleanup(exception, this::restoreDefaultServerTenant);
+    exception = runCleanup(exception, this::restoreSharedTableConfigs);
+    exception = runCleanup(exception, this::restoreSharedSchemaIfNeeded);
+    exception = runCleanup(exception, this::removeControllerJobMetadataForCurrentTable);
+    exception = runCleanup(exception, this::deleteForceCommitTenantsIfPresent);
+    if (exception != null) {
+      throw new RuntimeException(exception);
+    }
+  }
+
+  @Override
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
+    if (!isSharedRichClusterEnabled()) {
+      super.tearDown();
+      return;
+    }
+
+    Exception exception = null;
+    exception = runCleanup(exception, this::stopAndDropTrackedExtraServers);
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::removeControllerJobMetadataForCurrentTable);
+    exception = runCleanup(exception, this::deleteForceCommitTenantsIfPresent);
+    exception = runCleanup(exception, this::restoreClusterConfigOverrides);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::closeAdminClient);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + _sharedResourceSuffix
+        : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC_PREFIX + "-" + _sharedResourceSuffix
+        : super.getKafkaTopic();
+  }
+
+  @Override
+  protected String getBrokerTenant() {
+    return isSharedRichClusterEnabled() ? getSharedTenantName() : super.getBrokerTenant();
+  }
+
+  @Override
+  protected String getServerTenant() {
+    return isSharedRichClusterEnabled() ? getSharedTenantName() : super.getServerTenant();
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return NUM_SERVERS;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
+  protected BaseServerStarter startOneServer(int serverId)
+      throws Exception {
+    BaseServerStarter serverStarter = super.startOneServer(serverId);
+    if (isSharedRichClusterEnabled() && _sharedBaselineCaptured) {
+      _extraServerStarters.add(serverStarter);
+    }
+    return serverStarter;
+  }
+
+  private String getSharedTenantName() {
+    return SHARED_TENANT_NAME_PREFIX + "_" + _sharedResourceSuffix;
+  }
+
+  private String getForceCommitTenantName(String tenantName) {
+    return isSharedRichClusterEnabled() ? getSharedTenantName() + "_" + tenantName : tenantName;
+  }
+
+  private void validateSharedClusterConfiguration() {
+    if (!isSharedRichClusterEnabled()) {
+      return;
+    }
+
+    assertTrue(_sharedRichClusterTestSuite instanceof TableRebalanceIntegrationTest,
+        "TableRebalanceIntegrationTest must run in a dedicated shared rich suite with its controller/broker/server "
+            + "config overrides");
+    assertEquals(_brokerStarters.size(), 1, "Shared rich cluster broker count mismatch");
+    assertEquals(_serverStarters.size(), NUM_SERVERS, "Shared rich cluster server count mismatch");
+    assertNotNull(_controllerStarter, "Shared rich cluster controller is not started");
+    assertNotNull(_kafkaStarters, "Shared rich cluster Kafka is not started");
+    assertFalse(_kafkaStarters.isEmpty(), "Shared rich cluster Kafka is not started");
+    assertNull(_minionStarter, "Shared rich cluster minion should not be started");
+    assertEquals(String.valueOf(_controllerConfig.getProperty(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE)),
+        "false", "Shared rich cluster must preserve the hybrid base controller config");
+    assertEquals(String.valueOf(
+            _controllerConfig.getProperty(ControllerConf.CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK)),
+        "2", "Shared rich cluster must preserve the table rebalance controller config");
+
+    PinotConfiguration brokerConfig = _brokerStarters.get(0).getConfig();
+    assertEquals(brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS),
+        TagNameUtils.getBrokerTagForTenant(getBrokerTenant()),
+        "Shared rich cluster must preserve the hybrid base broker config");
+    for (BaseServerStarter serverStarter : _serverStarters) {
+      assertEquals(String.valueOf(
+              serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION)),
+          "false", "Shared rich cluster must preserve the hybrid base server config");
+    }
+  }
+
+  private void captureSharedBaselineState()
+      throws Exception {
+    _sharedBaselineOfflineTableConfig = new TableConfig(getOfflineTableConfig());
+    _sharedBaselineRealtimeTableConfig = new TableConfig(getRealtimeTableConfig());
+    _sharedBaselineSchemaJson = getSchema(getTableName()).toSingleLineJsonString();
+    _sharedBaselineCaptured = true;
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + _sharedResourceSuffix)
+        : _tempDir;
+  }
+
+  private List<File> getClassAvroFiles()
+      throws Exception {
+    int numSegments = unpackAvroData(_classTempDir).size();
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_classTempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(offlineTableName) != null
+        || _helixResourceManager.hasOfflineTable(tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void createOrUpdateServerTenant(String tenantName, int numOfflineServers, int numRealtimeServers)
+      throws IOException {
+    try {
+      createServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    } catch (IOException e) {
+      if (!isSharedRichClusterEnabled()) {
+        throw e;
+      }
+      updateServerTenant(tenantName, numOfflineServers, numRealtimeServers);
+    }
+  }
+
+  private void restoreDefaultServerTenant()
+      throws IOException {
+    updateServerTenant(getServerTenant(), NUM_SERVERS_OFFLINE, NUM_SERVERS_REALTIME);
+  }
+
+  private void restoreSharedTableConfigs()
+      throws IOException {
+    if (_sharedBaselineOfflineTableConfig == null || _sharedBaselineRealtimeTableConfig == null
+        || _helixResourceManager == null) {
+      return;
+    }
+    if (_helixResourceManager.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(getTableName())) != null) {
+      updateTableConfig(new TableConfig(_sharedBaselineOfflineTableConfig));
+    }
+    if (_helixResourceManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(getTableName())) != null) {
+      updateTableConfig(new TableConfig(_sharedBaselineRealtimeTableConfig));
+    }
+  }
+
+  private void restoreSharedSchemaIfNeeded()
+      throws Exception {
+    if (_sharedBaselineSchemaJson == null || _helixResourceManager == null
+        || _helixResourceManager.getSchema(getTableName()) == null) {
+      return;
+    }
+    if (_sharedBaselineSchemaJson.equals(getSchema(getTableName()).toSingleLineJsonString())) {
+      return;
+    }
+
+    Schema baselineSchema = JsonUtils.stringToObject(_sharedBaselineSchemaJson, Schema.class);
+    forceUpdateSchema(baselineSchema);
+    String offlineReloadResponse = reloadOfflineTable(getTableName(), false);
+    waitForReloadToComplete(getReloadJobIdFromResponse(offlineReloadResponse), 30_000);
+    String realtimeReloadResponse = reloadRealtimeTable(getTableName());
+    waitForReloadToComplete(getReloadJobIdFromResponse(realtimeReloadResponse), 30_000);
+  }
+
+  private void stopAndDropTrackedExtraServers() {
+    List<BaseServerStarter> extraServerStarters = new ArrayList<>(_extraServerStarters);
+    _extraServerStarters.clear();
+    for (BaseServerStarter serverStarter : extraServerStarters) {
+      stopAndDropServer(serverStarter);
+    }
+  }
+
+  private void stopAndDropServer(BaseServerStarter serverStarter) {
+    String instanceId = serverStarter.getInstanceId();
+    if (!isInstanceInCluster(instanceId)) {
+      return;
+    }
+    try {
+      serverStarter.stop();
+    } catch (Exception e) {
+      // The test body may have already stopped this server. Drop the instance if Helix still has it.
+    }
+    TestUtils.waitForCondition(
+        aVoid -> {
+          try {
+            return !isInstanceInCluster(instanceId)
+                || getHelixResourceManager().dropInstance(instanceId).isSuccessful();
+          } catch (Exception e) {
+            return false;
+          }
+        },
+        60_000L, "Failed to drop added server");
+  }
+
+  private boolean isInstanceInCluster(String instanceId) {
+    return _helixAdmin != null && _helixAdmin.getInstancesInCluster(getHelixClusterName()).contains(instanceId);
+  }
+
+  private void removeControllerJobMetadataForCurrentTable() {
+    removeControllerJobMetadataForTables(
+        TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
+        TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+  }
+
+  private void removeControllerJobMetadataForTables(String... tableNamesWithType) {
+    if (_propertyStore == null) {
+      return;
+    }
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(
+        ControllerJobTypes.TABLE_REBALANCE.name());
+    Stat stat = new Stat();
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (jobsZnRecord == null) {
+      return;
+    }
+
+    Map<String, Map<String, String>> jobMetadataMap = new HashMap<>(jobsZnRecord.getMapFields());
+    boolean changed = jobMetadataMap.entrySet().removeIf(entry -> {
+      String tableNameWithType = entry.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+      for (String tableName : tableNamesWithType) {
+        if (tableName.equals(tableNameWithType)) {
+          return true;
+        }
+      }
+      return false;
+    });
+    if (changed) {
+      jobsZnRecord.setMapFields(jobMetadataMap);
+      _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
+    }
+  }
+
+  private void removeControllerJobMetadataByIds(String... jobIds) {
+    if (_propertyStore == null) {
+      return;
+    }
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(
+        ControllerJobTypes.TABLE_REBALANCE.name());
+    Stat stat = new Stat();
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (jobsZnRecord == null) {
+      return;
+    }
+
+    Map<String, Map<String, String>> jobMetadataMap = new HashMap<>(jobsZnRecord.getMapFields());
+    boolean changed = false;
+    for (String jobId : jobIds) {
+      if (jobId != null && jobMetadataMap.remove(jobId) != null) {
+        changed = true;
+      }
+    }
+    if (changed) {
+      jobsZnRecord.setMapFields(jobMetadataMap);
+      _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
+    }
+  }
+
+  private void deleteForceCommitTenantsIfPresent() {
+    deleteServerTenantIfPresent(getForceCommitTenantName("tenantA"));
+    deleteServerTenantIfPresent(getForceCommitTenantName("tenantA_new"));
+    deleteServerTenantIfPresent(getForceCommitTenantName("tenantA_strictRG"));
+    deleteServerTenantIfPresent(getForceCommitTenantName("tenantA_strictRG_new"));
+  }
+
+  private void deleteServerTenantIfPresent(String tenantName) {
+    try {
+      getOrCreateAdminClient().getTenantClient().deleteTenant(tenantName, "SERVER");
+    } catch (Exception e) {
+      // Ignore missing tenants; cleanup is best-effort because direct runs tear the cluster down.
+    }
+  }
+
+  private void applyClusterConfigOverrides() {
+    if (_clusterConfigOverrideApplied || _helixManager == null) {
+      return;
+    }
+    HelixConfigScope scope = getClusterConfigScope();
+    Map<String, String> configOverrides = new LinkedHashMap<>();
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(10));
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        Integer.toString(6));
+    configOverrides.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM, Integer.toString(12));
+
+    try {
+      _clusterConfigOverrideApplied = true;
+      configOverrides.forEach((key, value) -> {
+        _originalClusterConfigValues.put(key, _helixManager.getConfigAccessor().get(scope, key));
+        _helixManager.getConfigAccessor().set(scope, key, value);
+      });
+    } catch (RuntimeException e) {
+      restoreClusterConfigOverrides();
+      throw e;
+    }
+  }
+
+  private void restoreClusterConfigOverrides() {
+    if ((!_clusterConfigOverrideApplied && _originalClusterConfigValues.isEmpty()) || _helixManager == null) {
+      return;
+    }
+
+    HelixConfigScope scope = getClusterConfigScope();
+    _originalClusterConfigValues.forEach((key, originalValue) -> {
+      if (originalValue == null) {
+        _helixManager.getConfigAccessor().remove(scope, key);
+      } else {
+        _helixManager.getConfigAccessor().set(scope, key, originalValue);
+      }
+    });
+    _originalClusterConfigValues.clear();
+    _clusterConfigOverrideApplied = false;
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+        .build();
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+    _queryGenerator = null;
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void closeAdminClient()
+      throws IOException {
+    getOrCreateAdminClient().close();
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   @Test
@@ -530,7 +1097,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // segments assigned for this table, we don't try to get needReload status from that extra server, otherwise
     // ERROR status would be returned)
     BaseServerStarter serverStarter0 = startOneServer(NUM_SERVERS);
-    createServerTenant(getServerTenant(), 0, 1);
+    createOrUpdateServerTenant(getServerTenant(), 0, 1);
     rebalanceConfig.setReassignInstances(true);
     tableConfig.setInstanceAssignmentConfigMap(null);
     updateTableConfig(tableConfig);
@@ -606,7 +1173,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     // Trigger rebalance config warning
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS + 1);
-    createServerTenant(getServerTenant(), 0, 1);
+    createOrUpdateServerTenant(getServerTenant(), 0, 1);
     rebalanceConfig.setReassignInstances(true);
     rebalanceConfig.setBestEfforts(true);
     rebalanceConfig.setBootstrap(true);
@@ -1017,7 +1584,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     // Add a new server (to force change in instance assignment) and enable reassignInstances
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS);
-    createServerTenant(getServerTenant(), 1, 0);
+    createOrUpdateServerTenant(getServerTenant(), 1, 0);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = triggerTableRebalance(rebalanceConfig, TableType.OFFLINE);
     assertNotNull(rebalanceResult.getRebalanceSummaryResult());
@@ -1224,7 +1791,7 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
     // Add a new server (to force change in instance assignment) and enable reassignInstances to ensure that the
     // rebalance is not a NO_OP
     BaseServerStarter serverStarter = startOneServer(NUM_SERVERS);
-    createServerTenant(getServerTenant(), 1, 0);
+    createOrUpdateServerTenant(getServerTenant(), 1, 0);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(true);
 
@@ -1251,62 +1818,69 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
   public void testRebalanceJobZkMetadataCleanup()
       throws Exception {
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(getTableName());
-    // Manually write some rebalance job metadata to ZK - an IN_PROGRESS job and two DONE jobs. The ZK job limit for
-    // table rebalances been overridden to 2 in this test, so the first DONE job should be cleaned up when the second
-    // DONE job is added.
-    Map<String, String> jobMetadata = new HashMap<>();
-    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    String inProgressJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, inProgressJobId);
-    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "1000");
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name());
-    TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
-    progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
-    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-        JsonUtils.objectToString(progressStats));
-    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, inProgressJobId, jobMetadata,
-        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
+    String inProgressJobId = null;
+    String doneJobId = null;
+    String anotherDoneJobId = null;
+    try {
+      // Manually write some rebalance job metadata to ZK - an IN_PROGRESS job and two DONE jobs. The ZK job limit for
+      // table rebalances been overridden to 2 in this test, so the first DONE job should be cleaned up when the second
+      // DONE job is added.
+      Map<String, String> jobMetadata = new HashMap<>();
+      jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+      inProgressJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+      jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, inProgressJobId);
+      jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, "1000");
+      jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TABLE_REBALANCE.name());
+      TableRebalanceProgressStats progressStats = new TableRebalanceProgressStats();
+      progressStats.setStatus(RebalanceResult.Status.IN_PROGRESS);
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+          JsonUtils.objectToString(progressStats));
+      ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, inProgressJobId, jobMetadata,
+          ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
 
-    assertNotNull(
-        _helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobTypes.TABLE_REBALANCE));
+      assertNotNull(
+          _helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobTypes.TABLE_REBALANCE));
 
-    // Add a DONE rebalance
-    String doneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, doneJobId);
-    progressStats.setStatus(RebalanceResult.Status.DONE);
-    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "randomTable_REALTIME");
-    jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-        JsonUtils.objectToString(progressStats));
-    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, String.valueOf(System.currentTimeMillis()));
-    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, doneJobId, jobMetadata,
-        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
+      // Add a DONE rebalance
+      doneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+      jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, doneJobId);
+      progressStats.setStatus(RebalanceResult.Status.DONE);
+      jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "randomTable_REALTIME");
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+          JsonUtils.objectToString(progressStats));
+      jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, String.valueOf(System.currentTimeMillis()));
+      ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, doneJobId, jobMetadata,
+          ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
 
-    assertNotNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobTypes.TABLE_REBALANCE));
+      assertNotNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobTypes.TABLE_REBALANCE));
 
-    // Add another DONE rebalance
-    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "anotherTable_REALTIME");
-    String anotherDoneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
-    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
-        String.valueOf(System.currentTimeMillis() + 1000));
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, anotherDoneJobId);
-    ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, anotherDoneJobId, jobMetadata,
-        ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
+      // Add another DONE rebalance
+      jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, "anotherTable_REALTIME");
+      anotherDoneJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
+      jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
+          String.valueOf(System.currentTimeMillis() + 1000));
+      jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, anotherDoneJobId);
+      ControllerZkHelixUtils.addControllerJobToZK(_propertyStore, anotherDoneJobId, jobMetadata,
+          ControllerJobTypes.TABLE_REBALANCE, prevJobMetadata -> true);
 
-    assertNotNull(
-        _helixResourceManager.getControllerJobZKMetadata(anotherDoneJobId, ControllerJobTypes.TABLE_REBALANCE));
+      assertNotNull(
+          _helixResourceManager.getControllerJobZKMetadata(anotherDoneJobId, ControllerJobTypes.TABLE_REBALANCE));
 
-    // Verify that the first DONE job is cleaned up
-    assertNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobTypes.TABLE_REBALANCE));
+      // Verify that the first DONE job is cleaned up
+      assertNull(_helixResourceManager.getControllerJobZKMetadata(doneJobId, ControllerJobTypes.TABLE_REBALANCE));
 
-    // Verify that the in-progress job is still there even though it has the oldest submission time
-    assertNotNull(
-        _helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobTypes.TABLE_REBALANCE));
+      // Verify that the in-progress job is still there even though it has the oldest submission time
+      assertNotNull(
+          _helixResourceManager.getControllerJobZKMetadata(inProgressJobId, ControllerJobTypes.TABLE_REBALANCE));
+    } finally {
+      removeControllerJobMetadataByIds(inProgressJobId, doneJobId, anotherDoneJobId);
+    }
   }
 
   @DataProvider(name = "forceCommitTableConfigProvider")
   public Object[][] forceCommitTableConfigProvider() {
-    String originalTenant = "tenantA";
-    String originalTenantStrictReplicaGroup = "tenantA_strictRG";
+    String originalTenant = getForceCommitTenantName("tenantA");
+    String originalTenantStrictReplicaGroup = getForceCommitTenantName("tenantA_strictRG");
 
     TableConfig tableConfig = new TableConfig(getRealtimeTableConfig());
     TableConfig tableConfigStrictReplicaGroup = new TableConfig(getRealtimeTableConfig());
@@ -1334,11 +1908,11 @@ public class TableRebalanceIntegrationTest extends BaseHybridClusterIntegrationT
 
     BaseServerStarter serverStarter0 = startOneServer(NUM_SERVERS);
     BaseServerStarter serverStarter1 = startOneServer(NUM_SERVERS + 1);
-    createServerTenant(tenantA, 0, 2);
+    createOrUpdateServerTenant(tenantA, 0, 2);
 
     BaseServerStarter serverStarter2 = startOneServer(NUM_SERVERS + 2);
     BaseServerStarter serverStarter3 = startOneServer(NUM_SERVERS + 3);
-    createServerTenant(tenantB, 0, 2);
+    createOrUpdateServerTenant(tenantB, 0, 2);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     try {
       // Prepare the table to replicate segments across two servers on tenantA

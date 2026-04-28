@@ -25,9 +25,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
@@ -44,6 +49,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -53,9 +59,20 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
+public class QueryWorkloadIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
+  private static final String SHARED_TABLE_NAME = "query_workload";
+  private static final String WORKLOAD_NAME = "testWorkload";
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
@@ -76,7 +93,10 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start Zk, Kafka and Pinot
     startZk();
@@ -85,7 +105,11 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    List<File> avroFiles = getAllAvroFiles();
+    cleanupQueryWorkloadConfig();
+    cleanTableAndSchema();
+    resetKafkaTopic();
+
+    List<File> avroFiles = getAllAvroFiles(_classTempDir);
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
     List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
@@ -106,9 +130,9 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     addTableConfig(realtimeTableConfig);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
-        _tarDir);
-    uploadSegments(getTableName(), _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
 
     // Push data into Kafka
     pushAvroIntoKafka(realtimeAvroFiles);
@@ -123,19 +147,23 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(100_000L);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    try {
-      dropOfflineTable(getTableName());
-      dropRealtimeTable(getTableName());
-      stopServer();
-      stopBroker();
-      stopController();
-      stopKafka();
-      stopZk();
-    } finally {
-      FileUtils.deleteQuietly(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanupQueryWorkloadConfig);
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopKafka);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::cleanTempDirectory);
+    if (exception != null) {
+      throw exception;
     }
   }
 
@@ -144,17 +172,18 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   public void testQueryWorkloadConfig()
       throws Exception {
     EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
-    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME + "_OFFLINE", 1000L, 1000L, null);
+    PropagationEntity entity =
+        new PropagationEntity(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), 1000L, 1000L, null);
     PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
-    QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
+    QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig(WORKLOAD_NAME, List.of(nodeConfig));
     try {
       getOrCreateAdminClient().getQueryWorkloadClient()
           .updateQueryWorkloadConfig(JsonUtils.objectToString(queryWorkloadConfig));
       TestUtils.waitForCondition(aVoid -> {
         try {
           QueryWorkloadConfig retrievedConfig =
-              getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfigObject("testWorkload");
+              getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfigObject(WORKLOAD_NAME);
           return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
         } catch (Exception e) {
           throw new RuntimeException(e);
@@ -167,10 +196,10 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
       long expectedMemoryCostBytes = entity.getMemoryCostBytes() / serverInstances.size();
       // Test calling the endpoints on each server that serves this table
       for (String serverInstance : serverInstances) {
-        testServerQueryWorkloadEndpoints(serverInstance, "testWorkload", expectedCpuCostNs, expectedMemoryCostBytes);
+        testServerQueryWorkloadEndpoints(serverInstance, WORKLOAD_NAME, expectedCpuCostNs, expectedMemoryCostBytes);
       }
     } finally {
-      getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig("testWorkload");
+      cleanupQueryWorkloadConfig();
     }
   }
 
@@ -180,15 +209,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private void testServerQueryWorkloadEndpoints(String serverInstance, String workloadName, long expectedCpuBudgetNs,
       long expectedMemoryBudgetBytes)
       throws Exception {
-    // Extract host from server instance name (format: Server_hostname_port)
-    String[] parts = serverInstance.split("_");
-    String host = parts[1];
-
-    // Use the proper admin API port (not the netty port from instance name)
-    String serverBaseApiUrl = "http://" + host + ":" + getServerAdminApiPort();
-
     // Test the get specific workload endpoint (GET /queryWorkloadCost/{workloadName})
-    String getWorkloadUrl = serverBaseApiUrl + "/debug/queryWorkloadCost/" + workloadName;
+    String getWorkloadUrl = getServerBaseApiUrl(serverInstance) + "/debug/queryWorkloadCost/" + workloadName;
     String workloadResponse = sendGetRequest(getWorkloadUrl);
 
     // Verify response is valid JSON and contains InstanceCost structure
@@ -233,5 +255,137 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         new InstanceReplicaGroupPartitionConfig(true, 1, 1, 1, 1, 1, minimizeDataMovement, null);
     return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
         instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private List<File> getAllAvroFiles(File outputDir)
+      throws Exception {
+    int numSegments = unpackAvroData(outputDir).size();
+    List<File> avroFiles = new ArrayList<>(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(outputDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  private void cleanupQueryWorkloadConfig()
+      throws Exception {
+    if (_controllerStarter == null) {
+      return;
+    }
+    getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig(WORKLOAD_NAME);
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(realtimeTableName) || _helixResourceManager.hasRealtimeTable(
+        tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private String getServerBaseApiUrl(String serverInstance) {
+    String host = serverInstance.split("_")[1];
+    for (BaseServerStarter serverStarter : _serverStarters) {
+      if (serverStarter.getInstanceId().equals(serverInstance)) {
+        String adminApiPort = serverStarter.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT);
+        if (adminApiPort != null) {
+          return "http://" + host + ":" + adminApiPort;
+        }
+      }
+    }
+    return "http://" + host + ":" + getServerAdminApiPort();
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void cleanTempDirectory()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

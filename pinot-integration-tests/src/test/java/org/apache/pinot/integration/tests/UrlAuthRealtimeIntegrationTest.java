@@ -19,16 +19,23 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.admin.PinotAdminAuthenticationException;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.common.auth.UrlAuthProvider;
+import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -43,16 +50,23 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 
 
-public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
-  final static String AUTH_PROVIDER_CLASS = UrlAuthProvider.class.getCanonicalName();
-  final static URL AUTH_URL = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token.txt");
-  final static URL AUTH_URL_PREFIXED = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token-prefixed.txt");
-  final static String AUTH_PREFIX = "Basic";
+public class UrlAuthRealtimeIntegrationTest extends SharedRichClusterIntegrationTest {
+  static final String AUTH_PROVIDER_CLASS = UrlAuthProvider.class.getCanonicalName();
+  static final URL AUTH_URL = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token.txt");
+  static final URL AUTH_URL_PREFIXED = UrlAuthRealtimeIntegrationTest.class.getResource("/url-auth-token-prefixed.txt");
+  static final String AUTH_PREFIX = "Basic";
+
+  private static final String SHARED_TABLE_NAME = "url_auth_realtime";
+  private static final String SHARED_KAFKA_TOPIC = "url-auth-realtime";
+  private static final String TASK_TYPE = MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE;
+
+  private File _classTempDir;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    _classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
 
     // Start Zookeeper
     startZk();
@@ -63,8 +77,13 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
     startMinion();
 
+    cleanUpTaskQueue();
+    cleanUpTablesAndSchema();
+    cleanUpTaskMetadata();
+    resetKafkaTopic();
+
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload the schema and table config
     addSchema(createSchema());
@@ -79,14 +98,23 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanUpTaskQueue);
+    exception = runCleanup(exception, this::cleanUpTablesAndSchema);
+    exception = runCleanup(exception, this::cleanUpTaskMetadata);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::closeAdminClient);
+    exception = runCleanup(exception, this::stopMinionIfStarted);
+    exception = runCleanup(exception, this::stopServerIfStarted);
+    exception = runCleanup(exception, this::stopBrokerIfStarted);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopKafkaIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Override
@@ -128,6 +156,36 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC : super.getKafkaTopic();
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return true;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return true;
+  }
+
+  @Override
   protected TableTaskConfig getTaskConfig() {
     Map<String, String> properties = new HashMap<>();
     properties.put("bucketTimePeriod", "30d");
@@ -152,7 +210,7 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
     try (PinotAdminClient unauthenticatedAdminClient =
         new PinotAdminClient(getControllerBaseApiUrl().replaceFirst("^https?://", ""))) {
       unauthenticatedAdminClient.getTableClient()
-          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType("mytable"));
+          .deleteTable(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     }
   }
 
@@ -186,5 +244,160 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
           .downloadSegment(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()), segment);
       Assert.assertTrue(segmentBytes.length > 200000); // download segment
     }
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-shared")
+        : _tempDir;
+  }
+
+  private void cleanUpTablesAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(getTableName())) {
+      dropRealtimeTable(getTableName());
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getTableConfig(offlineTableName) != null
+        || _helixResourceManager.hasOfflineTable(getTableName())) {
+      dropOfflineTable(getTableName());
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void cleanUpTaskQueue() {
+    if (_controllerStarter == null) {
+      return;
+    }
+    if (_controllerStarter.getHelixTaskResourceManager().getTaskTypes().contains(TASK_TYPE)) {
+      _controllerStarter.getHelixTaskResourceManager().deleteTaskQueue(TASK_TYPE, false);
+    }
+  }
+
+  private void cleanUpTaskMetadata() {
+    if (_propertyStore == null) {
+      return;
+    }
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    if (MinionTaskMetadataUtils.fetchTaskMetadata(_propertyStore, TASK_TYPE, realtimeTableName) != null) {
+      MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, TASK_TYPE, realtimeTableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void closeAdminClient()
+      throws Exception {
+    Field adminClientField = ControllerTest.class.getDeclaredField("_pinotAdminClient");
+    adminClientField.setAccessible(true);
+    PinotAdminClient adminClient = (PinotAdminClient) adminClientField.get(this);
+    if (adminClient != null) {
+      adminClient.close();
+      adminClientField.set(this, null);
+    }
+  }
+
+  private void stopMinionIfStarted() {
+    if (_minionStarter != null) {
+      stopMinion();
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+      _classTempDir = null;
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

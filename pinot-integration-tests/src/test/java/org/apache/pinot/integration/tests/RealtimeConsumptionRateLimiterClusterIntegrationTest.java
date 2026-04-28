@@ -22,10 +22,17 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -51,6 +58,12 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
       LoggerFactory.getLogger(RealtimeConsumptionRateLimiterClusterIntegrationTest.class);
 
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  private static final String SHARED_TABLE_NAME = "realtime_consumption_rate_limiter";
+  private static final String SHARED_KAFKA_TOPIC = "realtime_consumption_rate_limiter";
+  private static final String DEFAULT_EXTRA_TABLE_NAME_1 = "testTable1";
+  private static final String DEFAULT_EXTRA_TABLE_NAME_2 = "testTable2";
+  private static final String SHARED_EXTRA_TABLE_NAME_1 = "realtime_consumption_rate_limiter_1";
+  private static final String SHARED_EXTRA_TABLE_NAME_2 = "realtime_consumption_rate_limiter_2";
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final double SERVER_RATE_LIMIT = 100;
@@ -58,7 +71,11 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   private final boolean _isDirectAlloc = RANDOM.nextBoolean();
   private final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
   private final boolean _enableLeadControllerResource = RANDOM.nextBoolean();
+  private File _classTempDir;
   private List<File> _avroFiles;
+  private String _previousServerConsumptionRateLimit;
+  private String _previousServerConsumptionByteRateLimit;
+  private boolean _serverConsumptionRateLimitApplied;
 
   @Override
   protected String getLoadMode() {
@@ -69,7 +86,9 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   public void startController()
       throws Exception {
     super.startController();
-    enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
+    if (!isSharedRichClusterEnabled()) {
+      enableResourceConfigForLeadControllerResource(_enableLeadControllerResource);
+    }
   }
 
   @Override
@@ -77,7 +96,7 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
     if (_isConsumerDirConfigured) {
-      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, getConsumerDirectory());
     }
     configuration.setProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, SERVER_RATE_LIMIT);
   }
@@ -96,14 +115,25 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
     return super.getCountStarResult() * 2;
   }
 
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC : super.getKafkaTopic();
+  }
+
   @BeforeClass
   @Override
   public void setUp()
       throws Exception {
     // Remove the consumer directory
-    FileUtils.deleteQuietly(new File(CONSUMER_DIRECTORY));
+    FileUtils.deleteQuietly(getConsumerDirectoryFile());
 
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    _classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
 
     // Start the Pinot cluster
     startZk();
@@ -112,26 +142,40 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
     startServer();
 
     // Start Kafka
-    startKafka();
+    startKafkaWithoutTopic();
+
+    if (isSharedRichClusterEnabled()) {
+      applyServerConsumptionRateLimit();
+    }
+
+    cleanRealtimeTablesAndSchemas();
+    resetKafkaTopic();
 
     // Unpack the Avro files
-    _avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = unpackAvroData(_classTempDir);
 
     // Push data into Kafka
     pushAvroIntoKafka(_avroFiles);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   @Override
   public void tearDown()
       throws Exception {
-    FileUtils.deleteDirectory(new File(CONSUMER_DIRECTORY));
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTablesAndSchemas);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::restoreServerConsumptionRateLimit);
+    exception = runCleanup(exception, () -> FileUtils.deleteDirectory(getConsumerDirectoryFile()));
+    exception = runCleanup(exception, this::stopServerIfStarted);
+    exception = runCleanup(exception, this::stopBrokerIfStarted);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopKafkaIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Test
@@ -166,24 +210,23 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
             "Rate should be less than " + SERVER_RATE_LIMIT);
       }
     } finally {
-      dropRealtimeTable(tableName);
-      waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      cleanRealtimeTableAndSchema(tableName);
     }
   }
 
   @Test
   public void testTwoTableRateLimit()
       throws Exception {
-    String tableName1 = "testTable1";
-    String tableName2 = "testTable2";
+    String tableName1 = getExtraTableName1();
+    String tableName2 = getExtraTableName2();
 
     try {
       // Create and upload the schema and table config
       Schema schema1 = createSchema();
-      schema1.setSchemaName("testTable1");
+      schema1.setSchemaName(tableName1);
       addSchema(schema1);
       Schema schema2 = createSchema();
-      schema2.setSchemaName("testTable2");
+      schema2.setSchemaName(tableName2);
       addSchema(schema2);
       long startTime = System.currentTimeMillis();
 
@@ -226,10 +269,7 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
                 + ", currentRate2 = " + currentRate2 + ", currentServerRate = " + currentServerRate);
       }
     } finally {
-      dropRealtimeTable(tableName1);
-      dropRealtimeTable(tableName2);
-      waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(tableName1));
-      waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(tableName2));
+      cleanRealtimeTablesAndSchemas(tableName1, tableName2);
     }
   }
 
@@ -259,6 +299,203 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   @Override
   protected Map<String, String> getStreamConfigs() {
     return null;
+  }
+
+  private String getExtraTableName1() {
+    return isSharedRichClusterEnabled() ? SHARED_EXTRA_TABLE_NAME_1 : DEFAULT_EXTRA_TABLE_NAME_1;
+  }
+
+  private String getExtraTableName2() {
+    return isSharedRichClusterEnabled() ? SHARED_EXTRA_TABLE_NAME_2 : DEFAULT_EXTRA_TABLE_NAME_2;
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-shared")
+        : _tempDir;
+  }
+
+  private String getConsumerDirectory() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-consumer").getAbsolutePath()
+        : CONSUMER_DIRECTORY;
+  }
+
+  private File getConsumerDirectoryFile() {
+    return new File(getConsumerDirectory());
+  }
+
+  private void cleanRealtimeTablesAndSchemas()
+      throws Exception {
+    cleanRealtimeTablesAndSchemas(getTableName(), getExtraTableName1(), getExtraTableName2());
+  }
+
+  private void cleanRealtimeTablesAndSchemas(String... tableNames)
+      throws Exception {
+    Exception exception = null;
+    for (String tableName : tableNames) {
+      exception = runCleanup(exception, () -> cleanRealtimeTableAndSchema(tableName));
+    }
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private void cleanRealtimeTableAndSchema(String tableName)
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void applyServerConsumptionRateLimit()
+      throws Exception {
+    if (_serverConsumptionRateLimitApplied) {
+      return;
+    }
+
+    _previousServerConsumptionRateLimit =
+        getClusterConfig(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT);
+    _previousServerConsumptionByteRateLimit =
+        getClusterConfig(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES);
+    _serverConsumptionRateLimitApplied = true;
+    if (_previousServerConsumptionByteRateLimit != null) {
+      deleteClusterConfig(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES);
+    }
+    updateClusterConfig(
+        Map.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, Double.toString(SERVER_RATE_LIMIT)));
+    updateServerRateLimiter(SERVER_RATE_LIMIT, 0.0);
+  }
+
+  private void restoreServerConsumptionRateLimit()
+      throws Exception {
+    if (!_serverConsumptionRateLimitApplied) {
+      return;
+    }
+
+    restoreClusterConfig(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        _previousServerConsumptionRateLimit);
+    restoreClusterConfig(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
+        _previousServerConsumptionByteRateLimit);
+    updateServerRateLimiter(parseRateLimit(_previousServerConsumptionRateLimit),
+        parseRateLimit(_previousServerConsumptionByteRateLimit));
+    _serverConsumptionRateLimitApplied = false;
+  }
+
+  private String getClusterConfig(String key) {
+    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(getHelixClusterName()).build();
+    return _helixManager.getConfigAccessor().get(scope, key);
+  }
+
+  private void restoreClusterConfig(String key, String value)
+      throws Exception {
+    if (value == null) {
+      deleteClusterConfig(key);
+    } else {
+      updateClusterConfig(Map.of(key, value));
+    }
+  }
+
+  private void updateServerRateLimiter(double messageRateLimit, double byteRateLimit) {
+    RealtimeConsumptionRateManager.getInstance().updateServerRateLimiter(
+        RealtimeConsumptionRateManager.resolveServerRateLimit(messageRateLimit, byteRateLimit), ServerMetrics.get());
+  }
+
+  private double parseRateLimit(String rateLimit) {
+    if (rateLimit == null) {
+      return CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
+    }
+    try {
+      return Double.parseDouble(rateLimit);
+    } catch (NumberFormatException e) {
+      return CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
+    }
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 
   @Test(enabled = false)

@@ -24,17 +24,23 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingInfo;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -58,6 +64,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -69,6 +76,12 @@ import static org.testng.Assert.assertTrue;
  * accordingly.
  */
 public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final String TASK_TYPE = MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE;
+  private static final String DEFAULT_METADATA_TABLE_NAME = "myTable2";
+  private static final String SHARED_TABLE_NAME = "realtime_to_offline_segments";
+  private static final String SHARED_METADATA_TABLE_NAME = "realtime_to_offline_segments_metadata";
+  private static final String SHARED_KAFKA_TOPIC = "realtime_to_offline_segments_minion";
+
   private PinotHelixTaskResourceManager _taskResourceManager;
   private PinotTaskManager _taskManager;
   private String _realtimeTableName;
@@ -78,6 +91,16 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
   private String _offlineMetadataTableName;
   private long _dataSmallestTimeMs;
   private long _dataSmallestMetadataTableTimeMs;
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC : super.getKafkaTopic();
+  }
 
   @Override
   protected SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -92,7 +115,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    File classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(classTempDir);
 
     // Start the Pinot cluster
     startZk();
@@ -103,9 +127,11 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
     // Start Kafka
     startKafka();
+    cleanUpTablesAndSchemas();
+    resetKafkaTopic();
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(classTempDir);
 
     // Create and upload the schema and table configs with a TIMESTAMP field
     Schema schema = createSchema();
@@ -126,8 +152,9 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     Map<String, String> taskConfigs = new HashMap<>();
     taskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     taskConfigs.put(MinionConstants.SEGMENT_DOWNLOAD_PARALLELISM, "3");
+    taskConfigs.put(BatchConfigProperties.TASK_NAME_PREFIX_KEY, getTableName());
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs)));
+        Collections.singletonMap(TASK_TYPE, taskConfigs)));
     addTableConfig(realtimeTableConfig);
 
     TableConfig offlineTableConfig = createOfflineTableConfig();
@@ -139,12 +166,15 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     taskConfigsWithMetadata.put(BatchConfigProperties.PUSH_MODE,
         BatchConfigProperties.SegmentPushType.METADATA.toString());
     taskConfigsWithMetadata.put(MinionConstants.SEGMENT_DOWNLOAD_PARALLELISM, "3");
-    String tableWithMetadataPush = "myTable2";
+    taskConfigsWithMetadata.put(BatchConfigProperties.TASK_NAME_PREFIX_KEY, getMetadataTableName());
+    if (isSharedRichClusterEnabled()) {
+      taskConfigsWithMetadata.put(MinionTaskUtils.ALLOW_METADATA_PUSH_WITH_LOCAL_FS, "true");
+    }
+    String tableWithMetadataPush = getMetadataTableName();
     schema.setSchemaName(tableWithMetadataPush);
     addSchema(schema);
     TableConfig realtimeMetadataTableConfig = createRealtimeTableConfig(avroFiles.get(0), tableWithMetadataPush,
-        new TableTaskConfig(Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
-            taskConfigsWithMetadata)));
+        new TableTaskConfig(Collections.singletonMap(TASK_TYPE, taskConfigsWithMetadata)));
     realtimeMetadataTableConfig.setIngestionConfig(ingestionConfig);
     realtimeMetadataTableConfig.setFieldConfigList(Collections.singletonList(tsFieldConfig));
     addTableConfig(realtimeMetadataTableConfig);
@@ -233,19 +263,15 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     long expectedWatermark = _dataSmallestTimeMs + 86400000;
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-              .setTablesToSchedule(Collections.singleton(_realtimeTableName)))
-          .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
-      assertTrue(_taskResourceManager.getTaskQueues().contains(
-          PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
+      List<String> scheduledTaskNames = scheduleRealtimeToOfflineTask(_realtimeTableName);
       // Should not generate more tasks
       MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
               .setTablesToSchedule(Collections.singleton(_realtimeTableName))
-              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+              .setTasksToSchedule(Collections.singleton(TASK_TYPE)),
           _taskManager);
 
       // Wait at most 600 seconds for all tasks COMPLETED
-      waitForTaskToComplete(expectedWatermark, _realtimeTableName);
+      waitForTaskToComplete(expectedWatermark, _realtimeTableName, scheduledTaskNames);
       // check segment is in offline
       segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineTableName);
       assertEquals(segmentsZKMetadata.size(), (numOfflineSegmentsPerTask * (i + 1)));
@@ -266,7 +292,11 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
       expectedWatermark += 86400000;
     }
 
-    testHardcodedQueries();
+    if (isSharedRichClusterEnabled()) {
+      testQuery("SELECT COUNT(*) FROM " + getTableName());
+    } else {
+      testHardcodedQueries();
+    }
   }
 
   @Test
@@ -288,19 +318,15 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     _taskManager.cleanUpTask();
     for (int i = 0; i < 3; i++) {
       // Schedule task
-      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
-              .setTablesToSchedule(Collections.singleton(_realtimeMetadataTableName)))
-          .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
-      assertTrue(_taskResourceManager.getTaskQueues().contains(
-          PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
+      List<String> scheduledTaskNames = scheduleRealtimeToOfflineTask(_realtimeMetadataTableName);
       // Should not generate more tasks
       MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
               .setTablesToSchedule(Collections.singleton(_realtimeMetadataTableName))
-              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+              .setTasksToSchedule(Collections.singleton(TASK_TYPE)),
           _taskManager);
 
       // Wait at most 600 seconds for all tasks COMPLETED
-      waitForTaskToComplete(expectedWatermark, _realtimeMetadataTableName);
+      waitForTaskToComplete(expectedWatermark, _realtimeMetadataTableName, scheduledTaskNames);
       // check segment is in offline
       segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineMetadataTableName);
       assertEquals(segmentsZKMetadata.size(), (numOfflineSegmentsPerTask * (i + 1)));
@@ -322,12 +348,27 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     }
   }
 
-  private void waitForTaskToComplete(long expectedWatermark, String realtimeTableName) {
+  private List<String> scheduleRealtimeToOfflineTask(String realtimeTableName) {
+    TaskSchedulingInfo taskSchedulingInfo = _taskManager.scheduleTasks(new TaskSchedulingContext()
+            .setTablesToSchedule(Collections.singleton(realtimeTableName)))
+        .get(TASK_TYPE);
+    assertNotNull(taskSchedulingInfo);
+    MinionTaskTestUtils.assertNoTaskErrors(taskSchedulingInfo);
+    List<String> scheduledTaskNames = taskSchedulingInfo.getScheduledTaskNames();
+    assertNotNull(scheduledTaskNames);
+    assertFalse(scheduledTaskNames.isEmpty());
+    assertTrue(_taskResourceManager.getTaskQueues().contains(
+        PinotHelixTaskResourceManager.getHelixJobQueueName(TASK_TYPE)));
+    return scheduledTaskNames;
+  }
+
+  private void waitForTaskToComplete(long expectedWatermark, String realtimeTableName,
+      List<String> scheduledTaskNames) {
     TestUtils.waitForCondition(input -> {
       // Check task state
-      for (TaskState taskState : _taskResourceManager.getTaskStates(
-          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE).values()) {
-        if (taskState != TaskState.COMPLETED) {
+      Map<String, TaskState> taskStates = _taskResourceManager.getTaskStates(TASK_TYPE);
+      for (String scheduledTaskName : scheduledTaskNames) {
+        if (taskStates.get(scheduledTaskName) != TaskState.COMPLETED) {
           return false;
         }
       }
@@ -336,27 +377,134 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
     // Check segment ZK metadata
     ZNRecord znRecord = _taskManager.getClusterInfoAccessor()
-        .getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, realtimeTableName);
+        .getMinionTaskMetadataZNRecord(TASK_TYPE, realtimeTableName);
     RealtimeToOfflineSegmentsTaskMetadata minionTaskMetadata =
         znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
     assertNotNull(minionTaskMetadata);
     assertEquals(minionTaskMetadata.getWatermarkMs(), expectedWatermark);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(_realtimeTableName);
-    assertNull(MinionTaskMetadataUtils.fetchTaskMetadata(_propertyStore,
-        MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, _realtimeTableName));
-    dropOfflineTable(_offlineTableName);
+    Exception firstException = null;
+    try {
+      cleanUpTablesAndSchemas();
+      assertNoTaskMetadata(_realtimeTableName);
+      assertNoTaskMetadata(_realtimeMetadataTableName);
+    } catch (Exception e) {
+      firstException = e;
+    }
+    try {
+      deleteKafkaTopicIfPresent();
+    } catch (Exception e) {
+      if (firstException != null) {
+        firstException.addSuppressed(e);
+      } else {
+        firstException = e;
+      }
+    }
+    try {
+      closeH2Connection();
+    } catch (Exception e) {
+      if (firstException != null) {
+        firstException.addSuppressed(e);
+      } else {
+        firstException = e;
+      }
+    }
+    try {
+      stopMinion();
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(getClassTempDir());
+    }
+    if (firstException != null) {
+      throw firstException;
+    }
+  }
 
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+  private String getMetadataTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_METADATA_TABLE_NAME : DEFAULT_METADATA_TABLE_NAME;
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-shared")
+        : _tempDir;
+  }
+
+  private void cleanUpTablesAndSchemas()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+    cleanUpTableAndSchema(getTableName());
+    cleanUpTableAndSchema(getMetadataTableName());
+  }
+
+  private void cleanUpTableAndSchema(String tableName)
+      throws Exception {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(offlineTableName) != null) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void assertNoTaskMetadata(@Nullable String realtimeTableName) {
+    if (realtimeTableName != null && _propertyStore != null) {
+      assertNull(MinionTaskMetadataUtils.fetchTaskMetadata(_propertyStore, TASK_TYPE, realtimeTableName));
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
   }
 }

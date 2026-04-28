@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,6 +29,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant;
 import org.apache.pinot.core.accounting.QueryResourceTrackerImpl;
 import org.apache.pinot.integration.tests.window.utils.WindowFunnelUtils;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -42,6 +44,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -51,7 +54,12 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
+public class WindowResourceAccountingTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME = "window_resource_accounting";
+
+  private File _classTempDir;
+  private File _classSegmentDir;
+  private File _classTarDir;
 
   /// [PerQueryCPUMemResourceUsageAccountant] clears state at the end of a query. It cannot be used in tests to check if
   /// resources are being accounted. This class is a simple extension of [PerQueryCPUMemResourceUsageAccountant] that
@@ -114,7 +122,10 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    _classTempDir = getClassTempDir();
+    _classSegmentDir = new File(_classTempDir, "segmentDir");
+    _classTarDir = new File(_classTempDir, "tarDir");
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir, _classSegmentDir, _classTarDir);
 
     // Start the Pinot cluster
     startZk();
@@ -122,34 +133,38 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    cleanTableAndSchema();
+
     // create & upload schema AND table config
     Schema schema = createSchema();
     addSchema(schema);
 
-    List<File> avroFiles = WindowFunnelUtils.createAvroFiles(_tempDir);
-      // create offline table
-      TableConfig tableConfig = createOfflineTableConfig();
-      addTableConfig(tableConfig);
+    List<File> avroFiles = WindowFunnelUtils.createAvroFiles(_classTempDir);
+    // create offline table
+    TableConfig tableConfig = createOfflineTableConfig();
+    addTableConfig(tableConfig);
 
-      // create & upload segments
-      int segmentIndex = 0;
-      for (File avroFile : avroFiles) {
-        ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
-            _tarDir);
-        uploadSegments(getTableName(), _tarDir);
-      }
-    }
+    // create & upload segments
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _classSegmentDir,
+        _classTarDir);
+    uploadSegments(getTableName(), _classTarDir);
+    waitForAllDocsLoaded(60_000L);
+  }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
-      throws IOException {
-    // Shutdown the Pinot cluster
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   @Test
@@ -168,21 +183,26 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
         getTableName(), getCountStarResult());
 
     JsonNode response = postQuery(query);
-    ThreadAccountant threadAccountant = _serverStarters.get(0).getServerInstance().getThreadAccountant();
-    assertTrue(threadAccountant instanceof TestAccountantFactory.TestAccountant);
-    Map<String, ? extends QueryResourceTracker> queryMemUsage = threadAccountant.getQueryResources();
-    assertFalse(queryMemUsage.isEmpty());
+    String requestId = response.get("requestId").asText();
+    List<BaseServerStarter> serverStartersWithTable = getServerStartersWithTable();
+    assertFalse(serverStartersWithTable.isEmpty(), "Expected at least one server to serve table: " + getTableName());
+
     boolean foundRequestId = false;
-    String queryIdKey = null;
-    for (String key : queryMemUsage.keySet()) {
-      if (key.contains(response.get("requestId").asText())) {
-        foundRequestId = true;
-        queryIdKey = key;
-        break;
+    long allocatedBytes = 0;
+    for (BaseServerStarter serverStarter : serverStartersWithTable) {
+      ThreadAccountant threadAccountant = serverStarter.getServerInstance().getThreadAccountant();
+      assertTrue(threadAccountant instanceof TestAccountantFactory.TestAccountant,
+          "Unexpected thread accountant for server: " + serverStarter.getInstanceId());
+      Map<String, ? extends QueryResourceTracker> queryMemUsage = threadAccountant.getQueryResources();
+      for (Map.Entry<String, ? extends QueryResourceTracker> entry : queryMemUsage.entrySet()) {
+        if (entry.getKey().contains(requestId)) {
+          foundRequestId = true;
+          allocatedBytes += entry.getValue().getAllocatedBytes();
+        }
       }
     }
-    assertTrue(foundRequestId);
-    assertTrue(queryMemUsage.get(queryIdKey).getAllocatedBytes() > 0);
+    assertTrue(foundRequestId, "Expected resource accounting for request id: " + requestId);
+    assertTrue(allocatedBytes > 0, "Expected tracked allocated bytes for request id: " + requestId);
   }
 
   @Override
@@ -192,11 +212,86 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
 
   @Override
   public String getTableName() {
-    return DEFAULT_TABLE_NAME;
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : DEFAULT_TABLE_NAME;
   }
 
   @Override
   public Schema createSchema() {
     return WindowFunnelUtils.createSchema(getTableName());
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled() ? new File(_tempDir, "testData") : _tempDir;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private List<BaseServerStarter> getServerStartersWithTable() {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    List<BaseServerStarter> serverStartersWithTable = new ArrayList<>();
+    for (BaseServerStarter serverStarter : _serverStarters) {
+      if (serverStarter.getServerInstance().getInstanceDataManager().getTableDataManager(offlineTableName) != null) {
+        serverStartersWithTable.add(serverStarter);
+      }
+    }
+    return serverStartersWithTable;
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

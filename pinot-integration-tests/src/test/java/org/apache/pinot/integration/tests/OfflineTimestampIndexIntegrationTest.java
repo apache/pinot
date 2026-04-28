@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TimestampConfig;
@@ -33,16 +34,16 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertTrue;
 
 
-public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegrationTest
+public class OfflineTimestampIndexIntegrationTest extends SharedRichClusterIntegrationTest
     implements ExplainIntegrationTestTrait {
 
   @BeforeClass
@@ -55,6 +56,8 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
     startController();
     startBroker();
     startServers(2);
+
+    cleanTableAndSchema();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -71,12 +74,6 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    String property = CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN;
-    brokerConf.setProperty(property, "true");
   }
 
   @Override
@@ -118,7 +115,7 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
   @Test
   public void testProjectionMse() {
     setUseMultiStageQueryEngine(true);
-    explain("SELECT datetrunc('SECOND', ts) FROM mytable",
+    explainAskingServers("SELECT datetrunc('SECOND', ts) FROM mytable",
         "Execution Plan\n"
             + "PinotLogicalExchange(distribution=[broadcast])\n"
             + "  LeafStageCombineOperator(table=[mytable])\n"
@@ -147,7 +144,8 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
   @Test
   public void testAggregateFilterMse() {
     setUseMultiStageQueryEngine(true);
-    explain("SELECT sum(case when datetrunc('SECOND', ts) > 1577836801000 then 2 else 0 end) FROM mytable",
+    explainAskingServers("SELECT sum(case when datetrunc('SECOND', ts) > 1577836801000 then 2 else 0 end) FROM "
+            + "mytable",
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
             + "  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
@@ -176,7 +174,7 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
     JsonNode result = postQuery(query);
     assertNoError(result);
     assertTrue(result.get("resultTable").get("rows").get(0).get(0).asInt() > 0);
-    explain(query, "Execution Plan\n"
+    explainAskingServers(query, "Execution Plan\n"
         + "LogicalSort(fetch=[100])\n"
         + "  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], "
         + "isSortOnReceiver=[false])\n"
@@ -212,7 +210,7 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
   @Test
   public void testGroupByMse() {
     setUseMultiStageQueryEngine(true);
-    explain("SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)",
+    explainAskingServers("SELECT count(*) FROM mytable group by datetrunc('SECOND', ts)",
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[$1])\n"
             + "  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
@@ -229,7 +227,7 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
   @Test
   public void testJoinMse() {
     setUseMultiStageQueryEngine(true);
-    explain("SELECT 1 "
+    explainAskingServers("SELECT 1 "
             + "FROM mytable as a1 "
             + "join mytable as a2 "
             + "on datetrunc('SECOND', a1.ts) = datetrunc('DAY', a2.ts)",
@@ -253,5 +251,55 @@ public class OfflineTimestampIndexIntegrationTest extends BaseClusterIntegration
             + "                Project(columns=[[ts]])\n"
             + "                  DocIdSet(maxDocs=[120000])\n"
             + "                    FilterMatchEntireSegment(numDocs=[115545])\n");
+  }
+
+  @AfterClass(alwaysRun = true)
+  public void tearDown()
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, () -> FileUtils.deleteDirectory(_tempDir));
+    if (exception != null) {
+      throw exception;
+    }
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        getTableName())) {
+      dropOfflineTable(getTableName());
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

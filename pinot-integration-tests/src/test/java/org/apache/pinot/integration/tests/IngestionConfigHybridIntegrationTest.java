@@ -42,7 +42,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Tests ingestion configs on a hybrid table
  */
-public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegrationTest {
+public class IngestionConfigHybridIntegrationTest extends SharedRichClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
@@ -222,6 +222,7 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
       throws Exception {
     dropOfflineTable(getTableName());
     dropRealtimeTable(getTableName());
+    deleteSchema(getTableName());
     stopServer();
     stopBroker();
     stopController();

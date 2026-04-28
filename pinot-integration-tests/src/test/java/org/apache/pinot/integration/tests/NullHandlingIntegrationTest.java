@@ -22,10 +22,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
@@ -43,22 +48,30 @@ import static org.testng.Assert.assertTrue;
  */
 public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     implements ExplainIntegrationTestTrait {
+  private static final String SHARED_TABLE_NAME = "null_handling";
+  private static final String SHARED_KAFKA_TOPIC = "null_handling";
+
+  private File _classTempDir;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
+    _classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
 
     // Start the Pinot cluster
     startZk();
     // Start Kafka
-    startKafka();
+    startKafkaWithoutTopic();
     startController();
     startBroker();
     startServer();
 
+    cleanRealtimeTableAndSchema();
+    resetKafkaTopic();
+
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_classTempDir);
 
     // Create and upload the schema and table config
     addSchema(createSchema());
@@ -77,25 +90,49 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     waitForAllDocsLoaded(10_000L);
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropRealtimeTable(getTableName());
-
-    // Stop the Pinot cluster
-    stopServer();
-    stopBroker();
-    stopController();
-    // Stop Kafka
-    stopKafka();
-    // Stop Zookeeper
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::closeH2Connection);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopKafka);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
   }
 
   public JsonNode postQuery(@Language("sql") String query)
       throws Exception {
     return queryBrokerHttpEndpoint(query);
+  }
+
+  @Override
+  protected String getTableName() {
+    return isSharedRichClusterEnabled() ? SHARED_TABLE_NAME : super.getTableName();
+  }
+
+  @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC : super.getKafkaTopic();
+  }
+
+  @Override
+  protected int getNumKafkaPartitions() {
+    return isSharedRichClusterEnabled() ? 1 : super.getNumKafkaPartitions();
+  }
+
+  @Override
+  protected Map<String, String> getExtraQueryProperties() {
+    return Map.of(CommonConstants.Broker.Request.QUERY_OPTIONS,
+        CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING + "=true");
   }
 
   @Override
@@ -265,7 +302,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
   public void testOrderByByNullableKeepsOtherColNulls()
       throws Exception {
     setUseMultiStageQueryEngine(false);
-    String query = "select salary from mytable"
+    String query = "select salary from " + getTableName()
         + " where salary is null"
         + " order by description";
     testQuery(query);
@@ -301,7 +338,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Need to also select an identifier column to skip the all literal query optimization which returns without
     // querying the segment.
-    String sqlQuery = "SELECT NULL, salary FROM mytable";
+    String sqlQuery = "SELECT NULL, salary FROM " + getTableName();
 
     JsonNode response = postQuery(sqlQuery);
 
@@ -313,7 +350,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
   public void testCaseWhenAllLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String sqlQuery = "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM mytable";
+    String sqlQuery = "SELECT CASE WHEN true THEN 1 WHEN NOT true THEN 0 ELSE NULL END FROM " + getTableName();
     JsonNode response = postQuery(sqlQuery);
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
   }
@@ -322,12 +359,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
   public void testAggregateServerReturnFinalResult(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable";
+    String sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM " + getTableName();
     JsonNode response = postQuery(sqlQuery);
     assertNoError(response);
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asDouble(), 5429377.34, 0.1);
 
-    sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable WHERE city = 'does_not_exist'";
+    sqlQuery =
+        "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM " + getTableName() + " WHERE city = "
+            + "'does_not_exist'";
     response = postQuery(sqlQuery);
     assertNoError(response);
     assertTrue(response.get("resultTable").get("rows").get(0).get(0).isNull());
@@ -340,7 +379,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     setUseMultiStageQueryEngine(true);
     String sqlQuery =
         "SELECT salary, LAST_VALUE(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS gapfilledSalary from "
-            + "mytable";
+            + getTableName();
     JsonNode response = postQuery(sqlQuery);
     assertNoError(response);
 
@@ -372,7 +411,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
             + "  LogicalFilter(condition=[AND(IS NOT NULL($8), <>($8, 0))])\n"
-            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+            + "    PinotLogicalTableScan(table=[[default, " + getTableName() + "]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
   }
 
@@ -390,7 +429,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
             + "  LogicalFilter(condition=[<>($8, 0)])\n"
-            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+            + "    PinotLogicalTableScan(table=[[default, " + getTableName() + "]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
   }
 
@@ -408,7 +447,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
             + "  LogicalFilter(condition=[AND(IS NULL($8), <>($8, 0))])\n"
-            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+            + "    PinotLogicalTableScan(table=[[default, " + getTableName() + "]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
   }
 
@@ -465,7 +504,10 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String query = "SELECT city, COUNT(*), COUNT(*) FILTER(WHERE description = 'unknown') FROM mytable GROUP BY city";
+    String tableName = getTableName();
+    int maxDocs = isSharedRichClusterEnabled() ? 10000 : 20000;
+    String query = "SELECT city, COUNT(*), COUNT(*) FILTER(WHERE description = 'unknown') FROM " + tableName
+        + " GROUP BY city";
 
     if (useMultiStageQueryEngine) {
       // MSE will insert IS_TRUE to the aggregate filter
@@ -475,21 +517,21 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
               + "  PinotLogicalExchange(distribution=[hash[0]])\n"
               + "    PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[COUNT() FILTER $1], aggType=[LEAF])\n"
               + "      LogicalProject(city=[$5], $f1=[IS TRUE(=($7, _UTF-8'unknown'))])\n"
-              + "        PinotLogicalTableScan(table=[[default, mytable]])\n");
+              + "        PinotLogicalTableScan(table=[[default, " + tableName + "]])\n");
       // IS_TRUE should be trimmed off, then the filter becomes always false in the server execution plan
       explainAskingServers(query,
           "Execution Plan\n"
               + "PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], agg#1=[COUNT($2)], aggType=[FINAL])\n"
               + "  PinotLogicalExchange(distribution=[hash[0]])\n"
-              + "    LeafStageCombineOperator(table=[mytable])\n"
+              + "    LeafStageCombineOperator(table=[" + tableName + "])\n"
               + "      StreamingInstanceResponse\n"
               + "        CombineGroupBy\n"
               + "          GroupByFiltered(groupKeys=[[city]], aggregations=[[count(*), count(*)]])\n"
               + "            Project(columns=[[city]])\n"
-              + "              DocIdSet(maxDocs=[20000])\n"
+              + "              DocIdSet(maxDocs=[" + maxDocs + "])\n"
               + "                FilterEmpty\n"
               + "            Project(columns=[[city]])\n"
-              + "              DocIdSet(maxDocs=[20000])\n"
+              + "              DocIdSet(maxDocs=[" + maxDocs + "])\n"
               + "                FilterMatchEntireSegment(numDocs=[100])\n"
       );
     }
@@ -498,5 +540,104 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = postQuery(query);
     assertNoError(response);
     assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0L);
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-shared")
+        : _tempDir;
+  }
+
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null || _helixResourceManager.hasRealtimeTable(
+        getTableName())) {
+      dropRealtimeTable(getTableName());
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private void closeH2Connection()
+      throws Exception {
+    if (_h2Connection != null) {
+      _h2Connection.close();
+      _h2Connection = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

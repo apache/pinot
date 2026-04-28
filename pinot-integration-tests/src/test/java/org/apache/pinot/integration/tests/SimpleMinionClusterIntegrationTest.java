@@ -53,7 +53,7 @@ import static org.testng.Assert.*;
  * Integration test that provides example of {@link PinotTaskGenerator} and {@link PinotTaskExecutor} and tests simple
  * minion functionality.
  */
-public class SimpleMinionClusterIntegrationTest extends ClusterTest {
+public class SimpleMinionClusterIntegrationTest extends SharedRichClusterIntegrationTest {
   // Accessed by the plug-in classes
   public static final String TASK_TYPE = "TestTask";
   public static final String TABLE_NAME_1 = "testTable1";
@@ -76,6 +76,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    resetTaskFlags();
     startZk();
     startController();
     startBroker();
@@ -267,16 +268,72 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
             == 0, ZK_CALLBACK_TIMEOUT_MS, "Failed to update the controller gauges");
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropOfflineTable(TABLE_NAME_1);
-    dropOfflineTable(TABLE_NAME_2);
-    dropOfflineTable(TABLE_NAME_3);
-    stopMinion();
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+    try {
+      cleanUpTaskQueue();
+      cleanUpClusterTaskConfig();
+      cleanUpTablesAndSchemas();
+    } finally {
+      resetTaskFlags();
+      if (_minionStarter != null) {
+        stopMinion();
+      }
+      if (!_serverStarters.isEmpty()) {
+        stopServer();
+      }
+      if (!_brokerStarters.isEmpty()) {
+        stopBroker();
+      }
+      if (_controllerStarter != null) {
+        stopController();
+      }
+      stopZk();
+    }
+  }
+
+  private void cleanUpTaskQueue() {
+    HOLD.set(false);
+    if (_helixTaskResourceManager == null || !_helixTaskResourceManager.getTaskTypes().contains(TASK_TYPE)) {
+      return;
+    }
+
+    _helixTaskResourceManager.deleteTaskQueue(TASK_TYPE, false);
+    TestUtils.waitForCondition(input -> !_helixTaskResourceManager.getTaskTypes().contains(TASK_TYPE),
+        STATE_TRANSITION_TIMEOUT_MS, "Failed to delete the task queue");
+  }
+
+  private void cleanUpClusterTaskConfig() {
+    if (_controllerStarter == null) {
+      return;
+    }
+
+    PinotHelixResourceManager helixResourceManager = _controllerStarter.getHelixResourceManager();
+    helixResourceManager.getHelixAdmin().removeConfig(
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+            helixResourceManager.getHelixClusterName()).build(),
+        List.of(TASK_TYPE + MinionConstants.TIMEOUT_MS_KEY_SUFFIX,
+            TASK_TYPE + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX));
+  }
+
+  private void cleanUpTablesAndSchemas()
+      throws Exception {
+    for (String tableName : List.of(TABLE_NAME_1, TABLE_NAME_2, TABLE_NAME_3)) {
+      if (_helixResourceManager != null && _helixResourceManager.hasOfflineTable(tableName)) {
+        dropOfflineTable(tableName);
+      }
+      if (_helixResourceManager != null && _helixResourceManager.getSchema(tableName) != null) {
+        deleteSchema(tableName);
+      }
+    }
+  }
+
+  private static void resetTaskFlags() {
+    HOLD.set(false);
+    TASK_START_NOTIFIED.set(false);
+    TASK_SUCCESS_NOTIFIED.set(false);
+    TASK_CANCELLED_NOTIFIED.set(false);
+    TASK_ERROR_NOTIFIED.set(false);
   }
 }

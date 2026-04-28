@@ -50,23 +50,43 @@ print_surefire_dumps() {
   done <<< "${dump_files}"
 }
 
+run_integration_profile() {
+  local profile="$1"
+  shift
+
+  mvn test "$@" \
+      -P "github-actions,codecoverage,${profile}" || {
+    print_surefire_dumps
+    exit 1
+  }
+}
+
 # Integration Tests
 cd pinot-integration-tests || exit 1
 if [ "$RUN_TEST_SET" == "1" ]; then
-  mvn test \
-      -P github-actions,codecoverage,integration-tests-set-1 || {
-    print_surefire_dumps
-    exit 1
-  }
+  run_integration_profile integration-tests-set-1
+  shared_profiles=(
+    shared-hybrid-cluster-integration-test-suite
+    shared-llc-realtime-cluster-integration-test-suite
+  )
+  for shared_profile in "${shared_profiles[@]}"; do
+    run_integration_profile "${shared_profile}"
+  done
   exit 0
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test \
-      -DargLine="-Xms1g -Xmx2g -Dlog4j2.configurationFile=log4j2.xml" \
-      -P github-actions,codecoverage,integration-tests-set-2 || {
-    print_surefire_dumps
-    exit 1
-  }
+  run_integration_profile integration-tests-set-2 \
+      -DargLine="-Xms1g -Xmx2g -Dlog4j2.configurationFile=log4j2.xml"
+  # Keep this lane to the shared profiles that have shown a local wall-clock win.
+  shared_profiles=(
+    shared-no-override-offline-cluster-integration-test-suite
+    shared-realtime-manager-cluster-integration-test-suite
+    shared-controller-only-cluster-integration-test-suite
+    shared-offline-cluster-integration-test-suite
+  )
+  for shared_profile in "${shared_profiles[@]}"; do
+    run_integration_profile "${shared_profile}"
+  done
   exit 0
 fi
 

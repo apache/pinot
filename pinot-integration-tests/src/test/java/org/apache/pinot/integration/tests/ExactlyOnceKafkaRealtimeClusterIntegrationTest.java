@@ -29,11 +29,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -46,13 +52,19 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 
 
 public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExactlyOnceKafkaRealtimeClusterIntegrationTest.class);
+  private static final String SHARED_KAFKA_TOPIC = "exactly_once_kafka_realtime";
   private static final int REALTIME_TABLE_CONFIG_RETRY_COUNT = 5;
   private static final long REALTIME_TABLE_CONFIG_RETRY_WAIT_MS = 1_000L;
   private static final long KAFKA_TOPIC_METADATA_READY_TIMEOUT_MS = 60_000L;
@@ -61,6 +73,89 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   private static final Duration COUNT_RECORDS_POSITION_TIMEOUT = Duration.ofSeconds(5);
   private static final Duration COUNT_RECORDS_PRIMING_POLL_TIMEOUT = Duration.ofMillis(200);
   private static final Duration COUNT_RECORDS_POLL_TIMEOUT = Duration.ofSeconds(2);
+
+  private File _classTempDir;
+  private String _previousMaxSegmentPreprocessParallelism;
+  private String _previousMaxSegmentStarTreePreprocessParallelism;
+  private boolean _clusterConfigOverridesApplied;
+
+  @BeforeClass
+  @Override
+  public void setUp()
+      throws Exception {
+    _classTempDir = getClassTempDir();
+    TestUtils.ensureDirectoriesExistAndEmpty(_classTempDir);
+
+    // Start the Pinot cluster
+    startZk();
+    // Start Kafka
+    startKafkaWithoutTopic();
+    startController();
+
+    if (isSharedRichClusterEnabled()) {
+      rememberClusterConfigOverrides();
+    }
+    HelixConfigScope scope = getClusterConfigScope();
+    // Set max segment preprocess parallelism to 8
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
+    // Set max segment startree preprocess parallelism to 6
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM, Integer.toString(6));
+
+    startBroker();
+    startServer();
+
+    cleanRealtimeTableAndSchema();
+    resetKafkaTopic();
+
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_classTempDir);
+
+    // Create and upload the schema and table config
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
+    addTableConfig(tableConfig);
+    waitForAllRealtimePartitionsConsuming(TableNameBuilder.REALTIME.tableNameWithType(getTableName()),
+        getRealtimePartitionsReadyTimeoutMs());
+
+    // Push data into Kafka
+    pushAvroIntoKafka(avroFiles);
+
+    // create segments and upload them to controller
+    createSegmentsAndUpload(avroFiles, schema, tableConfig);
+
+    // Set up the H2 connection
+    setUpH2Connection(avroFiles);
+
+    // Initialize the query generator
+    setUpQueryGenerator(avroFiles);
+
+    runValidationJob(600_000);
+
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(getDocsLoadedTimeoutMs());
+  }
+
+  @AfterClass(alwaysRun = true)
+  @Override
+  public void tearDown()
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanRealtimeTableAndSchema);
+    exception = runCleanup(exception, this::deleteKafkaTopicIfPresent);
+    exception = runCleanup(exception, this::restoreClusterConfigOverrides);
+    exception = runCleanup(exception, this::stopServerIfStarted);
+    exception = runCleanup(exception, this::stopBrokerIfStarted);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopKafkaIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
   @Override
   public void addTableConfig(TableConfig tableConfig)
@@ -94,6 +189,11 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
   }
 
   @Override
+  protected String getKafkaTopic() {
+    return isSharedRichClusterEnabled() ? SHARED_KAFKA_TOPIC : super.getKafkaTopic();
+  }
+
+  @Override
   protected Properties getKafkaExtraProperties() {
     Properties props = new Properties();
     props.setProperty("log.flush.interval.messages", "1");
@@ -102,6 +202,9 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
 
   @Override
   protected int getNumKafkaBrokers() {
+    if (isSharedRichClusterEnabled() && _kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      return getSharedKafkaBrokerCount();
+    }
     return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
   }
 
@@ -408,5 +511,160 @@ public class ExactlyOnceKafkaRealtimeClusterIntegrationTest extends BaseRealtime
     } catch (Exception e) {
       return false;
     }
+  }
+
+  private File getClassTempDir() {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-shared")
+        : _tempDir;
+  }
+
+  private void cleanRealtimeTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    if (_helixResourceManager.getTableConfig(realtimeTableName) != null
+        || _helixResourceManager.hasRealtimeTable(tableName)) {
+      dropRealtimeTable(tableName);
+      waitForTableDataManagerRemoved(realtimeTableName);
+      waitForEVToDisappear(realtimeTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void resetKafkaTopic() {
+    deleteKafkaTopicIfPresent();
+    createKafkaTopic(getKafkaTopic());
+  }
+
+  private void deleteKafkaTopicIfPresent() {
+    if (isKafkaTopicPresent()) {
+      deleteKafkaTopic(getKafkaTopic());
+    }
+  }
+
+  private boolean isKafkaTopicPresent() {
+    if (_kafkaStarters == null || _kafkaStarters.isEmpty()) {
+      return false;
+    }
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.listTopics().names().get(5, TimeUnit.SECONDS).contains(getKafkaTopic());
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private int getSharedKafkaBrokerCount() {
+    Properties adminProps = new Properties();
+    adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getKafkaBrokerList());
+    adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
+    adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, "5000");
+    try (AdminClient adminClient = AdminClient.create(adminProps)) {
+      return adminClient.describeCluster().nodes().get(5, TimeUnit.SECONDS).size();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to determine shared Kafka broker count, using transactional default", e);
+      return DEFAULT_TRANSACTION_NUM_KAFKA_BROKERS;
+    }
+  }
+
+  private void rememberClusterConfigOverrides() {
+    if (_clusterConfigOverridesApplied) {
+      return;
+    }
+
+    _previousMaxSegmentPreprocessParallelism =
+        getClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM);
+    _previousMaxSegmentStarTreePreprocessParallelism =
+        getClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM);
+    _clusterConfigOverridesApplied = true;
+  }
+
+  private void restoreClusterConfigOverrides()
+      throws Exception {
+    if (!_clusterConfigOverridesApplied) {
+      return;
+    }
+
+    restoreClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
+        _previousMaxSegmentPreprocessParallelism);
+    restoreClusterConfig(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
+        _previousMaxSegmentStarTreePreprocessParallelism);
+    _clusterConfigOverridesApplied = false;
+  }
+
+  private String getClusterConfig(String key) {
+    return _helixManager.getConfigAccessor().get(getClusterConfigScope(), key);
+  }
+
+  private void restoreClusterConfig(String key, String value)
+      throws Exception {
+    if (value == null) {
+      deleteClusterConfig(key);
+    } else {
+      updateClusterConfig(Map.of(key, value));
+    }
+  }
+
+  private HelixConfigScope getClusterConfigScope() {
+    return new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+        .build();
+  }
+
+  private void stopServerIfStarted() {
+    if (!_serverStarters.isEmpty()) {
+      stopServer();
+    }
+  }
+
+  private void stopBrokerIfStarted() {
+    if (!_brokerStarters.isEmpty()) {
+      stopBroker();
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void stopKafkaIfStarted() {
+    if (_kafkaStarters != null && !_kafkaStarters.isEmpty()) {
+      stopKafka();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws Exception {
+    if (_classTempDir != null) {
+      FileUtils.deleteDirectory(_classTempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

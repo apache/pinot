@@ -30,8 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
@@ -41,7 +40,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class SpoolIntegrationTest extends BaseClusterIntegrationTest
+public class SpoolIntegrationTest extends SharedRichClusterIntegrationTest
     implements ExplainIntegrationTestTrait {
 
   @BeforeClass
@@ -54,6 +53,8 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     startController();
     startBroker();
     startServers(2);
+
+    cleanTableAndSchema();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
@@ -70,11 +71,6 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-  }
-
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    String property = CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN;
-    brokerConf.setProperty(property, "true");
   }
 
   @BeforeMethod
@@ -282,16 +278,52 @@ public class SpoolIntegrationTest extends BaseClusterIntegrationTest
     }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    dropOfflineTable(DEFAULT_TABLE_NAME);
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopController);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, () -> FileUtils.deleteDirectory(_tempDir));
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null) {
+      return;
+    }
 
-    FileUtils.deleteDirectory(_tempDir);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    if (_helixResourceManager.getAllTables().contains(offlineTableName) || _helixResourceManager.hasOfflineTable(
+        getTableName())) {
+      dropOfflineTable(getTableName());
+    }
+    waitForEVToDisappear(offlineTableName);
+    if (_helixResourceManager.getSchema(getTableName()) != null) {
+      deleteSchema(getTableName());
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }

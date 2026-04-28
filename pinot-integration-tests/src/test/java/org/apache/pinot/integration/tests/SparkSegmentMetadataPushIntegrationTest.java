@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.plugin.ingestion.batch.spark3.SparkSegmentMetadataPushJobRunner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,11 +47,14 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTest {
+public class SparkSegmentMetadataPushIntegrationTest extends SharedRichClusterIntegrationTest {
+  private static final String SHARED_TABLE_NAME_PREFIX = "spark_segment_metadata_push";
 
   private SparkContext _sparkContext;
-  private final String _testTable = DEFAULT_TABLE_NAME;
-  private final String _testTableWithType = _testTable + "_OFFLINE";
+  private String _tableName;
+  private File _testTempDir;
+  private File _testSegmentDir;
+  private File _testTarDir;
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -82,19 +86,24 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     return null;
   }
 
-  @BeforeMethod
+  @BeforeMethod(alwaysRun = true)
   public void setUpTest()
-      throws IOException {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+      throws Exception {
+    String tableNameSuffix = RandomStringUtils.randomAlphabetic(12);
+    _tableName = isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX + "_" + tableNameSuffix
+        : DEFAULT_TABLE_NAME;
+    _testTempDir = getTestTempDir(tableNameSuffix);
+    _testSegmentDir = isSharedRichClusterEnabled() ? new File(_testTempDir, "segmentDir") : _segmentDir;
+    _testTarDir = isSharedRichClusterEnabled() ? new File(_testTempDir, "tarDir") : _tarDir;
+    TestUtils.ensureDirectoriesExistAndEmpty(_testTempDir, _testSegmentDir, _testTarDir);
+    cleanTableAndSchema();
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    // Start Zk and Kafka
+    // Start Zk and the Pinot cluster
     startZk();
-
-    // Start the Pinot cluster
     startController();
     startBroker();
     startServer();
@@ -128,7 +137,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     // Create and push the segment using SparkSegmentMetadataPushJobRunner
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema,
-        "_no_consistent_push", _segmentDir, _tarDir);
+        "_no_consistent_push", _testSegmentDir, _testTarDir);
 
     SparkSegmentMetadataPushJobRunner runner = new SparkSegmentMetadataPushJobRunner();
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
@@ -146,11 +155,11 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
-    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    jobSpec.setOutputDirURI(_testTarDir.getAbsolutePath());
 
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(_testTableWithType);
-    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + _testTableWithType);
+    tableSpec.setTableName(getTableNameWithType());
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableNameWithType());
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -227,7 +236,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     // Create and push the segment using SparkSegmentMetadataPushJobRunner
     for (int i = 0; i < numSegments; i++) {
       ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(i), offlineTableConfig, schema, firstTimeStamp,
-          _segmentDir, _tarDir);
+          _testSegmentDir, _testTarDir);
     }
 
     SparkSegmentMetadataPushJobRunner runner = new SparkSegmentMetadataPushJobRunner();
@@ -245,11 +254,11 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
-    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    jobSpec.setOutputDirURI(_testTarDir.getAbsolutePath());
 
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(_testTableWithType);
-    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + _testTableWithType);
+    tableSpec.setTableName(getTableNameWithType());
+    tableSpec.setTableConfigURI(getControllerBaseApiUrl() + "/tables/" + getTableNameWithType());
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -272,7 +281,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled
     String segmentLineageResponse =
-        getOrCreateAdminClient().getSegmentClient().listSegmentLineage(_testTable, TableType.OFFLINE.toString());
+        getOrCreateAdminClient().getSegmentClient().listSegmentLineage(getTableName(), TableType.OFFLINE.toString());
     // Segment lineage should be in completed state
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should be empty as we started with a blank table
@@ -292,13 +301,15 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     }
 
     // Create and push the additional segment using SparkSegmentMetadataPushJobRunner
-    for (File tarFile : _tarDir.listFiles()) {
+    File[] tarFiles = _testTarDir.listFiles();
+    Assert.assertNotNull(tarFiles);
+    for (File tarFile : tarFiles) {
       FileUtils.deleteQuietly(tarFile);
     }
     String secondTimeStamp = Long.toString(System.currentTimeMillis());
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(numSegments), offlineTableConfig, schema,
-        secondTimeStamp, _segmentDir, _tarDir);
-    Assert.assertEquals(_tarDir.listFiles().length, 1);
+        secondTimeStamp, _testSegmentDir, _testTarDir);
+    Assert.assertEquals(_testTarDir.listFiles().length, 1);
 
     runner.init(jobSpec);
     runner.run();
@@ -355,14 +366,15 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   private long getNumDocs(String segmentName)
       throws Exception {
     Map<String, Object> segmentMetadata = getOrCreateAdminClient().getSegmentClient()
-        .getSegmentMetadata(TableNameBuilder.OFFLINE.tableNameWithType(_testTable), segmentName, null);
+        .getSegmentMetadata(getTableNameWithType(), segmentName, null);
     Object totalDocs = segmentMetadata.get("segment.total.docs");
     return totalDocs == null ? 0L : Long.parseLong(totalDocs.toString());
   }
 
   private List<String> getSegmentsList()
       throws Exception {
-    return getOrCreateAdminClient().getSegmentClient().listSegments(_testTable, TableType.OFFLINE.toString(), false);
+    return getOrCreateAdminClient().getSegmentClient().listSegments(getTableName(), TableType.OFFLINE.toString(),
+        false);
   }
 
   protected void testCountStar(long countStarResult) {
@@ -370,23 +382,161 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
         "Failed to load " + countStarResult + " documents", null);
   }
 
-  @AfterMethod
+  @AfterMethod(alwaysRun = true)
   public void tearDownTest()
-      throws IOException {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
-    dropOfflineTable(offlineTableName);
-
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+      throws Exception {
+    Exception exception = null;
+    exception = runCleanup(exception, this::cleanTableAndSchema);
+    exception = runCleanup(exception, this::cleanTestDirectory);
+    _tableName = null;
+    _testTempDir = null;
+    _testSegmentDir = null;
+    _testTarDir = null;
+    if (exception != null) {
+      throw exception;
+    }
   }
 
-  @AfterClass
+  @AfterClass(alwaysRun = true)
   public void tearDown()
       throws Exception {
-    _sparkContext.stop();
+    Exception exception = null;
+    exception = runCleanup(exception, this::stopSparkContext);
+    exception = runCleanup(exception, this::closePinotConnections);
+    exception = runCleanup(exception, this::stopServer);
+    exception = runCleanup(exception, this::stopBroker);
+    exception = runCleanup(exception, this::stopControllerIfStarted);
+    exception = runCleanup(exception, this::stopZk);
+    exception = runCleanup(exception, this::deleteClassTempDir);
+    if (exception != null) {
+      throw exception;
+    }
+  }
 
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
+  @Override
+  public String getTableName() {
+    return _tableName != null ? _tableName : isSharedRichClusterEnabled() ? SHARED_TABLE_NAME_PREFIX
+        : DEFAULT_TABLE_NAME;
+  }
+
+  @Override
+  protected boolean shouldStartSharedKafka() {
+    return false;
+  }
+
+  @Override
+  protected int getSharedNumBrokers() {
+    return 1;
+  }
+
+  @Override
+  protected int getSharedNumServers() {
+    return 1;
+  }
+
+  @Override
+  protected boolean shouldStartSharedMinion() {
+    return false;
+  }
+
+  @Override
+  protected List<File> getAllAvroFiles()
+      throws Exception {
+    int numSegments = unpackAvroData(_testTempDir).size();
+
+    List<File> avroFiles = Lists.newArrayListWithCapacity(numSegments);
+    for (int i = 1; i <= numSegments; i++) {
+      avroFiles.add(new File(_testTempDir, "On_Time_On_Time_Performance_2014_" + i + ".avro"));
+    }
+    return avroFiles;
+  }
+
+  private String getTableNameWithType() {
+    return TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+  }
+
+  private File getTestTempDir(String tableNameSuffix) {
+    return isSharedRichClusterEnabled()
+        ? new File(FileUtils.getTempDirectory(), getClass().getSimpleName() + "-" + tableNameSuffix)
+        : _tempDir;
+  }
+
+  private void cleanTableAndSchema()
+      throws Exception {
+    if (_helixResourceManager == null || _tableName == null) {
+      return;
+    }
+
+    String tableName = getTableName();
+    String offlineTableName = getTableNameWithType();
+    if (_helixResourceManager.getAllTables().contains(offlineTableName)
+        || _helixResourceManager.hasOfflineTable(tableName)) {
+      dropOfflineTable(tableName);
+      waitForTableDataManagerRemoved(offlineTableName);
+      waitForEVToDisappear(offlineTableName);
+    }
+    if (_helixResourceManager.getSchema(tableName) != null) {
+      deleteSchema(tableName);
+    }
+  }
+
+  private void cleanTestDirectory()
+      throws IOException {
+    if (_testTempDir == null) {
+      return;
+    }
+    if (isSharedRichClusterEnabled()) {
+      FileUtils.deleteDirectory(_testTempDir);
+    } else {
+      TestUtils.ensureDirectoriesExistAndEmpty(_testTempDir, _testSegmentDir, _testTarDir);
+    }
+  }
+
+  private void stopSparkContext() {
+    if (_sparkContext != null) {
+      _sparkContext.stop();
+      _sparkContext = null;
+    }
+  }
+
+  private void closePinotConnections() {
+    if (_pinotConnection != null) {
+      _pinotConnection.close();
+      _pinotConnection = null;
+    }
+    if (_pinotConnectionV2 != null) {
+      _pinotConnectionV2.close();
+      _pinotConnectionV2 = null;
+    }
+  }
+
+  private void stopControllerIfStarted() {
+    if (_controllerStarter != null) {
+      stopController();
+    }
+  }
+
+  private void deleteClassTempDir()
+      throws IOException {
+    if (!isSharedRichClusterEnabled()) {
+      FileUtils.deleteDirectory(_tempDir);
+    }
+  }
+
+  private Exception runCleanup(Exception firstException, Cleanup cleanup) {
+    try {
+      cleanup.run();
+    } catch (Exception e) {
+      if (firstException == null) {
+        return e;
+      }
+      firstException.addSuppressed(e);
+    }
+    return firstException;
+  }
+
+  private interface Cleanup {
+    void run()
+        throws Exception;
   }
 }
