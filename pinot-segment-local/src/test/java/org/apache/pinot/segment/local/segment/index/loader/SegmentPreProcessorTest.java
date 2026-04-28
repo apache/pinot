@@ -824,7 +824,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         assertFalse(hasDictionary);
         IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
         FieldIndexConfigs fieldIndexConfigs =
-            new FieldIndexConfigs.Builder().add(StandardIndexes.forward(), ForwardIndexConfig.getDefault()).build();
+            new FieldIndexConfigs.Builder()
+                .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
+                .build();
         try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
             columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();

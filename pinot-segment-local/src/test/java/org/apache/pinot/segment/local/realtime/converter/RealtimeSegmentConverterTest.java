@@ -50,6 +50,7 @@ import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProvide
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
@@ -166,6 +167,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setCapacity(1000)
         .setAvgNumMultiValues(3)
         .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
         .setIndex(Set.of(STRING_COLUMN3), StandardIndexes.dictionary(), new DictionaryIndexConfig(false, true))
         .setIndex(Set.of(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
         .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
@@ -242,6 +245,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setCapacity(1000)
         .setAvgNumMultiValues(3)
         .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
         .setIndex(Set.of(STRING_COLUMN3), StandardIndexes.dictionary(), new DictionaryIndexConfig(false, true))
         .setIndex(Set.of(STRING_COLUMN1, LONG_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
         .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
@@ -332,6 +337,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setCapacity(1000)
         .setAvgNumMultiValues(3)
         .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
         .setIndex(Set.of(STRING_COLUMN3), StandardIndexes.dictionary(), new DictionaryIndexConfig(false, true))
         .setIndex(Set.of(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
         .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
@@ -408,6 +415,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setCapacity(1000)
         .setAvgNumMultiValues(3)
         .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+        .setIndex(Set.of(LONG_COLUMN2), StandardIndexes.forward(),
+            ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW))
         .setIndex(Set.of(STRING_COLUMN3), StandardIndexes.dictionary(), new DictionaryIndexConfig(false, true))
         .setIndex(Set.of(STRING_COLUMN1, LONG_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
         .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
@@ -495,10 +504,10 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
   @DataProvider
   public static Object[][] optimizeDictionaryTypeParams() {
-    // Format: {optimizeDictionaryType, expectedCRC}, crc is used here to check the correct dictionary type was used
+    // Format: {optimizeDictionaryType, expectedCRC}, crc is used here to check the correct dictionary type was used.
     return new Object[][]{
-        {true, "3570313565"},
-        {false, "4134511491"},
+        {true, "94495458"},
+        {false, "2028789000"},
     };
   }
 
@@ -648,7 +657,7 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
         .withRawValueForTextIndex(rawValueForTextIndex)
         .build();
-    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder()
         .setTableNameWithType(tableNameWithType)
         .setSegmentName(segmentName)
         .setStreamName(tableNameWithType)
@@ -662,8 +671,12 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
         .setOffHeap(true)
         .setMemoryManager(new DirectMemoryManager(segmentName))
         .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
-        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath())
-        .build();
+        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
+    if (!dictionaryIndexConfig.isEnabled()) {
+      realtimeSegmentConfigBuilder.setIndex(Set.of(STRING_COLUMN1), StandardIndexes.forward(),
+          ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+    }
+    RealtimeSegmentConfig realtimeSegmentConfig = realtimeSegmentConfigBuilder.build();
 
     // create mutable segment impl
     RealtimeLuceneTextIndexSearcherPool.init(1);

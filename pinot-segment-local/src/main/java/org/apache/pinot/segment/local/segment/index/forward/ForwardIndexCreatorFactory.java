@@ -52,8 +52,9 @@ public class ForwardIndexCreatorFactory {
     String columnName = fieldSpec.getName();
     int numTotalDocs = context.getTotalDocs();
 
-    if (context.hasDictionary()) {
-      // Dictionary enabled columns
+    if (indexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      // Dictionary-encoded forward index requires a dictionary to translate dict ids to values.
+      assert context.hasDictionary();
       int cardinality = context.getCardinality();
       if (fieldSpec.isSingleValueField()) {
         if (context.isSorted()) {
@@ -70,7 +71,7 @@ public class ForwardIndexCreatorFactory {
         }
       }
     } else {
-      // Dictionary disabled columns
+      // Raw forward index
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
         // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`

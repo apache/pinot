@@ -1040,7 +1040,7 @@ public class ForwardIndexHandlerTest {
         _writer = writer;
 
         existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
-        ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder()
+        ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
             .withCompressionCodec(CompressionCodec.LZ4)
             .withRawIndexWriterVersion(4)
             .build();
@@ -2136,7 +2136,8 @@ public class ForwardIndexHandlerTest {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
 
     // Add forward index config
-    ForwardIndexConfig forwardIndexConfig = ForwardIndexConfig.getDefault();
+    ForwardIndexConfig forwardIndexConfig =
+        ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding());
     builder.add(StandardIndexes.forward(), forwardIndexConfig);
 
     // Add dictionary config if the column has dictionary

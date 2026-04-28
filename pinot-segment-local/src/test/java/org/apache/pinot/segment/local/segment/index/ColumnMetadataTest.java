@@ -44,6 +44,7 @@ import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -54,6 +55,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -302,9 +304,41 @@ public class ColumnMetadataTest {
             new DimensionFieldSpec("value", DataType.INT, true)));
     PropertiesConfiguration config = new PropertiesConfiguration();
     BaseSegmentCreator.addColumnMetadataInfo(config, "intMap", mock(ColumnStatistics.class), 1, intMapFieldSpec, false,
-        -1, false);
+        -1, FieldConfig.EncodingType.RAW, false);
     ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "intMap");
     assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
+  }
+
+  @Test
+  public void testColumnMetadataEqualityIncludesForwardIndexEncoding() {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col", DataType.INT, true);
+    ColumnMetadataImpl dictForwardMetadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(fieldSpec)
+        .setHasDictionary(true)
+        .setForwardIndexEncoding(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    ColumnMetadataImpl rawForwardMetadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(fieldSpec)
+        .setHasDictionary(true)
+        .setForwardIndexEncoding(FieldConfig.EncodingType.RAW)
+        .build();
+
+    assertNotEquals(dictForwardMetadata, rawForwardMetadata);
+    assertNotEquals(dictForwardMetadata.hashCode(), rawForwardMetadata.hashCode());
+    assertTrue(dictForwardMetadata.toString().contains("_forwardIndexEncoding=DICTIONARY"));
+  }
+
+  @Test
+  public void testForwardIndexEncodingIsExposedInJson()
+      throws Exception {
+    ColumnMetadataImpl rawMetadata = new ColumnMetadataImpl.Builder()
+        .setFieldSpec(new DimensionFieldSpec("col", DataType.INT, true))
+        .setHasDictionary(false)
+        .setForwardIndexEncoding(FieldConfig.EncodingType.RAW)
+        .build();
+    String json = JsonUtils.objectToString(rawMetadata);
+    assertTrue(json.contains("\"forwardIndexEncoding\":\"RAW\""),
+        "Expected forwardIndexEncoding in JSON output but got: " + json);
   }
 
   @Test

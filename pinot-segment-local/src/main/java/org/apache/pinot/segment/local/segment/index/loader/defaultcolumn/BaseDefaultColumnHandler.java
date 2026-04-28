@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -527,7 +528,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, totalDocs, fieldSpec, true,
-        dictionaryElementSize, true);
+        dictionaryElementSize, FieldConfig.EncodingType.DICTIONARY, true);
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -1112,7 +1113,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         // Add the column metadata
         BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, true,
-            dictionaryCreator.getNumBytesPerEntry(), true);
+            dictionaryCreator.getNumBytesPerEntry(), FieldConfig.EncodingType.DICTIONARY, true);
       }
     }
   }
@@ -1197,7 +1198,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, false,
-        0, true);
+        0, FieldConfig.EncodingType.RAW, true);
   }
 
   private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnStatistics columnStatistics,
@@ -1221,7 +1222,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
     }
     if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
+      forwardIndexConfig = ForwardIndexConfig.getDefault(
+          hasDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
     }
     return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
@@ -1237,7 +1239,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
       IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
       FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
-          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
           .build();
       _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {

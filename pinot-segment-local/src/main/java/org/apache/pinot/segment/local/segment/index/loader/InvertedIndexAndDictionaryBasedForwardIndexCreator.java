@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -281,10 +282,12 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
       // Setup and return the metadata properties to update
       if (_dictionaryEnabled) {
-        return Map.of();
+        return Map.of(
+            getKeyFor(_columnName, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.DICTIONARY.name());
       } else {
         return Map.of(
             getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false),
+            getKeyFor(_columnName, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name(),
             getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0)
             // TODO: See https://github.com/apache/pinot/pull/16921 for details
             // getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1)
@@ -376,6 +379,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS),
           String.valueOf(maxNumberOfMultiValues[0]));
       metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
+      metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_ENCODING),
+          (_dictionaryEnabled ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW).name());
       if (!_dictionaryEnabled) {
         metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
         metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
