@@ -275,31 +275,37 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void validateDimensionTableWithReplicaGroupStrategy() {
+  public void validateDimensionTableSegmentAssignmentStrategy() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
         .build();
 
-    // Dimension table with replica group strategy should fail
+    // Valid: null segment assignment strategy
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
-        .setSegmentAssignmentStrategy(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)
         .build();
+    TableConfigUtils.validate(tableConfig, schema);
 
+    // Valid: allservers strategy using constant
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .setSegmentAssignmentStrategy(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Invalid: other strategy
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .setSegmentAssignmentStrategy("replicaGroup")
+        .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for dimension table with replica group strategy");
+      fail("Should fail with invalid segment assignment strategy for dimension table");
     } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("has segmentAssignmentStrategy: 'replicagroup'"));
-      assertTrue(e.getMessage().contains("dimension tables automatically use 'allservers' strategy"));
+      assertTrue(e.getMessage().contains("can only use '" +
+          AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
     }
-
-    // Valid dimension table without segment assignment strategy should pass
-    TableConfig validTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setIsDimTable(true)
-        .build();
-    TableConfigUtils.validate(validTableConfig, schema);
 }
 
   @Test
