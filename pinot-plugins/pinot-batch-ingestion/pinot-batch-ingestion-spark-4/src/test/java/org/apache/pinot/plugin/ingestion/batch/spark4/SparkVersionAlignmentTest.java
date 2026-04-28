@@ -20,7 +20,7 @@ package org.apache.pinot.plugin.ingestion.batch.spark4;
 
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -52,7 +52,9 @@ public class SparkVersionAlignmentTest {
     }
 
     // Same shape, but for the netty common module — different jar, same expectation.
+    // Class.forName throws ClassNotFoundException if the class is missing, so a successful
+    // return is sufficient evidence; assertNotNull is a courtesy belt-and-suspenders.
     Class<?> nettyCommon = Class.forName("io.netty.util.Version");
-    assertEquals(nettyCommon != null, true);
+    assertNotNull(nettyCommon, "io.netty.util.Version must resolve on the test classpath");
   }
 }
