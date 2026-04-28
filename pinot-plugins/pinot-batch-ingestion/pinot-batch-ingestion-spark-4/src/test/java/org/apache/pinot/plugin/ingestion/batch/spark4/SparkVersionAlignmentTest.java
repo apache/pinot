@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark4;
 
+import java.util.Map;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -36,31 +39,30 @@ public class SparkVersionAlignmentTest {
   @Test
   public void nettyOnTestClasspathIsInThe42xLine()
       throws ClassNotFoundException {
-    // KQueueIoHandler is netty 4.2-only (it does not exist in 4.1.x). Force the class to load
-    // via Class.forName so we hit the same resolver path Spark's NettyUtils.createEventLoop
-    // uses — a NoClassDefFoundError here means the module's pom override has stopped winning.
-    Class<?> kqueueIoHandler = Class.forName("io.netty.channel.kqueue.KQueueIoHandler");
-    String version = kqueueIoHandler.getPackage().getImplementationVersion();
-    // ImplementationVersion can be null when the class is on the IDE's classpath without a
-    // manifest; tolerate that case but still assert the class loaded successfully.
-    if (version != null) {
-      assertTrue(version.startsWith("4.2."),
-          "Expected netty 4.2.x on the spark-4 batch-ingestion test classpath, got " + version
-              + ". This usually means a spark4.version bump pulled in a different netty major; "
-              + "either update the netty.version override in pom.xml or revert the bump.");
+    // io.netty.util.Version#identify() reads each netty module's own manifest under the same
+    // classloader and returns a Map<artifactId, Version>. Using it (instead of
+    // Package#getImplementationVersion on a single class) lets us cross-check that *every*
+    // netty module on the classpath is 4.2.x — the actual failure mode this test exists to
+    // catch is a mixed-version classpath where some modules are 4.1 and some are 4.2.
+    Map<String, io.netty.util.Version> versions = io.netty.util.Version.identify();
+    assertFalse(versions.isEmpty(),
+        "io.netty.util.Version#identify() returned empty — netty modules are not on the "
+            + "test classpath at all. The spark4.version override in pom.xml is broken.");
+    for (Map.Entry<String, io.netty.util.Version> e : versions.entrySet()) {
+      String artifactVersion = e.getValue().artifactVersion();
+      assertTrue(artifactVersion.startsWith("4.2."),
+          "Expected netty 4.2.x for every netty module on the spark-4 batch-ingestion test "
+              + "classpath; module '" + e.getKey() + "' reports " + artifactVersion + ". This "
+              + "usually means a spark4.version bump pulled in a different netty major or "
+              + "shadowed only some modules; update the netty.version override in pom.xml or "
+              + "revert the bump.");
     }
 
-    // Same shape, but for the netty-common module — different jar, same expectation.
-    // Cross-check the version recorded in netty-common against the kqueue version above so
-    // both jars agree (a partial mix would be the actual failure mode if a future Spark bump
-    // pulled some 4.1 and some 4.2 transitively).
-    Class<?> nettyCommon = Class.forName("io.netty.util.Version");
-    String nettyCommonVersion = nettyCommon.getPackage().getImplementationVersion();
-    if (nettyCommonVersion != null) {
-      assertTrue(nettyCommonVersion.startsWith("4.2."),
-          "Expected netty-common 4.2.x on the spark-4 batch-ingestion test classpath, got "
-              + nettyCommonVersion + ". A mixed-version netty (some 4.1, some 4.2) is the "
-              + "actual failure mode this test is designed to catch.");
-    }
+    // KQueueIoHandler is netty 4.2-only (does not exist in 4.1.x). Force the class to load
+    // via Class.forName so we hit the same resolver path Spark's NettyUtils.createEventLoop
+    // uses on macOS at runtime — a NoClassDefFoundError here means the module's pom override
+    // has stopped winning even if Version#identify() reports 4.2.x.
+    Class<?> kqueueIoHandler = Class.forName("io.netty.channel.kqueue.KQueueIoHandler");
+    assertNotNull(kqueueIoHandler);
   }
 }

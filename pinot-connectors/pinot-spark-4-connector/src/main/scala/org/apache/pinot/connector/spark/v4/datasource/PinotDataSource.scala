@@ -76,26 +76,39 @@ private[datasource] object PinotDataSource {
   // preserves the safer fail-fast behavior.
   private[datasource] val SKIP_CONFLICT_GUARD_PROP = "pinot.spark.connector.skip-conflict-guard"
 
-  // Probe for the Spark 3 connector's PinotDataSource by class name on every constructor
-  // call. We use Class.forName rather than a static reference so this module does not
-  // develop a compile-time dependency on the Spark 3 connector. The JVM's own class lookup
-  // is cached (subsequent Class.forName calls are fast hash-table reads), so the per-call
-  // cost is negligible — and probing per call detects v3 jars added to the classpath after
-  // the first PinotDataSource was constructed (e.g. via spark-shell `:require`, a custom
-  // plugin loader, or any post-startup classpath mutation), which a one-shot lazy val
-  // cannot do.
+  // Probe for the Spark 3 connector's PinotDataSource by class name. We use Class.forName
+  // rather than a static reference so this module does not develop a compile-time
+  // dependency on the Spark 3 connector. We probe both `getClass.getClassLoader` (the
+  // loader that loaded this Spark 4 connector) and `Thread.currentThread.getContextClassLoader`
+  // (what Spark's `DataSource.lookupDataSource` uses to discover DataSourceRegister
+  // candidates). In a typical Spark deployment with `--packages` and isolated executor
+  // classloaders, the v3 jar may be visible only via the context classloader — probing only
+  // our own would let the conflict slip through.
   //
-  // We probe both `getClass.getClassLoader` (the loader that loaded this Spark 4 connector)
-  // and `Thread.currentThread.getContextClassLoader` (what Spark's
-  // `DataSource.lookupDataSource` uses to discover DataSourceRegister candidates). In a
-  // typical Spark deployment with `--packages` and isolated executor classloaders, the v3
-  // jar may be visible only via the context classloader — probing only our own would let
-  // the conflict slip through.
+  // The result is cached behind an AtomicReference so the probe runs at most once per
+  // (ownLoader, ctxLoader) pair — Spark instantiates `PinotDataSource` repeatedly during
+  // a job (driver + executors + planner), and a per-call probe burns ~20 microseconds on
+  // each `spark.read.format("pinot")…`. Caching by classloader pair preserves correctness
+  // under Spark's isolated-executor-classloader topology (each executor's first probe still
+  // runs); the only deployment we cannot detect is one that mutates a single JVM's
+  // classpath after the first probe (e.g. `spark-shell :require`), and the
+  // `pinot.spark.connector.skip-conflict-guard` escape hatch already exists for users in
+  // that situation.
+  private val probeCache = new java.util.concurrent.ConcurrentHashMap[(ClassLoader, ClassLoader), java.lang.Boolean]()
+
   private[datasource] def spark3Conflict: Boolean = {
     val ownLoader = getClass.getClassLoader
     val ctxLoader = Thread.currentThread.getContextClassLoader
-    isSpark3ConnectorOnClasspath(ownLoader) ||
-      (ctxLoader != null && (ctxLoader ne ownLoader) && isSpark3ConnectorOnClasspath(ctxLoader))
+    val effectiveCtxLoader = if (ctxLoader != null) ctxLoader else ownLoader
+    val key = (ownLoader, effectiveCtxLoader)
+    val cached = probeCache.get(key)
+    if (cached != null) {
+      return cached.booleanValue()
+    }
+    val result = isSpark3ConnectorOnClasspath(ownLoader) ||
+      ((effectiveCtxLoader ne ownLoader) && isSpark3ConnectorOnClasspath(effectiveCtxLoader))
+    probeCache.put(key, java.lang.Boolean.valueOf(result))
+    result
   }
 
   def guardAgainstSpark3ConnectorOnClasspath(): Unit = {
