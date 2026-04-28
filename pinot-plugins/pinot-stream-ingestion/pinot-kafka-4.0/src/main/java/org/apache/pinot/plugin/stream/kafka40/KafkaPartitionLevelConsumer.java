@@ -48,14 +48,17 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   // Offset the consumer is positioned to read NEXT. -1 means the consumer has not been
   // positioned for any caller-requested startOffset yet (we have not issued a seek).
-  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch (e.g.
-  // read_committed filtered the batch as aborted), this is the consumer's actual
-  // KafkaConsumer.position(), which may have advanced past the caller's startOffset even
-  // though zero records were returned. RealtimeSegmentDataManager only advances its own
-  // _currentOffset on non-empty batches, so the next call typically passes the same
-  // startOffset back; comparing startOffset against _nextReadOffset (rather than re-seeking
-  // unconditionally) is what lets the consumer make progress through aborted regions.
+  // After a successful fetch, this is lastRecord.offset + 1. After an empty fetch under
+  // read_committed (where the batch may have been filtered as aborted), this is the
+  // consumer's actual KafkaConsumer.position(), which may have advanced past the caller's
+  // startOffset even though zero records were returned.
   private long _nextReadOffset = -1;
+  // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
+  // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
+  // _currentOffset didn't advance on our last empty batch" (should NOT re-seek and undo
+  // _nextReadOffset's progress) from "caller is requesting a new startOffset"
+  // (e.g. arbitrary backward seek -- should re-seek).
+  private long _lastFetchStartOffset = Long.MIN_VALUE;
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -74,21 +77,24 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     }
     // Seek when:
     //   (a) we have not yet positioned the consumer (initial state), OR
-    //   (b) the caller's startOffset is BEYOND _nextReadOffset (caller advanced or
-    //       reset to a different fetch position).
-    // We do NOT seek when startOffset <= _nextReadOffset. With read_committed isolation an
-    // empty poll legitimately advances _nextReadOffset past the caller's startOffset (the
-    // batch was filtered as aborted) while RealtimeSegmentDataManager keeps passing the
-    // same startOffset on the next call (it only advances on non-empty batches). Seeking
-    // back to startOffset would undo the consumer's progress through the aborted region
-    // and wedge consumption forever; this was the dominant CI flake mode.
-    if (_nextReadOffset < 0 || startOffset > _nextReadOffset) {
+    //   (b) the caller passed a startOffset different from the previous call AND
+    //       different from the consumer's current _nextReadOffset (i.e. a fresh
+    //       caller-requested seek that doesn't already match where we are).
+    // We do NOT seek when the caller passed the SAME startOffset as the previous call --
+    // that is the read_committed empty-poll case, where RealtimeSegmentDataManager.
+    // _currentOffset didn't advance on our last empty batch and so calls us with the same
+    // startOffset again. Seeking back to that startOffset would undo the consumer's
+    // progress through the filtered (aborted) region and wedge consumption forever; this
+    // was the dominant CI flake mode for ExactlyOnceKafkaRealtimeClusterIntegrationTest.
+    boolean explicitNewStartOffset = startOffset != _lastFetchStartOffset && startOffset != _nextReadOffset;
+    if (_nextReadOffset < 0 || explicitNewStartOffset) {
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Seeking to offset: {}", startOffset);
       }
       _consumer.seek(_topicPartition, startOffset);
       _nextReadOffset = startOffset;
     }
+    _lastFetchStartOffset = startOffset;
 
     ConsumerRecords<Bytes, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMs));
     List<ConsumerRecord<Bytes, Bytes>> records = consumerRecords.records(_topicPartition);
