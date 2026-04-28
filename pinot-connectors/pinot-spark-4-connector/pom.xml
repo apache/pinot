@@ -32,6 +32,13 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
+    <!-- The root pom's <dependencyManagement> pins org.apache.spark:* to ${spark3.version}.
+         For this Spark 4 module we need 4.1.1; rather than redeclare each spark-* dependency
+         with an inline <version> (which trips PinotCustomDependencyVersionRule), override
+         spark3.version locally so the inherited <dependencyManagement> resolution picks up
+         4.1.1 for spark-core / spark-sql / spark-launcher / etc. The property name is a
+         misnomer here but the alternative is worse. -->
+    <spark3.version>${spark4.version}</spark3.version>
   </properties>
 
   <profiles>
@@ -85,12 +92,12 @@
         <activeByDefault>true</activeByDefault>
       </activation>
       <dependencies>
-        <!-- Explicit spark-core override needed to prevent the root pom's Spark-3 dependencyManagement
-             pin from forcing spark-core back to 3.5.8 when spark-sql:4.x pulls it in transitively. -->
+        <!-- spark-* versions are inherited from the root pom's <dependencyManagement> via the
+             local spark3.version → spark4.version override above; do not declare <version>
+             inline here (PinotCustomDependencyVersionRule rejects that). -->
         <dependency>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-core_${scala.compat.version}</artifactId>
-          <version>${spark4.version}</version>
           <scope>provided</scope>
           <exclusions>
             <exclusion>
@@ -102,13 +109,11 @@
         <dependency>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-          <version>${spark4.version}</version>
           <scope>provided</scope>
         </dependency>
         <dependency>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-sql_${scala.compat.version}</artifactId>
-          <version>${spark4.version}</version>
           <scope>provided</scope>
           <exclusions>
             <exclusion>
