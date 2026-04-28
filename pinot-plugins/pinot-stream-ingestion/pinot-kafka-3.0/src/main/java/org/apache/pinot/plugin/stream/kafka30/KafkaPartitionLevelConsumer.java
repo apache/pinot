@@ -28,6 +28,7 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
+import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamMessageMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -56,9 +57,16 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   // The caller's startOffset on the previous fetchMessages() call. Used to distinguish
   // "caller is passing the same startOffset back because RealtimeSegmentDataManager's
   // _currentOffset didn't advance on our last empty batch" (should NOT re-seek and undo
-  // _nextReadOffset's progress) from "caller is requesting a new startOffset"
-  // (e.g. arbitrary backward seek -- should re-seek).
+  // _nextReadOffset's progress) from "caller is requesting a new startOffset" (should
+  // re-seek). The latter does not occur in production -- RealtimeSegmentDataManager
+  // consumes monotonically forward -- but the public PartitionGroupConsumer contract
+  // (and KafkaPartitionLevelConsumerTest.testConsumer) does exercise arbitrary
+  // re-seeks, so we preserve that behaviour.
   private long _lastFetchStartOffset = Long.MIN_VALUE;
+  // Cached true iff stream.kafka.isolation.level == read_committed. Computed once at
+  // construction (the value is final per consumer) and reused on every fetch instead of
+  // re-resolving the StreamConfig each time.
+  private final boolean _isReadCommitted = isReadCommitted(_config);
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
@@ -120,7 +128,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         }
         lastMessageMetadata = messageMetadata;
       }
-    } else if (isReadCommitted()) {
+    } else if (_isReadCommitted) {
       // No records returned. With read_committed isolation, the underlying KafkaConsumer's
       // internal position may still have advanced past offsets filtered out as aborted
       // transactional records, so snap _nextReadOffset to the consumer's actual position.
@@ -146,20 +154,17 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
     long offsetOfNextBatch = _nextReadOffset;
-    // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
-    // TODO: A better solution would be to fetch earliest offset from topic and see if it is greater than startOffset.
-    // However, this would require and additional call to Kafka which we want to avoid.
-    boolean hasDataLoss = false;
-    if (_config.getKafkaIsolationLevel() == null || _config.getKafkaIsolationLevel()
-        .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED)) {
-      hasDataLoss = firstOffset > startOffset;
-    }
+    // For read_uncommitted (the default), a non-contiguous returned batch implies data
+    // loss (records dropped before being read). For read_committed the offset gap is
+    // expected because the broker filters aborted transactional records, so we don't flag
+    // it as data loss.
+    boolean hasDataLoss = !_isReadCommitted && firstOffset > startOffset;
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
         hasDataLoss, batchSizeInBytes);
   }
 
-  private boolean isReadCommitted() {
-    String level = _config.getKafkaIsolationLevel();
+  private static boolean isReadCommitted(KafkaPartitionLevelStreamConfig config) {
+    String level = config.getKafkaIsolationLevel();
     return level != null
         && !level.equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED);
   }
