@@ -234,7 +234,7 @@
          module READMEs for the migration path. -->
     <spark3.version>3.5.9</spark3.version>
     <!-- Spark 4.x requires Java 17+. Pinot compiles the Spark 4 modules with release=21.
-         JDK 21+ is enforced cluster-wide by the root pom's requireJavaVersion rule below,
+         JDK 21+ is enforced at build time by the root pom's requireJavaVersion rule below,
          so the Spark 4 modules build unconditionally as part of the default reactor (see
          pinot-connectors/pom.xml and pinot-plugins/pinot-batch-ingestion/pom.xml). -->
     <spark4.version>4.1.1</spark4.version>
