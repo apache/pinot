@@ -75,17 +75,29 @@ private[datasource] object PinotDataSource {
   // flag disables both directions of the bidirectional check.
   private[datasource] val SKIP_CONFLICT_GUARD_PROP = "pinot.spark.connector.skip-conflict-guard"
 
-  // Probe for the Spark 4 connector's PinotDataSource by class name on every constructor
-  // call. Class.forName is JVM-cached after first lookup so the per-call cost is negligible —
-  // and probing per call detects v4 jars added to the classpath after the first
-  // PinotDataSource was constructed (e.g. via spark-shell `:require` or a custom plugin
-  // loader). We probe both `getClass.getClassLoader` and the thread context classloader
-  // to cover Spark deployments where the v4 jar is visible only via one or the other.
+  // Probe for the Spark 4 connector's PinotDataSource by class name. We probe both
+  // `getClass.getClassLoader` and the thread context classloader to cover Spark deployments
+  // where the v4 jar is visible only via one or the other. The result is cached per
+  // (ownLoader, ctxLoader) pair so the probe runs at most once per pair — Spark instantiates
+  // `PinotDataSource` repeatedly during a job (driver + executors + planner), and a per-call
+  // probe burns ~20 microseconds on each `spark.read.format("pinot")…`. The only deployment
+  // we cannot detect is one that mutates a single JVM's classpath after the first probe; the
+  // `pinot.spark.connector.skip-conflict-guard` escape hatch already covers that case.
+  private val probeCache = new java.util.concurrent.ConcurrentHashMap[(ClassLoader, ClassLoader), java.lang.Boolean]()
+
   private[datasource] def spark4Conflict: Boolean = {
     val ownLoader = getClass.getClassLoader
     val ctxLoader = Thread.currentThread.getContextClassLoader
-    isSpark4ConnectorOnClasspath(ownLoader) ||
-      (ctxLoader != null && (ctxLoader ne ownLoader) && isSpark4ConnectorOnClasspath(ctxLoader))
+    val effectiveCtxLoader = if (ctxLoader != null) ctxLoader else ownLoader
+    val key = (ownLoader, effectiveCtxLoader)
+    val cached = probeCache.get(key)
+    if (cached != null) {
+      return cached.booleanValue()
+    }
+    val result = isSpark4ConnectorOnClasspath(ownLoader) ||
+      ((effectiveCtxLoader ne ownLoader) && isSpark4ConnectorOnClasspath(effectiveCtxLoader))
+    probeCache.put(key, java.lang.Boolean.valueOf(result))
+    result
   }
 
   def guardAgainstSpark4ConnectorOnClasspath(): Unit = {
