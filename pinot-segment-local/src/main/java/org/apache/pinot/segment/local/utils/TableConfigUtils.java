@@ -114,6 +114,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLL;
 import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLLPLUS;
 import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMPRECISION;
+import static org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY;
 
 
 /**
@@ -374,9 +375,7 @@ public final class TableConfigUtils {
       // Check for incompatible segment assignment strategies
       String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
       if (segmentAssignmentStrategy != null
-          && CommonConstants.Segment.AssignmentStrategy
-          .REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY
-          .equalsIgnoreCase(segmentAssignmentStrategy)) {
+          && REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY.equalsIgnoreCase(segmentAssignmentStrategy)) {
         throw new IllegalStateException(
             "Dimension table '" + tableConfig.getTableName()
               + "' has segmentAssignmentStrategy: 'replicagroup', but dimension tables automatically "
