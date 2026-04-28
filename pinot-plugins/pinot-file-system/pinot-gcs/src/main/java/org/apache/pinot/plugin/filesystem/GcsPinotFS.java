@@ -343,7 +343,12 @@ public class GcsPinotFS extends BasePinotFS {
   @Override
   public long lastModified(URI uri)
       throws IOException {
-    return getBlob(new GcsUri(uri)).getUpdateTime();
+    Blob blob = getBlob(new GcsUri(uri));
+    if (blob == null) {
+      return 0L;
+    }
+    Long updateTime = blob.getUpdateTime();
+    return updateTime != null ? updateTime : 0L;
   }
 
   @Override
@@ -353,9 +358,17 @@ public class GcsPinotFS extends BasePinotFS {
       LOGGER.info("touch {}", uri);
       GcsUri gcsUri = new GcsUri(uri);
       Blob blob = getBlob(gcsUri);
-      long updateTime = blob.getUpdateTime();
+      if (blob == null) {
+        // PinotFS contract: if the file does not exist, create an empty file
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), gcsUri.getPath())).build();
+        _storage.create(blobInfo, new byte[0]);
+        return true;
+      }
+      long updateTime = blob.getUpdateTime() != null ? blob.getUpdateTime() : 0L;
       _storage.update(blob.toBuilder().setMetadata(blob.getMetadata()).build());
-      long newUpdateTime = getBlob(gcsUri).getUpdateTime();
+      Blob updatedBlob = getBlob(gcsUri);
+      long newUpdateTime = (updatedBlob != null && updatedBlob.getUpdateTime() != null)
+          ? updatedBlob.getUpdateTime() : 0L;
       return newUpdateTime > updateTime;
     } catch (StorageException e) {
       throw new IOException(e);
@@ -367,6 +380,9 @@ public class GcsPinotFS extends BasePinotFS {
       throws IOException {
     try {
       Blob blob = getBlob(new GcsUri(uri));
+      if (blob == null) {
+        throw new IOException(String.format("File '%s' does not exist", uri));
+      }
       return Channels.newInputStream(blob.reader());
     } catch (StorageException e) {
       throw new IOException(e);
@@ -533,11 +549,24 @@ public class GcsPinotFS extends BasePinotFS {
   private boolean copyFile(GcsUri srcUri, GcsUri dstUri)
       throws IOException {
     Blob blob = getBlob(srcUri);
-    Blob newBlob =
-        _storage.create(BlobInfo.newBuilder(BlobId.of(dstUri.getBucketName(), dstUri.getPath())).build(), new byte[0]);
-    CopyWriter copyWriter = blob.copyTo(newBlob.getBlobId());
-    copyWriter.getResult();
-    return copyWriter.isDone() && blob.exists();
+    if (blob == null) {
+      throw new IOException(String.format("Source file '%s' does not exist", srcUri));
+    }
+    BlobId dstBlobId = BlobId.of(dstUri.getBucketName(), dstUri.getPath());
+    Blob newBlob = _storage.create(BlobInfo.newBuilder(dstBlobId).build(), new byte[0]);
+    try {
+      CopyWriter copyWriter = blob.copyTo(newBlob.getBlobId());
+      copyWriter.getResult();
+      return copyWriter.isDone() && blob.exists();
+    } catch (StorageException e) {
+      // Clean up the empty destination blob created above
+      try {
+        _storage.delete(dstBlobId);
+      } catch (StorageException cleanupException) {
+        LOGGER.warn("Failed to clean up destination blob '{}' after copy failure", dstUri, cleanupException);
+      }
+      throw new IOException(String.format("Failed to copy '%s' to '%s'", srcUri, dstUri), e);
+    }
   }
 
   private boolean copy(GcsUri srcUri, GcsUri dstUri)
