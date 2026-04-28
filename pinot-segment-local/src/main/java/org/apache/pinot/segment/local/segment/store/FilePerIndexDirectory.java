@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,9 +36,13 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilePerIndexDirectory.class);
+
   private final File _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
@@ -106,8 +109,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       try {
         removed.close();
       } catch (IOException e) {
-        throw new UncheckedIOException(
-            "Failed to close buffer for column " + columnName + ", index " + indexType.getId(), e);
+        LOGGER.error("Failed to close buffer for column {}, index {}", columnName, indexType.getId(), e);
       }
     }
     if (indexType == StandardIndexes.text()) {
