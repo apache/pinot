@@ -1076,10 +1076,12 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Sets the {@code isBeingDeleted} flag on each segment's ZK metadata via a version-checked write so concurrent
-   * operations can observe an in-flight deletion and skip the segment. The flag is advisory; the segment znode and
-   * deep-store cleanup still happen in the subsequent steps. Aborts on the first version mismatch — the caller is
-   * expected to retry on the next tick.
+   * Sets the indicative {@code isBeingDeleted} flag on each segment's ZK metadata via a version-checked write so
+   * concurrent operations can observe an in-flight deletion and skip the segment. The flag is advisory only — it
+   * states that the segment is either being deleted or may be deleted in the near future, not that the segment is
+   * deleted. Subsequent IS removal and segment znode / deep-store cleanup may still fail or be retried later, so a
+   * flagged segment may remain present transiently. Aborts on the first version mismatch — the caller is expected
+   * to retry on the next tick.
    */
   private void markSegmentsAsBeingDeleted(String tableNameWithType, List<String> segmentNames) {
     for (String segmentName : segmentNames) {

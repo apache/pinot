@@ -1956,9 +1956,16 @@ public class CommonConstants {
     public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
 
     /**
-     * Marker indicating the segment is mid-deletion. Set on the segment ZK metadata before the segment is removed
-     * from the Ideal State and before the segment znode is deleted, so concurrent operations can observe an in-flight
-     * deletion and skip the segment. Stored as a string (`"true"` or absent); absent is interpreted as `false`.
+     * Indicative (not authoritative) marker that the segment is either being deleted or may be deleted in the
+     * near future. Set on the segment ZK metadata before the segment is removed from the Ideal State and before
+     * the segment znode is deleted, so concurrent operations can observe an in-flight deletion and skip the segment.
+     *
+     * <p>The flag does NOT guarantee the segment is or will be deleted: the deletion may fail or be retried later,
+     * and a flagged segment may still be present in the Ideal State / External View transiently. Conversely, the
+     * absence of the flag does not guarantee the segment is live — it may be deleted by a later request. Treat this
+     * as a hint to avoid acting on a segment whose lifecycle is unstable, not as proof of its state.
+     *
+     * <p>Stored as a string (`"true"` or absent); absent is interpreted as `false`.
      */
     public static final String IS_BEING_DELETED = "segment.is.being.deleted";
 
