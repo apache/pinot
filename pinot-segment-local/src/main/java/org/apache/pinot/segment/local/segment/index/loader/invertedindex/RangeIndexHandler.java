@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -37,6 +38,7 @@ import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -167,17 +169,25 @@ public class RangeIndexHandler extends BaseIndexHandler {
         _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
-      if (columnMetadata.isSingleValue()) {
-        // Single-value column
-        for (int i = 0; i < numDocs; i++) {
-          rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+      if (forwardIndexReader.isDictionaryEncoded()) {
+        if (columnMetadata.isSingleValue()) {
+          // Single-value column
+          for (int i = 0; i < numDocs; i++) {
+            rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+          }
+        } else {
+          // Multi-value column
+          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+          for (int i = 0; i < numDocs; i++) {
+            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+            rangeIndexCreator.add(dictIds, length);
+          }
         }
       } else {
-        // Multi-value column
-        int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-        for (int i = 0; i < numDocs; i++) {
-          int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-          rangeIndexCreator.add(dictIds, length);
+        try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+          DictionaryBasedIndexBuilder.addRawValuesViaDictionary(rangeIndexCreator, forwardIndexReader, readerContext,
+              dictionary,
+              columnMetadata, numDocs);
         }
       }
       rangeIndexCreator.seal();

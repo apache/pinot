@@ -40,7 +40,6 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -93,7 +92,18 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final int _maxNumberOfMultiValues;
   private final FieldSpec.DataType _storedType;
   private final int _totalNumberOfEntries;
-  private final boolean _dictionaryEnabled;
+  /// `true` if a standalone dictionary file exists for the column. Independent of how the forward index is
+  /// encoded — both the standard "dict-encoded forward index" and the new "shared-dictionary + raw forward index"
+  /// configurations have `_dictionaryPresent == true`.
+  private final boolean _dictionaryPresent;
+  /// `true` if the forward index itself stores dict IDs (`FieldConfig.EncodingType.DICTIONARY`),
+  /// `false` if it stores raw values (`FieldConfig.EncodingType.RAW`).
+  ///
+  /// Pre-shared-dict, this field used to be a single `_dictionaryEnabled` that conflated both meanings.
+  /// After the shared-dictionary feature, the two boolean dimensions are independent: a column can have a dictionary
+  /// AND a raw forward index simultaneously. Subclasses or callers that previously expected a single combined flag
+  /// must update to the two-flag model.
+  private final boolean _dictionaryBasedForwardIndex;
   private final boolean _useMMapBuffer;
 
   // Files and temporary buffers
@@ -114,7 +124,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private PinotDataBuffer _forwardIndexMaxSizeBuffer;
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
-      boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
+      boolean dictionaryPresent, boolean dictionaryBasedForwardIndex, ForwardIndexConfig fwdConf,
+      SegmentDirectory.Writer segmentWriter,
       boolean isTemporaryForwardIndex, String tableNameWithType, boolean continueOnError)
       throws IOException {
     _columnName = columnName;
@@ -132,7 +143,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     _totalNumberOfEntries = _columnMetadata.getTotalNumberOfEntries();
     _maxNumberOfMultiValues = _columnMetadata.getMaxNumberOfMultiValues();
     _storedType = _columnMetadata.getFieldSpec().getDataType().getStoredType();
-    _dictionaryEnabled = dictionaryEnabled;
+    _dictionaryPresent = dictionaryPresent;
+    _dictionaryBasedForwardIndex = dictionaryBasedForwardIndex;
     int numValues = _singleValue ? _numDocs : _totalNumberOfEntries;
     _useMMapBuffer = numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
 
@@ -140,7 +152,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     // a no-op for sorted columns
     File indexDir = _segmentMetadata.getIndexDir();
     String fileExtension;
-    if (_dictionaryEnabled) {
+    if (_dictionaryBasedForwardIndex) {
       fileExtension = _singleValue ? V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION
           : V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     } else {
@@ -230,7 +242,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       // Only cleanup the other indexes if the forward index to be created is permanent. If the forward index is
       // temporary, it is meant to be used only for construction of other indexes and will be deleted once all the
       // IndexHandlers have completed.
-      if (!_dictionaryEnabled) {
+      if (!_dictionaryPresent) {
         LOGGER.info("Clean up indexes no longer needed or which need to be rewritten for segment: {}, column: {}",
             segmentName, _columnName);
         // Delete the dictionary
@@ -271,7 +283,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
-          .withDictionary(_dictionaryEnabled)
+          .withDictionary(_dictionaryPresent)
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .withTableNameWithType(_tableNameWithType)
           .withContinueOnError(_continueOnError)
@@ -281,18 +293,17 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update
-      if (_dictionaryEnabled) {
-        return Map.of(
-            getKeyFor(_columnName, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.DICTIONARY.name());
-      } else {
-        return Map.of(
-            getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false),
-            getKeyFor(_columnName, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name(),
-            getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0)
-            // TODO: See https://github.com/apache/pinot/pull/16921 for details
-            // getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1)
-        );
+      if (_dictionaryPresent) {
+        return Map.of(getKeyFor(_columnName, FORWARD_INDEX_ENCODING),
+            _forwardIndexConfig.getEncodingType().name());
       }
+      return Map.of(
+          getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false),
+          getKeyFor(_columnName, FORWARD_INDEX_ENCODING), _forwardIndexConfig.getEncodingType().name(),
+          getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0)
+          // TODO: See https://github.com/apache/pinot/pull/16921 for details
+          // getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1)
+      );
     }
   }
 
@@ -363,7 +374,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
-          .withDictionary(_dictionaryEnabled)
+          .withDictionary(_dictionaryPresent)
           .withTotalNumberOfEntries(_nextValueId)
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
@@ -380,8 +391,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           String.valueOf(maxNumberOfMultiValues[0]));
       metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
       metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_ENCODING),
-          (_dictionaryEnabled ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW).name());
-      if (!_dictionaryEnabled) {
+          _forwardIndexConfig.getEncodingType().name());
+      if (!_dictionaryPresent) {
         metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
         metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
         // TODO: See https://github.com/apache/pinot/pull/16921 for details
@@ -401,7 +412,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
       throws IOException {
     try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, _forwardIndexConfig)) {
-      if (_dictionaryEnabled) {
+      if (creator.isDictionaryEncoded()) {
         if (_singleValue) {
           for (int docId = 0; docId < _numDocs; docId++) {
             creator.putDictId(getInt(_forwardIndexValueBuffer, docId));

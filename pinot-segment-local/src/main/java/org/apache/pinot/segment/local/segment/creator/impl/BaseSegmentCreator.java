@@ -370,8 +370,21 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    // Infer dictionary existence based on index
+    boolean dictionaryRequired = DictionaryIndexConfig.requiresDictionary(spec, fieldIndexConfigs);
     if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      if (dictionaryRequired) {
+        LOGGER.warn("Found indexes {} require dictionary, but dictionary is disabled explicitly.",
+            DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(spec, fieldIndexConfigs));
+      }
       return false;
+    }
+
+    // If any enabled index requires a dictionary for this column, short-circuit the optimization heuristics.
+    // Otherwise, optimizeDictionary* could override the dictionary requirement and cause index creation failures
+    // (e.g., FST/IFST expect a dictionary but the column gets switched to no-dictionary).
+    if (dictionaryRequired) {
+      return true;
     }
 
     return DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),

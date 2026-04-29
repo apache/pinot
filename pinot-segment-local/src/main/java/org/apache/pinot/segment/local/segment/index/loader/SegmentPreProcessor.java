@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
@@ -113,6 +115,10 @@ public class SegmentPreProcessor implements AutoCloseable {
     removeInvertedIndexTempFiles(indexDir);
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Invalidate any legacy raw-value embedded-dictionary inverted indexes so the standard handlers can rebuild
+      // them in the dict-id format. Must run before any handler that may try to read the inverted-index buffer.
+      removeLegacyRawValueInvertedIndexes(segmentWriter);
+
       // Update default columns according to the schema.
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
@@ -124,9 +130,14 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<IndexHandler> indexHandlers = new ArrayList<>();
 
       // We cannot just create all the index handlers in a random order.
-      // Specifically, ForwardIndexHandler needs to be executed first. This is because it modifies the segment metadata
-      // while rewriting forward index to create a dictionary. Some other handlers (like the range one) assume that
-      // metadata was already been modified by ForwardIndexHandler.
+      // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
+      //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
+      //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
+      //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
+      // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata and
+      // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
+      // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
+      // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
       IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);
@@ -411,6 +422,38 @@ public class SegmentPreProcessor implements AutoCloseable {
       }
     }
     return true;
+  }
+
+  /// Drops any inverted index file that uses the legacy raw-value embedded-dictionary format written by the
+  /// now-deleted `RawValueBitmapInvertedIndexCreator`. This must run before any other index handler so they don't
+  /// try to interpret the legacy buffer as the modern bitmap-inverted-index format.
+  ///
+  /// Two outcomes after this method runs:
+  ///
+  /// - If the user's table config still requests an inverted index on the column, [InvertedIndexHandler]
+  ///   (or [org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler] if a shared dictionary must be
+  ///   created first) rebuilds it in the dict-id format on the same reload pass.
+  /// - If the user has removed the inverted index from the config, the index simply stays absent — the column
+  ///   still has its raw forward index, and queries scan it.
+  private void removeLegacyRawValueInvertedIndexes(SegmentDirectory.Writer segmentWriter)
+      throws IOException {
+    SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
+    String segmentName = segmentMetadata.getName();
+    for (ColumnMetadata columnMetadata : segmentMetadata.getColumnMetadataMap().values()) {
+      String column = columnMetadata.getColumnName();
+      if (!segmentWriter.hasIndexFor(column, StandardIndexes.inverted())) {
+        continue;
+      }
+      // NOTE: getIndexFor returns a cached buffer reference; do NOT close it here, otherwise the underlying
+      // segment-writer cache entry becomes invalid for subsequent handler reads.
+      PinotDataBuffer buffer = segmentWriter.getIndexFor(column, StandardIndexes.inverted());
+      if (!InvertedIndexHandler.isLegacyRawValueInvertedIndexFormat(buffer, columnMetadata)) {
+        continue;
+      }
+      LOGGER.info("Removing legacy raw-value inverted index for segment: {}, column: {}; standard handlers will "
+          + "rebuild a dict-id-based inverted index if the column config still requires one", segmentName, column);
+      segmentWriter.removeIndex(column, StandardIndexes.inverted());
+    }
   }
 
   /**
