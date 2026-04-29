@@ -492,12 +492,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
   }
 
-  /**
-   * Downloads and loads a segment without registering it in the segment data manager map and without invoking upsert
-   * hooks. Returns the loaded {@link ImmutableSegment} so callers can compose registration separately. Single-segment
-   * callers should use {@link #downloadAndLoadSegment} which performs the registration step. Multi-segment managers
-   * may load several physical segments before wrapping them under a single map entry.
-   */
   protected ImmutableSegment loadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     File indexDir = downloadSegment(zkMetadata);
