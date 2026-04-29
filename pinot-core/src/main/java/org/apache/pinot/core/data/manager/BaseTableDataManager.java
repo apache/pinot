@@ -486,12 +486,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     _logger.info("Downloading and loading segment: {}", segmentName);
-    File indexDir = downloadSegment(zkMetadata);
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
+    ImmutableSegment immutableSegment = loadSegment(zkMetadata, indexLoadingConfig);
     addSegment(immutableSegment, zkMetadata);
     _logger.info("Downloaded and loaded segment: {} with CRC: {} on tier: {}", segmentName, zkMetadata.getCrc(),
         TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
+  }
+
+  /**
+   * Downloads and loads a segment without registering it in the segment data manager map and without invoking upsert
+   * hooks. Returns the loaded {@link ImmutableSegment} so callers can compose registration separately. Single-segment
+   * callers should use {@link #downloadAndLoadSegment} which performs the registration step. Multi-segment managers
+   * may load several physical segments before wrapping them under a single map entry.
+   */
+  protected ImmutableSegment loadSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    File indexDir = downloadSegment(zkMetadata);
+    return ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottlerSet, zkMetadata);
   }
 
   @Override
@@ -616,12 +626,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-      _segmentReloadSemaphore.acquire(segmentName, _logger);
-      try {
-        reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
-      } finally {
-        _segmentReloadSemaphore.release();
-      }
+      reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
     } else {
       _logger.warn("Failed to find segment: {}, skipping reloading it", segmentName);
     }
@@ -947,12 +952,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     CompletableFuture.allOf(segmentDataManagers.stream().map(segmentDataManager -> CompletableFuture.runAsync(() -> {
       String segmentName = segmentDataManager.getSegmentName();
       try {
-        _segmentReloadSemaphore.acquire(segmentName, _logger);
-        try {
-          reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
-        } finally {
-          _segmentReloadSemaphore.release();
-        }
+        reloadSegment(segmentDataManager, indexLoadingConfig, forceDownload);
       } catch (Throwable t) {
         _logger.error("Caught exception while reloading segment: {}", segmentName, t);
         failedSegments.add(segmentName);
@@ -973,36 +973,41 @@ public abstract class BaseTableDataManager implements TableDataManager {
       boolean forceDownload)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
-    if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-      // Use force commit to reload consuming segment
-      if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-        // Force-committing consuming segments is restricted only for tables with inconsistent state configs
-        // (partial-upsert or dropOutOfOrderRecord=true with replication > 1).
-        // For these tables, winner selection could incorrectly favor replicas with fewer consumed rows,
-        // triggering unnecessary reconsumption and resulting in inconsistent upsert state.
-        // To enable force commit for such tables, change the cluster config
-        // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload.
-        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
-        boolean isTableTypeInconsistentDuringConsumption =
-            TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
-        // Allow force commit if:
-        // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
-        // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
-        if (tableConfig == null || (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed())) {
-          _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
-              + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
+    _segmentReloadSemaphore.acquire(segmentName, _logger);
+    try {
+      if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+        // Use force commit to reload consuming segment
+        if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
+          // Force-committing consuming segments is restricted only for tables with inconsistent state configs
+          // (partial-upsert or dropOutOfOrderRecord=true with replication > 1).
+          // For these tables, winner selection could incorrectly favor replicas with fewer consumed rows,
+          // triggering unnecessary reconsumption and resulting in inconsistent upsert state.
+          // To enable force commit for such tables, change the cluster config
+          // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload.
+          TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+          ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
+          boolean isTableTypeInconsistentDuringConsumption =
+              TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
+          // Allow force commit if:
+          // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
+          // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
+          if (tableConfig == null || (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed())) {
+            _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
+                + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
+          } else {
+            _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
+            ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          }
         } else {
-          _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
         }
       } else {
-        _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
+        SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+        SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+        reloadSegment(segmentName, indexLoadingConfig, zkMetadata, localMetadata, forceDownload);
       }
-    } else {
-      SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-      SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-      reloadSegment(segmentName, indexLoadingConfig, zkMetadata, localMetadata, forceDownload);
+    } finally {
+      _segmentReloadSemaphore.release();
     }
   }
 
@@ -1542,8 +1547,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return staleSegments;
   }
 
-  @VisibleForTesting
-  StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
+  protected StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert tableConfig != null && schema != null;
