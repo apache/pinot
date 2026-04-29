@@ -2142,14 +2142,6 @@ public class CommonConstants {
     /// - "SAFE": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
     /// - "ALWAYS": MSE will always send stats, regardless of the version of the instances in the cluster.
     /// - "NEVER": MSE will never send stats.
-    ///
-    /// The reason for this flag that versions 1.3.0 and lower have two undesired behaviors:
-    /// 1. Some queries using intersection generate incorrect stats
-    /// 2. When stats from other nodes are sent but are different from expected, the query fails.
-    ///
-    /// In 1.4.0 the first issue is solved and instead of failing when unexpected stats are received, the query
-    /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
-    /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
 
