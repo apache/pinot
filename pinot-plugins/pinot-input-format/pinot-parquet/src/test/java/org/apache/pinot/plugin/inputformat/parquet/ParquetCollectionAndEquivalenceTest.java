@@ -18,18 +18,19 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
+import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.avro.Schema;
@@ -46,6 +47,7 @@ import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
@@ -136,15 +138,6 @@ public class ParquetCollectionAndEquivalenceTest {
       "    }",
       "  }",
       "}");
-
-  /**
-   * Files where the two readers disagree because of unrelated, pre-existing TIMESTAMP_NANOS / INT96
-   * unit-conversion behavior (Avro applies a different unit conversion than Native returns the raw value in).
-   * Out of scope for this PR — exclude rather than mask the divergence inside {@link #canonicalizeValue}.
-   */
-  private static final Set<String> KNOWN_TIMESTAMP_DIVERGENCE_FILES = Set.of(
-      "nested_structs.rust.parquet"
-  );
 
   private final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
 
@@ -302,11 +295,7 @@ public class ParquetCollectionAndEquivalenceTest {
     int compared = 0;
     for (File file : parquetFiles) {
       String fileName = file.getName();
-      if (KNOWN_TIMESTAMP_DIVERGENCE_FILES.contains(fileName)) {
-        continue;
-      }
       List<GenericRow> rowsAvro;
-      List<GenericRow> rowsNative;
       try {
         rowsAvro = readAll(new ParquetAvroRecordReader(), file);
       } catch (Throwable t) {
@@ -314,20 +303,17 @@ public class ParquetCollectionAndEquivalenceTest {
         // fail since this test verifies cross-reader agreement, not single-reader coverage.
         continue;
       }
-      try {
-        rowsNative = readAll(new ParquetNativeRecordReader(), file);
-      } catch (Throwable t) {
-        continue;
-      }
+      // All files readable by Avro reader should also be readable by native reader
+      List<GenericRow> rowsNative = readAll(new ParquetNativeRecordReader(), file);
       try {
         assertReadersAgree(fileName, rowsAvro, rowsNative);
         compared++;
       } catch (AssertionError e) {
-        Map<String, Object> firstAvro = rowsAvro.isEmpty() ? Collections.emptyMap()
-            : canonicalize(rowsAvro.get(0).getFieldToValueMap());
-        Map<String, Object> firstNative = rowsNative.isEmpty() ? Collections.emptyMap()
-            : canonicalize(rowsNative.get(0).getFieldToValueMap());
-        failures.add(fileName + ": " + e.getMessage() + "\n      avro  =" + firstAvro
+        Map<String, Object> firstAvro = rowsAvro.isEmpty() ? Map.of() : wrapArray(rowsAvro.get(0).getFieldToValueMap());
+        Map<String, Object> firstNative =
+            rowsNative.isEmpty() ? Map.of() : wrapArray(rowsNative.get(0).getFieldToValueMap());
+        failures.add(fileName + ": " + e.getMessage()
+            + "\n      avro  =" + firstAvro
             + "\n      native=" + firstNative);
       }
     }
@@ -428,8 +414,8 @@ public class ParquetCollectionAndEquivalenceTest {
     assertEquals(row.getValue("boolField"), true);
     assertEquals(row.getValue("stringField"), "hello parquet");
     assertEquals(row.getValue("decimalField"), new BigDecimal("123.45"));
-    assertEquals(row.getValue("dateField"), 19723);
-    assertEquals(row.getValue("timestampMillisField"), 1700000000123L);
+    assertEquals(row.getValue("dateField"), LocalDate.of(2024, 1, 1));
+    assertEquals(row.getValue("timestampMillisField"), new Timestamp(1700000000123L));
 
     Map<String, Object> struct = (Map<String, Object>) row.getValue("structField");
     assertEquals(struct.get("nestedString"), "nested-value");
@@ -459,8 +445,8 @@ public class ParquetCollectionAndEquivalenceTest {
   private static void assertReadersAgree(String fileName, List<GenericRow> rowsAvro, List<GenericRow> rowsNative) {
     assertEquals(rowsAvro.size(), rowsNative.size(), fileName + ": row count");
     for (int i = 0; i < rowsAvro.size(); i++) {
-      Map<String, Object> avroRow = canonicalize(rowsAvro.get(i).getFieldToValueMap());
-      Map<String, Object> nativeRow = canonicalize(rowsNative.get(i).getFieldToValueMap());
+      Map<String, Object> avroRow = wrapArray(rowsAvro.get(i).getFieldToValueMap());
+      Map<String, Object> nativeRow = wrapArray(rowsNative.get(i).getFieldToValueMap());
       assertEquals(avroRow, nativeRow, fileName + " row " + i);
     }
   }
@@ -496,97 +482,45 @@ public class ParquetCollectionAndEquivalenceTest {
     return rows;
   }
 
-  /**
-   * Normalizes a row's value map so that representation differences between the readers don't show up as data
-   * differences in the cross-reader equivalence check: {@code Object[]} becomes a {@code List}, nested Maps
-   * recurse into a {@link TreeMap} (so HashMap vs LinkedHashMap iteration order doesn't matter), {@code byte[]}
-   * gets content-based equality, and {@code Date}/{@code Timestamp}/{@code LocalDate}/{@code Instant} (as well
-   * as the {@code "YYYY-MM-DD"} string the Avro reader emits for LocalDate) all collapse to the underlying
-   * raw numeric form the native reader returns.
-   */
-  private static Map<String, Object> canonicalize(Map<String, Object> row) {
-    Map<String, Object> out = new TreeMap<>();
+  /// Wraps `byte[]` as [ByteArray] and converts `Object[]` to `List`, recursing through nested [Map] / [List] values,
+  /// so the row map can be compared via [Map#equals] without tripping on JVM array reference-equality.
+  private static Map<String, Object> wrapArray(Map<String, Object> row) {
+    Map<String, Object> out = Maps.newHashMapWithExpectedSize(row.size());
     for (Map.Entry<String, Object> e : row.entrySet()) {
-      out.put(e.getKey(), canonicalizeValue(e.getValue()));
+      out.put(e.getKey(), wrapArrayValue(e.getValue()));
     }
     return out;
   }
 
   @SuppressWarnings("unchecked")
-  private static Object canonicalizeValue(Object value) {
+  private static Object wrapArrayValue(Object value) {
+    if (value instanceof byte[]) {
+      return new ByteArray((byte[]) value);
+    }
     if (value instanceof Object[]) {
-      Object[] arr = (Object[]) value;
-      List<Object> list = new ArrayList<>(arr.length);
-      for (Object o : arr) {
-        list.add(canonicalizeValue(o));
+      Object[] array = (Object[]) value;
+      List<Object> list = new ArrayList<>(array.length);
+      for (Object v : array) {
+        list.add(wrapArrayValue(v));
       }
       return list;
     }
     if (value instanceof List) {
       List<Object> in = (List<Object>) value;
-      List<Object> list = new ArrayList<>(in.size());
-      for (Object o : in) {
-        list.add(canonicalizeValue(o));
-      }
-      return list;
-    }
-    if (value instanceof Map) {
-      Map<String, Object> in = (Map<String, Object>) value;
-      Map<String, Object> out = new TreeMap<>();
-      for (Map.Entry<String, Object> e : in.entrySet()) {
-        out.put(e.getKey(), canonicalizeValue(e.getValue()));
+      List<Object> out = new ArrayList<>(in.size());
+      for (Object v : in) {
+        out.add(wrapArrayValue(v));
       }
       return out;
     }
-    if (value instanceof byte[]) {
-      return new ByteArrayWrapper((byte[]) value);
-    }
-    if (value instanceof java.sql.Date) {
-      return (int) (((java.sql.Date) value).toLocalDate().toEpochDay());
-    }
-    if (value instanceof java.sql.Timestamp) {
-      return ((java.sql.Timestamp) value).getTime();
-    }
-    if (value instanceof java.time.LocalDate) {
-      return (int) ((java.time.LocalDate) value).toEpochDay();
-    }
-    if (value instanceof java.time.Instant) {
-      return ((java.time.Instant) value).toEpochMilli();
-    }
-    if (value instanceof String) {
-      String s = (String) value;
-      if (s.length() == 10 && s.charAt(4) == '-' && s.charAt(7) == '-') {
-        try {
-          return (int) java.time.LocalDate.parse(s).toEpochDay();
-        } catch (Exception ignored) {
-          // Not actually a date — leave the string alone.
-        }
+    if (value instanceof Map) {
+      Map<Object, Object> in = (Map<Object, Object>) value;
+      Map<Object, Object> out = Maps.newHashMapWithExpectedSize(in.size());
+      for (Map.Entry<Object, Object> e : in.entrySet()) {
+        out.put(e.getKey(), wrapArrayValue(e.getValue()));
       }
+      return out;
     }
     return value;
-  }
-
-  /** Content-based equality for byte arrays, so {@code byte[]} values compare correctly inside Maps/Lists. */
-  private static final class ByteArrayWrapper {
-    private final byte[] _bytes;
-
-    ByteArrayWrapper(byte[] bytes) {
-      _bytes = bytes;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      return o instanceof ByteArrayWrapper && Arrays.equals(_bytes, ((ByteArrayWrapper) o)._bytes);
-    }
-
-    @Override
-    public int hashCode() {
-      return Arrays.hashCode(_bytes);
-    }
-
-    @Override
-    public String toString() {
-      return "bytes(" + _bytes.length + ")";
-    }
   }
 }
