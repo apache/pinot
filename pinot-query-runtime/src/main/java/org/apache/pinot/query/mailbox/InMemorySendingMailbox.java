@@ -26,12 +26,14 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class InMemorySendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
+  private static final String SEND_SCOPE = "InMemorySendingMailbox";
 
   private final String _id;
   private final MailboxService _mailboxService;
@@ -63,6 +65,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Data data) {
+    QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
     sendPrivate(data, Collections.emptyList());
   }
 

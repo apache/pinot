@@ -86,6 +86,12 @@ public class SegmentAssignmentStrategyFactory {
     } else {
       // Set segment assignment strategy depending on strategy set in table config
       switch (assignmentStrategy) {
+        case AssignmentStrategy.ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY:
+          segmentAssignmentStrategy = new RoundRobinSegmentAssignmentStrategy();
+          break;
+        case AssignmentStrategy.ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY:
+          segmentAssignmentStrategy = new RoundRobinReplicaGroupSegmentAssignmentStrategy();
+          break;
         case AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY:
           segmentAssignmentStrategy = new ReplicaGroupSegmentAssignmentStrategy();
           break;

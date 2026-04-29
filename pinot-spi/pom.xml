@@ -47,6 +47,13 @@
 
                  DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
                  and non-existence of classes in these jars.
+
+                 DO NOT BUMP the hardcoded versions below. They are intentionally pinned test fixtures used by
+                 ClassLoaderTest to validate plugin realm isolation against known artifact contents. Corresponding
+                 ignore rules live in .github/dependabot.yml, but Dependabot cannot always distinguish these locked
+                 references from other uses of the same coordinate elsewhere in the repo (e.g., commons-io is also
+                 consumed at a newer version in the top-level pom.xml), so Dependabot may still open PRs that touch
+                 this file. Reviewers: reject any change to the versions below.
             -->
             <phase>generate-test-resources</phase>
             <goals>
@@ -57,34 +64,34 @@
                 <artifactItem>
                   <groupId>org.apache.pinot</groupId>
                   <artifactId>pinot-dropwizard</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <version>0.10.0</version> <!-- PINNED test fixture: DO NOT BUMP -->
                   <classifier>shaded</classifier>
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-dropwizard</outputDirectory>
                 </artifactItem>
                 <artifactItem>
                   <groupId>org.apache.pinot</groupId>
                   <artifactId>pinot-yammer</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <version>0.10.0</version> <!-- PINNED test fixture: DO NOT BUMP -->
                   <classifier>shaded</classifier>
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-yammer</outputDirectory>
                 </artifactItem>
                 <artifactItem>
                   <groupId>org.apache.pinot</groupId>
                   <artifactId>pinot-yammer</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <version>0.10.0</version> <!-- PINNED test fixture: DO NOT BUMP -->
                   <classifier>shaded</classifier>
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
                 </artifactItem>
                 <artifactItem>
                   <groupId>commons-io</groupId>
                   <artifactId>commons-io</artifactId>
-                  <version>2.11.0</version> <!-- @dependabot ignore -->
+                  <version>2.11.0</version> <!-- PINNED test fixture: DO NOT BUMP (asserted by ClassLoaderTest) -->
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
                 </artifactItem>
                 <artifactItem>
                   <groupId>com.yammer.metrics</groupId>
                   <artifactId>metrics-core</artifactId>
-                  <version>2.1.5</version> <!-- @dependabot ignore -->
+                  <version>2.1.5</version> <!-- PINNED test fixture: DO NOT BUMP -->
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
                 </artifactItem>
               </artifactItems>
@@ -98,6 +105,9 @@
 
                  DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
                  and non-existence of classes in these jars.
+
+                 DO NOT BUMP the hardcoded version below. See the matching notice in the copy-pinot-plugins
+                 execution above and the ignore rules in .github/dependabot.yml.
             -->
             <phase>generate-test-resources</phase>
             <goals>
@@ -108,7 +118,7 @@
                 <artifactItem>
                   <groupId>org.apache.pinot</groupId>
                   <artifactId>pinot-yammer</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
+                  <version>0.10.0</version> <!-- PINNED test fixture: DO NOT BUMP -->
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
                 </artifactItem>
               </artifactItems>

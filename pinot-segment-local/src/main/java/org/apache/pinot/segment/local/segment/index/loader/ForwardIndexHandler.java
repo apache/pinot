@@ -983,7 +983,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       if (!columnMetadata.getDataType().getStoredType().isFixedWidth()) {
         if (columnMetadata.isSingleValue()) {
           // lengthOfLongestEntry is available for dict columns from metadata.
-          builder.withLengthOfLongestEntry(columnMetadata.getColumnMaxLength());
+          builder.withLengthOfLongestEntry(columnMetadata.getLengthOfLongestElement());
         } else {
           // maxRowLength can only be determined by scanning the column.
           builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, reader, dictionary));

@@ -326,15 +326,15 @@ public class DictionaryIndexType
         return loadOnHeap ? new OnHeapDoubleDictionary(dataBuffer, length)
             : new DoubleDictionary(dataBuffer, length);
       case BIG_DECIMAL:
-        int numBytesPerValue = metadata.getColumnMaxLength();
+        int numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapBigDecimalDictionary(dataBuffer, length, numBytesPerValue)
             : new BigDecimalDictionary(dataBuffer, length, numBytesPerValue);
       case STRING:
-        numBytesPerValue = metadata.getColumnMaxLength();
+        numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue, strInterner, byteInterner)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
-        numBytesPerValue = metadata.getColumnMaxLength();
+        numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue, byteInterner)
             : new BytesDictionary(dataBuffer, length, numBytesPerValue);
       default:

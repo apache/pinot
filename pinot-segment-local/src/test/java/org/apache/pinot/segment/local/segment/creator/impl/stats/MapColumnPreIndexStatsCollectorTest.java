@@ -24,10 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.pinot.segment.local.segment.index.map.MapIndexReaderWrapper;
-import org.apache.pinot.segment.local.segment.index.map.MapKeyIndexReader;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -35,12 +32,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
 import static org.testng.Assert.*;
 
 
@@ -56,11 +53,11 @@ public class MapColumnPreIndexStatsCollectorTest {
         .build();
 
     Map<String, FieldSpec> children = new HashMap<>();
-    children.put("key", new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true));
+    children.put("key", new DimensionFieldSpec("key", DataType.STRING, true));
     // Values of heterogeneous types will drive per-key collectors of different types
-    children.put("value", new DimensionFieldSpec("value", FieldSpec.DataType.STRING, true));
+    children.put("value", new DimensionFieldSpec("value", DataType.STRING, true));
     Schema schema = new Schema();
-    schema.addField(new ComplexFieldSpec("col", FieldSpec.DataType.MAP, true, children));
+    schema.addField(new ComplexFieldSpec("col", DataType.MAP, true, children));
     return new StatsCollectorConfig(tableConfig, schema,
         tableConfig.getIndexingConfig().getSegmentPartitionConfig());
   }
@@ -561,53 +558,5 @@ public class MapColumnPreIndexStatsCollectorTest {
 
     assertTrue(col.getKeyStatistics("kInt") instanceof NoDictColumnStatisticsCollector);
     assertTrue(col.getKeyStatistics("kStr") instanceof NoDictColumnStatisticsCollector);
-  }
-
-  private static MapIndexReaderWrapper mapReaderWithValueType(FieldSpec.DataType valueType) {
-    FieldSpec keySpec = new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true);
-    FieldSpec valueSpec = new DimensionFieldSpec("value", valueType, true);
-    ComplexFieldSpec complexFieldSpec = new ComplexFieldSpec("testMap", FieldSpec.DataType.MAP, true,
-        Map.of(ComplexFieldSpec.KEY_FIELD, keySpec, ComplexFieldSpec.VALUE_FIELD, valueSpec));
-    return new MapIndexReaderWrapper(mock(ForwardIndexReader.class), ComplexFieldSpec.toMapFieldSpec(complexFieldSpec));
-  }
-
-  @Test
-  public void testGetKeyStoredTypeReturnsPrimitiveStoredTypes() {
-    for (FieldSpec.DataType type : new FieldSpec.DataType[]{
-        FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
-        FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES
-    }) {
-      assertEquals(mapReaderWithValueType(type).getKeyStoredType("k"), type, "Stored type mismatch for: " + type);
-    }
-  }
-
-  @Test
-  public void testGetKeyStoredTypeForBooleanIsInt() {
-    assertEquals(mapReaderWithValueType(FieldSpec.DataType.BOOLEAN).getKeyStoredType("k"), FieldSpec.DataType.INT);
-  }
-
-  @Test
-  public void testGetKeyStoredTypeForTimestampIsLong() {
-    assertEquals(mapReaderWithValueType(FieldSpec.DataType.TIMESTAMP).getKeyStoredType("k"), FieldSpec.DataType.LONG);
-  }
-
-  @Test
-  public void testGetKeyStoredTypeForJsonIsString() {
-    assertEquals(mapReaderWithValueType(FieldSpec.DataType.JSON).getKeyStoredType("k"), FieldSpec.DataType.STRING);
-  }
-
-  @Test
-  public void testGetStoredTypeIsAlwaysMap() {
-    assertEquals(mapReaderWithValueType(FieldSpec.DataType.STRING).getStoredType(), FieldSpec.DataType.MAP);
-  }
-
-  @Test
-  public void testMapKeyIndexReaderGetStoredTypeReturnsStoredType() {
-    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
-        new DimensionFieldSpec("k", FieldSpec.DataType.BOOLEAN, true)).getStoredType(), FieldSpec.DataType.INT);
-    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
-        new DimensionFieldSpec("k", FieldSpec.DataType.TIMESTAMP, true)).getStoredType(), FieldSpec.DataType.LONG);
-    assertEquals(new MapKeyIndexReader(mock(ForwardIndexReader.class), "k",
-        new DimensionFieldSpec("k", FieldSpec.DataType.JSON, true)).getStoredType(), FieldSpec.DataType.STRING);
   }
 }

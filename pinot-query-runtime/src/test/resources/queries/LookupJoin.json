@@ -1,6 +1,6 @@
 {
   "lookup_join_basic": {
-    "comment": "Tests lookup join with a dimension table. V1 and V2 pass end-to-end. Lite mode is skipped because the broker lacks DimensionTableDataManager. The V2 path is additionally validated at the planner level by LookupJoinPlanTest.",
+    "comment": "Tests lookup join with a dimension table: inner/left join, fact-side filter, and aggregation above the join. V1 and V2 pass end-to-end. Lite mode is skipped because the broker lacks DimensionTableDataManager. The V2 path is additionally validated at the planner level by LookupJoinPlanTest. Exercises WorkerManager.assignWorkersToNonRootFragment lookup-join branch on the V1 path.",
     "tables": {
       "fact_tbl": {
         "schema": [
@@ -39,6 +39,38 @@
           [1, "alpha"],
           [2, "beta"],
           [3, "gamma"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Left outer lookup join - unmatched fact row (dim_key=4) preserved with null dim column",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.dim_key, {dim_tbl}.name FROM {fact_tbl} LEFT JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id",
+        "outputs": [
+          [1, "alpha"],
+          [1, "alpha"],
+          [2, "beta"],
+          [3, "gamma"],
+          [4, null]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Lookup join with filter on fact-side column - filter applied before the join",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.dim_key, {fact_tbl}.metric, {dim_tbl}.name FROM {fact_tbl} JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id WHERE {fact_tbl}.metric >= 200",
+        "outputs": [
+          [2, 200, "beta"],
+          [3, 300, "gamma"],
+          [1, 400, "alpha"]
+        ],
+        "ignoreLiteMode": true
+      },
+      {
+        "description": "Aggregation above lookup join - counts matched fact rows per dim name",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {dim_tbl}.name, COUNT(*) FROM {fact_tbl} JOIN {dim_tbl} ON {fact_tbl}.dim_key = {dim_tbl}.id GROUP BY {dim_tbl}.name",
+        "outputs": [
+          ["alpha", 2],
+          ["beta", 1],
+          ["gamma", 1]
         ],
         "ignoreLiteMode": true
       }

@@ -234,6 +234,44 @@ public class MergeRollupTaskGeneratorTest {
     });
   }
 
+  @Test
+  public void testValidCompressionFactor() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("a", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> validConfig = new HashMap<>();
+    validConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    validConfig.put(prefix + "a.compressionFactor", "200");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, validConfig)))
+        .build();
+    taskGenerator.validateTaskConfigs(offlineTableConfig, schema, validConfig);
+  }
+
+  @Test
+  public void testInvalidCompressionFactor() {
+    MergeRollupTaskGenerator taskGenerator = new MergeRollupTaskGenerator();
+    Schema schema = new Schema();
+    schema.addField(new MetricFieldSpec("a", FieldSpec.DataType.BYTES));
+
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MinionConstants.MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+
+    Map<String, String> invalidConfig = new HashMap<>();
+    invalidConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    invalidConfig.put(prefix + "a.compressionFactor", "0");
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTaskConfig(new TableTaskConfig(Map.of(MinionConstants.MergeRollupTask.TASK_TYPE, invalidConfig)))
+        .build();
+    assertThrows(IllegalStateException.class, () -> {
+      taskGenerator.validateTaskConfigs(offlineTableConfig, schema, invalidConfig);
+    });
+  }
+
   /**
    * Tests for some config checks
    */

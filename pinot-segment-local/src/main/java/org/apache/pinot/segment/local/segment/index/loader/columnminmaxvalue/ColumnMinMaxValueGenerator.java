@@ -186,11 +186,11 @@ public class ColumnMinMaxValueGenerator {
       case DOUBLE:
         return new DoubleDictionary(dictionaryBuffer, length);
       case BIG_DECIMAL:
-        return new BigDecimalDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
+        return new BigDecimalDictionary(dictionaryBuffer, length, columnMetadata.getLengthOfLongestElement());
       case STRING:
-        return new StringDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
+        return new StringDictionary(dictionaryBuffer, length, columnMetadata.getLengthOfLongestElement());
       case BYTES:
-        return new BytesDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
+        return new BytesDictionary(dictionaryBuffer, length, columnMetadata.getLengthOfLongestElement());
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
     }
