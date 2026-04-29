@@ -267,7 +267,7 @@
     <protobuf.version>4.34.0</protobuf.version>
     <grpc.version>1.80.0</grpc.version>
     <google.cloud.libraries.version>26.80.0</google.cloud.libraries.version>
-    <opentelemetry.gcp.resources.version>1.55.0-alpha</opentelemetry.gcp.resources.version>
+    <opentelemetry.gcp.resources.version>1.56.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.49.0</google.errorprone.version>
