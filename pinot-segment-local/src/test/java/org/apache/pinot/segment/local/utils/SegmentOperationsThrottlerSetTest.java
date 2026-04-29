@@ -20,6 +20,9 @@ package org.apache.pinot.segment.local.utils;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -195,15 +198,76 @@ public class SegmentOperationsThrottlerSetTest {
 
   @Test
   public void testThrowExceptionOnSettingInvalidConfigValues() {
-    // All invalid constructor args should throw IllegalArgumentException regardless of isServingQueries
+    // Negative constructor args should throw IllegalArgumentException regardless of isServingQueries.
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(-1, 4, true));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(0, 4, true));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, -4, true));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, 0, true));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(-1, 4, false));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(0, 4, false));
     Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, -4, false));
-    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentOperationsThrottler(1, 0, false));
+  }
+
+  @Test
+  public void testZeroPermitsKillSwitch()
+      throws Exception {
+    SegmentOperationsThrottler t = new SegmentOperationsThrottler(0, 0, true);
+    Assert.assertEquals(t.totalPermits(), 0);
+    Assert.assertEquals(t.availablePermits(), 0);
+
+    // Updating to a positive value lifts the kill switch.
+    t.updatePermits(2, 2);
+    Assert.assertEquals(t.totalPermits(), 2);
+    Assert.assertEquals(t.availablePermits(), 2);
+
+    // Setting back to 0 restores the kill switch without throwing.
+    t.updatePermits(0, 0);
+    Assert.assertEquals(t.totalPermits(), 0);
+    Assert.assertEquals(t.availablePermits(), 0);
+  }
+
+  @Test(timeOut = 10_000)
+  public void testZeroPermitsBlocksAcquireUntilPermitsRestored()
+      throws Exception {
+    SegmentOperationsThrottler t = new SegmentOperationsThrottler(0, 0, true);
+    Assert.assertEquals(t.totalPermits(), 0);
+    Assert.assertEquals(t.availablePermits(), 0);
+
+    // Spawn a thread that calls acquire() and parks because permits == 0.
+    CountDownLatch acquired = new CountDownLatch(1);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Thread acquirer = new Thread(() -> {
+      try {
+        t.acquire();
+        acquired.countDown();
+      } catch (Throwable th) {
+        failure.set(th);
+      }
+    }, "kill-switch-acquirer");
+    acquirer.setDaemon(true);
+    acquirer.start();
+
+    // Wait until the acquirer is parked inside acquire(). availablePermits() goes to -1 once it
+    // has decremented but not yet been granted a permit (AdjustableSemaphore behavior), so poll
+    // for that condition.
+    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (acquirer.getState() != Thread.State.WAITING && System.nanoTime() < deadlineNanos) {
+      Thread.sleep(10);
+    }
+    Assert.assertEquals(acquirer.getState(), Thread.State.WAITING,
+        "acquirer thread should be parked when permits == 0");
+    Assert.assertFalse(acquired.await(100, TimeUnit.MILLISECONDS),
+        "acquire() must not return while permits == 0");
+
+    // Restore permits — the parked acquirer should be released.
+    t.updatePermits(1, 1);
+    Assert.assertTrue(acquired.await(5, TimeUnit.SECONDS),
+        "acquire() should complete once permits are restored");
+    Assert.assertNull(failure.get(), "acquirer thread should not throw");
+
+    // The released acquirer holds the one permit, so available is now 0 with total 1.
+    Assert.assertEquals(t.totalPermits(), 1);
+    Assert.assertEquals(t.availablePermits(), 0);
+
+    t.release();
+    Assert.assertEquals(t.availablePermits(), 1);
   }
 
   @Test
@@ -259,7 +323,7 @@ public class SegmentOperationsThrottlerSetTest {
       Assert.assertEquals(countGaugeValue, 0);
 
       // Change the value of cluster config for max segment operation parallelism to be a negative value.
-      // If config is <= 0, this is an invalid configuration change. The throttler should not be updated.
+      // Negative values are invalid and the throttler should not be updated. (0 is valid as a kill switch.)
       Map<String, String> updatedClusterConfigs = new HashMap<>();
       updatedClusterConfigs.put(PARALLELISM_KEYS[i], "-1");
       sot.onChange(updatedClusterConfigs.keySet(), updatedClusterConfigs);
