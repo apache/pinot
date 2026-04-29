@@ -188,9 +188,6 @@ public final class IngestionConfigUtils {
 
   /**
    * Fetches the configured segmentIngestionType (APPEND/REFRESH) from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here
-   * in favor of ingestion
-   * config)
    */
   public static String getBatchSegmentIngestionType(TableConfig tableConfig) {
     String segmentIngestionType = null;
@@ -200,17 +197,11 @@ public final class IngestionConfigUtils {
         segmentIngestionType = batchIngestionConfig.getSegmentIngestionType();
       }
     }
-    if (segmentIngestionType == null) {
-      segmentIngestionType = tableConfig.getValidationConfig().getSegmentPushType();
-    }
     return (segmentIngestionType == null) ? DEFAULT_SEGMENT_INGESTION_TYPE : segmentIngestionType;
   }
 
   /**
    * Fetches the configured segmentIngestionFrequency from the table config
-   * First checks in the ingestionConfig. If not found, checks in the segmentsConfig (has been deprecated from here
-   * in favor of ingestion
-   * config)
    */
   public static String getBatchSegmentIngestionFrequency(TableConfig tableConfig) {
     String segmentIngestionFrequency = null;
@@ -219,9 +210,6 @@ public final class IngestionConfigUtils {
       if (batchIngestionConfig != null) {
         segmentIngestionFrequency = batchIngestionConfig.getSegmentIngestionFrequency();
       }
-    }
-    if (segmentIngestionFrequency == null) {
-      segmentIngestionFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
     }
     return segmentIngestionFrequency;
   }
