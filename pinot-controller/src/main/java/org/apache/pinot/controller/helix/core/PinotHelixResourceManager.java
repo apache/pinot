@@ -137,9 +137,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
-import org.apache.pinot.common.utils.helix.PinotZkMultiResult;
-import org.apache.pinot.common.utils.helix.PinotZkOp;
-import org.apache.pinot.common.utils.helix.ZkMultiWriter;
+import org.apache.pinot.common.utils.helix.ZkMultiWriteBuilder;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -2124,23 +2122,19 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Submits a list of znode operations as a single atomic ZooKeeper {@code multi()} transaction.
-   * Each op is independently a {@link PinotZkOp#set}, {@link PinotZkOp#create},
-   * {@link PinotZkOp#delete}, or {@link PinotZkOp#check} (version assertion without mutation) on
-   * any path. Either every op commits or none do. Per-op version checks make this the transactional
-   * CAS primitive for cross-znode controller writes.
-   * <p>Returns a {@link PinotZkMultiResult}. On atomic rollback (e.g. version mismatch, node
-   * missing, node already exists), the result carries the failing op index and ZK error code —
-   * no exception is thrown. <b>Unlike</b> the single-znode wrappers on this class ({@code
-   * setZKData}, {@code createZKNode}, {@code deleteZKPath}) which return {@code boolean} on
-   * any failure, {@code multiWriteZK} throws on connectivity / session failures (they are not an
-   * atomic outcome and cannot be meaningfully rolled back into a per-op result).
-   * <p>Requires the controller to have been constructed with a non-null zkAddress (via the
-   * {@link ControllerConf} constructor); otherwise throws {@link IllegalStateException}. Also
-   * throws {@link IllegalStateException} if called after {@link #stop()}.
+   * Returns a fresh {@link ZkMultiWriteBuilder} for submitting an atomic ZooKeeper {@code multi()}
+   * transaction (set / create / delete / version-check ops on any combination of znodes). Either
+   * every op commits or none do.
+   * <p>Eagerly validates the dedicated multi-write ZK client is available: requires the controller
+   * to have been constructed with a non-null zkAddress (via the {@link ControllerConf} constructor)
+   * and not yet {@link #stop()}-ped, otherwise throws {@link IllegalStateException}.
+   * <p>The builder's {@code execute()} throws {@link org.apache.zookeeper.KeeperException} on atomic
+   * rollback (the subtype identifies the cause: {@code BadVersionException}, {@code NoNodeException},
+   * {@code NodeExistsException}, ...). Connectivity / session failures propagate as the original
+   * {@link org.apache.helix.zookeeper.zkclient.exception.ZkException}.
    */
-  public PinotZkMultiResult multiWriteZK(List<PinotZkOp> ops) {
-    return ZkMultiWriter.multi(getOrBuildMultiWriteZkClient(), ops);
+  public ZkMultiWriteBuilder multiWriteZK() {
+    return new ZkMultiWriteBuilder(getOrBuildMultiWriteZkClient());
   }
 
   private ZkClient getOrBuildMultiWriteZkClient() {

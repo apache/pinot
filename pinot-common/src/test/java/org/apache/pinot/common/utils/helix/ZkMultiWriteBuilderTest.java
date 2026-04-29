@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.helix;
 
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -33,9 +32,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class ZkMultiWriterTest {
+public class ZkMultiWriteBuilderTest {
 
-  private static final String ROOT = "/ZkMultiWriterTest";
+  private static final String ROOT = "/ZkMultiWriteBuilderTest";
 
   private ZkStarter.ZookeeperInstance _zk;
   private ZkClient _client;
@@ -92,45 +91,48 @@ public class ZkMultiWriterTest {
     return s.getVersion();
   }
 
+  private ZkMultiWriteBuilder builder() {
+    return new ZkMultiWriteBuilder(_client);
+  }
+
   // -----------------------------------------------------------------------
   // Tests
   // -----------------------------------------------------------------------
 
   @Test
-  public void testAllSetSuccess() {
+  public void testAllSetSuccess()
+      throws KeeperException {
     String pA = ROOT + "/a";
     String pB = ROOT + "/b";
     seed(pA, record("a", "v", "1"));
     seed(pB, record("b", "v", "1"));
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.set(pA, record("a", "v", "2"), 0),
-        PinotZkOp.set(pB, record("b", "v", "2"), 0)));
+    builder()
+        .set(pA, record("a", "v", "2"), 0)
+        .set(pB, record("b", "v", "2"), 0)
+        .execute();
 
-    Assert.assertTrue(res.isSuccess());
-    Assert.assertEquals(res.getFailedOpIndex(), -1);
-    Assert.assertNull(res.getFailureCode());
-    Assert.assertEquals(res.getOutcomes().size(), 2);
-    Assert.assertNotNull(res.getOutcomes().get(0).getStat());
-    Assert.assertEquals(res.getOutcomes().get(0).getStat().getVersion(), 1);
     Assert.assertEquals(read(pA).getSimpleField("v"), "2");
     Assert.assertEquals(read(pB).getSimpleField("v"), "2");
+    Assert.assertEquals(version(pA), 1);
+    Assert.assertEquals(version(pB), 1);
   }
 
   @Test
-  public void testMixedCreateSetDeleteSuccess() {
+  public void testMixedCreateSetDeleteSuccess()
+      throws KeeperException {
     String pExisting = ROOT + "/existing";
     String pNew = ROOT + "/new";
     String pStale = ROOT + "/stale";
     seed(pExisting, record("existing", "v", "1"));
     seed(pStale, record("stale", "v", "x"));
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.set(pExisting, record("existing", "v", "2"), 0),
-        PinotZkOp.create(pNew, record("new", "v", "1")),
-        PinotZkOp.delete(pStale, 0)));
+    builder()
+        .set(pExisting, record("existing", "v", "2"), 0)
+        .create(pNew, record("new", "v", "1"))
+        .delete(pStale, 0)
+        .execute();
 
-    Assert.assertTrue(res.isSuccess(), "result: " + res);
     Assert.assertEquals(read(pExisting).getSimpleField("v"), "2");
     Assert.assertEquals(read(pNew).getSimpleField("v"), "1");
     Assert.assertFalse(_client.exists(pStale));
@@ -147,13 +149,11 @@ public class ZkMultiWriterTest {
     _client.writeData(pB, record("b", "v", "bumped"));
     Assert.assertEquals(version(pB), 1);
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.set(pA, record("a", "v", "2"), 0),
-        PinotZkOp.set(pB, record("b", "v", "2"), 0))); // stale version -> BADVERSION
-
-    Assert.assertFalse(res.isSuccess());
-    Assert.assertEquals(res.getFailedOpIndex(), 1);
-    Assert.assertEquals(res.getFailureCode(), KeeperException.Code.BADVERSION);
+    Assert.expectThrows(KeeperException.BadVersionException.class, () ->
+        builder()
+            .set(pA, record("a", "v", "2"), 0)
+            .set(pB, record("b", "v", "2"), 0) // stale version -> BADVERSION
+            .execute());
 
     // Atomic rollback — pA must NOT have been updated.
     Assert.assertEquals(read(pA).getSimpleField("v"), "1");
@@ -171,13 +171,12 @@ public class ZkMultiWriterTest {
     // Bump gate's version; check(gate, 0) should fail and prevent the set.
     _client.writeData(pGate, record("gate", "v", "bumped"));
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.check(pGate, 0),
-        PinotZkOp.set(pTarget, record("target", "v", "2"), 0)));
+    Assert.expectThrows(KeeperException.BadVersionException.class, () ->
+        builder()
+            .check(pGate, 0)
+            .set(pTarget, record("target", "v", "2"), 0)
+            .execute());
 
-    Assert.assertFalse(res.isSuccess());
-    Assert.assertEquals(res.getFailedOpIndex(), 0);
-    Assert.assertEquals(res.getFailureCode(), KeeperException.Code.BADVERSION);
     Assert.assertEquals(read(pTarget).getSimpleField("v"), "1", "target must not have been mutated");
   }
 
@@ -187,13 +186,12 @@ public class ZkMultiWriterTest {
     String pMissing = ROOT + "/missing";
     seed(pExisting, record("existing", "v", "1"));
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.set(pExisting, record("existing", "v", "2"), 0),
-        PinotZkOp.delete(pMissing, PinotZkOp.ANY_VERSION)));
+    Assert.expectThrows(KeeperException.NoNodeException.class, () ->
+        builder()
+            .set(pExisting, record("existing", "v", "2"), 0)
+            .delete(pMissing)
+            .execute());
 
-    Assert.assertFalse(res.isSuccess());
-    Assert.assertEquals(res.getFailedOpIndex(), 1);
-    Assert.assertEquals(res.getFailureCode(), KeeperException.Code.NONODE);
     // pExisting must NOT have been updated.
     Assert.assertEquals(read(pExisting).getSimpleField("v"), "1");
   }
@@ -205,29 +203,52 @@ public class ZkMultiWriterTest {
     seed(pA, record("a", "v", "1"));
     seed(pB, record("b", "v", "existing"));
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.set(pA, record("a", "v", "2"), 0),
-        PinotZkOp.create(pB, record("b", "v", "fresh"))));
+    Assert.expectThrows(KeeperException.NodeExistsException.class, () ->
+        builder()
+            .set(pA, record("a", "v", "2"), 0)
+            .create(pB, record("b", "v", "fresh"))
+            .execute());
 
-    Assert.assertFalse(res.isSuccess());
-    Assert.assertEquals(res.getFailedOpIndex(), 1);
-    Assert.assertEquals(res.getFailureCode(), KeeperException.Code.NODEEXISTS);
     Assert.assertEquals(read(pA).getSimpleField("v"), "1");
     Assert.assertEquals(read(pB).getSimpleField("v"), "existing");
   }
 
   @Test
-  public void testAnyVersionSetSucceedsRegardlessOfVersion() {
+  public void testAnyVersionSetSucceedsRegardlessOfVersion()
+      throws KeeperException {
     String pA = ROOT + "/a";
     seed(pA, record("a", "v", "1"));
     _client.writeData(pA, record("a", "v", "bumped"));
     _client.writeData(pA, record("a", "v", "bumped-again"));
     Assert.assertEquals(version(pA), 2);
 
-    PinotZkMultiResult res = ZkMultiWriter.multi(_client, List.of(
-        PinotZkOp.set(pA, record("a", "v", "final"), PinotZkOp.ANY_VERSION)));
+    builder().set(pA, record("a", "v", "final")).execute();
 
-    Assert.assertTrue(res.isSuccess());
     Assert.assertEquals(read(pA).getSimpleField("v"), "final");
+  }
+
+  @Test
+  public void testBuilderRejectsDoubleExecute()
+      throws KeeperException {
+    String pA = ROOT + "/a";
+    seed(pA, record("a", "v", "1"));
+
+    // After a successful execute(), the builder rejects further calls.
+    ZkMultiWriteBuilder b = builder().set(pA, record("a", "v", "2"), 0);
+    b.execute();
+    Assert.expectThrows(IllegalStateException.class, b::execute);
+    Assert.expectThrows(IllegalStateException.class, () -> b.set(pA, record("a", "v", "3"), 1));
+
+    // After a failed execute() (atomic rollback), the builder is also burned — no retry through
+    // the same instance. Caller must obtain a fresh builder for the retry tick.
+    ZkMultiWriteBuilder failed = builder().set(pA, record("a", "v", "x"), 99); // stale version
+    Assert.expectThrows(KeeperException.BadVersionException.class, failed::execute);
+    Assert.expectThrows(IllegalStateException.class, failed::execute);
+    Assert.expectThrows(IllegalStateException.class, () -> failed.set(pA, record("a", "v", "y"), 1));
+
+    // Empty execute() also burns the builder.
+    ZkMultiWriteBuilder empty = builder();
+    Assert.expectThrows(IllegalStateException.class, empty::execute);
+    Assert.expectThrows(IllegalStateException.class, empty::execute);
   }
 }
