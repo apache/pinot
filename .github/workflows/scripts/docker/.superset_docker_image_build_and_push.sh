@@ -18,8 +18,14 @@
 # under the License.
 #
 
+set -e
+
 if [ -z "${DOCKER_IMAGE_NAME}" ]; then
   DOCKER_IMAGE_NAME="apachepinot/pinot-superset"
+fi
+if [ -z "${DOCKER_FILE_BASE_DIR}" ]; then
+  echo "DOCKER_FILE_BASE_DIR is required" >&2
+  exit 1
 fi
 if [ -z "${SUPERSET_IMAGE_TAG}" ]; then
   SUPERSET_IMAGE_TAG="latest"
@@ -27,33 +33,40 @@ fi
 if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/amd64"
 fi
+if [ -z "${TAG_SUFFIX}" ]; then
+  TAG_SUFFIX=""
+fi
 
-DATE=`date +%Y%m%d`
-docker pull apache/superset:${SUPERSET_IMAGE_TAG}
-COMMIT_ID=`docker images apache/superset:${SUPERSET_IMAGE_TAG} --format "{{.ID}}"`
+DATE=$(date +%Y%m%d)
+docker pull "apache/superset:${SUPERSET_IMAGE_TAG}"
+COMMIT_ID=$(docker images "apache/superset:${SUPERSET_IMAGE_TAG}" --format "{{.ID}}")
 
 tags=()
 if [ -z "${TAGS}" ]; then
   tags=("${COMMIT_ID}-${DATE}")
   tags+=("latest")
 else
-  declare -a tags=($(echo ${TAGS} | tr "," " "))
+  declare -a tags=($(echo "${TAGS}" | tr "," " "))
 fi
 
 DOCKER_BUILD_TAGS=""
 for tag in "${tags[@]}"
 do
-  echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}"
-  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag} "
+  echo "Plan to build and push docker images for: ${DOCKER_IMAGE_NAME}:${tag}${TAG_SUFFIX}"
+  DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}${TAG_SUFFIX} "
 done
 
-cd ${DOCKER_FILE_BASE_DIR}
+cd "${DOCKER_FILE_BASE_DIR}"
 
 docker build \
     --no-cache \
-    --platform=${BUILD_PLATFORM} \
+    --platform="${BUILD_PLATFORM}" \
     --file Dockerfile \
-    --build-arg SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG} \
+    --build-arg "SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG}" \
     ${DOCKER_BUILD_TAGS} \
-    --push \
     .
+
+for tag in "${tags[@]}"
+do
+  docker push "${DOCKER_IMAGE_NAME}:${tag}${TAG_SUFFIX}"
+done
