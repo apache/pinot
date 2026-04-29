@@ -147,6 +147,7 @@ public class PinotBrokerDebug {
   @ApiOperation(value = "Get the routing table for a table")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request"),
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
@@ -179,6 +180,7 @@ public class PinotBrokerDebug {
   @ApiOperation(value = "Get the routing table for a table, including optional segments")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request"),
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
@@ -218,9 +220,11 @@ public class PinotBrokerDebug {
       throw new WebApplicationException("Logical table config not found for: " + rawTableName,
           Response.Status.NOT_FOUND);
     }
+    // Use a single requestId across all physical tables so replica-group selection is consistent.
+    long requestId = getRequestId();
     for (String physicalTableWithType : config.getPhysicalTableConfigMap().keySet()) {
       RoutingTable routingTable = routingManager.getRoutingTable(
-          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + physicalTableWithType), getRequestId());
+          CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + physicalTableWithType), requestId);
       if (routingTable != null) {
         consumer.accept(physicalTableWithType, routingTable);
       } else {
