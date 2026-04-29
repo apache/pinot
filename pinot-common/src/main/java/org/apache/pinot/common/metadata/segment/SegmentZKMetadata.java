@@ -198,6 +198,18 @@ public class SegmentZKMetadata implements ZKMetadata {
     }
   }
 
+  public boolean isBeingDeleted() {
+    return Boolean.parseBoolean(_simpleFields.get(Segment.IS_BEING_DELETED));
+  }
+
+  public void setBeingDeleted(boolean beingDeleted) {
+    if (beingDeleted) {
+      _simpleFields.put(Segment.IS_BEING_DELETED, "true");
+    } else {
+      _simpleFields.remove(Segment.IS_BEING_DELETED);
+    }
+  }
+
   public String getTier() {
     return _simpleFields.get(Segment.TIER);
   }

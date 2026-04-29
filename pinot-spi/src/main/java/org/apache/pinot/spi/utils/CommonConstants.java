@@ -1955,6 +1955,13 @@ public class CommonConstants {
      */
     public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
 
+    /**
+     * Marker indicating the segment is mid-deletion. Set on the segment ZK metadata before the segment is removed
+     * from the Ideal State and before the segment znode is deleted, so concurrent operations can observe an in-flight
+     * deletion and skip the segment. Stored as a string (`"true"` or absent); absent is interpreted as `false`.
+     */
+    public static final String IS_BEING_DELETED = "segment.is.being.deleted";
+
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
 

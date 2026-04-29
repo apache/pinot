@@ -1051,6 +1051,42 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertTrue(tierToSegmentsMap.isEmpty());
   }
 
+  @Test
+  public void testDeleteSegmentsMarksFlagBeforeIdealStateRemoval()
+      throws Exception {
+    addDummySchema(RAW_TABLE_NAME);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
+            .setServerTenant(SERVER_TENANT_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    _helixResourceManager.addTable(tableConfig);
+
+    String segmentName = "segDeleteFlag";
+    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName),
+        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, segmentName));
+
+    // Sanity: znode exists with the flag unset and the segment is in the IS.
+    SegmentZKMetadata before =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);
+    assertNotNull(before);
+    assertFalse(before.isBeingDeleted());
+    assertTrue(_helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getPartitionSet().contains(segmentName));
+
+    // SegmentDeletionManager schedules znode removal via a delayed executor task, so the segment znode (with whatever
+    // simpleFields the controller wrote during deleteSegments) remains observable for a short window after the call.
+    assertTrue(_helixResourceManager.deleteSegments(OFFLINE_TABLE_NAME, List.of(segmentName)).isSuccessful());
+
+    // After deleteSegments returns: the segment is gone from the Ideal State and the znode is marked.
+    assertFalse(_helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getPartitionSet().contains(segmentName));
+    SegmentZKMetadata after =
+        ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);
+    assertNotNull(after, "Segment znode should still exist (deletion is scheduled with a delay)");
+    assertTrue(after.isBeingDeleted(), "isBeingDeleted flag should be set on the znode after deleteSegments");
+
+    _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
+  }
+
   /**
    * Tests the code path where a subset of merged segments (from the original segmentsTo list)
    * is passed to the endReplace API.

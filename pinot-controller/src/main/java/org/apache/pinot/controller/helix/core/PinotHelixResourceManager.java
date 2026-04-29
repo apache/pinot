@@ -1059,6 +1059,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+      markSegmentsAsBeingDeleted(tableNameWithType, segmentNames);
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
       if (retentionPeriod != null) {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
@@ -1071,6 +1072,28 @@ public class PinotHelixResourceManager {
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);
       return PinotResourceManagerResponse.failure(e.getMessage());
+    }
+  }
+
+  /**
+   * Sets the {@code isBeingDeleted} flag on each segment's ZK metadata via a version-checked write so concurrent
+   * operations can observe an in-flight deletion and skip the segment. The flag is advisory; the segment znode and
+   * deep-store cleanup still happen in the subsequent steps. Aborts on the first version mismatch — the caller is
+   * expected to retry on the next tick.
+   */
+  private void markSegmentsAsBeingDeleted(String tableNameWithType, List<String> segmentNames) {
+    for (String segmentName : segmentNames) {
+      Stat stat = new Stat();
+      SegmentZKMetadata metadata =
+          ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName, stat);
+      if (metadata == null || metadata.isBeingDeleted()) {
+        continue;
+      }
+      metadata.setBeingDeleted(true);
+      if (!ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, metadata, stat.getVersion())) {
+        throw new IllegalStateException(
+            "Failed to mark segment: " + segmentName + " of table: " + tableNameWithType + " as being deleted");
+      }
     }
   }
 

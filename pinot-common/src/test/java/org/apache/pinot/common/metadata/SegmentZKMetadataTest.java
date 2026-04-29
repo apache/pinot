@@ -82,6 +82,26 @@ public class SegmentZKMetadataTest {
   }
 
   @Test
+  public void beingDeletedFlagRoundTripTest() {
+    // Default-on-missing: a freshly built ZNRecord with no key reads as false.
+    SegmentZKMetadata fresh = new SegmentZKMetadata(new ZNRecord("seg"));
+    Assert.assertFalse(fresh.isBeingDeleted());
+    Assert.assertFalse(fresh.toZNRecord().getSimpleFields().containsKey(CommonConstants.Segment.IS_BEING_DELETED));
+
+    // Set true: round-trips through ZNRecord and the simple field is "true".
+    fresh.setBeingDeleted(true);
+    ZNRecord serialized = fresh.toZNRecord();
+    assertEquals(serialized.getSimpleField(CommonConstants.Segment.IS_BEING_DELETED), "true");
+    SegmentZKMetadata reparsed = new SegmentZKMetadata(serialized);
+    Assert.assertTrue(reparsed.isBeingDeleted());
+
+    // Set false: the key is REMOVED (not stored as "false") to keep unrelated znodes clean.
+    reparsed.setBeingDeleted(false);
+    Assert.assertFalse(reparsed.isBeingDeleted());
+    Assert.assertFalse(reparsed.toZNRecord().getSimpleFields().containsKey(CommonConstants.Segment.IS_BEING_DELETED));
+  }
+
+  @Test
   public void segmentPartitionMetadataTest()
       throws IOException {
     // Test for partition metadata serialization/de-serialization.

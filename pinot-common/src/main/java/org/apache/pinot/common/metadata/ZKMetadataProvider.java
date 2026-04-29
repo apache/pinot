@@ -434,6 +434,19 @@ public class ZKMetadataProvider {
     return znRecord != null ? new SegmentZKMetadata(znRecord) : null;
   }
 
+  /**
+   * Reads the segment ZK metadata and populates {@code stat} with the znode's current version (and other ZK stat
+   * fields) so the caller can perform a version-checked write via
+   * {@link #setSegmentZKMetadata(ZkHelixPropertyStore, String, SegmentZKMetadata, int)}.
+   */
+  @Nullable
+  public static SegmentZKMetadata getSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType, String segmentName, Stat stat) {
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForSegment(tableNameWithType, segmentName), stat,
+        AccessOption.PERSISTENT);
+    return znRecord != null ? new SegmentZKMetadata(znRecord) : null;
+  }
+
   @Nullable
   public static UserConfig getUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username) {
     ZNRecord znRecord =
