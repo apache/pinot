@@ -66,6 +66,7 @@ public class PeriodicTaskScheduler {
 
   /**
    * Starts scheduling periodic tasks.
+   * It uses the cron expression if provided, if not, it falls back to the default fixed delay scheduling.
    *
    */
   public synchronized void start() {
@@ -86,18 +87,18 @@ public class PeriodicTaskScheduler {
           _quartzScheduler = StdSchedulerFactory.getDefaultScheduler();
           _quartzScheduler.start();
         } catch (SchedulerException e) {
-          LOGGER.error("Failed to initialize Quartz scheduler. Falling back to fixed delay based periodic tasks.", e);
+          LOGGER.error("Failed to initialize Quartz scheduler.", e);
         }
       }
 
       for (PeriodicTask periodicTask : periodicTasks) {
-        boolean scheduledCronJob = false;
         periodicTask.start();
         String cronExpression = periodicTask.getCronExpression();
         String periodicTaskTaskName = periodicTask.getTaskName();
+
         if (cronExpression != null && !cronExpression.trim().isEmpty()) {
           try {
-            LOGGER.info("Scheduling periodic task {} with cron expression: {}", periodicTask, cronExpression);
+            LOGGER.info("Scheduling periodic task {} with cron expression: {}", periodicTaskTaskName, cronExpression);
 
             JobDetail jobDetail = JobBuilder.newJob(PeriodicTaskCronJob.class)
                 .withIdentity(periodicTaskTaskName)
@@ -108,13 +109,12 @@ public class PeriodicTaskScheduler {
                 .withSchedule(CronScheduleBuilder.cronSchedule(cronExpression))
                 .build();
             _quartzScheduler.scheduleJob(jobDetail, trigger);
-            scheduledCronJob = true;
           } catch (SchedulerException | RuntimeException e) {
-            LOGGER.error("Failed to schedule Quartz job for task: {}", periodicTaskTaskName, e);
+            LOGGER.error("Failed to schedule Quartz job for task: {}. "
+                    + "Task will NOT be scheduled! Please verify the cron expression: {}",
+                periodicTaskTaskName, cronExpression, e);
           }
-        }
-        //fallback to legacy method if the cron job was not able to schedule for any multitude of reasons.
-        if (!scheduledCronJob) {
+        } else {
           long intervalInSeconds = periodicTask.getIntervalInSeconds();
           if (intervalInSeconds <= 0) {
             LOGGER.info("Skip scheduling periodic task: {} for periodic execution (it can be manually triggered)",
@@ -126,11 +126,6 @@ public class PeriodicTaskScheduler {
               LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTaskTaskName, intervalInSeconds);
               periodicTask.run();
             } catch (Throwable e) {
-              // catch all errors to prevent subsequent executions from being silently suppressed
-              // <pre>
-              // See <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService
-              // .html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-">Ref</a>
-              // </pre>
               LOGGER.warn("Caught exception while running Task: {}", periodicTaskTaskName, e);
             }
           }, periodicTask.getInitialDelayInSeconds(), intervalInSeconds, TimeUnit.SECONDS);
