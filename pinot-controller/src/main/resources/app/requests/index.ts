@@ -221,6 +221,57 @@ export const getTaskGeneratorDebug = (taskName: string, taskType: string): Promi
 export const getTaskTypeDebug = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/debug?verbosity=1`, { headers: { ...headers, Accept: 'application/json' } });
 
+// All admin / status helpers below intentionally use `baseApiWithErrors` so that
+// 4xx/5xx responses actually reject. `baseApi` swallows error responses (see
+// axios-config.ts: "control will never go to catch block"), which would otherwise
+// let the UI render "Running"/"Successfully deleted task" on top of a failed call.
+export const getTasksSummary = (tenant?: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/summary`, { headers: { ...headers, Accept: 'application/json' }, params: tenant ? { tenant } : {} });
+
+export const getTaskCounts = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/${taskType}/taskcounts`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getTaskStates = (taskType: string): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/${taskType}/taskstates`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const getCronSchedulerInformation = (): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/tasks/scheduler/information`, { headers: { ...headers, Accept: 'application/json' } });
+
+export const deleteSingleTask = (taskName: string, forceDelete = false): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.delete(`/tasks/task/${taskName}`, {
+    headers: { ...headers, Accept: 'application/json' },
+    params: { forceDelete }
+  });
+
+export const getInstanceLogFiles = (instanceName: string): Promise<AxiosResponse<string[]>> =>
+  baseApiWithErrors.get(`/loggers/instances/${instanceName}`, { headers: { ...headers, Accept: 'application/json' } });
+
+// Fetches the log file as a Blob through the authenticated axios client so that
+// auth headers (basic / bearer) attached by the request interceptor are preserved.
+// Plain anchor downloads cannot reuse those headers, so we route through axios
+// and trigger a download via createObjectURL on the client side.
+export const downloadInstanceLogFile = (
+  instanceName: string,
+  filePath: string
+): Promise<AxiosResponse<Blob>> =>
+  baseApiWithErrors.get(`/loggers/instances/${instanceName}/download`, {
+    params: { filePath },
+    responseType: 'blob',
+  });
+
+// `runPeriodicTask` (above) is shared with legacy callers and stays on baseApi
+// to preserve their behavior. The error-aware variant is used by the new Run
+// Periodic Task dialog so a failed invocation surfaces an error toast rather
+// than a misleading success.
+export const runPeriodicTaskWithErrors = (
+  taskName: string,
+  tableName?: string,
+  tableType?: string
+): Promise<AxiosResponse<OperationResponse>> =>
+  baseApiWithErrors.get(`/periodictask/run`, {
+    params: { taskname: taskName, tableName, type: tableType },
+  });
+
 export const getTables = (params): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tables`, { params, headers: { ...headers, Accept: 'application/json' } });
 

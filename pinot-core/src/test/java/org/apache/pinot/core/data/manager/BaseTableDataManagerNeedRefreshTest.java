@@ -43,6 +43,8 @@ import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TimestampConfig;
+import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -859,5 +861,115 @@ public class BaseTableDataManagerNeedRefreshTest {
     assertTrue(
         BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(newTableConfig, SCHEMA), segmentDataManager)
             .isStale());
+  }
+
+  @Test
+  void testTimestampIndexNoChange()
+      throws Exception {
+    // Segment built with a DAY timestamp index; table config still has the same timestamp index → not stale.
+    FieldConfig fieldConfig = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    TableConfig tableConfig = getTableConfigBuilder().setFieldConfigList(List.of(fieldConfig)).build();
+    // Use a fresh schema per test: applyTimestampIndex mutates the schema object in-place, so sharing the
+    // static SCHEMA across timestamp tests causes cross-test contamination.
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, getSchema());
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(indexLoadingConfig, _testName, generateRows());
+
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfig, segmentDataManager).isStale());
+  }
+
+  @Test
+  void testTimestampIndexAdded()
+      throws Exception {
+    // Segment built without a timestamp index; table config adds a DAY timestamp index → stale.
+    FieldConfig fieldConfig = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    TableConfig tableConfigWithTimestampIndex =
+        getTableConfigBuilder().setFieldConfigList(List.of(fieldConfig)).build();
+    IndexLoadingConfig indexLoadingConfigWithTimestampIndex =
+        new IndexLoadingConfig(tableConfigWithTimestampIndex, getSchema());
+
+    // Segment was created without the timestamp index.
+    StaleSegment response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfigWithTimestampIndex, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
+    assertEquals(response.getReason(), "timestamp index changed");
+  }
+
+  @Test
+  void testTimestampIndexRemoved()
+      throws Exception {
+    // Segment built with a DAY timestamp index; table config no longer has the timestamp index → stale.
+    // The orphaned $col$DAY column must trigger a reload to clean up the derived column.
+    FieldConfig fieldConfig = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    TableConfig tableConfigWithTimestampIndex =
+        getTableConfigBuilder().setFieldConfigList(List.of(fieldConfig)).build();
+    IndexLoadingConfig indexLoadingConfigWithTimestampIndex =
+        new IndexLoadingConfig(tableConfigWithTimestampIndex, getSchema());
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(indexLoadingConfigWithTimestampIndex, _testName, generateRows());
+
+    // Evaluate staleness against a fresh config with no timestamp index.
+    IndexLoadingConfig indexLoadingConfigNoTimestamp = new IndexLoadingConfig(getTableConfigBuilder().build(),
+        getSchema());
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfigNoTimestamp, segmentDataManager);
+    assertTrue(response.isStale());
+    assertEquals(response.getReason(), "timestamp index changed");
+  }
+
+  @Test
+  void testTimestampIndexGranularityAdded()
+      throws Exception {
+    // Segment built with DAY timestamp index; table config adds WEEK granularity → stale ("timestamp index changed").
+    FieldConfig fieldConfigDay = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    TableConfig tableConfigDay = getTableConfigBuilder().setFieldConfigList(List.of(fieldConfigDay)).build();
+    IndexLoadingConfig indexLoadingConfigDay = new IndexLoadingConfig(tableConfigDay, getSchema());
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(indexLoadingConfigDay, _testName, generateRows());
+
+    FieldConfig fieldConfigDayAndWeek = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(
+            new TimestampConfig(List.of(TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK)))
+        .build();
+    TableConfig tableConfigDayAndWeek =
+        getTableConfigBuilder().setFieldConfigList(List.of(fieldConfigDayAndWeek)).build();
+    IndexLoadingConfig indexLoadingConfigDayAndWeek = new IndexLoadingConfig(tableConfigDayAndWeek, getSchema());
+
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfigDayAndWeek, segmentDataManager);
+    assertTrue(response.isStale());
+    assertEquals(response.getReason(), "timestamp index changed");
+  }
+
+  @Test
+  void testTimestampIndexGranularityRemoved()
+      throws Exception {
+    // Segment built with DAY + WEEK timestamp index; table config drops WEEK → stale.
+    // The orphaned $col$WEEK column must trigger a reload to clean up the derived column.
+    FieldConfig fieldConfigDayAndWeek = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(
+            new TimestampConfig(List.of(TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK)))
+        .build();
+    TableConfig tableConfigDayAndWeek =
+        getTableConfigBuilder().setFieldConfigList(List.of(fieldConfigDayAndWeek)).build();
+    IndexLoadingConfig indexLoadingConfigDayAndWeek = new IndexLoadingConfig(tableConfigDayAndWeek, getSchema());
+    ImmutableSegmentDataManager segmentDataManager =
+        createImmutableSegmentDataManager(indexLoadingConfigDayAndWeek, _testName, generateRows());
+
+    FieldConfig fieldConfigDay = new FieldConfig.Builder(MS_SINCE_EPOCH_COLUMN_NAME)
+        .withTimestampConfig(new TimestampConfig(List.of(TimestampIndexGranularity.DAY)))
+        .build();
+    TableConfig tableConfigDay = getTableConfigBuilder().setFieldConfigList(List.of(fieldConfigDay)).build();
+    IndexLoadingConfig indexLoadingConfigDay = new IndexLoadingConfig(tableConfigDay, getSchema());
+
+    StaleSegment response = BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfigDay, segmentDataManager);
+    assertTrue(response.isStale());
+    assertEquals(response.getReason(), "timestamp index changed");
   }
 }

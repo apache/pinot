@@ -266,8 +266,7 @@ public class ProtoBufRecordExtractorCachingTest {
     assertEquals(row.getValue(LONG_FIELD), 100L);
     assertEquals(row.getValue(DOUBLE_FIELD), 1.1);
     assertEquals(row.getValue(FLOAT_FIELD), 2.2f);
-    // Note: convertSingleValue converts booleans to strings via toString()
-    assertEquals(row.getValue(BOOL_FIELD), "true");
+    assertEquals(row.getValue(BOOL_FIELD), true);
     assertNotNull(row.getValue(BYTES_FIELD)); // ByteString converted to byte[]
     assertEquals(row.getValue(ENUM_FIELD), "GAMMA");
 
@@ -352,7 +351,7 @@ public class ProtoBufRecordExtractorCachingTest {
     record.put(LONG_FIELD, (long) intValue * 10);
     record.put(DOUBLE_FIELD, intValue * 1.1);
     record.put(FLOAT_FIELD, intValue * 0.5f);
-    record.put(BOOL_FIELD, String.valueOf(intValue % 2 == 0));
+    record.put(BOOL_FIELD, intValue % 2 == 0);
     record.put(BYTES_FIELD, ("bytes_" + intValue).getBytes(UTF_8));
     record.put(REPEATED_STRINGS, Arrays.asList("a", "b", "c"));
     record.put(NESTED_MESSAGE, getNestedMap(NESTED_STRING_FIELD, "nested_" + intValue, NESTED_INT_FIELD, intValue));

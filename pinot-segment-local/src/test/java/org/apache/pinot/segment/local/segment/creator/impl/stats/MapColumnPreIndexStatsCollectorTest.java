@@ -35,6 +35,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -258,7 +259,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     r1.put("kLong", 7L);
     r1.put("kFloat", 1.5f);
     r1.put("kDouble", 2.25d);
-    r1.put("kBigDec", new java.math.BigDecimal("10.01"));
+    r1.put("kBigDec", new BigDecimal("10.01"));
     r1.put("kNull", null); // ignored
 
     Map<String, Object> r2 = new HashMap<>();
@@ -267,13 +268,13 @@ public class MapColumnPreIndexStatsCollectorTest {
     r2.put("kLong", 2L);
     r2.put("kFloat", 1.5f);
     r2.put("kDouble", 0.75d);
-    r2.put("kBigDec", new java.math.BigDecimal("10.01"));
+    r2.put("kBigDec", new BigDecimal("10.01"));
 
     Map<String, Object> r3 = new HashMap<>();
     r3.put("kStr", "alpha");
     r3.put("kInt", 3);
     r3.put("kFloat", 3.5f);
-    r3.put("kBigDec", new java.math.BigDecimal("5.25"));
+    r3.put("kBigDec", new BigDecimal("5.25"));
 
     StatsCollectorConfig cfg = newConfig(false);
     MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
@@ -297,9 +298,9 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(keys, new String[]{"kBigDec", "kDouble", "kFloat", "kInt", "kLong", "kStr"});
 
     // Row length metrics
-    int l1 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r1).length;
-    int l2 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r2).length;
-    int l3 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r3).length;
+    int l1 = MapUtils.serializedSize(r1);
+    int l2 = MapUtils.serializedSize(r2);
+    int l3 = MapUtils.serializedSize(r3);
     int expectedMin = Math.min(l1, Math.min(l2, l3));
     int expectedMax = Math.max(l1, Math.max(l2, l3));
     assertEquals(col.getLengthOfShortestElement(), expectedMin);
@@ -339,8 +340,8 @@ public class MapColumnPreIndexStatsCollectorTest {
     AbstractColumnStatisticsCollector sDec = col.getKeyStatistics("kBigDec2");
     assertNotNull(sDec);
     assertTrue(sDec instanceof BigDecimalColumnPreIndexStatsCollector);
-    assertEquals(sDec.getMaxValue(), new java.math.BigDecimal("4.56"));
-    assertEquals(sDec.getMinValue(), new java.math.BigDecimal("1.23"));
+    assertEquals(sDec.getMaxValue(), new BigDecimal("4.56"));
+    assertEquals(sDec.getMinValue(), new BigDecimal("1.23"));
 
     // JSON serialization branch for String collector
     AbstractColumnStatisticsCollector sObj = col.getKeyStatistics("kObj");

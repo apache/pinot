@@ -261,8 +261,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         return _floatValueToIndexMap;
       case DOUBLE:
         return _doubleValueToIndexMap;
-      case STRING:
       case BIG_DECIMAL:
+      case STRING:
       case BYTES:
         return _objectValueToIndexMap;
       default:
@@ -314,8 +314,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         return _floatValueToIndexMap.get((float) value);
       case DOUBLE:
         return _doubleValueToIndexMap.get((double) value);
-      case STRING:
       case BIG_DECIMAL:
+      case STRING:
         return _objectValueToIndexMap.getInt(value);
       case BYTES:
         return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
@@ -398,6 +398,14 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return indexes;
   }
 
+  public int[] indexOfMV(BigDecimal[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+    }
+    return indexes;
+  }
+
   public int[] indexOfMV(String[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
@@ -439,6 +447,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
           indexes[i] = _doubleValueToIndexMap.get((double) multiValues[i]);
         }
         break;
+      case BIG_DECIMAL:
       case STRING:
         for (int i = 0; i < multiValues.length; i++) {
           indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);

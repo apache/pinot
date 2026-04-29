@@ -165,6 +165,13 @@ public interface BlockValSet {
   double[][] getDoubleValuesMV();
 
   /**
+   * Returns the BigDecimal values for a multi-valued column.
+   *
+   * @return Array of BigDecimal values
+   */
+  BigDecimal[][] getBigDecimalValuesMV();
+
+  /**
    * Returns the string values for a multi-valued column.
    *
    * @return Array of string values

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -52,6 +53,16 @@ public final class VarByteChunkMVForwardIndexReader extends BaseChunkForwardInde
     } else {
       return null;
     }
+  }
+
+  @Override
+  public int getBigDecimalMV(int docId, BigDecimal[] valueBuffer, ChunkReaderContext context) {
+    return ArraySerDeUtils.deserializeBigDecimalArray(getBytes(docId, context), valueBuffer);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId, ChunkReaderContext context) {
+    return ArraySerDeUtils.deserializeBigDecimalArray(getBytes(docId, context));
   }
 
   @Override

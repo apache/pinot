@@ -309,6 +309,19 @@ public class DataTableImplV4 implements DataTable {
   }
 
   @Override
+  public BigDecimal[] getBigDecimalArray(int rowId, int colId) {
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    BigDecimal[] bigDecimals = new BigDecimal[length];
+    for (int i = 0; i < length; i++) {
+      int byteLength = _variableSizeData.getInt();
+      byte[] bytes = new byte[byteLength];
+      _variableSizeData.get(bytes);
+      bigDecimals[i] = BigDecimalUtils.deserialize(bytes);
+    }
+    return bigDecimals;
+  }
+
+  @Override
   public String[] getStringArray(int rowId, int colId) {
     int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
     String[] strings = new String[length];
@@ -316,6 +329,19 @@ public class DataTableImplV4 implements DataTable {
       strings[i] = _stringDictionary[_variableSizeData.getInt()];
     }
     return strings;
+  }
+
+  @Override
+  public ByteArray[] getBytesArray(int rowId, int colId) {
+    int length = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    ByteArray[] bytes = new ByteArray[length];
+    for (int i = 0; i < length; i++) {
+      int byteLength = _variableSizeData.getInt();
+      byte[] value = new byte[byteLength];
+      _variableSizeData.get(value);
+      bytes[i] = new ByteArray(value);
+    }
+    return bytes;
   }
 
   @Nullable

@@ -27,6 +27,8 @@ import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
 import PackageVersions from '../components/Homepage/PackageVersions';
 import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
+import CronSchedulerInformation from '../components/Homepage/CronSchedulerInformation';
+import PeriodicTasks from '../components/Homepage/PeriodicTasks';
 import Skeleton from '@material-ui/lab/Skeleton';
 import { getTenants } from '../requests';
 import { DataTable, InstanceType } from 'Models';
@@ -232,6 +234,8 @@ const HomePage = () => {
         clusterName={clusterName}
       />
       {taskTypesTable}
+      <CronSchedulerInformation />
+      <PeriodicTasks />
       <ClusterConfig />
       <PackageVersions />
     </Grid>

@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -126,6 +127,13 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   protected final @Nullable DistributedTaskLockManager _distributedTaskLockManager;
 
+  // Cluster-level default for concurrent task scheduling. When true (and not overridden per table),
+  // scheduleTasks runs without a controller-wide synchronized lock so that scheduling for different
+  // tables can proceed in parallel. Same-table concurrency is coordinated by the distributed ZK
+  // lock; two scheduleTasks calls targeting the same table will contend on the ZK lock and one will
+  // skip generation with a "could not acquire lock" error for that table.
+  protected final boolean _clusterConcurrentSchedulingEnabled;
+
   // Dynamically updatable task queue configs
   private volatile int _taskQueueMaxSize;
   private volatile int _taskQueueMaxDeletesPerCycle;
@@ -192,6 +200,18 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     } else {
       LOGGER.info("Distributed locking is disabled for PinotTaskManager");
       _distributedTaskLockManager = null;
+    }
+
+    _clusterConcurrentSchedulingEnabled = controllerConf.isPinotTaskManagerConcurrentSchedulingEnabled();
+    LOGGER.info("Concurrent task scheduling cluster default: {}", _clusterConcurrentSchedulingEnabled);
+    if (_clusterConcurrentSchedulingEnabled && _distributedTaskLockManager == null) {
+      // The concurrent path relies on the distributed ZK lock to coordinate same-table task
+      // generation (and to mutually exclude with ad-hoc createTask, which still takes
+      // synchronized(this)). Running without distributed locking leaves those races unprotected.
+      LOGGER.warn("Concurrent task scheduling is enabled but distributed locking is disabled. "
+          + "Same-table scheduleTasks and ad-hoc createTask will not be mutually exclusive. "
+          + "Enable {} to close this race window.",
+          ControllerConf.ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING);
     }
   }
 
@@ -728,10 +748,89 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   /**
    * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled.
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
+   *
+   * <p>Dispatches between two paths based on the resolved concurrent-scheduling flag (cluster
+   * default, optionally overridden per table):
+   * <ul>
+   *   <li><b>Legacy path</b> ({@code concurrentSchedulingEnabled = false}): the call runs under a
+   *       global {@code synchronized(this)} — same mutual exclusion the method had before this
+   *       refactor.</li>
+   *   <li><b>Concurrent path</b> ({@code concurrentSchedulingEnabled = true}): the call holds no
+   *       controller-wide monitor. Task generation for different tables proceeds in parallel;
+   *       same-table concurrency is coordinated by the distributed ZK lock (enabling
+   *       {@link ControllerConf.ControllerPeriodicTasksConf#ENABLE_DISTRIBUTED_LOCKING} is
+   *       strongly recommended when opting into this path).</li>
+   * </ul>
+   * Both paths share the same underlying body in {@link #doScheduleTasks}.
    */
-  public synchronized Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
+  public Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
+    if (shouldUseConcurrentPath(context)) {
+      return doScheduleTasks(context);
+    }
+    synchronized (this) {
+      return doScheduleTasks(context);
+    }
+  }
 
+  /**
+   * Resolves whether the concurrent scheduling path should be used for the given scheduling request.
+   * A request uses the concurrent path only when every targeted table opts in (explicitly via
+   * {@link TableTaskConfig#getConcurrentSchedulingEnabled()} or implicitly via the cluster default).
+   * If no specific tables are targeted (i.e., "schedule for every table"), the check iterates the full
+   * table list so that per-table opt-outs are still honored.
+   */
+  @VisibleForTesting
+  boolean shouldUseConcurrentPath(TaskSchedulingContext context) {
+    Set<String> targetTables = context.getTablesToSchedule();
+    Set<String> targetDatabases = context.getDatabasesToSchedule();
+    Set<String> consolidatedTables = new HashSet<>();
+    if (targetTables != null) {
+      consolidatedTables.addAll(targetTables);
+    }
+    if (targetDatabases != null) {
+      targetDatabases.forEach(database ->
+          consolidatedTables.addAll(_pinotHelixResourceManager.getAllTables(database)));
+    }
+    Collection<String> tablesToCheck =
+        consolidatedTables.isEmpty() ? _pinotHelixResourceManager.getAllTables() : consolidatedTables;
+    boolean checkedAnyTable = false;
+    for (String tableNameWithType : tablesToCheck) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        continue;
+      }
+      checkedAnyTable = true;
+      if (!resolveConcurrentScheduling(tableConfig)) {
+        return false;
+      }
+    }
+    // If at least one table was inspected and none opted out, use concurrent path. Otherwise (no
+    // tables in scope) fall back to the cluster default so the decision is deterministic.
+    return checkedAnyTable || _clusterConcurrentSchedulingEnabled;
+  }
+
+  /**
+   * Resolves the effective concurrent-scheduling flag for a single table: table-level override if
+   * set, otherwise the cluster-level default.
+   */
+  @VisibleForTesting
+  boolean resolveConcurrentScheduling(TableConfig tableConfig) {
+    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+    if (taskConfig != null) {
+      Boolean tableFlag = taskConfig.getConcurrentSchedulingEnabled();
+      if (tableFlag != null) {
+        return tableFlag;
+      }
+    }
+    return _clusterConcurrentSchedulingEnabled;
+  }
+
+  /**
+   * Shared body used by both the legacy (synchronized) and concurrent paths. The caller decides
+   * whether to wrap this call in {@code synchronized(this)}.
+   */
+  private Map<String, TaskSchedulingInfo> doScheduleTasks(TaskSchedulingContext context) {
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
     Set<String> targetTables = context.getTablesToSchedule();
     Set<String> targetDatabases = context.getDatabasesToSchedule();
@@ -786,7 +885,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
             if (lock != null) {
               acquiredTaskLocks.put(tableName, lock);
             }
-          } catch (RuntimeException ignore) {
+          } catch (RuntimeException e) {
+            LOGGER.warn("Failed to acquire task lock for task type: {} on table: {}", taskType, tableName, e);
           }
         }
 

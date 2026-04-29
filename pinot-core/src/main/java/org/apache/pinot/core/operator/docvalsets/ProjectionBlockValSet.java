@@ -227,6 +227,14 @@ public class ProjectionBlockValSet implements BlockValSet {
   }
 
   @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BIG_DECIMAL, false);
+      return _dataBlockCache.getBigDecimalValuesForMVColumn(_column);
+    }
+  }
+
+  @Override
   public String[][] getStringValuesMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.STRING, false);

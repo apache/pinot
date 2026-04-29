@@ -154,6 +154,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MergeRollupTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    boolean useCreationTimeFallback = MinionTaskUtils.isCreationTimeFallbackEnabled(_clusterInfoAccessor);
     for (TableConfig tableConfig : tableConfigs) {
       if (!validate(tableConfig, taskType)) {
         continue;
@@ -176,6 +177,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       }
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
+      Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
+
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
       for (SegmentZKMetadata segment : allSegments) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0
@@ -183,6 +186,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           preSelectedSegments.add(segment);
         }
       }
+      // Filter out segments past retention to avoid selecting segments that RetentionManager may delete before the
+      // task executor downloads them. Note: if early time buckets consist entirely of expired segments, the watermark
+      // will advance past them since they won't appear in preSelectedSegments. This is expected because those segments
+      // will be purged by RetentionManager regardless.
+      long currentTimeMs = System.currentTimeMillis();
+      preSelectedSegments = MinionTaskUtils.filterSegmentsPastRetention(preSelectedSegments, tableConfig, taskConfigs,
+          currentTimeMs, useCreationTimeFallback);
 
       if (preSelectedSegments.isEmpty()) {
         // Reset the watermark time if no segment found. This covers the case where the table is newly created or
@@ -206,7 +216,6 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       });
 
       // Sort merge levels based on bucket time period
-      Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
       Map<String, Map<String, String>> mergeLevelToConfigs = MergeRollupTaskUtils.getLevelToConfigMap(taskConfigs);
       List<Map.Entry<String, Map<String, String>>> sortedMergeLevelConfigs =
           new ArrayList<>(mergeLevelToConfigs.entrySet());

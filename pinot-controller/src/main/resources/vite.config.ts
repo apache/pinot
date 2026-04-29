@@ -28,7 +28,7 @@ const BACKEND_API_PREFIXES = [
   'tenants', 'tables', 'schemas', 'segments', 'instances',
   'cluster', 'periodictask', 'tasks', 'zk', 'sql', 'timeseries',
   'brokers', 'table', 'auth', 'users', 'health', 'appconfigs',
-  'query', 'version', 'debug',
+  'query', 'version', 'debug', 'loggers',
 ];
 
 // Match the prefix then require either '/', '?', or end-of-path.

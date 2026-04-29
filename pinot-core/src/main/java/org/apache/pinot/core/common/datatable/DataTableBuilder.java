@@ -81,10 +81,14 @@ public interface DataTableBuilder {
   void setColumn(int colId, double[] values)
       throws IOException;
 
+  void setColumn(int colId, BigDecimal[] values)
+      throws IOException;
+
   void setColumn(int colId, String[] values)
       throws IOException;
 
-  // TODO: Support MV BYTES
+  void setColumn(int colId, ByteArray[] values)
+      throws IOException;
 
   void setColumn(int colId, AggregationFunction.SerializedIntermediateResult value)
       throws IOException;

@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSorted
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
@@ -689,17 +690,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         case BIG_DECIMAL: {
           for (int i = 0; i < numDocs; i++) {
-            Preconditions.checkState(isSingleValue, "MV BIG_DECIMAL is not supported");
-
-            // Skip type conversion if output value is already the required type. If outputValueType is null, that
-            // means the transform function returned null for all docs and in that case outputValue will be the
-            // default null value for the field type
-            if (outputValueType != null && !(outputValues[i] instanceof BigDecimal)) {
-              outputValues[i] = outputValueType.toBigDecimal(outputValues[i]);
-            }
+            outputValues[i] = getBigDecimalOutputValue(outputValues[i], isSingleValue, outputValueType,
+                (BigDecimal) fieldSpec.getDefaultNullValue());
           }
           statsCollector = !useNoDictColumnStatsCollector
-              ? new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig)
+              ? new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig)
               : new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
           for (Object value : outputValues) {
             statsCollector.collect(value);
@@ -1020,6 +1015,40 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
   /**
    * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
+   * {@link FieldSpec.DataType#BIG_DECIMAL} field
+   *
+   * @param outputValue the output of the transform function
+   * @param isSingleValue true if the field (column) is single-valued
+   * @param outputValueType the output value type for the transform function; can be null (in which case,
+   *                        the {@code outputValue} should be the field's default null value)
+   * @param defaultNullValue the default null value for the field
+   * @return the converted output value (either a BigDecimal or a BigDecimal[])
+   */
+  private Object getBigDecimalOutputValue(Object outputValue, boolean isSingleValue, PinotDataType outputValueType,
+      BigDecimal defaultNullValue) {
+    if (isSingleValue) {
+      // Skip type conversion if output value is already the required type. The outputValueType is guaranteed to be
+      // non-null if outputValue is not the default null value
+      if (outputValue instanceof BigDecimal) {
+        return outputValue;
+      } else {
+        return outputValueType.toBigDecimal(outputValue);
+      }
+    } else {
+      if (outputValue instanceof BigDecimal) {
+        return new BigDecimal[]{(BigDecimal) outputValue};
+      } else {
+        BigDecimal[] values = outputValueType.toBigDecimalArray(outputValue);
+        if (values.length == 0) {
+          values = new BigDecimal[]{defaultNullValue};
+        }
+        return values;
+      }
+    }
+  }
+
+  /**
+   * Helper method to convert the output of a transform function to the appropriate type for an SV or MV
    * {@link FieldSpec.DataType#BYTES} field
    *
    * @param outputValue the output of the transform function
@@ -1148,6 +1177,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
               break;
             case DOUBLE:
               forwardIndexCreator.putDoubleMV((double[]) outputValue);
+              break;
+            case BIG_DECIMAL:
+              forwardIndexCreator.putBigDecimalMV((BigDecimal[]) outputValue);
               break;
             case STRING:
               forwardIndexCreator.putStringMV((String[]) outputValue);

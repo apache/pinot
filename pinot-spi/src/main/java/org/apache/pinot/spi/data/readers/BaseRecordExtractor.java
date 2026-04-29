@@ -163,6 +163,9 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
    * a different conversion for its single values.
    */
   protected Object convertSingleValue(Object value) {
+    if (value instanceof Number || value instanceof Boolean || value instanceof byte[]) {
+      return value;
+    }
     if (value instanceof ByteBuffer) {
       // NOTE: ByteBuffer might be reused in some record reader implementation. Make a slice to ensure nothing is
       //       modified in the original buffer
@@ -170,12 +173,6 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
       byte[] bytesValue = new byte[slice.limit()];
       slice.get(bytesValue);
       return bytesValue;
-    }
-    if (value instanceof Number || value instanceof byte[]) {
-      if (value instanceof Short) {
-        return Integer.valueOf(value.toString());
-      }
-      return value;
     }
     return value.toString();
   }

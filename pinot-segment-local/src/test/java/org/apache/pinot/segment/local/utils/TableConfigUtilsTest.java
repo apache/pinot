@@ -78,6 +78,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
@@ -272,6 +273,40 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIsDimTable(true).build();
     TableConfigUtils.validate(tableConfig, schema);
   }
+
+  @Test
+  public void validateDimensionTableSegmentAssignmentStrategy() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .build();
+
+    // Valid: null segment assignment strategy
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Valid: allservers strategy using constant
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .setSegmentAssignmentStrategy(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // Invalid: other strategy
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setIsDimTable(true)
+        .setSegmentAssignmentStrategy("replicaGroup")
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail with invalid segment assignment strategy for dimension table");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("can only use '"
+          + AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
+    }
+}
 
   @Test
   public void validateIngestionConfig() {

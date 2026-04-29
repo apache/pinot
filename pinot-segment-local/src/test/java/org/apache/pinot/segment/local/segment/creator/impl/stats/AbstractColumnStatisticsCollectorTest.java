@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -139,7 +140,8 @@ public class AbstractColumnStatisticsCollectorTest {
   @DataProvider(name = "multiValueSupportedTypes")
   public Object[][] multiValueSupportedTypes() {
     return new Object[][]{
-        {DataType.INT}, {DataType.LONG}, {DataType.FLOAT}, {DataType.DOUBLE}, {DataType.STRING}, {DataType.BYTES}
+        {DataType.INT}, {DataType.LONG}, {DataType.FLOAT}, {DataType.DOUBLE}, {DataType.BIG_DECIMAL},
+        {DataType.STRING}, {DataType.BYTES}
     };
   }
 
@@ -285,6 +287,10 @@ public class AbstractColumnStatisticsCollectorTest {
       case DOUBLE:
         collector.collect(new double[]{1.5, 2.5});
         collector.collect(new double[]{3.5, 4.5, 5.5});
+        break;
+      case BIG_DECIMAL:
+        collector.collect(new BigDecimal[]{new BigDecimal("1.5"), new BigDecimal("2.5")});
+        collector.collect(new BigDecimal[]{new BigDecimal("3.5"), new BigDecimal("4.5"), new BigDecimal("5.5")});
         break;
       case STRING:
         collector.collect(new String[]{"a", "b"});
@@ -437,12 +443,21 @@ public class AbstractColumnStatisticsCollectorTest {
     assertTrue(collector.getLengthOfLongestElement() >= collector.getLengthOfShortestElement());
   }
 
-  @Test(expectedExceptions = UnsupportedOperationException.class)
-  public void testBigDecimalMultiValueNotSupported() {
-    AbstractColumnStatisticsCollector collector = createCollector(DataType.BIG_DECIMAL, true, false);
+  @Test
+  public void testBigDecimalMultiValueLengthTracking() {
+    AbstractColumnStatisticsCollector collector = createCollector(DataType.BIG_DECIMAL, false, false);
 
-    // BigDecimal does not support multi-value
-    collector.collect(new Object[]{new BigDecimal("1.0"), new BigDecimal("2.0")});
+    int shortLength = BigDecimalUtils.byteSize(new BigDecimal("1.0"));
+    int midLength = BigDecimalUtils.byteSize(new BigDecimal("99.99"));
+    int longLength = BigDecimalUtils.byteSize(new BigDecimal("123456.789"));
+    collector.collect(new BigDecimal[]{new BigDecimal("1.0"), new BigDecimal("99.99")});
+    collector.collect(new BigDecimal[]{new BigDecimal("123456.789"), new BigDecimal("99.99")});
+
+    collector.seal();
+
+    assertEquals(collector.getLengthOfShortestElement(), Math.min(shortLength, midLength));
+    assertEquals(collector.getLengthOfLongestElement(), longLength);
+    assertEquals(collector.getMaxRowLengthInBytes(), longLength + midLength);
   }
 
   @Test
@@ -772,6 +787,11 @@ public class AbstractColumnStatisticsCollectorTest {
       case DOUBLE:
         return new Object[][]{
             {1.5, 2.5}, {3.5, 4.5, 5.5}
+        };
+      case BIG_DECIMAL:
+        return new Object[][]{
+            {new BigDecimal("1.5"), new BigDecimal("2.5")},
+            {new BigDecimal("3.5"), new BigDecimal("4.5"), new BigDecimal("5.5")}
         };
       case STRING:
         return new Object[][]{

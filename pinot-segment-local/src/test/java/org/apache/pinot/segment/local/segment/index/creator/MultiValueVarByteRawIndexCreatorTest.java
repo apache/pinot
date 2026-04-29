@@ -20,6 +20,8 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -93,6 +95,60 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
     new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, ChunkCompressionType.PASS_THROUGH, "column", 10000,
         DataType.STRING, 2, Integer.MAX_VALUE - Integer.BYTES - 2 * Integer.BYTES, 2,
         ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
+  }
+
+  @Test(dataProvider = "params")
+  public void testMVBigDecimal(ChunkCompressionType compressionType, boolean useFullSize, int writerVersion,
+      int maxLength, int maxNumEntries)
+      throws IOException {
+    String column = "testCol-" + UUID.randomUUID();
+    int numDocs = 1000;
+    File file = new File(OUTPUT_DIR, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION);
+    List<BigDecimal[]> inputs = new ArrayList<>();
+    Random random = new Random();
+    int maxTotalLength = 0;
+    int maxElements = 0;
+    for (int i = 0; i < numDocs; i++) {
+      int numEntries = useFullSize ? maxNumEntries : random.nextInt(maxNumEntries + 1);
+      maxElements = Math.max(numEntries, maxElements);
+      BigDecimal[] values = new BigDecimal[numEntries];
+      int serializedLength = 0;
+      for (int j = 0; j < numEntries; j++) {
+        // BigDecimal serialized size = 2 bytes (scale) + N bytes (unscaled). Bound the unscaled byte length by
+        // maxLength so we exercise the maxRowLengthInBytes accounting.
+        int maxUnscaledBytes = Math.max(1, maxLength - 2);
+        int unscaledByteLength = useFullSize ? maxUnscaledBytes : random.nextInt(maxUnscaledBytes) + 1;
+        byte[] unscaledBytes = new byte[unscaledByteLength];
+        random.nextBytes(unscaledBytes);
+        BigInteger unscaled = new BigInteger(unscaledBytes);
+        int scale = random.nextInt(10);
+        values[j] = new BigDecimal(unscaled, scale);
+        serializedLength += 2 + unscaledByteLength;
+      }
+      maxTotalLength = Math.max(serializedLength, maxTotalLength);
+      inputs.add(values);
+    }
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(OUTPUT_DIR, compressionType,
+        column, numDocs, DataType.BIG_DECIMAL, writerVersion, maxTotalLength, maxElements, 1024 * 1024, 1000)) {
+      for (BigDecimal[] input : inputs) {
+        creator.putBigDecimalMV(input);
+      }
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, DataType.BIG_DECIMAL, false);
+        ForwardIndexReaderContext context = reader.createContext()) {
+      BigDecimal[] values = new BigDecimal[maxElements];
+      for (int i = 0; i < numDocs; i++) {
+        BigDecimal[] input = inputs.get(i);
+        assertEquals(reader.getNumValuesMV(i, context), input.length);
+        int length = reader.getBigDecimalMV(i, values, context);
+        assertEquals(Arrays.copyOf(values, length), input);
+        // Exercise the alternate getter that allocates the result array too.
+        assertEquals(reader.getBigDecimalMV(i, context), input);
+      }
+    }
   }
 
   @Test(dataProvider = "params")

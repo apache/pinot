@@ -171,6 +171,26 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("Duplicates")
+  @Override
+  public boolean applyMV(BigDecimal[] values, int length) {
+    if (isExclusive()) {
+      for (int i = 0; i < length; i++) {
+        if (!applySV(values[i])) {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      for (int i = 0; i < length; i++) {
+        if (applySV(values[i])) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
   @Override
   public boolean applySV(String value) {
     throw new UnsupportedOperationException();

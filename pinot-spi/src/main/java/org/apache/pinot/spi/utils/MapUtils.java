@@ -19,60 +19,98 @@
 package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.SortedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 
-
+/// Utilities for Pinot's `MAP` column representation.
+///
+/// Write paths come in two flavors:
+/// - `sortByKey = true` (default) — entries are sorted by key and nested maps are also key-sorted via
+///   [SerializationFeature#ORDER_MAP_ENTRIES_BY_KEYS]. Output is canonical: a pure function of the logical map.
+/// - `sortByKey = false` — entries written in the input map's iteration order with no nested key sort. Faster, but
+///   bytes are not a pure function of the logical map.
+///
+/// Read paths are identical regardless of how the input was written.
 public class MapUtils {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(MapUtils.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private MapUtils() {
   }
 
-  public static byte[] serializeMap(Map<String, Object> map) {
-    int size = map.size();
+  private static final Logger LOGGER = LoggerFactory.getLogger(MapUtils.class);
+  private static final ObjectMapper SORTED_MAPPER =
+      new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+  private static final ObjectMapper UNSORTED_MAPPER = new ObjectMapper();
+  private static final TypeReference<Map<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() {
+  };
 
-    // Directly return the size (0) for empty map
+  /// Serializes a map into a length-prefixed binary frame: `[size][keyLen][keyBytes][valueLen][valueBytes]...`.
+  /// Entries are sorted by key before writing for canonical output.
+  public static byte[] serializeMap(Map<String, Object> map) {
+    return serializeMap(map, true);
+  }
+
+  /// Variant of [#serializeMap(Map)] that lets the caller skip the per-entry key sort when canonical output is not
+  /// required. `sortByKey = false` writes entries in the input map's iteration order and skips the per-value
+  /// nested-map key sort — faster, but the bytes are no longer a pure function of the logical map.
+  public static byte[] serializeMap(Map<String, Object> map, boolean sortByKey) {
+    int size = map.size();
     if (size == 0) {
       return new byte[Integer.BYTES];
     }
+    ObjectMapper mapper = sortByKey ? SORTED_MAPPER : UNSORTED_MAPPER;
 
-    // Besides the value bytes, we store: size, length for each key, length for each value
+    // Sorted path on a non-SortedMap: copy entries to a sortable array. Otherwise iterate the entrySet directly to
+    // avoid the array allocation (`SortedMap.entrySet()` is already sorted; the unsorted path doesn't care).
+    Collection<Entry<String, Object>> entries;
+    if (sortByKey && !(map instanceof SortedMap)) {
+      //noinspection unchecked
+      Entry<String, Object>[] sorted = map.entrySet().toArray(new Entry[0]);
+      Arrays.sort(sorted, Entry.comparingByKey());
+      entries = Arrays.asList(sorted);
+    } else {
+      entries = map.entrySet();
+    }
+
+    // First pass: serialize values and accumulate the total buffer size (4-byte map size + per-entry 4-byte key/value
+    // lengths plus key/value bytes).
     long bufferSize = (1 + 2 * (long) size) * Integer.BYTES;
     byte[][] keyBytesArray = new byte[size][];
     byte[][] valueBytesArray = new byte[size][];
-
     int index = 0;
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
-      byte[] keyBytes = entry.getKey().getBytes(UTF_8);
-      bufferSize += keyBytes.length;
+    for (Entry<String, Object> entry : entries) {
+      byte[] keyBytes = Utf8Utils.encode(entry.getKey());
       keyBytesArray[index] = keyBytes;
-
-      byte[] valueBytes = null;
+      bufferSize += keyBytes.length;
+      byte[] valueBytes;
       try {
-        valueBytes = OBJECT_MAPPER.writeValueAsBytes(entry.getValue());
+        valueBytes = mapper.writeValueAsBytes(entry.getValue());
       } catch (JsonProcessingException e) {
         throw new RuntimeException(e);
       }
+      valueBytesArray[index] = valueBytes;
       bufferSize += valueBytes.length;
-      valueBytesArray[index++] = valueBytes;
+      index++;
     }
     Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+
+    // Second pass: emit into a single pre-sized buffer.
     byte[] bytes = new byte[(int) bufferSize];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     byteBuffer.putInt(size);
-    for (int i = 0; i < index; i++) {
+    for (int i = 0; i < size; i++) {
       byte[] keyBytes = keyBytesArray[i];
       byteBuffer.putInt(keyBytes.length);
       byteBuffer.put(keyBytes);
@@ -83,61 +121,91 @@ public class MapUtils {
     return bytes;
   }
 
+  /// Returns the byte size that [#serializeMap] would produce for the given map. Sort order does not affect the size.
+  /// Streams each value through Jackson into a counting sink so no per-value `byte[]` is allocated — Jackson's
+  /// per-thread `BufferRecycler` provides the encoding buffer.
+  public static int serializedSize(Map<String, Object> map) {
+    int size = map.size();
+    if (size == 0) {
+      return Integer.BYTES;
+    }
+    long bufferSize = (1 + 2 * (long) size) * Integer.BYTES;
+    CountingOutputStream sink = new CountingOutputStream();
+    for (Entry<String, Object> entry : map.entrySet()) {
+      bufferSize += Utf8Utils.encodedLength(entry.getKey());
+      try {
+        UNSORTED_MAPPER.writeValue(sink, entry.getValue());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    bufferSize += sink._count;
+    Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+    return (int) bufferSize;
+  }
+
+  /// Discards bytes and counts them. Used by [#serializedSize] to measure JSON output without allocating a buffer.
+  private static final class CountingOutputStream extends OutputStream {
+    private long _count;
+
+    @Override
+    public void write(int b) {
+      _count++;
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) {
+      _count += len;
+    }
+  }
+
   public static Map<String, Object> deserializeMap(byte[] bytes) {
     return deserializeMap(ByteBuffer.wrap(bytes));
   }
 
   public static Map<String, Object> deserializeMap(ByteBuffer byteBuffer) {
-    Preconditions.checkNotNull(byteBuffer, "ByteBuffer cannot be null");
-
     int size = byteBuffer.getInt();
-    Preconditions.checkState(size >= 0, "Size of the map cannot be negative");
-
     if (size == 0) {
-      return Map.of(); // Return empty map if size is zero
+      return Map.of();
     }
-
-    // Check that remaining bytes are sufficient to read key and value lengths and data
-    Preconditions.checkState(byteBuffer.remaining() >= size * 2 * Integer.BYTES,
-        "Insufficient bytes in buffer to read all keys and values");
-
-    Map<String, Object> map = new HashMap<>(size);
+    Map<String, Object> map = Maps.newHashMapWithExpectedSize(size);
     for (int i = 0; i < size; i++) {
-      Preconditions.checkState(byteBuffer.remaining() >= Integer.BYTES,
-          "Insufficient bytes in buffer to read key length");
-      int keyLength = byteBuffer.getInt();
-      Preconditions.checkState(keyLength >= 0, "Key length cannot be negative");
-      Preconditions.checkState(byteBuffer.remaining() >= keyLength,
-          "Insufficient bytes in buffer to read key");
-
-      byte[] keyBytes = new byte[keyLength];
-      byteBuffer.get(keyBytes);
-      String key = new String(keyBytes, UTF_8);
-
-      Preconditions.checkState(byteBuffer.remaining() >= Integer.BYTES,
-          "Insufficient bytes in buffer to read value length");
-      int valueLength = byteBuffer.getInt();
-      Preconditions.checkState(valueLength >= 0, "Value length cannot be negative");
-      Preconditions.checkState(byteBuffer.remaining() >= valueLength,
-          "Insufficient bytes in buffer to read value");
-
-      byte[] valueBytes = new byte[valueLength];
-      byteBuffer.get(valueBytes);
-      Object value = null;
-
+      String key = Utf8Utils.decode(readLengthPrefixed(byteBuffer));
+      byte[] valueBytes = readLengthPrefixed(byteBuffer);
       try {
-        value = OBJECT_MAPPER.readValue(valueBytes, Object.class);
+        Object value = UNSORTED_MAPPER.readValue(valueBytes, Object.class);
+        map.put(key, value);
       } catch (IOException e) {
         LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
       }
-      map.put(key, value);
     }
     return map;
   }
 
+  private static byte[] readLengthPrefixed(ByteBuffer byteBuffer) {
+    int length = byteBuffer.getInt();
+    byte[] bytes = new byte[length];
+    byteBuffer.get(bytes);
+    return bytes;
+  }
+
   public static String toString(Map<String, Object> map) {
+    return toString(map, true);
+  }
+
+  /// `sortByKey = false` skips key sorting (top-level and nested) for faster serialization when canonical output is
+  /// not required.
+  public static String toString(Map<String, Object> map, boolean sortByKey) {
     try {
-      return OBJECT_MAPPER.writeValueAsString(map);
+      return (sortByKey ? SORTED_MAPPER : UNSORTED_MAPPER).writeValueAsString(map);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static Map<String, Object> fromString(String json) {
+    try {
+      return UNSORTED_MAPPER.readValue(json, MAP_TYPE_REFERENCE);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

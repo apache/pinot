@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 ARG JDK_IMAGE=mcr.microsoft.com/openjdk/jdk
 FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu AS pinot_build_env
 

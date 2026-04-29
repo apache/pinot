@@ -25,25 +25,14 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 20
-    ignore:
-    # Locked test resources for pinot-spi/src/test/java/org/apache/pinot/spi/plugin/ClassLoaderTest.java.
-    # These artifacts are pinned in pinot-spi/pom.xml (maven-dependency-plugin artifactItems) because
-    # ClassLoaderTest asserts plugin realm isolation against known artifact contents. Dependabot's
-    # `versions` filter is matched against the *target* version of an update, so we use range filters
-    # (">= <next>") to block every bump to a newer version for these coordinates.
-    #
-    # Caveat: these rules apply repo-wide by coordinate. pinot-dropwizard / pinot-yammer /
-    # com.yammer.metrics:metrics-core are not referenced anywhere else, so locking them is safe.
-    # commons-io:commons-io is also consumed in the top-level pom.xml at a newer version, so it is
-    # intentionally NOT locked here; Dependabot may still open PRs that also modify the hardcoded
-    # 2.11.0 in pinot-spi/pom.xml — reviewers must revert that part manually (see the DO NOT BUMP
-    # comment next to the <version>2.11.0</version> entry in pinot-spi/pom.xml).
-    - dependency-name: "org.apache.pinot:pinot-dropwizard"
-      versions: [">= 0.10.1"]
-    - dependency-name: "org.apache.pinot:pinot-yammer"
-      versions: [">= 0.10.1"]
-    - dependency-name: "com.yammer.metrics:metrics-core"
-      versions: [">= 2.1.6"]
+    # No `ignore` rules needed for the ClassLoaderTest pinned test fixtures
+    # (pinot-dropwizard, pinot-yammer, commons-io, com.yammer.metrics:metrics-core).
+    # Those fixtures are resolved by pinot-spi/pom.xml via maven-dependency-plugin's
+    # `dependency:get` goal using single-string <artifact>groupId:artifactId:version</artifact>
+    # parameters — Dependabot's Maven updater scans structured groupId+artifactId+version
+    # triples inside <dependency>, <plugin>, and <artifactItem> blocks, not single-string
+    # <artifact> values in plugin configuration, so the pinned coordinates are invisible
+    # to Dependabot and no ignore rule is required.
 
   - package-ecosystem: "npm"
     directory: "/pinot-controller/src/main/resources"

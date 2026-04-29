@@ -236,7 +236,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
     }).when(spyExecutor).submit(any(Runnable.class));
 
     // Replace the executor in the table data manager
-    _tableDataManager._segmentReloadRefreshExecutor = spyExecutor;
+    _tableDataManager._segmentRefreshExecutor = spyExecutor;
 
     // Test the method
     _tableDataManager.replaceSegment(SEGMENT_NAME);
@@ -262,7 +262,7 @@ public class BaseTableDataManagerEnqueueSegmentToReplaceTest {
   @Test
   public void testExecutorUsage() throws Exception {
     ExecutorService mockExecutor = mock(ExecutorService.class);
-    _tableDataManager._segmentReloadRefreshExecutor = mockExecutor;
+    _tableDataManager._segmentRefreshExecutor = mockExecutor;
 
     // Test the method
     _tableDataManager.replaceSegment(SEGMENT_NAME);

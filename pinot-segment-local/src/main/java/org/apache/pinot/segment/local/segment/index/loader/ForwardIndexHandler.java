@@ -616,6 +616,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
+      case BIG_DECIMAL: {
+        for (int i = 0; i < numDocs; i++) {
+          if (isSVColumn) {
+            BigDecimal val = reader.getBigDecimal(i, readerContext);
+            creator.putBigDecimal(val);
+          } else {
+            BigDecimal[] bigDecimals = reader.getBigDecimalMV(i, readerContext);
+            creator.putBigDecimalMV(bigDecimals);
+          }
+        }
+        break;
+      }
       case STRING: {
         for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
@@ -637,14 +649,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             byte[][] bytesArray = reader.getBytesMV(i, readerContext);
             creator.putBytesMV(bytesArray);
           }
-        }
-        break;
-      }
-      case BIG_DECIMAL: {
-        Preconditions.checkState(isSVColumn, "BigDecimal is not supported for MV columns");
-        for (int i = 0; i < numDocs; i++) {
-          BigDecimal val = reader.getBigDecimal(i, readerContext);
-          creator.putBigDecimal(val);
         }
         break;
       }
@@ -732,17 +736,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
-      case BYTES: {
+      case BIG_DECIMAL: {
         for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             int dictId = reader.getDictId(i, readerContext);
-            byte[] val = dictionaryReader.getBytesValue(dictId);
-            creator.putBytes(val);
+            BigDecimal val = dictionaryReader.getBigDecimalValue(dictId);
+            creator.putBigDecimal(val);
           } else {
             int[] dictIds = reader.getDictIdMV(i, readerContext);
-            byte[][] bytes = new byte[dictIds.length][];
-            dictionaryReader.readBytesValues(dictIds, dictIds.length, bytes);
-            creator.putBytesMV(bytes);
+            BigDecimal[] bigDecimals = new BigDecimal[dictIds.length];
+            dictionaryReader.readBigDecimalValues(dictIds, dictIds.length, bigDecimals);
+            creator.putBigDecimalMV(bigDecimals);
           }
         }
         break;
@@ -762,12 +766,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
-      case BIG_DECIMAL: {
-        Preconditions.checkState(isSVColumn, "BigDecimal is not supported for MV columns");
+      case BYTES: {
         for (int i = 0; i < numDocs; i++) {
-          int dictId = reader.getDictId(i, readerContext);
-          BigDecimal val = dictionaryReader.getBigDecimalValue(dictId);
-          creator.putBigDecimal(val);
+          if (isSVColumn) {
+            int dictId = reader.getDictId(i, readerContext);
+            byte[] val = dictionaryReader.getBytesValue(dictId);
+            creator.putBytes(val);
+          } else {
+            int[] dictIds = reader.getDictIdMV(i, readerContext);
+            byte[][] bytes = new byte[dictIds.length][];
+            dictionaryReader.readBytesValues(dictIds, dictIds.length, bytes);
+            creator.putBytesMV(bytes);
+          }
         }
         break;
       }

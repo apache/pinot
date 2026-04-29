@@ -36,6 +36,7 @@ import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorCo
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.fail;
 
 
@@ -147,6 +148,15 @@ public class CLPLogRecordExtractorTest {
     assertEquals(row.getValue(_LEVEL_FIELD_NAME), _LEVEL_FIELD_VALUE);
     assertEquals(row.getValue(_MESSAGE_1_FIELD_NAME), _MESSAGE_1_FIELD_VALUE);
     assertEquals(row.getValue(_MESSAGE_2_FIELD_NAME), _MESSAGE_2_FIELD_VALUE);
+  }
+
+  /// Verify that primitive types pass through `convertSingleValue` as their native Java boxed types — Boolean stays
+  /// Boolean (was previously stringified), int stays Integer.
+  @Test
+  public void testPrimitiveTypePreservation() {
+    GenericRow row = extract(new HashMap<>(), null);
+    assertSame(row.getValue(_BOOLEAN_FIELD_NAME).getClass(), Boolean.class, "boolean → Boolean");
+    assertSame(row.getValue(_TIMESTAMP_FIELD_NAME).getClass(), Integer.class, "int → Integer");
   }
 
   @Test

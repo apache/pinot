@@ -47,8 +47,8 @@ public class EmptyColumnStatisticsTest {
     List<Object[]> params = new ArrayList<>();
     for (DataType type : ALL_TYPES) {
       params.add(new Object[]{type, true});
-      // BIG_DECIMAL and MAP do not support MV
-      if (type != DataType.BIG_DECIMAL && type != DataType.MAP) {
+      // MAP does not support MV
+      if (type != DataType.MAP) {
         params.add(new Object[]{type, false});
       }
     }

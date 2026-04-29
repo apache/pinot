@@ -92,6 +92,13 @@ public class ParquetUtils {
     conf.set("fs.defaultFS", DEFAULT_FS);
     // To read Int96 as bytes.
     conf.set(AvroReadSupport.READ_INT96_AS_FIXED, "true");
+    // Tell parquet-avro NOT to surface the 3-level Parquet LIST encoding's repeated wrapper as an Avro record.
+    // With the default (true), a Parquet `LIST<STRING>` reads back as Avro `array<record<element: string>>` and
+    // we have to strip that wrapper ourselves; with this off, parquet-avro materializes the Avro schema flat
+    // (`array<string>`), matching Apache Arrow's Parquet reader behavior. This eliminates the wrapper-stripping
+    // ambiguity entirely — real user records (e.g. `array<record<UserTag, [element: string]>>` written from an
+    // Avro source) survive untouched because their Avro schema in the file metadata is honored as-is.
+    conf.set("parquet.avro.add-list-element-records", "false");
     conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     return conf;
   }

@@ -29,8 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertSame;
 
 
 /**
@@ -197,5 +201,33 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
     record.put(MAP_2_FIELD, map6);
 
     return record;
+  }
+
+  /// Verify that JSON primitive types come back as their native Java boxed types — Boolean stays Boolean (was
+  /// previously stringified by `convertSingleValue`).
+  @Test
+  public void testPrimitiveTypePreservation()
+      throws IOException {
+    File typeFile = new File(_tempDir, "types.json");
+    try (FileWriter writer = new FileWriter(typeFile)) {
+      ObjectNode node = JsonUtils.newObjectNode();
+      node.put("boolField", true);
+      node.put("intField", 42);
+      node.put("longField", 1234567890123L);
+      node.put("doubleField", 1.5);
+      node.put("stringField", "hello");
+      writer.write(node.toString());
+    }
+    JSONRecordReader reader = new JSONRecordReader();
+    reader.init(typeFile, null, null);
+    GenericRow row = new GenericRow();
+    reader.next(row);
+    reader.close();
+
+    assertSame(row.getValue("boolField").getClass(), Boolean.class, "JSON bool → Boolean");
+    assertSame(row.getValue("intField").getClass(), Integer.class, "JSON int → Integer");
+    assertSame(row.getValue("longField").getClass(), Long.class, "JSON long → Long");
+    assertSame(row.getValue("doubleField").getClass(), Double.class, "JSON double → Double");
+    assertSame(row.getValue("stringField").getClass(), String.class, "JSON string → String");
   }
 }

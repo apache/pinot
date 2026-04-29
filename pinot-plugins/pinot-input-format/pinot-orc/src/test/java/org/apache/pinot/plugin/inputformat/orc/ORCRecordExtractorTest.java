@@ -44,9 +44,12 @@ import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.testng.Assert.assertSame;
 
 
 /**
@@ -359,5 +362,45 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
     struct.put(fieldName2, value2);
     struct.put(fieldName3, value3);
     return struct;
+  }
+
+  /// Locks in the ORC reader's primitive type contract: BOOLEAN comes back as String "true"/"false" (TODO in
+  /// ORCRecordReader.java tracks aligning with the Boolean-preserving contract); BYTE / SHORT / INT all collapse to
+  /// Integer; LONG stays Long; FLOAT stays Float; DOUBLE stays Double. If anyone changes ORCRecordReader to
+  /// preserve Boolean directly, this test will catch and require updating.
+  @Test
+  public void testPrimitiveTypePreservation()
+      throws IOException {
+    File typeFile = new File(_tempDir, "types.orc");
+    TypeDescription schema = TypeDescription.fromString(
+        "struct<boolField:boolean,byteField:tinyint,shortField:smallint,intField:int,longField:bigint,"
+            + "floatField:float,doubleField:double,stringField:string>");
+    VectorizedRowBatch batch = schema.createRowBatch(1);
+    ((LongColumnVector) batch.cols[0]).vector[0] = 1; // true
+    ((LongColumnVector) batch.cols[1]).vector[0] = 7;
+    ((LongColumnVector) batch.cols[2]).vector[0] = 42;
+    ((LongColumnVector) batch.cols[3]).vector[0] = 1234;
+    ((LongColumnVector) batch.cols[4]).vector[0] = 1234567890123L;
+    ((DoubleColumnVector) batch.cols[5]).vector[0] = 1.5;
+    ((DoubleColumnVector) batch.cols[6]).vector[0] = 2.5;
+    ((BytesColumnVector) batch.cols[7]).setVal(0, "hello".getBytes(UTF_8));
+    batch.size = 1;
+    try (Writer writer = OrcFile.createWriter(new Path(typeFile.getAbsolutePath()),
+        OrcFile.writerOptions(new Configuration()).setSchema(schema).overwrite(true))) {
+      writer.addRowBatch(batch);
+    }
+
+    try (ORCRecordReader reader = new ORCRecordReader()) {
+      reader.init(typeFile, null, null);
+      GenericRow row = reader.next();
+      assertSame(row.getValue("boolField").getClass(), String.class, "ORC BOOLEAN currently surfaces as String");
+      assertSame(row.getValue("byteField").getClass(), Integer.class, "ORC TINYINT collapses to Integer");
+      assertSame(row.getValue("shortField").getClass(), Integer.class, "ORC SMALLINT collapses to Integer");
+      assertSame(row.getValue("intField").getClass(), Integer.class, "ORC INT → Integer");
+      assertSame(row.getValue("longField").getClass(), Long.class, "ORC BIGINT → Long");
+      assertSame(row.getValue("floatField").getClass(), Float.class, "ORC FLOAT → Float");
+      assertSame(row.getValue("doubleField").getClass(), Double.class, "ORC DOUBLE → Double");
+      assertSame(row.getValue("stringField").getClass(), String.class, "ORC STRING → String");
+    }
   }
 }

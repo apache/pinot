@@ -102,6 +102,7 @@ import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationC
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -348,7 +349,7 @@ public final class TableConfigUtils {
    *
    * 2. For OFFLINE table
    * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
-   * - for Dimension tables checks the primary key requirement
+   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
    *
    * 3. Checks peerDownloadSchema
    * 4. Checks time column existence if null handling for time column is enabled
@@ -371,6 +372,16 @@ public final class TableConfigUtils {
           "Dimension table must be of OFFLINE table type.");
       Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
           "Dimension table must have primary key[s]");
+
+      String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
+      if (segmentAssignmentStrategy != null
+          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
+        throw new IllegalStateException(
+            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
+              tableConfig.getTableName(),
+              CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
+              segmentAssignmentStrategy));
+      }
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
