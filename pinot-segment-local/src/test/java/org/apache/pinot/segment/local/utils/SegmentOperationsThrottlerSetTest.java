@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.utils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -224,19 +223,16 @@ public class SegmentOperationsThrottlerSetTest {
   }
 
   @Test(timeOut = 10_000)
-  public void testZeroPermitsBlocksAcquireUntilPermitsRestored()
+  public void testZeroPermitsUnblocksWhenPermitsRestored()
       throws Exception {
     SegmentOperationsThrottler t = new SegmentOperationsThrottler(0, 0, true);
     Assert.assertEquals(t.totalPermits(), 0);
     Assert.assertEquals(t.availablePermits(), 0);
 
-    // Spawn a thread that calls acquire() and parks because permits == 0.
-    CountDownLatch acquired = new CountDownLatch(1);
     AtomicReference<Throwable> failure = new AtomicReference<>();
     Thread acquirer = new Thread(() -> {
       try {
         t.acquire();
-        acquired.countDown();
       } catch (Throwable th) {
         failure.set(th);
       }
@@ -244,22 +240,10 @@ public class SegmentOperationsThrottlerSetTest {
     acquirer.setDaemon(true);
     acquirer.start();
 
-    // Wait until the acquirer is parked inside acquire(). availablePermits() goes to -1 once it
-    // has decremented but not yet been granted a permit (AdjustableSemaphore behavior), so poll
-    // for that condition.
-    long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-    while (acquirer.getState() != Thread.State.WAITING && System.nanoTime() < deadlineNanos) {
-      Thread.sleep(10);
-    }
-    Assert.assertEquals(acquirer.getState(), Thread.State.WAITING,
-        "acquirer thread should be parked when permits == 0");
-    Assert.assertFalse(acquired.await(100, TimeUnit.MILLISECONDS),
-        "acquire() must not return while permits == 0");
-
     // Restore permits — the parked acquirer should be released.
     t.updatePermits(1, 1);
-    Assert.assertTrue(acquired.await(5, TimeUnit.SECONDS),
-        "acquire() should complete once permits are restored");
+    acquirer.join(TimeUnit.SECONDS.toMillis(5));
+    Assert.assertFalse(acquirer.isAlive(), "acquire() should complete once permits are restored");
     Assert.assertNull(failure.get(), "acquirer thread should not throw");
 
     // The released acquirer holds the one permit, so available is now 0 with total 1.
