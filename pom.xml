@@ -264,7 +264,7 @@
     <httpcore5.version>5.4.2</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>4.34.0</protobuf.version>
+    <protobuf.version>4.34.1</protobuf.version>
     <grpc.version>1.80.0</grpc.version>
     <google.cloud.libraries.version>26.80.0</google.cloud.libraries.version>
     <opentelemetry.gcp.resources.version>1.55.0-alpha</opentelemetry.gcp.resources.version>
