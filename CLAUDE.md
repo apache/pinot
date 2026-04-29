@@ -123,7 +123,7 @@ Before pushing a commit, run the following checks on the affected modules and fi
 Do not push until all four checks pass cleanly.
 
 Additionally, run the compiler warning check and fix what you can:
-5. `./mvnw clean test-compile -pl <module> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true` — review warnings (deprecation, unchecked, etc.) in your changed code and fix where possible.
+5. `./mvnw test-compile -pl <module> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true` — review warnings (deprecation, unchecked, etc.) in your changed code and fix where possible.
 
 Claude Code users can invoke `/precommit` to automate all of the above.
 

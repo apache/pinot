@@ -46,7 +46,7 @@ Skills are plain Markdown with YAML frontmatter — Claude reads them and follow
 - `license:format` — inserts the ASF header into new files that don't have it. Governed by `HEADER` at repo root.
 - `checkstyle:check` — `config/checkstyle.xml`. Top offenders: `LineLength` (120), `AvoidStarImport`, `AvoidStaticImport`, `HideUtilityClassConstructor`, `NeedBraces`.
 - `license:check` — final gate confirming every touched file has a header.
-- `clean test-compile -Xlint:all` — recompiles both `src/main/` and `src/test/` with all compiler warnings enabled (deprecation, unchecked casts, raw types, fallthrough, etc.). Uses `clean` to ensure warnings are always emitted. Warnings are filtered to only lines added in the diff (not just by file). Uses `-am` because compilation needs upstream deps.
+- `test-compile -Xlint:all` — compiles both `src/main/` and `src/test/` with all compiler warnings enabled (deprecation, unchecked casts, raw types, fallthrough, etc.). Does not use `clean` — incremental compilation still emits warnings for the entire module, and per-line filtering handles pre-existing warnings. Using `clean` would break modules with generated sources (e.g., JavaCC in `pinot-common`). Warnings are filtered to only lines added in the diff (not just by file). Uses `-am` because compilation needs upstream deps.
 
 **Example scenarios:**
 

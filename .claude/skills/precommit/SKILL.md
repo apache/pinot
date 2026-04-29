@@ -28,7 +28,7 @@ The five checks (in order):
 2. `./mvnw license:format -pl <modules>` — adds ASF headers to any new files.
 3. `./mvnw checkstyle:check -pl <modules>` — validates style; fails hard.
 4. `./mvnw license:check -pl <modules>` — validates headers; fails hard.
-5. `./mvnw clean test-compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'` — compiles and checks for deprecation, unchecked casts, raw types, fallthrough, etc. Warnings are filtered to only lines added in the diff.
+5. `./mvnw test-compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'` — compiles and checks for deprecation, unchecked casts, raw types, fallthrough, etc. Warnings are filtered to only lines added in the diff.
 
 Steps 1 and 2 are auto-fixers. Steps 3 and 4 are validators — if they fail after the auto-fixers ran, report the failure with the exact offending file/line from the Maven output and stop. Do not try to manually patch style errors; fix the underlying issue or ask the user. Step 5 is a compiler check — if it produces warnings on newly added lines, report them. Prefer the non-deprecated replacement; suppress with `@SuppressWarnings` only with a comment explaining why the deprecated reference is required (e.g., backward-compat serialization, mixed-version SPI calls, testing the deprecated path).
 
@@ -43,31 +43,31 @@ Steps 1 and 2 are auto-fixers. Steps 3 and 4 are validators — if they fail aft
    - If the only pom is the repo root, the user is touching top-level config — just run the checks at the root (no `-pl`).
    - Some plugin modules are nested two levels deep (e.g. `pinot-plugins/pinot-input-format/pinot-parquet`). Don't stop at an intermediate aggregator pom if it doesn't define the actual sources — walk up until you find the module that directly contains the changed file.
 
-3. **Build the added-line set for compiler warning filtering.** Run `git diff --unified=0 HEAD -- <changed .java files>` and parse the `@@` hunk headers to extract the added line ranges. Build a map of `file → set of added line numbers`. This is used in step 6 to filter compiler warnings to only newly added lines, avoiding false positives from pre-existing warnings in touched files.
+3. **Report the plan.** Print the list of detected modules in one line: `Modules: pinot-broker, pinot-common, pinot-plugins/pinot-input-format/pinot-parquet`. If there are no modules, say "No changed Java/XML files — nothing to do." and exit.
 
-4. **Report the plan.** Print the list of detected modules in one line: `Modules: pinot-broker, pinot-common, pinot-plugins/pinot-input-format/pinot-parquet`. If there are no modules, say "No changed Java/XML files — nothing to do." and exit.
-
-5. **Run the auto-fixers.** Build a single `-pl` argument with comma-separated modules:
+4. **Run the auto-fixers.** Build a single `-pl` argument with comma-separated modules:
    ```
    ./mvnw spotless:apply -pl <modules>
    ./mvnw license:format -pl <modules>
    ```
    Run each in the foreground. Track the number of files modified by each. If either fails with a non-build error (not a style error — those go through checkstyle), stop and surface the error.
 
-6. **Run the validators.**
+5. **Run the validators.**
    ```
    ./mvnw checkstyle:check -pl <modules>
    ./mvnw license:check -pl <modules>
    ```
    If either fails, parse the Maven output, extract the file:line of each violation, and track them for the summary. Do not attempt to auto-fix checkstyle violations — they need human judgment.
 
+6. **Build the added-line set for compiler warning filtering.** This runs after the auto-fixers so that line numbers reflect the post-fix state (spotless may remove imports, shifting line numbers). Run `git diff --unified=0 HEAD -- <changed .java files>` and parse the `@@` hunk headers to extract the added line ranges. Build a map of `file → set of added line numbers`. For untracked `.java` files (new files not yet in git), `git diff` returns nothing — treat all lines as added (use `wc -l` to get the line count and add 1 through N to the set).
+
 7. **Run the compiler check.**
    ```
-   ./mvnw clean test-compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'
+   ./mvnw test-compile -pl <modules> -am -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true '-Dmaven.compiler.compilerArgs=-Xlint:all'
    ```
-   This is the only step that uses `-am` — compilation needs upstream dependencies built, unlike the other steps. Uses `clean` to ensure all sources are recompiled and warnings are emitted (without `clean`, Maven's incremental compilation may skip unchanged files and emit no warnings).
+   This is the only step that uses `-am` — compilation needs upstream dependencies built, unlike the other steps. Do not use `clean` — incremental compilation still emits warnings for all files in the module, and the per-line filter (step 6) handles pre-existing warnings. Using `clean` would break modules with generated sources (e.g., JavaCC in `pinot-common`) and adds significant overhead on deep modules. If warnings seem missing (e.g., stale `target/` from a different branch), the user can manually run `./mvnw clean generate-sources test-compile -pl <modules> -am ...` to force full recompilation.
 
-   Parse the output for `[WARNING]` lines. **Filter to only added lines from the diff** — for each warning of the form `[WARNING] /path/File.java:[line,col] <message>`, check whether that file and line number appear in the added-line set from step 3. Only report warnings that match. This avoids surfacing pre-existing warnings when a contributor edits a file that already has them.
+   Parse the output for `[WARNING]` lines. **Filter to only added lines from the diff** — for each warning of the form `[WARNING] /path/File.java:[line,col] <message>`, check whether that file and line number appear in the added-line set from step 6. Only report warnings that match. This avoids surfacing pre-existing warnings when a contributor edits a file that already has them.
 
    Track each matching warning with file:line and category (deprecation, unchecked, rawtypes, etc.).
 
@@ -116,15 +116,15 @@ Knowing this matters for diagnosing failures:
 - **`license:check/format`**: the ASF header from `HEADER` (repo root), applied to `.java`, `.xml`, `.js`, `.sh`, `.md`, etc. Many file types are excluded — see the `licenseSets/excludes` block in the parent `pom.xml`.
 - **`checkstyle:check`**: rules from `config/checkstyle.xml`. The common ones contributors trip: `LineLength` (120 chars), `AvoidStarImport`, `AvoidStaticImport`, `HideUtilityClassConstructor`, `NeedBraces`. Output format is `[WARNING] <file>:[<line>] (<group>) <RuleName>: <message>` — parse that when surfacing violations.
 - **`license:check`** runs after `license:format` to confirm every touched file now has the header, including files the user only renamed (the plugin keys off content, not git status).
-- **`clean test-compile -Xlint:all`**: uses `clean test-compile` (not just `compile`) so both `src/main/` and `src/test/` sources are recompiled and all warnings are emitted. The Java compiler flags any reference to `@Deprecated` classes/methods/fields from any dependency (Pinot internal or third-party jars), plus unchecked casts, raw types, fallthrough in switch, and other warning categories. Output format: `[WARNING] /path/File.java:[line,col] <message>`. Warnings are filtered to added lines in the diff only — not just by file, but by the specific line numbers from `git diff --unified=0`.
+- **`test-compile -Xlint:all`**: uses `test-compile` (not just `compile`) so both `src/main/` and `src/test/` sources are compiled and all warnings are emitted. Do not use `clean` — it wipes generated sources (e.g., JavaCC in `pinot-common`) and adds significant overhead on deep modules. Incremental compilation still emits warnings for the entire module; the per-line filter handles pre-existing warnings. The Java compiler flags any reference to `@Deprecated` classes/methods/fields from any dependency (Pinot internal or third-party jars), plus unchecked casts, raw types, fallthrough in switch, and other warning categories. Output format: `[WARNING] /path/File.java:[line,col] <message>`. Warnings are filtered to added lines in the diff only — not just by file, but by the specific line numbers from `git diff --unified=0`.
 
 ## Notes
 
 - Always use `./mvnw`, never a system `mvn`. The repo's CLAUDE.md is explicit on this.
-- Don't pass `-am` for steps 1–4 — that builds upstream dependencies too, which defeats the purpose of scoping. Only step 5 (compile) needs `-am` because javac needs dependency jars on the classpath.
+- Don't pass `-am` for steps 1–5 — that builds upstream dependencies too, which defeats the purpose of scoping. Only step 7 (compile) needs `-am` because javac needs dependency jars on the classpath.
 - Run sequentially, not in parallel. Spotless and license:format may both modify the same files; ordering matters.
 - When `spotless:apply` removes an unused import, it leaves a *leftover blank line* where the import used to be. This is harmless (checkstyle does not flag it), but if the user cares about the cosmetic double-blank, they'll need to hand-clean after the skill runs. Mention this in the report if spotless touched any files.
 - If the user says `/precommit all`, run on the whole repo (no `-pl`). Warn that this is slow (several minutes).
-- Long builds: steps 1–4 are fast (<30s warm). Step 5 (clean test-compile with `-am`) is slower (~30–120s depending on module depth and Maven cache state). Deep modules with many upstream deps may take longer on a cold cache. Use `run_in_background` only if the user explicitly asks — otherwise show progress inline.
+- Long builds: steps 1–5 are fast (<30s warm). Step 7 (test-compile with `-am`) is slower (~7–90s depending on module depth and Maven cache state). Deep modules with many upstream deps may take longer on a cold cache. Use `run_in_background` only if the user explicitly asks — otherwise show progress inline.
 - The `license:check` and `checkstyle:check` goals return Maven exit code `1` on violations. If you're capturing the output with shell chaining like `... | tail`, the *tail* pipeline's exit code will mask Maven's — always record Maven's exit code separately, e.g. with `set -o pipefail` or by capturing `${PIPESTATUS[0]}`.
-- The compiler warning filter (step 7) uses the added-line set from step 3, not just the changed-file list. This is critical — per-file filtering would surface pre-existing warnings in files the contributor merely edited, which is unfair. Per-line filtering ensures only warnings on newly added code are reported.
+- The compiler warning filter (step 7) uses the added-line set from step 6, not just the changed-file list. This is critical — per-file filtering would surface pre-existing warnings in files the contributor merely edited, which is unfair. Per-line filtering ensures only warnings on newly added code are reported.
