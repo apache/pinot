@@ -2151,7 +2151,7 @@ public class CommonConstants {
     /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
     /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
-    public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+    public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
 
     /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
     /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
