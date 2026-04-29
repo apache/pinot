@@ -122,6 +122,19 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, FstIndexConfig indexConfig) {
+    // IFST is built over the column's sorted dictionary entries; without a dictionary it cannot be created or read.
+    return true;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, FstIndexConfig indexConfig) {
+    // IFST exists only when a dictionary exists; enabling/disabling the dictionary changes whether the IFST file
+    // must exist at all and is built from a different value set.
+    return true;
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return EXTENSIONS;
   }

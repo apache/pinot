@@ -120,6 +120,18 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, TextIndexConfig indexConfig) {
+    // Lucene text index is built directly from raw text values.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, TextIndexConfig indexConfig) {
+    // Lucene text index payload is derived from raw text values, independent of dictionary representation.
+    return false;
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return EXTENSIONS;
   }
