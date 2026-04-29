@@ -164,7 +164,7 @@ public abstract class AggregationStrategy<A> {
    */
   abstract void add(A aggResult, int step, Dictionary[] dictionaries, int[] correlationDictIds);
 
-  protected Dictionary[] getDictionaries(Map<ExpressionContext, BlockValSet> blockValSetMap) {
+  private Dictionary[] getDictionaries(Map<ExpressionContext, BlockValSet> blockValSetMap) {
     int numKeys = _correlateByExpressions.size();
     Dictionary[] dictionaries = new Dictionary[numKeys];
     for (int k = 0; k < numKeys; k++) {

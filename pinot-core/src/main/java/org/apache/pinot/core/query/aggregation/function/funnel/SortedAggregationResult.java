@@ -46,10 +46,6 @@ class SortedAggregationResult {
   private Map<IntArrayList, boolean[]> _secondaryKeySteps;
   private final IntArrayList _lookupKey;
 
-  SortedAggregationResult(int numSteps) {
-    this(numSteps, 1);
-  }
-
   SortedAggregationResult(int numSteps, int numKeys) {
     _numSteps = numSteps;
     _numKeys = numKeys;
@@ -105,9 +101,6 @@ class SortedAggregationResult {
   }
 
   private void flushMultiKeyGroup() {
-    if (_secondaryKeySteps == null) {
-      return;
-    }
     for (boolean[] steps : _secondaryKeySteps.values()) {
       for (int n = 0; n < _numSteps; n++) {
         if (!steps[n]) {
