@@ -122,7 +122,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       row.putValue(NO_INDEX_INT_COL_NAME, i);
       row.putValue(STATIC_INT_COL_NAME, 10);
       row.putValue(BOOLEAN_COL_NAME, random.nextBoolean());
-      row.putValue(STRING_COL_NAME, RandomStringUtils.randomAlphabetic(4));
+      row.putValue(STRING_COL_NAME, RandomStringUtils.secure().nextAlphabetic(4));
       rows.add(row);
     }
     return rows;

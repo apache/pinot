@@ -28,6 +28,7 @@ import java.util.Random;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -134,7 +135,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertEquals(transformFunction.getName(), "replace");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = StringUtils.replace(_stringAlphaNumericSVValues[i], "A", "B");
+      expectedValues[i] = Strings.CS.replace(_stringAlphaNumericSVValues[i], "A", "B");
     }
     testTransformFunction(transformFunction, expectedValues);
   }

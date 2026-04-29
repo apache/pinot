@@ -692,7 +692,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
     final AccessControlFactory accessControlFactory;
     try {
-      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+      accessControlFactory =
+          (AccessControlFactory) Class.forName(accessControlFactoryClass).getDeclaredConstructor().newInstance();
       accessControlFactory.init(_config, _helixResourceManager);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);

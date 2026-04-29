@@ -1689,7 +1689,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
   @Test
   public void testNeedAddMinMaxValueOnLongString()
       throws Exception {
-    String longString = RandomStringUtils.randomAlphanumeric(1000);
+    String longString = RandomStringUtils.secure().nextAlphanumeric(1000);
     String[] stringValuesValid = {"B", "C", "D", "E", longString};
     long[] longValues = {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();

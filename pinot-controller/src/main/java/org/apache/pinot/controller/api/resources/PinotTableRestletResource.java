@@ -445,7 +445,7 @@ public class PinotTableRestletResource {
     if (instanceAssignmentConfigMap == null) {
       return;
     }
-    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.fields();
+    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.properties().iterator();
     while (iterator.hasNext()) {
       Map.Entry<String, JsonNode> entry = iterator.next();
       JsonNode instanceAssignmentConfig = entry.getValue();

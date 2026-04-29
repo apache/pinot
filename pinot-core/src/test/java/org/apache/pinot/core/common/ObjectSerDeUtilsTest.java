@@ -81,7 +81,7 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testString() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      String expected = RandomStringUtils.random(RANDOM.nextInt(20));
+      String expected = RandomStringUtils.secure().next(RANDOM.nextInt(20));
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       String actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.String);
@@ -211,7 +211,7 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testStringValueTimePair() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      ValueLongPair<String> expected = new StringLongPair(RandomStringUtils.random(10), RANDOM.nextLong());
+      ValueLongPair<String> expected = new StringLongPair(RandomStringUtils.secure().next(10), RANDOM.nextLong());
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ValueLongPair<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringLongPair);
@@ -268,7 +268,7 @@ public class ObjectSerDeUtilsTest {
       int size = RANDOM.nextInt(100);
       Map<String, Double> expected = new HashMap<>(size);
       for (int j = 0; j < size; j++) {
-        expected.put(RandomStringUtils.random(RANDOM.nextInt(20)), RANDOM.nextDouble());
+        expected.put(RandomStringUtils.secure().next(RANDOM.nextInt(20)), RANDOM.nextDouble());
       }
 
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
@@ -461,7 +461,7 @@ public class ObjectSerDeUtilsTest {
       int size = RANDOM.nextInt(100);
       ObjectArrayList<String> expected = new ObjectArrayList<>(size);
       for (int j = 0; j < size; j++) {
-        expected.add(RandomStringUtils.random(RANDOM.nextInt(20)));
+        expected.add(RandomStringUtils.secure().next(RANDOM.nextInt(20)));
       }
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ObjectArrayList<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringArrayList);
@@ -587,7 +587,7 @@ public class ObjectSerDeUtilsTest {
       int size = RANDOM.nextInt(100);
       ObjectLinkedOpenHashSet<String> expected = new ObjectLinkedOpenHashSet<>(size);
       for (int j = 0; j < size; j++) {
-        expected.add(RandomStringUtils.random(RANDOM.nextInt(20)));
+        expected.add(RandomStringUtils.secure().next(RANDOM.nextInt(20)));
       }
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       ObjectLinkedOpenHashSet<String> actual =

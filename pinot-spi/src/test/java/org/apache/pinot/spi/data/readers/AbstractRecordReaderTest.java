@@ -104,7 +104,7 @@ public abstract class AbstractRecordReaderTest {
       case DOUBLE:
         return RANDOM.nextDouble();
       case STRING:
-        return RandomStringUtils.randomAscii(RANDOM.nextInt(50) + 1);
+        return RandomStringUtils.secure().nextAscii(RANDOM.nextInt(50) + 1);
       case BOOLEAN:
         return RANDOM.nextBoolean();
       default:
