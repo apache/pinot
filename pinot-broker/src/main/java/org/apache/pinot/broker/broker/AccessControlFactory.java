@@ -28,6 +28,7 @@ import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.grpc.GrpcRequesterIdentity;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +63,13 @@ public abstract class AccessControlFactory {
     }
     try {
       LOGGER.info("Instantiating Access control factory class {}", accessControlFactoryClassName);
-      accessControlFactory =
-          (AccessControlFactory) Class.forName(accessControlFactoryClassName).getDeclaredConstructor().newInstance();
+      // PluginManager.loadClass is realm-aware (consults plugin realms in addition to the
+      // system classloader). We deliberately keep the explicit getDeclaredConstructor() +
+      // newInstance() pattern instead of going through PluginManager.createInstance, because
+      // the former tolerates non-public no-arg constructors and we don't want to silently
+      // regress factory implementations that rely on it.
+      Class<?> clazz = PluginManager.get().loadClass(accessControlFactoryClassName);
+      accessControlFactory = (AccessControlFactory) clazz.getDeclaredConstructor().newInstance();
       LOGGER.info("Initializing Access control factory class {}", accessControlFactoryClassName);
       accessControlFactory.init(configuration, propertyStore);
       return accessControlFactory;
