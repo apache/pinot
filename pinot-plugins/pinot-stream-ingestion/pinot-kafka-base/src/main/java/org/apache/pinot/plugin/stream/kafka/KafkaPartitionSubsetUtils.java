@@ -38,7 +38,13 @@ public final class KafkaPartitionSubsetUtils {
   }
 
   /**
-   * Reads the optional comma-separated partition ID list from the stream config map.
+   * Reads the optional partition ID specification from the stream config map.
+   * Supports three formats, which can be mixed in a single value:
+   * <ul>
+   *   <li>Individual IDs: {@code "0,2,5"}</li>
+   *   <li>Inclusive ranges (both start and end are included): {@code "0-399"}</li>
+   *   <li>Mixed: {@code "0-99,200,300-399"}</li>
+   * </ul>
    * Returns a sorted, deduplicated list for stable ordering when used for partition group metadata.
    * Duplicate IDs in the config are silently removed; this ensures stable ordering and prevents
    * duplicate processing of the same partition.
@@ -47,7 +53,7 @@ public final class KafkaPartitionSubsetUtils {
    *                        {@link org.apache.pinot.spi.stream.StreamConfig#getStreamConfigsMap()})
    * @return Sorted list of unique partition IDs when stream.kafka.partition.ids is set and non-empty;
    *         null when not set or blank
-   * @throws IllegalArgumentException if the value contains invalid (non-integer) entries
+   * @throws IllegalArgumentException if the value contains invalid entries
    */
   @Nullable
   public static List<Integer> getPartitionIdsFromConfig(Map<String, String> streamConfigMap) {
@@ -63,16 +69,11 @@ public final class KafkaPartitionSubsetUtils {
       if (trimmed.isEmpty()) {
         continue;
       }
-      try {
-        int partitionId = Integer.parseInt(trimmed);
-        if (partitionId < 0) {
-          throw new IllegalArgumentException("Invalid " + key
-              + " value: partition IDs must be non-negative, got '" + value + "'");
-        }
-        idSet.add(partitionId);
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException(
-            "Invalid " + key + " value: expected comma-separated integers, got '" + value + "'", e);
+      int hyphenIndex = trimmed.indexOf('-', 1);
+      if (hyphenIndex > 0) {
+        parseRange(trimmed, hyphenIndex, key, value, idSet);
+      } else {
+        parseSingleId(trimmed, key, value, idSet);
       }
     }
     if (idSet.isEmpty()) {
@@ -81,5 +82,46 @@ public final class KafkaPartitionSubsetUtils {
     List<Integer> ids = new ArrayList<>(idSet);
     Collections.sort(ids);
     return ids;
+  }
+
+  private static void parseSingleId(String trimmed, String key, String originalValue, Set<Integer> idSet) {
+    try {
+      int partitionId = Integer.parseInt(trimmed);
+      if (partitionId < 0) {
+        throw new IllegalArgumentException(
+            "Invalid " + key + " value: partition IDs must be non-negative, got '" + originalValue + "'");
+      }
+      idSet.add(partitionId);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid " + key + " value: expected integers or ranges, got '" + originalValue + "'", e);
+    }
+  }
+
+  // Parses an inclusive range token like "0-399" (both start and end are included).
+  private static void parseRange(String trimmed, int hyphenIndex, String key, String originalValue,
+      Set<Integer> idSet) {
+    String startStr = trimmed.substring(0, hyphenIndex).trim();
+    String endStr = trimmed.substring(hyphenIndex + 1).trim();
+    int start;
+    int end;
+    try {
+      start = Integer.parseInt(startStr);
+      end = Integer.parseInt(endStr);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid " + key + " value: invalid range '" + trimmed + "', got '" + originalValue + "'", e);
+    }
+    if (start < 0 || end < 0) {
+      throw new IllegalArgumentException(
+          "Invalid " + key + " value: partition IDs must be non-negative, got '" + originalValue + "'");
+    }
+    if (start > end) {
+      throw new IllegalArgumentException(
+          "Invalid " + key + " value: range start must be <= end in '" + trimmed + "', got '" + originalValue + "'");
+    }
+    for (int i = start; i <= end; i++) {
+      idSet.add(i);
+    }
   }
 }
