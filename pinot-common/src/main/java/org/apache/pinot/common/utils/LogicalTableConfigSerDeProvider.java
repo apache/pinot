@@ -19,13 +19,13 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ServiceLoader;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Singleton holder for {@link LogicalTableConfigSerDe}, loaded via {@link ServiceLoader}.
+ * Singleton holder for {@link LogicalTableConfigSerDe}, loaded via {@link PluginManager#loadServices(Class)}.
  *
  * <p>When multiple implementations are discovered, the one with the highest
  * {@link LogicalTableConfigSerDe#getPriority()} is selected</p>
@@ -54,7 +54,7 @@ public class LogicalTableConfigSerDeProvider {
     LogicalTableConfigSerDe best = null;
     int bestPriority = Integer.MIN_VALUE;
 
-    for (LogicalTableConfigSerDe serDe : ServiceLoader.load(LogicalTableConfigSerDe.class)) {
+    for (LogicalTableConfigSerDe serDe : PluginManager.get().loadServices(LogicalTableConfigSerDe.class)) {
       LOGGER.info("Discovered LogicalTableConfigSerDe: {} with priority {}",
           serDe.getClass().getName(), serDe.getPriority());
       if (serDe.getPriority() > bestPriority) {
