@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -511,14 +512,37 @@ public class PluginManager {
 
   private static <T> void loadServicesInto(Class<T> iface, ClassLoader classLoader, List<T> results,
       Set<String> seenFqcns) {
+    Iterator<T> iterator;
     try {
-      for (T impl : ServiceLoader.load(iface, classLoader)) {
-        if (seenFqcns.add(impl.getClass().getName())) {
-          results.add(impl);
-        }
-      }
+      iterator = ServiceLoader.load(iface, classLoader).iterator();
     } catch (ServiceConfigurationError e) {
-      LOGGER.warn("Failed to load services for {} from classloader {}", iface.getName(), classLoader, e);
+      LOGGER.warn("Failed to start ServiceLoader for {} from classloader {}", iface.getName(), classLoader, e);
+      return;
+    }
+    // ServiceLoader can throw ServiceConfigurationError from both `hasNext()` and `next()` —
+    // skip the malformed entry and keep iterating. The iterator advances internally on error,
+    // so retrying `hasNext()` lets us recover without losing well-formed entries.
+    while (true) {
+      boolean hasNext;
+      try {
+        hasNext = iterator.hasNext();
+      } catch (ServiceConfigurationError e) {
+        LOGGER.warn("Skipping malformed service entry for {} on classloader {}", iface.getName(), classLoader, e);
+        continue;
+      }
+      if (!hasNext) {
+        return;
+      }
+      T impl;
+      try {
+        impl = iterator.next();
+      } catch (ServiceConfigurationError e) {
+        LOGGER.warn("Skipping unloadable service for {} on classloader {}", iface.getName(), classLoader, e);
+        continue;
+      }
+      if (seenFqcns.add(impl.getClass().getName())) {
+        results.add(impl);
+      }
     }
   }
 
