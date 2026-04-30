@@ -398,16 +398,17 @@ public class PluginManagerTest {
   }
 
   @Test
-  public void testLoadServicesDeduplicatesAcrossClassLoaders() {
-    // Even if the same impl class were reachable through multiple registered classloaders,
-    // loadServices must dedupe by fully-qualified class name. The manager's own classloader
-    // is iterated first, then each ClassRealm, then each PluginClassLoader. With nothing
-    // registered for this SPI in any plugin, calling twice in a row must produce stable
-    // single-impl results.
+  public void testLoadServicesIsIdempotentAcrossInvocations() {
+    // Each call performs a fresh walk; results are not cached. Sanity-check that two calls
+    // back-to-back produce the same single impl. (Cross-classloader dedup of the same FQCN is
+    // an internal implementation detail of `loadServicesInto`; testing it would require
+    // building two jars that ship the same impl class, which is out of scope for this unit
+    // test — the production path is covered by the in-tree migrations.)
     List<LoadServicesTestSpi> first = PluginManager.get().loadServices(LoadServicesTestSpi.class);
     List<LoadServicesTestSpi> second = PluginManager.get().loadServices(LoadServicesTestSpi.class);
     Assert.assertEquals(first.size(), 1);
     Assert.assertEquals(second.size(), 1);
+    Assert.assertEquals(first.get(0).getClass(), second.get(0).getClass());
   }
 
   @Test

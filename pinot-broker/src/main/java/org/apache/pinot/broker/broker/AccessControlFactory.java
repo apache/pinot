@@ -66,8 +66,11 @@ public abstract class AccessControlFactory {
       // PluginManager.loadClass is realm-aware (consults plugin realms in addition to the
       // system classloader). We deliberately keep the explicit getDeclaredConstructor() +
       // newInstance() pattern instead of going through PluginManager.createInstance, because
-      // the former tolerates non-public no-arg constructors and we don't want to silently
-      // regress factory implementations that rely on it.
+      // the former preserves the historical contract that factories with package-private
+      // no-arg constructors load successfully (PluginManager.createInstance uses
+      // getConstructor() which only finds public ones). Truly-private constructors still
+      // require setAccessible(true), which we do not do — match the prior Class.forName
+      // behaviour exactly.
       Class<?> clazz = PluginManager.get().loadClass(accessControlFactoryClassName);
       accessControlFactory = (AccessControlFactory) clazz.getDeclaredConstructor().newInstance();
       LOGGER.info("Initializing Access control factory class {}", accessControlFactoryClassName);

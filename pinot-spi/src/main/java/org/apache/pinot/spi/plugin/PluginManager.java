@@ -489,23 +489,33 @@ public class PluginManager {
   /// silently miss plugin-provided implementations.
   ///
   /// Implementations are de-duplicated by fully-qualified class name, so the same impl class
-  /// reachable via two classloaders is returned once. Iteration order is: this manager's
-  /// classloader first, then realms in `ClassWorld` registration order, then legacy
-  /// `PluginClassLoader` registry order. A malformed `META-INF/services` resource on a single
-  /// classloader logs a warning and is skipped — it does not break discovery for other
+  /// reachable via two classloaders is returned once; the first one wins. Iteration order is:
+  /// this manager's classloader first, then realms in `ClassWorld` registration order, then
+  /// legacy `PluginClassLoader` registry order. A malformed `META-INF/services` resource on a
+  /// single classloader logs a warning and is skipped — it does not break discovery for other
   /// classloaders.
   ///
-  /// Each invocation performs a fresh walk; results are not cached. Safe to call from any
-  /// thread.
+  /// Each invocation performs a fresh walk; results are not cached. The classloader list is
+  /// snapshotted under synchronisation so a concurrent [#load] does not produce a
+  /// `ConcurrentModificationException`, but the snapshot is point-in-time: a plugin
+  /// registered after the snapshot is taken won't be visible to that call. Safe to call from
+  /// any thread under those semantics.
   public <T> List<T> loadServices(Class<T> iface) {
+    List<ClassLoader> classLoaders;
+    synchronized (this) {
+      classLoaders = new ArrayList<>(_classWorld.getRealms().size() + _registry.size());
+      classLoaders.add(getClass().getClassLoader());
+      for (ClassRealm realm : _classWorld.getRealms()) {
+        classLoaders.add(realm);
+      }
+      for (PluginClassLoader pluginClassLoader : _registry.values()) {
+        classLoaders.add(pluginClassLoader);
+      }
+    }
     List<T> results = new ArrayList<>();
     Set<String> seenFqcns = new HashSet<>();
-    loadServicesInto(iface, getClass().getClassLoader(), results, seenFqcns);
-    for (ClassRealm realm : _classWorld.getRealms()) {
-      loadServicesInto(iface, realm, results, seenFqcns);
-    }
-    for (PluginClassLoader pluginClassLoader : _registry.values()) {
-      loadServicesInto(iface, pluginClassLoader, results, seenFqcns);
+    for (ClassLoader cl : classLoaders) {
+      loadServicesInto(iface, cl, results, seenFqcns);
     }
     return results;
   }
