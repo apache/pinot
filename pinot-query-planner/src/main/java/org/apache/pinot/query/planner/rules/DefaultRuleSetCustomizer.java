@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.calcite.rel.rules;
+package org.apache.pinot.query.planner.rules;
 
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
@@ -43,26 +43,44 @@ import org.apache.calcite.rel.rules.SortJoinCopyRule;
 import org.apache.calcite.rel.rules.SortJoinTransposeRule;
 import org.apache.calcite.rel.rules.SortRemoveRule;
 import org.apache.calcite.rel.rules.UnionToDistinctRule;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateExchangeNodeInsertRule;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateFunctionRewriteRule;
+import org.apache.pinot.calcite.rel.rules.PinotAggregateReduceFunctionsRule;
+import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
+import org.apache.pinot.calcite.rel.rules.PinotEvaluateLiteralRule;
+import org.apache.pinot.calcite.rel.rules.PinotExchangeEliminationRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
+import org.apache.pinot.calcite.rel.rules.PinotJoinExchangeNodeInsertRule;
+import org.apache.pinot.calcite.rel.rules.PinotJoinPushTransitivePredicatesRule;
+import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
+import org.apache.pinot.calcite.rel.rules.PinotLogicalAggregateRule;
+import org.apache.pinot.calcite.rel.rules.PinotProjectJoinTransposeRule;
+import org.apache.pinot.calcite.rel.rules.PinotSemiJoinDistinctProjectRule;
+import org.apache.pinot.calcite.rel.rules.PinotSetOpExchangeNodeInsertRule;
+import org.apache.pinot.calcite.rel.rules.PinotSingleValueAggregateRemoveRule;
+import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
+import org.apache.pinot.calcite.rel.rules.PinotSortExchangeNodeInsertRule;
+import org.apache.pinot.calcite.rel.rules.PinotTableScanConverterRule;
+import org.apache.pinot.calcite.rel.rules.PinotWindowExchangeNodeInsertRule;
+import org.apache.pinot.calcite.rel.rules.PinotWindowSplitRule;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 
-/**
- * Default rule sets for Pinot query
- * Defaultly disabled rules are defined in
- * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
- *
- * TODO: This class started as a list of constant rule sets, but since then we have added dynamic rule generation
- *   to it as well. We should probably refactor the class to make it easier to understand, maintain and change the rules
- *   based on contextual information like query options.
- */
-public class PinotQueryRuleSets {
-  private PinotQueryRuleSets() {
-  }
+/// [RuleSetCustomizer] that seeds every [Phase] with the OSS default Calcite
+/// rules for the multi-stage query planner. Registered as a [java.util.ServiceLoader]
+/// service entry so it is picked up automatically by [PinotRuleSet].
+///
+/// `POST_LOGICAL` includes `PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY`
+/// configured with the rule's hard-coded default `fetchLimitThreshold`.
+/// Per-query overrides (and broker-config overrides) of that limit are
+/// applied later by `QueryEnvironment.getTraitProgram`, which swaps the
+/// configured `PinotSortExchangeCopyRule` on a per-query copy of the
+/// `POST_LOGICAL` list.
+public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
 
   //@formatter:off
-  public static final List<RelOptRule> BASIC_RULES = List.of(
+  static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
@@ -162,7 +180,7 @@ public class PinotQueryRuleSets {
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
   // single HepInstruction.
-  public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
+  static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       FilterAggregateTransposeRule.Config.DEFAULT
@@ -175,7 +193,7 @@ public class PinotQueryRuleSets {
 
   // Project pushdown rules run using a RuleCollection since we want to push down a project as much as possible in a
   // single HepInstruction.
-  public static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
+  static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
       ProjectFilterTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_FILTER_TRANSPOSE).toRule(),
       PinotProjectJoinTransposeRule
@@ -185,7 +203,7 @@ public class PinotQueryRuleSets {
   );
 
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
-  public static final List<RelOptRule> PRUNE_RULES = List.of(
+  static final List<RelOptRule> PRUNE_RULES = List.of(
       AggregateProjectMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_PROJECT_MERGE).toRule(),
       ProjectMergeRule.Config.DEFAULT
@@ -218,7 +236,38 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_UNION).toRule()
   );
 
-  public static final List<RelOptRule> PINOT_POST_RULES_V2 = List.of(
+  /// Pinot specific rules that should be run AFTER all other rules.
+  /// Includes [PinotSortExchangeCopyRule#SORT_EXCHANGE_COPY] (configured with
+  /// the rule's hard-coded default fetch limit). `QueryEnvironment` swaps the
+  /// rule on a per-query copy of this list when the per-query
+  /// `sortExchangeCopyLimit` differs from that default.
+  static final List<RelOptRule> POST_LOGICAL_RULES = List.of(
+      // TODO: Merge the following 2 rules into a single rule
+      // add an extra exchange for sort
+      PinotSortExchangeNodeInsertRule.INSTANCE,
+      PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
+
+      PinotSingleValueAggregateRemoveRule.INSTANCE,
+      PinotJoinExchangeNodeInsertRule.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
+      PinotWindowSplitRule.INSTANCE,
+      PinotWindowExchangeNodeInsertRule.INSTANCE,
+      PinotSetOpExchangeNodeInsertRule.INSTANCE,
+
+      // apply dynamic broadcast rule after exchange is inserted
+      PinotJoinToDynamicBroadcastRule.INSTANCE,
+
+      // remove exchanges when there's duplicates
+      PinotExchangeEliminationRule.INSTANCE,
+
+      // Evaluate the Literal filter nodes
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
+      PinotTableScanConverterRule.INSTANCE
+  );
+
+  static final List<RelOptRule> POST_LOGICAL_V2_RULES = List.of(
       PinotTableScanConverterRule.INSTANCE,
       PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
       PinotLogicalAggregateRule.SortAggregate.INSTANCE,
@@ -229,44 +278,38 @@ public class PinotQueryRuleSets {
   );
   //@formatter:on
 
-  /// Pinot specific rules that should be run AFTER all other rules
-  public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
+  /// No-arg constructor required by [java.util.ServiceLoader].
+  public DefaultRuleSetCustomizer() {
+  }
 
-    // copy exchanges down, this must be done after SortExchangeNodeInsertRule
-    PinotSortExchangeCopyRule sortExchangeCopyRule;
-    if (sortExchangeCopyLimit != PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold()) {
-      sortExchangeCopyRule = ImmutablePinotSortExchangeCopyRule.Config.builder()
-          .from(PinotSortExchangeCopyRule.Config.DEFAULT)
-          .fetchLimitThreshold(sortExchangeCopyLimit)
-          .build()
-          .toRule();
-    } else {
-      sortExchangeCopyRule = PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY;
+  @Override
+  public void customize(Phase phase, List<RelOptRule> rules) {
+    switch (phase) {
+      case BASIC:
+        rules.addAll(BASIC_RULES);
+        return;
+      case FILTER_PUSHDOWN:
+        rules.addAll(FILTER_PUSHDOWN_RULES);
+        return;
+      case PROJECT_PUSHDOWN:
+        rules.addAll(PROJECT_PUSHDOWN_RULES);
+        return;
+      case PRUNE:
+        rules.addAll(PRUNE_RULES);
+        return;
+      case POST_LOGICAL:
+        rules.addAll(POST_LOGICAL_RULES);
+        return;
+      case POST_LOGICAL_V2:
+        rules.addAll(POST_LOGICAL_V2_RULES);
+        return;
+      case POST_LOGICAL_ENRICHED_JOIN:
+        rules.addAll(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+        return;
+      default:
+        throw new IllegalStateException(
+            "DefaultRuleSetCustomizer is missing OSS rule defaults for Phase." + phase
+                + "; extend the switch when adding a new Phase value.");
     }
-    return List.of(
-        // TODO: Merge the following 2 rules into a single rule
-        // add an extra exchange for sort
-        PinotSortExchangeNodeInsertRule.INSTANCE,
-        sortExchangeCopyRule,
-
-        PinotSingleValueAggregateRemoveRule.INSTANCE,
-        PinotJoinExchangeNodeInsertRule.INSTANCE,
-        PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
-        PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
-        PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
-        PinotWindowSplitRule.INSTANCE,
-        PinotWindowExchangeNodeInsertRule.INSTANCE,
-        PinotSetOpExchangeNodeInsertRule.INSTANCE,
-
-        // apply dynamic broadcast rule after exchange is inserted/
-        PinotJoinToDynamicBroadcastRule.INSTANCE,
-
-        // remove exchanges when there's duplicates
-        PinotExchangeEliminationRule.INSTANCE,
-
-        // Evaluate the Literal filter nodes
-        CoreRules.FILTER_REDUCE_EXPRESSIONS,
-        PinotTableScanConverterRule.INSTANCE
-    );
   }
 }
