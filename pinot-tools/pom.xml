@@ -57,9 +57,15 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-batch-ingestion-common</artifactId>
     </dependency>
+    <!--
+      Depend on pinot-avro-base (the shared library) rather than pinot-avro (the plugin), so
+      pinot-tools' Java code can use AvroUtils/AvroRecordReader without pulling the runtime
+      AvroMessageDecoder plugin classes into pinot-all.jar. The decoder classes live in
+      pinot-avro and are loaded at runtime from the plugins/ directory.
+    -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-avro</artifactId>
+      <artifactId>pinot-avro-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
