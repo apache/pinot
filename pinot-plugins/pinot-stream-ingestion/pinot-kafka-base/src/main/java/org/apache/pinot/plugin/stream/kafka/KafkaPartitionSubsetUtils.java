@@ -34,6 +34,8 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class KafkaPartitionSubsetUtils {
 
+  static final int MAX_TOTAL_PARTITION_IDS = 10_000;
+
   private KafkaPartitionSubsetUtils() {
   }
 
@@ -49,11 +51,15 @@ public final class KafkaPartitionSubsetUtils {
    * Duplicate IDs in the config are silently removed; this ensures stable ordering and prevents
    * duplicate processing of the same partition.
    *
+   * <p>The total number of unique partition IDs must not exceed {@link #MAX_TOTAL_PARTITION_IDS}
+   * (currently 10,000). This guard prevents accidental OOM from typos or overly broad ranges.
+   *
    * @param streamConfigMap table stream config map (e.g. from
    *                        {@link org.apache.pinot.spi.stream.StreamConfig#getStreamConfigsMap()})
    * @return Sorted list of unique partition IDs when stream.kafka.partition.ids is set and non-empty;
    *         null when not set or blank
-   * @throws IllegalArgumentException if the value contains invalid entries
+   * @throws IllegalArgumentException if the value contains invalid entries or exceeds
+   *         {@link #MAX_TOTAL_PARTITION_IDS}
    */
   @Nullable
   public static List<Integer> getPartitionIdsFromConfig(Map<String, String> streamConfigMap) {
@@ -75,6 +81,11 @@ public final class KafkaPartitionSubsetUtils {
       } else {
         parseSingleId(trimmed, key, value, idSet);
       }
+      if (idSet.size() > MAX_TOTAL_PARTITION_IDS) {
+        throw new IllegalArgumentException(
+            "Invalid " + key + " value: total partition count " + idSet.size()
+                + " exceeds maximum allowed " + MAX_TOTAL_PARTITION_IDS + ", got '" + value + "'");
+      }
     }
     if (idSet.isEmpty()) {
       return null;
@@ -89,12 +100,14 @@ public final class KafkaPartitionSubsetUtils {
       int partitionId = Integer.parseInt(trimmed);
       if (partitionId < 0) {
         throw new IllegalArgumentException(
-            "Invalid " + key + " value: partition IDs must be non-negative, got '" + originalValue + "'");
+            "Invalid " + key + " value: partition ID must be non-negative in '" + trimmed + "', got '"
+                + originalValue + "'");
       }
       idSet.add(partitionId);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
-          "Invalid " + key + " value: expected integers or ranges, got '" + originalValue + "'", e);
+          "Invalid " + key + " value: expected integer or range in '" + trimmed + "', got '" + originalValue + "'",
+          e);
     }
   }
 
@@ -120,8 +133,14 @@ public final class KafkaPartitionSubsetUtils {
       throw new IllegalArgumentException(
           "Invalid " + key + " value: range start must be <= end in '" + trimmed + "', got '" + originalValue + "'");
     }
-    for (int i = start; i <= end; i++) {
-      idSet.add(i);
+    long rangeSize = (long) end - start + 1;
+    if (idSet.size() + rangeSize > MAX_TOTAL_PARTITION_IDS) {
+      throw new IllegalArgumentException(
+          "Invalid " + key + " value: total partition count exceeds maximum allowed " + MAX_TOTAL_PARTITION_IDS
+              + ", got '" + originalValue + "'");
+    }
+    for (long i = start; i <= end; i++) {
+      idSet.add((int) i);
     }
   }
 }

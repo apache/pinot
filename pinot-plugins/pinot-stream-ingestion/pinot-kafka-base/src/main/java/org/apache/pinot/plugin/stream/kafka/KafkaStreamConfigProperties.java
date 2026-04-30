@@ -73,6 +73,7 @@ public class KafkaStreamConfigProperties {
    * Optional comma-separated list of Kafka partition IDs or inclusive ranges to consume
    * (e.g. "0,2,5" or "0-399" or "0-99,200,300-399").
    * When set, only these partitions are used for the table; when absent, all topic partitions are consumed.
+   * The total number of unique partition IDs must not exceed 10,000.
    */
   public static final String PARTITION_IDS = "kafka.partition.ids";
 }
