@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -31,6 +32,8 @@ import javax.tools.ToolProvider;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.plugin.loadservices.LoadServicesTestSpi;
+import org.apache.pinot.spi.plugin.loadservices.LoadServicesTestSpiImpl;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -382,6 +385,38 @@ public class PluginManagerTest {
   public void testLoadClassWithBackwardCompatibleCheckWithNull() {
     // Null should return null
     Assert.assertNull(PluginManager.loadClassWithBackwardCompatibleCheck(null));
+  }
+
+  @Test
+  public void testLoadServicesFindsImplementationsViaServiceLoader() {
+    // The test classpath ships META-INF/services/<LoadServicesTestSpi-fqcn> registering
+    // LoadServicesTestSpiImpl. loadServices must find it through the manager's classloader.
+    List<LoadServicesTestSpi> services = PluginManager.get().loadServices(LoadServicesTestSpi.class);
+    Assert.assertEquals(services.size(), 1, "Expected exactly one impl registered via META-INF/services");
+    Assert.assertTrue(services.get(0) instanceof LoadServicesTestSpiImpl);
+    Assert.assertEquals(services.get(0).name(), "loadServicesTestImpl");
+  }
+
+  @Test
+  public void testLoadServicesDeduplicatesAcrossClassLoaders() {
+    // Even if the same impl class were reachable through multiple registered classloaders,
+    // loadServices must dedupe by fully-qualified class name. The manager's own classloader
+    // is iterated first, then each ClassRealm, then each PluginClassLoader. With nothing
+    // registered for this SPI in any plugin, calling twice in a row must produce stable
+    // single-impl results.
+    List<LoadServicesTestSpi> first = PluginManager.get().loadServices(LoadServicesTestSpi.class);
+    List<LoadServicesTestSpi> second = PluginManager.get().loadServices(LoadServicesTestSpi.class);
+    Assert.assertEquals(first.size(), 1);
+    Assert.assertEquals(second.size(), 1);
+  }
+
+  @Test
+  public void testLoadServicesReturnsEmptyForUnknownSpi() {
+    // For an interface no one implements, the result must be an empty list — never null,
+    // never throwing.
+    List<Runnable> services = PluginManager.get().loadServices(Runnable.class);
+    Assert.assertNotNull(services);
+    Assert.assertTrue(services.isEmpty());
   }
 
   @AfterClass

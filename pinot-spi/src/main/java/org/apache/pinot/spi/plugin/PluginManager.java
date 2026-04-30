@@ -34,9 +34,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -472,6 +476,50 @@ public class PluginManager {
       return _pluginsDirectories.split(";");
     }
     return null;
+  }
+
+  /// Discovers all `ServiceLoader` implementations of `iface` across every plugin classloader
+  /// known to this manager (both legacy [PluginClassLoader] entries and Plexus
+  /// [ClassRealm]s) plus the classloader that loaded this class.
+  ///
+  /// Use this in place of `ServiceLoader.load(iface)` (which only consults the
+  /// thread-context classloader). When plugins live in isolated realms — i.e. their classes
+  /// are not visible to the system classloader — a plain `ServiceLoader.load(iface)` will
+  /// silently miss plugin-provided implementations.
+  ///
+  /// Implementations are de-duplicated by fully-qualified class name, so the same impl class
+  /// reachable via two classloaders is returned once. Iteration order is: this manager's
+  /// classloader first, then realms in `ClassWorld` registration order, then legacy
+  /// `PluginClassLoader` registry order. A malformed `META-INF/services` resource on a single
+  /// classloader logs a warning and is skipped — it does not break discovery for other
+  /// classloaders.
+  ///
+  /// Each invocation performs a fresh walk; results are not cached. Safe to call from any
+  /// thread.
+  public <T> List<T> loadServices(Class<T> iface) {
+    List<T> results = new ArrayList<>();
+    Set<String> seenFqcns = new HashSet<>();
+    loadServicesInto(iface, getClass().getClassLoader(), results, seenFqcns);
+    for (ClassRealm realm : _classWorld.getRealms()) {
+      loadServicesInto(iface, realm, results, seenFqcns);
+    }
+    for (PluginClassLoader pluginClassLoader : _registry.values()) {
+      loadServicesInto(iface, pluginClassLoader, results, seenFqcns);
+    }
+    return results;
+  }
+
+  private static <T> void loadServicesInto(Class<T> iface, ClassLoader classLoader, List<T> results,
+      Set<String> seenFqcns) {
+    try {
+      for (T impl : ServiceLoader.load(iface, classLoader)) {
+        if (seenFqcns.add(impl.getClass().getName())) {
+          results.add(impl);
+        }
+      }
+    } catch (ServiceConfigurationError e) {
+      LOGGER.warn("Failed to load services for {} from classloader {}", iface.getName(), classLoader, e);
+    }
   }
 
   public static PluginManager get() {
