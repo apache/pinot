@@ -30,6 +30,13 @@ service PinotQueryWorker {
   rpc Cancel(CancelRequest) returns (CancelResponse);
 
   rpc Explain(QueryRequest) returns (stream ExplainResponse);
+
+  // Long-lived bidi RPC used by the "stream" stats-reporting mode (S3-variant).
+  // The broker keeps the stream open for the query lifetime; the server pushes one
+  // OpChainComplete per stage it ran on this server, followed by a ServerDone.
+  // Stats no longer travel through the mailbox in this mode.
+  // See OpChainComplete / MultiStageStatsTree below for the payload shape.
+  rpc SubmitWithStream(stream BrokerToServer) returns (stream ServerToBroker);
 }
 
 message CancelRequest {
@@ -99,4 +106,82 @@ message MailboxInfo {
 
 message Properties {
   map<string, string> property = 1;
+}
+
+// =============================================================================
+// SubmitWithStream — stream-mode stats reporting messages
+// =============================================================================
+
+// Messages flowing from broker to server on the SubmitWithStream stream.
+// First message MUST be a `submit`. Subsequent messages may carry cancel.
+message BrokerToServer {
+  oneof payload {
+    // Plan submission. Same shape as today's unary Submit request.
+    QueryRequest submit = 1;
+    // Optional cancel message. In Phase A the broker still uses the unary
+    // Cancel RPC; this field is reserved and processed by the server but only
+    // emitted by the broker in Phase B.
+    CancelRequest cancel = 2;
+  }
+}
+
+// Messages flowing from server to broker on the SubmitWithStream stream.
+// The first server message is a `submit_ack`. Each opchain that runs on this
+// server emits exactly one `opchain` message when it finishes (success or error).
+// After the last opchain has reported, the server emits `done` and half-closes.
+message ServerToBroker {
+  oneof payload {
+    // Synchronous-style ack for the submission. Same shape as today's unary
+    // QueryResponse. Carries early errors (plan parsing, malformed metadata).
+    QueryResponse submit_ack = 1;
+    // Per-stage stats from one opchain that ran on this server.
+    OpChainComplete opchain = 2;
+    // Final marker — the server has no more messages for this query.
+    ServerDone done = 3;
+  }
+}
+
+// Sent once per opchain that ran on this server, regardless of success/failure.
+message OpChainComplete {
+  int32 stage_id = 1;
+  int32 worker_id = 2;
+  bool success = 3;
+  string error_msg = 4;            // populated when success = false
+  MultiStageStatsTree stats = 5;   // structured, tree-shaped stats payload
+}
+
+// Final marker on the server-to-broker stream.
+message ServerDone {
+}
+
+// Multi-stage stats produced by one opchain. Carries the current stage as an
+// explicit operator tree, plus any upstream-stage trees this opchain
+// accumulated (today these reach an opchain via pipeline-breaker stats and via
+// mailbox-receive merges; in stream mode each upstream stage is also reported
+// by its own server, so the broker merges duplicates per stage).
+message MultiStageStatsTree {
+  int32 current_stage_id = 1;
+  StageStatsNode current_stage = 2;
+  // Sparse map of upstream stage id -> tree.
+  map<int32, StageStatsNode> upstream_stages = 3;
+}
+
+// One node of the operator tree for a single stage.
+message StageStatsNode {
+  // The MultiStageOperator.Type id, same byte we serialize today via
+  // MultiStageOperator.Type.getId().
+  int32 operator_type_id = 1;
+  // Plan node ids that compile down to this operator. One-to-many; the leaf
+  // operator typically owns the whole sub-tree of v1 plan nodes below the leaf
+  // boundary. Stable per request via PlanNode.getNodeId().
+  repeated int32 plan_node_ids = 2;
+  // Opaque StatMap bytes -- same encoding the existing StatMap.serialize
+  // produces. The broker decodes by looking up the StatMap key class via
+  // MultiStageOperator.Type.fromId(operator_type_id).
+  bytes stat_map = 3;
+  // Children in left-to-right order. Arity is whatever the operator dictates
+  // (1 for transforms, 2 for joins, N for set ops). The tree shape on the wire
+  // is canonical -- legacy mode keeps using its inorder/implicit-arity
+  // encoding.
+  repeated StageStatsNode children = 4;
 }
