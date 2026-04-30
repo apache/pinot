@@ -163,30 +163,14 @@ public class PinotHelixResourceManagerConfigValidationTest {
   }
 
   @Test
-  public void testMultiWriteZkThrowsWhenZkAddressNotConfigured() {
-    // 7-arg test constructor leaves _zkAddress null; the builder factory itself must refuse.
+  public void testMultiWriteZkThrowsBeforeStart() {
+    // The fixture never calls start(), so _helixZkManager is null. multiWriteZK() must refuse to
+    // build a client — the ZK address is derived from the Helix manager.
     try {
       _resourceManager.multiWriteZK();
       fail("Expected IllegalStateException");
     } catch (IllegalStateException expected) {
-      assertTrue(expected.getMessage().contains("zkAddress"),
-          "Unexpected message: " + expected.getMessage());
-    }
-  }
-
-  @Test
-  public void testMultiWriteZkThrowsAfterStop()
-      throws Exception {
-    // _segmentDeletionManager is normally wired by start(); mock it so stop() doesn't NPE.
-    setField("_segmentDeletionManager", Mockito.mock(SegmentDeletionManager.class));
-    _resourceManager.stop();
-    try {
-      _resourceManager.multiWriteZK();
-      fail("Expected IllegalStateException");
-    } catch (IllegalStateException expected) {
-      // either "stopped" or "zkAddress" message is acceptable — both mean "no client available"
-      assertTrue(
-          expected.getMessage().contains("stopped") || expected.getMessage().contains("zkAddress"),
+      assertTrue(expected.getMessage().contains("not been started"),
           "Unexpected message: " + expected.getMessage());
     }
   }

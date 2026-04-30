@@ -21,9 +21,8 @@ package org.apache.pinot.common.utils.helix;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -32,9 +31,14 @@ import org.apache.zookeeper.ZooDefs;
 
 
 /**
- * Fluent builder for an atomic ZooKeeper {@code multi()} transaction. Accumulates ops via
- * {@link #set}/{@link #create}/{@link #delete}/{@link #check} and submits them as a single
- * all-or-nothing batch on {@link #execute()}.
+ * Fluent builder for an atomic ZooKeeper {@code multi()} transaction over Helix property-store
+ * paths. Accumulates ops via {@link #set}/{@link #create}/{@link #delete}/{@link #check} and
+ * submits them as a single all-or-nothing batch on {@link #execute()}.
+ *
+ * <p>Paths passed to op methods are property-store-relative — i.e. the same path you would pass to
+ * {@code ZkHelixPropertyStore.set(...)}, e.g. {@code /SEGMENTS/{table}/{segment}}. The builder
+ * prepends the configured property-store root (e.g. {@code /{cluster}/PROPERTYSTORE}) before
+ * submitting to ZK. Multi-path writes outside the property store are intentionally not supported.
  *
  * <p>On atomic rollback (e.g. version mismatch, node missing, node already exists), {@link #execute()}
  * throws the underlying {@link KeeperException} subtype ({@code BadVersionException},
@@ -47,33 +51,44 @@ import org.apache.zookeeper.ZooDefs;
  *
  * <p>Single-use: each instance can be executed at most once. Obtain a fresh builder per transaction
  * (typically via {@code PinotHelixResourceManager.multiWriteZK()}).
+ *
+ * <p>Not thread-safe: instance state ({@code _ops}, {@code _executed}) is mutated by every fluent
+ * call. A single builder must not be shared across threads; use a fresh builder per thread.
  */
 public final class ZkMultiWriteBuilder {
 
   /** Pass as {@code expectedVersion} to skip the version check on a {@link #set}/{@link #delete}. */
   public static final int ANY_VERSION = -1;
 
-  // ZNRecordSerializer is documented thread-safe by Helix (no mutable state beyond per-call buffers),
-  // so a single static instance is fine across concurrent builders.
-  private static final ZNRecordSerializer SERIALIZER = new ZNRecordSerializer();
-
-  private final RealmAwareZkClient _zkClient;
+  private final ZkClient _zkClient;
+  private final String _propertyStoreRoot;
   private final List<Op> _ops = new ArrayList<>();
   private boolean _executed;
 
-  public ZkMultiWriteBuilder(RealmAwareZkClient zkClient) {
+  /**
+   * @param zkClient ZK client used to serialize records and submit the transaction.
+   * @param propertyStoreRoot absolute ZK path that all op paths are prefixed with (typically
+   *     {@code /{clusterName}/PROPERTYSTORE}). Must start with {@code /} and not end with {@code /}.
+   *     Pass {@code ""} to operate on raw absolute paths (test-only).
+   */
+  public ZkMultiWriteBuilder(ZkClient zkClient, String propertyStoreRoot) {
     _zkClient = Preconditions.checkNotNull(zkClient, "zkClient");
+    Preconditions.checkNotNull(propertyStoreRoot, "propertyStoreRoot");
+    Preconditions.checkArgument(
+        propertyStoreRoot.isEmpty() || (propertyStoreRoot.startsWith("/") && !propertyStoreRoot.endsWith("/")),
+        "propertyStoreRoot must be empty or start with '/' and not end with '/': %s", propertyStoreRoot);
+    _propertyStoreRoot = propertyStoreRoot;
   }
 
   /**
-   * Set (overwrite) the znode at {@code path} to {@code record}, with a CAS check on
-   * {@code expectedVersion}. Pass {@link #ANY_VERSION} to skip the check.
+   * Set (overwrite) the znode at {@code path} (property-store-relative) to {@code record}, with a
+   * CAS check on {@code expectedVersion}. Pass {@link #ANY_VERSION} to skip the check.
    */
   public ZkMultiWriteBuilder set(String path, ZNRecord record, int expectedVersion) {
     checkNotExecuted();
-    Preconditions.checkNotNull(path, "path");
     Preconditions.checkNotNull(record, "record");
-    _ops.add(Op.setData(path, SERIALIZER.serialize(record), expectedVersion));
+    String fullPath = resolve(path);
+    _ops.add(Op.setData(fullPath, _zkClient.serialize(record, fullPath), expectedVersion));
     return this;
   }
 
@@ -82,23 +97,26 @@ public final class ZkMultiWriteBuilder {
     return set(path, record, ANY_VERSION);
   }
 
-  /** Create a persistent znode at {@code path} with {@code record} as its data. */
+  /**
+   * Create a persistent znode at {@code path} (property-store-relative) with {@code record} as its
+   * data.
+   */
   public ZkMultiWriteBuilder create(String path, ZNRecord record) {
     checkNotExecuted();
-    Preconditions.checkNotNull(path, "path");
     Preconditions.checkNotNull(record, "record");
-    _ops.add(Op.create(path, SERIALIZER.serialize(record), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT));
+    String fullPath = resolve(path);
+    _ops.add(
+        Op.create(fullPath, _zkClient.serialize(record, fullPath), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT));
     return this;
   }
 
   /**
-   * Delete the znode at {@code path}, with a CAS check on {@code expectedVersion}. Pass
-   * {@link #ANY_VERSION} to skip the check.
+   * Delete the znode at {@code path} (property-store-relative), with a CAS check on
+   * {@code expectedVersion}. Pass {@link #ANY_VERSION} to skip the check.
    */
   public ZkMultiWriteBuilder delete(String path, int expectedVersion) {
     checkNotExecuted();
-    Preconditions.checkNotNull(path, "path");
-    _ops.add(Op.delete(path, expectedVersion));
+    _ops.add(Op.delete(resolve(path), expectedVersion));
     return this;
   }
 
@@ -108,14 +126,13 @@ public final class ZkMultiWriteBuilder {
   }
 
   /**
-   * Assert the version of the znode at {@code path}. No mutation; gates other ops in the batch
-   * atomically — the whole transaction fails with {@link KeeperException.BadVersionException} if the
-   * version no longer matches.
+   * Assert the version of the znode at {@code path} (property-store-relative). No mutation; gates
+   * other ops in the batch atomically — the whole transaction fails with
+   * {@link KeeperException.BadVersionException} if the version no longer matches.
    */
   public ZkMultiWriteBuilder check(String path, int expectedVersion) {
     checkNotExecuted();
-    Preconditions.checkNotNull(path, "path");
-    _ops.add(Op.check(path, expectedVersion));
+    _ops.add(Op.check(resolve(path), expectedVersion));
     return this;
   }
 
@@ -143,5 +160,11 @@ public final class ZkMultiWriteBuilder {
 
   private void checkNotExecuted() {
     Preconditions.checkState(!_executed, "ZkMultiWriteBuilder already executed");
+  }
+
+  private String resolve(String path) {
+    Preconditions.checkNotNull(path, "path");
+    Preconditions.checkArgument(path.startsWith("/"), "path must start with '/': %s", path);
+    return _propertyStoreRoot + path;
   }
 }

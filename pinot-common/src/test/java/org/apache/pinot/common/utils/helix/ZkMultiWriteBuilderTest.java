@@ -92,7 +92,8 @@ public class ZkMultiWriteBuilderTest {
   }
 
   private ZkMultiWriteBuilder builder() {
-    return new ZkMultiWriteBuilder(_client);
+    // Tests use absolute paths under ROOT, so pass empty prefix (no property-store rebase).
+    return new ZkMultiWriteBuilder(_client, "");
   }
 
   // -----------------------------------------------------------------------
