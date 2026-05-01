@@ -577,7 +577,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
       // TODO Although the metric is called real-time, updating it at this point is not really real-time. The choice of
       // name is partly to avoid a more convoluted name and partly in anticipation of making it real-time.
-      _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.REALTIME_BYTES_DROPPED, _numBytesDropped);
+      _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.REALTIME_BYTES_DROPPED,
+          _numBytesDropped);
     }
     return true;
   }
@@ -658,8 +659,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           // Silently drop the row with error
           realtimeRowsDroppedMeter =
-              _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                  realtimeRowsDroppedMeter);
+              _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
+                  1, realtimeRowsDroppedMeter);
           _numRowsErrored++;
           _numBytesDropped += rowSizeInBytes;
         }
@@ -686,8 +687,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           if (result.getIncompleteRowCount() > 0) {
             realtimeIncompleteRowsConsumedMeter =
-                _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
-                    result.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
+                _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey,
+                    ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED, result.getIncompleteRowCount(),
+                    realtimeIncompleteRowsConsumedMeter);
           }
           if (result.getSanitizedRowCount() > 0) {
             realtimeRowsSanitizedMeter =
@@ -702,8 +704,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _lastRowMetadata = metadata;
               _lastConsumedTimestampMs = System.currentTimeMillis();
               realtimeRowsConsumedMeter =
-                  _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
-                      realtimeRowsConsumedMeter);
+                  _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.REALTIME_ROWS_CONSUMED,
+                    1, realtimeRowsConsumedMeter);
               _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
 
               int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
