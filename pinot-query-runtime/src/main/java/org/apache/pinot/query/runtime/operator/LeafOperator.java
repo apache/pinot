@@ -524,10 +524,14 @@ public class LeafOperator extends MultiStageOperator {
       }
     } else {
       // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
-      //       Also propagate empty-but-typed results (e.g. zero-row selection) so partitioned or empty-segment leaves
-      //       contribute the correct schema upstream.
+      //       Propagate empty-but-typed non-selection results (e.g. zero-row aggregation) so pruned leaves still
+      //       contribute schema upstream. For selection, require at least one row: an empty SelectionResultsBlock
+      //       from the instance response is skipped so a mismatched block schema does not emit a spurious zero-row
+      //       data block before EOS (LeafOperatorTest#shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsSelection).
       BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
-      if (resultsBlock != null && (resultsBlock.getNumRows() > 0 || resultsBlock.getDataSchema() != null)) {
+      boolean shouldAdd = resultsBlock != null && (resultsBlock.getNumRows() > 0
+          || (resultsBlock.getDataSchema() != null && !(resultsBlock instanceof SelectionResultsBlock)));
+      if (shouldAdd) {
         try {
           addResultsBlock(resultsBlock);
         } catch (InterruptedException e) {
