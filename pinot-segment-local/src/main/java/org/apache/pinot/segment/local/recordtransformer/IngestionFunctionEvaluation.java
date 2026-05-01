@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
@@ -29,17 +30,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Shared evaluation of function expressions during ingestion. Two call sites exist for historical reasons:
+ * Shared per-row application of {@link FunctionEvaluator}s during ingestion. A single entry point,
+ * {@link #applyFunctionEvaluations}, iterates evaluators; {@link Policy} selects semantics for each pipeline:
  * <ul>
- *   <li>{@link ExpressionTransformer} &mdash; {@link org.apache.pinot.spi.recordtransformer.RecordTransformer} chain.
- *   Table/schema {@link org.apache.pinot.spi.config.table.ingestion.TransformConfig}s, topological order,
- *   null / overwrite / implicit MAP rules, and {@code continueOnError} (see
- *   {@link #applyExpressionTransformations})</li>
- *   <li>{@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher} &mdash;
- *   {@link org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher} with JSON
- *   {@code fieldToFunctionMap}; see {@link #applyEnricherEvaluations}.</li>
+ *   <li>{@link Policy#enricher()} &mdash; used by
+ *   {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher}: always
+ *   {@code putValue(column, evaluate(record))} in map order (exceptions propagate).</li>
+ *   <li>{@link Policy#expressionTransformation} &mdash; used by {@link ExpressionTransformer}: null / overwrite /
+ *   implicit MAP rules and {@code continueOnError} as in table/schema-driven transforms.</li>
  * </ul>
- * Configuration, ordering, and pipeline wiring stay in the respective classes.
  */
 public final class IngestionFunctionEvaluation {
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionFunctionEvaluation.class);
@@ -48,45 +47,74 @@ public final class IngestionFunctionEvaluation {
   }
 
   /**
-   * Enricher: each target field is set to {@code evaluate(record)} (map iteration order; same {@link FunctionEvaluator}
-   * type as {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher} and
-   * {@link org.apache.pinot.segment.local.recordtransformer.ExpressionTransformer}).
+   * How each {@code (column, evaluator)} pair is applied to the row. Only one policy is active per call.
    */
-  public static void applyEnricherEvaluations(GenericRow record,
-      Map<String, FunctionEvaluator> fieldToFunctionEvaluator) {
-    fieldToFunctionEvaluator.forEach(
-        (field, evaluator) -> record.putValue(field, evaluator.evaluate(record)));
+  public static final class Policy {
+    private final boolean _enricherOverwrite;
+    private final boolean _continueOnError;
+    private final boolean _overwriteExistingValues;
+    private final Set<String> _implicitMapTransformColumns;
+    private final ThrottledLogger _throttledLogger;
+
+    private Policy(boolean enricherOverwrite, boolean continueOnError, boolean overwriteExistingValues,
+        Set<String> implicitMapTransformColumns, ThrottledLogger throttledLogger) {
+      _enricherOverwrite = enricherOverwrite;
+      _continueOnError = continueOnError;
+      _overwriteExistingValues = overwriteExistingValues;
+      _implicitMapTransformColumns = implicitMapTransformColumns;
+      _throttledLogger = throttledLogger;
+    }
+
+    /**
+     * JSON {@code fieldToFunctionMap} enricher: every field is overwritten with {@code evaluate(record)}.
+     */
+    public static Policy enricher() {
+      return new Policy(true, false, false, Set.of(), null);
+    }
+
+    /**
+     * Table/schema-driven {@link ExpressionTransformer} transforms (including post-upsert overrides).
+     */
+    public static Policy expressionTransformation(boolean continueOnError, boolean overwriteExistingValues,
+        Set<String> implicitMapTransformColumns, ThrottledLogger throttledLogger) {
+      return new Policy(false, continueOnError, overwriteExistingValues, implicitMapTransformColumns,
+          Objects.requireNonNull(throttledLogger, "throttledLogger"));
+    }
   }
 
   /**
-   * {@link ExpressionTransformer#transform} semantics: SPI {@link FunctionEvaluator} map, post-upsert overwrite flag,
-   * and implicit MAP-derived column handling.
+   * Single loop over {@code evaluators}: behavior is determined by {@code policy} (enricher vs. expression transform).
    */
-  public static void applyExpressionTransformations(GenericRow record,
-      Map<String, FunctionEvaluator> expressionEvaluators, boolean continueOnError, boolean overwriteExistingValues,
-      Set<String> implicitMapTransformColumns, ThrottledLogger throttledLogger) {
-    for (Map.Entry<String, FunctionEvaluator> entry : expressionEvaluators.entrySet()) {
+  public static void applyFunctionEvaluations(GenericRow record, Map<String, FunctionEvaluator> evaluators,
+      Policy policy) {
+    for (Map.Entry<String, FunctionEvaluator> entry : evaluators.entrySet()) {
       String column = entry.getKey();
       FunctionEvaluator transformFunctionEvaluator = entry.getValue();
+
+      if (policy._enricherOverwrite) {
+        record.putValue(column, transformFunctionEvaluator.evaluate(record));
+        continue;
+      }
+
       Object existingValue = record.getValue(column);
       boolean shouldApplyTransform =
-          overwriteExistingValues || existingValue == null || record.isNullValue(column);
+          policy._overwriteExistingValues || existingValue == null || record.isNullValue(column);
       if (shouldApplyTransform) {
         try {
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
           applyTransformedValue(record, column, transformedValue);
         } catch (Exception e) {
-          if (!continueOnError) {
+          if (!policy._continueOnError) {
             throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
           }
-          throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
+          policy._throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
           record.markIncomplete();
         }
       } else if (existingValue.getClass().isArray() || existingValue instanceof Collection
           || existingValue instanceof Map) {
         try {
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
-          if (transformedValue == null && implicitMapTransformColumns.contains(column)) {
+          if (transformedValue == null && policy._implicitMapTransformColumns.contains(column)) {
             continue;
           }
           if (!isTypeCompatible(existingValue, transformedValue)) {
