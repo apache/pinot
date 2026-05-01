@@ -18,10 +18,15 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -78,13 +83,14 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   /// This method is called by the consumer thread.
   protected abstract boolean isSuccess(E element);
 
-  /// This method is called whenever a [`successful EOS`]\[#isSuccess(Object)\] is read from one of the mailboxes.
+  /// This method is called whenever a [successful EOS][#isSuccess(Object)] is read from one of the mailboxes.
   ///
   /// It is guaranteed that the received element is an EOS as defined by [#isSuccess(Object)].
   /// No more messages are going to be read from that mailbox.
+  /// The `completedStream` is the stream that just sent its EOS and has already been removed from [#_mailboxes].
   ///
   /// This method is called by the consumer thread.
-  protected abstract void onMailboxSuccess(E element);
+  protected abstract void onMailboxSuccess(E element, AsyncStream<E> completedStream);
 
   /// This method is called whenever a timeout is reached while reading an element.
   ///
@@ -244,7 +250,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
         LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
             + " (mailboxes alive: " + ids + ")");
       }
-      onMailboxSuccess(block);
+      onMailboxSuccess(block, removed);
 
       block = readBlockOrNull();
     }
@@ -310,13 +316,35 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Nullable
     private MultiStageQueryStats _stats;
     private final int _senderStageId;
+    private final long _startTimeMs;
+    private final LongSupplier _clock;
+    // Maps senderKey (hostname|mailboxPort) -> max elapsed time (ms) seen for that sender
+    private final Map<String, Long> _senderElapsedMs = new ConcurrentHashMap<>();
+    // Maps stream ID -> sender key (hostname|mailboxPort)
+    private final Map<Object, String> _streamIdToSenderKey;
 
     public OfMseBlock(OpChainExecutionContext context,
         List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId) {
+      this(context, asyncProducers, senderStageId, Map.of());
+    }
+
+    public OfMseBlock(OpChainExecutionContext context,
+        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId,
+        Map<Object, String> streamIdToSenderKey) {
+      this(context, asyncProducers, senderStageId, streamIdToSenderKey, System::currentTimeMillis);
+    }
+
+    @VisibleForTesting
+    OfMseBlock(OpChainExecutionContext context,
+        List<? extends AsyncStream<ReceivingMailbox.MseBlockWithStats>> asyncProducers, int senderStageId,
+        Map<Object, String> streamIdToSenderKey, LongSupplier clock) {
       super(context.getId(), context.getPassiveDeadlineMs(), asyncProducers);
       _stageId = context.getStageId();
       _stats = MultiStageQueryStats.emptyStats(context.getStageId());
       _senderStageId = senderStageId;
+      _streamIdToSenderKey = streamIdToSenderKey;
+      _clock = clock;
+      _startTimeMs = clock.getAsLong();
     }
 
     @Override
@@ -330,8 +358,27 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     }
 
     @Override
-    protected void onMailboxSuccess(ReceivingMailbox.MseBlockWithStats element) {
+    protected void onMailboxSuccess(ReceivingMailbox.MseBlockWithStats element,
+        AsyncStream<ReceivingMailbox.MseBlockWithStats> completedStream) {
       mergeStats(element);
+      String senderKey = _streamIdToSenderKey.get(completedStream.getId());
+      if (senderKey == null) {
+        LOGGER.warn("==[UPSTREAM_TIMING]== stage {} stream {} has no senderKey mapping, skipping timing",
+            _senderStageId, completedStream.getId());
+        return;
+      }
+      long elapsedMs = _clock.getAsLong() - _startTimeMs;
+      _senderElapsedMs.merge(senderKey, elapsedMs, Math::max);
+      LOGGER.debug("==[UPSTREAM_TIMING]== stage {} sender {} EOS at {}ms since receiver start",
+          _senderStageId, senderKey, elapsedMs);
+    }
+
+    /**
+     * Returns the per-sender timing map (senderKey -> max elapsedMs since consumer construction).
+     * May be empty if no timing data was collected.
+     */
+    public Map<String, Long> getSenderElapsedMs() {
+      return Collections.unmodifiableMap(_senderElapsedMs);
     }
 
     @Override

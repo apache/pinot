@@ -45,6 +45,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
@@ -133,11 +134,14 @@ public class QueryDispatcher {
   /// Cluster-level default for stream-stats mode. Used as the fallback in [#submitAndReduce] when the query
   /// does not carry an explicit [QueryOptionKey#STREAM_STATS] override.
   private final boolean _streamStatsDefault;
+  // Injectable for tests that need to manipulate time (e.g. to simulate a timeout without actually waiting).
+  private final LongSupplier _clock;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
+        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS,
+        System::currentTimeMillis);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
@@ -147,12 +151,19 @@ public class QueryDispatcher {
       boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new GrpcKeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault, statsDrainMs);
+        streamStatsDefault, statsDrainMs, System::currentTimeMillis);
+  }
+
+  @VisibleForTesting
+  QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, LongSupplier clock) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        GrpcKeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS, clock);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, GrpcKeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault, long statsDrainMs) {
+      boolean streamStatsDefault, long statsDrainMs, LongSupplier clock) {
     _cancelTimeout = cancelTimeout;
     _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
@@ -163,6 +174,7 @@ public class QueryDispatcher {
     _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
     _streamStatsDefault = streamStatsDefault;
+    _clock = clock;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -189,18 +201,15 @@ public class QueryDispatcher {
     return submitAndReduce(context, dispatchableSubPlan, timeoutMs, queryOptions, null);
   }
 
-  /// Same as [#submitAndReduce(RequestContext, DispatchableSubPlan, long, Map)] but records per-server
-  /// in-flight request statistics into `statsManager` for use by the adaptive query router.
-  /// When `statsManager` is non-null:
+  /// Same as [#submitAndReduce(RequestContext, DispatchableSubPlan, long, Map)] but records per-server in-flight
+  /// request statistics into `statsManager` for use by the adaptive query router. When `statsManager` is non-null:
   ///
-  /// - Each leaf server is registered as having one more in-flight request via
-  ///      [ServerRoutingStatsManager#recordStatsForQuerySubmission] after the fan-out begins.
-  /// - After the full fan-out completes (or fails), each server is decremented via
-  ///      [ServerRoutingStatsManager#recordStatsUponResponseArrival] with `latency = -1`
-  ///      (no latency is recorded at this stage).
+  /// - Each submitted server is registered as having one more in-flight request via
+  ///      [ServerRoutingStatsManager#recordStatsForQuerySubmission] after the fan-out succeeds.
+  /// - Servers reporting trusted leaf-stage timings are decremented with their measured elapsed time.
+  /// - If no timing was received, all submitted servers are decremented with `-1`. When timings are partial, unreported
+  ///      tracked leaf servers use the elapsed dispatch time and intermediate servers use `-1`.
   ///
-  /// TODO: Replace the coarse end-of-fanout decrement with per-sender arrival once per-sender EOS
-  ///       interception is in place, and record real leaf-stage latency at that point.
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
       throws Exception {
@@ -209,9 +218,11 @@ public class QueryDispatcher {
     }
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
-    // Tracks servers where recordStatsForQuerySubmission was actually called, so the finally block only
-    // decrements servers that were incremented — guarding against a partial failure in submit().
     Set<QueryServerInstance> incrementedServers = new HashSet<>();
+    Set<String> decrementedServers = new HashSet<>();
+    long submitTimeMs = _clock.getAsLong();
+    QueryResult result = null;
+
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       // The SSE engine increments before `submit`, but here we increment after because `submit` populates
@@ -223,21 +234,54 @@ public class QueryDispatcher {
           incrementedServers.add(server);
         }
       }
-      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+      result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         cancel(requestId);
       }
       return result;
     } catch (Exception ex) {
-      return tryRecover(context.getRequestId(), servers, ex);
+      result = tryRecover(context.getRequestId(), servers, ex);
+      return result;
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
       cancel(requestId);
       throw e;
     } finally {
       if (statsManager != null) {
-        for (QueryServerInstance server : incrementedServers) {
-          statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
+        Set<String> trackedServers = Set.of();
+        if (result != null && !incrementedServers.isEmpty()) {
+          try {
+            // Gather all the timings we fully received.
+            AdaptiveRoutingStageClassification classification =
+                AdaptiveRoutingStageClassification.classify(dispatchableSubPlan);
+            Map<String, Long> maxTimings = extractMaxTimingsPerInstance(result, classification, requestId);
+            for (Map.Entry<String, Long> entry : maxTimings.entrySet()) {
+              String instanceId = entry.getKey();
+              if (decrementedServers.add(instanceId)) {
+                LOGGER.debug("==[UPSTREAM_TIMING]== request {} recording indirect sender {} latency={}ms",
+                    requestId, instanceId, entry.getValue());
+                statsManager.recordStatsUponResponseArrival(requestId, instanceId, entry.getValue());
+              }
+            }
+            trackedServers = classification._trackedServers;
+          } catch (Exception e) {
+            LOGGER.warn("Failed to apply upstream timings for request {}", requestId, e);
+          }
+        }
+        if (decrementedServers.isEmpty()) {
+          // Fallback 1: if we received no partial timings, avoid marking all servers with the full elapsed time.
+          for (QueryServerInstance server : incrementedServers) {
+            statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1L);
+          }
+        } else {
+          // Fallback 2: if we received partial timings, mark remaining leaf servers with the full elapsed time.
+          long elapsedMs = _clock.getAsLong() - submitTimeMs;
+          for (QueryServerInstance server : incrementedServers) {
+            String id = server.getInstanceId();
+            if (!decrementedServers.contains(id)) {
+              statsManager.recordStatsUponResponseArrival(requestId, id, trackedServers.contains(id) ? elapsedMs : -1L);
+            }
+          }
         }
       }
       if (isQueryCancellationEnabled()) {
@@ -616,6 +660,56 @@ public class QueryDispatcher {
   private boolean isQueryCancellationEnabled() {
     return _serversByQuery != null;
   }
+
+  /**
+   * Extracts the maximum observed latency per instance from consulted stages' stats.
+   * Takes the maximum when the same server appears in multiple consulted stages.
+   */
+  @VisibleForTesting
+  static Map<String, Long> extractMaxTimingsPerInstance(QueryResult result,
+      AdaptiveRoutingStageClassification classification, long requestId) {
+    Map<String, Long> maxTimingPerInstance = new HashMap<>();
+    List<MultiStageQueryStats.StageStats.Closed> queryStatsList = result.getQueryStats();
+    for (int stageIdx = 0; stageIdx < queryStatsList.size(); stageIdx++) {
+      if (!classification._trustedStageIds.contains(stageIdx)) {
+        continue;
+      }
+      MultiStageQueryStats.StageStats.Closed stageStats = queryStatsList.get(stageIdx);
+      if (stageStats == null) {
+        continue;
+      }
+      final int stage = stageIdx;
+      stageStats.forEach((opType, statMap) -> {
+        if (opType != MultiStageOperator.Type.MAILBOX_RECEIVE) {
+          return;
+        }
+        @SuppressWarnings("unchecked")
+        StatMap<BaseMailboxReceiveOperator.StatKey> receiveStats =
+            (StatMap<BaseMailboxReceiveOperator.StatKey>) statMap;
+        String encoded =
+            receiveStats.getString(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS);
+        if (encoded == null) {
+          LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} MAILBOX_RECEIVE has null timing",
+              requestId, stage);
+          return;
+        }
+        LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} encoded timing: {}",
+            requestId, stage, encoded);
+        Map<String, Long> timings = AdaptiveRoutingUpstreamTimings.decode(encoded);
+        for (Map.Entry<String, Long> entry : timings.entrySet()) {
+          String instanceId = classification._senderKeyToInstanceId.get(entry.getKey());
+          if (instanceId != null) {
+            maxTimingPerInstance.merge(instanceId, entry.getValue(), Math::max);
+          } else {
+            LOGGER.debug("==[UPSTREAM_TIMING]== request {} senderKey={} not found in known servers, skipping",
+                requestId, entry.getKey());
+          }
+        }
+      });
+    }
+    return maxTimingPerInstance;
+  }
+
 
   private <E> void execute(long requestId, Set<DispatchablePlanFragment> stagePlans, long timeoutMs,
       Map<String, String> queryOptions, SendRequest<Worker.QueryRequest, E> sendRequest,
