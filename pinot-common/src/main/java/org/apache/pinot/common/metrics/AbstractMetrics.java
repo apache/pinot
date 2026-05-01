@@ -40,6 +40,7 @@ import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotTimer;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -608,7 +609,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private static String composeStreamTopicPartitionKey(String tableNameWithType, String topicName,
       int partitionGroupId) {
-    return tableNameWithType + "-" + topicName + "-" + partitionGroupId;
+    return IngestionConfigUtils.getStreamConsumerClientIdWithoutSuffix(tableNameWithType, topicName,
+        partitionGroupId);
   }
 
   /**
