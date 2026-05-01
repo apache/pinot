@@ -34,6 +34,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.fetcher.HttpSegmentFetcher.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -146,7 +147,7 @@ public class HttpSegmentFetcherTest {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     when(client.downloadFile(any(), any(), any()))
         .thenThrow(new java.io.FileNotFoundException("Segment file not found"));
-    when(client.downloadFile(any(), any(), any(), any(), any(Integer.class), any(Integer.class)))
+    when(client.downloadFile(any(), any(), any(), any(), anyInt(), anyInt()))
         .thenThrow(new java.io.FileNotFoundException("Segment file not found"));
     HttpSegmentFetcher segmentFetcher = getSegmentFetcher(client);
     // Use 127.0.0.1 to avoid DNS resolution (RoundRobinURIProvider resolves hostname)
