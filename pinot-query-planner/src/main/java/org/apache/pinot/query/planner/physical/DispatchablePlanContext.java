@@ -156,6 +156,10 @@ public class DispatchablePlanContext {
           dispatchablePlanMetadata.getWorkerIdToMailboxesMap();
       Preconditions.checkArgument(workerIdToSegmentsMap == null || workerIdToTableNameSegmentsMap == null,
           "Both workerIdToSegmentsMap and workerIdToTableNameSegmentsMap cannot be set at the same time");
+      Map<Integer, Map<String, List<String>>> workerIdToOptionalSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToOptionalSegmentsMap();
+      Map<Integer, Map<String, List<String>>> workerIdToOptionalTableSegmentsMap =
+          dispatchablePlanMetadata.getWorkerIdToOptionalTableSegmentsMap();
       Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdsMap = new HashMap<>();
       WorkerMetadata[] workerMetadataArray = new WorkerMetadata[workerIdToServerInstanceMap.size()];
       for (Map.Entry<Integer, QueryServerInstance> serverEntry : workerIdToServerInstanceMap.entrySet()) {
@@ -165,9 +169,21 @@ public class DispatchablePlanContext {
         WorkerMetadata workerMetadata = new WorkerMetadata(workerId, workerIdToMailboxesMap.get(workerId));
         if (workerIdToSegmentsMap != null) {
           workerMetadata.setTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
+          if (workerIdToOptionalSegmentsMap != null) {
+            Map<String, List<String>> optionalForWorker = workerIdToOptionalSegmentsMap.get(workerId);
+            if (optionalForWorker != null && !optionalForWorker.isEmpty()) {
+              workerMetadata.setOptionalTableSegmentsMap(optionalForWorker);
+            }
+          }
         }
         if (workerIdToTableNameSegmentsMap != null) {
           workerMetadata.setLogicalTableSegmentsMap(workerIdToTableNameSegmentsMap.get(workerId));
+          if (workerIdToOptionalTableSegmentsMap != null) {
+            Map<String, List<String>> optionalLogical = workerIdToOptionalTableSegmentsMap.get(workerId);
+            if (optionalLogical != null && !optionalLogical.isEmpty()) {
+              workerMetadata.setOptionalTableSegmentsMap(optionalLogical);
+            }
+          }
         }
         workerMetadataArray[workerId] = workerMetadata;
       }
