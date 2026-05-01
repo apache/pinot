@@ -589,7 +589,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   /**
    * Registers a per-partition table gauge keyed by table name with type, Kafka (or other stream) topic, and partition
    * group id. The resulting MBean name matches {@code server.yml} rules so Prometheus exports {@code topic} and
-   * {@code partition} labels on the same metric series as the table+partition-only registration (see apache/pinot#18099).
+   * {@code partition} labels on the same metric series as the table+partition-only registration (see #18099).
    */
   public void setOrUpdatePartitionGaugeForStreamTopic(final String tableNameWithType, final String topicName,
       final int partitionGroupId, final G gauge, final Supplier<Long> valueSupplier) {
