@@ -120,7 +120,7 @@ public class LeafStageToPinotQuery {
    * Note: This method mutates the input expression's operand lists in-place for AND/OR/NOT nodes.
    * It assumes the expression tree is freshly constructed and not shared across concurrent callers.
    */
-  static Expression ensureFilterIsFunctionExpression(Expression expression) {
+  public static Expression ensureFilterIsFunctionExpression(Expression expression) {
     if (expression == null) {
       return null;
     }

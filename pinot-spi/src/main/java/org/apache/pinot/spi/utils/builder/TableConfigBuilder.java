@@ -74,6 +74,8 @@ public class TableConfigBuilder {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
+  private String _replacedSegmentsRetentionPeriod;
+  private String _lineageEntryCleanupRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency;
 
@@ -204,6 +206,16 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
+    return this;
+  }
+
+  public TableConfigBuilder setReplacedSegmentsRetentionPeriod(String replacedSegmentsRetentionPeriod) {
+    _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
+    return this;
+  }
+
+  public TableConfigBuilder setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
+    _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
     return this;
   }
 
@@ -510,6 +522,8 @@ public class TableConfigBuilder {
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
+    validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
+    validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
     validationConfig.setSegmentPushType(_segmentPushType);
     validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);

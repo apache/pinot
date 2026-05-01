@@ -37,6 +37,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtil
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.upsertcompactmerge.UpsertCompactMergeTaskGenerator.SegmentMergerMetadata;
 import org.apache.pinot.plugin.minion.tasks.upsertcompactmerge.UpsertCompactMergeTaskGenerator.SegmentSelectionResult;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -539,5 +540,64 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     String crcList = _taskGenerator.getSegmentCrcList(segmentList);
     Assert.assertEquals(crcList, "9999");
+  }
+
+  @Test
+  public void testRetentionExpiryBufferFiltersCandidates() {
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY, "2d");
+    taskConfigs.put(MinionTaskUtils.RETENTION_EXPIRY_BUFFER_PERIOD_KEY, "5d");
+
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("30")
+        .setUpsertConfig(upsertConfig)
+        .setTaskConfig(new TableTaskConfig(
+            Map.of(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, taskConfigs)))
+        .build();
+
+    // Within effective retention (30d - 5d = 25d), outside buffer (2d)
+    SegmentZKMetadata recentSegment = new SegmentZKMetadata("testTable__0__0__100");
+    recentSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    recentSegment.setStartTime(nowMs - 5 * oneDayMs);
+    recentSegment.setEndTime(nowMs - 4 * oneDayMs);
+    recentSegment.setTimeUnit(TimeUnit.MILLISECONDS);
+    recentSegment.setDownloadUrl("fs://testTable__0__0__100");
+
+    // Past effective retention (27d > 25d), outside buffer (2d)
+    SegmentZKMetadata oldSegment = new SegmentZKMetadata("testTable__0__1__101");
+    oldSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    oldSegment.setStartTime(nowMs - 28 * oneDayMs);
+    oldSegment.setEndTime(nowMs - 27 * oneDayMs);
+    oldSegment.setTimeUnit(TimeUnit.MILLISECONDS);
+    oldSegment.setDownloadUrl("fs://testTable__0__1__101");
+
+    // Within buffer period (filtered by getCandidateSegments)
+    SegmentZKMetadata freshSegment = new SegmentZKMetadata("testTable__0__2__102");
+    freshSegment.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    freshSegment.setStartTime(nowMs - oneDayMs);
+    freshSegment.setEndTime(nowMs);
+    freshSegment.setTimeUnit(TimeUnit.MILLISECONDS);
+    freshSegment.setDownloadUrl("fs://testTable__0__2__102");
+
+    List<SegmentZKMetadata> allSegments =
+        new ArrayList<>(Arrays.asList(recentSegment, oldSegment, freshSegment));
+
+    // Step 1: getCandidateSegments filters out freshSegment (within 2d buffer)
+    List<SegmentZKMetadata> candidates =
+        UpsertCompactMergeTaskGenerator.getCandidateSegments(taskConfigs, allSegments, nowMs);
+    Assert.assertEquals(candidates.size(), 2, "getCandidateSegments should keep recent + old, filter fresh");
+
+    // Step 2: filterSegmentsPastRetention with 5d buffer (effective retention = 25d) filters out oldSegment
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(candidates, tableConfig, taskConfigs, nowMs, false);
+    Assert.assertEquals(filtered.size(), 1, "Retention filter with buffer should remove the old segment");
+    Assert.assertEquals(filtered.get(0).getSegmentName(), "testTable__0__0__100");
   }
 }

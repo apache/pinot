@@ -29,6 +29,7 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -37,6 +38,8 @@ import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
  * them up if necessary).
  */
 class HashExchange extends BlockExchange {
+  private static final String ROUTE_SCOPE = "HashExchange";
+
   private final KeySelector<?> _keySelector;
 
   HashExchange(List<SendingMailbox> sendingMailboxes, KeySelector<?> keySelector, BlockSplitter splitter,
@@ -65,7 +68,9 @@ class HashExchange extends BlockExchange {
     }
     RowHeapDataBlock rowHeapBlock = block.asRowHeap();
     List<Object[]> rows = rowHeapBlock.getRows();
+    int r = 0;
     for (Object[] row : rows) {
+      QueryThreadContext.checkTerminationAndSampleUsagePeriodically(r++, ROUTE_SCOPE);
       int mailboxId = _keySelector.computeHash(row) % numMailboxes;
       mailboxIdToRowsMap[mailboxId].add(row);
     }

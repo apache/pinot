@@ -185,7 +185,7 @@ public class PinotQueryResource {
 
       Map<String, String> queryOptions = new HashMap<>();
       if (requestJson.has("queryOptions") && requestJson.get("queryOptions").isObject()) {
-        requestJson.get("queryOptions").fields().forEachRemaining(entry -> {
+        requestJson.get("queryOptions").properties().forEach(entry -> {
           queryOptions.put(entry.getKey(), entry.getValue().asText());
         });
       }

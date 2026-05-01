@@ -31,7 +31,7 @@ public class RebalancePreCheckerFactory {
   public static RebalancePreChecker create(String rebalancePreCheckerClassName) {
     try {
       LOGGER.info("Trying to create rebalance pre-checker object for class: {}", rebalancePreCheckerClassName);
-      return (RebalancePreChecker) Class.forName(rebalancePreCheckerClassName).newInstance();
+      return (RebalancePreChecker) Class.forName(rebalancePreCheckerClassName).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       String errMsg = String.format("Failed to create rebalance pre-checker for class: %s",
           rebalancePreCheckerClassName);

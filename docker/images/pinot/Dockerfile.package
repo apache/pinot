@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG PINOT_BUILD_IMAGE_TAG=11-amazoncorretto
+ARG PINOT_BUILD_IMAGE_TAG=21-amazoncorretto
 ARG PINOT_RUNTIME_IMAGE_TAG=${PINOT_BUILD_IMAGE_TAG}
 FROM --platform=linux/amd64 pinot-build:${PINOT_BUILD_IMAGE_TAG} AS pinot_build_dist
 FROM apachepinot/pinot-base-runtime:${PINOT_RUNTIME_IMAGE_TAG}

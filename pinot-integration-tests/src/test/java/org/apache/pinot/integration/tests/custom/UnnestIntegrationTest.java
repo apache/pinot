@@ -372,7 +372,7 @@ public class UnnestIntegrationTest extends CustomDataQueryClusterIntegrationTest
         record.put(LONG_COLUMN, i);
         record.put(FLOAT_COLUMN, i + RANDOM.nextFloat());
         record.put(DOUBLE_COLUMN, i + RANDOM.nextDouble());
-        record.put(STRING_COLUMN, RandomStringUtils.insecure().next(i));
+        record.put(STRING_COLUMN, RandomStringUtils.secure().nextAscii(i));
         record.put(TIMESTAMP_COLUMN, i);
         record.put(GROUP_BY_COLUMN, String.valueOf(i % 10));
         record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));

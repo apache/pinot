@@ -122,6 +122,17 @@ public interface ForwardIndexCreator extends IndexCreator {
           }
           putDoubleMV(doubles);
           break;
+        case BIG_DECIMAL:
+          if (cellValues instanceof BigDecimal[]) {
+            putBigDecimalMV((BigDecimal[]) cellValues);
+          } else {
+            BigDecimal[] bigDecimals = new BigDecimal[length];
+            for (int i = 0; i < length; i++) {
+              bigDecimals[i] = (BigDecimal) cellValues[i];
+            }
+            putBigDecimalMV(bigDecimals);
+          }
+          break;
         case STRING:
           if (cellValues instanceof String[]) {
             putStringMV((String[]) cellValues);
@@ -253,6 +264,16 @@ public interface ForwardIndexCreator extends IndexCreator {
       putDictIdMV(dictIds);
     } else {
       putDoubleMV(values);
+    }
+  }
+
+  @Override
+  default void addBigDecimalMV(BigDecimal[] values, @Nullable int[] dictIds)
+      throws IOException {
+    if (dictIds != null) {
+      putDictIdMV(dictIds);
+    } else {
+      putBigDecimalMV(values);
     }
   }
 
@@ -420,6 +441,15 @@ public interface ForwardIndexCreator extends IndexCreator {
    * @param values Values to write
    */
   default void putDoubleMV(double[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the next BIG_DECIMAL type multi-value into the forward index.
+   *
+   * @param values Values to write
+   */
+  default void putBigDecimalMV(BigDecimal[] values) {
     throw new UnsupportedOperationException();
   }
 

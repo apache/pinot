@@ -56,7 +56,7 @@ public class TaskGeneratorRegistry {
       TaskGenerator annotation = clazz.getAnnotation(TaskGenerator.class);
       if (annotation.enabled()) {
         try {
-          PinotTaskGenerator taskGenerator = (PinotTaskGenerator) clazz.newInstance();
+          PinotTaskGenerator taskGenerator = (PinotTaskGenerator) clazz.getDeclaredConstructor().newInstance();
           taskGenerator.init(clusterInfoAccessor);
           registerTaskGenerator(taskGenerator);
         } catch (Exception e) {

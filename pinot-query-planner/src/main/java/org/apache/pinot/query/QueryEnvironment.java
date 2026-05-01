@@ -786,7 +786,7 @@ public class QueryEnvironment {
     }
 
     /**
-     * Whether to use broker pruning by default.
+     * Whether to use broker pruning by default on the physical optimizer path.
      *
      * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
      * This default value can be always overridden at query level by the query option
@@ -795,6 +795,18 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUseBrokerPruning() {
       return CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
+    }
+
+    /**
+     * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
+     *
+     * Separated from {@link #defaultUseBrokerPruning()} so the two planner paths can be rolled out independently.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_BROKER_PRUNING}.
+     */
+    @Value.Default
+    default boolean defaultLogicalPlannerUseBrokerPruning() {
+      return CommonConstants.Broker.DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING;
     }
 
     /**

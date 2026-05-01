@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +76,7 @@ public class TarCompressionUtilsTest {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
-    FileUtils.write(dataFile, fileContent);
+    FileUtils.write(dataFile, fileContent, StandardCharsets.UTF_8);
 
     File compressedTarFile = new File(TAR_DIR, fileName + compressedTarFileExtension);
     TarCompressionUtils.createCompressedTarFile(dataFile, compressedTarFile);
@@ -84,11 +85,11 @@ public class TarCompressionUtilsTest {
     assertEquals(untarredFiles.size(), 1);
     File untarredFile = untarredFiles.get(0);
     assertEquals(untarredFile, new File(UNTAR_DIR, fileName));
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent);
 
     untarredFile = new File(UNTAR_DIR, "untarred");
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName, untarredFile);
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent);
   }
 
   @Test
@@ -112,8 +113,8 @@ public class TarCompressionUtilsTest {
     String fileContent1 = "fileContent1";
     String fileName2 = "data2";
     String fileContent2 = "fileContent2";
-    FileUtils.write(new File(dir1, fileName1), fileContent1);
-    FileUtils.write(new File(dir2, fileName2), fileContent2);
+    FileUtils.write(new File(dir1, fileName1), fileContent1, StandardCharsets.UTF_8);
+    FileUtils.write(new File(dir2, fileName2), fileContent2, StandardCharsets.UTF_8);
 
     String outputTarName = "output_tar" + compressedTarFileExtension;
     File compressedTarFile = new File(TAR_DIR, outputTarName);
@@ -140,12 +141,14 @@ public class TarCompressionUtilsTest {
     File[] filesDir1 = untarredFileDir1.listFiles();
     assertNotNull(filesDir1);
     assertEquals(filesDir1.length, 1);
-    assertEquals(FileUtils.readFileToString(new File(untarredFileDir1, fileName1)), fileContent1);
+    assertEquals(
+        FileUtils.readFileToString(new File(untarredFileDir1, fileName1), StandardCharsets.UTF_8), fileContent1);
 
     File[] filesDir2 = untarredFileDir2.listFiles();
     assertNotNull(filesDir2);
     assertEquals(filesDir2.length, 1);
-    assertEquals(FileUtils.readFileToString(new File(untarredFileDir2, fileName2)), fileContent2);
+    assertEquals(
+        FileUtils.readFileToString(new File(untarredFileDir2, fileName2), StandardCharsets.UTF_8), fileContent2);
   }
 
   @Test
@@ -164,8 +167,8 @@ public class TarCompressionUtilsTest {
     String fileContent1 = "fileContent1";
     String fileName2 = "data2";
     String fileContent2 = "fileContent2";
-    FileUtils.write(new File(dir, fileName1), fileContent1);
-    FileUtils.write(new File(dir, fileName2), fileContent2);
+    FileUtils.write(new File(dir, fileName1), fileContent1, StandardCharsets.UTF_8);
+    FileUtils.write(new File(dir, fileName2), fileContent2, StandardCharsets.UTF_8);
 
     File compressedTarFile = new File(TAR_DIR, dirName + compressedTarFileExtension);
     TarCompressionUtils.createCompressedTarFile(dir, compressedTarFile);
@@ -177,14 +180,14 @@ public class TarCompressionUtilsTest {
     File[] files = untarredFile.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 2);
-    assertEquals(FileUtils.readFileToString(new File(untarredFile, fileName1)), fileContent1);
-    assertEquals(FileUtils.readFileToString(new File(untarredFile, fileName2)), fileContent2);
+    assertEquals(FileUtils.readFileToString(new File(untarredFile, fileName1), StandardCharsets.UTF_8), fileContent1);
+    assertEquals(FileUtils.readFileToString(new File(untarredFile, fileName2), StandardCharsets.UTF_8), fileContent2);
 
     untarredFile = new File(UNTAR_DIR, "untarred");
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName1, untarredFile);
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent1);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent1);
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName2, untarredFile);
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent2);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent2);
     try {
       TarCompressionUtils.untarOneFile(compressedTarFile, dirName, untarredFile);
       fail();
@@ -213,8 +216,8 @@ public class TarCompressionUtilsTest {
     String fileContent1 = "fileContent1";
     String fileName2 = "data2";
     String fileContent2 = "fileContent2";
-    FileUtils.write(new File(subDir1, fileName1), fileContent1);
-    FileUtils.write(new File(subDir2, fileName2), fileContent2);
+    FileUtils.write(new File(subDir1, fileName1), fileContent1, StandardCharsets.UTF_8);
+    FileUtils.write(new File(subDir2, fileName2), fileContent2, StandardCharsets.UTF_8);
 
     File compressedTarFile = new File(TAR_DIR, dirName + compressedTarFileExtension);
     TarCompressionUtils.createCompressedTarFile(dir, compressedTarFile);
@@ -226,14 +229,16 @@ public class TarCompressionUtilsTest {
     File[] files = untarredFile.listFiles();
     assertNotNull(files);
     assertEquals(files.length, 2);
-    assertEquals(FileUtils.readFileToString(new File(new File(untarredFile, subDirName1), fileName1)), fileContent1);
-    assertEquals(FileUtils.readFileToString(new File(new File(untarredFile, subDirName2), fileName2)), fileContent2);
+    assertEquals(FileUtils.readFileToString(new File(new File(untarredFile, subDirName1), fileName1),
+        StandardCharsets.UTF_8), fileContent1);
+    assertEquals(FileUtils.readFileToString(new File(new File(untarredFile, subDirName2), fileName2),
+        StandardCharsets.UTF_8), fileContent2);
 
     untarredFile = new File(UNTAR_DIR, "untarred");
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName1, untarredFile);
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent1);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent1);
     TarCompressionUtils.untarOneFile(compressedTarFile, fileName2, untarredFile);
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent2);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent2);
     try {
       TarCompressionUtils.untarOneFile(compressedTarFile, dirName, untarredFile);
       fail();
@@ -301,7 +306,7 @@ public class TarCompressionUtilsTest {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
-    FileUtils.write(dataFile, fileContent);
+    FileUtils.write(dataFile, fileContent, StandardCharsets.UTF_8);
 
     File badCompressedTarFile = new File(TAR_DIR, "bad" + compressedTarFileExtension);
     try (OutputStream fileOut = Files.newOutputStream(badCompressedTarFile.toPath());
@@ -328,6 +333,6 @@ public class TarCompressionUtilsTest {
     // Allow untar one file to the given destination
     File untarredFile = new File(UNTAR_DIR, "untarred");
     TarCompressionUtils.untarOneFile(badCompressedTarFile, fileName, untarredFile);
-    assertEquals(FileUtils.readFileToString(untarredFile), fileContent);
+    assertEquals(FileUtils.readFileToString(untarredFile, StandardCharsets.UTF_8), fileContent);
   }
 }

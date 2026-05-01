@@ -136,6 +136,11 @@ public class IdentifierTransformFunction implements TransformFunction {
   }
 
   @Override
+  public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+    return valueBlock.getBlockValueSet(_columnName).getBigDecimalValuesMV();
+  }
+
+  @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     return valueBlock.getBlockValueSet(_columnName).getStringValuesMV();
   }

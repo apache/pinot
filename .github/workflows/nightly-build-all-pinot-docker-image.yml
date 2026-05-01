@@ -32,7 +32,7 @@ jobs:
       commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
       tags: ${{ steps.generate-build-info.outputs.tags }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Generate Build Info
         id: generate-build-info
         env:
@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java-version: ["11", "17", "21", "25"]
+        java-version: ["21", "25"]
     name: Compile JDK-${{ matrix.java-version }} Pinot
     needs: [generate-build-info]
     steps:
@@ -56,7 +56,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Compile Pinot and push build image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -71,7 +71,7 @@ jobs:
       fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["11", "17", "21", "25"]
+        java-version: ["21", "25"]
         arch: ["amd64", "arm64"]
         include:
           - arch: amd64
@@ -86,7 +86,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Package and push the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -104,7 +104,7 @@ jobs:
       fail-fast: false
       matrix:
         java-disto: ["ms-openjdk", "amazoncorretto"]
-        java-version: ["11", "17", "21", "25"]
+        java-version: ["21", "25"]
     name: Create ${{ matrix.java-disto }}-${{ matrix.java-version }} Multi-Arch Manifest
     needs: [generate-build-info, package-pinot-docker-image]
     steps:
@@ -113,7 +113,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Create Multi-Arch Manifest
         env:
           TAGS: "${{ needs.generate-build-info.outputs.tags }}"

@@ -396,6 +396,19 @@ public class DataBlockEquals {
                 }
               }
               break;
+            case BIG_DECIMAL_ARRAY:
+              for (int did = 0; did < numRows; did++) {
+                if (!Arrays.equals(left.getBigDecimalArray(did, colId), right.getBigDecimalArray(did, colId))) {
+                  if (_failOnFalse) {
+                    throw new IllegalArgumentException("Different values for " + colTypes[colId]
+                        + " column: " + colNames[colId]
+                        + " left: " + Arrays.toString(left.getBigDecimalArray(did, colId))
+                        + " right: " + Arrays.toString(right.getBigDecimalArray(did, colId)));
+                  }
+                  return false;
+                }
+              }
+              break;
             case STRING_ARRAY:
               for (int did = 0; did < numRows; did++) {
                 if (!Arrays.equals(left.getStringArray(did, colId), right.getStringArray(did, colId))) {
@@ -410,6 +423,18 @@ public class DataBlockEquals {
               }
               break;
             case BYTES_ARRAY:
+              for (int did = 0; did < numRows; did++) {
+                if (!Arrays.equals(left.getBytesArray(did, colId), right.getBytesArray(did, colId))) {
+                  if (_failOnFalse) {
+                    throw new IllegalArgumentException("Different values for " + colTypes[colId]
+                        + " column: " + colNames[colId]
+                        + " left: " + Arrays.toString(left.getBytesArray(did, colId))
+                        + " right: " + Arrays.toString(right.getBytesArray(did, colId)));
+                  }
+                  return false;
+                }
+              }
+              break;
             case BOOLEAN_ARRAY:
             case UNKNOWN:
               throw new UnsupportedOperationException("Check how to read " + colTypes[colId] + " from data block");

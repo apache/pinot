@@ -110,7 +110,15 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>11</jdk.version>
+    <!--
+      Pinot services build against Java 21 by default. SPI/client modules consumed
+      by external JVMs (pinot-spi, pinot-segment-spi, pinot-timeseries-spi,
+      pinot-common, pinot-java-client, pinot-jdbc-client) hard-code Java 11
+      bytecode in their own maven-compiler-plugin configuration.
+    -->
+    <jdk.version>21</jdk.version>
+    <!-- OS classifier for platform-specific protoc/grpc binaries, overridden by OS detection profiles -->
+    <os.detected.classifier>linux-x86_64</os.detected.classifier>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
@@ -149,13 +157,13 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.21.2</jackson.version>
+    <jackson.version>2.21.3</jackson.version>
     <zookeeper.version>3.9.5</zookeeper.version>
     <async-http-client.version>3.0.9</async-http-client.version>
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.32.4</swagger-ui.version>
+    <swagger-ui.version>5.32.5</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
@@ -184,10 +192,10 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.42.39</aws.sdk.version>
+    <aws.sdk.version>2.43.1</aws.sdk.version>
     <azure.sdk.version>1.3.6</azure.sdk.version>
     <azure.msal4j.version>1.24.1</azure.msal4j.version>
-    <joda-time.version>2.14.1</joda-time.version>
+    <joda-time.version>2.14.2</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <ayza.version>10.0.4</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
@@ -200,7 +208,7 @@
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.5.1</prometheus.metrics.version>
+    <prometheus.metrics.version>1.6.1</prometheus.metrics.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
@@ -216,7 +224,7 @@
     <kafka3.version>3.9.2</kafka3.version>
     <kafka4.version>4.2.0</kafka4.version>
     <confluent.version>8.2.0</confluent.version>
-    <pulsar.version>4.0.9</pulsar.version>
+    <pulsar.version>4.0.10</pulsar.version>
     <flink.version>2.2.0</flink.version>
 
     <!-- Apache Commons Libraries -->
@@ -228,8 +236,8 @@
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-configuration2.version>2.14.0</commons-configuration2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
-    <commons-io.version>2.21.0</commons-io.version>
-    <commons-codec.version>1.21.0</commons-codec.version>
+    <commons-io.version>2.22.0</commons-io.version>
+    <commons-codec.version>1.22.0</commons-codec.version>
     <commons-cli.version>1.11.0</commons-cli.version>
     <commons-net.version>3.13.0</commons-net.version>
     <commons-validator.version>1.10.1</commons-validator.version>
@@ -256,10 +264,10 @@
     <httpcore5.version>5.4.2</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>4.34.0</protobuf.version>
+    <protobuf.version>4.34.1</protobuf.version>
     <grpc.version>1.80.0</grpc.version>
     <google.cloud.libraries.version>26.80.0</google.cloud.libraries.version>
-    <opentelemetry.gcp.resources.version>1.55.0-alpha</opentelemetry.gcp.resources.version>
+    <opentelemetry.gcp.resources.version>1.56.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.49.0</google.errorprone.version>
@@ -284,7 +292,7 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.0.12</jline.version>
+    <jline.version>4.0.14</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.5</jettison.version>
     <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
@@ -308,13 +316,13 @@
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.12.0</c3p0.version>
+    <c3p0.version>0.13.0</c3p0.version>
     <mchange-commons-java.version>0.5.0</mchange-commons-java.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
     <testng.version>7.12.0</testng.version>
-    <junit-jupiter-api.version>5.14.3</junit-jupiter-api.version>
+    <junit-jupiter-api.version>5.14.4</junit-jupiter-api.version>
     <mockito-core.version>5.23.0</mockito-core.version>
     <equalsverifier.version>3.19.4</equalsverifier.version>
     <testcontainers.version>2.0.5</testcontainers.version>
@@ -385,6 +393,56 @@
         <pinot.skip.remote.resources>true</pinot.skip.remote.resources>
       </properties>
     </profile>
+    <!-- OS detection profiles: set os.detected.classifier for protoc/grpc binary resolution -->
+    <profile>
+      <id>os-detect-linux-aarch64</id>
+      <activation>
+        <os>
+          <name>linux</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>linux-aarch_64</os.detected.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>os-detect-osx-x86_64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>x86_64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>osx-x86_64</os.detected.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>os-detect-osx-aarch64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>osx-aarch_64</os.detected.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>os-detect-windows-x86_64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <os.detected.classifier>windows-x86_64</os.detected.classifier>
+      </properties>
+    </profile>
+
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
     <profile>
       <id>linux-aarch64</id>
@@ -437,7 +495,32 @@
         </plugins>
       </build>
     </profile>
-    <!-- Apple Silicon Mac with Homebrew for protoc -->
+    <!-- Apple Silicon Mac with protoc-gen-grpc-java at /usr/local (fallback path) -->
+    <profile>
+      <id>macos-arm64-protobuf-homebrew-fallback</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <file>
+          <exists>/usr/local/bin/protoc-gen-grpc-java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <configuration>
+              <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Apple Silicon Mac with Homebrew for protoc (wins over fallback when both exist) -->
     <profile>
       <id>macos-arm64-protobuf-homebrew</id>
       <activation>
@@ -456,32 +539,6 @@
             <artifactId>protobuf-maven-plugin</artifactId>
             <configuration>
               <pluginExecutable>/opt/homebrew/bin/protoc-gen-grpc-java</pluginExecutable>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
-    <!-- Apple Silicon Mac with Homebrew (fallback path) -->
-    <profile>
-      <id>macos-arm64-protobuf-homebrew-fallback</id>
-      <activation>
-        <os>
-          <family>mac</family>
-          <arch>aarch64</arch>
-        </os>
-        <file>
-          <exists>/usr/local/bin/protoc-gen-grpc-java</exists>
-          <missing>/opt/homebrew/bin/protoc-gen-grpc-java</missing>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.xolstice.maven.plugins</groupId>
-            <artifactId>protobuf-maven-plugin</artifactId>
-            <configuration>
-              <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
             </configuration>
           </plugin>
         </plugins>
@@ -938,6 +995,12 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- Explicit pin: arrow-bom declares arrow-vector twice (with empty classifier), causing Maven 4 warnings -->
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>arrow-vector</artifactId>
+        <version>${arrow.version}</version>
+      </dependency>
 
       <dependency>
         <groupId>org.checkerframework</groupId>
@@ -991,6 +1054,19 @@
       <dependency>
         <groupId>io.prometheus</groupId>
         <artifactId>prometheus-metrics-core</artifactId>
+        <version>${prometheus.metrics.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <!--
+        Pin prometheus-metrics-model to the same version as prometheus-metrics-core. The JMX
+        exporter (io.prometheus.jmx:collector) brings in an older prometheus-metrics-model
+        transitively, and a model/core version skew causes IllegalArgumentException at metric
+        registration time (the older model still rejects names ending in '_total', which the
+        newer core's Counter builder now passes through unstripped).
+      -->
+      <dependency>
+        <groupId>io.prometheus</groupId>
+        <artifactId>prometheus-metrics-model</artifactId>
         <version>${prometheus.metrics.version}</version>
         <scope>test</scope>
       </dependency>
@@ -1354,6 +1430,22 @@
         <version>${google.cloud.libraries.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- Explicit pins: libraries-bom transitively imports protobuf-bom:4.33.2, conflicting with our 4.34.0 -->
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java-util</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-kotlin</artifactId>
+        <version>${protobuf.version}</version>
       </dependency>
       <dependency>
         <groupId>io.opentelemetry.contrib</groupId>
@@ -2222,14 +2314,6 @@
   <build>
     <defaultGoal>clean install</defaultGoal>
 
-    <extensions>
-      <extension>
-        <groupId>kr.motd.maven</groupId>
-        <artifactId>os-maven-plugin</artifactId>
-        <version>1.7.1</version>
-      </extension>
-    </extensions>
-
     <pluginManagement>
       <plugins>
         <plugin>
@@ -2623,6 +2707,28 @@
     </pluginManagement>
 
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-java-version</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,)</version>
+                  <message>Apache Pinot requires JDK 21 or newer to build.</message>
+                </requireJavaVersion>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>

@@ -56,7 +56,9 @@ public class FunctionUtils {
     put(long[].class, PinotDataType.PRIMITIVE_LONG_ARRAY);
     put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
+    put(BigDecimal[].class, PinotDataType.BIG_DECIMAL_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(byte[][].class, PinotDataType.BYTES_ARRAY);
     put(Map.class, PinotDataType.MAP);
     put(Object.class, PinotDataType.OBJECT);
   }};
@@ -83,7 +85,9 @@ public class FunctionUtils {
     put(Float[].class, PinotDataType.FLOAT_ARRAY);
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(Double[].class, PinotDataType.DOUBLE_ARRAY);
+    put(BigDecimal[].class, PinotDataType.BIG_DECIMAL_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(byte[][].class, PinotDataType.BYTES_ARRAY);
     put(Object.class, PinotDataType.OBJECT);
     put(Object[].class, PinotDataType.OBJECT_ARRAY);
   }};
@@ -107,7 +111,9 @@ public class FunctionUtils {
     put(long[].class, DataType.LONG);
     put(float[].class, DataType.FLOAT);
     put(double[].class, DataType.DOUBLE);
+    put(BigDecimal[].class, DataType.BIG_DECIMAL);
     put(String[].class, DataType.STRING);
+    put(byte[][].class, DataType.BYTES);
   }};
 
   private static final Map<Class<?>, ColumnDataType> COLUMN_DATA_TYPE_MAP = new HashMap<>() {{
@@ -129,7 +135,9 @@ public class FunctionUtils {
     put(long[].class, ColumnDataType.LONG_ARRAY);
     put(float[].class, ColumnDataType.FLOAT_ARRAY);
     put(double[].class, ColumnDataType.DOUBLE_ARRAY);
+    put(BigDecimal[].class, ColumnDataType.BIG_DECIMAL_ARRAY);
     put(String[].class, ColumnDataType.STRING_ARRAY);
+    put(byte[][].class, ColumnDataType.BYTES_ARRAY);
     put(Object.class, ColumnDataType.OBJECT);
   }};
 
@@ -207,6 +215,8 @@ public class FunctionUtils {
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.FLOAT), -1);
       case DOUBLE_ARRAY:
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
+      case BIG_DECIMAL_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DECIMAL), -1);
       case BOOLEAN_ARRAY:
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BOOLEAN), -1);
       case TIMESTAMP_ARRAY:

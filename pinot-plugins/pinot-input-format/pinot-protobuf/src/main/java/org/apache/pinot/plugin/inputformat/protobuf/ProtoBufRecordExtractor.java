@@ -22,244 +22,173 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Extractor for ProtoBuf records
- *
- * <p>Performance optimizations:
- * <ul>
- *   <li>Field descriptors are cached during initialization to avoid repeated lookups</li>
- *   <li>A reusable ProtoBufFieldInfo instance is used to reduce object allocation</li>
- * </ul>
- */
-@SuppressWarnings("unchecked")
+/// Extracts Pinot [GenericRow] from a ProtoBuf [Message]. Conversion is dispatched directly off the field's
+/// [Descriptors.FieldDescriptor] (`isMapField` / `isRepeated` / `getJavaType`) — no [BaseRecordExtractor#convert]
+/// pipeline, no per-value wrapper allocation.
+///
+/// **Proto source type → Java input → Java output type:**
+/// - proto `bool` → `Boolean` → `Boolean`
+/// - proto `int32` / `sint32` / `sfixed32` / `uint32` / `fixed32` → `Integer` → `Integer`
+/// - proto `int64` / `sint64` / `sfixed64` / `uint64` / `fixed64` → `Long` → `Long`
+/// - proto `float` → `Float` → `Float`
+/// - proto `double` → `Double` → `Double`
+/// - proto `string` → `String` → `String`
+/// - proto `bytes` → [ByteString] → `byte[]` (via [ByteString#toByteArray])
+/// - proto `enum` → [Descriptors.EnumValueDescriptor] → enum constant name `String`
+/// - proto nested `message` → [Message] → `Map<String, Object>` (recursive over the message's set fields)
+/// - proto `repeated X` → `List<X>` → `Object[]` (each element recursively converted)
+/// - proto `map<K, V>` → `Map<K, V>` → `Map<Object, Object>` (each key + value recursively converted)
+/// - proto3 `optional` field that is unset / cleared → `null`
 public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
-  private Set<String> _fields;
-  private boolean _extractAll = false;
-
   // Cached field descriptors initialized lazily on first message extraction to avoid repeated lookups
-  // via findFieldByName. The cache is invalidated when the descriptor's full name changes.
-  private Descriptors.FieldDescriptor[] _cachedFieldDescriptors;
-  private String[] _cachedFieldNames;
-  private String _cachedDescriptorFullName;
+  // via findFieldByName. The cache is invalidated when the descriptor's full name changes (handles schema
+  // evolution within a single reader).
+  private String _descriptorFullName;
+  private Descriptors.FieldDescriptor[] _fieldDescriptors;
+  private String[] _fieldNames;
 
-  // Reusable ProtoBufFieldInfo to reduce object allocation
-  private final ProtoBufFieldInfo _reusableFieldInfo = new ProtoBufFieldInfo(null, null);
-
-  @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    if (fields == null || fields.isEmpty()) {
-      _extractAll = true;
-      _fields = Set.of();
-    } else {
-      _extractAll = false;
-      _fields = Set.copyOf(fields);
-    }
-    // Reset cache state for re-initialization
-    _cachedDescriptorFullName = null;
-    _cachedFieldDescriptors = null;
-    _cachedFieldNames = null;
-  }
-
-  /**
-   * Initializes the field descriptor cache from the message descriptor.
-   * This is called on the first message and when schema changes are detected.
-   *
-   * <p>Schema changes are detected by comparing the descriptor's full name.
-   * This handles:
-   * <ul>
-   *   <li>Different message types (should not happen in normal use)</li>
-   *   <li>Schema evolution scenarios where descriptor might change</li>
-   * </ul>
-   */
-  private void initFieldDescriptorCache(Descriptors.Descriptor descriptor) {
+  /// Initializes the field descriptor cache from the message descriptor. Called on the first message and when
+  /// schema changes are detected (compared via the descriptor's full name). For the include-list path, fields
+  /// not present in the descriptor are skipped — `DataTypeTransformer` back-fills nulls downstream — so the
+  /// cache only contains live descriptors and the per-row loop never has to null-check.
+  private void initFieldDescriptors(Descriptors.Descriptor descriptor) {
     if (_extractAll) {
-      List<Descriptors.FieldDescriptor> fieldsList = descriptor.getFields();
-      int numFields = fieldsList.size();
-      _cachedFieldDescriptors = new Descriptors.FieldDescriptor[numFields];
-      _cachedFieldNames = new String[numFields];
+      List<Descriptors.FieldDescriptor> fieldDescriptors = descriptor.getFields();
+      int numFields = fieldDescriptors.size();
+      _fieldDescriptors = new Descriptors.FieldDescriptor[numFields];
+      _fieldNames = new String[numFields];
       for (int i = 0; i < numFields; i++) {
-        Descriptors.FieldDescriptor fd = fieldsList.get(i);
-        _cachedFieldDescriptors[i] = fd;
-        _cachedFieldNames[i] = fd.getName();
+        Descriptors.FieldDescriptor fieldDescriptor = fieldDescriptors.get(i);
+        _fieldDescriptors[i] = fieldDescriptor;
+        _fieldNames[i] = fieldDescriptor.getName();
       }
     } else {
       int numFields = _fields.size();
-      _cachedFieldDescriptors = new Descriptors.FieldDescriptor[numFields];
-      _cachedFieldNames = new String[numFields];
+      Descriptors.FieldDescriptor[] fieldDescriptors = new Descriptors.FieldDescriptor[numFields];
+      String[] fieldNames = new String[numFields];
       int i = 0;
       for (String fieldName : _fields) {
-        _cachedFieldDescriptors[i] = descriptor.findFieldByName(fieldName);
-        _cachedFieldNames[i] = fieldName;
-        i++;
+        Descriptors.FieldDescriptor fieldDescriptor = descriptor.findFieldByName(fieldName);
+        if (fieldDescriptor != null) {
+          fieldDescriptors[i] = fieldDescriptor;
+          fieldNames[i] = fieldName;
+          i++;
+        }
       }
+      _fieldDescriptors = i < numFields ? Arrays.copyOf(fieldDescriptors, i) : fieldDescriptors;
+      _fieldNames = i < numFields ? Arrays.copyOf(fieldNames, i) : fieldNames;
     }
-    _cachedDescriptorFullName = descriptor.getFullName();
-  }
-
-  /**
-   * For fields that are not set, we want to populate a null, instead of proto default.
-   */
-  private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
-    // In order to support null, the field needs to support _field presence_
-    // See https://github.com/protocolbuffers/protobuf/blob/main/docs/field_presence.md
-    // or FieldDescriptor#hasPresence()
-    if (!fieldDescriptor.hasPresence() || message.hasField(fieldDescriptor)) {
-      return message.getField(fieldDescriptor);
-    } else {
-      return null;
-    }
+    _descriptorFullName = descriptor.getFullName();
   }
 
   @Override
   public GenericRow extract(Message from, GenericRow to) {
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
-
-    // Initialize or reinitialize cache if descriptor changed (handles schema evolution)
-    if (_cachedDescriptorFullName == null || !_cachedDescriptorFullName.equals(descriptor.getFullName())) {
-      initFieldDescriptorCache(descriptor);
+    // Initialize or reinitialize cache if descriptor changed (handles schema evolution).
+    if (_descriptorFullName == null || !_descriptorFullName.equals(descriptor.getFullName())) {
+      initFieldDescriptors(descriptor);
     }
-
-    // Use cached field descriptors to avoid repeated lookups
-    int numFields = _cachedFieldDescriptors.length;
+    // The cache only contains live descriptors — fields requested but not in the source schema were filtered
+    // out at cache-build time.
+    int numFields = _fieldDescriptors.length;
     for (int i = 0; i < numFields; i++) {
-      Descriptors.FieldDescriptor fieldDescriptor = _cachedFieldDescriptors[i];
-      String fieldName = _cachedFieldNames[i];
-
-      Object fieldValue;
-      if (fieldDescriptor == null) {
-        // Field not found in descriptor (only possible in non-extractAll mode)
-        fieldValue = null;
-      } else {
-        fieldValue = getFieldValue(fieldDescriptor, from);
-        if (fieldValue != null) {
-          // Reuse ProtoBufFieldInfo to avoid object allocation
-          _reusableFieldInfo.setFieldValue(fieldValue);
-          _reusableFieldInfo.setFieldDescriptor(fieldDescriptor);
-          fieldValue = convert(_reusableFieldInfo);
-        }
-      }
-      to.putValue(fieldName, fieldValue);
+      Descriptors.FieldDescriptor fd = _fieldDescriptors[i];
+      Object value = getFieldValue(fd, from);
+      to.putValue(_fieldNames[i], value != null ? extractValue(fd, value) : null);
     }
     return to;
   }
 
-  /**
-   * Returns whether the object is a ProtoBuf Message.
-   */
-  @Override
-  protected boolean isRecord(Object value) {
-    return ((ProtoBufFieldInfo) value).getFieldValue() instanceof Message;
+  /// Reads the field value from `message`, returning `null` for unset / cleared optional fields (so they
+  /// surface as `null` instead of the proto default). See the
+  /// [field-presence docs](https://github.com/protocolbuffers/protobuf/blob/main/docs/field_presence.md).
+  @Nullable
+  private static Object getFieldValue(Descriptors.FieldDescriptor fd, Message message) {
+    return !fd.hasPresence() || message.hasField(fd) ? message.getField(fd) : null;
   }
 
-  /**
-   * Returns whether the field is a multi-value type.
-   */
-  @Override
-  protected boolean isMultiValue(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    return protoBufFieldInfo.getFieldValue() instanceof Collection && !protoBufFieldInfo.getFieldDescriptor()
-        .isMapField();
-  }
-
-  /**
-   * Returns whether the field is a map type.
-   */
-  @Override
-  protected boolean isMap(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    return protoBufFieldInfo.getFieldValue() instanceof Collection && protoBufFieldInfo.getFieldDescriptor()
-        .isMapField();
-  }
-
-  /**
-   * Handles the conversion of every value in the ProtoBuf map.
-   *
-   * @param value should be verified to contain a ProtoBuf map prior to calling this method as it will be handled
-   *              as a map field without checking
-   */
-  @Override
-  protected Map<Object, Object> convertMap(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    List<Descriptors.FieldDescriptor> fieldDescriptors =
-        protoBufFieldInfo.getFieldDescriptor().getMessageType().getFields();
-    Descriptors.FieldDescriptor keyDescriptor = fieldDescriptors.get(0);
-    Descriptors.FieldDescriptor valueDescriptor = fieldDescriptors.get(1);
-    Collection<Message> messages = (Collection<Message>) protoBufFieldInfo.getFieldValue();
-    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(messages.size());
-    for (Message message : messages) {
-      Object fieldKey = message.getField(keyDescriptor);
-      if (fieldKey != null) {
-        Object fieldValue = message.getField(valueDescriptor);
-        Object convertedValue = fieldValue != null ? convert(new ProtoBufFieldInfo(fieldValue, valueDescriptor)) : null;
-        convertedMap.put(convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyDescriptor)), convertedValue);
-      }
+  /// Dispatches a non-null protobuf field value off `fd`'s shape:
+  /// - `map<K, V>` → [#extractMap] → `Map<Object, Object>`
+  /// - `repeated X` → [#extractList] → `Object[]`
+  /// - scalar / message → [#extractSingleValue]
+  private static Object extractValue(Descriptors.FieldDescriptor fd, Object value) {
+    if (fd.isMapField()) {
+      //noinspection unchecked
+      return extractMap(fd, (Collection<Message>) value);
     }
-    return convertedMap;
+    if (fd.isRepeated()) {
+      return extractList(fd, (Collection<?>) value);
+    }
+    return extractSingleValue(fd, value);
   }
 
-  /**
-   * Handles the conversion of each value of the Protobuf collection. Converts the Collection to an Object array.
-   *
-   * @param value should be verified to contain a ProtoBuf collection prior to calling this method as it will
-   *              be handled as a collection field without checking
-   */
-  @Override
-  protected Object[] convertMultiValue(Object value) {
-    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
-    Descriptors.FieldDescriptor fieldDescriptor = protoBufFieldInfo.getFieldDescriptor();
-    Collection<Object> values = (Collection<Object>) protoBufFieldInfo.getFieldValue();
-    int numValues = values.size();
-    Object[] convertedValues = new Object[numValues];
-    int index = 0;
-    for (Object fieldValue : values) {
-      Object convertedValue = fieldValue != null ? convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor)) : null;
-      convertedValues[index++] = convertedValue;
+  /// Converts one non-null scalar / message value to its Pinot type per the matrix on the class Javadoc.
+  private static Object extractSingleValue(Descriptors.FieldDescriptor fd, Object value) {
+    switch (fd.getJavaType()) {
+      case BOOLEAN:
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case STRING:
+        return value;
+      case BYTE_STRING:
+        return ((ByteString) value).toByteArray();
+      case ENUM:
+        return value.toString();
+      case MESSAGE:
+        return extractMessage((Message) value);
+      default:
+        throw new IllegalStateException("Unsupported ProtoBuf type: " + fd.getJavaType());
     }
-    return convertedValues;
   }
 
-  /**
-   * Handles conversion of ProtoBuf single values.
-   */
-  @Override
-  protected Object convertSingleValue(Object value) {
-    Object fieldValue = ((ProtoBufFieldInfo) value).getFieldValue();
-    if (fieldValue instanceof ByteString) {
-      return ((ByteString) fieldValue).toByteArray();
-    } else if (fieldValue instanceof Number) {
-      return fieldValue;
+  /// Converts a `repeated X` field's [List] of values to `Object[]`, recursively converting each element.
+  private static Object[] extractList(Descriptors.FieldDescriptor fd, Collection<?> values) {
+    Object[] result = new Object[values.size()];
+    int i = 0;
+    for (Object value : values) {
+      result[i++] = value != null ? extractSingleValue(fd, value) : null;
     }
-    return fieldValue.toString();
+    return result;
   }
 
-  /**
-   * Handles conversion of ProtoBuf {@link Message} types
-   *
-   * @param value should be verified to contain a ProtoBuf Message prior to calling this method as it will be
-   *              handled as a Message without checking
-   */
-  @Override
-  protected Map<Object, Object> convertRecord(Object value) {
-    ProtoBufFieldInfo record = (ProtoBufFieldInfo) value;
-    Map<Descriptors.FieldDescriptor, Object> fields = ((Message) record.getFieldValue()).getAllFields();
-    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(fields.size());
-    for (Map.Entry<Descriptors.FieldDescriptor, Object> entry : fields.entrySet()) {
-      Descriptors.FieldDescriptor fieldDescriptor = entry.getKey();
-      Object fieldValue = entry.getValue();
-      Object convertedValue = fieldValue != null ? convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor)) : null;
-      convertedMap.put(fieldDescriptor.getName(), convertedValue);
+  /// Converts a `map<K, V>` field's [List] of entry messages to `Map<Object, Object>`. Each entry message
+  /// has exactly two fields (key at index 0, value at index 1) per the protobuf encoding. By the protobuf
+  /// map spec, both keys and values must always be present, so no null-guard is needed on either.
+  private static Map<Object, Object> extractMap(Descriptors.FieldDescriptor fd, Collection<Message> entries) {
+    List<Descriptors.FieldDescriptor> entryFields = fd.getMessageType().getFields();
+    Descriptors.FieldDescriptor keyFd = entryFields.get(0);
+    Descriptors.FieldDescriptor valueFd = entryFields.get(1);
+    Map<Object, Object> map = Maps.newHashMapWithExpectedSize(entries.size());
+    for (Message entry : entries) {
+      Object key = extractSingleValue(keyFd, entry.getField(keyFd));
+      Object value = extractSingleValue(valueFd, entry.getField(valueFd));
+      map.put(key, value);
     }
-    return convertedMap;
+    return map;
+  }
+
+  /// Converts a nested [Message] to `Map<String, Object>` keyed by field name. Iterates only the message's
+  /// set fields ([Message#getAllFields]) so unset optional / default fields don't pollute the map. Values
+  /// from `getAllFields()` are always non-null per the protobuf API.
+  private static Map<String, Object> extractMessage(Message message) {
+    Map<Descriptors.FieldDescriptor, Object> setFields = message.getAllFields();
+    Map<String, Object> map = Maps.newHashMapWithExpectedSize(setFields.size());
+    for (Map.Entry<Descriptors.FieldDescriptor, Object> entry : setFields.entrySet()) {
+      Descriptors.FieldDescriptor fd = entry.getKey();
+      map.put(fd.getName(), extractValue(fd, entry.getValue()));
+    }
+    return map;
   }
 }

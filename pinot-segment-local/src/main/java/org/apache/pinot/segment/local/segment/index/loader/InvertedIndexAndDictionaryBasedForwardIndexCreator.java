@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -491,6 +492,25 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
               }
             }
             break;
+          case BIG_DECIMAL:
+            if (_singleValue) {
+              for (int docId = 0; docId < _numDocs; docId++) {
+                creator.putBigDecimal(dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, docId)));
+              }
+            } else {
+              int startIdx = 0;
+              for (int docId = 0; docId < _numDocs; docId++) {
+                int endIdx = getInt(_forwardIndexLengthBuffer, docId);
+                BigDecimal[] values = new BigDecimal[endIdx - startIdx];
+                int valuesIdx = 0;
+                for (int i = startIdx; i < endIdx; i++) {
+                  values[valuesIdx++] = dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, i));
+                }
+                creator.putBigDecimalMV(values);
+                startIdx = endIdx;
+              }
+            }
+            break;
           case STRING:
             if (_singleValue) {
               for (int docId = 0; docId < _numDocs; docId++) {
@@ -527,12 +547,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
                 creator.putBytesMV(values);
                 startIdx = endIdx;
               }
-            }
-            break;
-          case BIG_DECIMAL:
-            Preconditions.checkState(_singleValue, "BIG_DECIMAL type not supported for multi-value columns");
-            for (int docId = 0; docId < _numDocs; docId++) {
-              creator.putBigDecimal(dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, docId)));
             }
             break;
           default:

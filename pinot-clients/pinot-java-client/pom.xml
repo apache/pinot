@@ -40,6 +40,20 @@
         <filtering>true</filtering>
       </resource>
     </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- Pinned to Java 11 bytecode for external consumers (e.g. plugins
+               loaded by older JVMs). Hard-coded literal so -Djdk.version=21
+               on the CLI cannot silently bump the bytecode level. -->
+          <release>11</release>
+          <source>11</source>
+          <target>11</target>
+        </configuration>
+      </plugin>
+    </plugins>
   </build>
   <dependencies>
     <dependency>

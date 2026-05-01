@@ -19,46 +19,38 @@
 package org.apache.pinot.plugin.inputformat.json;
 
 import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Extractor for JSON records
- */
+/// Extracts Pinot [GenericRow] from a parsed JSON `Map<String, Object>` (Jackson representation). JSON has
+/// no native bytes / float / big-decimal type.
+///
+/// **JSON source type → Java input → Java output type:**
+/// - JSON `true` / `false` → `Boolean` → `Boolean`
+/// - JSON int that fits in 32 bits → `Integer` → `Integer`
+/// - JSON int that overflows 32 bits but fits in 64 → `Long` → `Long`
+/// - JSON int that overflows 64 bits → `BigInteger` → `BigDecimal` (widened by [BaseRecordExtractor])
+/// - JSON decimal → `Double` → `Double` (never `Float` or `BigDecimal` with default Jackson config)
+/// - JSON string → `String` → `String`
+/// - JSON `null` → `null` → `null`
+/// - JSON array → `List` → `Object[]` (each element recursively converted)
+/// - JSON object → `Map` → `Map<String, Object>` (each value recursively converted)
 public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
-
-  private Set<String> _fields;
-  private boolean _extractAll = false;
-
-  @Override
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-    if (fields == null || fields.isEmpty()) {
-      _extractAll = true;
-      _fields = Set.of();
-    } else {
-      _fields = Set.copyOf(fields);
-    }
-  }
 
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     if (_extractAll) {
-      for (Map.Entry<String, Object> fieldToVal : from.entrySet()) {
-        Object value = fieldToVal.getValue();
+      for (Map.Entry<String, Object> entry : from.entrySet()) {
+        Object value = entry.getValue();
         if (value != null) {
           value = convert(value);
         }
-        to.putValue(fieldToVal.getKey(), value);
+        to.putValue(entry.getKey(), value);
       }
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);
-        // NOTE about JSON behavior - cannot distinguish between INT/LONG and FLOAT/DOUBLE.
-        // DataTypeTransformer fixes it.
         if (value != null) {
           value = convert(value);
         }

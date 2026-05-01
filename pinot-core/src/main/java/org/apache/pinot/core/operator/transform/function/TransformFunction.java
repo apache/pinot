@@ -153,6 +153,11 @@ public interface TransformFunction {
   double[][] transformToDoubleValuesMV(ValueBlock valueBlock);
 
   /**
+   * Transforms the data from the given value block to multi-valued BigDecimal values.
+   */
+  BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock);
+
+  /**
    * Transforms the data from the given value block to multi-valued string values.
    */
   String[][] transformToStringValuesMV(ValueBlock valueBlock);

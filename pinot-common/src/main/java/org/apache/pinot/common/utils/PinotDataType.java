@@ -21,6 +21,9 @@ package org.apache.pinot.common.utils;
 import com.fasterxml.jackson.core.JsonParseException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Map;
@@ -601,6 +604,165 @@ public enum PinotDataType {
     }
   },
 
+  /// Wraps [LocalDate]. Internal representation is `Integer` days-since-epoch (via [LocalDate#toEpochDay]).
+  ///
+  /// When converting from DATE to other types:
+  /// - INT / LONG / FLOAT / DOUBLE: days since epoch
+  /// - String: ISO date format (e.g. `"2022-04-14"`)
+  /// - TIMESTAMP: midnight UTC of the date as epoch millis
+  ///
+  /// Unlike [java.sql.Date], `LocalDate` is TZ-independent — a calendar date is the same date everywhere,
+  /// matching the semantic meaning of DATE.
+  DATE {
+    @Override
+    public int toInt(Object value) {
+      return (int) toLong(value);
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((LocalDate) value).toEpochDay();
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      return toLong(value);
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return toLong(value);
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(toLong(value));
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      return new Timestamp(((LocalDate) value).toEpochDay() * 86_400_000L);
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to BYTES");
+    }
+
+    @Override
+    public LocalDate convert(Object value, PinotDataType sourceType) {
+      switch (sourceType) {
+        case DATE:
+          return (LocalDate) value;
+        case INTEGER:
+          return LocalDate.ofEpochDay((Integer) value);
+        case LONG:
+          return LocalDate.ofEpochDay((Long) value);
+        case STRING:
+        case JSON:
+          return LocalDate.parse(value.toString().trim());
+        case TIMESTAMP:
+          // Treat the timestamp as a UTC instant and extract its calendar date in UTC.
+          return ((Timestamp) value).toInstant().atZone(ZoneOffset.UTC).toLocalDate();
+        default:
+          throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to DATE");
+      }
+    }
+
+    @Override
+    public Integer toInternal(Object value) {
+      return toInt(value);
+    }
+  },
+
+  /// Wraps [LocalTime]. Internal representation is `Long` millis-since-midnight (truncated from
+  /// [LocalTime#toNanoOfDay]).
+  ///
+  /// When converting from TIME to other types:
+  /// - INT / LONG / FLOAT / DOUBLE: millis since midnight
+  /// - String: ISO time format (e.g. `"08:51:32"` or `"08:51:32.123"` when sub-second nanos are present)
+  ///
+  /// Unlike [java.sql.Time], `LocalTime` is TZ-independent and supports nanosecond precision — matching
+  /// the OLAP convention (Snowflake / Trino / Parquet `TIME_NANOS`).
+  TIME {
+    @Override
+    public int toInt(Object value) {
+      return (int) toLong(value);
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((LocalTime) value).toNanoOfDay() / 1_000_000L;
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      return toLong(value);
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return toLong(value);
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(toLong(value));
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to TIMESTAMP");
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to BYTES");
+    }
+
+    @Override
+    public LocalTime convert(Object value, PinotDataType sourceType) {
+      switch (sourceType) {
+        case TIME:
+          return (LocalTime) value;
+        case INTEGER:
+        case LONG:
+          // Treat the input as millis-since-midnight (matches `toLong`).
+          return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1_000_000L);
+        case STRING:
+        case JSON:
+          return LocalTime.parse(value.toString().trim());
+        default:
+          throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to TIME");
+      }
+    }
+
+    @Override
+    public Long toInternal(Object value) {
+      return toLong(value);
+    }
+  },
+
   STRING {
     @Override
     public int toInt(Object value) {
@@ -820,38 +982,36 @@ public enum PinotDataType {
 
   MAP {
     @Override
+    public String toString(Object value) {
+      //noinspection unchecked
+      return MapUtils.toString((Map<String, Object>) value);
+    }
+
+    @Override
+    public String toJson(Object value) {
+      //noinspection unchecked
+      return MapUtils.toString((Map<String, Object>) value);
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      //noinspection unchecked
+      return MapUtils.serializeMap((Map<String, Object>) value);
+    }
+
+    @Override
     public Object convert(Object value, PinotDataType sourceType) {
       switch (sourceType) {
         case STRING:
-          try {
-            return JsonUtils.stringToObject(value.toString(), Map.class);
-          } catch (Exception e) {
-            throw new RuntimeException("Unable to convert String to Map. Input value: " + value, e);
-          }
+          return MapUtils.fromString(value.toString());
         case BYTES:
           return MapUtils.deserializeMap((byte[]) value);
-        case OBJECT:
         case MAP:
-          if (value instanceof Map) {
-            return value;
-          } else {
-            throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
-                sourceType, value.getClass()));
-          }
+          return value;
         default:
           throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
               sourceType, value.getClass()));
       }
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public byte[] toBytes(Object value) {
-      if (!(value instanceof Map)) {
-        throw new UnsupportedOperationException("Cannot convert non-Map value to BYTES for MAP type: "
-            + (value == null ? "null" : value.getClass()));
-      }
-      return MapUtils.serializeMap((Map<String, Object>) value);
     }
   },
 
@@ -932,6 +1092,13 @@ public enum PinotDataType {
     @Override
     public Double[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toDoubleArray(value);
+    }
+  },
+
+  BIG_DECIMAL_ARRAY {
+    @Override
+    public BigDecimal[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBigDecimalArray(value);
     }
   },
 
@@ -1264,6 +1431,24 @@ public enum PinotDataType {
     }
   }
 
+  public BigDecimal[] toBigDecimalArray(Object value) {
+    if (value instanceof BigDecimal[]) {
+      return (BigDecimal[]) value;
+    }
+    if (isSingleValue()) {
+      return new BigDecimal[]{toBigDecimal(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      BigDecimal[] bigDecimalArray = new BigDecimal[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        bigDecimalArray[i] = singleValueType.toBigDecimal(valueArray[i]);
+      }
+      return bigDecimalArray;
+    }
+  }
+
   private static Object[] toObjectArray(Object array) {
     if (array instanceof Collection) {
       return ((Collection<?>) array).toArray();
@@ -1365,6 +1550,12 @@ public enum PinotDataType {
       case PRIMITIVE_DOUBLE_ARRAY:
       case DOUBLE_ARRAY:
         return DOUBLE;
+      case BIG_DECIMAL_ARRAY:
+        return BIG_DECIMAL;
+      case BOOLEAN_ARRAY:
+        return BOOLEAN;
+      case TIMESTAMP_ARRAY:
+        return TIMESTAMP;
       case STRING_ARRAY:
         return STRING;
       case BYTES_ARRAY:
@@ -1372,10 +1563,6 @@ public enum PinotDataType {
       case OBJECT_ARRAY:
       case COLLECTION:
         return OBJECT;
-      case BOOLEAN_ARRAY:
-        return BOOLEAN;
-      case TIMESTAMP_ARRAY:
-        return TIMESTAMP;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
@@ -1409,6 +1596,15 @@ public enum PinotDataType {
     if (cls == Timestamp.class) {
       return TIMESTAMP;
     }
+    if (cls != null && Map.class.isAssignableFrom(cls)) {
+      return MAP;
+    }
+    if (cls == LocalDate.class) {
+      return DATE;
+    }
+    if (cls == LocalTime.class) {
+      return TIME;
+    }
     if (cls == Byte.class) {
       return BYTE;
     }
@@ -1417,9 +1613,6 @@ public enum PinotDataType {
     }
     if (cls == Short.class) {
       return SHORT;
-    }
-    if (cls != null && Map.class.isAssignableFrom(cls)) {
-      return MAP;
     }
     return OBJECT;
   }
@@ -1437,17 +1630,11 @@ public enum PinotDataType {
     if (cls == Double.class) {
       return DOUBLE_ARRAY;
     }
+    if (cls == BigDecimal.class) {
+      return BIG_DECIMAL_ARRAY;
+    }
     if (cls == String.class) {
       return STRING_ARRAY;
-    }
-    if (cls == Byte.class) {
-      return BYTE_ARRAY;
-    }
-    if (cls == Character.class) {
-      return CHARACTER_ARRAY;
-    }
-    if (cls == Short.class) {
-      return SHORT_ARRAY;
     }
     if (cls == byte[].class) {
       return BYTES_ARRAY;
@@ -1457,6 +1644,15 @@ public enum PinotDataType {
     }
     if (cls == Timestamp.class) {
       return TIMESTAMP_ARRAY;
+    }
+    if (cls == Byte.class) {
+      return BYTE_ARRAY;
+    }
+    if (cls == Character.class) {
+      return CHARACTER_ARRAY;
+    }
+    if (cls == Short.class) {
+      return SHORT_ARRAY;
     }
     return OBJECT_ARRAY;
   }
@@ -1493,10 +1689,7 @@ public enum PinotDataType {
       case DOUBLE:
         return fieldSpec.isSingleValueField() ? DOUBLE : DOUBLE_ARRAY;
       case BIG_DECIMAL:
-        if (fieldSpec.isSingleValueField()) {
-          return BIG_DECIMAL;
-        }
-        throw new IllegalStateException("There is no multi-value type for BigDecimal");
+        return fieldSpec.isSingleValueField() ? BIG_DECIMAL : BIG_DECIMAL_ARRAY;
       case BOOLEAN:
         return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
       case TIMESTAMP:
@@ -1557,8 +1750,12 @@ public enum PinotDataType {
         return PRIMITIVE_FLOAT_ARRAY;
       case DOUBLE_ARRAY:
         return PRIMITIVE_DOUBLE_ARRAY;
+      case BIG_DECIMAL_ARRAY:
+        return BIG_DECIMAL_ARRAY;
       case STRING_ARRAY:
         return STRING_ARRAY;
+      case BYTES_ARRAY:
+        return BYTES_ARRAY;
       default:
         throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
     }

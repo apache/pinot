@@ -563,6 +563,48 @@ public class RowBasedBlockValSet implements BlockValSet {
   }
 
   @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
+    int numRows = _rows.size();
+    BigDecimal[][] values = new BigDecimal[numRows][];
+    if (numRows == 0) {
+      return values;
+    }
+    if (_dataType == DataType.UNKNOWN) {
+      Arrays.fill(values, new BigDecimal[0]);
+      return values;
+    }
+    for (int i = 0; i < numRows; i++) {
+      Object storedValue = _rows.get(i)[_colId];
+      if (storedValue instanceof int[]) {
+        int[] intArray = (int[]) storedValue;
+        values[i] = new BigDecimal[intArray.length];
+        ArrayCopyUtils.copy(intArray, values[i], intArray.length);
+      } else if (storedValue instanceof long[]) {
+        long[] longArray = (long[]) storedValue;
+        values[i] = new BigDecimal[longArray.length];
+        ArrayCopyUtils.copy(longArray, values[i], longArray.length);
+      } else if (storedValue instanceof float[]) {
+        float[] floatArray = (float[]) storedValue;
+        values[i] = new BigDecimal[floatArray.length];
+        ArrayCopyUtils.copy(floatArray, values[i], floatArray.length);
+      } else if (storedValue instanceof double[]) {
+        double[] doubleArray = (double[]) storedValue;
+        values[i] = new BigDecimal[doubleArray.length];
+        ArrayCopyUtils.copy(doubleArray, values[i], doubleArray.length);
+      } else if (storedValue instanceof BigDecimal[]) {
+        values[i] = (BigDecimal[]) storedValue;
+      } else if (storedValue instanceof String[]) {
+        String[] stringArray = (String[]) storedValue;
+        values[i] = new BigDecimal[stringArray.length];
+        ArrayCopyUtils.copy(stringArray, values[i], stringArray.length);
+      } else {
+        throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
+      }
+    }
+    return values;
+  }
+
+  @Override
   public String[][] getStringValuesMV() {
     int numRows = _rows.size();
     String[][] values = new String[numRows][];
@@ -578,27 +620,23 @@ public class RowBasedBlockValSet implements BlockValSet {
       if (storedValue instanceof int[]) {
         int[] intArray = (int[]) storedValue;
         values[i] = new String[intArray.length];
-        for (int j = 0; j < intArray.length; j++) {
-          values[i][j] = Integer.toString(intArray[j]);
-        }
+        ArrayCopyUtils.copy(intArray, values[i], intArray.length);
       } else if (storedValue instanceof long[]) {
         long[] longArray = (long[]) storedValue;
         values[i] = new String[longArray.length];
-        for (int j = 0; j < longArray.length; j++) {
-          values[i][j] = Long.toString(longArray[j]);
-        }
+        ArrayCopyUtils.copy(longArray, values[i], longArray.length);
       } else if (storedValue instanceof float[]) {
         float[] floatArray = (float[]) storedValue;
         values[i] = new String[floatArray.length];
-        for (int j = 0; j < floatArray.length; j++) {
-          values[i][j] = Float.toString(floatArray[j]);
-        }
+        ArrayCopyUtils.copy(floatArray, values[i], floatArray.length);
       } else if (storedValue instanceof double[]) {
         double[] doubleArray = (double[]) storedValue;
         values[i] = new String[doubleArray.length];
-        for (int j = 0; j < doubleArray.length; j++) {
-          values[i][j] = Double.toString(doubleArray[j]);
-        }
+        ArrayCopyUtils.copy(doubleArray, values[i], doubleArray.length);
+      } else if (storedValue instanceof BigDecimal[]) {
+        BigDecimal[] bigDecimalArray = (BigDecimal[]) storedValue;
+        values[i] = new String[bigDecimalArray.length];
+        ArrayCopyUtils.copy(bigDecimalArray, values[i], bigDecimalArray.length);
       } else if (storedValue instanceof String[]) {
         values[i] = (String[]) storedValue;
       } else {

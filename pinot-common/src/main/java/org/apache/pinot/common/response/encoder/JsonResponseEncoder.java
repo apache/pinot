@@ -190,8 +190,9 @@ public class JsonResponseEncoder implements ResponseEncoder {
           doubleArray[k] = jsonValue.get(k).asDouble();
         }
         return doubleArray;
-      case STRING_ARRAY:
+      case BIG_DECIMAL_ARRAY:
       case TIMESTAMP_ARRAY:
+      case STRING_ARRAY:
       case BYTES_ARRAY:
         String[] stringArray = new String[jsonValue.size()];
         for (int k = 0; k < jsonValue.size(); k++) {
@@ -203,8 +204,7 @@ public class JsonResponseEncoder implements ResponseEncoder {
     }
   }
 
-  private static Object extractValue(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue)
-      throws IOException {
+  private static Object extractValue(DataSchema.ColumnDataType columnDataType, JsonNode jsonValue) {
     if (jsonValue.isNull()) {
       return null;
     }
@@ -219,11 +219,11 @@ public class JsonResponseEncoder implements ResponseEncoder {
         return Double.valueOf(jsonValue.asDouble()).floatValue();
       case DOUBLE:
         return jsonValue.asDouble();
-      case STRING:
-      case BYTES:
-      case TIMESTAMP:
-      case JSON:
       case BIG_DECIMAL:
+      case TIMESTAMP:
+      case STRING:
+      case JSON:
+      case BYTES:
       case OBJECT:
         return jsonValue.textValue();
       case UNKNOWN:

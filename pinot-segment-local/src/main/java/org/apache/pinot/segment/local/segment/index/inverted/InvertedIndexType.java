@@ -149,6 +149,22 @@ public class InvertedIndexType
     return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // Inverted index posting lists are keyed by dictionary IDs. Note: a separate raw-value bitmap inverted index
+    // currently exists for SV no-dictionary columns (RawValueBitmapInvertedIndexCreator); under the upcoming
+    // shared-dictionary contract (apache/pinot#17269) that path is removed and any enabled inverted index requires
+    // a dictionary, so we declare the dependency unconditionally here.
+    return true;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // Inverted index references dictionary IDs; enabling/disabling the dictionary changes whether the index can
+    // exist at all and (for shared-dict columns) the format on disk.
+    return true;
+  }
+
   public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 

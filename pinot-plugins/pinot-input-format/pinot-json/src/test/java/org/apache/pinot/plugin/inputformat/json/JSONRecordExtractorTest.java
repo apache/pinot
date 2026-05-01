@@ -18,184 +18,210 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.Sets;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.JsonUtils;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
-/**
- * Tests the {@link JSONRecordExtractor}
- */
-public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
+/// Tests [JSONRecordExtractor] — see its class Javadoc for the JSON source type → Java output type matrix.
+public class JSONRecordExtractorTest {
 
-  private final File _dataFile = new File(_tempDir, "events.json");
+  private static final String COLUMN = "col";
 
-  private static final String NULL_FIELD = "myNull";
-  private static final String INT_FIELD = "myInt";
-  private static final String LONG_FIELD = "myLong";
-  private static final String DOUBLE_FIELD = "myDouble";
-  private static final String STRING_FIELD = "myString";
-  private static final String INT_ARRAY_FIELD = "myIntArray";
-  private static final String DOUBLE_ARRAY_FIELD = "myDoubleArray";
-  private static final String STRING_ARRAY_FIELD = "myStringArray";
-  private static final String COMPLEX_ARRAY_1_FIELD = "myComplexArray1";
-  private static final String COMPLEX_ARRAY_2_FIELD = "myComplexArray2";
-  private static final String MAP_1_FIELD = "myMap1";
-  private static final String MAP_2_FIELD = "myMap2";
+  // === Single value — order follows the type list in the class Javadoc ===
 
-  @Override
-  protected List<Map<String, Object>> getInputRecords() {
-    return Arrays.asList(createRecord1(), createRecord2());
+  @Test
+  public void testBooleanPreserved() {
+    Object trueResult = extract(true);
+    assertEquals(trueResult, true);
+    Object falseResult = extract(false);
+    assertEquals(falseResult, false);
   }
 
-  @Override
-  protected Set<String> getSourceFields() {
-    return Sets
-        .newHashSet(NULL_FIELD, INT_FIELD, LONG_FIELD, DOUBLE_FIELD, STRING_FIELD, INT_ARRAY_FIELD, DOUBLE_ARRAY_FIELD,
-            STRING_ARRAY_FIELD, COMPLEX_ARRAY_1_FIELD, COMPLEX_ARRAY_2_FIELD, MAP_1_FIELD, MAP_2_FIELD);
+  @Test
+  public void testIntegerPreserved() {
+    Object result = extract(42);
+    assertEquals(result, 42);
   }
 
-  /**
-   * Create a JSONRecordReader
-   */
-  @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
-    JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dataFile, fieldsToRead, null);
-    return recordReader;
+  @Test
+  public void testLongPreserved() {
+    Object result = extract(1_588_469_340_000L);
+    assertEquals(result, 1_588_469_340_000L);
   }
 
-  /**
-   * Create a JSON input file using the input records
-   */
-  @Override
-  protected void createInputFile()
-      throws IOException {
-    try (FileWriter fileWriter = new FileWriter(_dataFile)) {
-      for (Map<String, Object> inputRecord : _inputRecords) {
-        ObjectNode jsonRecord = JsonUtils.newObjectNode();
-        for (String key : inputRecord.keySet()) {
-          jsonRecord.set(key, JsonUtils.objectToJsonNode(inputRecord.get(key)));
-        }
-        fileWriter.write(jsonRecord.toString());
-      }
-    }
+  @Test
+  public void testBigIntegerWidenedToBigDecimal() {
+    // Default Jackson parses integer literals that overflow `Long` as `BigInteger`. The base widens to
+    // `BigDecimal` since Pinot has no `BigInteger` type.
+    BigInteger value = new BigInteger("99999999999999999999999999");
+    Object result = extract(value);
+    assertEquals(result, new BigDecimal(value));
   }
 
-  private Map<String, Object> createRecord1() {
+  @Test
+  public void testDoublePreserved() {
+    Object result = extract(1.5d);
+    assertEquals(result, 1.5d);
+  }
+
+  @Test
+  public void testStringPreserved() {
+    Object result = extract("hello");
+    assertEquals(result, "hello");
+  }
+
+  @Test
+  public void testNullPassedThrough() {
+    assertNull(extract(null));
+  }
+
+  // === List (JSON array) → Object[]; element order again follows the type list ===
+
+  @Test
+  public void testBooleanListExtractedAsArray() {
+    Object[] result = (Object[]) extract(List.of(true, false, true));
+    assertEquals(result, new Object[]{true, false, true});
+  }
+
+  @Test
+  public void testIntegerListExtractedAsArray() {
+    Object[] result = (Object[]) extract(List.of(10, 20, 30));
+    assertEquals(result, new Object[]{10, 20, 30});
+  }
+
+  @Test
+  public void testLongListExtractedAsArray() {
+    Object[] result = (Object[]) extract(List.of(1_588_469_340_000L, 2_588_469_340_000L));
+    assertEquals(result, new Object[]{1_588_469_340_000L, 2_588_469_340_000L});
+  }
+
+  @Test
+  public void testDoubleListExtractedAsArray() {
+    Object[] result = (Object[]) extract(List.of(1.1, 2.2, 3.3));
+    assertEquals(result, new Object[]{1.1, 2.2, 3.3});
+  }
+
+  @Test
+  public void testStringListExtractedAsArray() {
+    Object[] result = (Object[]) extract(List.of("foo", "bar"));
+    assertEquals(result, new Object[]{"foo", "bar"});
+  }
+
+  @Test
+  public void testListWithNullElement() {
+    // `[1, null, 3]` is valid JSON; the parsed list has null at index 1. (`List.of` rejects nulls.)
+    Object[] result = (Object[]) extract(Arrays.asList(1, null, 3));
+    assertEquals(result, new Object[]{1, null, 3});
+  }
+
+  @Test
+  public void testEmptyListExtractedAsEmptyArray() {
+    Object[] result = (Object[]) extract(List.of());
+    assertEquals(result, new Object[]{});
+  }
+
+  @Test
+  public void testHeterogeneousListExtractedAsArray() {
+    // JSON arrays can hold mixed types (`[1, "a", true]`); each element is converted independently.
+    Object[] result = (Object[]) extract(List.of(1, "a", true, 1.5d));
+    assertEquals(result, new Object[]{1, "a", true, 1.5d});
+  }
+
+  // === Map (JSON object) — recursive cases ===
+
+  @Test
+  public void testMapWithStringKeys() {
+    Map<?, ?> result = (Map<?, ?>) extract(Map.of(
+        "k1", 1,
+        "k2", "foo",
+        "k3", true
+    ));
+    assertEquals(result.size(), 3);
+    assertEquals(result.get("k1"), 1);
+    assertEquals(result.get("k2"), "foo");
+    assertEquals(result.get("k3"), true);
+  }
+
+  @Test
+  public void testMapWithListValue() {
+    // Inner List values are recursively converted to Object[].
+    Map<?, ?> result = (Map<?, ?>) extract(Map.of(
+        "nums", List.of(1, 2, 3),
+        "words", List.of("a", "b")
+    ));
+    assertEquals((Object[]) result.get("nums"), new Object[]{1, 2, 3});
+    assertEquals((Object[]) result.get("words"), new Object[]{"a", "b"});
+  }
+
+  @Test
+  public void testNestedMap() {
+    Map<?, ?> result = (Map<?, ?>) extract(Map.of("k", Map.of(
+        "sub1", 1.1,
+        "sub2", 1.2
+    )));
+    Map<?, ?> innerResult = (Map<?, ?>) result.get("k");
+    assertEquals(innerResult.get("sub1"), 1.1);
+    assertEquals(innerResult.get("sub2"), 1.2);
+  }
+
+  @Test
+  public void testListOfMaps() {
+    Object[] result = (Object[]) extract(List.of(
+        Map.of(
+            "one", 1,
+            "two", "foo"
+        ),
+        Map.of(
+            "one", 11,
+            "two", "bar"
+        )
+    ));
+    assertEquals(result.length, 2);
+    Map<?, ?> r0 = (Map<?, ?>) result[0];
+    assertEquals(r0.get("one"), 1);
+    assertEquals(r0.get("two"), "foo");
+    Map<?, ?> r1 = (Map<?, ?>) result[1];
+    assertEquals(r1.get("one"), 11);
+    assertEquals(r1.get("two"), "bar");
+  }
+
+  @Test
+  public void testListOfNestedMapsAndLists() {
+    // A real-world JSON shape: list of records where each record has a scalar, a nested map, and a list field.
+    Object[] result = (Object[]) extract(List.of(Map.of(
+        "scalar", 1,
+        "nested", Map.of(
+            "sub1", 1.1,
+            "sub2", 1.2
+        ),
+        "list", List.of("a", "b")
+    )));
+    Map<?, ?> r0 = (Map<?, ?>) result[0];
+    assertEquals(r0.get("scalar"), 1);
+    assertEquals(((Map<?, ?>) r0.get("nested")).get("sub1"), 1.1);
+    assertEquals((Object[]) r0.get("list"), new Object[]{"a", "b"});
+  }
+
+  // === Helpers ===
+
+  /// Run the extractor against a single-column input map and return the extracted value.
+  private static Object extract(@Nullable Object input) {
+    JSONRecordExtractor extractor = new JSONRecordExtractor();
+    extractor.init(null, null);
     Map<String, Object> record = new HashMap<>();
-    record.put(NULL_FIELD, null);
-    record.put(INT_FIELD, 10);
-    record.put(LONG_FIELD, 1588469340000L);
-    record.put(DOUBLE_FIELD, 10.2);
-    record.put(STRING_FIELD, "foo");
-    record.put(INT_ARRAY_FIELD, Arrays.asList(10, 20, 30));
-    record.put(DOUBLE_ARRAY_FIELD, Arrays.asList(10.2, 12.1, 1.1));
-    record.put(STRING_ARRAY_FIELD, Arrays.asList("foo", "bar"));
-
-    Map<String, Object> map1 = new HashMap<>();
-    map1.put("one", 1);
-    map1.put("two", "too");
-    Map<String, Object> map2 = new HashMap<>();
-    map2.put("one", 11);
-    map2.put("two", "roo");
-    record.put(COMPLEX_ARRAY_1_FIELD, Arrays.asList(map1, map2));
-
-    Map<String, Object> map3 = new HashMap<>();
-    map3.put("one", 1);
-    Map<String, Object> map31 = new HashMap<>();
-    map31.put("sub1", 1.1);
-    map31.put("sub2", 1.2);
-    map3.put("two", map31);
-    map3.put("three", Arrays.asList("a", "b"));
-
-    Map<String, Object> map4 = new HashMap<>();
-    map4.put("one", 11);
-    Map<String, Object> map41 = new HashMap<>();
-    map41.put("sub1", 11.1);
-    map41.put("sub2", 11.2);
-    map4.put("two", map41);
-    map4.put("three", Arrays.asList("aa", "bb"));
-    record.put(COMPLEX_ARRAY_2_FIELD, Arrays.asList(map3, map4));
-
-    Map<String, Object> map5 = new HashMap<>();
-    map5.put("k1", "foo");
-    map5.put("k2", "bar");
-    record.put(MAP_1_FIELD, map5);
-
-    Map<String, Object> map6 = new HashMap<>();
-    Map<String, Object> map61 = new HashMap<>();
-    map61.put("sub1", 10);
-    map61.put("sub2", 1.0);
-    map6.put("k3", map61);
-    map6.put("k4", "baz");
-    map6.put("k5", Arrays.asList(1, 2, 3));
-    record.put(MAP_2_FIELD, map6);
-
-    return record;
-  }
-
-  private Map<String, Object> createRecord2() {
-    Map<String, Object> record = new HashMap<>();
-    record.put(NULL_FIELD, null);
-    record.put(INT_FIELD, 20);
-    record.put(LONG_FIELD, 998732130000L);
-    record.put(DOUBLE_FIELD, 11.2);
-    record.put(STRING_FIELD, "hello");
-    record.put(INT_ARRAY_FIELD, Arrays.asList(100, 200, 300));
-    record.put(DOUBLE_ARRAY_FIELD, Arrays.asList(20.1, 30.2, 40.3));
-    record.put(STRING_ARRAY_FIELD, Arrays.asList("hello", "world!"));
-
-    Map<String, Object> map1 = new HashMap<>();
-    map1.put("two", 2);
-    map1.put("three", "tree");
-    Map<String, Object> map2 = new HashMap<>();
-    map2.put("two", 22);
-    map2.put("three", "free");
-    record.put(COMPLEX_ARRAY_1_FIELD, Arrays.asList(map1, map2));
-
-    Map<String, Object> map3 = new HashMap<>();
-    map3.put("two", 2);
-    Map<String, Object> map31 = new HashMap<>();
-    map31.put("sub1", 1.2);
-    map31.put("sub2", 2.3);
-    map3.put("two", map31);
-    map3.put("three", Arrays.asList("b", "c"));
-
-    Map<String, Object> map4 = new HashMap<>();
-    map4.put("one", 12);
-    Map<String, Object> map41 = new HashMap<>();
-    map41.put("sub1", 12.2);
-    map41.put("sub2", 10.1);
-    map4.put("two", map41);
-    map4.put("three", Arrays.asList("cc", "cc"));
-    record.put(COMPLEX_ARRAY_2_FIELD, Arrays.asList(map3, map4));
-
-    Map<String, Object> map5 = new HashMap<>();
-    map5.put("k1", "hello");
-    map5.put("k2", "world");
-    record.put(MAP_1_FIELD, map5);
-
-    Map<String, Object> map6 = new HashMap<>();
-    Map<String, Object> map61 = new HashMap<>();
-    map61.put("sub1", 20);
-    map61.put("sub2", 2.0);
-    map6.put("k3", map61);
-    map6.put("k4", "abc");
-    map6.put("k5", Arrays.asList(3, 2, 1));
-    record.put(MAP_2_FIELD, map6);
-
-    return record;
+    record.put(COLUMN, input);
+    GenericRow row = new GenericRow();
+    extractor.extract(record, row);
+    return row.getValue(COLUMN);
   }
 }

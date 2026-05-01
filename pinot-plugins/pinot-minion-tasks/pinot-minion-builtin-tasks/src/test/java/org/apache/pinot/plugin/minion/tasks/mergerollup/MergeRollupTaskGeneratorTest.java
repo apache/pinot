@@ -38,6 +38,7 @@ import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -1097,6 +1098,65 @@ public class MergeRollupTaskGeneratorTest {
         mockClusterInfoProvide.getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE,
             OFFLINE_TABLE_NAME)).getWatermarkMap().get(MONTHLY).longValue(), 0L);
     assertEquals(pinotTaskConfigs.size(), 0);
+  }
+
+  /**
+   * Tests that retentionExpiryBufferPeriod config causes segments near retention to be filtered out from task
+   * generation. With 30d retention and 5d buffer, effective retention is 25d — segments older than that should be
+   * excluded.
+   */
+  @Test
+  public void testRetentionExpiryBufferFiltersSegments() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put("daily.mergeType", "concat");
+    tableTaskConfigs.put("daily.bufferTimePeriod", "2d");
+    tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
+    tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put(MinionTaskUtils.RETENTION_EXPIRY_BUFFER_PERIOD_KEY, "5d");
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("30")
+        .setTaskConfig(new TableTaskConfig(taskConfigsMap))
+        .build();
+
+    ClusterInfoAccessor mockClusterInfoProvider = mock(ClusterInfoAccessor.class);
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    // Within effective retention (25d), outside buffer (2d)
+    String segmentName1 = "testTable__1";
+    SegmentZKMetadata metadata1 = getSegmentZKMetadata(segmentName1,
+        nowMs - 5 * oneDayMs, nowMs - 4 * oneDayMs, TimeUnit.MILLISECONDS, "download1");
+
+    // Past effective retention (27d > 25d)
+    String segmentName2 = "testTable__2";
+    SegmentZKMetadata metadata2 = getSegmentZKMetadata(segmentName2,
+        nowMs - 28 * oneDayMs, nowMs - 27 * oneDayMs, TimeUnit.MILLISECONDS, "download2");
+
+    when(mockClusterInfoProvider.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(metadata1, metadata2));
+    when(mockClusterInfoProvider.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
+        getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2)));
+    when(mockClusterInfoProvider.getTaskStates(MinionConstants.MergeRollupTask.TASK_TYPE))
+        .thenReturn(new HashMap<>());
+    mockMergeRollupTaskMetadataGetterAndSetter(mockClusterInfoProvider);
+
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvider);
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+
+    assertEquals(pinotTaskConfigs.size(), 1);
+    String taskSegments = pinotTaskConfigs.get(0).getConfigs().get(MinionConstants.SEGMENT_NAME_KEY);
+    assertTrue(taskSegments.contains(segmentName1),
+        "Segment within effective retention should be included in task");
+    assertFalse(taskSegments.contains(segmentName2),
+        "Segment past effective retention (with buffer) should be filtered out");
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, long startTime, long endTime, TimeUnit timeUnit,

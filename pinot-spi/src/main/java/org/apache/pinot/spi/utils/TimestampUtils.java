@@ -85,6 +85,7 @@ public class TimestampUtils {
     try {
       return new Timestamp(Long.parseLong(timestampString));
     } catch (Exception e) {
+      // Try the next format
     }
     try {
       return Timestamp.from(ZonedDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER).toInstant());

@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.aggregation.utils.ParentAggregationFunctionRe
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 
 
+@SuppressWarnings("rawtypes")
 public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
 
   // if the object is created but not yet populated, this happens e.g. when a server has no data for
@@ -223,11 +224,9 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
       for (int i = 0; i < _sizeOfExtremumMeasuringKeys; i++) {
         switch (_measuringSchema.getColumnDataType(i)) {
           case INT:
-          case BOOLEAN:
             extremumKeys[i] = _immutableMeasuringKeys.getInt(0, i);
             break;
           case LONG:
-          case TIMESTAMP:
             extremumKeys[i] = _immutableMeasuringKeys.getLong(0, i);
             break;
           case FLOAT:
@@ -236,11 +235,14 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
           case DOUBLE:
             extremumKeys[i] = _immutableMeasuringKeys.getDouble(0, i);
             break;
+          case BIG_DECIMAL:
+            extremumKeys[i] = _immutableMeasuringKeys.getBigDecimal(0, i);
+            break;
           case STRING:
             extremumKeys[i] = _immutableMeasuringKeys.getString(0, i);
             break;
-          case BIG_DECIMAL:
-            extremumKeys[i] = _immutableMeasuringKeys.getBigDecimal(0, i);
+          case BYTES:
+            extremumKeys[i] = _immutableMeasuringKeys.getBytes(0, i);
             break;
           default:
             throw new IllegalStateException("Unsupported data type: " + _measuringSchema.getColumnDataType(i));
@@ -250,45 +252,40 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     }
   }
 
-  /**
-   * Get the field from a projection column
-   */
   @Override
   public Object getField(int rowId, int colId) {
     if (_mutable) {
       return _extremumProjectionValues.get(rowId)[colId];
     } else {
       switch (_projectionSchema.getColumnDataType(colId)) {
-        case BOOLEAN:
         case INT:
           return _immutableProjectionVals.getInt(rowId, colId);
-        case TIMESTAMP:
         case LONG:
           return _immutableProjectionVals.getLong(rowId, colId);
         case FLOAT:
           return _immutableProjectionVals.getFloat(rowId, colId);
         case DOUBLE:
           return _immutableProjectionVals.getDouble(rowId, colId);
-        case JSON:
+        case BIG_DECIMAL:
+          return _immutableProjectionVals.getBigDecimal(rowId, colId);
         case STRING:
           return _immutableProjectionVals.getString(rowId, colId);
         case BYTES:
           return _immutableProjectionVals.getBytes(rowId, colId);
-        case BIG_DECIMAL:
-          return _immutableProjectionVals.getBigDecimal(rowId, colId);
-        case BOOLEAN_ARRAY:
         case INT_ARRAY:
           return _immutableProjectionVals.getIntArray(rowId, colId);
-        case TIMESTAMP_ARRAY:
         case LONG_ARRAY:
           return _immutableProjectionVals.getLongArray(rowId, colId);
         case FLOAT_ARRAY:
           return _immutableProjectionVals.getFloatArray(rowId, colId);
         case DOUBLE_ARRAY:
           return _immutableProjectionVals.getDoubleArray(rowId, colId);
+        case BIG_DECIMAL_ARRAY:
+          return _immutableProjectionVals.getBigDecimalArray(rowId, colId);
         case STRING_ARRAY:
-        case BYTES_ARRAY:
           return _immutableProjectionVals.getStringArray(rowId, colId);
+        case BYTES_ARRAY:
+          return _immutableProjectionVals.getBytesArray(rowId, colId);
         default:
           throw new IllegalStateException("Unsupported data type: " + _projectionSchema.getColumnDataType(colId));
       }

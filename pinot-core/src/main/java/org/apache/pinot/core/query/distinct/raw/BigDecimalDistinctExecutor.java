@@ -50,7 +50,7 @@ public class BigDecimalDistinctExecutor
 
   @Override
   protected BigDecimal[][] getValuesMV(BlockValSet blockValSet) {
-    throw new UnsupportedOperationException();
+    return blockValSet.getBigDecimalValuesMV();
   }
 
   @Override
@@ -77,6 +77,29 @@ public class BigDecimalDistinctExecutor
 
   @Override
   protected boolean processMV(BigDecimal[][] values, int from, int to) {
-    throw new UnsupportedOperationException();
+    if (_distinctTable.hasLimit()) {
+      if (_distinctTable.hasOrderBy()) {
+        for (int i = from; i < to; i++) {
+          for (BigDecimal value : values[i]) {
+            _distinctTable.addWithOrderBy(value);
+          }
+        }
+      } else {
+        for (int i = from; i < to; i++) {
+          for (BigDecimal value : values[i]) {
+            if (_distinctTable.addWithoutOrderBy(value)) {
+              return true;
+            }
+          }
+        }
+      }
+    } else {
+      for (int i = from; i < to; i++) {
+        for (BigDecimal value : values[i]) {
+          _distinctTable.addUnbounded(value);
+        }
+      }
+    }
+    return false;
   }
 }

@@ -188,8 +188,8 @@ public class MultiValueRawQueriesTest extends BaseQueriesTest {
       record.putValue(MV_RAW_DOUBLE_COL, mvValue);
       record.putValue(MV_RAW_STRING_COL, mvValue);
 
-      String stringVal = RandomStringUtils.randomAlphanumeric(10, 100);
-      String stringVal2 = RandomStringUtils.randomAlphanumeric(10, 100);
+      String stringVal = RandomStringUtils.secure().nextAlphanumeric(10, 100);
+      String stringVal2 = RandomStringUtils.secure().nextAlphanumeric(10, 100);
       record.putValue(MV_STRING_COL_2, Arrays.asList(stringVal, stringVal2));
       record.putValue(MV_RAW_STRING_COL_2, Arrays.asList(stringVal, stringVal2));
       _stringSet.add(stringVal);

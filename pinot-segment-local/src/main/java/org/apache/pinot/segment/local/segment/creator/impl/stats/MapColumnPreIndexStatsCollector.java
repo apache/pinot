@@ -93,7 +93,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     if (entry instanceof Map) {
       //noinspection unchecked
       Map<String, Object> mapValue = (Map<String, Object>) entry;
-      int length = MapUtils.serializeMap(mapValue).length;
+      int length = MapUtils.serializedSize(mapValue);
       _minLength = Math.min(_minLength, length);
       _maxLength = Math.max(_maxLength, length);
 

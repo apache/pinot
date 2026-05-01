@@ -993,6 +993,11 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     }
 
     @Override
+    public BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock) {
+      return new BigDecimal[0][];
+    }
+
+    @Override
     public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
       return new String[0][];
     }

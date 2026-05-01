@@ -334,7 +334,7 @@ public class PinotClientRequest {
       String language = requestJson.has(Request.LANGUAGE) ? requestJson.get(Request.LANGUAGE).asText() : null;
       String queryString = requestJson.get(Request.QUERY).asText();
       Map<String, String> queryParams = new HashMap<>();
-      requestJson.fields().forEachRemaining(entry -> {
+      requestJson.properties().forEach(entry -> {
           if (entry.getValue().isTextual()) {
             queryParams.put(entry.getKey(), entry.getValue().asText());
           } else {

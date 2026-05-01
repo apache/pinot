@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
@@ -94,6 +93,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Nullable
   private final QueryAccessControlFactory _accessControlFactory;
   private final ThreadAccountant _threadAccountant;
+  private final int _permitKeepAliveTimeMs;
+  private final boolean _permitKeepAliveWithoutCalls;
 
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
@@ -150,6 +151,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       _accessControlFactory = accessControlFactory;
     }
     _threadAccountant = threadAccountant;
+    _permitKeepAliveTimeMs = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS);
+    _permitKeepAliveWithoutCalls = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS);
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -173,14 +180,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     LOGGER.info("Starting QueryServer");
     try {
       if (_server == null) {
-        ServerBuilder<?> serverBuilder;
-        if (_tlsConfig == null) {
-          serverBuilder = ServerBuilder.forPort(_port);
-        } else {
-          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(getOrCreateServerSslContext());
+        // Always use NettyServerBuilder so we can configure Netty-specific gRPC server options
+        // (e.g. permitKeepAliveTime / permitKeepAliveWithoutCalls).
+        NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(_port);
+        if (_tlsConfig != null) {
+          serverBuilder.sslContext(getOrCreateServerSslContext());
         }
         _server = buildGrpcServer(serverBuilder);
-        LOGGER.info("Initialized QueryServer on port: {}", _port);
+        LOGGER.info(
+            "Initialized QueryServer on port: {} with permitKeepAliveTimeMs: {}, permitKeepAliveWithoutCalls: {}",
+            _port, _permitKeepAliveTimeMs, _permitKeepAliveWithoutCalls);
       }
       _queryRunner.start();
       _server.start();
@@ -189,12 +198,28 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
   }
 
-  private <T extends ServerBuilder<T>> Server buildGrpcServer(ServerBuilder<T> builder) {
+  @VisibleForTesting
+  int getPermitKeepAliveTimeMs() {
+    return _permitKeepAliveTimeMs;
+  }
+
+  @VisibleForTesting
+  boolean isPermitKeepAliveWithoutCalls() {
+    return _permitKeepAliveWithoutCalls;
+  }
+
+  private Server buildGrpcServer(NettyServerBuilder builder) {
     // By using directExecutor, GRPC doesn't need to manage its own thread pool
     builder.directExecutor();
     if (_accessControlFactory != null) {
       builder.intercept(new AuthorizationInterceptor(_accessControlFactory));
     }
+    // Configure server-side keep-alive enforcement so that operators tuning down the broker dispatch keep-alive time
+    // (or enabling pings-without-calls) do not get their channels torn down with GOAWAY(ENHANCE_YOUR_CALM).
+    if (_permitKeepAliveTimeMs > 0) {
+      builder.permitKeepAliveTime(_permitKeepAliveTimeMs, TimeUnit.MILLISECONDS);
+    }
+    builder.permitKeepAliveWithoutCalls(_permitKeepAliveWithoutCalls);
     return builder.addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
   }
 

@@ -231,6 +231,20 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, ForwardIndexConfig indexConfig) {
+    // Forward index supports both DICT and RAW encodings; it does not require a dictionary to function.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, ForwardIndexConfig indexConfig) {
+    // The forward index encoding is reconciled with FieldConfig.encodingType independently of dictionary state
+    // (apache/pinot#18364), so adding or removing a dictionary alone does not change the on-disk forward index
+    // layout — the existing forward index can be reused.
+    return false;
+  }
+
+  @Override
   protected IndexReaderFactory<ForwardIndexReader> createReaderFactory() {
     return ForwardIndexReaderFactory.getInstance();
   }

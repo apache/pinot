@@ -21,6 +21,7 @@ package org.apache.pinot.common.auth;
 import java.util.Base64;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.BcryptUtils;
 
 
@@ -54,7 +55,7 @@ public final class BasicAuthTokenUtils {
     if (StringUtils.isBlank(auth)) {
       return null;
     }
-    String replacedAuth = StringUtils.replace(auth, "Basic ", "");
+    String replacedAuth = Strings.CS.replace(auth, "Basic ", "");
     byte[] decodedBytes = Base64.getDecoder().decode(replacedAuth);
     String decodedString = new String(decodedBytes);
     return decodedString;
@@ -80,7 +81,7 @@ public final class BasicAuthTokenUtils {
     if (StringUtils.isBlank(auth)) {
       return null;
     }
-    String replacedAuth = StringUtils.replace(auth, "Basic ", "");
+    String replacedAuth = Strings.CS.replace(auth, "Basic ", "");
     byte[] decodedBytes = Base64.getDecoder().decode(replacedAuth);
     String decodedString = new String(decodedBytes);
     String[] cretential = StringUtils.split(decodedString, ":");

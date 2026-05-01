@@ -35,6 +35,7 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -355,7 +356,7 @@ public enum AggregationFunctionType {
   }
 
   public static String getNormalizedAggregationFunctionName(String functionName) {
-    return StringUtils.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
+    return Strings.CS.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
   }
 
   /**

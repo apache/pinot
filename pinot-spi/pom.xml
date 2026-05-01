@@ -37,81 +37,154 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- Pinned to Java 11 bytecode for external consumers (e.g. plugins
+               loaded by older JVMs). Hard-coded literal so -Djdk.version=21
+               on the CLI cannot silently bump the bytecode level. -->
+          <release>11</release>
+          <source>11</source>
+          <target>11</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
+        <!-- ClassLoaderTest fixture resolution.
+
+             The org.apache.pinot.spi.plugin.ClassLoaderTest validates plugin classloader/realm isolation
+             against pinned versions of real plugin jars. The jars could have been checked in under
+             src/test/resources/plugins, but that would bloat the source repository, so we let Maven
+             download them on demand.
+
+             DO NOT replace these versions with ${project.version}, as the test depends on the presence
+             (and absence) of specific classes in those exact jars. DO NOT BUMP the hardcoded versions
+             below — they are deliberately frozen test fixtures.
+
+             Why dependency:get with a single-string <artifact> instead of <artifactItem> blocks?
+             Dependabot's Maven updater scans <dependency>, <plugin>, and <artifactItem> blocks for
+             structured groupId+artifactId+version triples; it does NOT parse single-string
+             <artifact>...</artifact> values inside plugin configuration. Using <artifactItem> here
+             gave Dependabot a coordinate to "upgrade" and produced repeated noise PRs (e.g. #18331).
+             For coordinates that are not consumed elsewhere in the repo, a `versions: [">= <next>"]`
+             ignore rule in .github/dependabot.yml would suppress those PRs, but commons-io is also
+             consumed at a newer version in the top-level pom.xml, so a repo-wide ignore would block
+             legitimate upgrades. To keep the mechanism uniform across all the pinned fixtures (and
+             defensive against any future shared-coordinate situation), we route every fixture through
+             dependency:get + antrun copy/unzip from ${settings.localRepository}.
+
+             dependency:get goes through Maven's normal resolution chain (local cache, configured
+             mirrors, authenticated repos, SHA-1 checksum validation), so offline/mirrored builds keep
+             working and artifact integrity is verified.
+
+             The companion antrun execution `stage-classloadertest-fixtures` copies the resolved jars
+             from ${settings.localRepository} into target/test-classes/plugins/ with the literal
+             filenames ClassLoaderTest asserts on (see CodeSource.getLocation().getPath().endsWith(...)
+             checks in the test).
+        -->
         <executions>
           <execution>
-            <id>copy-pinot-plugins</id>
-            <!-- The org.apache.pinot.spi.plugin.ClassLoaderTest has tests that requires plugin jars.
-                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
-                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
-
-                 DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
-                 and non-existence of classes in these jars.
-            -->
+            <id>fetch-classloadertest-fixture-pinot-dropwizard-shaded</id>
             <phase>generate-test-resources</phase>
             <goals>
-              <goal>copy</goal>
+              <goal>get</goal>
             </goals>
             <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.apache.pinot</groupId>
-                  <artifactId>pinot-dropwizard</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
-                  <classifier>shaded</classifier>
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-dropwizard</outputDirectory>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.pinot</groupId>
-                  <artifactId>pinot-yammer</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
-                  <classifier>shaded</classifier>
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-yammer</outputDirectory>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.pinot</groupId>
-                  <artifactId>pinot-yammer</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
-                  <classifier>shaded</classifier>
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>commons-io</groupId>
-                  <artifactId>commons-io</artifactId>
-                  <version>2.11.0</version> <!-- @dependabot ignore -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>com.yammer.metrics</groupId>
-                  <artifactId>metrics-core</artifactId>
-                  <version>2.1.5</version> <!-- @dependabot ignore -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
-                </artifactItem>
-              </artifactItems>
+              <artifact>org.apache.pinot:pinot-dropwizard:0.10.0:jar:shaded</artifact>
+              <transitive>false</transitive>
             </configuration>
           </execution>
           <execution>
-            <id>unpack-pinot-plugins</id>
-            <!-- The org.apache.pinot.spi.plugin.ClassLoaderTest has tests that requires plugin jars.
-                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
-                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+            <id>fetch-classloadertest-fixture-pinot-yammer-shaded</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>get</goal>
+            </goals>
+            <configuration>
+              <artifact>org.apache.pinot:pinot-yammer:0.10.0:jar:shaded</artifact>
+              <transitive>false</transitive>
+            </configuration>
+          </execution>
+          <execution>
+            <id>fetch-classloadertest-fixture-pinot-yammer</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>get</goal>
+            </goals>
+            <configuration>
+              <artifact>org.apache.pinot:pinot-yammer:0.10.0</artifact>
+              <transitive>false</transitive>
+            </configuration>
+          </execution>
+          <execution>
+            <id>fetch-classloadertest-fixture-metrics-core</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>get</goal>
+            </goals>
+            <configuration>
+              <artifact>com.yammer.metrics:metrics-core:2.1.5</artifact>
+              <transitive>false</transitive>
+            </configuration>
+          </execution>
+          <execution>
+            <id>fetch-classloadertest-fixture-commons-io</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>get</goal>
+            </goals>
+            <configuration>
+              <artifact>commons-io:commons-io:2.11.0</artifact>
+              <transitive>false</transitive>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>stage-classloadertest-fixtures</id>
+            <!-- Stages the ClassLoaderTest fixture jars from ${settings.localRepository} into
+                 target/test-classes/plugins/ with the literal filenames the test asserts on.
+                 See the rationale comment on the maven-dependency-plugin block above.
 
-                 DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
-                 and non-existence of classes in these jars.
+                 Ordering: this execution must run AFTER all `fetch-classloadertest-fixture-*`
+                 executions. Both plugins bind to generate-test-resources; cross-plugin executions
+                 in the same phase run in plugin declaration order, so maven-dependency-plugin
+                 must remain declared before maven-antrun-plugin in <build><plugins>.
             -->
             <phase>generate-test-resources</phase>
             <goals>
-              <goal>unpack</goal>
+              <goal>run</goal>
             </goals>
             <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.apache.pinot</groupId>
-                  <artifactId>pinot-yammer</artifactId>
-                  <version>0.10.0</version> <!-- @dependabot ignore -->
-                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
-                </artifactItem>
-              </artifactItems>
+              <target>
+                <!-- pinot-dropwizard 0.10.0 (shaded) -->
+                <mkdir dir="${project.build.testOutputDirectory}/plugins/pinot-dropwizard"/>
+                <copy file="${settings.localRepository}/org/apache/pinot/pinot-dropwizard/0.10.0/pinot-dropwizard-0.10.0-shaded.jar"
+                      todir="${project.build.testOutputDirectory}/plugins/pinot-dropwizard"/>
+                <!-- pinot-yammer 0.10.0 (shaded) -->
+                <mkdir dir="${project.build.testOutputDirectory}/plugins/pinot-yammer"/>
+                <copy file="${settings.localRepository}/org/apache/pinot/pinot-yammer/0.10.0/pinot-yammer-0.10.0-shaded.jar"
+                      todir="${project.build.testOutputDirectory}/plugins/pinot-yammer"/>
+                <!-- pinot-yammer 0.10.0 (shaded) — staged again under a different plugin name
+                     so the test exercises the legacy shaded-jar PluginClassloader code path. -->
+                <mkdir dir="${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer"/>
+                <copy file="${settings.localRepository}/org/apache/pinot/pinot-yammer/0.10.0/pinot-yammer-0.10.0-shaded.jar"
+                      todir="${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer"/>
+                <!-- assemblybased-pinot-plugin: commons-io 2.11.0 + metrics-core 2.1.5 placed
+                     side-by-side, plus the unpacked classes from pinot-yammer 0.10.0. -->
+                <mkdir dir="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin"/>
+                <copy file="${settings.localRepository}/commons-io/commons-io/2.11.0/commons-io-2.11.0.jar"
+                      todir="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin"/>
+                <copy file="${settings.localRepository}/com/yammer/metrics/metrics-core/2.1.5/metrics-core-2.1.5.jar"
+                      todir="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin"/>
+                <mkdir dir="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes"/>
+                <unzip src="${settings.localRepository}/org/apache/pinot/pinot-yammer/0.10.0/pinot-yammer-0.10.0.jar"
+                       dest="${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes"/>
+              </target>
             </configuration>
           </execution>
         </executions>

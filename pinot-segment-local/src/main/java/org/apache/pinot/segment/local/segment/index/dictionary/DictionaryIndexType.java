@@ -353,6 +353,18 @@ public class DictionaryIndexType
     return IndexHandler.NoOp.INSTANCE;
   }
 
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // The dictionary index is the dictionary itself; the question of whether it requires a dictionary is moot.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // Enable/disable of the dictionary IS the change being driven; the dictionary handler owns its own rebuild.
+    return false;
+  }
+
   public static String getFileExtension() {
     return V1Constants.Dict.FILE_EXTENSION;
   }

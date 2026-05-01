@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +32,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertEqualsDeep;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertNull;
 
 
 public class AvroRecordToPinotRowGeneratorTest {
@@ -52,8 +51,8 @@ public class AvroRecordToPinotRowGeneratorTest {
     GenericRow genericRow = new GenericRow();
     avroRecordExtractor.extract(avroRecord, genericRow);
 
-    assertTrue(genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));
     assertEquals(genericRow.getValue("incomingTime"), 12345L);
+    assertNull(genericRow.getValue("outgoingTime"));
   }
 
   @Test

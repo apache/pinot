@@ -427,6 +427,8 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
               Assert.assertFalse(result.hasNulls(), "Multi-value primitive types should not have nulls");
               return result.getValues();
             }, null},
+        {MV_BIG_DECIMAL_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getBigDecimalMV,
+            (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextBigDecimalMV, null},
         {MV_STRING_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getStringMV,
             (MultiValueSequentialGetter) PinotSegmentColumnReaderImpl::nextStringMV, null},
         {MV_BYTES_COL, (MultiValueGetter) PinotSegmentColumnReaderImpl::getBytesMV,
@@ -491,6 +493,9 @@ public class PinotSegmentColumnReaderImplTest extends ColumnarSegmentBuildingTes
           break;
         case DOUBLE:
           defaultValue = new double[]{((Number) defaultNullValue).doubleValue()};
+          break;
+        case BIG_DECIMAL:
+          defaultValue = new BigDecimal[]{(BigDecimal) defaultNullValue};
           break;
         case STRING:
           defaultValue = new String[]{(String) defaultNullValue};

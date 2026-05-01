@@ -91,7 +91,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeMethod
   public void setUpTest()
       throws IOException {
-    _tableNameSuffix = RandomStringUtils.randomAlphabetic(12);
+    _tableNameSuffix = RandomStringUtils.secure().nextAlphabetic(12);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
   }
 

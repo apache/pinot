@@ -46,7 +46,7 @@ If `gh` isn't available, report that and exit. Don't try to fall back to `curl` 
    ```
    If `--pr` is set, filter with `--branch` to the PR's head branch, or use `gh pr view <num> --json headRefName`.
 
-3. **For each failed run, find the failing jobs.** A "Pinot Tests" run has ~10 matrix jobs (test sets 1/2 × java 11/21 × unit/integration). Only some fail.
+3. **For each failed run, find the failing jobs.** A "Pinot Tests" run has matrix jobs (test sets 1/2 × java 21 × unit/integration). Only some fail.
    ```
    gh run view <run-id> --repo apache/pinot --json jobs
    ```

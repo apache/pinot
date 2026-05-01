@@ -28,6 +28,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.language.Soundex;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -762,7 +763,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String remove(String input, String search) {
-    return StringUtils.remove(input, search);
+    return Strings.CS.remove(input, search);
   }
 
   /**

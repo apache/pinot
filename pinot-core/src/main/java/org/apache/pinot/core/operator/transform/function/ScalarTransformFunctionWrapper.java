@@ -436,8 +436,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case PRIMITIVE_DOUBLE_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToDoubleValuesMV(valueBlock);
           break;
+        case BIG_DECIMAL_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToBigDecimalValuesMV(valueBlock);
+          break;
         case STRING_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToStringValuesMV(valueBlock);
+          break;
+        case BYTES_ARRAY:
+          _nonLiteralValues[i] = transformFunction.transformToBytesValuesMV(valueBlock);
           break;
         default:
           throw new IllegalStateException("Unsupported parameter type: " + parameterType);
