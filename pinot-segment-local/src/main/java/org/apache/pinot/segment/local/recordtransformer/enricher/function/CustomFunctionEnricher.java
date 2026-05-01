@@ -35,7 +35,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * {@link RecordEnricher} that applies a JSON {@code fieldToFunctionMap} of transform expressions. Evaluation is
- * delegated to {@link IngestionFunctionEvaluation#applyEnricherEvaluations}; for table/schema-driven transforms and
+ * delegated to {@link IngestionFunctionEvaluation#applyFunctionEvaluations} with
+ * {@link IngestionFunctionEvaluation.Policy#enricher()}; for table/schema-driven transforms and
  * dependency ordering, see {@link org.apache.pinot.segment.local.recordtransformer.ExpressionTransformer}.
  */
 public class CustomFunctionEnricher implements RecordEnricher {
@@ -63,6 +64,7 @@ public class CustomFunctionEnricher implements RecordEnricher {
 
   @Override
   public void enrich(GenericRow record) {
-    IngestionFunctionEvaluation.applyEnricherEvaluations(record, _fieldToFunctionEvaluator);
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, _fieldToFunctionEvaluator,
+        IngestionFunctionEvaluation.Policy.enricher());
   }
 }
