@@ -5,7 +5,6 @@
     "timeColumnName": "mtime",
     "timeType": "MILLISECONDS",
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "1",
     "replicasPerPartition": "1"
   },
