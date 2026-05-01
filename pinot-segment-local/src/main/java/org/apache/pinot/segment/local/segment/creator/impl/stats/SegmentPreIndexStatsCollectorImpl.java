@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
 import com.google.common.collect.Maps;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsCollector;
@@ -29,6 +30,7 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,10 +87,16 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void collectRow(GenericRow row) {
+    Schema schema = _statsCollectorConfig.getSchema();
     for (Map.Entry<String, ColumnStatistics> entry : _columnStatisticsMap.entrySet()) {
       String column = entry.getKey();
       ColumnStatistics columnStatistics = entry.getValue();
-      ((AbstractColumnStatisticsCollector) columnStatistics).collect(row.getValue(column));
+      Object value = row.getValue(column);
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      if (!fieldSpec.isSingleValueField() && value instanceof List) {
+        value = RecordReaderUtils.toObjectArray(value);
+      }
+      ((AbstractColumnStatisticsCollector) columnStatistics).collect(value);
     }
     _totalDocCount++;
   }
