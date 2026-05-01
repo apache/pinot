@@ -182,4 +182,10 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
   }
+
+  @Test
+  public void testGetStreamConsumerClientIdWithoutSuffix() {
+    Assert.assertEquals(IngestionConfigUtils.getStreamConsumerClientIdWithoutSuffix(
+        "db.myTable_REALTIME", "events", 3), "db.myTable_REALTIME-events-3");
+  }
 }
