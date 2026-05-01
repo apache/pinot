@@ -44,9 +44,9 @@ import org.slf4j.LoggerFactory;
 /**
  * {@link RecordTransformer} that evaluates ingestion transform functions from table config and field specs.
  * <p>Per-row evaluation logic is shared with the enricher pipeline via
- * {@link IngestionFunctionEvaluation#applyExpressionTransformations};
- * see {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher} for the
- * enricher-specific configuration and {@link IngestionFunctionEvaluation#applyEnricherEvaluations} semantics.
+ * {@link IngestionFunctionEvaluation#applyFunctionEvaluations} and {@link IngestionFunctionEvaluation.Policy};
+ * see {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher} for
+ * enricher-specific configuration (JSON {@code fieldToFunctionMap}).
  * <p>NOTE: should put this before the {@link DataTypeTransformer}. After this, transformed column can be treated as
  * regular column for other record transformers.
  */
@@ -178,8 +178,9 @@ public class ExpressionTransformer implements RecordTransformer {
 
   @Override
   public void transform(GenericRow record) {
-    IngestionFunctionEvaluation.applyExpressionTransformations(record, _expressionEvaluators, _continueOnError,
-        _overwriteExistingValues, _implicitMapTransformColumns, _throttledLogger);
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, _expressionEvaluators,
+        IngestionFunctionEvaluation.Policy.expressionTransformation(_continueOnError, _overwriteExistingValues,
+            _implicitMapTransformColumns, _throttledLogger));
   }
 
   private static boolean isImplicitMapTransform(FieldSpec fieldSpec) {
