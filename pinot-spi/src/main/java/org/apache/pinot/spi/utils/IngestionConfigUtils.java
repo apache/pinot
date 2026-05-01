@@ -142,6 +142,20 @@ public final class IngestionConfigUtils {
   }
 
   /**
+   * Returns the stream consumer client id without the optional instance suffix from
+   * {@link org.apache.pinot.spi.config.instance.InstanceDataManagerConfig#getConsumerClientIdSuffix()}.
+   * Format: {@code tableNameWithType + "-" + streamTopic + "-" + partitionId}.
+   * <p>Use the stream topic partition id for {@code partitionId} when matching realtime consumer client ids. Other
+   * callers (for example stream-aware ingestion gauges) may pass the Pinot partition group id as the third segment;
+   * the string format matches server metrics keys that {@code server.yml} maps to Prometheus series with
+   * {@code topic} and {@code partition} labels.
+   */
+  public static String getStreamConsumerClientIdWithoutSuffix(String tableNameWithType, String streamTopic,
+      int partitionId) {
+    return tableNameWithType + "-" + streamTopic + "-" + partitionId;
+  }
+
+  /**
    * Fetches the streamConfig from the list of streamConfigs according to the partition id.
    */
   public static Map<String, String> getStreamConfigMap(TableConfig tableConfig, int partitionId) {
