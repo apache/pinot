@@ -659,8 +659,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
           // Silently drop the row with error
           realtimeRowsDroppedMeter =
-              _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.INVALID_REALTIME_ROWS_DROPPED,
-                  1, realtimeRowsDroppedMeter);
+              _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey,
+                  ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1, realtimeRowsDroppedMeter);
           _numRowsErrored++;
           _numBytesDropped += rowSizeInBytes;
         }
@@ -711,8 +711,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
               if (recordSerializedValueLength > 0) {
                 realtimeBytesIngestedMeter =
-                    _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.REALTIME_BYTES_CONSUMED,
-                        recordSerializedValueLength, realtimeBytesIngestedMeter);
+                    _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey,
+                        ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength, realtimeBytesIngestedMeter);
                 _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
               }
             } catch (Exception e) {
@@ -849,7 +849,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           } else if (_state == State.CATCHING_UP) {
             catchUpTimeMillis += now() - lastCatchUpStart;
             _serverMetrics
-                .setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
+                .setValueOfTableGauge(_streamConsumerMetricBaseKey,
+                    ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
                     TimeUnit.MILLISECONDS.toSeconds(catchUpTimeMillis));
           }
 
@@ -946,7 +947,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 // respectively.
                 // Refer to the PR for the new commit protocol: https://github.com/apache/pinot/pull/14741
                 if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
-                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
+                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED,
+                    1);
                   if (!startSegmentCommit()) {
                     // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                     // Change the state to HOLDING before looping around.
@@ -956,7 +958,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     break;
                   }
                 } else {
-                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
+                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED,
+                    0);
                 }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 try {
@@ -1015,7 +1018,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
       if (initialConsumptionEnd != 0L) {
         _serverMetrics
-            .setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
+            .setValueOfTableGauge(_streamConsumerMetricBaseKey,
+                ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
       // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
@@ -1263,9 +1267,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
 
       long segmentSizeBytes = FileUtils.sizeOfDirectory(indexDir);
-      _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
+      _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey,
+          ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
           TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
-      _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
+      _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey,
+          ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
@@ -2075,7 +2081,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to create stream consumer for topic partition {} reason {}",
           _clientId, reason, e);
-      _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+      _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS,
+          1L);
       throw e;
     }
   }
@@ -2096,7 +2103,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } catch (Exception e) {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
           e);
-      _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+      _serverMetrics.addMeteredTableValue(_streamConsumerMetricBaseKey, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS,
+          1L);
       throw e;
     }
   }
