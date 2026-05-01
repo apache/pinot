@@ -20,7 +20,9 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
@@ -28,13 +30,17 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.service.dispatch.AdaptiveRoutingUpstreamTimings;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,8 +53,11 @@ import org.apache.pinot.spi.query.QueryThreadContext;
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
 public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseMailboxReceiveOperator.class);
+
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _distributionType;
+  protected final int _senderStageId;
   protected final List<String> _mailboxIds;
   protected final BlockingMultiStreamConsumer.OfMseBlock _multiConsumer;
   protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
@@ -63,11 +72,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _distributionType = distributionType;
 
     long requestId = context.getRequestId();
-    int senderStageId = node.getSenderStageId();
-    MailboxInfos mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(senderStageId);
+    _senderStageId = node.getSenderStageId();
+    MailboxInfos mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(_senderStageId);
     if (mailboxInfos != null) {
       _mailboxIds =
-          MailboxIdUtils.toMailboxIds(requestId, senderStageId, mailboxInfos.getMailboxInfos(), context.getStageId(),
+          MailboxIdUtils.toMailboxIds(requestId, _senderStageId, mailboxInfos.getMailboxInfos(), context.getStageId(),
               context.getWorkerId());
       int numMailboxes = _mailboxIds.size();
       List<ReadMailboxAsyncStream> asyncStreams = new ArrayList<>(numMailboxes);
@@ -79,12 +88,14 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
-      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, asyncStreams, senderStageId);
+      Map<Object, String> streamIdToSenderKey = buildStreamIdToSenderKey(mailboxInfos, asyncStreams);
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(
+          context, asyncStreams, _senderStageId, streamIdToSenderKey);
     } else {
       // TODO: Revisit if we should throw exception here.
       _mailboxIds = List.of();
       _receivingStats = List.of();
-      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of(), senderStageId);
+      _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(context, List.of(), _senderStageId);
     }
     _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
@@ -124,12 +135,32 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
   @Override
   public StatMap<StatKey> copyStatMaps() {
-    return new StatMap<>(_statMap);
+    StatMap<StatKey> copy = new StatMap<>(_statMap);
+    // Flush partial timing data so that the timeout/cancellation path (where onEos() never ran)
+    // still captures timings for senders whose EOS did arrive. In the normal path onEos() has
+    // already merged the same data into _statMap, so this is idempotent via the Math::max merger.
+    mergeSenderTimingsInto(copy);
+    return copy;
   }
 
   protected void onEos() {
     for (StatMap<ReceivingMailbox.StatKey> receivingStats : _receivingStats) {
       addReceivingStats(receivingStats);
+    }
+    mergeSenderTimingsInto(_statMap);
+    LOGGER.debug("==[UPSTREAM_TIMING]== stage {} onEos: merged sender timings", _senderStageId);
+  }
+
+  /**
+   * Encodes per-sender elapsed-time data from the multi-consumer and merges it into {@code target}.
+   */
+  private void mergeSenderTimingsInto(StatMap<StatKey> target) {
+    Map<String, Long> senderElapsedMs = _multiConsumer.getSenderElapsedMs();
+    if (!senderElapsedMs.isEmpty()) {
+      String encoded = AdaptiveRoutingUpstreamTimings.encode(senderElapsedMs);
+      if (encoded != null) {
+        target.merge(StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS, encoded);
+      }
     }
   }
 
@@ -148,6 +179,27 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
     _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
     _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
+  }
+
+  /**
+   * Builds a map from stream ID to sender key (hostname|mailboxPort) for per-sender elapsed-time tracking.
+   * Iterates {@link MailboxInfos} and {@code asyncStreams} in parallel (same order as
+   * {@link MailboxIdUtils#toMailboxIds}), mapping each stream's ID to its server's sender key.
+   */
+  private static Map<Object, String> buildStreamIdToSenderKey(MailboxInfos mailboxInfos,
+      List<? extends AsyncStream<?>> asyncStreams) {
+    Map<Object, String> streamIdToSenderKey = new HashMap<>(asyncStreams.size());
+    int i = 0;
+    for (MailboxInfo info : mailboxInfos.getMailboxInfos()) {
+      String key = AdaptiveRoutingUpstreamTimings.senderKey(info.getHostname(), info.getPort());
+      for (int ignored : info.getWorkerIds()) {
+        streamIdToSenderKey.put(asyncStreams.get(i).getId(), key);
+        i++;
+      }
+    }
+    Preconditions.checkState(i == asyncStreams.size(),
+        "MailboxInfos worker count (%s) does not match asyncStreams size (%s)", i, asyncStreams.size());
+    return streamIdToSenderKey;
   }
 
   private void addReceivingStats(StatMap<ReceivingMailbox.StatKey> from) {
@@ -266,7 +318,35 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /**
      * Time spent on GC while this operator or its children in the same stage were running.
      */
-    GC_TIME_MS(StatMap.Type.LONG);
+    GC_TIME_MS(StatMap.Type.LONG),
+    /**
+     * Per-upstream-sender wall-clock elapsed time (consumer construction -> EOS arrival),
+     * encoded as a semicolon-separated list of {@code "hostname|mailboxPort=elapsedMs"} pairs.
+     *
+     * <p>Populated by every {@link BaseMailboxReceiveOperator}. Elapsed time is anchored to consumer
+     * construction (after pipeline breakers), avoiding cross-host clock skew. When multiple workers on
+     * the same stage contribute stats for the same sender, the merge function takes the maximum elapsed
+     * time so the slowest observation is preserved for the same sending server.
+     *
+     * <p>On the broker side, {@code QueryDispatcher#extractMaxTimingsPerInstance} reads this stat and calls
+     * {@link org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager
+     *     #recordStatsUponResponseArrival}
+     * for servers that the broker did not track directly (e.g. S2 in a join query routed through S1).
+     * Senders with no observed timing are omitted from the encoding.
+     */
+    UPSTREAM_SERVER_RESPONSE_TIMES_MS(StatMap.Type.STRING) {
+      @Override
+      public String merge(@Nullable String value1, @Nullable String value2) {
+        return AdaptiveRoutingUpstreamTimings.mergeEncodings(value1, value2);
+      }
+
+      @Override
+      public boolean includeInJson() {
+        // Excluded from stage stats in the query response because the encoded timing string can be large
+        // (one entry per upstream sender). It is only needed broker-side for adaptive routing.
+        return false;
+      }
+    };
 
     private final StatMap.Type _type;
 

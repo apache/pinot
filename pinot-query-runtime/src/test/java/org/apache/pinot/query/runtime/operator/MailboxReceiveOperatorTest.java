@@ -55,6 +55,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -261,6 +262,47 @@ public class MailboxReceiveOperatorTest {
       MultiStageQueryStats stats = operator.calculateStats();
       MultiStageQueryStats.StageStats.Closed upstreamStats = stats.getUpstreamStageStats(1);
       assertNull(upstreamStats, "Upstream stats should be null in case of error merging stats");
+    }
+  }
+
+  /**
+   * Verifies that {@link BaseMailboxReceiveOperator#copyStatMaps()} includes per-sender timing for
+   * senders whose EOS arrived before the query was cancelled or timed out, even when {@code onEos()}
+   * was never called (because a slow sender never completed).
+   *
+   * <p>This is the timeout path fix: fast-server timings are "trapped" in
+   * {@code _multiConsumer._senderElapsedMs} until {@code onEos()} fires, but on timeout
+   * {@code onEos()} never fires.  {@code copyStatMaps()} must flush the partial map so that
+   * {@code applyUpstreamTimingsFromStats} can exempt those fast servers from the full elapsed-time
+   * penalty in the {@code finally} block.
+   */
+  @Test
+  public void copyStatMapsIncludesPartialTimingWhenSlowSenderNeverCompletes() {
+    // mailbox 1 (fast sender): returns EOS immediately.
+    // mailbox 2 (slow sender): never returns data; the operator will time out waiting for it.
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.eosWithEmptyStats());
+
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    // _mailbox2.poll() returns null by default (slow sender never completes).
+
+    // Use a short deadline so the test does not take too long waiting for the slow sender.
+    long shortDeadlineMs = System.currentTimeMillis() + 500L;
+    try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED,
+        shortDeadlineMs)) {
+      MseBlock block = operator.nextBlock();
+      // The operator times out waiting for mailbox 2.
+      assertTrue(block.isError(), "Expected a timeout error block");
+
+      // onEos() was NOT called (only one of two senders completed), so _statMap has no timing.
+      // copyStatMaps() must flush partial timing from _multiConsumer._senderElapsedMs.
+      StatMap<BaseMailboxReceiveOperator.StatKey> stats = operator.copyStatMaps();
+      String encoded = stats.getString(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS);
+      assertNotNull(encoded, "copyStatMaps() should include partial timing for fast sender that already sent EOS");
+      // The sender key is derived from the MailboxInfo hostname/port ("localhost", 1234).
+      String expectedKey = "localhost|1234";
+      assertTrue(encoded.contains(expectedKey),
+          "Encoded timing '" + encoded + "' should contain the sender key '" + expectedKey + "'");
     }
   }
 
