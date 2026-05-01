@@ -527,7 +527,7 @@ public class LeafOperator extends MultiStageOperator {
       //       Propagate empty-but-typed non-selection results (e.g. zero-row aggregation) so pruned leaves still
       //       contribute schema upstream. For selection, require at least one row: an empty SelectionResultsBlock
       //       from the instance response is skipped so a mismatched block schema does not emit a spurious zero-row
-      //       data block before EOS (LeafOperatorTest#shouldNotErrorOutWhenIncorrectDataSchemaProvidedWithEmptyRowsSelection).
+      //       data block before EOS.
       BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
       boolean shouldAdd = resultsBlock != null && (resultsBlock.getNumRows() > 0
           || (resultsBlock.getDataSchema() != null && !(resultsBlock instanceof SelectionResultsBlock)));
