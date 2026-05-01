@@ -21,6 +21,8 @@ package org.apache.pinot.plugin.inputformat.orc;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
@@ -167,9 +169,10 @@ public class ORCRecordExtractorTest {
 
   // === Complex types ===
 
-  @Test
-  public void testListOfIntsExtractedAsArray() {
-    Object[] result = (Object[]) extract("array<int>", batch -> {
+   @Test
+   public void testListOfIntsExtractedAsList() {
+    @SuppressWarnings("unchecked")
+    List<Object> result = (List<Object>) extract("array<int>", batch -> {
       ListColumnVector list = (ListColumnVector) batch.cols[0];
       LongColumnVector child = (LongColumnVector) list.child;
       child.ensureSize(3, false);
@@ -179,13 +182,14 @@ public class ORCRecordExtractorTest {
       child.vector[1] = 20;
       child.vector[2] = 30;
     });
-    assertEquals(result, new Object[]{10, 20, 30});
+    assertEquals(result, List.of(10, 20, 30));
   }
 
   @Test
   public void testListPreservesNullElements() {
-    // The contract requires multi-value shape preservation: null elements stay null in `Object[]`.
-    Object[] result = (Object[]) extract("array<int>", batch -> {
+    // Null elements stay null in the returned list (`List.of` cannot express this).
+    @SuppressWarnings("unchecked")
+    List<Object> result = (List<Object>) extract("array<int>", batch -> {
       ListColumnVector list = (ListColumnVector) batch.cols[0];
       LongColumnVector child = (LongColumnVector) list.child;
       child.ensureSize(3, false);
@@ -196,18 +200,18 @@ public class ORCRecordExtractorTest {
       child.vector[0] = 10;
       child.vector[2] = 30;
     });
-    assertEquals(result, new Object[]{10, null, 30});
+    assertEquals(result, Arrays.asList(10, null, 30));
   }
 
   @Test
-  public void testEmptyListExtractedAsEmptyArray() {
-    // The contract requires shape preservation: an empty list surfaces as an empty `Object[]`, not `null`.
-    Object[] result = (Object[]) extract("array<int>", batch -> {
+  public void testEmptyListExtractedAsEmptyList() {
+    @SuppressWarnings("unchecked")
+    List<Object> result = (List<Object>) extract("array<int>", batch -> {
       ListColumnVector list = (ListColumnVector) batch.cols[0];
       list.offsets[0] = 0;
       list.lengths[0] = 0;
     });
-    assertEquals(result, new Object[]{});
+    assertEquals(result, List.of());
   }
 
   @Test
