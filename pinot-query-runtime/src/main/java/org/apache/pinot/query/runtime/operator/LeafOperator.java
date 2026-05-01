@@ -524,9 +524,10 @@ public class LeafOperator extends MultiStageOperator {
       }
     } else {
       // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
-      //       Add the results block if it contains data.
+      //       Also propagate empty-but-typed results (e.g. zero-row selection) so partitioned or empty-segment leaves
+      //       contribute the correct schema upstream.
       BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
-      if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
+      if (resultsBlock != null && (resultsBlock.getNumRows() > 0 || resultsBlock.getDataSchema() != null)) {
         try {
           addResultsBlock(resultsBlock);
         } catch (InterruptedException e) {
