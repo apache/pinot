@@ -26,7 +26,6 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
   // Cached bitmap to avoid re-deserializing from the underlying buffer on every call.
-  // ImmutableRoaringBitmap is thread-safe once constructed, so a volatile field is sufficient.
   private final ImmutableRoaringBitmap _nullBitmap;
 
   public NullValueVectorReaderImpl(PinotDataBuffer dataBuffer) {
