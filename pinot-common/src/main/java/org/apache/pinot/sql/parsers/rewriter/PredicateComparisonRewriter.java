@@ -123,6 +123,12 @@ public class PredicateComparisonRewriter implements QueryRewriter {
             break;
           }
           break;
+        case SEMANTIC_MATCH: {
+          // SEMANTIC_MATCH(column, 'query text', topK) — pass through, rewritten by semantic rewriter
+          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
+              "For %s predicate, the number of operands must be 2 or 3, got: %s", filterKind, expression);
+          break;
+        }
         case VECTOR_SIMILARITY: {
           Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
               "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);

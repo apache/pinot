@@ -122,7 +122,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
 
     Set<String> stringSet = new HashSet<>();
     while (stringSet.size() < NUM_VALUES) {
-      stringSet.add(RandomStringUtils.random(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
+      stringSet.add(RandomStringUtils.secure().next(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
     }
     _stringValues = stringSet.toArray(new String[NUM_VALUES]);
     Arrays.sort(_stringValues);
@@ -412,7 +412,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(stringDictionary.indexOf(_stringValues[i]), i);
 
       // Test String longer than MAX_STRING_LENGTH
-      String randomString = RandomStringUtils.random(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
+      String randomString = RandomStringUtils.secure().next(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
       assertEquals(stringDictionary.insertionIndexOf(randomString), Arrays.binarySearch(_stringValues, randomString));
     }
   }

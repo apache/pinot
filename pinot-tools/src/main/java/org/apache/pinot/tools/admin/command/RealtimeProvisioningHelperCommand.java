@@ -19,10 +19,11 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Preconditions;
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
@@ -216,7 +217,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     TableConfig tableConfig;
     try (FileInputStream fis = new FileInputStream(_tableConfigFile)) {
-      String tableConfigString = IOUtils.toString(fis);
+      String tableConfigString = IOUtils.toString(fis, StandardCharsets.UTF_8);
       tableConfig = JsonUtils.stringToObject(tableConfigString, TableConfig.class);
     } catch (IOException e) {
       throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
@@ -264,7 +265,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     long maxUsableHostMemBytes = DataSizeUtils.toBytes(_maxUsableHostMemory);
 
-    File workingDir = Files.createTempDir();
+    File workingDir = Files.createTempDirectory("pinot-provisioning-").toFile();
     Schema schema = extractSchema();
     MemoryEstimator memoryEstimator;
     if (segmentProvided) {
@@ -304,7 +305,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   private Schema extractSchema() {
     if (_schemaFile != null) {
       try (FileInputStream fis = new FileInputStream(_schemaFile)) {
-        String schemaString = IOUtils.toString(fis);
+        String schemaString = IOUtils.toString(fis, StandardCharsets.UTF_8);
         return Schema.fromString(schemaString);
       } catch (IOException e) {
         throw new RuntimeException("Exception in reading schema from file " + _schemaFile, e);

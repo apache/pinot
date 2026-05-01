@@ -4107,4 +4107,40 @@ public class TableConfigUtilsTest {
       assertTrue(e.getMessage().contains("out-of-order record column"));
     }
   }
+
+  @Test
+  public void testValidateBackwardCompatibilityAllowsPartialUpsertStrategyChanges() {
+    // Build two PARTIAL upsert table configs that differ only in partialUpsertStrategies and
+    // defaultPartialUpsertStrategy. The relaxed validator must accept all of:
+    //   - adding a strategy for a new column
+    //   - changing a strategy on an existing column
+    //   - removing a strategy on an existing column
+    //   - changing the defaultPartialUpsertStrategy
+    Map<String, UpsertConfig.Strategy> existingStrategies = new HashMap<>();
+    existingStrategies.put("col_a", UpsertConfig.Strategy.INCREMENT);
+    existingStrategies.put("col_b", UpsertConfig.Strategy.MAX);
+    UpsertConfig existingUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    existingUpsertConfig.setPartialUpsertStrategies(existingStrategies);
+    existingUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+
+    Map<String, UpsertConfig.Strategy> newStrategies = new HashMap<>();
+    // col_a: INCREMENT → MAX (mutation)
+    newStrategies.put("col_a", UpsertConfig.Strategy.MAX);
+    // col_b: removed
+    // col_c: new
+    newStrategies.put("col_c", UpsertConfig.Strategy.UNION);
+    UpsertConfig newUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    newUpsertConfig.setPartialUpsertStrategies(newStrategies);
+    // default: OVERWRITE → APPEND (default change)
+    newUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.APPEND);
+
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(existingUpsertConfig).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(newUpsertConfig).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertTrue(violations.isEmpty(),
+        "Expected no violations for partial-upsert strategy and default-strategy changes, but got: " + violations);
+  }
 }

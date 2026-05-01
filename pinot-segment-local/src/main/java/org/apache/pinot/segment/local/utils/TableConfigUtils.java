@@ -1287,8 +1287,10 @@ public final class TableConfigUtils {
   /**
    * Validates that critical upsert configuration fields are not changed during table config update.
    * Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn,
-   * partialUpsertStrategies, defaultPartialUpsertStrategy.
+   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+   *
+   * <p>Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
+   * not validated here — they may be added, removed, or changed on existing tables.
    *
    * @param newConfig the new table config being applied
    * @param existingConfig the existing table config
@@ -1346,19 +1348,6 @@ public final class TableConfigUtils {
           newUpsertConfig.getOutOfOrderRecordColumn())) {
         violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
-      }
-      if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-        if (!Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
-            newUpsertConfig.getPartialUpsertStrategies())) {
-          violations.add(String.format("upsertConfig.partialUpsertStrategies (%s -> %s)",
-              existingUpsertConfig.getPartialUpsertStrategies(), newUpsertConfig.getPartialUpsertStrategies()));
-        }
-        if (existingUpsertConfig.getDefaultPartialUpsertStrategy()
-            != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
-          violations.add(String.format("upsertConfig.defaultPartialUpsertStrategy (%s -> %s)",
-              existingUpsertConfig.getDefaultPartialUpsertStrategy(),
-              newUpsertConfig.getDefaultPartialUpsertStrategy()));
-        }
       }
     }
   }

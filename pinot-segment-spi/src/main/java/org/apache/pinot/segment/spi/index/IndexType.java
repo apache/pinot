@@ -33,11 +33,19 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * @param <C> the class that represents how this object is configured.
- * @param <IR> the {@link IndexReader} subclass that should be used to read indexes of this type.
- * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
- */
+/// @param <C> the class that represents how this object is configured.
+/// @param <IR> the [IndexReader] subclass that should be used to read indexes of this type.
+/// @param <IC> the [IndexCreator] subclass that should be used to create indexes of this type.
+///
+/// ## Backward compatibility
+///
+/// [#requiresDictionary(FieldSpec, IndexConfig)] and
+/// [#shouldInvalidateOnDictionaryChange(FieldSpec, IndexConfig)] are declared *abstract* rather than `default` on
+/// purpose: every `IndexType` implementation must explicitly declare its dictionary contract. **This is a
+/// binary-incompatible change.** External plugins compiled against an older version of this SPI will fail to load
+/// (or fail to compile) until they implement both methods. Plugin authors upgrading across this change should
+/// consult the Javadoc on each method and pick a value consistent with whether their on-disk index references
+/// dictionary IDs.
 public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
   /**
    * Returns the {@link BuildLifecycle} for this index type. This is used to determine when the index should be built.
@@ -118,6 +126,66 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   // TODO: Consider passing in IndexLoadingConfig
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig);
+
+  /// Declares whether the on-disk representation of this index *references dictionary IDs* for the given column,
+  /// meaning the index cannot be built or read without a dictionary being present.
+  ///
+  /// This is consulted at segment-creation and segment-reload time to decide whether a shared dictionary must be
+  /// materialized for a column whose forward index is RAW-encoded but which carries an enabled secondary index that
+  /// needs dictionary IDs (for example `inverted`, `fst`, `ifst`). When any enabled index on the column returns
+  /// `true`, the loader auto-creates a shared standalone dictionary for the column even if the user did not
+  /// explicitly request one.
+  ///
+  /// Implementation guidance:
+  ///
+  ///   - Return `true` only when the on-disk representation of this index references dictionary IDs (e.g. inverted
+  ///     posting lists keyed by dict ID, FST/IFST built over the sorted dictionary).
+  ///   - Return `false` when the index is computed directly from raw column values (e.g. bloom over hashed values,
+  ///     json/text over the raw payload, vector/h3 over the geometry).
+  ///   - This must be a pure function of `fieldSpec` and `indexConfig`; it is called during config validation and
+  ///     segment creation, not against a live segment. Implementations should NOT short-circuit on
+  ///     `indexConfig.isDisabled()` — the caller filters out disabled configs.
+  ///
+  /// This method is intentionally abstract so that every [IndexType] implementation must explicitly declare its
+  /// dictionary dependency. New index types must opt in by considering the contract above.
+  ///
+  /// @param fieldSpec the column's field spec
+  /// @param indexConfig the per-column config for this specific index type
+  boolean requiresDictionary(FieldSpec fieldSpec, C indexConfig);
+
+  /// Declares whether the on-disk representation of this index depends on whether a dictionary exists for the
+  /// column. If `true`, an existing on-disk index of this type must be deleted and rebuilt when the dictionary for
+  /// the column is added or removed across a segment reload.
+  ///
+  /// Used by segment reload (e.g. `SegmentPreProcessor` / per-index handlers) to decide whether a stale index file
+  /// can be reused or must be dropped and rebuilt after a dictionary enable/disable transition. This covers exactly
+  /// the presence/absence change of the dictionary:
+  ///
+  ///   - dictionary previously absent → now enabled (column gained a dictionary), or
+  ///   - dictionary previously present → now disabled (column lost its dictionary).
+  ///
+  /// It does *not* cover changes to dictionary *configuration* while the dictionary remains enabled (heap mode,
+  /// capacity, etc.) — those are handled by the per-index [IndexHandler#needUpdateIndices] hook.
+  ///
+  /// Implementation guidance:
+  ///
+  ///   - Return `true` when the index's on-disk format differs depending on dictionary presence — i.e.
+  ///     enabling/disabling the dictionary would silently leave a wrong-result index on disk if not rebuilt
+  ///     (inverted, fst/ifst, range).
+  ///   - Return `false` when the index is computed from raw column values and is therefore identical regardless of
+  ///     dictionary presence (bloom, json, text, vector, h3, null-value, forward index — encoding is reconciled
+  ///     with FieldConfig.encodingType independently of dictionary state).
+  ///   - The dictionary index type itself returns `false` — the dictionary *is* what is changing; its own rebuild
+  ///     is driven by the dictionary handler, not by this hook.
+  ///   - This must be a pure function of `fieldSpec` and `indexConfig`. Implementations should NOT short-circuit
+  ///     on `indexConfig.isDisabled()` — the caller filters out disabled configs.
+  ///
+  /// This method is intentionally abstract so that every [IndexType] implementation must explicitly declare its
+  /// rebuild requirement. New index types must opt in by considering the contract above.
+  ///
+  /// @param fieldSpec the column's field spec
+  /// @param indexConfig the per-column config for this specific index type
+  boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, C indexConfig);
 
   /**
    * This method is used to perform in place conversion of provided {@link TableConfig} to newer format

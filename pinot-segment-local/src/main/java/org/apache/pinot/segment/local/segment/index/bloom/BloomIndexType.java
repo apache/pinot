@@ -121,6 +121,19 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, BloomFilterConfig indexConfig) {
+    // Bloom filters are computed by hashing column values directly, so the index does not need a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, BloomFilterConfig indexConfig) {
+    // The on-disk bloom filter content is independent of dictionary presence (values are hashed, not dict IDs),
+    // so enabling/disabling the dictionary does not require rebuilding it.
+    return false;
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return EXTENSIONS;
   }

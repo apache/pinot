@@ -262,6 +262,8 @@ public class QueryOptionsUtilsTest {
   @Test
   public void testInvertedIndexDistinctCostRatioValid() {
     assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "0")), Double.valueOf(0));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
         Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "2.5")), Double.valueOf(2.5));
     assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
         Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, " 3.5 ")), Double.valueOf(3.5));
@@ -270,13 +272,13 @@ public class QueryOptionsUtilsTest {
 
   @Test
   public void testInvertedIndexDistinctCostRatioRejectsNonFiniteValues() {
-    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "0", "-1"}) {
+    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "-1", "invalid"}) {
       try {
         QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, value));
         fail();
       } catch (IllegalArgumentException e) {
         assertEquals(e.getMessage(),
-            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a positive number, got: " + value);
+            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a non-negative number, got: " + value);
       }
     }
   }

@@ -40,6 +40,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -464,8 +465,8 @@ public abstract class PinotPrometheusMetricsTest {
     }
 
     private boolean metricNamesAreSimilar(PromMetric that) {
-      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
-      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
+      String processedMetricNameThis = Strings.CS.remove(_metricName, "_");
+      String processedMetricNameThat = Strings.CS.remove(that._metricName, "_");
       return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
     }
 

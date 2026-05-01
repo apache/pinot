@@ -420,6 +420,11 @@ public class InvertedIndexDistinctOperatorTest extends BaseQueriesTest {
         "SELECT DISTINCT intColumn FROM testTable WHERE intColumn = 0 "
             + OPT + ", invertedIndexDistinctCostRatio=2)")));
 
+    // costRatio=0: force inverted index for non-empty filters
+    assertTrue(usedInvertedIndex(runDistinct(
+        "SELECT DISTINCT intColumn FROM testTable WHERE intColumn = 0 "
+            + OPT + ", invertedIndexDistinctCostRatio=0)")));
+
     // Default costRatio=30: 100*30=3000 <= 10K → inverted
     assertTrue(usedInvertedIndex(runDistinct(
         "SELECT DISTINCT intColumn FROM testTable WHERE intColumn >= 0 " + OPT + ")")));

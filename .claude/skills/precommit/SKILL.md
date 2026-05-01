@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 name: precommit
-description: Run Pinot's mandatory pre-commit checks (spotless, license, checkstyle) on only the modules affected by the current diff. Auto-fixes what it can.
+description: Run Pinot's mandatory pre-commit checks (spotless, license, checkstyle) and compiler warning checks on only the modules affected by the current diff. Auto-fixes what it can, reports what it can't.
 ---
 
 # /precommit

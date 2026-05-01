@@ -39,6 +39,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
   private static final String SEGMENT_NAME_KEY = "segmentName";
   private static final String SIMPLE_FIELDS_KEY = "simpleFields";
+  private static final String CUSTOM_MAP_KEY = "customMap";
   private static final String NULL = "null";
 
   private final ZNRecord _znRecord;
@@ -418,6 +419,10 @@ public class SegmentZKMetadata implements ZKMetadata {
     ObjectNode objectNode = JsonUtils.newObjectNode();
     objectNode.put(SEGMENT_NAME_KEY, getSegmentName());
     objectNode.set(SIMPLE_FIELDS_KEY, JsonUtils.objectToJsonNode(_simpleFields));
+    Map<String, String> customMap = getCustomMap();
+    if (MapUtils.isNotEmpty(customMap)) {
+      objectNode.set(CUSTOM_MAP_KEY, JsonUtils.objectToJsonNode(customMap));
+    }
     return objectNode.toString();
   }
 
@@ -430,6 +435,12 @@ public class SegmentZKMetadata implements ZKMetadata {
     });
     ZNRecord znRecord = new ZNRecord(segmentName);
     znRecord.setSimpleFields(simpleFields);
+    JsonNode customMapJsonNode = jsonNode.get(CUSTOM_MAP_KEY);
+    if (customMapJsonNode != null && !customMapJsonNode.isNull()) {
+      Map<String, String> customMap = JsonUtils.jsonNodeToObject(customMapJsonNode, new TypeReference<>() {
+      });
+      znRecord.setMapField(Segment.CUSTOM_MAP, customMap);
+    }
     return new SegmentZKMetadata(znRecord);
   }
 

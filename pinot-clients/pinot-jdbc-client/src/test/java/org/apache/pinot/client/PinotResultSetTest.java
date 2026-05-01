@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Calendar;
@@ -118,8 +119,10 @@ public class PinotResultSetTest {
     int currentRow = 0;
 
     while (pinotResultSet.next()) {
-      Assert.assertEquals(IOUtils.toString(pinotResultSet.getAsciiStream(5)), resultSet.getString(currentRow, 4));
-      Assert.assertEquals(IOUtils.toString(pinotResultSet.getUnicodeStream(5)), resultSet.getString(currentRow, 4));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getAsciiStream(5), StandardCharsets.US_ASCII),
+          resultSet.getString(currentRow, 4));
+      Assert.assertEquals(IOUtils.toString(pinotResultSet.getUnicodeStream(5), StandardCharsets.UTF_8),
+          resultSet.getString(currentRow, 4));
       Assert.assertEquals(IOUtils.toString(pinotResultSet.getCharacterStream(5)), resultSet.getString(currentRow, 4));
       currentRow++;
     }

@@ -96,7 +96,7 @@ public class MutableSegmentImplAggregateMetricsTest {
     Float[] floatValues = new Float[10];
     Random random = new Random();
     for (int i = 0; i < stringValues.length; i++) {
-      stringValues[i] = RandomStringUtils.random(10);
+      stringValues[i] = RandomStringUtils.secure().next(10);
       floatValues[i] = random.nextFloat() * 10f;
     }
 

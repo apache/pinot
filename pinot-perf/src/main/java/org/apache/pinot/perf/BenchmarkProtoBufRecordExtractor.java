@@ -63,7 +63,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  * <p>This benchmark measures the performance improvement from:
  * <ul>
  *   <li>Field descriptor caching (eliminates repeated findFieldByName() calls)</li>
- *   <li>Reusable ProtoBufFieldInfo object (reduces GC pressure)</li>
+ *   <li>Direct dispatch off {@code FieldDescriptor} (no per-value wrapper allocation)</li>
  * </ul>
  *
  * <p>Run with:

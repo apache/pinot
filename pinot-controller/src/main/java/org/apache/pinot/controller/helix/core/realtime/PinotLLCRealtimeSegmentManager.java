@@ -56,6 +56,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -2357,6 +2358,19 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
           uploadedMetadata.getCrc());
       currentMetadata.setCrc(uploadedMetadata.getCrc());
       currentMetadata.setDataCrc(uploadedMetadata.getDataCrc());
+    }
+    // Merge the custom map from the server into the current metadata. The server merges segment-file customMap entries
+    // into the existing ZK customMap; without this merge those entries would be dropped when we persist
+    // currentMetadata. Additive merge matches the server-side convention of preserving existing keys.
+    Map<String, String> uploadedCustomMap = uploadedMetadata.getCustomMap();
+    if (MapUtils.isNotEmpty(uploadedCustomMap)) {
+      Map<String, String> mergedCustomMap = currentMetadata.getCustomMap();
+      if (mergedCustomMap == null) {
+        mergedCustomMap = new HashMap<>(uploadedCustomMap);
+      } else {
+        mergedCustomMap.putAll(uploadedCustomMap);
+      }
+      currentMetadata.setCustomMap(mergedCustomMap);
     }
     moveSegmentAndSetDownloadUrl(rawTableName, segmentName, uploadedMetadata.getDownloadUrl(), pinotFS,
         currentMetadata);

@@ -53,6 +53,7 @@ import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -494,6 +495,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultUseBrokerPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_BROKER_PRUNING,
         CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING);
+    boolean defaultLogicalPlannerUseBrokerPruning = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING,
+        CommonConstants.Broker.DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING);
     int defaultLiteModeLeafStageLimit = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
@@ -531,6 +535,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
+        .defaultLogicalPlannerUseBrokerPruning(defaultLogicalPlannerUseBrokerPruning)
         .defaultLiteModeLeafStageLimit(defaultLiteModeLeafStageLimit)
         .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
         .defaultLiteModeEnableJoins(defaultLiteModeEnableJoins)
@@ -823,6 +828,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         if (stageStats != null) { // for example pipeline breaker may not have stats
           stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
         }
+      }
+      // Broker-pruned segments are computed during routing in WorkerManager, not reported by servers.
+      // Inject the count directly since it doesn't flow through the LeafOperator stat pipeline.
+      long numSegmentsPrunedByBroker = dispatchableSubPlan.getNumSegmentsPrunedByBroker();
+      if (numSegmentsPrunedByBroker > 0) {
+        StatMap<BrokerResponseNativeV2.StatKey> brokerPruningStats =
+            new StatMap<>(BrokerResponseNativeV2.StatKey.class);
+        brokerPruningStats.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER,
+            (int) numSegmentsPrunedByBroker);
+        brokerResponse.addBrokerStats(brokerPruningStats);
       }
     } catch (Exception e) {
       LOGGER.warn("Error encountered while collecting multi-stage stats", e);

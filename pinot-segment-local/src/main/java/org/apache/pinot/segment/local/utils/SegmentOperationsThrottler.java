@@ -31,7 +31,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Base class for segment operation throttlers, contains the common logic for the semaphore and handling the pre and
- * post query serving values. The semaphore cannot be null and must contain > 0 total permits
+ * post query serving values. The semaphore cannot be null and must contain >= 0 total permits. A value of 0 acts as
+ * a kill switch that blocks all {@link #acquire()} callers until permits are restored via
+ * {@link #updatePermits(int, int)} or {@link #startServingQueries()}; negative values are rejected as
+ * misconfiguration.
  */
 public class SegmentOperationsThrottler {
 
@@ -39,8 +42,9 @@ public class SegmentOperationsThrottler {
   protected ServerMetrics _serverMetrics;
   protected AdjustableSemaphore _semaphore;
   /**
-   * _maxConcurrency and _maxConcurrencyBeforeServingQueries must be > 0. To effectively disable throttling, this can
-   * be set to a very high value
+   * _maxConcurrency and _maxConcurrencyBeforeServingQueries must be >= 0. To effectively disable throttling, set
+   * to a very high value. To halt all operations (kill switch), set to 0; blocked acquirers park until permits are
+   * restored.
    */
   protected int _maxConcurrency;
   protected int _maxConcurrencyBeforeServingQueries;
@@ -95,9 +99,10 @@ public class SegmentOperationsThrottler {
             + "maxConcurrencyBeforeServingQueries: {}, isServingQueries: {}",
         throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries,
         isServingQueries);
-    Preconditions.checkArgument(maxConcurrency > 0, "Max parallelism must be > 0, but found to be: " + maxConcurrency);
-    Preconditions.checkArgument(maxConcurrencyBeforeServingQueries > 0,
-        "Max parallelism before serving queries must be > 0, but found to be: " + maxConcurrencyBeforeServingQueries);
+    Preconditions.checkArgument(maxConcurrency >= 0,
+        "Max parallelism must be >= 0, but found to be: " + maxConcurrency);
+    Preconditions.checkArgument(maxConcurrencyBeforeServingQueries >= 0,
+        "Max parallelism before serving queries must be >= 0, but found to be: " + maxConcurrencyBeforeServingQueries);
 
     _maxConcurrency = maxConcurrency;
     _maxConcurrencyBeforeServingQueries = maxConcurrencyBeforeServingQueries;
@@ -173,9 +178,9 @@ public class SegmentOperationsThrottler {
    * @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value
    */
   public synchronized void updatePermits(int maxConcurrency, int maxConcurrencyBeforeServingQueries) {
-    Preconditions.checkArgument(maxConcurrency > 0, "Max concurrency must be > 0, but found: " + maxConcurrency);
-    Preconditions.checkArgument(maxConcurrencyBeforeServingQueries > 0,
-        "Max concurrency before serving queries must be > 0, but found: " + maxConcurrencyBeforeServingQueries);
+    Preconditions.checkArgument(maxConcurrency >= 0, "Max concurrency must be >= 0, but found: " + maxConcurrency);
+    Preconditions.checkArgument(maxConcurrencyBeforeServingQueries >= 0,
+        "Max concurrency before serving queries must be >= 0, but found: " + maxConcurrencyBeforeServingQueries);
 
     LOGGER.info("Throttler {}: Updating permits - maxConcurrency: {} -> {}, "
         + "maxConcurrencyBeforeServingQueries: {} -> {}",

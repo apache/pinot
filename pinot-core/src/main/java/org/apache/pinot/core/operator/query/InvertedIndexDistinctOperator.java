@@ -85,7 +85,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * </ul>
  *
  * <p>Enabled via the {@code useIndexBasedDistinctOperator} query option. The cost ratio can be tuned
- * via the {@code invertedIndexDistinctCostRatio} query option.
+ * via the {@code invertedIndexDistinctCostRatio} query option; setting it to 0 forces the inverted index path
+ * for non-empty filter results.
  */
 public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsBlock> {
   private static final String EXPLAIN_NAME = "DISTINCT_INVERTED_INDEX";
@@ -173,7 +174,8 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
    *   <li>dictCard &gt; 10K: costRatio=6  — inverted index wins when filteredDocs &ge; ~6x dictCard</li>
    * </ul>
    *
-   * <p>Can be overridden at query time via the query option {@code invertedIndexDistinctCostRatio}.
+   * <p>Can be overridden at query time via the query option {@code invertedIndexDistinctCostRatio}. Setting it
+   * to 0 forces the inverted index path for non-empty filter results.
    */
   static final NavigableMap<Integer, Double> DEFAULT_COST_RATIO_BY_CARDINALITY;
 
@@ -190,11 +192,14 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
   }
 
   private boolean shouldUseBitmapInvertedIndex(int filteredDocCount) {
-    int dictionaryCardinality = _dictionary.length();
     if (filteredDocCount == 0) {
       return false;
     }
     Double costRatioOverride = QueryOptionsUtils.getInvertedIndexDistinctCostRatio(_queryContext.getQueryOptions());
+    if (costRatioOverride != null && costRatioOverride == 0.0) {
+      return true;
+    }
+    int dictionaryCardinality = _dictionary.length();
     double costRatio = costRatioOverride != null ? costRatioOverride : getDefaultCostRatio(dictionaryCardinality);
     return (double) dictionaryCardinality * costRatio <= filteredDocCount;
   }

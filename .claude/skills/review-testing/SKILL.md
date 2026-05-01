@@ -1,6 +1,6 @@
 ---
 name: review-testing
-description: Review Apache Pinot diffs for test coverage and test quality — positive + negative cases, real dictionaries vs mocks, rolling-upgrade / mixed-version tests, null-handling toggle coverage, exhaustive type coverage for aggregators/operators, integration-test base-class choice (prefer `CustomDataQueryClusterIntegrationTest` unless cluster-level setup differs), assertion quality, and regression tests that reproduce the bug. Trigger keywords — Test, TestNG, JUnit, Mockito, mock, integration test, assertEquals, assertThrows, regression, null handling test, mixed version, CustomDataQueryClusterIntegrationTest, BaseClusterIntegrationTest.
+description: Review Apache Pinot diffs for test coverage and test quality — positive + negative cases, real dictionaries vs mocks, rolling-upgrade / mixed-version tests, null-handling toggle coverage, exhaustive type coverage for aggregators/operators, integration-test base-class choice (reject standalone clusters unless special setup is needed; prefer `CustomDataQueryClusterIntegrationTest`), assertion quality, and regression tests that reproduce the bug. Trigger keywords — Test, TestNG, JUnit, Mockito, mock, integration test, assertEquals, assertThrows, regression, null handling test, mixed version, CustomDataQueryClusterIntegrationTest, BaseClusterIntegrationTest.
 domain: kb/code-review-principles.md#6-testing-strategies
 triggers:
   - diff adds or modifies any src/test/** file

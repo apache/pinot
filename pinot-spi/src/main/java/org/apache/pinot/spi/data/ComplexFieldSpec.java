@@ -145,9 +145,9 @@ public final class ComplexFieldSpec extends FieldSpec {
     ObjectNode jsonObject = super.toJsonObject();
     ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
     for (Map.Entry<String, FieldSpec> entry : _childFieldSpecs.entrySet()) {
-      childFieldSpecsNode.put(entry.getKey(), entry.getValue().toJsonObject());
+      childFieldSpecsNode.set(entry.getKey(), entry.getValue().toJsonObject());
     }
-    jsonObject.put("childFieldSpecs", childFieldSpecsNode);
+    jsonObject.set("childFieldSpecs", childFieldSpecsNode);
     return jsonObject;
   }
 }

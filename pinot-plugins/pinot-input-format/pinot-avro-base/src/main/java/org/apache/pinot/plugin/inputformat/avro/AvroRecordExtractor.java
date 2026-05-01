@@ -19,11 +19,8 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.collect.Maps;
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericFixed;
@@ -33,25 +30,39 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Extractor for Avro Records
- */
+/// Extracts Pinot [GenericRow] from an Avro [GenericRecord]. Native Java input types are what `GenericDatumReader`
+/// produces.
+///
+/// **Avro source type → Java input → Java output type:**
+/// - avro `boolean` → `Boolean` → `Boolean`
+/// - avro `int` → `Integer` → `Integer`
+/// - avro `long` → `Long` → `Long`
+/// - avro `float` → `Float` → `Float`
+/// - avro `double` → `Double` → `Double`
+/// - avro `string` → `Utf8` → `String` (via `Utf8.toString()`)
+/// - avro `bytes` → `ByteBuffer` → `byte[]` (materialized from the buffer's remaining content)
+/// - avro `fixed` → [GenericFixed] / `GenericData.Fixed` → `byte[]`
+/// - avro `enum` → `GenericData.EnumSymbol` → `String` (enum name)
+/// - avro `array<T>` → `List<T>` → `Object[]` (each element recursively converted)
+/// - avro `map<string, T>` → `Map<Utf8, T>` → `Map<String, Object>` (each value recursively converted)
+/// - avro nested `record` → [GenericRecord] → `Map<String, Object>`
+/// - avro `union[null, X]` with the `null` branch selected → `null`
+///
+/// **Logical types** (applied when `enableLogicalTypes = true`, the config default; `GenericDatumReader` emits
+/// the post-conversion Java types listed below):
+/// - `decimal` → `BigDecimal` → `BigDecimal`
+/// - `uuid` → `UUID` → `String` (UUID string form via `UUID.toString()`)
+/// - `date` → `LocalDate` → `LocalDate` (passes through; TZ-independent)
+/// - `time-millis` / `time-micros` → `LocalTime` → `LocalTime` (passes through; full ns precision preserved)
+/// - `timestamp-millis` / `timestamp-micros` → `Instant` → `java.sql.Timestamp` (sub-millisecond nanos preserved
+///   via `Timestamp.getNanos()`)
 public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
-  private Set<String> _fields;
-  private boolean _extractAll = false;
   private boolean _applyLogicalTypes = true;
 
   @Override
-  public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-    AvroRecordExtractorConfig config = (AvroRecordExtractorConfig) recordExtractorConfig;
-    if (config != null) {
-      _applyLogicalTypes = config.isEnableLogicalTypes();
-    }
-    if (fields == null || fields.isEmpty()) {
-      _extractAll = true;
-      _fields = Set.of();
-    } else {
-      _fields = Set.copyOf(fields);
+  protected void initConfig(@Nullable RecordExtractorConfig config) {
+    if (config instanceof AvroRecordExtractorConfig) {
+      _applyLogicalTypes = ((AvroRecordExtractorConfig) config).isEnableLogicalTypes();
     }
   }
 
@@ -73,14 +84,16 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     } else {
       for (String fieldName : _fields) {
         Schema.Field field = from.getSchema().getField(fieldName);
-        Object value = field == null ? null : from.get(field.pos());
-        if (_applyLogicalTypes) {
-          value = AvroSchemaUtil.applyLogicalType(field, value);
+        if (field != null) {
+          Object value = from.get(field.pos());
+          if (_applyLogicalTypes) {
+            value = AvroSchemaUtil.applyLogicalType(field, value);
+          }
+          if (value != null) {
+            value = transformValue(value, field);
+          }
+          to.putValue(fieldName, value);
         }
-        if (value != null) {
-          value = transformValue(value, field);
-        }
-        to.putValue(fieldName, value);
       }
     }
     return to;
@@ -90,20 +103,11 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     return convert(value);
   }
 
-  /**
-   * Returns whether the object is an Avro GenericRecord.
-   */
   @Override
   protected boolean isRecord(Object value) {
     return value instanceof GenericRecord;
   }
 
-  /**
-   * Handles the conversion of every field of the Avro GenericRecord.
-   *
-   * @param value should be verified to be a GenericRecord type prior to calling this method as it will be casted
-   *              without checking
-   */
   @Override
   protected Map<Object, Object> convertRecord(Object value) {
     GenericRecord record = (GenericRecord) value;
@@ -118,24 +122,13 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     return convertedMap;
   }
 
-  /**
-   * This method convert any Avro logical-type converted (or not) value to a class supported by
-   * Pinot {@link GenericRow}
-   *
-   * Note that at the moment BigDecimal is converted to Pinot double which may lead to precision loss or may not be
-   * represented at all.
-   * Similarly, timestamp microsecond precision is not supported at the moment. These values will get converted to
-   * millisecond precision.
-   */
+  /// Adds Avro-specific handling: [GenericFixed] (`fixed`) → `byte[]`. Everything else delegates to the base
+  /// (see class Javadoc for the full Avro-source → Java-output matrix).
   @Override
   protected Object convertSingleValue(Object value) {
-    if (value instanceof Instant) {
-      return Timestamp.from((Instant) value);
-    }
     if (value instanceof GenericFixed) {
       return ((GenericFixed) value).bytes();
     }
-    // LocalDate, LocalTime and UUID are returned as the ::toString version of the logical type
     return super.convertSingleValue(value);
   }
 }

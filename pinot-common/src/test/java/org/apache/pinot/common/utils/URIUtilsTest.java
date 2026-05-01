@@ -79,7 +79,7 @@ public class URIUtilsTest {
     int maxPartLength = 10;
     Random random = new Random();
     for (int i = 0; i < numRounds; i++) {
-      String randomString = RandomStringUtils.random(random.nextInt(maxPartLength + 1));
+      String randomString = RandomStringUtils.secure().next(random.nextInt(maxPartLength + 1));
       assertEquals(URIUtils.decode(URIUtils.encode(randomString)), randomString);
     }
   }

@@ -56,6 +56,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -73,6 +74,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -121,6 +123,29 @@ public class QueryServerTest extends QueryTestSet {
   @AfterMethod
   public void tearDownMethod() {
     MDC.clear();
+  }
+
+  @Test
+  public void testPermitKeepAliveDefaultsMatchNettyDefaults() {
+    // Defaults must match Netty's gRPC server defaults so that operators not configuring keep-alive on the broker
+    // dispatch side keep observing the same behavior as before this configurability was added.
+    QueryServer server = new QueryServer(QueryTestUtils.getAvailablePort(), mock(QueryRunner.class));
+    assertEquals(server.getPermitKeepAliveTimeMs(),
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS);
+    assertFalse(server.isPermitKeepAliveWithoutCalls());
+  }
+
+  @Test
+  public void testPermitKeepAliveOverridesPickedUpFromConfig() {
+    // Verify the config keys are wired to the server fields. Using values that mirror what an operator would set
+    // when tuning the broker-side dispatch keep-alive down (e.g. keepAliveTime=30s, keepAliveWithoutCalls=true).
+    Map<String, Object> overrides = new HashMap<>();
+    overrides.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS, 30_000);
+    overrides.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS, true);
+    QueryServer server = new QueryServer(new PinotConfiguration(overrides), "serverId",
+        QueryTestUtils.getAvailablePort(), mock(QueryRunner.class), null, ThreadAccountantUtils.getNoOpAccountant());
+    assertEquals(server.getPermitKeepAliveTimeMs(), 30_000);
+    assertTrue(server.isPermitKeepAliveWithoutCalls());
   }
 
   @Test

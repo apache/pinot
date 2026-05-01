@@ -31,6 +31,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod;
+  private String _replacedSegmentsRetentionPeriod;
+  private String _lineageEntryCleanupRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
   @Deprecated
@@ -110,6 +112,42 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setDeletedSegmentsRetentionPeriod(String deletedSegmentsRetentionPeriod) {
     _deletedSegmentsRetentionPeriod = deletedSegmentsRetentionPeriod;
+  }
+
+  /**
+   * Returns the retention period for segments replaced by a REFRESH ingestion job. Only applies to tables with
+   * REFRESH ingestion type; for APPEND tables this setting is ignored and replaced segments are deleted immediately.
+   *
+   * <p>When a lineage entry transitions to COMPLETED state, source segments are preserved for this duration before
+   * being scheduled for deletion, providing a rollback window. Consumers of this config (e.g. the lineage manager)
+   * treat a null or unparseable value as a 1 day default.
+   *
+   * <p>Accepts a human-readable period string (e.g. {@code "7d"}, {@code "12h"}) as understood by
+   * {@code TimeUtils.convertPeriodToMillis}. Setting this value too low (e.g. {@code "0d"}) eliminates the rollback
+   * window; source segments will be deleted on the next retention pass after the lineage is COMPLETED.
+   */
+  public String getReplacedSegmentsRetentionPeriod() {
+    return _replacedSegmentsRetentionPeriod;
+  }
+
+  public void setReplacedSegmentsRetentionPeriod(String replacedSegmentsRetentionPeriod) {
+    _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
+  }
+
+  /**
+   * Returns the retention period before stale IN_PROGRESS or REVERTED lineage entries and their destination segments
+   * are cleaned up. Consumers of this config (e.g. the lineage manager) treat a null or unparseable value as a
+   * 1 day default.
+   *
+   * <p>Accepts a human-readable period string (e.g. {@code "7d"}, {@code "12h"}) as understood by
+   * {@code TimeUtils.convertPeriodToMillis}.
+   */
+  public String getLineageEntryCleanupRetentionPeriod() {
+    return _lineageEntryCleanupRetentionPeriod;
+  }
+
+  public void setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
+    _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
   }
 
   /**

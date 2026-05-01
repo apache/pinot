@@ -574,11 +574,20 @@ public class CommonConstants {
     public static final boolean DEFAULT_RUN_IN_BROKER = true;
 
     /**
-     * Whether to use broker pruning by default.
+     * Whether to use broker pruning by default on the physical optimizer path.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option
      */
     public static final String CONFIG_OF_USE_BROKER_PRUNING = "pinot.broker.multistage.use.broker.pruning";
     public static final boolean DEFAULT_USE_BROKER_PRUNING = true;
+
+    /**
+     * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option.
+     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently.
+     */
+    public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
+        "pinot.broker.multistage.logical.planner.use.broker.pruning";
+    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = false;
 
     /**
      * Default server stage limit for lite mode queries.
@@ -884,10 +893,9 @@ public class CommonConstants {
         // Server stage limit for lite mode queries.
         public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
         public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
-        // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
-        // new MSE query optimizer.
-        // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
-        //   a table config to enable broker pruning (it is disabled by default).
+        // Used by the MSE engine to enable broker-side segment pruning during routing. The physical optimizer
+        // path defaults to DEFAULT_USE_BROKER_PRUNING (true); the logical planner path defaults to
+        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (false). Both can be overridden per-query.
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
@@ -2237,6 +2245,29 @@ public class CommonConstants {
     public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS =
         "pinot.query.multistage.dispatch.channel.keep.alive.without.calls";
     public static final boolean DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Minimum interval, in milliseconds, between client gRPC keep-alive pings that the MSE
+    /// [org.apache.pinot.query.service.server.QueryServer] will accept. Pings arriving more frequently than this are
+    /// counted as "bad pings"; once the server's internal threshold is exceeded it sends `GOAWAY(ENHANCE_YOUR_CALM)`
+    /// with `too_many_pings` debug data and closes the connection.
+    ///
+    /// Defaults to 5 minutes to match Netty's gRPC server default. Operators tuning down the broker dispatch
+    /// `keepAliveTime` (see [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS]) for faster silent-peer detection MUST set
+    /// this to a value less than or equal to the configured client keep-alive time, otherwise the server will tear
+    /// down the dispatch channel. A non-positive value leaves Netty's gRPC server default (currently 5 minutes) in
+    /// place.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.query.server.permit.keep.alive.time.ms";
+    public static final int DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// Whether the MSE [org.apache.pinot.query.service.server.QueryServer] permits client gRPC keep-alive pings when
+    /// there are no active RPCs on the connection. Defaults to `false` to match Netty's gRPC server default. Must be
+    /// set to `true` if brokers configure
+    /// [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS] to `true`, otherwise the server will close idle channels
+    /// with `GOAWAY(ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
   }
 
   public static class NullValuePlaceHolder {

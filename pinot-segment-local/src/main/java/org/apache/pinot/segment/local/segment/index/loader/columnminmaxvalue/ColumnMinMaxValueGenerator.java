@@ -24,7 +24,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
@@ -335,10 +335,10 @@ public class ColumnMinMaxValueGenerator {
           if (isSingleValue) {
             for (int docId = 0; docId < numDocs; docId++) {
               String value = rawIndexReader.getString(docId, readerContext);
-              if (min == null || StringUtils.compare(min, value) > 0) {
+              if (min == null || Strings.CS.compare(min, value) > 0) {
                 min = value;
               }
-              if (max == null || StringUtils.compare(max, value) < 0) {
+              if (max == null || Strings.CS.compare(max, value) < 0) {
                 max = value;
               }
             }
@@ -346,10 +346,10 @@ public class ColumnMinMaxValueGenerator {
             for (int docId = 0; docId < numDocs; docId++) {
               String[] values = rawIndexReader.getStringMV(docId, readerContext);
               for (String value : values) {
-                if (min == null || StringUtils.compare(min, value) > 0) {
+                if (min == null || Strings.CS.compare(min, value) > 0) {
                   min = value;
                 }
-                if (max == null || StringUtils.compare(max, value) < 0) {
+                if (max == null || Strings.CS.compare(max, value) < 0) {
                   max = value;
                 }
               }
