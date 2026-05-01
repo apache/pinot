@@ -49,7 +49,7 @@ public class IngestionFunctionEvaluationTest {
     map.put("out", evaluator);
     GenericRow record = new GenericRow();
     record.putValue("out", "stale");
-    IngestionFunctionEvaluation.applyEnricherEvaluations(record, map);
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, map, IngestionFunctionEvaluation.Policy.enricher());
     assertEquals(record.getValue("out"), "enriched");
     verify(evaluator).evaluate(record);
   }
@@ -63,8 +63,9 @@ public class IngestionFunctionEvaluationTest {
     GenericRow record = new GenericRow();
     assertNull(record.getValue("c"));
     ThrottledLogger throttledLogger = mock(ThrottledLogger.class);
-    IngestionFunctionEvaluation.applyExpressionTransformations(record, map, false, false,
-        Collections.emptySet(), throttledLogger);
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, map,
+        IngestionFunctionEvaluation.Policy.expressionTransformation(false, false, Collections.emptySet(),
+            throttledLogger));
     assertEquals(record.getValue("c"), 99L);
   }
 
@@ -76,8 +77,9 @@ public class IngestionFunctionEvaluationTest {
     GenericRow record = new GenericRow();
     record.putValue("c", 1);
     ThrottledLogger throttledLogger = mock(ThrottledLogger.class);
-    IngestionFunctionEvaluation.applyExpressionTransformations(record, map, false, false,
-        Collections.emptySet(), throttledLogger);
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, map,
+        IngestionFunctionEvaluation.Policy.expressionTransformation(false, false, Collections.emptySet(),
+            throttledLogger));
     assertEquals(record.getValue("c"), 1);
     verifyNoInteractions(evaluator);
   }
@@ -91,8 +93,9 @@ public class IngestionFunctionEvaluationTest {
     map.put("c", evaluator);
     GenericRow record = new GenericRow();
     ThrottledLogger throttledLogger = mock(ThrottledLogger.class);
-    IngestionFunctionEvaluation.applyExpressionTransformations(record, map, true, false,
-        Collections.emptySet(), throttledLogger);
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, map,
+        IngestionFunctionEvaluation.Policy.expressionTransformation(true, false, Collections.emptySet(),
+            throttledLogger));
     assertTrue(record.isIncomplete());
   }
 }
