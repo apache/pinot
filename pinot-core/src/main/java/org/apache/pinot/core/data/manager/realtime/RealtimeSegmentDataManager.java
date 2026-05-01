@@ -947,8 +947,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 // respectively.
                 // Refer to the PR for the new commit protocol: https://github.com/apache/pinot/pull/14741
                 if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
-                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED,
-                    1);
+                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey,
+                    ServerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
                   if (!startSegmentCommit()) {
                     // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                     // Change the state to HOLDING before looping around.
@@ -958,8 +958,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                     break;
                   }
                 } else {
-                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey, ServerGauge.PAUSELESS_CONSUMPTION_ENABLED,
-                    0);
+                  _serverMetrics.setValueOfTableGauge(_streamConsumerMetricBaseKey,
+                    ServerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
                 }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 try {
