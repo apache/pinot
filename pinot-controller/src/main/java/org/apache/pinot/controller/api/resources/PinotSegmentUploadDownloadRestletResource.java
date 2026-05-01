@@ -72,7 +72,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -798,11 +797,6 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
         throw new ControllerApplicationException(LOGGER,
             "Segment file not found at URI: " + currentSegmentLocationURI, Response.Status.NOT_FOUND, e);
-      }
-      HttpErrorStatusException httpErr = ExceptionUtils.getFirstCauseOfType(e, HttpErrorStatusException.class);
-      if (httpErr != null && httpErr.getStatusCode() == Response.Status.NOT_FOUND.getStatusCode()) {
-        throw new ControllerApplicationException(LOGGER,
-            "Segment not found at URI: " + currentSegmentLocationURI, Response.Status.NOT_FOUND, e);
       }
       throw e;
     }
