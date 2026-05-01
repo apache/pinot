@@ -72,23 +72,6 @@ public class ExceptionUtils {
     return false;
   }
 
-  /**
-   * Returns the first throwable in the cause chain that is an instance of the given type, or null if none.
-   */
-  @SuppressWarnings("unchecked")
-  public static <T extends Throwable> T getFirstCauseOfType(Throwable e, Class<T> type) {
-    while (e != null) {
-      if (type.isInstance(e)) {
-        return (T) e;
-      }
-      if (e.getCause() == e) {
-        break;
-      }
-      e = e.getCause();
-    }
-    return null;
-  }
-
   public static String getStackTrace(Throwable e) {
     return getStackTrace(e, Integer.MAX_VALUE);
   }
