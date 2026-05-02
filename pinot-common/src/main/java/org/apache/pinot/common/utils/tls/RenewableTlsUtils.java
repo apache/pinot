@@ -302,10 +302,10 @@ public class RenewableTlsUtils {
                   + "truststore {}) on file", baseSslFactory, keyStorePath, trustStorePath);
               return true;
             } catch (Exception e) {
-              LOGGER.info(
+              LOGGER.warn(
                   "reloadSslFactory :: Encountered issues when renewing SSLFactory "
                   + "{} (built from key store {} and "
-                  + "truststore {}) on ", baseSslFactory, keyStorePath, trustStorePath, e);
+                  + "truststore {}), retrying if attempts remain", baseSslFactory, keyStorePath, trustStorePath, e);
               return false;
             }
           });
