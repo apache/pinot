@@ -2380,6 +2380,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes
 
+  /////////////////////////////////////////////////////////////////////////////////
+
   private static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
     static final ControllerConf CONTROLLER_CONF = new ControllerConf();
 
