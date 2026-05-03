@@ -36,9 +36,13 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class FilePerIndexDirectory extends ColumnIndexDirectory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilePerIndexDirectory.class);
+
   private final File _segmentDirectory;
   private SegmentMetadataImpl _segmentMetadata;
   private final ReadMode _readMode;
@@ -99,8 +103,15 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
-    // TODO: this leaks the removed data buffer (it's not going to be freed in close() method)
-    _indexBuffers.remove(new IndexKey(columnName, indexType));
+    PinotDataBuffer removedBuffer = _indexBuffers.remove(new IndexKey(columnName, indexType));
+    if (removedBuffer != null) {
+      try {
+        removedBuffer.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close removed buffer for column: {}, indexType: {}",
+            columnName, indexType, e);
+      }
+    }
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else if (indexType == StandardIndexes.vector()) {
