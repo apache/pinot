@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.local.utils.SpecialValueTransformerUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
@@ -78,6 +80,10 @@ public class SpecialValueTransformer implements RecordTransformer {
         if (transformedValues != value) {
           record.putValue(column, transformedValues);
         }
+      } else if (value instanceof List) {
+        Object[] values = RecordReaderUtils.toObjectArray(value);
+        Object[] transformedValues = SpecialValueTransformerUtils.transformValues(values);
+        record.putValue(column, transformedValues);
       } else if (value != null) {
         // Single-valued column.
         Object transformedValue = SpecialValueTransformerUtils.transformValue(value);

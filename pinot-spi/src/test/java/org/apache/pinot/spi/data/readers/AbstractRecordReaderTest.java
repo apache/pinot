@@ -123,9 +123,11 @@ public abstract class AbstractRecordReaderTest {
         if (fieldSpec.isSingleValueField()) {
           assertValueEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
         } else {
-          Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
-          List expectedRecords = (List) expectedRecord.get(fieldSpecName);
+          List<?> expectedRecords = (List<?>) expectedRecord.get(fieldSpecName);
           if (expectedRecords != null) {
+            Object actualMv = actualRecord.getValue(fieldSpecName);
+            Assert.assertNotNull(actualMv, "Multi-value column " + fieldSpecName + " is null but expected non-null");
+            Object[] actualRecords = RecordReaderUtils.toObjectArray(actualMv);
             Assert.assertEquals(actualRecords.length, expectedRecords.size());
             for (int j = 0; j < actualRecords.length; j++) {
               assertValueEquals(actualRecords[j], expectedRecords.get(j));

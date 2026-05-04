@@ -29,6 +29,7 @@ import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 
@@ -87,5 +88,20 @@ public class RecordReaderUtils {
       magic = raf.read() & 0xff | ((raf.read() << 8) & 0xff00);
     }
     return magic == GZIPInputStream.GZIP_MAGIC;
+  }
+
+  /**
+   * Normalizes a multi-value column read from a {@link RecordReader} to {@code Object[]}. Most readers already
+   * return {@code Object[]}; some (e.g. ORC {@code LIST}) return a {@link List}.
+   */
+  public static Object[] toObjectArray(Object multiValue) {
+    if (multiValue instanceof Object[]) {
+      return (Object[]) multiValue;
+    }
+    if (multiValue instanceof List) {
+      return ((List<?>) multiValue).toArray();
+    }
+    throw new IllegalArgumentException(
+        "Multi-value column must be Object[] or List, got: " + multiValue.getClass().getName());
   }
 }

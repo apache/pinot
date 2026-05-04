@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.inputformat.orc;
 import com.google.common.collect.Maps;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +60,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /// - `BINARY` → `byte[]`
 /// - `DATE` → [LocalDate] via [LocalDate#ofEpochDay] (TZ-independent, calendar-date semantics)
 /// - `TIMESTAMP` / `TIMESTAMP_INSTANT` → [Timestamp] preserving full sub-second nanos from [TimestampColumnVector]
-/// - `LIST<X>` → `Object[]` (null elements preserved; empty list surfaces as empty `Object[]`)
+/// - `LIST<X>` → `List<Object>` (null elements preserved; empty list surfaces as an empty list)
 /// - `MAP<K, V>` → `Map<Object, Object>`
 /// - `STRUCT<...>` → `Map<String, Object>`
 /// - any nullable column with `isNull[rowId]` set → `null`
@@ -140,9 +141,9 @@ public class ORCRecordExtractor extends BaseRecordExtractor<ORCRecordExtractor.R
         ListColumnVector listColumnVector = (ListColumnVector) columnVector;
         int offset = (int) listColumnVector.offsets[rowId];
         int length = (int) listColumnVector.lengths[rowId];
-        Object[] values = new Object[length];
+        List<Object> values = new ArrayList<>(length);
         for (int j = 0; j < length; j++) {
-          values[j] = extractValue(field, listColumnVector.child, childType, offset + j);
+          values.add(extractValue(field, listColumnVector.child, childType, offset + j));
         }
         return values;
       }
@@ -191,7 +192,8 @@ public class ORCRecordExtractor extends BaseRecordExtractor<ORCRecordExtractor.R
       TypeDescription.Category category) {
     switch (category) {
       case BOOLEAN:
-        return ((LongColumnVector) columnVector).vector[rowId] == 1;
+        // ORC booleans are stored in a LongColumnVector as 0 / 1.
+        return Boolean.valueOf(((LongColumnVector) columnVector).vector[rowId] != 0);
       case BYTE:
       case SHORT:
       case INT:

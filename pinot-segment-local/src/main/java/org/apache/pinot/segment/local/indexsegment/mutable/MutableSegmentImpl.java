@@ -117,6 +117,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -831,7 +832,7 @@ public class MutableSegmentImpl implements MutableSegment {
         continue;
       }
 
-      Object[] values = (Object[]) row.getValue(entry.getKey());
+      Object[] values = RecordReaderUtils.toObjectArray(row.getValue(entry.getKey()));
       // Note that max chunk capacity is derived from "FixedByteMVMutableForwardIndex._maxNumberOfMultiValuesPerRow"
       // which is set to "1000" in "ForwardIndexType.MAX_MULTI_VALUES_PER_ROW". If the number of values in the
       // multi-value entry that we are attempting to ingest is greater than the maximum accepted value, we throw an
@@ -859,7 +860,7 @@ public class MutableSegmentImpl implements MutableSegment {
         if (indexContainer._fieldSpec.isSingleValueField()) {
           indexContainer._dictId = dictionary.index(value);
         } else {
-          indexContainer._dictIds = dictionary.index((Object[]) value);
+          indexContainer._dictIds = dictionary.index(RecordReaderUtils.toObjectArray(value));
         }
 
         // Update min/max value from dictionary
@@ -989,7 +990,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
         int[] dictIds = indexContainer._dictIds;
         indexContainer._valuesInfo.updateVarByteMVMaxRowLengthInBytes(value, dataType.getStoredType());
-        Object[] values = (Object[]) value;
+        Object[] values = RecordReaderUtils.toObjectArray(value);
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();

@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordReaderUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -60,7 +61,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
         if (fieldSpec.isSingleValueField()) {
           indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
         } else {
-          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+          indexMultiValueRow(dictionaryCreator, RecordReaderUtils.toObjectArray(columnValueToIndex), creatorsByIndex);
         }
       } catch (JsonParseException jpe) {
         throw new ColumnJsonParserException(columnName, jpe);
@@ -172,7 +173,8 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
         if (fieldSpec.isSingleValueField()) {
           indexSingleValueRow(dictionaryCreator, reuseColumnValueToIndex, creatorsByIndex);
         } else {
-          indexMultiValueRow(dictionaryCreator, (Object[]) reuseColumnValueToIndex, creatorsByIndex);
+          indexMultiValueRow(dictionaryCreator, RecordReaderUtils.toObjectArray(reuseColumnValueToIndex),
+              creatorsByIndex);
         }
       } catch (JsonParseException jpe) {
         throw new ColumnJsonParserException(columnName, jpe);
@@ -197,7 +199,7 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
     if (fieldSpec.isSingleValueField()) {
       indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
     } else {
-      indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+      indexMultiValueRow(dictionaryCreator, RecordReaderUtils.toObjectArray(columnValueToIndex), creatorsByIndex);
     }
 
     if (nullVec != null) {
