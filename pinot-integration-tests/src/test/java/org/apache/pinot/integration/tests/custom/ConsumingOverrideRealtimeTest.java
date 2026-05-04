@@ -224,7 +224,7 @@ public class ConsumingOverrideRealtimeTest extends CustomDataQueryClusterIntegra
     ///    index (the override is in effect). STRING_COLUMN_NO_OVERRIDE MUST also have a dictionary (default).
     int consumingSegmentsInspected = 0;
     int totalDocsAcrossConsumingSegments = 0;
-    for (BaseServerStarter serverStarter : _serverStarters) {
+    for (BaseServerStarter serverStarter : getSharedServerStarters()) {
       TableDataManager tableDataManager = serverStarter.getServerInstance().getInstanceDataManager()
           .getTableDataManager(realtimeTableName);
       if (tableDataManager == null) {
@@ -275,7 +275,7 @@ public class ConsumingOverrideRealtimeTest extends CustomDataQueryClusterIntegra
     ///    on first-ever segment creation but lost on subsequent rollovers.
     int immutableSegmentsInspected = 0;
     int newConsumingSegmentsInspected = 0;
-    for (BaseServerStarter serverStarter : _serverStarters) {
+    for (BaseServerStarter serverStarter : getSharedServerStarters()) {
       TableDataManager tableDataManager = serverStarter.getServerInstance().getInstanceDataManager()
           .getTableDataManager(realtimeTableName);
       if (tableDataManager == null) {

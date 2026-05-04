@@ -220,8 +220,8 @@ public class FieldConfig extends BaseJsonConfig {
   /// intentionally not overridable. Unknown keys are rejected at table-config validation time.
   ///
   /// Never returns `null`; absent override is represented as a `NullNode` (matching the contract of sibling
-  /// `JsonNode` accessors `getIndexes()` and `getTierOverwrites()`). To detect an actually-configured override
-  /// use {@code overrideJson.isObject() && !overrideJson.isEmpty()}.
+  /// `JsonNode` accessors `getIndexes()` and `getTierOverwrites()`). Validation rejects non-object override values;
+  /// use `overrideJson.isObject() && !overrideJson.isEmpty()` to detect an object override.
   public JsonNode getConsumingOverride() {
     return _consumingOverride;
   }

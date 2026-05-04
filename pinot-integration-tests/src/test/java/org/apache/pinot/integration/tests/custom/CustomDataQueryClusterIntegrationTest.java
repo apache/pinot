@@ -46,6 +46,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -338,6 +339,13 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
    */
   protected String getSharedKafkaBrokerList() {
     return _sharedClusterTestSuite.getKafkaBrokerList();
+  }
+
+  /// Returns the live server starters from the shared suite instance. Tests that need to inspect server-side state
+  /// (e.g. walk TableDataManager, acquire segments) must use this rather than `_serverStarters` on `this`, because in
+  /// suite mode only the shared instance has the populated list.
+  protected List<BaseServerStarter> getSharedServerStarters() {
+    return _sharedClusterTestSuite._serverStarters;
   }
 
   /**

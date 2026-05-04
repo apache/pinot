@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -48,12 +49,10 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/**
- * Tests for {@link TableConfigUtils#applyConsumingOverrides(TableConfig)} and the validation rules around
- * {@link FieldConfig#getConsumingOverride()}. The override is consuming-segment-only — it merges into the
- * {@link FieldConfig} that drives the mutable consuming segment, while the persisted/immutable segment shape comes
- * from the un-overridden table config.
- */
+/// Tests for [TableConfigUtils#applyConsumingOverrides(TableConfig)] and the validation rules around
+/// [FieldConfig#getConsumingOverride()]. The override is consuming-segment-only — it merges into the [FieldConfig]
+/// that drives the mutable consuming segment, while the persisted/immutable segment shape comes from the
+/// un-overridden table config.
 public class TableConfigConsumingOverrideTest {
   private static final String TABLE_NAME = "overrideTable";
   private static final String TIME_COLUMN = "ts";
@@ -80,10 +79,8 @@ public class TableConfigConsumingOverrideTest {
         "realtime.segment.flush.threshold.rows", "1000");
   }
 
-  /**
-   * Builds a FieldConfig that on the persisted/immutable side is RAW with no indexes, but with a consumingOverride
-   * that lifts it to DICTIONARY + INVERTED for the mutable consuming segment.
-   */
+  /// Builds a [FieldConfig] that on the persisted/immutable side is RAW with no indexes, but with a
+  /// `consumingOverride` that lifts it to DICTIONARY + INVERTED for the mutable consuming segment.
   private static FieldConfig buildRawColumnWithRichConsumingOverride(String name, ObjectNode override) {
     return new FieldConfig.Builder(name)
         .withEncodingType(FieldConfig.EncodingType.RAW)
@@ -144,6 +141,29 @@ public class TableConfigConsumingOverrideTest {
     /// Original tableConfig must not have been mutated — persisted/immutable side stays RAW.
     assertTrue(tableConfig.getIndexingConfig().getNoDictionaryColumns().contains("colA"),
         "applyConsumingOverrides must not mutate the input table config");
+  }
+
+  @Test
+  public void applyConsumingOverridesScrubsNoDictionaryConfig() {
+    ObjectNode override = JsonUtils.newObjectNode();
+    override.put("encodingType", FieldConfig.EncodingType.DICTIONARY.name());
+    FieldConfig overridden = buildRawColumnWithRichConsumingOverride("colA", override);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .build();
+    tableConfig.getIndexingConfig().setNoDictionaryConfig(Map.of("colA", "RAW", "colB", "RAW"));
+
+    TableConfig consumingView = TableConfigUtils.applyConsumingOverrides(tableConfig);
+    Map<String, String> noDictionaryConfig = consumingView.getIndexingConfig().getNoDictionaryConfig();
+    assertFalse(noDictionaryConfig.containsKey("colA"),
+        "colA should be scrubbed from noDictionaryConfig on the consuming view");
+    assertEquals(noDictionaryConfig.get("colB"), "RAW",
+        "unrelated noDictionaryConfig entries must be preserved");
+    assertTrue(tableConfig.getIndexingConfig().getNoDictionaryConfig().containsKey("colA"),
+        "applyConsumingOverrides must not mutate the input noDictionaryConfig");
   }
 
   @Test
@@ -231,6 +251,28 @@ public class TableConfigConsumingOverrideTest {
   }
 
   @Test
+  public void validateRejectsNonObjectConsumingOverride() {
+    FieldConfig overridden = new FieldConfig.Builder("colA")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withConsumingOverride(JsonUtils.newArrayNode())
+        .build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfig, buildSchema());
+      fail("Expected validation failure for non-object consumingOverride");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("must be a JSON object"),
+          "Expected object-shape message, got: " + e.getMessage());
+    }
+  }
+
+  @Test
   public void validateAcceptsValidConsumingOverride() {
     ObjectNode override = JsonUtils.newObjectNode();
     override.put("encodingType", FieldConfig.EncodingType.DICTIONARY.name());
@@ -246,6 +288,24 @@ public class TableConfigConsumingOverrideTest {
         .build();
 
     // Should not throw — colA is RAW persisted, DICTIONARY + INVERTED on consuming.
+    TableConfigUtils.validate(tableConfig, buildSchema());
+  }
+
+  @Test
+  public void validateAcceptsValidConsumingOverrideWithNoDictionaryConfig() {
+    ObjectNode override = JsonUtils.newObjectNode();
+    override.put("encodingType", FieldConfig.EncodingType.DICTIONARY.name());
+    override.set("indexes",
+        JsonUtils.newObjectNode().set("inverted", JsonUtils.newObjectNode().put("enabled", true)));
+    FieldConfig overridden = buildRawColumnWithRichConsumingOverride("colA", override);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .build();
+    tableConfig.getIndexingConfig().setNoDictionaryConfig(Map.of("colA", "RAW"));
+
     TableConfigUtils.validate(tableConfig, buildSchema());
   }
 
@@ -290,6 +350,28 @@ public class TableConfigConsumingOverrideTest {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("Unknown FieldConfig.consumingOverride key"),
           "Expected unknown-key message, got: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void applyConsumingOverridesRejectsNonObjectOverrideOnStaleConfig() {
+    FieldConfig overridden = new FieldConfig.Builder("colA")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withConsumingOverride(JsonUtils.newArrayNode())
+        .build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .build();
+
+    try {
+      TableConfigUtils.applyConsumingOverrides(tableConfig);
+      fail("Expected applyConsumingOverrides to reject a non-object override");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("must be a JSON object"),
+          "Expected object-shape message, got: " + e.getMessage());
     }
   }
 
@@ -366,6 +448,33 @@ public class TableConfigConsumingOverrideTest {
       assertTrue(e.getMessage().contains("indexTypes"),
           "Expected message to surface the bad key, got: " + e.getMessage());
     }
+  }
+
+  @Test
+  public void applyConsumingOverridesClearsLegacyIndexTypesWhenIndexesOverridePresent() {
+    ObjectNode override = JsonUtils.newObjectNode();
+    override.set("indexes",
+        JsonUtils.newObjectNode().set("inverted", JsonUtils.newObjectNode().put("enabled", true)));
+    FieldConfig overridden = new FieldConfig.Builder("colA")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .withIndexTypes(List.of(FieldConfig.IndexType.INVERTED))
+        .withConsumingOverride(override)
+        .build();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .build();
+
+    TableConfig consumingView = TableConfigUtils.applyConsumingOverrides(tableConfig);
+    FieldConfig consumingCol = consumingView.getFieldConfigList().get(0);
+    assertTrue(consumingCol.getIndexTypes().isEmpty(),
+        "consumingOverride.indexes must replace and clear legacy indexTypes");
+    assertTrue(consumingCol.getIndexes().path("inverted").path("enabled").asBoolean(false),
+        "modern indexes override should be preserved");
+    assertEquals(tableConfig.getFieldConfigList().get(0).getIndexTypes(), List.of(FieldConfig.IndexType.INVERTED),
+        "applyConsumingOverrides must not mutate legacy indexTypes on the input");
   }
 
   @Test
@@ -527,6 +636,28 @@ public class TableConfigConsumingOverrideTest {
   }
 
   @Test
+  public void applyConsumingOverridesRejectsSortedColumnOnStaleConfig() {
+    ObjectNode override = JsonUtils.newObjectNode();
+    override.put("encodingType", FieldConfig.EncodingType.DICTIONARY.name());
+    FieldConfig overridden = buildRawColumnWithRichConsumingOverride("colA", override);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .setSortedColumn("colA")
+        .build();
+
+    try {
+      TableConfigUtils.applyConsumingOverrides(tableConfig);
+      fail("Expected applyConsumingOverrides to reject sorted column override");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("sorted column"),
+          "Expected sorted-column message, got: " + e.getMessage());
+    }
+  }
+
+  @Test
   public void validateRejectsCompressionCodecKeyOutsideAllowlist() {
     /// `compressionCodec` is intentionally NOT in the allowlist — only `encodingType` + `indexes` are allowed.
     ObjectNode override = JsonUtils.newObjectNode();
@@ -569,7 +700,7 @@ public class TableConfigConsumingOverrideTest {
     IndexLoadingConfig ilc = new IndexLoadingConfig(tableConfig, buildSchema());
     /// Track that the onFallback callback fired — this is the hook RealtimeSegmentDataManager uses to bump the
     /// CONSUMING_OVERRIDE_FALLBACK metric, so the test asserts the contract the production caller relies on.
-    java.util.concurrent.atomic.AtomicInteger fallbackInvocations = new java.util.concurrent.atomic.AtomicInteger();
+    AtomicInteger fallbackInvocations = new AtomicInteger();
     /// Should NOT throw — the helper catches and logs.
     RealtimeSegmentConfig.Builder builder = TableConfigUtils.buildConsumingSegmentConfigBuilder(
         tableConfig, buildSchema(), ilc, LoggerFactory.getLogger(TableConfigConsumingOverrideTest.class),
@@ -602,6 +733,31 @@ public class TableConfigConsumingOverrideTest {
     try {
       TableConfigUtils.validate(tableConfig, buildSchema());
       fail("Expected validation failure for consuming override on partition column");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("partition column"),
+          "Expected partition-column message, got: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void applyConsumingOverridesRejectsPartitionColumnOnStaleConfig() {
+    ObjectNode override = JsonUtils.newObjectNode();
+    override.put("encodingType", FieldConfig.EncodingType.DICTIONARY.name());
+    FieldConfig overridden = buildRawColumnWithRichConsumingOverride("colA", override);
+
+    ColumnPartitionConfig partitionCfg = new ColumnPartitionConfig("Murmur", 4);
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(Map.of("colA", partitionCfg));
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(streamConfigs())
+        .setFieldConfigList(List.of(overridden))
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .build();
+
+    try {
+      TableConfigUtils.applyConsumingOverrides(tableConfig);
+      fail("Expected applyConsumingOverrides to reject partition column override");
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains("partition column"),
           "Expected partition-column message, got: " + e.getMessage());
