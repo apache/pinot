@@ -81,9 +81,8 @@ public class RangeIndexType
     if (rangeIndexConfig.isEnabled()) {
       String column = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      Preconditions.checkState(
-          storedType.isNumeric() || indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
-          "Cannot create range index on non-numeric column: %s without dictionary", column);
+      Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create range index on column: %s without dictionary", column);
       Preconditions.checkState(storedType != DataType.MAP, "Cannot create range index on MAP column: %s", column);
     }
   }
