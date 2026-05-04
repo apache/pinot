@@ -152,10 +152,8 @@ public class InvertedIndexType
 
   @Override
   public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
-    // Inverted index posting lists are keyed by dictionary IDs. Note: a separate raw-value bitmap inverted index
-    // currently exists for SV no-dictionary columns (RawValueBitmapInvertedIndexCreator); under the upcoming
-    // shared-dictionary contract (apache/pinot#17269) that path is removed and any enabled inverted index requires
-    // a dictionary, so we declare the dependency unconditionally here.
+    // Inverted index posting lists are keyed by dictionary IDs; an enabled inverted index always requires a
+    // dictionary.
     return true;
   }
 

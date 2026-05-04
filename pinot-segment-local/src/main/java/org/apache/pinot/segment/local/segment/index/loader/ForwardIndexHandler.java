@@ -990,11 +990,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     ColumnMetadata existingColMetadata = segmentMetadata.getColumnMetadataFor(column);
     FieldSpec fieldSpec = existingColMetadata.getFieldSpec();
-    AbstractColumnStatisticsCollector statsCollector;
-    SegmentDictionaryCreator dictionaryCreator;
+    int dictionaryCardinality;
+    int dictionaryElementSize;
     try (ForwardIndexReader<?> reader = StandardIndexes.forward().getReaderFactory()
         .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
-      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType());
+      AbstractColumnStatisticsCollector statsCollector =
+          getStatsCollector(column, fieldSpec.getDataType().getStoredType());
       try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < existingColMetadata.getTotalDocs(); i++) {
@@ -1008,31 +1009,37 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           || DictionaryIndexType.shouldUseVarLengthDictionary(reader.getStoredType(), statsCollector)
           || (optimizeDictionaryType
           && DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(reader.getStoredType(), statsCollector));
-      dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, indexDir, useVarLength);
-      try {
-        dictionaryCreator.build(statsCollector.getUniqueValuesSet());
-      } catch (Exception e) {
-        dictionaryCreator.close();
-        throw e;
+      try (SegmentDictionaryCreator dictionaryCreator =
+          new SegmentDictionaryCreator(fieldSpec, indexDir, useVarLength)) {
+        // Capture cardinality from the unique-values set passed to build() rather than from the stats collector,
+        // because some collectors over-count by tracking null/duplicate occurrences separately. The dictionary on
+        // disk has exactly java.lang.reflect.Array.getLength(uniqueValues) entries.
+        Object uniqueValues = statsCollector.getUniqueValuesSet();
+        dictionaryCardinality = java.lang.reflect.Array.getLength(uniqueValues);
+        dictionaryCreator.build(uniqueValues);
+        dictionaryElementSize = dictionaryCreator.getNumBytesPerEntry();
       }
     }
 
     LoaderUtils.writeIndexToV3Format(segmentWriter, column, dictionaryFile, StandardIndexes.dictionary());
 
+    Preconditions.checkState(dictionaryCardinality > 0,
+        "Dictionary cardinality for column %s must be > 0 to compute BITS_PER_ELEMENT", column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
     metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
-    metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
-        String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
-    int cardinality = statsCollector.getCardinality();
-    metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
+    metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
+    metadataProperties.put(getKeyFor(column, CARDINALITY), String.valueOf(dictionaryCardinality));
     metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT),
-        String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
+        String.valueOf(PinotDataBitSet.getNumBitsPerValue(dictionaryCardinality - 1)));
     SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
 
     // Secondary indexes that require dictionary semantics should be rebuilt against the new shared dictionary.
     removeDictRelatedIndexes(column, segmentWriter);
 
+    // Delete the inprogress marker only after the cleanup is complete. If the JVM dies between the metadata write
+    // and the secondary-index removal, the marker still exists; on next preprocess `inProgress.exists()` deletes
+    // the partial dictionary file and the rebuild starts fresh.
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created dictionary for raw forward index segment={} column={}", segmentName, column);

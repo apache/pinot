@@ -42,6 +42,12 @@ public final class DictionaryBasedIndexBuilder {
   /// Reads raw values from `forwardIndexReader`, looks each value up in `dictionary`, and feeds the
   /// (value, dictId) pair into `creator` for every doc in the segment.
   ///
+  /// **MV allocation note:** the multi-value [DictionaryBasedInvertedIndexCreator#addIntMV] family takes
+  /// `(values, dictIds)` where `dictIds.length` must equal `values.length`, and the reader's no-buffer overload
+  /// returns an exact-length values array. As a result, both arrays are necessarily fresh per-row allocations under
+  /// the current SPI; eliminating either one would require a length-aware `addXxxMV(values, dictIds, length)` SPI
+  /// method.
+  ///
   /// @throws IllegalStateException if the column data type is unsupported, or if the column is multi-value with a
   ///     data type that does not support MV (e.g. BIG_DECIMAL).
   @SuppressWarnings("rawtypes")

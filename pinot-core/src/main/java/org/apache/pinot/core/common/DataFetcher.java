@@ -331,6 +331,11 @@ public class DataFetcher implements AutoCloseable {
 
     boolean _readerContextCreated;
     ForwardIndexReaderContext _readerContext;
+    /// Lazily-initialized typed value buffer for the RAW MV path in [#readDictIdsFromRawValuesMV]. Sized to the
+    /// outer-class `_maxNumValuesPerMVEntry`. Held as `Object` because the type depends on `_storedType`; cast in
+    /// the per-type switch arm. Allocated once per ColumnValueReader (which is per-column), then reused across
+    /// every `readDictIdsMV` call to avoid per-batch allocations under the shared-dict + RAW MV workload.
+    private Object _rawMVValueBuffer;
 
     ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary, boolean useDictionary) {
       _reader = reader;
@@ -632,12 +637,18 @@ public class DataFetcher implements AutoCloseable {
     /// Multi-value counterpart to [#readDictIdsFromRawValues]. Used when the column has a RAW MV forward index
     /// but a shared dictionary exists (auto-created for a secondary index that requires it). For each docId, reads
     /// the raw MV cell, looks up each element in the dictionary, and emits the resulting dict-id array.
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    ///
+    /// Uses a per-reader reusable typed value buffer ([#_rawMVValueBuffer]) to avoid per-batch allocations. The
+    /// per-doc `int[] dictIds` array is allocated fresh because each entry escapes via `dictIdsBuffer[i]` (the
+    /// caller may retain references), so it cannot be reused across docs within a single call.
     private void readDictIdsFromRawValuesMV(int[] docIds, int length, int[][] dictIdsBuffer,
         ForwardIndexReaderContext readerContext) {
       switch (_storedType) {
         case INT: {
-          int[] valueBuffer = new int[_maxNumValuesPerMVEntry];
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new int[_maxNumValuesPerMVEntry];
+          }
+          int[] valueBuffer = (int[]) _rawMVValueBuffer;
           for (int i = 0; i < length; i++) {
             int numValues = _reader.getIntMV(docIds[i], valueBuffer, readerContext);
             int[] dictIds = new int[numValues];
@@ -649,7 +660,10 @@ public class DataFetcher implements AutoCloseable {
           return;
         }
         case LONG: {
-          long[] valueBuffer = new long[_maxNumValuesPerMVEntry];
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new long[_maxNumValuesPerMVEntry];
+          }
+          long[] valueBuffer = (long[]) _rawMVValueBuffer;
           for (int i = 0; i < length; i++) {
             int numValues = _reader.getLongMV(docIds[i], valueBuffer, readerContext);
             int[] dictIds = new int[numValues];
@@ -661,7 +675,10 @@ public class DataFetcher implements AutoCloseable {
           return;
         }
         case FLOAT: {
-          float[] valueBuffer = new float[_maxNumValuesPerMVEntry];
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new float[_maxNumValuesPerMVEntry];
+          }
+          float[] valueBuffer = (float[]) _rawMVValueBuffer;
           for (int i = 0; i < length; i++) {
             int numValues = _reader.getFloatMV(docIds[i], valueBuffer, readerContext);
             int[] dictIds = new int[numValues];
@@ -673,7 +690,10 @@ public class DataFetcher implements AutoCloseable {
           return;
         }
         case DOUBLE: {
-          double[] valueBuffer = new double[_maxNumValuesPerMVEntry];
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new double[_maxNumValuesPerMVEntry];
+          }
+          double[] valueBuffer = (double[]) _rawMVValueBuffer;
           for (int i = 0; i < length; i++) {
             int numValues = _reader.getDoubleMV(docIds[i], valueBuffer, readerContext);
             int[] dictIds = new int[numValues];
@@ -685,7 +705,10 @@ public class DataFetcher implements AutoCloseable {
           return;
         }
         case STRING: {
-          String[] valueBuffer = new String[_maxNumValuesPerMVEntry];
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new String[_maxNumValuesPerMVEntry];
+          }
+          String[] valueBuffer = (String[]) _rawMVValueBuffer;
           for (int i = 0; i < length; i++) {
             int numValues = _reader.getStringMV(docIds[i], valueBuffer, readerContext);
             int[] dictIds = new int[numValues];
@@ -697,7 +720,10 @@ public class DataFetcher implements AutoCloseable {
           return;
         }
         case BYTES: {
-          byte[][] valueBuffer = new byte[_maxNumValuesPerMVEntry][];
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new byte[_maxNumValuesPerMVEntry][];
+          }
+          byte[][] valueBuffer = (byte[][]) _rawMVValueBuffer;
           for (int i = 0; i < length; i++) {
             int numValues = _reader.getBytesMV(docIds[i], valueBuffer, readerContext);
             int[] dictIds = new int[numValues];

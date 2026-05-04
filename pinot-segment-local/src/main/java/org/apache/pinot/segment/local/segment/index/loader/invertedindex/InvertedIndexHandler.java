@@ -157,22 +157,26 @@ public class InvertedIndexHandler extends BaseIndexHandler {
   /// `RawValueBitmapInvertedIndexCreator` (before this format was replaced by a shared standalone dictionary +
   /// standard bitmap inverted index).
   ///
-  /// The legacy format starts with a 44-byte header in *little-endian* byte order:
+  /// Both the legacy file and modern bitmap inverted index files are mapped via [PinotDataBuffer] in
+  /// big-endian order (see `FilePerIndexDirectory`), so all reads here are big-endian. The legacy format starts
+  /// with a 44-byte header:
   ///
   /// - offset 0: version int (always 1)
   /// - offset 4: cardinality int
-  /// - offsets 12, 20, 28, 36: 8-byte long offsets into the file
+  /// - offset 8: max-length int (0 for fixed-width data types)
+  /// - offsets 12, 20, 28, 36: 8-byte longs (dict offset, dict length, inverted-index offset, inverted-index length)
   ///
-  /// The new standard bitmap inverted index format written by
-  /// [org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter] stores its offset
-  /// table in *big-endian* byte order (Java's default [java.nio.ByteBuffer] byte order). The first 4 bytes
-  /// store the start offset of the first bitmap as a big-endian int, which equals `(cardinality + 1) * 4`.
-  /// [org.apache.pinot.segment.spi.memory.PinotDataBuffer#getInt] reads with native (little-endian) byte order,
-  /// so it interprets those bytes as `Integer.reverseBytes((cardinality + 1) * 4)`. For this reversed value to
-  /// equal 1 (the legacy version), `(cardinality + 1) * 4` would need to be `0x01000000 = 16777216`,
-  /// i.e. cardinality ~4.2 M. Even in that extremely unlikely case the second check
-  /// (`getInt(4) == columnMetadata.getCardinality()`) would almost certainly fail because that position holds the
-  /// end-offset of the first bitmap (a large number). False positives are therefore effectively impossible.
+  /// The modern format written by
+  /// [org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter] starts with an offset
+  /// table whose first int is the start offset of bitmap 0, equal to `(cardinality + 1) * 4` — the size of the
+  /// offset table itself. False positives against a legacy-format check are therefore effectively impossible
+  /// because:
+  ///
+  /// - For a modern file to pass `getInt(0) == 1`, the offset table size would have to be 1 byte, which is
+  ///   impossible (each entry is 4 bytes and the smallest valid value with one bitmap is 8).
+  /// - The follow-up `getInt(4) == cardinality` further narrows: in the modern format that position holds the
+  ///   end-offset of bitmap 0 (typically a large number unrelated to cardinality).
+  /// - The trailing offset/length range checks against `dataBuffer.size()` reject random byte patterns.
   public static boolean isLegacyRawValueInvertedIndexFormat(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata) {
     if (dataBuffer.size() < 44) {
       return false;
