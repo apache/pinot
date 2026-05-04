@@ -392,14 +392,13 @@ public class TableIndexingTest {
           idxCfg.setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of(field.getName())));
           break;
         case "range_index":
-            /* range index (supported for dictionary encoded columns of any type as well as raw encoded columns
-            of a numeric type)
+            /* range index — under the shared-dict design, range is always built over dictionary IDs and
+               therefore requires a dictionary. For RAW-encoded columns the user opts in to a shared standalone
+               dictionary by adding `indexes.dictionary: {}` to the column's FieldConfig (mirroring the FST/IFST
+               opt-in path).
                 {
                   "tableIndexConfig": {
-                      "rangeIndexColumns": [
-                          "column_name",
-                          ...
-                      ],
+                      "rangeIndexColumns": [ "column_name", ... ],
                       ...
                   }
               }
@@ -408,6 +407,9 @@ public class TableIndexingTest {
             idxCfg.setRangeIndexColumns(new ArrayList<>());
           }
           idxCfg.getRangeIndexColumns().add(field.getName());
+          if (encoding == FieldConfig.EncodingType.RAW) {
+            indexes.put("dictionary", new ObjectNode(JsonNodeFactory.instance));
+          }
           break;
         case "startree_index":
              /* star tree
