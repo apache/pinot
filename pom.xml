@@ -247,7 +247,7 @@
     <!-- DO NOT upgrade these versions unless we are migrating to Jakarta EE -->
     <jakarta.servlet-api.version>4.0.4</jakarta.servlet-api.version>        <!-- DO NOT UPGRADE -->
     <javax.servlet-api.version>4.0.1</javax.servlet-api.version>            <!-- DO NOT UPGRADE -->
-    <jakarta.annotation-api.version>1.3.5</jakarta.annotation-api.version>  <!-- DO NOT UPGRADE -->
+    <jakarta.annotation-api.version>3.0.0</jakarta.annotation-api.version>  <!-- DO NOT UPGRADE -->
     <javax.annotation-api.version>1.3.2</javax.annotation-api.version>      <!-- DO NOT UPGRADE -->
     <jakarta.validation-api.version>2.0.2</jakarta.validation-api.version>  <!-- DO NOT UPGRADE -->
     <javax.validation-api.version>2.0.1.Final</javax.validation-api.version><!-- DO NOT UPGRADE -->
