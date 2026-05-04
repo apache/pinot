@@ -142,12 +142,47 @@ public class RangeIndexHandler extends BaseIndexHandler {
     // Create a temporary forward index if it is disabled and does not exist
     columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
 
+    // Range index is always built over dictionary IDs (RangeIndexType.requiresDictionary == true). For RAW forward
+    // columns with a dictionary-requiring index, ForwardIndexHandler runs first and materializes a shared standalone
+    // dictionary (the ENABLE_DICTIONARY op). If we reach this point without a dictionary on disk, the handler
+    // pipeline has been violated — fail fast rather than build a stale or wrongly-typed index.
+    if (!columnMetadata.hasDictionary()) {
+      FileUtils.deleteQuietly(inProgress);
+      throw new IllegalStateException(
+          "Cannot create range index for segment: " + segmentName + ", column: " + columnName
+              + " — no dictionary present. ForwardIndexHandler must create a shared standalone dictionary before "
+              + "RangeIndexHandler runs, since range indexes are keyed by dict IDs.");
+    }
+
     // Create new range index for the column.
     LOGGER.info("Creating new range index for segment: {}, column: {}", segmentName, columnName);
-    if (columnMetadata.hasDictionary()) {
-      handleDictionaryBasedColumn(segmentWriter, columnMetadata);
-    } else {
-      handleNonDictionaryBasedColumn(segmentWriter, columnMetadata);
+    int numDocs = columnMetadata.getTotalDocs();
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader =
+            readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(columnName), columnMetadata);
+        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
+        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
+      if (forwardIndexReader.isDictionaryEncoded()) {
+        if (columnMetadata.isSingleValue()) {
+          for (int i = 0; i < numDocs; i++) {
+            rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
+          }
+        } else {
+          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+          for (int i = 0; i < numDocs; i++) {
+            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+            rangeIndexCreator.add(dictIds, length);
+          }
+        }
+      } else {
+        // RAW forward + shared standalone dictionary: read raw values and look each up in the dictionary to feed
+        // dict IDs into the range index.
+        try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+          DictionaryBasedIndexBuilder.addRawValuesViaDictionary(rangeIndexCreator, forwardIndexReader, readerContext,
+              dictionary, columnMetadata, numDocs);
+        }
+      }
+      rangeIndexCreator.seal();
     }
 
     // For v3, write the generated range index file into the single file and remove it.
@@ -159,113 +194,6 @@ public class RangeIndexHandler extends BaseIndexHandler {
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created range index for segment: {}, column: {}", segmentName, columnName);
-  }
-
-  private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws Exception {
-    int numDocs = columnMetadata.getTotalDocs();
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
-        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
-      if (forwardIndexReader.isDictionaryEncoded()) {
-        if (columnMetadata.isSingleValue()) {
-          // Single-value column
-          for (int i = 0; i < numDocs; i++) {
-            rangeIndexCreator.add(forwardIndexReader.getDictId(i, readerContext));
-          }
-        } else {
-          // Multi-value column
-          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-          for (int i = 0; i < numDocs; i++) {
-            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-            rangeIndexCreator.add(dictIds, length);
-          }
-        }
-      } else {
-        try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
-          DictionaryBasedIndexBuilder.addRawValuesViaDictionary(rangeIndexCreator, forwardIndexReader, readerContext,
-              dictionary,
-              columnMetadata, numDocs);
-        }
-      }
-      rangeIndexCreator.seal();
-    }
-  }
-
-  private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws Exception {
-    int numDocs = columnMetadata.getTotalDocs();
-    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
-        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
-        ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
-        CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
-      if (columnMetadata.isSingleValue()) {
-        // Single-value column.
-        switch (columnMetadata.getDataType().getStoredType()) {
-          case INT:
-            for (int i = 0; i < numDocs; i++) {
-              rangeIndexCreator.add(forwardIndexReader.getInt(i, readerContext));
-            }
-            break;
-          case LONG:
-            for (int i = 0; i < numDocs; i++) {
-              rangeIndexCreator.add(forwardIndexReader.getLong(i, readerContext));
-            }
-            break;
-          case FLOAT:
-            for (int i = 0; i < numDocs; i++) {
-              rangeIndexCreator.add(forwardIndexReader.getFloat(i, readerContext));
-            }
-            break;
-          case DOUBLE:
-            for (int i = 0; i < numDocs; i++) {
-              rangeIndexCreator.add(forwardIndexReader.getDouble(i, readerContext));
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
-        }
-      } else {
-        // Multi-value column
-        int maxNumValuesPerMVEntry = columnMetadata.getMaxNumberOfMultiValues();
-        switch (columnMetadata.getDataType().getStoredType()) {
-          case INT:
-            int[] intValues = new int[maxNumValuesPerMVEntry];
-            for (int i = 0; i < numDocs; i++) {
-              int length = forwardIndexReader.getIntMV(i, intValues, readerContext);
-              rangeIndexCreator.add(intValues, length);
-            }
-            break;
-          case LONG:
-            long[] longValues = new long[maxNumValuesPerMVEntry];
-            for (int i = 0; i < numDocs; i++) {
-              int length = forwardIndexReader.getLongMV(i, longValues, readerContext);
-              rangeIndexCreator.add(longValues, length);
-            }
-            break;
-          case FLOAT:
-            float[] floatValues = new float[maxNumValuesPerMVEntry];
-            for (int i = 0; i < numDocs; i++) {
-              int length = forwardIndexReader.getFloatMV(i, floatValues, readerContext);
-              rangeIndexCreator.add(floatValues, length);
-            }
-            break;
-          case DOUBLE:
-            double[] doubleValues = new double[maxNumValuesPerMVEntry];
-            for (int i = 0; i < numDocs; i++) {
-              int length = forwardIndexReader.getDoubleMV(i, doubleValues, readerContext);
-              rangeIndexCreator.add(doubleValues, length);
-            }
-            break;
-          default:
-            throw new IllegalStateException("Unsupported data type: " + columnMetadata.getDataType());
-        }
-      }
-      rangeIndexCreator.seal();
-    }
   }
 
   private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata)

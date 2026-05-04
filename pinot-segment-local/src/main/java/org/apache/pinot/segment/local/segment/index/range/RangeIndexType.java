@@ -162,14 +162,17 @@ public class RangeIndexType
 
   @Override
   public boolean requiresDictionary(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
-    // Range index supports both dict-encoded (range over dict IDs) and raw (range over values) columns.
-    return false;
+    // Range index is always built over dictionary IDs. RAW forward columns that want a range index must opt in to a
+    // shared standalone dictionary (`fieldConfig.indexes.dictionary: {}`); the loader auto-creates one on segment
+    // load, and segment generation keeps the dictionary because of this requirement.
+    return true;
   }
 
   @Override
   public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
-    // The on-disk format differs: dict-encoded ranges use dict IDs while raw ranges use raw values. Transitioning
-    // between the two states requires rebuilding the index against the new domain.
+    // Even though range now always requires a dictionary, the dictionary itself can change (added on a previously
+    // raw column, or its cardinality bucket changed). The range index is keyed by dict IDs and must be rebuilt
+    // whenever the dictionary state on disk changes.
     return true;
   }
 

@@ -1302,66 +1302,55 @@ public class ForwardIndexHandlerTest {
   }
 
   /**
-   * Regression test for the "raw range index built first, dict added later" scenario.
+   * End-to-end "enable dictionary on a RAW column with a range index" scenario.
    *
-   * <p>When a column initially has RAW forward + raw-value range index (no dict), the range index file stores raw
-   * values and {@code BitSlicedRangeIndexReader} reads {@code _max} from {@code metadata.getMaxValue()}. If a
-   * dictionary is later added to the column via segment reload, the existing reader logic at
-   * {@code BitSlicedRangeIndexReader} would compute {@code _max = cardinality - 1} (the dict-id branch), causing
-   * silently wrong query results.
+   * <p>{@link org.apache.pinot.segment.local.segment.index.range.RangeIndexType#requiresDictionary} returns
+   * {@code true}: a range index is always built over dictionary IDs. A user who wants a range index on a RAW
+   * forward column must opt in to a shared standalone dictionary by adding {@code indexes.dictionary: {}} to the
+   * column's {@code FieldConfig}; on segment reload, {@code ForwardIndexHandler.ENABLE_DICTIONARY} materializes
+   * the dictionary on disk and {@link RangeIndexHandler} then builds the range index over those dict IDs.
    *
-   * <p>The reload pipeline avoids this by removing the existing range index file inside
-   * {@code ForwardIndexHandler.removeDictRelatedIndexes} during the {@code ENABLE_DICTIONARY} operation. The
-   * subsequent {@code RangeIndexHandler.updateIndices} pass then rebuilds the range index using the now-set
-   * {@code hasDictionary=true} metadata, producing a dict-id-based range index that matches the reader's
-   * assumption. This test pins down both halves of that contract.
+   * <p>This test pins down the full handler chain: starting from a RAW column with no dictionary and no range
+   * index, after the config change and one reload pass the column ends up with {@code hasDictionary=true} (forward
+   * index still RAW-encoded), a dictionary file on disk, and a freshly built dict-id-based range index. If a
+   * future change re-orders handlers, drops range from {@code DICTIONARY_BASED_INDEXES_TO_REWRITE}, or breaks the
+   * RAW-with-shared-dict path in either handler, this test catches the regression.
    */
   @Test
-  public void testEnableDictionaryRebuildsRangeIndexOnRawForward()
+  public void testEnableDictionaryAndRangeOnRawForwardColumn()
       throws Exception {
     String column = METRIC_LZ4_INTEGER;
     SegmentMetadataImpl existingSegmentMetadata;
 
-    // Step 1: build a raw-value range index on the RAW column. This simulates the "before" state where the column
-    // has no dictionary and the range index was created over raw values.
-    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
-        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
-      _segmentDirectory = segmentDirectory;
-      _writer = writer;
-      existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
-
-      _rangeIndexColumns.add(column);
-      RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentDirectory, createIndexLoadingConfig());
-      assertTrue(rangeIndexHandler.needUpdateIndices(writer));
-      rangeIndexHandler.updateIndices(writer);
-      rangeIndexHandler.postUpdateIndicesCleanup(writer);
-    }
-
-    // Range index should now exist on a column without a dictionary.
+    // Pre-condition: column starts as RAW (no dictionary, no range index). A range index on a no-dictionary column
+    // is no longer a valid configuration; a user reaching this state migrates by adding both the explicit
+    // dictionary and the range index in the same reload.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-      ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      existingSegmentMetadata = segmentDirectory.getSegmentMetadata();
+      ColumnMetadata columnMetadata = existingSegmentMetadata.getColumnMetadataFor(column);
       assertFalse(columnMetadata.hasDictionary(),
-          "Pre-condition: column should not have a dictionary before ENABLE_DICTIONARY");
-      assertTrue(reader.hasIndexFor(column, StandardIndexes.range()),
-          "Pre-condition: range index should exist before dictionary is enabled");
+          "Pre-condition: column should start without a dictionary");
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.range()),
+          "Pre-condition: column should start without a range index");
     }
 
-    // Step 2: enable dictionary on this RAW column. ForwardIndexHandler should detect ENABLE_DICTIONARY and remove
-    // the raw-value range index file as part of removeDictRelatedIndexes (range/inverted/fst all get rebuilt).
+    // Update config: opt-in to a shared dictionary (RAW + indexes.dictionary: {}) and add a range index.
+    _noDictionaryColumns.remove(column);
+    _rangeIndexColumns.add(column);
+    FieldConfig existingFieldConfig = _fieldConfigMap.get(column);
+    ObjectNode dictIndexes = JsonUtils.newObjectNode();
+    dictIndexes.set("dictionary", JsonUtils.newObjectNode());
+    _fieldConfigMap.put(column,
+        new FieldConfig(column, FieldConfig.EncodingType.RAW, null, null,
+            existingFieldConfig != null ? existingFieldConfig.getCompressionCodec() : null, null, dictIndexes,
+            null, null));
+
+    // Step 1: ForwardIndexHandler emits ENABLE_DICTIONARY, materializing a standalone dictionary on the RAW column.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       _segmentDirectory = segmentDirectory;
       _writer = writer;
-
-      _noDictionaryColumns.remove(column);
-      FieldConfig existingFieldConfig = _fieldConfigMap.get(column);
-      ObjectNode dictIndexes = JsonUtils.newObjectNode();
-      dictIndexes.set("dictionary", JsonUtils.newObjectNode());
-      _fieldConfigMap.put(column,
-          new FieldConfig(column, FieldConfig.EncodingType.RAW, null, null,
-              existingFieldConfig != null ? existingFieldConfig.getCompressionCodec() : null, null, dictIndexes,
-              null, null));
 
       ForwardIndexHandler forwardIndexHandler = createForwardIndexHandler();
       assertEquals(forwardIndexHandler.computeOperations(writer),
@@ -1370,7 +1359,7 @@ public class ForwardIndexHandlerTest {
       forwardIndexHandler.postUpdateIndicesCleanup(writer);
     }
 
-    // Verify: dict now exists, range index file was removed (waiting for RangeIndexHandler to rebuild it).
+    // Verify: dictionary on disk, forward index still RAW-encoded, no range index yet.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
@@ -1379,12 +1368,11 @@ public class ForwardIndexHandlerTest {
           "Forward index should remain RAW-encoded");
       assertTrue(reader.hasIndexFor(column, StandardIndexes.dictionary()));
       assertFalse(reader.hasIndexFor(column, StandardIndexes.range()),
-          "Stale raw-value range index must be removed when dictionary is enabled — RangeIndexHandler will rebuild");
+          "RangeIndexHandler has not run yet, so the range index should not exist");
     }
 
-    // Step 3: rebuild the range index. RangeIndexType.createIndexCreator now sees columnMetadata.hasDictionary() ==
-    // true and constructs a dict-id-based range index (cardinality variant of BitSlicedRangeIndexCreator), which is
-    // what BitSlicedRangeIndexReader's _max-from-cardinality branch expects.
+    // Step 2: RangeIndexHandler now sees columnMetadata.hasDictionary() == true and builds the range index over
+    // dict IDs (reading raw forward values and looking each up in the shared dictionary).
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       _segmentDirectory = segmentDirectory;
@@ -1392,34 +1380,37 @@ public class ForwardIndexHandlerTest {
 
       RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentDirectory, createIndexLoadingConfig());
       assertTrue(rangeIndexHandler.needUpdateIndices(writer),
-          "RangeIndexHandler should detect missing range index and recreate");
+          "RangeIndexHandler should detect the new range index in the config");
       rangeIndexHandler.updateIndices(writer);
       rangeIndexHandler.postUpdateIndicesCleanup(writer);
     }
 
-    // Final state: dict exists, range index exists and is dict-based by virtue of being built with dict present.
+    // Final state: dict + range present, forward index still RAW-encoded.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       assertTrue(columnMetadata.hasDictionary());
+      assertEquals(columnMetadata.getForwardIndexEncoding(), FieldConfig.EncodingType.RAW);
       assertTrue(reader.hasIndexFor(column, StandardIndexes.range()),
-          "Range index should be rebuilt by RangeIndexHandler after dictionary was enabled");
+          "Range index should be built by RangeIndexHandler over the new dictionary");
       validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
           existingSegmentMetadata.getColumnMetadataFor(column), true);
     }
   }
 
   /**
-   * Symmetric counterpart to {@link #testEnableDictionaryRebuildsRangeIndexOnRawForward}: when a dictionary is
-   * removed from a column that has a range index, the existing dict-id-based range index is stale (its dict IDs no
-   * longer correspond to anything) and must be dropped and rebuilt as raw-value-based in the same reload pass.
+   * Symmetric "disable dictionary on a column with a range index" scenario, under the new contract that a range
+   * index always requires a dictionary. The valid migration path is to drop the range index in the same reload as
+   * the dictionary; otherwise the table-config validation rejects the change.
    *
-   * <p>Both halves are required for symmetry of the invariant {@code metadata.hasDictionary() ⇔ range index is
-   * dict-id-based}, which {@code BitSlicedRangeIndexReader} relies on when computing {@code _max}. If a future
-   * change drops {@code StandardIndexes.range()} from {@code DICTIONARY_BASED_INDEXES_TO_REWRITE}, this test fails.
+   * <p>This test asserts the handler chain for the supported flow: starting from a dict-encoded column with a
+   * range index, removing the column from both the dictionary set and the {@code rangeIndexColumns} set causes
+   * {@code ForwardIndexHandler.DISABLE_DICTIONARY} to drop the dictionary and (via
+   * {@code removeDictRelatedIndexes}) the now-stale range index. {@code RangeIndexHandler} then sees the column
+   * is no longer requested and stays a no-op.
    */
   @Test
-  public void testDisableDictionaryRebuildsRangeIndexAsRawValueBased()
+  public void testDisableDictionaryAndRangeIndexTogether()
       throws Exception {
     String column = DIM_DICT_INTEGER;
     SegmentMetadataImpl existingSegmentMetadata;
@@ -1447,15 +1438,16 @@ public class ForwardIndexHandlerTest {
           "Pre-condition: dict-id-based range index should exist");
     }
 
-    // Step 2: disable dictionary. ForwardIndexHandler should emit DISABLE_DICTIONARY and call
-    // removeDictRelatedIndexes, dropping the now-stale dict-id-based range index.
+    // Step 2: disable dictionary AND remove range index from the config (the only valid migration under the new
+    // contract). ForwardIndexHandler emits DISABLE_DICTIONARY and via removeDictRelatedIndexes also drops the
+    // now-stale range index.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       _segmentDirectory = segmentDirectory;
       _writer = writer;
 
       _noDictionaryColumns.add(column);
-      // Keep the column in _rangeIndexColumns so RangeIndexHandler will rebuild after dict is removed.
+      _rangeIndexColumns.remove(column);
 
       ForwardIndexHandler forwardIndexHandler = createForwardIndexHandler();
       assertEquals(forwardIndexHandler.computeOperations(writer),
@@ -1464,38 +1456,33 @@ public class ForwardIndexHandlerTest {
       forwardIndexHandler.postUpdateIndicesCleanup(writer);
     }
 
-    // Verify: dict and stale range are both gone after ForwardIndexHandler's DISABLE_DICTIONARY pass.
+    // Verify: dict and range are both gone after ForwardIndexHandler's DISABLE_DICTIONARY pass.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       assertFalse(columnMetadata.hasDictionary(), "Dictionary should be disabled after DISABLE_DICTIONARY");
       assertFalse(reader.hasIndexFor(column, StandardIndexes.dictionary()));
       assertFalse(reader.hasIndexFor(column, StandardIndexes.range()),
-          "Stale dict-id-based range index must be removed when dictionary is disabled — "
-              + "RangeIndexHandler will rebuild as raw-value-based");
+          "Stale dict-id-based range index must be removed when dictionary is disabled");
     }
 
-    // Step 3: rebuild the range index. With the column now dict-less, RangeIndexType.createIndexCreator picks the
-    // raw-value variant of BitSlicedRangeIndexCreator (via context.hasDictionary() == false branch).
+    // Step 3: RangeIndexHandler is a no-op because the column is no longer in the range-index list.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
       _segmentDirectory = segmentDirectory;
       _writer = writer;
 
       RangeIndexHandler rangeIndexHandler = new RangeIndexHandler(segmentDirectory, createIndexLoadingConfig());
-      assertTrue(rangeIndexHandler.needUpdateIndices(writer),
-          "RangeIndexHandler should detect missing range index and recreate as raw-value-based");
-      rangeIndexHandler.updateIndices(writer);
-      rangeIndexHandler.postUpdateIndicesCleanup(writer);
+      assertFalse(rangeIndexHandler.needUpdateIndices(writer),
+          "RangeIndexHandler should not need updates after the range index was removed from the config");
     }
 
-    // Final state: dict gone, range exists (now raw-value-based by virtue of being built without a dict).
+    // Final state: dict gone, range gone, forward index regenerated as raw.
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       assertFalse(columnMetadata.hasDictionary());
-      assertTrue(reader.hasIndexFor(column, StandardIndexes.range()),
-          "Range index should be rebuilt by RangeIndexHandler after dictionary was disabled");
+      assertFalse(reader.hasIndexFor(column, StandardIndexes.range()));
       validateMetadataProperties(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column),
           existingSegmentMetadata.getColumnMetadataFor(column), false);
     }
