@@ -20,7 +20,9 @@ package org.apache.pinot.spi.utils;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryUsage;
+import java.util.List;
 
 
 public class ResourceUsageUtils {
@@ -39,5 +41,22 @@ public class ResourceUsageUtils {
 
   public static long getUsedHeapSize() {
     return MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
+  }
+
+  /**
+   * Returns heap bytes used immediately after the last GC, summed across all memory pools.
+   * More stable than {@link #getUsedHeapSize()} because it excludes short-lived objects allocated
+   * since the last collection.
+   */
+  public static long getHeapUsedAfterGc() {
+    long total = 0;
+    List<MemoryPoolMXBean> pools = ManagementFactory.getMemoryPoolMXBeans();
+    for (MemoryPoolMXBean pool : pools) {
+      MemoryUsage collectionUsage = pool.getCollectionUsage();
+      if (collectionUsage != null && collectionUsage.getUsed() >= 0) {
+        total += collectionUsage.getUsed();
+      }
+    }
+    return total;
   }
 }

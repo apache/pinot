@@ -37,6 +37,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
 import javax.net.ssl.SSLContext;
@@ -163,6 +164,7 @@ import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
@@ -898,6 +900,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     ControllerMetrics.register(_controllerMetrics);
     _validationMetrics = new ValidationMetrics(_metricsRegistry);
+
+    _controllerMetrics.setOrUpdateGauge("jvmHeapUsedAfterGc", ResourceUsageUtils::getHeapUsedAfterGc);
+    if (_executorService instanceof ThreadPoolExecutor) {
+      ThreadPoolExecutor tpe = (ThreadPoolExecutor) _executorService;
+      _controllerMetrics.setOrUpdateGauge("asyncExecutorQueueDepth", () -> (long) tpe.getQueue().size());
+      _controllerMetrics.setOrUpdateGauge("asyncExecutorActiveThreads", () -> (long) tpe.getActiveCount());
+    }
   }
 
   private void initPinotFSFactory() {
