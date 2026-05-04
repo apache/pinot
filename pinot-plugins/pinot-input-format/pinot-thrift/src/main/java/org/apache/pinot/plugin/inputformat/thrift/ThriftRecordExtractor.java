@@ -98,10 +98,10 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
    *              without checking
    */
   @Override
-  protected Map<Object, Object> convertRecord(Object value) {
+  protected Map<String, Object> convertRecord(Object value) {
     TBase record = (TBase) value;
     Set<TFieldIdEnum> fields = FieldMetaData.getStructMetaDataMap(record.getClass()).keySet();
-    Map<Object, Object> convertedRecord = Maps.newHashMapWithExpectedSize(fields.size());
+    Map<String, Object> convertedRecord = Maps.newHashMapWithExpectedSize(fields.size());
     for (TFieldIdEnum field : fields) {
       Object fieldValue = record.getFieldValue(field);
       Object convertedValue = fieldValue != null ? convert(fieldValue) : null;

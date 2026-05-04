@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -37,6 +39,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -665,15 +668,21 @@ public enum PinotDataType {
         case DATE:
           return (LocalDate) value;
         case INTEGER:
-          return LocalDate.ofEpochDay((Integer) value);
         case LONG:
-          return LocalDate.ofEpochDay((Long) value);
-        case STRING:
-        case JSON:
-          return LocalDate.parse(value.toString().trim());
+          return LocalDate.ofEpochDay(((Number) value).longValue());
         case TIMESTAMP:
           // Treat the timestamp as a UTC instant and extract its calendar date in UTC.
           return ((Timestamp) value).toInstant().atZone(ZoneOffset.UTC).toLocalDate();
+        case STRING:
+          return LocalDate.parse(value.toString().trim());
+        case JSON:
+          try {
+            // JSON-encoded date is a quoted ISO-8601 string; Jackson's JavaTimeModule (registered in
+            // JsonUtils) handles parsing.
+            return JsonUtils.stringToObject(value.toString(), LocalDate.class);
+          } catch (IOException e) {
+            throw new RuntimeException("Cannot parse JSON value as DATE: " + value, e);
+          }
         default:
           throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to DATE");
       }
@@ -750,8 +759,15 @@ public enum PinotDataType {
           // Treat the input as millis-since-midnight (matches `toLong`).
           return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1_000_000L);
         case STRING:
-        case JSON:
           return LocalTime.parse(value.toString().trim());
+        case JSON:
+          try {
+            // JSON-encoded time is a quoted ISO-8601 string; Jackson's JavaTimeModule (registered in
+            // JsonUtils) handles parsing.
+            return JsonUtils.stringToObject(value.toString(), LocalTime.class);
+          } catch (IOException e) {
+            throw new RuntimeException("Cannot parse JSON value as TIME: " + value, e);
+          }
         default:
           throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to TIME");
       }
@@ -850,7 +866,13 @@ public enum PinotDataType {
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      return TimestampUtils.toTimestamp(value.toString().trim());
+      try {
+        // Jackson handles both the numeric form (epoch millis JSON number, the default) and the quoted ISO-8601 form
+        // via its [Timestamp] (de)serializers.
+        return JsonUtils.stringToObject(value.toString(), Timestamp.class);
+      } catch (IOException e) {
+        throw new RuntimeException("Cannot parse JSON value as TIMESTAMP: " + value, e);
+      }
     }
 
     @Override
@@ -925,6 +947,94 @@ public enum PinotDataType {
     @Override
     public Object convert(Object value, PinotDataType sourceType) {
       return sourceType.toBytes(value);
+    }
+  },
+
+  /// Wraps [UUID]. Internal representation is the canonical String form (e.g.
+  /// `"550e8400-e29b-41d4-a716-446655440000"`).
+  ///
+  /// When converting from UUID to other types:
+  /// - String / JSON: canonical UUID string
+  /// - BYTES: 16-byte big-endian binary form (most-significant 64 bits + least-significant 64 bits)
+  ///
+  /// When converting to UUID from other types:
+  /// - String / JSON: parsed via [UUID#fromString]
+  /// - BYTES (length 16): decoded big-endian
+  ///
+  /// Pinot has no UUID storage type — declaring the schema column as `STRING` produces the canonical
+  /// form, declaring it as `BYTES` produces the 16-byte big-endian form. Decoders / extractors emit
+  /// [UUID] uniformly and `PinotDataType` adapts at the type-transformer boundary.
+  UUID {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to LONG");
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to DOUBLE");
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to BIG_DECIMAL");
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from UUID to TIMESTAMP");
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      return UuidUtils.toBytes((UUID) value);
+    }
+
+    @Override
+    public UUID convert(Object value, PinotDataType sourceType) {
+      switch (sourceType) {
+        case UUID:
+          return (UUID) value;
+        case STRING:
+          return java.util.UUID.fromString(value.toString().trim());
+        case JSON:
+          try {
+            // JSON-encoded UUID is a quoted JSON string; Jackson's UUIDDeserializer handles both the
+            // canonical-string form and 16-byte binary form natively.
+            return JsonUtils.stringToObject(value.toString(), UUID.class);
+          } catch (IOException e) {
+            throw new RuntimeException("Cannot parse JSON value as UUID: " + value, e);
+          }
+        case BYTES:
+          return UuidUtils.fromBytes((byte[]) value);
+        default:
+          throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to UUID");
+      }
+    }
+
+    @Override
+    public String toInternal(Object value) {
+      return value.toString();
     }
   },
 
@@ -1138,6 +1248,44 @@ public enum PinotDataType {
     }
   },
 
+  /// MV companion to [#DATE]; element type [LocalDate].
+  DATE_ARRAY {
+    @Override
+    public LocalDate[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalDateArray(value);
+    }
+
+    @Override
+    public Integer[] toInternal(Object value) {
+      LocalDate[] dateArray = (LocalDate[]) value;
+      int length = dateArray.length;
+      Integer[] result = new Integer[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = (int) dateArray[i].toEpochDay();
+      }
+      return result;
+    }
+  },
+
+  /// MV companion to [#TIME]; element type [LocalTime].
+  TIME_ARRAY {
+    @Override
+    public LocalTime[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalTimeArray(value);
+    }
+
+    @Override
+    public Long[] toInternal(Object value) {
+      LocalTime[] timeArray = (LocalTime[]) value;
+      int length = timeArray.length;
+      Long[] result = new Long[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = timeArray[i].toNanoOfDay() / 1_000_000L;
+      }
+      return result;
+    }
+  },
+
   STRING_ARRAY {
     @Override
     public String[] convert(Object value, PinotDataType sourceType) {
@@ -1149,6 +1297,26 @@ public enum PinotDataType {
     @Override
     public byte[][] convert(Object value, PinotDataType sourceType) {
       return sourceType.toBytesArray(value);
+    }
+  },
+
+  /// MV companion to [#UUID]; element type [UUID]. Pinot has no UUID storage type — declaring the column as MV STRING
+  /// produces canonical-form strings, MV BYTES produces 16-byte big-endian.
+  UUID_ARRAY {
+    @Override
+    public UUID[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toUuidArray(value);
+    }
+
+    @Override
+    public String[] toInternal(Object value) {
+      UUID[] uuidArray = (UUID[]) value;
+      int length = uuidArray.length;
+      String[] result = new String[length];
+      for (int i = 0; i < length; i++) {
+        result[i] = uuidArray[i].toString();
+      }
+      return result;
     }
   },
 
@@ -1509,6 +1677,60 @@ public enum PinotDataType {
     }
   }
 
+  public LocalDate[] toLocalDateArray(Object value) {
+    if (value instanceof LocalDate[]) {
+      return (LocalDate[]) value;
+    }
+    if (isSingleValue()) {
+      return new LocalDate[]{(LocalDate) DATE.convert(value, this)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      LocalDate[] result = new LocalDate[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        result[i] = (LocalDate) DATE.convert(valueArray[i], singleValueType);
+      }
+      return result;
+    }
+  }
+
+  public LocalTime[] toLocalTimeArray(Object value) {
+    if (value instanceof LocalTime[]) {
+      return (LocalTime[]) value;
+    }
+    if (isSingleValue()) {
+      return new LocalTime[]{(LocalTime) TIME.convert(value, this)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      LocalTime[] result = new LocalTime[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        result[i] = (LocalTime) TIME.convert(valueArray[i], singleValueType);
+      }
+      return result;
+    }
+  }
+
+  public UUID[] toUuidArray(Object value) {
+    if (value instanceof UUID[]) {
+      return (UUID[]) value;
+    }
+    if (isSingleValue()) {
+      return new UUID[]{(UUID) UUID.convert(value, this)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      UUID[] result = new UUID[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        result[i] = (UUID) UUID.convert(valueArray[i], singleValueType);
+      }
+      return result;
+    }
+  }
+
   public Object convert(Object value, PinotDataType sourceType) {
     throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to " + this);
   }
@@ -1556,10 +1778,16 @@ public enum PinotDataType {
         return BOOLEAN;
       case TIMESTAMP_ARRAY:
         return TIMESTAMP;
+      case DATE_ARRAY:
+        return DATE;
+      case TIME_ARRAY:
+        return TIME;
       case STRING_ARRAY:
         return STRING;
       case BYTES_ARRAY:
         return BYTES;
+      case UUID_ARRAY:
+        return UUID;
       case OBJECT_ARRAY:
       case COLLECTION:
         return OBJECT;
@@ -1589,6 +1817,9 @@ public enum PinotDataType {
     }
     if (cls == byte[].class) {
       return BYTES;
+    }
+    if (cls == UUID.class) {
+      return UUID;
     }
     if (cls == Boolean.class) {
       return BOOLEAN;
@@ -1644,6 +1875,15 @@ public enum PinotDataType {
     }
     if (cls == Timestamp.class) {
       return TIMESTAMP_ARRAY;
+    }
+    if (cls == LocalDate.class) {
+      return DATE_ARRAY;
+    }
+    if (cls == LocalTime.class) {
+      return TIME_ARRAY;
+    }
+    if (cls == UUID.class) {
+      return UUID_ARRAY;
     }
     if (cls == Byte.class) {
       return BYTE_ARRAY;

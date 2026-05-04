@@ -60,7 +60,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /// - `DATE` → [LocalDate] via [LocalDate#ofEpochDay] (TZ-independent, calendar-date semantics)
 /// - `TIMESTAMP` / `TIMESTAMP_INSTANT` → [Timestamp] preserving full sub-second nanos from [TimestampColumnVector]
 /// - `LIST<X>` → `Object[]` (null elements preserved; empty list surfaces as empty `Object[]`)
-/// - `MAP<K, V>` → `Map<Object, Object>`
+/// - `MAP<K, V>` → `Map<String, Object>` (keys stringified via [BaseRecordExtractor#stringifyMapKey])
 /// - `STRUCT<...>` → `Map<String, Object>`
 /// - any nullable column with `isNull[rowId]` set → `null`
 public class ORCRecordExtractor extends BaseRecordExtractor<ORCRecordExtractor.Record> {
@@ -151,19 +151,21 @@ public class ORCRecordExtractor extends BaseRecordExtractor<ORCRecordExtractor.R
         // `isRepeating` / null guards that `extractValue` performs. ORC's format invariants guarantee map
         // keys are non-null, and the Apache ORC reader populates each entry individually instead of
         // collapsing the child key vector to `isRepeating = true`. Adding the guards here would be defensive
-        // against API states no real reader produces.
+        // against API states no real reader produces. Keys are stringified via [#stringifyMapKey] per the
+        // `Map<String, Object>` contract — TIMESTAMP / BINARY / TINYINT etc. ORC key types all serialize
+        // through the same shared helper as every other format.
         List<TypeDescription> children = fieldType.getChildren();
         TypeDescription.Category keyCategory = children.get(0).getCategory();
         TypeDescription valueType = children.get(1);
         MapColumnVector mapColumnVector = (MapColumnVector) columnVector;
         int offset = (int) mapColumnVector.offsets[rowId];
         int length = (int) mapColumnVector.lengths[rowId];
-        Map<Object, Object> map = new HashMap<>();
+        Map<String, Object> map = new HashMap<>();
         for (int j = 0; j < length; j++) {
           int childRowId = offset + j;
           Object key = extractSingleValue(field, mapColumnVector.keys, childRowId, keyCategory);
           Object value = extractValue(field, mapColumnVector.values, valueType, childRowId);
-          map.put(key, value);
+          map.put(stringifyMapKey(key), value);
         }
         return map;
       }
@@ -171,7 +173,7 @@ public class ORCRecordExtractor extends BaseRecordExtractor<ORCRecordExtractor.R
         StructColumnVector structColumnVector = (StructColumnVector) columnVector;
         List<String> childrenFieldNames = fieldType.getFieldNames();
         List<TypeDescription> childrenFieldTypes = fieldType.getChildren();
-        Map<Object, Object> convertedMap = new HashMap<>();
+        Map<String, Object> convertedMap = new HashMap<>();
         for (int i = 0; i < childrenFieldNames.size(); i++) {
           convertedMap.put(childrenFieldNames.get(i),
               extractValue(childrenFieldNames.get(i), structColumnVector.fields[i], childrenFieldTypes.get(i), rowId));

@@ -34,6 +34,7 @@ import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
 import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.util.Text;
+import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -227,7 +228,7 @@ public class ArrowToGenericRowConverter {
             Object rawVal = entryMap.get(MapVector.VALUE_NAME);
             Object convertedKey = convertArrowTypeToPinotCompatible(rawKey);
             Object convertedVal = convertArrowTypeToPinotCompatible(rawVal);
-            flattened.put(String.valueOf(convertedKey), convertedVal);
+            flattened.put(BaseRecordExtractor.stringifyMapKey(convertedKey), convertedVal);
           }
           return flattened;
         }

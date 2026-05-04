@@ -21,11 +21,13 @@ package org.apache.pinot.common.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -205,11 +207,12 @@ public class PinotDataTypeTest {
 
   @Test
   public void testTimestamp() {
-    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+    Timestamp timestamp = new Timestamp(1620324238610L);
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), LONG), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
-    assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);
-    assertEquals(TIMESTAMP.convert(timestamp.toString(), JSON), timestamp);
+    // JSON: numeric (epoch millis) and quoted ISO-8601 forms — both round-trip via Jackson.
+    assertEquals(TIMESTAMP.convert(Long.toString(timestamp.getTime()), JSON), timestamp);
+    assertEquals(TIMESTAMP.convert("\"" + Instant.ofEpochMilli(timestamp.getTime()) + "\"", JSON), timestamp);
   }
 
   @Test
@@ -220,12 +223,30 @@ public class PinotDataTypeTest {
     assertEquals(DATE.convert(19_096, INTEGER), date);
     assertEquals(DATE.convert(19_096L, LONG), date);
     assertEquals(DATE.convert("2022-04-14", STRING), date);
-    assertEquals(DATE.convert("2022-04-14", JSON), date);
+    // JSON: quoted ISO-8601 string parsed via Jackson.
+    assertEquals(DATE.convert("\"2022-04-14\"", JSON), date);
     assertEquals(DATE.convert(new Timestamp(19_096L * 86_400_000L), TIMESTAMP), date);
     assertEquals(DATE.toInt(date), 19_096);
     assertEquals(DATE.toLong(date), 19_096L);
     assertEquals(DATE.toInternal(date), 19_096);
     assertEquals(DATE.toString(date), "2022-04-14");
+  }
+
+  @Test
+  public void testDateArray() {
+    LocalDate[] dates = {LocalDate.parse("2022-04-14"), LocalDate.parse("2024-01-01")};
+    // Identity round-trip from MV DATE.
+    assertEquals(DATE_ARRAY.convert(dates, DATE_ARRAY), dates);
+    // STRING_ARRAY → DATE_ARRAY: per-element ISO-8601 parsing via DATE.convert.
+    assertEquals(DATE_ARRAY.convert(new String[]{"2022-04-14", "2024-01-01"}, STRING_ARRAY), dates);
+    // INTEGER_ARRAY → DATE_ARRAY: per-element epoch-day decoding.
+    assertEquals(DATE_ARRAY.convert(new Integer[]{19_096, 19_723}, INTEGER_ARRAY), dates);
+    // DATE_ARRAY → STRING_ARRAY: each element via DATE.toString.
+    assertEquals(STRING_ARRAY.convert(dates, DATE_ARRAY), new String[]{"2022-04-14", "2024-01-01"});
+    // Class lookup: Object[] of LocalDate routes to DATE_ARRAY.
+    assertEquals(getMultiValueType(LocalDate.class), DATE_ARRAY);
+    // toInternal: Integer[] of epoch-days.
+    assertEquals(DATE_ARRAY.toInternal(dates), new Integer[]{19_096, 19_723});
   }
 
   @Test
@@ -236,11 +257,69 @@ public class PinotDataTypeTest {
     assertEquals(TIME.convert(31_892_000L, LONG), time);
     assertEquals(TIME.convert(31_892_000, INTEGER), time);
     assertEquals(TIME.convert("08:51:32", STRING), time);
-    assertEquals(TIME.convert("08:51:32", JSON), time);
+    // JSON: quoted ISO-8601 string parsed via Jackson.
+    assertEquals(TIME.convert("\"08:51:32\"", JSON), time);
     assertEquals(TIME.toLong(time), 31_892_000L);
     assertEquals(TIME.toInt(time), 31_892_000);
     assertEquals(TIME.toInternal(time), 31_892_000L);
     assertEquals(TIME.toString(time), "08:51:32");
+  }
+
+  @Test
+  public void testTimeArray() {
+    LocalTime[] times = {LocalTime.parse("08:51:32"), LocalTime.parse("12:00:00")};
+    assertEquals(TIME_ARRAY.convert(times, TIME_ARRAY), times);
+    assertEquals(TIME_ARRAY.convert(new String[]{"08:51:32", "12:00:00"}, STRING_ARRAY), times);
+    // LONG_ARRAY → TIME_ARRAY: per-element millis-since-midnight decoding.
+    assertEquals(TIME_ARRAY.convert(new Long[]{31_892_000L, 43_200_000L}, LONG_ARRAY), times);
+    assertEquals(STRING_ARRAY.convert(times, TIME_ARRAY), new String[]{"08:51:32", "12:00"});
+    assertEquals(getMultiValueType(LocalTime.class), TIME_ARRAY);
+    // toInternal: Long[] of millis-since-midnight.
+    assertEquals(TIME_ARRAY.toInternal(times), new Long[]{31_892_000L, 43_200_000L});
+  }
+
+  @Test
+  public void testUuid() {
+    UUID uuid = java.util.UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    String canonical = "550e8400-e29b-41d4-a716-446655440000";
+    assertEquals(UUID.convert(uuid, UUID), uuid);
+    assertEquals(UUID.convert(canonical, STRING), uuid);
+    // JSON: quoted canonical UUID string — Jackson's UUIDDeserializer handles it.
+    assertEquals(UUID.convert("\"" + canonical + "\"", JSON), uuid);
+    // BYTES: 16-byte big-endian round-trip via UuidUtils.
+    byte[] bytes = UUID.toBytes(uuid);
+    assertEquals(bytes.length, 16);
+    assertEquals(UUID.convert(bytes, BYTES), uuid);
+    // toString / toInternal both return the canonical form (no FQN needed in canonical 8-4-4-4-12 layout).
+    assertEquals(UUID.toString(uuid), canonical);
+    assertEquals(UUID.toInternal(uuid), canonical);
+  }
+
+  @Test
+  public void testUuidArray() {
+    UUID u1 = java.util.UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    UUID u2 = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID[] uuids = {u1, u2};
+    assertEquals(UUID_ARRAY.convert(uuids, UUID_ARRAY), uuids);
+    // STRING_ARRAY → UUID_ARRAY: per-element parse.
+    assertEquals(UUID_ARRAY.convert(
+        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"}, STRING_ARRAY),
+        uuids);
+    // STRING_ARRAY destination: canonical strings.
+    assertEquals(STRING_ARRAY.convert(uuids, UUID_ARRAY),
+        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
+    // BYTES_ARRAY destination: 16-byte big-endian per element. This is the path the bot flagged as broken
+    // pre-fix (Object[] of UUID → BYTES_ARRAY went through OBJECT.toBytes which threw).
+    byte[][] bytesArray = (byte[][]) BYTES_ARRAY.convert(uuids, UUID_ARRAY);
+    assertEquals(bytesArray.length, 2);
+    assertEquals(bytesArray[0].length, 16);
+    assertEquals(UUID.convert(bytesArray[0], BYTES), u1);
+    assertEquals(UUID.convert(bytesArray[1], BYTES), u2);
+    // Class lookup: Object[] of UUID routes to UUID_ARRAY.
+    assertEquals(getMultiValueType(UUID.class), UUID_ARRAY);
+    // toInternal: String[] of canonical form.
+    assertEquals(UUID_ARRAY.toInternal(uuids),
+        new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
   }
 
   @Test
@@ -253,6 +332,12 @@ public class PinotDataTypeTest {
         "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
             + "\"timestamp\":1620324238610}");
     assertEquals(JSON.convert(new Timestamp(1620324238610L), TIMESTAMP), "1620324238610");
+    assertEquals(JSON.convert(LocalDate.of(2022, 2, 8), DATE), "\"2022-02-08\"");
+    assertEquals(JSON.convert(LocalTime.of(12, 34, 56), TIME), "\"12:34:56\"");
+    assertEquals(JSON.convert(java.util.UUID.fromString("550e8400-e29b-41d4-a716-446655440000"), UUID),
+        "\"550e8400-e29b-41d4-a716-446655440000\"");
+    // Nested case: a Map produced by ResultSetRecordExtractor.extractStruct can wrap LocalDate values.
+    assertEquals(JSON.convert(Map.of("d", LocalDate.of(2022, 2, 8)), MAP), "{\"d\":\"2022-02-08\"}");
   }
 
   @Test
@@ -313,6 +398,7 @@ public class PinotDataTypeTest {
     testCases.put(LocalTime.class, TIME);
     testCases.put(String.class, STRING);
     testCases.put(byte[].class, BYTES);
+    testCases.put(UUID.class, UUID);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
       assertEquals(getSingleValueType(tc.getKey()), tc.getValue());
@@ -335,7 +421,10 @@ public class PinotDataTypeTest {
     testCases.put(String.class, STRING_ARRAY);
     testCases.put(Boolean.class, BOOLEAN_ARRAY);
     testCases.put(Timestamp.class, TIMESTAMP_ARRAY);
+    testCases.put(LocalDate.class, DATE_ARRAY);
+    testCases.put(LocalTime.class, TIME_ARRAY);
     testCases.put(byte[].class, BYTES_ARRAY);
+    testCases.put(UUID.class, UUID_ARRAY);
 
     for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
       assertEquals(getMultiValueType(tc.getKey()), tc.getValue());
@@ -360,11 +449,13 @@ public class PinotDataTypeTest {
 
   @Test
   public void testInvalidConversion() {
-    for (PinotDataType sourceType : values()) {
-      if (sourceType.isSingleValue() && sourceType != STRING && sourceType != BYTES && sourceType != JSON
-          && sourceType != BIG_DECIMAL) {
-        assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
-      }
+    // Single-value types that do NOT support BYTES conversion; STRING / JSON / BYTES / BIG_DECIMAL / UUID
+    // each have their own valid byte-form encoding and are tested elsewhere.
+    PinotDataType[] noBytesConversion = {
+        BOOLEAN, BYTE, CHARACTER, SHORT, INTEGER, LONG, FLOAT, DOUBLE, TIMESTAMP, DATE, TIME, OBJECT
+    };
+    for (PinotDataType sourceType : noBytesConversion) {
+      assertInvalidConversion(null, sourceType, BYTES, UnsupportedOperationException.class);
     }
 
     assertInvalidConversion(null, BYTES, INTEGER, UnsupportedOperationException.class);
@@ -388,15 +479,20 @@ public class PinotDataTypeTest {
   }
 
   private void assertInvalidConversion(Object value, PinotDataType sourceType, PinotDataType destType,
-      Class expectedExceptionType) {
+      Class<?> expectedExceptionType) {
+    Object result;
     try {
-      destType.convert(value, sourceType);
+      result = destType.convert(value, sourceType);
     } catch (Exception e) {
       if (e.getClass().equals(expectedExceptionType)) {
         return;
       }
+      fail(String.format("Converting %s from %s to %s: expected %s but got %s",
+          value, sourceType, destType, expectedExceptionType.getSimpleName(), e.getClass().getSimpleName()), e);
+      return;
     }
-    fail();
+    fail(String.format("Converting %s from %s to %s: expected %s but completed with %s",
+        value, sourceType, destType, expectedExceptionType.getSimpleName(), result));
   }
 
   private static class NumberObject extends Number {

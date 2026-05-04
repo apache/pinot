@@ -16,22 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.inputformat.avro;
+package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/// Config for [AvroRecordExtractor].
-///
-/// **`extractRawTimeValues`** (default `false`) controls how Avro temporal logical types are extracted:
-/// - `false`: `date` → [java.time.LocalDate], `time-millis`/`time-micros` → [java.time.LocalTime],
-///   `timestamp-millis`/`timestamp-micros` → [java.sql.Timestamp].
-/// - `true`: returns the raw underlying integer value per the Avro logical-type spec — `date` →
-///   `Integer` days-since-epoch, `time-millis` → `Integer` ms-since-midnight, `time-micros` → `Long`
-///   µs-since-midnight, `timestamp-millis` → `Long` epoch millis, `timestamp-micros` → `Long` epoch
-///   micros.
-public class AvroRecordExtractorConfig implements RecordExtractorConfig {
+/// Config for [ParquetNativeRecordExtractor]. See [ParquetRecordReaderConfig] for the meaning of
+/// `extractRawTimeValues`.
+public class ParquetNativeRecordExtractorConfig implements RecordExtractorConfig {
   public static final String EXTRACT_RAW_TIME_VALUES = "extractRawTimeValues";
 
   private boolean _extractRawTimeValues;
