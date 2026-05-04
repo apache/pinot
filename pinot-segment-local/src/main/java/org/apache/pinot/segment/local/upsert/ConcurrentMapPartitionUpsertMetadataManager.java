@@ -363,6 +363,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
+    AtomicBoolean isNewKey = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     int newDocId = recordInfo.getDocId();
@@ -404,11 +405,17 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             }
           } else {
             // New primary key
+            isNewKey.set(true);
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
             return new RecordLocation(segment, newDocId, newComparisonValue);
           }
         });
 
+    if (isNewKey.get()) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_NEW_KEYS_INSERTED, 1L);
+    } else if (!isOutOfOrderRecord.get()) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_EXISTING_KEYS_UPDATED, 1L);
+    }
     updatePrimaryKeyGauge();
     return !isOutOfOrderRecord.get();
   }
