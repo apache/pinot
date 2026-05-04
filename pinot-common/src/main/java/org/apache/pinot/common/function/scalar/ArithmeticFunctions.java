@@ -259,4 +259,65 @@ public class ArithmeticFunctions {
   public static int bitCount(long a) {
     return Long.bitCount(a);
   }
+
+  // Precomputed factorials for 0! through 20! (21! overflows long).
+  private static final long[] FACTORIALS = new long[21];
+
+  static {
+    FACTORIALS[0] = 1;
+    for (int i = 1; i < FACTORIALS.length; i++) {
+      FACTORIALS[i] = FACTORIALS[i - 1] * i;
+    }
+  }
+
+  /**
+   * Returns the factorial of the given non-negative integer.
+   *
+   * @param n non-negative integer (0 to 20)
+   * @return n! as a long
+   * @throws IllegalArgumentException if n is negative or greater than 20
+   */
+  @ScalarFunction
+  public static long factorial(long n) {
+    if (n < 0 || n > 20) {
+      throw new IllegalArgumentException("factorial argument must be between 0 and 20, got " + n);
+    }
+    return FACTORIALS[(int) n];
+  }
+
+  /**
+   * Returns the bucket number for a value in a histogram with the given bounds and number of buckets.
+   *
+   * <p>SQL standard semantics: returns 0 if value < lo, numBuckets + 1 if value >= hi,
+   * otherwise a bucket in the range [1, numBuckets].
+   *
+   * @param value the value to bucket
+   * @param lo lower bound of the histogram (inclusive)
+   * @param hi upper bound of the histogram (exclusive)
+   * @param numBuckets number of equal-width buckets
+   * @return bucket number (0 to numBuckets + 1)
+   * @throws IllegalArgumentException if lo >= hi or numBuckets <= 0
+   */
+  @ScalarFunction(names = {"widthBucket", "width_bucket"})
+  public static int widthBucket(double value, double lo, double hi, int numBuckets) {
+    if (Double.isNaN(value) || Double.isNaN(lo) || Double.isNaN(hi)) {
+      throw new IllegalArgumentException("widthBucket does not accept NaN values");
+    }
+    if (Double.isInfinite(lo) || Double.isInfinite(hi)) {
+      throw new IllegalArgumentException("widthBucket bounds must be finite");
+    }
+    if (lo >= hi) {
+      throw new IllegalArgumentException("lo must be less than hi: lo=" + lo + ", hi=" + hi);
+    }
+    if (numBuckets <= 0) {
+      throw new IllegalArgumentException("numBuckets must be positive, got " + numBuckets);
+    }
+    if (value < lo) {
+      return 0;
+    }
+    if (value >= hi) {
+      return numBuckets + 1;
+    }
+    return (int) ((value - lo) / (hi - lo) * numBuckets) + 1;
+  }
 }

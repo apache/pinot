@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.codec.language.Soundex;
 import org.apache.commons.lang3.StringUtils;
@@ -1053,5 +1055,76 @@ public class StringFunctions {
       }
     }
     return true;
+  }
+
+  /**
+   * Returns the number of bytes in the UTF-8 representation of the string.
+   *
+   * @param input the input string
+   * @return byte length of the UTF-8 encoded string
+   */
+  @ScalarFunction(names = {"octetLength", "octet_length"})
+  public static int octetLength(String input) {
+    return input.getBytes(StandardCharsets.UTF_8).length;
+  }
+
+  /**
+   * Returns the number of bits in the UTF-8 representation of the string.
+   *
+   * @param input the input string
+   * @return bit length of the UTF-8 encoded string
+   */
+  @ScalarFunction(names = {"bitLength", "bit_length"})
+  public static int bitLength(String input) {
+    return octetLength(input) * 8;
+  }
+
+  /**
+   * Returns the number of Unicode codepoints in the string.
+   * Unlike {@link #length(String)}, this correctly counts supplementary characters (e.g., emoji) as one.
+   *
+   * @param input the input string
+   * @return number of Unicode codepoints
+   */
+  @ScalarFunction(names = {"charLength", "char_length", "characterLength", "character_length"})
+  public static int charLength(String input) {
+    return input.codePointCount(0, input.length());
+  }
+
+  /**
+   * Returns the number of non-overlapping matches of a regular expression pattern in the string.
+   *
+   * <p>Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
+   * adding a {@code RegexpCountConstFunctions} variant in the {@code regexp/} package.
+   *
+   * @param input the input string
+   * @param regexp the regular expression pattern
+   * @return count of non-overlapping matches
+   */
+  @ScalarFunction(names = {"regexpCount", "regexp_count"})
+  public static int regexpCount(String input, String regexp) {
+    Matcher matcher = Pattern.compile(regexp).matcher(input);
+    int count = 0;
+    while (matcher.find()) {
+      count++;
+    }
+    return count;
+  }
+
+  /**
+   * Returns the first substring that matches the regular expression, or null if no match is found.
+   *
+   * <p>Note: the pattern is compiled on every invocation. For constant-pattern queries, consider
+   * adding a {@code RegexpSubstrConstFunctions} variant in the {@code regexp/} package.
+   *
+   * @param input the input string
+   * @param regexp the regular expression pattern
+   * @return the first matching substring, or null if no match
+   */
+  @Nullable
+  @ScalarFunction(names = {"regexpSubstr", "regexp_substr"})
+  public static String regexpSubstr(String input, String regexp) {
+    Matcher matcher = Pattern.compile(regexp).matcher(input);
+    return matcher.find() ? matcher.group() : null;
   }
 }

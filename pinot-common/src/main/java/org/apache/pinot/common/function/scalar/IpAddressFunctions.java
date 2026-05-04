@@ -251,4 +251,86 @@ public class IpAddressFunctions {
     String max = prefix.getUpper().withoutPrefixLength().toCanonicalString();
     return new String[]{min, max};
   }
+
+  /**
+   * Returns the IP version family: 4 for IPv4, 6 for IPv6.
+   *
+   * @param ipString IP address string (e.g., "192.168.1.1" or "2001:db8::1")
+   * @return 4 or 6
+   * @throws IllegalArgumentException if the string is not a valid IP address
+   */
+  @ScalarFunction(names = {"ipFamily", "ip_family"})
+  public static int ipFamily(String ipString) {
+    IPAddress addr = getAddress(ipString);
+    return addr.isIPv4() ? 4 : 6;
+  }
+
+  /**
+   * Extracts the prefix length (mask length) from a CIDR notation string.
+   *
+   * @param cidr CIDR string (e.g., "192.168.1.0/24" or "2001:db8::/32")
+   * @return the prefix length (e.g., 24)
+   * @throws IllegalArgumentException if the input is not a valid CIDR prefix
+   */
+  @ScalarFunction(names = {"ipMaskLen", "ip_mask_len"})
+  public static int ipMaskLen(String cidr) {
+    IPAddress prefix = getPrefix(cidr);
+    return prefix.getNetworkPrefixLength();
+  }
+
+  /**
+   * Builds a network or host mask for the given prefix.
+   *
+   * @param prefix the validated CIDR prefix
+   * @param invert false for network mask (1s in network portion), true for host mask (1s in host portion)
+   * @return mask as an IP address string
+   */
+  private static String buildMask(IPAddress prefix, boolean invert) {
+    int prefixLen = prefix.getNetworkPrefixLength();
+    int bitCount = prefix.getBitCount();
+    byte[] maskBytes = new byte[bitCount / 8];
+    int fullBytes = prefixLen / 8;
+    int remainingBits = prefixLen % 8;
+    // Build network mask: 1s for network portion, 0s for host portion
+    for (int i = 0; i < fullBytes; i++) {
+      maskBytes[i] = (byte) 0xFF;
+    }
+    if (remainingBits > 0 && fullBytes < maskBytes.length) {
+      maskBytes[fullBytes] = (byte) (0xFF << (8 - remainingBits));
+    }
+    // Invert for host mask
+    if (invert) {
+      for (int i = 0; i < maskBytes.length; i++) {
+        maskBytes[i] = (byte) ~maskBytes[i];
+      }
+    }
+    if (prefix.isIPv4()) {
+      return new IPv4Address(maskBytes).toCanonicalString();
+    }
+    return new IPv6Address(maskBytes).toCanonicalString();
+  }
+
+  /**
+   * Returns the network mask for a CIDR prefix as an IP address string.
+   *
+   * @param cidr CIDR string (e.g., "192.168.1.0/24")
+   * @return network mask string (e.g., "255.255.255.0")
+   * @throws IllegalArgumentException if the input is not a valid CIDR prefix
+   */
+  @ScalarFunction(names = {"ipNetmask", "ip_netmask"})
+  public static String ipNetmask(String cidr) {
+    return buildMask(getPrefix(cidr), false);
+  }
+
+  /**
+   * Returns the host mask (inverse of network mask) for a CIDR prefix as an IP address string.
+   *
+   * @param cidr CIDR string (e.g., "192.168.1.0/24")
+   * @return host mask string (e.g., "0.0.0.255")
+   * @throws IllegalArgumentException if the input is not a valid CIDR prefix
+   */
+  @ScalarFunction(names = {"ipHostmask", "ip_hostmask"})
+  public static String ipHostmask(String cidr) {
+    return buildMask(getPrefix(cidr), true);
+  }
 }

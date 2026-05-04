@@ -501,4 +501,71 @@ public class StringFunctionsTest {
     assertFalse(StringFunctions.isValidASCII("日本語"));
     assertFalse(StringFunctions.isValidASCII("café"));
   }
+
+  // ==================== Tests for bitLength ====================
+
+  @Test
+  public void testBitLength() {
+    assertEquals(StringFunctions.bitLength(""), 0);
+    assertEquals(StringFunctions.bitLength("a"), 8);
+    assertEquals(StringFunctions.bitLength("hello"), 40);
+    // Multi-byte UTF-8: é is 2 bytes in UTF-8
+    assertEquals(StringFunctions.bitLength("é"), 16);
+    // 3-byte UTF-8 character
+    assertEquals(StringFunctions.bitLength("日"), 24);
+  }
+
+  // ==================== Tests for octetLength ====================
+
+  @Test
+  public void testOctetLength() {
+    assertEquals(StringFunctions.octetLength(""), 0);
+    assertEquals(StringFunctions.octetLength("a"), 1);
+    assertEquals(StringFunctions.octetLength("hello"), 5);
+    // Multi-byte UTF-8
+    assertEquals(StringFunctions.octetLength("é"), 2);
+    assertEquals(StringFunctions.octetLength("日"), 3);
+  }
+
+  // ==================== Tests for charLength ====================
+
+  @Test
+  public void testCharLength() {
+    assertEquals(StringFunctions.charLength(""), 0);
+    assertEquals(StringFunctions.charLength("hello"), 5);
+    // Multi-byte characters still count as 1 codepoint each
+    assertEquals(StringFunctions.charLength("é"), 1);
+    assertEquals(StringFunctions.charLength("日本語"), 3);
+    assertEquals(StringFunctions.charLength("café"), 4);
+    // Supplementary character (emoji) — 1 codepoint but 2 UTF-16 code units
+    assertEquals(StringFunctions.charLength("\uD83D\uDE00"), 1); // U+1F600 grinning face
+    // Compare with length() which would return 2 for the emoji
+    assertEquals(StringFunctions.length("\uD83D\uDE00"), 2);
+  }
+
+  // ==================== Tests for regexpCount ====================
+
+  @Test
+  public void testRegexpCount() {
+    assertEquals(StringFunctions.regexpCount("hello world hello", "hello"), 2);
+    assertEquals(StringFunctions.regexpCount("aaa", "a"), 3);
+    assertEquals(StringFunctions.regexpCount("abc", "x"), 0);
+    assertEquals(StringFunctions.regexpCount("", "a"), 0);
+    // Non-overlapping: "aa" in "aaaa" matches at positions 0 and 2
+    assertEquals(StringFunctions.regexpCount("aaaa", "aa"), 2);
+    // Regex patterns
+    assertEquals(StringFunctions.regexpCount("abc123def456", "\\d+"), 2);
+    assertEquals(StringFunctions.regexpCount("a1b2c3", "[0-9]"), 3);
+  }
+
+  // ==================== Tests for regexpSubstr ====================
+
+  @Test
+  public void testRegexpSubstr() {
+    assertEquals(StringFunctions.regexpSubstr("hello world", "w\\w+"), "world");
+    assertEquals(StringFunctions.regexpSubstr("abc123def456", "\\d+"), "123");
+    assertNull(StringFunctions.regexpSubstr("hello", "\\d+"));
+    assertEquals(StringFunctions.regexpSubstr("", "a"), null);
+    assertEquals(StringFunctions.regexpSubstr("Hello World", "[A-Z][a-z]+"), "Hello");
+  }
 }
