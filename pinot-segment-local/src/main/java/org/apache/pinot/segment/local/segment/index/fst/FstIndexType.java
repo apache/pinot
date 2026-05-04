@@ -32,10 +32,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
-import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
-import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -45,7 +43,6 @@ import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -90,12 +87,6 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
-  }
-
-  @Override
-  protected ColumnConfigDeserializer<FstIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.FST,
-        (tableConfig, fieldConfig) -> new FstIndexConfig(false));
   }
 
   @Override

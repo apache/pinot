@@ -29,7 +29,6 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
 
 public class VectorIndexTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
@@ -59,7 +58,7 @@ public class VectorIndexTest {
       JsonNode indexConfig = fieldConfig.getIndexes().get(VectorIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
       assertFalse(indexConfig.get("disabled").asBoolean());
-      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      Assert.assertEquals(fieldConfig.getIndexType(), FieldConfig.IndexType.VECTOR);
       assertNull(fieldConfig.getProperties());
       Assert.assertEquals(indexConfig.toString(),
           "{\"disabled\":false,\"vectorIndexType\":\"HNSW\",\"vectorDimension\":1536,"

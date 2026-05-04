@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.h3;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -51,11 +52,11 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> {
@@ -94,9 +95,18 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
-  protected ColumnConfigDeserializer<H3IndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.H3,
-        (tableConfig, fieldConfig) -> new H3IndexConfig(fieldConfig.getProperties()));
+  protected ColumnConfigDeserializer<H3IndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), (tableConfig, fieldConfig) -> {
+      JsonNode indexNode = fieldConfig.getIndexes().get(getPrettyName());
+      if (IndexConfigDeserializer.isEnabledOnlyConfig(indexNode)) {
+        return new H3IndexConfig(fieldConfig.getProperties());
+      }
+      try {
+        return JsonUtils.jsonNodeToObject(indexNode, H3IndexConfig.class);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
   }
 
   @Override

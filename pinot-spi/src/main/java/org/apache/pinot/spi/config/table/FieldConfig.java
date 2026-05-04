@@ -19,13 +19,19 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -70,10 +76,10 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX = "reuseMutableIndex";
   public static final String TEXT_INDEX_LUCENE_NRT_CACHING_DIRECTORY_BUFFER_SIZE =
       "luceneNRTCachingDirectoryMaxBufferSizeMB";
+  private static final JsonNodeFactory JSON_NODE_FACTORY = JsonNodeFactory.instance;
 
   private final String _name;
   private final EncodingType _encodingType;
-  private final List<IndexType> _indexTypes;
   private final JsonNode _indexes;
   private final JsonNode _tierOverwrites;
   private final CompressionCodec _compressionCodec;
@@ -111,12 +117,10 @@ public class FieldConfig extends BaseJsonConfig {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
-    _indexTypes =
-        indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;
     _timestampConfig = timestampConfig;
     _properties = properties;
-    _indexes = indexes == null ? NullNode.getInstance() : indexes;
+    _indexes = normalizeIndexes(name, indexType, indexTypes, indexes);
     _tierOverwrites = tierOverwrites == null ? NullNode.getInstance() : tierOverwrites;
   }
 
@@ -128,7 +132,26 @@ public class FieldConfig extends BaseJsonConfig {
   // If null, there won't be any index
   // NOTE: TIMESTAMP is ignored. In order to create TIMESTAMP index, configure 'timestampConfig' instead.
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, IFST, H3, JSON, TIMESTAMP, VECTOR, RANGE
+    INVERTED("inverted"),
+    SORTED("sorted"),
+    TEXT("text"),
+    FST("fst"),
+    IFST("ifst"),
+    H3("h3"),
+    JSON("json"),
+    TIMESTAMP("timestamp"),
+    VECTOR("vector"),
+    RANGE("range");
+
+    private final String _prettyName;
+
+    IndexType(String prettyName) {
+      _prettyName = prettyName;
+    }
+
+    public String getPrettyName() {
+      return _prettyName;
+    }
   }
 
   public enum CompressionCodec {
@@ -181,12 +204,28 @@ public class FieldConfig extends BaseJsonConfig {
 
   @Nullable
   @Deprecated
+  @JsonIgnore
   public IndexType getIndexType() {
-    return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
+    List<IndexType> indexTypes = getIndexTypes();
+    return indexTypes.isEmpty() ? null : indexTypes.get(0);
   }
 
+  @Deprecated
+  @JsonIgnore
   public List<IndexType> getIndexTypes() {
-    return _indexTypes;
+    if (!_indexes.isObject()) {
+      return Collections.emptyList();
+    }
+
+    List<IndexType> indexTypes = new ArrayList<>();
+    ObjectNode indexes = (ObjectNode) _indexes;
+    for (IndexType indexType : IndexType.values()) {
+      JsonNode indexConfig = indexes.get(indexType.getPrettyName());
+      if (indexConfig != null && !indexConfig.path("disabled").asBoolean(false)) {
+        indexTypes.add(indexType);
+      }
+    }
+    return indexTypes;
   }
 
   public JsonNode getIndexes() {
@@ -229,7 +268,6 @@ public class FieldConfig extends BaseJsonConfig {
     public Builder(FieldConfig other) {
       _name = other._name;
       _encodingType = other._encodingType;
-      _indexTypes = other._indexTypes;
       _indexes = other._indexes;
       _compressionCodec = other._compressionCodec;
       _properties = other._properties;
@@ -281,5 +319,45 @@ public class FieldConfig extends BaseJsonConfig {
       return new FieldConfig(_name, _encodingType, null, _indexTypes, _compressionCodec, _timestampConfig, _indexes,
           _properties, _tierOverwrites);
     }
+  }
+
+  private static JsonNode normalizeIndexes(String fieldName, @Nullable IndexType indexType,
+      @Nullable List<IndexType> indexTypes, @Nullable JsonNode indexes) {
+    Set<IndexType> legacyIndexTypes = collectLegacyIndexTypes(indexType, indexTypes);
+    if (legacyIndexTypes.isEmpty()) {
+      return indexes == null ? NullNode.getInstance() : indexes;
+    }
+
+    Preconditions.checkArgument(indexes == null || indexes.isNull() || indexes.isObject(),
+        "'indexes' must be an object when used with legacy 'indexType'/'indexTypes' for column: %s", fieldName);
+
+    ObjectNode normalizedIndexes =
+        indexes != null && indexes.isObject() ? ((ObjectNode) indexes).deepCopy() : JSON_NODE_FACTORY.objectNode();
+    for (IndexType legacyIndexType : legacyIndexTypes) {
+      String indexKey = legacyIndexType.getPrettyName();
+      Preconditions.checkArgument(!normalizedIndexes.has(indexKey),
+          "Index '%s' is declared in both 'indexes' and legacy 'indexType'/'indexTypes' for column: %s", indexKey,
+          fieldName);
+      normalizedIndexes.set(indexKey, enabledIndexConfigNode());
+    }
+    return normalizedIndexes.size() == 0 ? NullNode.getInstance() : normalizedIndexes;
+  }
+
+  private static Set<IndexType> collectLegacyIndexTypes(@Nullable IndexType indexType,
+      @Nullable List<IndexType> indexTypes) {
+    Set<IndexType> legacyIndexTypes = new LinkedHashSet<>();
+    if (indexType != null) {
+      legacyIndexTypes.add(indexType);
+    }
+    if (indexTypes != null) {
+      legacyIndexTypes.addAll(indexTypes);
+    }
+    return legacyIndexTypes;
+  }
+
+  private static ObjectNode enabledIndexConfigNode() {
+    ObjectNode indexConfig = JSON_NODE_FACTORY.objectNode();
+    indexConfig.put("disabled", false);
+    return indexConfig;
   }
 }

@@ -19,10 +19,12 @@
 
 package org.apache.pinot.segment.local.segment.index.text;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -48,10 +50,10 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,9 +97,19 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   }
 
   @Override
-  protected ColumnConfigDeserializer<TextIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.TEXT,
-        (tableConfig, fieldConfig) -> new TextIndexConfigBuilder().withProperties(fieldConfig.getProperties()).build());
+  protected ColumnConfigDeserializer<TextIndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), (tableConfig, fieldConfig) -> {
+      JsonNode indexNode = fieldConfig.getIndexes().get(getPrettyName());
+      TextIndexConfig indexConfig;
+      try {
+        indexConfig = JsonUtils.jsonNodeToObject(indexNode, TextIndexConfig.class);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+      return IndexConfigDeserializer.isEnabledOnlyConfig(indexNode)
+          ? new TextIndexConfigBuilder(indexConfig).withProperties(fieldConfig.getProperties()).build()
+          : indexConfig;
+    });
   }
 
   @Override

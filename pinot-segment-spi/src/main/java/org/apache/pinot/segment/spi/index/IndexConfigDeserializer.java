@@ -103,6 +103,33 @@ public class IndexConfigDeserializer {
     };
   }
 
+  /**
+   * Returns a {@link ColumnConfigDeserializer} that reads a specific fieldName of the <pre>indexes</pre> attribute on
+   * each FieldConfig and lets the caller decide how to translate it.
+   */
+  public static <C extends IndexConfig> ColumnConfigDeserializer<C> fromIndexes(String fieldName,
+      BiFunction<TableConfig, FieldConfig, C> mapFunction) {
+    return (tableConfig, schema) -> {
+      Map<String, C> result = new HashMap<>();
+      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+      if (fieldConfigList == null) {
+        return result;
+      }
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (!fieldConfig.getIndexes().isObject() || fieldConfig.getIndexes().get(fieldName) == null) {
+          continue;
+        }
+        result.put(fieldConfig.getName(), mapFunction.apply(tableConfig, fieldConfig));
+      }
+      return result;
+    };
+  }
+
+  public static boolean isEnabledOnlyConfig(JsonNode jsonNode) {
+    return jsonNode != null && jsonNode.isObject() && !jsonNode.path("disabled").asBoolean(false)
+        && (jsonNode.size() == 0 || (jsonNode.size() == 1 && jsonNode.has("disabled")));
+  }
+
   public static <C extends IndexConfig> ColumnConfigDeserializer<C> fromIndexTypes(
       FieldConfig.IndexType configIndexType, BiFunction<TableConfig, FieldConfig, C> mapFunction) {
     return (tableConfig, schema) -> {

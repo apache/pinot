@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.range;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
@@ -48,7 +49,6 @@ import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -106,6 +106,16 @@ public class RangeIndexType
   }
 
   @Override
+  protected ColumnConfigDeserializer<RangeIndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), (tableConfig, fieldConfig) -> {
+      JsonNode indexNode = fieldConfig.getIndexes().get(getPrettyName());
+      Boolean disabled = indexNode.has("disabled") ? indexNode.get("disabled").asBoolean() : null;
+      Integer version = indexNode.has("version") ? indexNode.get("version").asInt() : getRangeIndexVersion(tableConfig);
+      return new RangeIndexConfig(disabled, version);
+    }).withExclusiveAlternative(createDeserializerForLegacyConfigs());
+  }
+
+  @Override
   protected ColumnConfigDeserializer<RangeIndexConfig> createDeserializerForLegacyConfigs() {
     ColumnConfigDeserializer<RangeIndexConfig> fromRangeIndexColumns = (tableConfig, schema) -> {
       List<String> rangeIndexColumns = tableConfig.getIndexingConfig().getRangeIndexColumns();
@@ -122,10 +132,7 @@ public class RangeIndexType
       }
       return result;
     };
-    ColumnConfigDeserializer<RangeIndexConfig> fromIndexTypes =
-        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.RANGE,
-            (tableConfig, fieldConfig) -> new RangeIndexConfig(getRangeIndexVersion(tableConfig)));
-    return fromRangeIndexColumns.withFallbackAlternative(fromIndexTypes);
+    return fromRangeIndexColumns;
   }
 
   private static int getRangeIndexVersion(TableConfig tableConfig) {

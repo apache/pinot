@@ -245,6 +245,10 @@ public class TableConfigSerDeUtilsTest {
           new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
               FieldConfig.CompressionCodec.SNAPPY, null));
       TableConfig tableConfig = tableConfigBuilder.setFieldConfigList(fieldConfigList).build();
+      String tableConfigJson = tableConfig.toJsonString();
+      assertTrue(tableConfigJson.contains("\"indexes\""));
+      assertFalse(tableConfigJson.contains("\"indexTypes\""));
+      assertFalse(tableConfigJson.contains("\"indexType\""));
 
       checkFieldConfig(tableConfig);
 

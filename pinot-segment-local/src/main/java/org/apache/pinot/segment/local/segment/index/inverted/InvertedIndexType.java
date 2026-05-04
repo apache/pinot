@@ -50,7 +50,6 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -97,13 +96,9 @@ public class InvertedIndexType
 
   @Override
   protected ColumnConfigDeserializer<IndexConfig> createDeserializerForLegacyConfigs() {
-    ColumnConfigDeserializer<IndexConfig> fromInvertedIndexColumns =
-        IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
-            (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    ColumnConfigDeserializer<IndexConfig> fromFieldConfigs =
-        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.INVERTED,
-            (tableConfig, fieldConfig) -> IndexConfig.ENABLED);
-    return fromInvertedIndexColumns.withFallbackAlternative(fromFieldConfigs);
+    return IndexConfigDeserializer.fromCollection(
+        tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
+        (acum, column) -> acum.put(column, IndexConfig.ENABLED));
   }
 
   public DictionaryBasedInvertedIndexCreator createIndexCreator(IndexCreationContext context)

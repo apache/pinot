@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index.vector;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -51,10 +53,10 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,9 +122,18 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   }
 
   @Override
-  protected ColumnConfigDeserializer<VectorIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.VECTOR,
-        (tableConfig, fieldConfig) -> new VectorIndexConfig(fieldConfig.getProperties()));
+  protected ColumnConfigDeserializer<VectorIndexConfig> createDeserializer() {
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), (tableConfig, fieldConfig) -> {
+      JsonNode indexNode = fieldConfig.getIndexes().get(getPrettyName());
+      if (IndexConfigDeserializer.isEnabledOnlyConfig(indexNode)) {
+        return new VectorIndexConfig(fieldConfig.getProperties());
+      }
+      try {
+        return JsonUtils.jsonNodeToObject(indexNode, VectorIndexConfig.class);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
   }
 
   @Override

@@ -60,7 +60,6 @@ import static org.apache.pinot.spi.config.table.FieldConfig.EncodingType.RAW;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
 
 
 public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
@@ -431,7 +430,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           .filter(fc -> fc.getName().equals("dimStr"))
           .collect(Collectors.toList()).get(0);
       assertNotNull(fieldConfig.getIndexes().get(H3IndexType.INDEX_DISPLAY_NAME));
-      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      Assert.assertEquals(fieldConfig.getIndexType(), FieldConfig.IndexType.H3);
     }
 
     @Test
@@ -454,7 +453,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           .filter(fc -> fc.getName().equals("location_st_point"))
           .collect(Collectors.toList()).get(0);
       Assert.assertEquals(fieldConfig.getEncodingType(), RAW);
-      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      Assert.assertEquals(fieldConfig.getIndexType(), FieldConfig.IndexType.H3);
       assertNull(fieldConfig.getProperties());
       JsonNode node = fieldConfig.getIndexes().get(H3IndexType.INDEX_DISPLAY_NAME);
       Assert.assertEquals(node.toString(), "{\"disabled\":false,\"resolution\":[5,6,13]}");

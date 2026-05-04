@@ -95,7 +95,7 @@ public class FstIndexTypeTest {
           .filter(fc -> fc.getName().equals("dimStr"))
           .collect(Collectors.toList()).get(0);
       assertNotNull(fieldConfig.getIndexes().get(FstIndexType.INDEX_DISPLAY_NAME));
-      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      Assert.assertEquals(fieldConfig.getIndexType(), FieldConfig.IndexType.FST);
     }
   }
 

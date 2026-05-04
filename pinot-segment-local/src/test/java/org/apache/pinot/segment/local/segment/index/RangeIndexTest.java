@@ -32,7 +32,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
 
 public class RangeIndexTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
@@ -48,7 +47,7 @@ public class RangeIndexTest {
       JsonNode indexConfig = fieldConfig.getIndexes().get(RangeIndexType.INDEX_DISPLAY_NAME);
       assertNotNull(indexConfig);
       assertEquals(RangeIndexConfig.DEFAULT.getVersion(), indexConfig.get("version").asInt());
-      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      assertEquals(fieldConfig.getIndexType(), FieldConfig.IndexType.RANGE);
       assertNull(fieldConfig.getProperties());
     }
   }

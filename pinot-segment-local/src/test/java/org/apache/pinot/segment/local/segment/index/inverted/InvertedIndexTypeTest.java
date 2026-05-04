@@ -116,7 +116,7 @@ public class InvertedIndexTypeTest {
           .collect(Collectors.toList()).get(0);
       assertNotNull(fieldConfig.getIndexes().get(InvertedIndexType.INDEX_DISPLAY_NAME));
       assertNull(_tableConfig.getIndexingConfig().getInvertedIndexColumns());
-      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      Assert.assertEquals(fieldConfig.getIndexType(), FieldConfig.IndexType.INVERTED);
     }
   }
 

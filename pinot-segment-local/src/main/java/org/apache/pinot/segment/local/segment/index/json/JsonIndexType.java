@@ -48,7 +48,6 @@ import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -100,10 +99,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     ColumnConfigDeserializer<JsonIndexConfig> fromJsonIndexColumns =
         IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getJsonIndexColumns(),
             (accum, column) -> accum.put(column, JsonIndexConfig.DEFAULT));
-    ColumnConfigDeserializer<JsonIndexConfig> fromFieldConfigs =
-        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.JSON,
-            (tableConfig, fieldConfig) -> JsonIndexConfig.DEFAULT);
-    return fromJsonIndexConfigs.withFallbackAlternative(fromJsonIndexColumns).withFallbackAlternative(fromFieldConfigs);
+    return fromJsonIndexConfigs.withFallbackAlternative(fromJsonIndexColumns);
   }
 
   @Override
