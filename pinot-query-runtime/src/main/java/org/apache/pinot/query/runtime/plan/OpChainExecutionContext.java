@@ -20,14 +20,18 @@ package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
@@ -63,6 +67,16 @@ public class OpChainExecutionContext {
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
   private final boolean _keepPipelineBreakerStats;
+  /**
+   * Map of MultiStageOperator -> PlanNodes that compile down to that operator. Populated by
+   * {@link org.apache.pinot.query.runtime.plan.PlanNodeToOpChain} during opchain construction. Cardinality is
+   * one-to-many: an intermediate operator maps to a single PlanNode, but the leaf operator maps to the whole sub-tree
+   * of v1 plan nodes below the leaf-stage boundary. Used by the stream-mode stats reporting path
+   * ({@code MultiStageStatsTreeEncoder}) to attach plan-node identifiers to each operator's stats.
+   * <p>
+   * Identity-based (IdentityHashMap) because PlanNode equality is structural and two distinct nodes can compare equal.
+   */
+  private final Map<MultiStageOperator, List<PlanNode>> _operatorToPlanNodes = new IdentityHashMap<>();
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
@@ -205,6 +219,22 @@ public class OpChainExecutionContext {
 
   public boolean isKeepPipelineBreakerStats() {
     return _keepPipelineBreakerStats;
+  }
+
+  /**
+   * Records which PlanNodes compiled down to the given MultiStageOperator. Should be called once per operator as the
+   * opchain is constructed; subsequent calls overwrite. {@code planNodes} is captured by reference; callers should not
+   * mutate it after passing it in.
+   */
+  public void recordPlanNodesForOperator(MultiStageOperator operator, List<PlanNode> planNodes) {
+    _operatorToPlanNodes.put(operator, planNodes);
+  }
+
+  /**
+   * Returns the PlanNodes that compiled down to the given operator, or an empty list if no mapping was recorded.
+   */
+  public List<PlanNode> getPlanNodesForOperator(MultiStageOperator operator) {
+    return _operatorToPlanNodes.getOrDefault(operator, List.of());
   }
 
   private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {

@@ -96,16 +96,34 @@ public class PlanNodeToOpChain {
    */
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
-    MyVisitor visitor = new MyVisitor(tracker);
+    MyVisitor visitor = new MyVisitor(context, tracker);
     MultiStageOperator root = node.visit(visitor, context);
+    visitor.record(node, root);
     tracker.accept(node, root);
     return new OpChain(context, root);
   }
 
+  /**
+   * Recursively collects all PlanNodes in the sub-tree rooted at {@code root} (including {@code root} itself), in
+   * pre-order (root first, then children left-to-right).
+   * <p>
+   * Used to record the leaf operator's full one-to-many mapping: the leaf operator's tracker fires once with the
+   * leaf-stage boundary PlanNode, but the leaf actually represents the whole sub-tree of v1 plan nodes below that
+   * boundary. We walk the boundary's sub-tree once at construction and store the full list on the operator.
+   */
+  private static void collectPlanNodeSubTree(PlanNode root, List<PlanNode> out) {
+    out.add(root);
+    for (PlanNode child : root.getInputs()) {
+      collectPlanNodeSubTree(child, out);
+    }
+  }
+
   private static class MyVisitor implements PlanNodeVisitor<MultiStageOperator, OpChainExecutionContext> {
+    private final OpChainExecutionContext _context;
     private final BiConsumer<PlanNode, MultiStageOperator> _tracker;
 
-    public MyVisitor(BiConsumer<PlanNode, MultiStageOperator> tracker) {
+    public MyVisitor(OpChainExecutionContext context, BiConsumer<PlanNode, MultiStageOperator> tracker) {
+      _context = context;
       _tracker = tracker;
     }
 
@@ -127,8 +145,26 @@ public class PlanNodeToOpChain {
       } else {
         result = node.visit(this, context);
       }
+      record(node, result);
       _tracker.accept(node, result);
       return result;
+    }
+
+    /**
+     * Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
+     * to {@code node}. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
+     * PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
+     */
+    void record(PlanNode node, MultiStageOperator operator) {
+      List<PlanNode> mapping;
+      ServerPlanRequestContext leafStageContext = _context.getLeafStageContext();
+      if (leafStageContext != null && leafStageContext.getLeafStageBoundaryNode() == node) {
+        mapping = new ArrayList<>();
+        collectPlanNodeSubTree(node, mapping);
+      } else {
+        mapping = List.of(node);
+      }
+      _context.recordPlanNodesForOperator(operator, mapping);
     }
 
     @Override
