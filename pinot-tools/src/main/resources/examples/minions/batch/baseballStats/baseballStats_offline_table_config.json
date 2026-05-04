@@ -11,6 +11,7 @@
   "tableIndexConfig": {
     "loadMode": "HEAP",
     "invertedIndexColumns": [
+      "playerID",
       "teamID"
     ]
   },
@@ -38,11 +39,5 @@
       "SegmentGenerationAndPushTask": {
       }
     }
-  },
-  "fieldConfigList": [
-    {
-      "name": "playerID",
-      "encodingType": "RAW"
-    }
-  ]
+  }
 }
