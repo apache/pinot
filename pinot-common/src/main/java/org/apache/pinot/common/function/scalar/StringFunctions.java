@@ -945,4 +945,113 @@ public class StringFunctions {
     }
     return matches;
   }
+
+  /**
+   * Returns the ASCII code of the first character, or 0 for an empty string.
+   * Matches SQL standard behavior (MySQL, PostgreSQL, Trino).
+   *
+   * @param input the input string
+   * @return ASCII value of the first character, or 0 if the string is empty
+   */
+  @ScalarFunction
+  public static int ascii(String input) {
+    return input.isEmpty() ? 0 : (int) input.charAt(0);
+  }
+
+  /**
+   * Returns a string consisting of {@code n} space characters.
+   *
+   * @param n the number of spaces
+   * @return a string of n spaces, or empty string if n is non-positive
+   */
+  @ScalarFunction
+  public static String space(int n) {
+    if (n <= 0) {
+      return "";
+    }
+    return StringUtils.repeat(' ', n);
+  }
+
+  /**
+   * Returns the substring before (positive count) or after (negative count) the Nth delimiter occurrence.
+   *
+   * <p>MySQL-compatible semantics: {@code substringIndex("a.b.c.d", ".", 2)} returns {@code "a.b"}.
+   * Negative count counts from the right: {@code substringIndex("a.b.c.d", ".", -2)} returns {@code "c.d"}.
+   *
+   * @param input the input string
+   * @param delimiter the delimiter to search for
+   * @param count occurrence count (positive = from left, negative = from right)
+   * @return the substring, or the entire input if the delimiter does not occur enough times
+   */
+  @ScalarFunction(names = {"substringIndex", "substring_index"})
+  public static String substringIndex(String input, String delimiter, int count) {
+    if (count == 0 || delimiter.isEmpty()) {
+      return "";
+    }
+    if (count > 0) {
+      int idx = StringUtils.ordinalIndexOf(input, delimiter, count);
+      return idx == -1 ? input : input.substring(0, idx);
+    } else {
+      int idx = StringUtils.lastOrdinalIndexOf(input, delimiter, -count);
+      return idx == -1 ? input : input.substring(idx + delimiter.length());
+    }
+  }
+
+  /**
+   * Returns the first line of the input string (up to the first line terminator).
+   * Handles Unix ({@code \n}), Windows ({@code \r\n}), and old Mac ({@code \r}) line endings.
+   *
+   * @param input the input string
+   * @return the first line, without the line terminator
+   */
+  @ScalarFunction
+  public static String firstLine(String input) {
+    int idxN = input.indexOf('\n');
+    int idxR = input.indexOf('\r');
+    if (idxN == -1 && idxR == -1) {
+      return input;
+    }
+    int idx = (idxN == -1) ? idxR : (idxR == -1) ? idxN : Math.min(idxN, idxR);
+    return input.substring(0, idx);
+  }
+
+  /**
+   * Returns true if the string starts with the given prefix, ignoring case differences.
+   *
+   * @param input the input string
+   * @param prefix the prefix to check
+   * @return true if the input starts with the prefix (case-insensitive)
+   */
+  @ScalarFunction
+  public static boolean startsWithCaseInsensitive(String input, String prefix) {
+    return Strings.CI.startsWith(input, prefix);
+  }
+
+  /**
+   * Returns true if the string ends with the given suffix, ignoring case differences.
+   *
+   * @param input the input string
+   * @param suffix the suffix to check
+   * @return true if the input ends with the suffix (case-insensitive)
+   */
+  @ScalarFunction
+  public static boolean endsWithCaseInsensitive(String input, String suffix) {
+    return Strings.CI.endsWith(input, suffix);
+  }
+
+  /**
+   * Returns true if all characters in the string are valid ASCII (values 0–127).
+   *
+   * @param input the input string
+   * @return true if every character is in the ASCII range
+   */
+  @ScalarFunction
+  public static boolean isValidASCII(String input) {
+    for (int i = 0; i < input.length(); i++) {
+      if (input.charAt(i) > 127) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

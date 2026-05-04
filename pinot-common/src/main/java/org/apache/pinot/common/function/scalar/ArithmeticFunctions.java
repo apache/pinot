@@ -211,4 +211,52 @@ public class ArithmeticFunctions {
     // Skip the heading 0s in the long value
     return Long.reverseBytes(a);
   }
+
+  /** Returns the cube root of the given value. */
+  @ScalarFunction
+  public static double cbrt(double a) {
+    return Math.cbrt(a);
+  }
+
+  /** Returns 2 raised to the power of the given value. */
+  @ScalarFunction
+  public static double exp2(double a) {
+    return Math.pow(2, a);
+  }
+
+  /** Returns 10 raised to the power of the given value. */
+  @ScalarFunction
+  public static double exp10(double a) {
+    return Math.pow(10, a);
+  }
+
+  /** Returns log(1 + x), computed in a way that is accurate even when x is close to zero. */
+  @ScalarFunction
+  public static double log1p(double a) {
+    return Math.log1p(a);
+  }
+
+  /** Returns the sigmoid (logistic) function: 1 / (1 + e^(-x)). */
+  @ScalarFunction
+  public static double sigmoid(double a) {
+    return 1.0 / (1.0 + Math.exp(-a));
+  }
+
+  /** Returns the mathematical constant pi (π). */
+  @ScalarFunction
+  public static double pi() {
+    return Math.PI;
+  }
+
+  /** Returns Euler's number (e), the base of the natural logarithm. */
+  @ScalarFunction(names = {"e", "euler"})
+  public static double e() {
+    return Math.E;
+  }
+
+  /** Returns the number of set bits (popcount) in the binary representation of the given long value. */
+  @ScalarFunction
+  public static int bitCount(long a) {
+    return Long.bitCount(a);
+  }
 }

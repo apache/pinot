@@ -24,7 +24,9 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class StringFunctionsTest {
@@ -394,5 +396,109 @@ public class StringFunctionsTest {
 
     assertEquals(StringFunctions.encodeUrl(
         "https://localhost:8080/hello?a=b"), "https%3A%2F%2Flocalhost%3A8080%2Fhello%3Fa%3Db");
+  }
+
+  // ==================== Tests for ascii ====================
+
+  @Test
+  public void testAscii() {
+    assertEquals(StringFunctions.ascii("A"), 65);
+    assertEquals(StringFunctions.ascii("a"), 97);
+    assertEquals(StringFunctions.ascii("0"), 48);
+    assertEquals(StringFunctions.ascii("hello"), 104);
+    assertEquals(StringFunctions.ascii(" "), 32);
+    assertEquals(StringFunctions.ascii(""), 0);
+  }
+
+  // ==================== Tests for space ====================
+
+  @Test
+  public void testSpace() {
+    assertEquals(StringFunctions.space(0), "");
+    assertEquals(StringFunctions.space(1), " ");
+    assertEquals(StringFunctions.space(5), "     ");
+    assertEquals(StringFunctions.space(-1), "");
+  }
+
+  // ==================== Tests for substringIndex ====================
+
+  @Test
+  public void testSubstringIndex() {
+    // Positive count — substring before nth delimiter
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", 1), "a");
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", 2), "a.b");
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", 3), "a.b.c");
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", 10), "a.b.c.d");
+
+    // Negative count — substring after nth delimiter from right
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", -1), "d");
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", -2), "c.d");
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", -3), "b.c.d");
+    assertEquals(StringFunctions.substringIndex("a.b.c.d", ".", -10), "a.b.c.d");
+
+    // Zero count
+    assertEquals(StringFunctions.substringIndex("a.b.c", ".", 0), "");
+
+    // Empty delimiter
+    assertEquals(StringFunctions.substringIndex("a.b.c", "", 1), "");
+
+    // No delimiter found
+    assertEquals(StringFunctions.substringIndex("abc", ".", 1), "abc");
+    assertEquals(StringFunctions.substringIndex("abc", ".", -1), "abc");
+
+    // Multi-char delimiter
+    assertEquals(StringFunctions.substringIndex("a::b::c", "::", 1), "a");
+    assertEquals(StringFunctions.substringIndex("a::b::c", "::", -1), "c");
+  }
+
+  // ==================== Tests for firstLine ====================
+
+  @Test
+  public void testFirstLine() {
+    assertEquals(StringFunctions.firstLine("hello\nworld"), "hello");
+    assertEquals(StringFunctions.firstLine("single line"), "single line");
+    assertEquals(StringFunctions.firstLine(""), "");
+    assertEquals(StringFunctions.firstLine("\nstart"), "");
+    assertEquals(StringFunctions.firstLine("line1\nline2\nline3"), "line1");
+    // Windows line endings
+    assertEquals(StringFunctions.firstLine("hello\r\nworld"), "hello");
+    // Old Mac line endings
+    assertEquals(StringFunctions.firstLine("hello\rworld"), "hello");
+    // Mixed
+    assertEquals(StringFunctions.firstLine("first\r\nsecond\nthird"), "first");
+  }
+
+  // ==================== Tests for startsWithCaseInsensitive ====================
+
+  @Test
+  public void testStartsWithCaseInsensitive() {
+    assertTrue(StringFunctions.startsWithCaseInsensitive("Hello World", "hello"));
+    assertTrue(StringFunctions.startsWithCaseInsensitive("Hello World", "HELLO"));
+    assertTrue(StringFunctions.startsWithCaseInsensitive("Hello World", "Hello"));
+    assertTrue(StringFunctions.startsWithCaseInsensitive("Hello World", ""));
+    assertFalse(StringFunctions.startsWithCaseInsensitive("Hello World", "world"));
+  }
+
+  // ==================== Tests for endsWithCaseInsensitive ====================
+
+  @Test
+  public void testEndsWithCaseInsensitive() {
+    assertTrue(StringFunctions.endsWithCaseInsensitive("Hello World", "world"));
+    assertTrue(StringFunctions.endsWithCaseInsensitive("Hello World", "WORLD"));
+    assertTrue(StringFunctions.endsWithCaseInsensitive("Hello World", "World"));
+    assertTrue(StringFunctions.endsWithCaseInsensitive("Hello World", ""));
+    assertFalse(StringFunctions.endsWithCaseInsensitive("Hello World", "hello"));
+  }
+
+  // ==================== Tests for isValidASCII ====================
+
+  @Test
+  public void testIsValidASCII() {
+    assertTrue(StringFunctions.isValidASCII("hello"));
+    assertTrue(StringFunctions.isValidASCII("Hello World 123!@#"));
+    assertTrue(StringFunctions.isValidASCII(""));
+    assertFalse(StringFunctions.isValidASCII("héllo"));
+    assertFalse(StringFunctions.isValidASCII("日本語"));
+    assertFalse(StringFunctions.isValidASCII("café"));
   }
 }
