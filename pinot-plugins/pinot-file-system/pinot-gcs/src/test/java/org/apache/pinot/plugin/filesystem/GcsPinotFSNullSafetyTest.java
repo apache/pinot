@@ -60,7 +60,8 @@ public class GcsPinotFSNullSafetyTest {
   }
 
   @Test
-  public void testOpenThrowsFileNotFoundExceptionWhenBlobDoesNotExist() {
+  public void testOpenThrowsFileNotFoundExceptionWhenBlobDoesNotExist()
+      throws IOException {
     URI uri = URI.create("gs://test-bucket/missing-file");
     when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
 
@@ -73,7 +74,8 @@ public class GcsPinotFSNullSafetyTest {
   }
 
   @Test
-  public void testOpenDoesNotThrowNullPointerException() {
+  public void testOpenDoesNotThrowNullPointerException()
+      throws IOException {
     URI uri = URI.create("gs://test-bucket/missing-file");
     when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
 
