@@ -36,6 +36,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -63,8 +64,12 @@ public class GcsPinotFSNullSafetyTest {
     URI uri = URI.create("gs://test-bucket/missing-file");
     when(_mockStorage.get(any(BlobId.class))).thenReturn(null);
 
-    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.open(uri));
-    assertEquals(ex.getMessage(), "File '" + uri + "' does not exist");
+    try {
+      _gcsPinotFS.open(uri);
+      fail("Expected FileNotFoundException");
+    } catch (FileNotFoundException ex) {
+      assertEquals(ex.getMessage(), "File '" + uri + "' does not exist");
+    }
   }
 
   @Test
@@ -99,9 +104,12 @@ public class GcsPinotFSNullSafetyTest {
         .thenReturn(mockBlob)  // existsFile: file-path blob (no trailing /)
         .thenReturn(null);     // copyFile's getBlob: returns null -> FileNotFoundException
 
-    FileNotFoundException ex =
-        assertThrows(FileNotFoundException.class, () -> _gcsPinotFS.copyDir(srcUri, dstUri));
-    assertEquals(ex.getMessage(), "Source file 'gs://test-bucket/src-file' does not exist");
+    try {
+      _gcsPinotFS.copyDir(srcUri, dstUri);
+      fail("Expected FileNotFoundException");
+    } catch (FileNotFoundException ex) {
+      assertEquals(ex.getMessage(), "Source file 'gs://test-bucket/src-file' does not exist");
+    }
   }
 
   @SuppressWarnings("unchecked")
