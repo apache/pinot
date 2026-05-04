@@ -146,22 +146,18 @@
       </source>
       <destName>plugins/pinot-input-format/pinot-csv/pinot-csv-${project.version}-shaded.jar</destName>
     </file>
-    <file>
-      <source>
-        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-json/target/pinot-json-${project.version}-shaded.jar
-      </source>
-      <destName>plugins/pinot-input-format/pinot-json/pinot-json-${project.version}-shaded.jar</destName>
-    </file>
+    <!--
+      pinot-json and pinot-parquet are NOT copied to plugins/ because pinot-tools depends on
+      them as compile-time libraries (JSONRecordReader, ParquetUtils, ParquetRecordReader are
+      imported directly from pinot-tools' Java code). Their classes therefore live in
+      pinot-all.jar already; copying them to plugins/ as well would duplicate the same
+      bytecode at two classloader levels. Treat them as "strong" deps for now; the cleaner
+      split (utilities → -base library, plugin classes → plugins/) can land in a follow-up.
+    -->
     <file>
       <source>${pinot.root}/pinot-plugins/pinot-input-format/pinot-orc/target/pinot-orc-${project.version}-shaded.jar
       </source>
       <destName>plugins/pinot-input-format/pinot-orc/pinot-orc-${project.version}-shaded.jar</destName>
-    </file>
-    <file>
-      <source>
-        ${pinot.root}/pinot-plugins/pinot-input-format/pinot-parquet/target/pinot-parquet-${project.version}-shaded.jar
-      </source>
-      <destName>plugins/pinot-input-format/pinot-parquet/pinot-parquet-${project.version}-shaded.jar</destName>
     </file>
     <file>
       <source>
@@ -194,16 +190,12 @@
       <destName>plugins/pinot-input-format/pinot-arrow/pinot-arrow-${project.version}-shaded.jar</destName>
     </file>
     <!-- End Include Pinot Input Format Plugins-->
-    <!-- Start Include Pinot Minion Tasks Plugins-->
-    <file>
-      <source>
-        ${pinot.root}/pinot-plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/target/pinot-minion-builtin-tasks-${project.version}.jar
-      </source>
-      <destName>
-        plugins/pinot-minion-tasks/pinot-minion-builtin-tasks/pinot-minion-builtin-tasks-${project.version}.jar
-      </destName>
-    </file>
-    <!-- End Include Pinot Minion Tasks Plugins-->
+    <!--
+      pinot-minion-builtin-tasks is intentionally not copied to plugins/. pinot-tools imports
+      SegmentConversionUtils from it directly, so it is a compile-time library dependency and
+      its classes are already in pinot-all.jar. See the same note above for pinot-json /
+      pinot-parquet.
+    -->
     <!-- Start Include Pinot Metrics Plugins-->
     <file>
       <source>${pinot.root}/pinot-plugins/pinot-metrics/pinot-yammer/target/pinot-yammer-${project.version}-shaded.jar

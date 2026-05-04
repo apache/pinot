@@ -145,6 +145,13 @@ public class PluginManagerTest {
         }
 
         Assert.assertEquals(count, 10);
+
+        // Realm-walk fallback: createInstance(className) without a plugin prefix must also resolve
+        // the plugin-only class. Pre-fallback this only consulted the DEFAULT PluginClassLoader
+        // (which has no URLs and only delegates to the system classloader), so plugin-only classes
+        // would throw ClassNotFoundException.
+        RecordReader viaFallback = PluginManager.get().createInstance("TestRecordReader");
+        Assert.assertEquals(viaFallback.getClass().getName(), "TestRecordReader");
       }
     }
   }

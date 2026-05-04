@@ -21,6 +21,7 @@ package org.apache.pinot.spi.plugin;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
@@ -42,6 +43,8 @@ import java.util.Properties;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -270,18 +273,8 @@ public class PluginManager {
    * @param directory the directory of one plugin
    */
   public void load(String pluginName, File directory) {
-    Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
-    if (Files.isRegularFile(pluginPropertiesPath)) {
-      Properties pluginProperties = new Properties();
-      PinotPluginConfiguration config;
-      try (Reader reader = Files.newBufferedReader(pluginPropertiesPath)) {
-        pluginProperties.load(reader);
-        config = new PinotPluginConfiguration(pluginProperties);
-      } catch (IOException e) {
-        LOGGER.warn("Failed to load plugin properties from {}", pluginPropertiesPath, e);
-        throw new UncheckedIOException(e);
-      }
-
+    PinotPluginConfiguration config = readPluginConfiguration(directory);
+    if (config != null) {
       final ClassLoader baseClassLoader = ClassLoader.getPlatformClassLoader();
 
       Collection<URL> urlList;
@@ -345,6 +338,80 @@ public class PluginManager {
     }
   }
 
+  /// Reads {@code pinot-plugin.properties} from the plugin directory.
+  ///
+  /// Looks first for the file at the directory root (`<dir>/pinot-plugin.properties`) — the
+  /// historical layout — and falls back to scanning the jars in the directory for the same
+  /// resource. The fallback lets a plugin author opt into realm loading by simply placing the
+  /// file under `src/main/resources` of the plugin module: at runtime the file ends up inside
+  /// the plugin jar, and PluginManager finds it without requiring the distribution assembly to
+  /// extract it next to the jar.
+  ///
+  /// Returns {@code null} when neither lookup turns up the file — the caller falls back to the
+  /// legacy {@link PluginClassLoader} path.
+  private PinotPluginConfiguration readPluginConfiguration(File directory) {
+    Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
+    if (Files.isRegularFile(pluginPropertiesPath)) {
+      Properties pluginProperties = new Properties();
+      try (Reader reader = Files.newBufferedReader(pluginPropertiesPath)) {
+        pluginProperties.load(reader);
+        return new PinotPluginConfiguration(pluginProperties);
+      } catch (IOException e) {
+        LOGGER.warn("Failed to load plugin properties from {}", pluginPropertiesPath, e);
+        throw new UncheckedIOException(e);
+      }
+    }
+    // Fall back to scanning jars in the plugin directory for the same resource. Plugin authors
+    // who opt into realm loading by adding `src/main/resources/pinot-plugin.properties` get the
+    // file inside their plugin jar — without this lookup, that placement would be ignored.
+    //
+    // Order the scan so the "obvious" jar (the one whose filename starts with the plugin
+    // directory name — e.g. `pinot-kafka-3.0/pinot-kafka-3.0-VERSION-shaded.jar`) is inspected
+    // first, then the rest. Avoids opening every dependency jar in the directory in the common
+    // case, which can be 100+ jars per plugin.
+    String prefix = directory.getName();
+    Collection<File> jarFiles = FileUtils.listFiles(directory, new String[]{JAR_FILE_EXTENSION}, true);
+    List<File> ordered = new ArrayList<>(jarFiles.size());
+    List<File> tail = new ArrayList<>();
+    for (File jarFile : jarFiles) {
+      if (jarFile.getName().startsWith(prefix)) {
+        ordered.add(jarFile);
+      } else {
+        tail.add(jarFile);
+      }
+    }
+    ordered.addAll(tail);
+    for (File jarFile : ordered) {
+      PinotPluginConfiguration config = readPluginConfigurationFromJar(jarFile);
+      if (config != null) {
+        return config;
+      }
+    }
+    return null;
+  }
+
+  private PinotPluginConfiguration readPluginConfigurationFromJar(File jarFile) {
+    try (JarFile jar = new JarFile(jarFile)) {
+      JarEntry entry = jar.getJarEntry(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
+      if (entry == null) {
+        return null;
+      }
+      Properties pluginProperties = new Properties();
+      try (InputStream in = jar.getInputStream(entry)) {
+        pluginProperties.load(in);
+        LOGGER.info("Loaded plugin properties from {} entry of {}", PINOUT_PLUGIN_PROPERTIES_FILE_NAME, jarFile);
+        return new PinotPluginConfiguration(pluginProperties);
+      }
+    } catch (IOException e) {
+      // Don't throw: a corrupt jar should not prevent us from inspecting the rest of the
+      // plugin directory. Worst case we miss the properties file and the caller falls back to
+      // the legacy PluginClassLoader path; the WARN message is the operator's signal.
+      LOGGER.warn("Could not read {} from {} — falling back to legacy plugin loading if no other jar declares it.",
+          PINOUT_PLUGIN_PROPERTIES_FILE_NAME, jarFile, e);
+      return null;
+    }
+  }
+
   private PluginClassLoader createClassLoader(Collection<URL> urlList) {
     URL[] urls = new URL[urlList.size()];
     urlList.toArray(urls);
@@ -354,9 +421,16 @@ public class PluginManager {
   }
 
   /**
-   * Loads a class. The class name can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
+   * Loads a class. The class name can be in any of the following formats:
+   * <ul>
+   *   <li>{@code com.x.y.Foo} — load via the realm-walk fallback: try the default
+   *       PluginClassLoader (which delegates to the system classloader) first, then every
+   *       registered plugin realm and PluginClassLoader. The first match wins; if more than
+   *       one plugin exposes the same FQCN, a WARN is logged.</li>
+   *   <li>{@code pluginName:com.x.y.Foo} — strict load via the named plugin's classloader
+   *       only. If that plugin does not have the class, throws {@link ClassNotFoundException}
+   *       without falling through to other plugins.</li>
+   * </ul>
    * @param className
    * @return
    * @throws ClassNotFoundException
@@ -374,27 +448,100 @@ public class PluginManager {
   }
 
   /**
-   * Loads a class using the plugin specific class loader
-   * @param pluginName
-   * @param className
-   * @return
-   * @throws ClassNotFoundException
+   * Loads a class using the plugin-specific class loader for the given {@code pluginName}, or, when
+   * {@code pluginName} is {@link #DEFAULT_PLUGIN_NAME}, walks every plugin classloader after
+   * exhausting the default one. The realm walk lets callers look up a class by FQCN without
+   * having to know which plugin provides it — important once plugin classes are no longer
+   * unconditionally on the JVM's system classpath.
+   *
+   * <p>For an explicit (non-{@code DEFAULT}) {@code pluginName}, the lookup is strict: only
+   * that plugin's classloader / realm is consulted, so a {@code "pluginA:Foo"} request never
+   * silently resolves to a {@code Foo} from {@code pluginB}.</p>
+   *
+   * @param pluginName the plugin to load from, or {@link #DEFAULT_PLUGIN_NAME} for an
+   *     unscoped lookup that walks every registered plugin classloader.
+   * @param className FQCN to load; subject to backward-compatible class-name remapping.
+   * @throws ClassNotFoundException if the class is not found on the named plugin (or, for
+   *     {@code DEFAULT}, on any classloader known to this manager).
    */
   public Class<?> loadClass(String pluginName, String className)
       throws ClassNotFoundException {
-    // Backward compatible check.
     String name = loadClassWithBackwardCompatibleCheck(className);
-
+    if (DEFAULT_PLUGIN_NAME.equals(pluginName)) {
+      return loadClassFromAnyPlugin(name);
+    }
     Plugin plugin = new Plugin(pluginName);
     if (_registry.containsKey(plugin)) {
       return _registry.get(plugin).loadClass(name, true);
-    } else {
-      try {
-        return _classWorld.getRealm(pluginName).loadClass(className);
-      } catch (NoSuchRealmException e) {
-        throw new RuntimeException(e);
+    }
+    try {
+      return _classWorld.getRealm(pluginName).loadClass(name);
+    } catch (NoSuchRealmException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /// Walk-all-plugins fallback used when the caller did not pin a specific {@code pluginName}.
+  ///
+  /// Order is deterministic: the `DEFAULT` `PluginClassLoader` first (its parent is the system
+  /// classloader, so this also covers core service classes), then every [ClassRealm] in
+  /// `ClassWorld` registration order, then every other entry in the legacy `PluginClassLoader`
+  /// registry in registration order. Returns the **first** match.
+  ///
+  /// If more than one classloader exposes the same FQCN — e.g. two plugins ship a class with
+  /// the same name, or a relocated dependency leaks the same package — the first hit wins and
+  /// a `WARN` is logged listing every classloader that also resolved the name. Callers that
+  /// need strict precedence must use the explicit `pluginName:className` form.
+  private Class<?> loadClassFromAnyPlugin(String name) throws ClassNotFoundException {
+    List<ClassLoader> classLoaders;
+    synchronized (this) {
+      classLoaders = new ArrayList<>(1 + _classWorld.getRealms().size() + _registry.size());
+      Plugin defaultPlugin = new Plugin(DEFAULT_PLUGIN_NAME);
+      PluginClassLoader defaultClassLoader = _registry.get(defaultPlugin);
+      if (defaultClassLoader != null) {
+        classLoaders.add(defaultClassLoader);
+      }
+      // PINOT_REALMID wraps the system classloader (already covered by the DEFAULT
+      // PluginClassLoader's parent delegation); DEFAULT_PLUGIN_NAME has no URLs.
+      for (ClassRealm realm : _classWorld.getRealms()) {
+        if (PINOT_REALMID.equals(realm.getId()) || DEFAULT_PLUGIN_NAME.equals(realm.getId())) {
+          continue;
+        }
+        classLoaders.add(realm);
+      }
+      for (Map.Entry<Plugin, PluginClassLoader> entry : _registry.entrySet()) {
+        if (defaultPlugin.equals(entry.getKey())) {
+          continue;
+        }
+        classLoaders.add(entry.getValue());
       }
     }
+    Class<?> firstHit = null;
+    ClassLoader firstHitLoader = null;
+    List<ClassLoader> additionalHitLoaders = null;
+    for (ClassLoader cl : classLoaders) {
+      try {
+        Class<?> c = Class.forName(name, true, cl);
+        if (firstHit == null) {
+          firstHit = c;
+          firstHitLoader = cl;
+        } else {
+          if (additionalHitLoaders == null) {
+            additionalHitLoaders = new ArrayList<>(2);
+          }
+          additionalHitLoaders.add(cl);
+        }
+      } catch (ClassNotFoundException ignored) {
+      }
+    }
+    if (firstHit == null) {
+      throw new ClassNotFoundException(name);
+    }
+    if (additionalHitLoaders != null) {
+      LOGGER.warn("Class {} resolved on multiple plugin classloaders; using {} (also found on {}). "
+              + "Use pluginName:className to disambiguate.", name, firstHitLoader, additionalHitLoaders);
+    }
+    return firstHit;
   }
 
   public static String loadClassWithBackwardCompatibleCheck(String className) {
@@ -402,9 +549,9 @@ public class PluginManager {
   }
 
   /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
+   * Create an instance of the className. See {@link #loadClass(String)} for the resolution
+   * rules — bare FQCNs walk every plugin classloader; the {@code pluginName:FQCN} form pins
+   * the lookup to that plugin.
    * @param className
    * @return
    */
@@ -414,9 +561,9 @@ public class PluginManager {
   }
 
   /**
-   * Create an instance of the className. The className can be in any of the following formats
-   * <li>com.x.y.foo</li> loads the class in the default class path
-   * <li>pluginName:com.x.y.foo</li> loads the class in plugin specific classloader
+   * Create an instance of the className. See {@link #loadClass(String)} for the resolution
+   * rules — bare FQCNs walk every plugin classloader; the {@code pluginName:FQCN} form pins
+   * the lookup to that plugin.
    * @param className
    * @return
    */
@@ -456,18 +603,13 @@ public class PluginManager {
    */
   public <T> T createInstance(String pluginName, String className, Class[] argTypes, Object[] argValues)
       throws Exception {
-    Class<T> loadedClass;
-    String name = loadClassWithBackwardCompatibleCheck(className);
-
-    Plugin plugin = new Plugin(pluginName);
-    if (_registry.containsKey(plugin)) {
-      PluginClassLoader pluginClassLoader = _registry.get(plugin);
-      loadedClass = (Class<T>) pluginClassLoader.loadClass(name, true);
-    } else {
-      loadedClass = (Class<T>) Class.forName(name, true, _classWorld.getRealm(pluginName));
-    }
-    Constructor<?> constructor;
-    constructor = loadedClass.getConstructor(argTypes);
+    // Reuse loadClass so DEFAULT_PLUGIN_NAME triggers the realm walk and explicit pluginNames
+    // stay strict. Previously this method bypassed loadClass and only consulted the named
+    // plugin, which meant `createInstance(className)` (no prefix) only saw classes on the
+    // system classloader — fine while plugins were unconditionally on the JVM classpath, broken
+    // once they live in isolated realms.
+    Class<T> loadedClass = (Class<T>) loadClass(pluginName, className);
+    Constructor<?> constructor = loadedClass.getConstructor(argTypes);
     Object instance = constructor.newInstance(argValues);
     return (T) instance;
   }
