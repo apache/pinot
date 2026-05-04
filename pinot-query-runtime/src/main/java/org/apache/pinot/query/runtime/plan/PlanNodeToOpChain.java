@@ -96,11 +96,29 @@ public class PlanNodeToOpChain {
    */
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
+    // Assign deterministic stage-scoped ids to every PlanNode reachable from the root before constructing operators,
+    // so the encoder can attach plan_node_ids to each StageStatsNode without needing to mutate or re-walk the plan.
+    // Both broker and server perform this same pre-walk over the same plan structure, producing matching ids.
+    assignPlanNodeIds(node, context);
     MyVisitor visitor = new MyVisitor(context, tracker);
     MultiStageOperator root = node.visit(visitor, context);
     visitor.record(node, root);
     tracker.accept(node, root);
     return new OpChain(context, root);
+  }
+
+  /**
+   * Pre-order walk that assigns each PlanNode in the sub-tree a sequential integer id, recorded on the context.
+   */
+  private static void assignPlanNodeIds(PlanNode root, OpChainExecutionContext context) {
+    assignPlanNodeIds(root, context, new int[]{0});
+  }
+
+  private static void assignPlanNodeIds(PlanNode node, OpChainExecutionContext context, int[] counter) {
+    context.recordPlanNodeId(node, counter[0]++);
+    for (PlanNode child : node.getInputs()) {
+      assignPlanNodeIds(child, context, counter);
+    }
   }
 
   /**

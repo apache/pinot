@@ -77,6 +77,15 @@ public class OpChainExecutionContext {
    * Identity-based (IdentityHashMap) because PlanNode equality is structural and two distinct nodes can compare equal.
    */
   private final Map<MultiStageOperator, List<PlanNode>> _operatorToPlanNodes = new IdentityHashMap<>();
+  /**
+   * Stage-scoped plan-node ids: each PlanNode reachable from the opchain's root receives a sequential integer id
+   * assigned by a deterministic pre-order walk. Both broker and server perform the same walk over the same plan
+   * structure, so the ids match without being serialized on the wire. Used by {@code MultiStageStatsTreeEncoder} to
+   * populate {@code StageStatsNode.plan_node_ids}.
+   * <p>
+   * Identity-based for the same reason as {@link #_operatorToPlanNodes}.
+   */
+  private final Map<PlanNode, Integer> _planNodeIds = new IdentityHashMap<>();
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
@@ -235,6 +244,22 @@ public class OpChainExecutionContext {
    */
   public List<PlanNode> getPlanNodesForOperator(MultiStageOperator operator) {
     return _operatorToPlanNodes.getOrDefault(operator, List.of());
+  }
+
+  /**
+   * Records the stage-scoped id assigned to the given PlanNode. Should only be called once per node by the
+   * {@link org.apache.pinot.query.runtime.plan.PlanNodeToOpChain} pre-walk.
+   */
+  public void recordPlanNodeId(PlanNode node, int id) {
+    _planNodeIds.put(node, id);
+  }
+
+  /**
+   * Returns the stage-scoped id assigned to the given PlanNode, or {@code -1} if no id was recorded for it.
+   */
+  public int getPlanNodeId(PlanNode node) {
+    Integer id = _planNodeIds.get(node);
+    return id != null ? id : -1;
   }
 
   private static QueryOperatorFactoryProvider getDefaultQueryOperatorFactoryProvider() {
