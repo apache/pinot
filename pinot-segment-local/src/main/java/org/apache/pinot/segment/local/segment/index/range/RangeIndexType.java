@@ -83,7 +83,11 @@ public class RangeIndexType
       DataType storedType = fieldSpec.getDataType().getStoredType();
       Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
           "Cannot create range index on column: %s without dictionary", column);
+      // Range index needs an order over the values. MAP has no natural order; BYTES has no defined comparison
+      // semantics under range filters and would crash later at ingestion time. Reject both upfront so the user
+      // gets a clear message at table-config validation rather than a generic ingestion error.
       Preconditions.checkState(storedType != DataType.MAP, "Cannot create range index on MAP column: %s", column);
+      Preconditions.checkState(storedType != DataType.BYTES, "Cannot create range index on BYTES column: %s", column);
     }
   }
 

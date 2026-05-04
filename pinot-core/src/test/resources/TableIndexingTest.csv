@@ -358,7 +358,7 @@ BYTES;sv;raw;h3_index;false;Caught exception while reading data
 BYTES;sv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
 BYTES;sv;raw;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 BYTES;sv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
-BYTES;sv;raw;range_index;false;Caught exception while reading data
+BYTES;sv;raw;range_index;false;Cannot create range index on BYTES column: col
 BYTES;sv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
 BYTES;sv;raw;vector_index;false;Cannot create vector index on single-value column: col
 BYTES;sv;raw;multi_col_text_index;false;Caught exception while reading data
@@ -369,7 +369,7 @@ BYTES;mv;raw;h3_index;false;Cannot create H3 index on multi-value column: col
 BYTES;mv;raw;inverted_index;false;Cannot create inverted index on column: col without dictionary
 BYTES;mv;raw;json_index;false;Cannot create JSON index on multi-value column: col
 BYTES;mv;raw;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
-BYTES;mv;raw;range_index;false;Caught exception while reading data
+BYTES;mv;raw;range_index;false;Cannot create range index on BYTES column: col
 BYTES;mv;raw;startree_index;false;Cannot create star-tree index on dimension column: col without dictionary
 BYTES;mv;raw;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 BYTES;mv;raw;multi_col_text_index;false;Caught exception while reading data
@@ -380,7 +380,7 @@ BYTES;sv;dict;h3_index;false;Caught exception while reading data
 BYTES;sv;dict;inverted_index;false;Caught exception while reading data
 BYTES;sv;dict;json_index;false;Cannot create JSON index on column: col of stored type other than STRING or MAP
 BYTES;sv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
-BYTES;sv;dict;range_index;false;Caught exception while reading data
+BYTES;sv;dict;range_index;false;Cannot create range index on BYTES column: col
 BYTES;sv;dict;startree_index;false;Caught exception while reading data
 BYTES;sv;dict;vector_index;false;Cannot create vector index on single-value column: col
 BYTES;sv;dict;multi_col_text_index;false;Caught exception while reading data
@@ -391,7 +391,7 @@ BYTES;mv;dict;h3_index;false;Cannot create H3 index on multi-value column: col
 BYTES;mv;dict;inverted_index;false;Caught exception while reading data
 BYTES;mv;dict;json_index;false;Cannot create JSON index on multi-value column: col
 BYTES;mv;dict;text_index;false;Cannot create TEXT index on column: col of stored type other than STRING
-BYTES;mv;dict;range_index;false;Caught exception while reading data
+BYTES;mv;dict;range_index;false;Cannot create range index on BYTES column: col
 BYTES;mv;dict;startree_index;false;Star-tree dimension columns must be single-value, but found multi-value column: col
 BYTES;mv;dict;vector_index;false;Cannot create vector index on column: col of stored type other than FLOAT
 BYTES;mv;dict;multi_col_text_index;false;Caught exception while reading data
