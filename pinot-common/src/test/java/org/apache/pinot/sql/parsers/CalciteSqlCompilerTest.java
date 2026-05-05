@@ -879,6 +879,27 @@ public class CalciteSqlCompilerTest {
     } catch (SqlCompilationException e) {
       Assert.assertTrue(e.getCause() instanceof ParseException);
     }
+
+    // Options inside SQL comments must NOT be honored.
+    // A trailing -- comment should not be mistaken for a real query option.
+    pinotQuery = compileToPinotQuery(
+        "SELECT col1, count(*) FROM foo GROUP BY col1 -- option(skipUpsert=true)");
+    Assert.assertTrue(pinotQuery.getQueryOptions() == null || pinotQuery.getQueryOptions().isEmpty(),
+        "option(...) inside a -- comment must not be parsed as a query option");
+
+    // Same check when the -- comment appears inline after a WHERE predicate (multi-line query).
+    // The regex finds OPTION() starting from the 'O', ignoring the preceding '--', so without
+    // the fix this would incorrectly honour skipUpsert.
+    pinotQuery = compileToPinotQuery(
+        "select *\nfrom foo\nwhere uuid = 1 --OPTION(skipUpsert = true)");
+    Assert.assertTrue(pinotQuery.getQueryOptions() == null || pinotQuery.getQueryOptions().isEmpty(),
+        "OPTION(...) after -- in a WHERE clause must not be parsed as a query option");
+
+    // A /* */ block comment should also not trigger the OPTIONS parser.
+    pinotQuery = compileToPinotQuery(
+        "SELECT col1, count(*) FROM foo GROUP BY col1 /* option(skipUpsert=true) */");
+    Assert.assertTrue(pinotQuery.getQueryOptions() == null || pinotQuery.getQueryOptions().isEmpty(),
+        "option(...) inside a /* */ comment must not be parsed as a query option");
   }
 
   @Test
