@@ -328,7 +328,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
       try {
-        queryFingerprint = QueryFingerprintUtils.generateFingerprint(query);
+        queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
         if (queryFingerprint != null) {
           queryHash = queryFingerprint.getQueryHash();
           requestContext.setQueryFingerprint(queryFingerprint);
