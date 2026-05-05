@@ -2153,6 +2153,19 @@ public class CommonConstants {
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
 
+    /// Per-request metadata key that overrides the cluster-level send-stats decision for the duration of a single
+    /// query. Set automatically by the {@code SubmitWithStream} bidi RPC handler on the server: when stats travel
+    /// out-of-band on the bidi stream there is no point in also paying the cost of serializing them onto the mailbox
+    /// path, so the mailbox-side {@code sendStats} flag is forced to {@code false} for that request.
+    ///
+    /// This is **not** a user-facing option — it exists purely as a server-internal channel from the
+    /// {@code SubmitWithStream} handler down to {@code QueryRunner.processQueryBlocking}. Brokers do not set it.
+    public static final String KEY_OF_STATS_REPORTING_MODE = "pinot.query.mse.statsReportingMode";
+    /// Value indicating the new bidi-stream stats reporting path is in use; mailbox-side stats are suppressed.
+    public static final String STATS_REPORTING_MODE_STREAM = "stream";
+    /// Value indicating today's legacy mailbox-piggyback stats reporting path. Equivalent to leaving the key unset.
+    public static final String STATS_REPORTING_MODE_LEGACY = "legacy";
+
     /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
     /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
     /// they are not included by default but can be included by setting this flag to false (upper or lower case).

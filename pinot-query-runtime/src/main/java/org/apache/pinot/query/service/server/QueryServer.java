@@ -28,6 +28,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.DataOutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -542,14 +543,20 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         return;
       }
       ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
-      Map<String, String> reqMetadata;
+      Map<String, String> deserializedMetadata;
       try {
-        reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
+        deserializedMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
       } catch (Exception e) {
         LOGGER.error("Caught exception while deserializing request metadata", e);
         sendErrorAndComplete("Caught exception while deserializing request metadata: " + e.getMessage());
         return;
       }
+      // Override the cluster-level _sendStats decision for this request: stats travel out-of-band on the bidi stream
+      // (via the OpChainCompletionListener), so we suppress the mailbox-side stats path. The override is read by
+      // QueryRunner.effectiveSendStats(...).
+      Map<String, String> reqMetadata = new HashMap<>(deserializedMetadata);
+      reqMetadata.put(CommonConstants.MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE,
+          CommonConstants.MultiStageQueryRunner.STATS_REPORTING_MODE_STREAM);
       try {
         _requestId = Long.parseLong(reqMetadata.get(MetadataKeys.REQUEST_ID));
       } catch (Exception ignored) {

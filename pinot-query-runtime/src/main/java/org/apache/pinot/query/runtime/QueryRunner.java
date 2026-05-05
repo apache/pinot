@@ -132,6 +132,9 @@ public class QueryRunner {
   private WindowOverFlowMode _windowOverflowMode;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
+  /// Cluster-level decision on whether to send stats over the mailbox path, driven by the {@code SendStatsPredicate}
+  /// at startup time. <b>May be overridden per-request</b> via the {@code KEY_OF_STATS_REPORTING_MODE} metadata key —
+  /// see {@link #effectiveSendStats(Map)}.
   private BooleanSupplier _sendStats;
   private BooleanSupplier _keepPipelineBreakerStats;
 
@@ -299,10 +302,15 @@ public class QueryRunner {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
+    // The cluster-level _sendStats decision can be overridden per-request by the SubmitWithStream RPC handler via
+    // MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE; in stream mode stats travel out-of-band
+    // and we suppress the mailbox-side path to avoid duplication.
+    boolean sendStats = effectiveSendStats(requestMetadata);
+
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
         _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
-        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+        sendStats, _keepPipelineBreakerStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -315,7 +323,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+            pipelineBreakerResult, sendStats, _keepPipelineBreakerStats.getAsBoolean());
     try {
       OpChain opChain;
       if (workerMetadata.isLeafStageWorker()) {
@@ -337,6 +345,10 @@ public class QueryRunner {
 
   /**
    * Attempts to propagate stage failures through the active {@link OpChainConverter}.
+   * <p>
+   * Note: the cluster-level {@code _sendStats} decision can be overridden per-request via
+   * {@link CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE} — see
+   * {@link #effectiveSendStats(Map)}.
    */
   private void tryPropagateErrorViaOpChainConverter(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult,
@@ -349,13 +361,29 @@ public class QueryRunner {
     try {
       OpChainExecutionContext executionContext =
           OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-              pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+              pipelineBreakerResult, effectiveSendStats(opChainMetadata), _keepPipelineBreakerStats.getAsBoolean());
       OpChain errorOpChain = OpChainConverterDispatcher.sendEarlyError(executionContext, stagePlan, errorBlock);
       _opChainScheduler.register(errorOpChain);
     } catch (RuntimeException e) {
       LOGGER.warn("Failed to propagate stage error via OpChainConverter for request: {}, stage: {}",
           requestId, stageMetadata.getStageId(), e);
     }
+  }
+
+  /**
+   * Returns the effective {@code sendStats} flag for the current request: starts from the cluster-level
+   * {@link #_sendStats} decision and forces it to {@code false} when
+   * {@link CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE} is set to
+   * {@link CommonConstants.MultiStageQueryRunner#STATS_REPORTING_MODE_STREAM} on the request metadata. The
+   * stream-mode handler injects this key when stats are being collected out-of-band on the bidi RPC, so the
+   * mailbox-side path can be skipped.
+   */
+  private boolean effectiveSendStats(Map<String, String> requestMetadata) {
+    String mode = requestMetadata.get(MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE);
+    if (MultiStageQueryRunner.STATS_REPORTING_MODE_STREAM.equals(mode)) {
+      return false;
+    }
+    return _sendStats.getAsBoolean();
   }
 
   /**
