@@ -108,8 +108,6 @@ public class ControllerConf extends PinotConfiguration {
     public static final String RETENTION_MANAGER_CRON_EXPRESSION = "controller.retention.cronExpression";
     public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD =
         "controller.offline.segment.interval.checker.frequencyPeriod";
-    public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_CRON_EXPRESSION =
-        "controller.offline.segment.interval.checker.cronExpression";
     public static final String REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD =
         "controller.realtime.segment.validation.frequencyPeriod";
     public static final String REALTIME_SEGMENT_VALIDATION_CRON_EXPRESSION =
@@ -709,17 +707,9 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
-  public String getOfflineSegmentIntervalCheckerCronExpression() {
-    return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_CRON_EXPRESSION);
-  }
-
   public void setOfflineSegmentIntervalCheckerFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD,
         Long.toString(validationFrequencyInSeconds) + "s");
-  }
-
-  public void setOfflineSegmentIntervalCheckerCronExpression(String cronExpression) {
-    setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_CRON_EXPRESSION, cronExpression);
   }
 
   /**
