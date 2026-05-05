@@ -131,7 +131,7 @@ public class PinotDataTypeTest {
     return new Object[][] {
         {INTEGER_ARRAY, LONG_ARRAY, new Object[]{"abc"}},
         {INTEGER_ARRAY, INTEGER_ARRAY, new Object[]{"abc"}},
-        {INTEGER_ARRAY, BOOLEAN_ARRAY, new Object[]{"abc"}}
+        {INTEGER_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new Object[]{"abc"}}
     };
   }
 
@@ -143,8 +143,15 @@ public class PinotDataTypeTest {
   @DataProvider
   public Object[][] conversions() {
     return new Object[][]{
-        {STRING_ARRAY, BOOLEAN_ARRAY, new String[] {"true", "false"}, new boolean[] { true, false }},
-        {BOOLEAN_ARRAY, BOOLEAN_ARRAY, new boolean[] { true, false }, new boolean[] { true, false }},
+        {STRING_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new String[] {"true", "false"}, new boolean[] { true, false }},
+        {PRIMITIVE_BOOLEAN_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new boolean[] { true, false },
+            new boolean[] { true, false }},
+        {STRING_ARRAY, BOOLEAN_ARRAY, new String[] {"true", "false"}, new Boolean[] { true, false }},
+        {BOOLEAN_ARRAY, BOOLEAN_ARRAY, new Boolean[] { true, false }, new Boolean[] { true, false }},
+        // Cross-form: PRIMITIVE_BOOLEAN_ARRAY -> BOOLEAN_ARRAY exercises the boolean[] path through
+        // toObjectArray (which now handles primitive boolean[]).
+        {PRIMITIVE_BOOLEAN_ARRAY, BOOLEAN_ARRAY, new boolean[] { true, false }, new Boolean[] { true, false }},
+        {BOOLEAN_ARRAY, PRIMITIVE_BOOLEAN_ARRAY, new Boolean[] { true, false }, new boolean[] { true, false }},
         {LONG_ARRAY, TIMESTAMP_ARRAY, new long[] {1000000L, 2000000L},
             new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) }},
         {TIMESTAMP_ARRAY, TIMESTAMP_ARRAY, new Timestamp[] { new Timestamp(1000000L), new Timestamp(2000000L) },
@@ -243,8 +250,8 @@ public class PinotDataTypeTest {
     assertEquals(DATE_ARRAY.convert(new Integer[]{19_096, 19_723}, INTEGER_ARRAY), dates);
     // DATE_ARRAY → STRING_ARRAY: each element via DATE.toString.
     assertEquals(STRING_ARRAY.convert(dates, DATE_ARRAY), new String[]{"2022-04-14", "2024-01-01"});
-    // Class lookup: Object[] of LocalDate routes to DATE_ARRAY.
-    assertEquals(getMultiValueType(LocalDate.class), DATE_ARRAY);
+    // Lookup: Object[] of LocalDate routes to DATE_ARRAY.
+    assertEquals(getMultiValueType(dates[0]), DATE_ARRAY);
     // toInternal: Integer[] of epoch-days.
     assertEquals(DATE_ARRAY.toInternal(dates), new Integer[]{19_096, 19_723});
   }
@@ -273,7 +280,7 @@ public class PinotDataTypeTest {
     // LONG_ARRAY → TIME_ARRAY: per-element millis-since-midnight decoding.
     assertEquals(TIME_ARRAY.convert(new Long[]{31_892_000L, 43_200_000L}, LONG_ARRAY), times);
     assertEquals(STRING_ARRAY.convert(times, TIME_ARRAY), new String[]{"08:51:32", "12:00"});
-    assertEquals(getMultiValueType(LocalTime.class), TIME_ARRAY);
+    assertEquals(getMultiValueType(times[0]), TIME_ARRAY);
     // toInternal: Long[] of millis-since-midnight.
     assertEquals(TIME_ARRAY.toInternal(times), new Long[]{31_892_000L, 43_200_000L});
   }
@@ -315,8 +322,8 @@ public class PinotDataTypeTest {
     assertEquals(bytesArray[0].length, 16);
     assertEquals(UUID.convert(bytesArray[0], BYTES), u1);
     assertEquals(UUID.convert(bytesArray[1], BYTES), u2);
-    // Class lookup: Object[] of UUID routes to UUID_ARRAY.
-    assertEquals(getMultiValueType(UUID.class), UUID_ARRAY);
+    // Lookup: Object[] of UUID routes to UUID_ARRAY.
+    assertEquals(getMultiValueType(u1), UUID_ARRAY);
     // toInternal: String[] of canonical form.
     assertEquals(UUID_ARRAY.toInternal(uuids),
         new String[]{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000001"});
@@ -383,54 +390,61 @@ public class PinotDataTypeTest {
 
   @Test
   public void testGetSingleValueType() {
-    Map<Class<?>, PinotDataType> testCases = new HashMap<>();
-    testCases.put(Boolean.class, BOOLEAN);
-    testCases.put(Byte.class, BYTE);
-    testCases.put(Character.class, CHARACTER);
-    testCases.put(Short.class, SHORT);
-    testCases.put(Integer.class, INTEGER);
-    testCases.put(Long.class, LONG);
-    testCases.put(Float.class, FLOAT);
-    testCases.put(Double.class, DOUBLE);
-    testCases.put(BigDecimal.class, BIG_DECIMAL);
-    testCases.put(Timestamp.class, TIMESTAMP);
-    testCases.put(LocalDate.class, DATE);
-    testCases.put(LocalTime.class, TIME);
-    testCases.put(String.class, STRING);
-    testCases.put(byte[].class, BYTES);
-    testCases.put(UUID.class, UUID);
+    assertEquals(getSingleValueType(1), INTEGER);
+    assertEquals(getSingleValueType(1L), LONG);
+    assertEquals(getSingleValueType(1.0f), FLOAT);
+    assertEquals(getSingleValueType(1.0d), DOUBLE);
+    assertEquals(getSingleValueType(BigDecimal.ONE), BIG_DECIMAL);
+    assertEquals(getSingleValueType(Boolean.TRUE), BOOLEAN);
+    assertEquals(getSingleValueType(new Timestamp(0L)), TIMESTAMP);
+    assertEquals(getSingleValueType("foo"), STRING);
+    assertEquals(getSingleValueType(new byte[]{0}), BYTES);
+    assertEquals(getSingleValueType(new HashMap<>()), MAP);
+    assertEquals(getSingleValueType(LocalDate.EPOCH), DATE);
+    assertEquals(getSingleValueType(LocalTime.NOON), TIME);
+    assertEquals(getSingleValueType(java.util.UUID.randomUUID()), UUID);
+    assertEquals(getSingleValueType((byte) 1), BYTE);
+    assertEquals(getSingleValueType('a'), CHARACTER);
+    assertEquals(getSingleValueType((short) 1), SHORT);
+    assertEquals(getSingleValueType(new Object()), OBJECT);
 
-    for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
-      assertEquals(getSingleValueType(tc.getKey()), tc.getValue());
+    // Vendor JDBC drivers commonly return Timestamp subclasses (e.g. BigQuery Simba's TimestampTz).
+    // Subclasses must resolve to TIMESTAMP, not OBJECT.
+    class VendorTimestamp extends Timestamp {
+      VendorTimestamp(long time) {
+        super(time);
+      }
     }
-    assertEquals(getSingleValueType(Object.class), OBJECT);
-    assertEquals(getSingleValueType(Map.class), MAP);
-    assertEquals(getSingleValueType(null), OBJECT);
+    assertEquals(getSingleValueType(new VendorTimestamp(0L)), TIMESTAMP);
   }
 
   @Test
   public void testGetMultipleValueType() {
-    Map<Class<?>, PinotDataType> testCases = new HashMap<>();
-    testCases.put(Byte.class, BYTE_ARRAY);
-    testCases.put(Character.class, CHARACTER_ARRAY);
-    testCases.put(Short.class, SHORT_ARRAY);
-    testCases.put(Integer.class, INTEGER_ARRAY);
-    testCases.put(Long.class, LONG_ARRAY);
-    testCases.put(Float.class, FLOAT_ARRAY);
-    testCases.put(Double.class, DOUBLE_ARRAY);
-    testCases.put(String.class, STRING_ARRAY);
-    testCases.put(Boolean.class, BOOLEAN_ARRAY);
-    testCases.put(Timestamp.class, TIMESTAMP_ARRAY);
-    testCases.put(LocalDate.class, DATE_ARRAY);
-    testCases.put(LocalTime.class, TIME_ARRAY);
-    testCases.put(byte[].class, BYTES_ARRAY);
-    testCases.put(UUID.class, UUID_ARRAY);
+    assertEquals(getMultiValueType(1), INTEGER_ARRAY);
+    assertEquals(getMultiValueType(1L), LONG_ARRAY);
+    assertEquals(getMultiValueType(1.0f), FLOAT_ARRAY);
+    assertEquals(getMultiValueType(1.0d), DOUBLE_ARRAY);
+    assertEquals(getMultiValueType(BigDecimal.ONE), BIG_DECIMAL_ARRAY);
+    assertEquals(getMultiValueType(Boolean.TRUE), BOOLEAN_ARRAY);
+    assertEquals(getMultiValueType(new Timestamp(0L)), TIMESTAMP_ARRAY);
+    assertEquals(getMultiValueType("foo"), STRING_ARRAY);
+    assertEquals(getMultiValueType(new byte[]{0}), BYTES_ARRAY);
+    assertEquals(getMultiValueType(LocalDate.EPOCH), DATE_ARRAY);
+    assertEquals(getMultiValueType(LocalTime.NOON), TIME_ARRAY);
+    assertEquals(getMultiValueType(java.util.UUID.randomUUID()), UUID_ARRAY);
+    assertEquals(getMultiValueType((byte) 1), BYTE_ARRAY);
+    assertEquals(getMultiValueType('a'), CHARACTER_ARRAY);
+    assertEquals(getMultiValueType((short) 1), SHORT_ARRAY);
+    assertEquals(getMultiValueType(new Object()), OBJECT_ARRAY);
 
-    for (Map.Entry<Class<?>, PinotDataType> tc : testCases.entrySet()) {
-      assertEquals(getMultiValueType(tc.getKey()), tc.getValue());
+    // Vendor JDBC drivers commonly return Timestamp subclasses (e.g. BigQuery Simba's TimestampTz).
+    // Subclasses must resolve to TIMESTAMP_ARRAY, not OBJECT_ARRAY.
+    class VendorTimestamp extends Timestamp {
+      VendorTimestamp(long time) {
+        super(time);
+      }
     }
-    assertEquals(getMultiValueType(Object.class), OBJECT_ARRAY);
-    assertEquals(getMultiValueType(null), OBJECT_ARRAY);
+    assertEquals(getMultiValueType(new VendorTimestamp(0L)), TIMESTAMP_ARRAY);
   }
 
   private static Object getGenericTestObject() {

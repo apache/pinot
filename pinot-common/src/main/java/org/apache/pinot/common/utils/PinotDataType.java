@@ -1212,10 +1212,10 @@ public enum PinotDataType {
     }
   },
 
-  BOOLEAN_ARRAY {
+  PRIMITIVE_BOOLEAN_ARRAY {
     @Override
     public boolean[] convert(Object value, PinotDataType sourceType) {
-      return sourceType.toBooleanArray(value);
+      return sourceType.toPrimitiveBooleanArray(value);
     }
 
     @Override
@@ -1225,6 +1225,24 @@ public enum PinotDataType {
       Integer[] intArray = new Integer[length];
       for (int i = 0; i < length; i++) {
         intArray[i] = booleanArray[i] ? 1 : 0;
+      }
+      return intArray;
+    }
+  },
+
+  BOOLEAN_ARRAY {
+    @Override
+    public Boolean[] convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBooleanArray(value);
+    }
+
+    @Override
+    public Integer[] toInternal(Object value) {
+      Boolean[] booleanArray = (Boolean[]) value;
+      int length = booleanArray.length;
+      Integer[] intArray = new Integer[length];
+      for (int i = 0; i < length; i++) {
+        intArray[i] = booleanArray[i] != null ? (booleanArray[i] ? 1 : 0) : null;
       }
       return intArray;
     }
@@ -1563,6 +1581,78 @@ public enum PinotDataType {
     }
   }
 
+  public BigDecimal[] toBigDecimalArray(Object value) {
+    if (value instanceof BigDecimal[]) {
+      return (BigDecimal[]) value;
+    }
+    if (isSingleValue()) {
+      return new BigDecimal[]{toBigDecimal(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      BigDecimal[] bigDecimalArray = new BigDecimal[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        bigDecimalArray[i] = singleValueType.toBigDecimal(valueArray[i]);
+      }
+      return bigDecimalArray;
+    }
+  }
+
+  public boolean[] toPrimitiveBooleanArray(Object value) {
+    if (value instanceof boolean[]) {
+      return (boolean[]) value;
+    }
+    if (isSingleValue()) {
+      return new boolean[]{toBoolean(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      boolean[] booleanArray = new boolean[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        booleanArray[i] = singleValueType.toBoolean(valueArray[i]);
+      }
+      return booleanArray;
+    }
+  }
+
+  public Boolean[] toBooleanArray(Object value) {
+    if (value instanceof Boolean[]) {
+      return (Boolean[]) value;
+    }
+    if (isSingleValue()) {
+      return new Boolean[]{toBoolean(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      Boolean[] booleanArray = new Boolean[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        booleanArray[i] = singleValueType.toBoolean(valueArray[i]);
+      }
+      return booleanArray;
+    }
+  }
+
+  public Timestamp[] toTimestampArray(Object value) {
+    if (value instanceof Timestamp[]) {
+      return (Timestamp[]) value;
+    }
+    if (isSingleValue()) {
+      return new Timestamp[]{toTimestamp(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      Timestamp[] timestampArray = new Timestamp[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        timestampArray[i] = singleValueType.toTimestamp(valueArray[i]);
+      }
+      return timestampArray;
+    }
+  }
+
   public String[] toStringArray(Object value) {
     if (value instanceof String[]) {
       return (String[]) value;
@@ -1596,84 +1686,6 @@ public enum PinotDataType {
         bytesArray[i] = singleValueType.toBytes(valueArray[i]);
       }
       return bytesArray;
-    }
-  }
-
-  public BigDecimal[] toBigDecimalArray(Object value) {
-    if (value instanceof BigDecimal[]) {
-      return (BigDecimal[]) value;
-    }
-    if (isSingleValue()) {
-      return new BigDecimal[]{toBigDecimal(value)};
-    } else {
-      Object[] valueArray = toObjectArray(value);
-      int length = valueArray.length;
-      BigDecimal[] bigDecimalArray = new BigDecimal[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        bigDecimalArray[i] = singleValueType.toBigDecimal(valueArray[i]);
-      }
-      return bigDecimalArray;
-    }
-  }
-
-  private static Object[] toObjectArray(Object array) {
-    if (array instanceof Collection) {
-      return ((Collection<?>) array).toArray();
-    }
-    Class<?> componentType = array.getClass().getComponentType();
-    if (componentType.isPrimitive()) {
-      if (componentType == int.class) {
-        return ArrayUtils.toObject((int[]) array);
-      }
-      if (componentType == long.class) {
-        return ArrayUtils.toObject((long[]) array);
-      }
-      if (componentType == float.class) {
-        return ArrayUtils.toObject((float[]) array);
-      }
-      if (componentType == double.class) {
-        return ArrayUtils.toObject((double[]) array);
-      }
-      throw new UnsupportedOperationException("Unsupported primitive array type: " + componentType);
-    } else {
-      return (Object[]) array;
-    }
-  }
-
-  public boolean[] toBooleanArray(Object value) {
-    if (value instanceof boolean[]) {
-      return (boolean[]) value;
-    }
-    if (isSingleValue()) {
-      return new boolean[]{toBoolean(value)};
-    } else {
-      Object[] valueArray = toObjectArray(value);
-      int length = valueArray.length;
-      boolean[] booleanArray = new boolean[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        booleanArray[i] = singleValueType.toBoolean(valueArray[i]);
-      }
-      return booleanArray;
-    }
-  }
-
-  public Timestamp[] toTimestampArray(Object value) {
-    if (value instanceof Timestamp[]) {
-      return (Timestamp[]) value;
-    }
-    if (isSingleValue()) {
-      return new Timestamp[]{toTimestamp(value)};
-    } else {
-      Object[] valueArray = toObjectArray(value);
-      int length = valueArray.length;
-      Timestamp[] timestampArray = new Timestamp[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        timestampArray[i] = singleValueType.toTimestamp(valueArray[i]);
-      }
-      return timestampArray;
     }
   }
 
@@ -1731,19 +1743,42 @@ public enum PinotDataType {
     }
   }
 
+  private static Object[] toObjectArray(Object array) {
+    if (array instanceof Collection) {
+      return ((Collection<?>) array).toArray();
+    }
+    Class<?> componentType = array.getClass().getComponentType();
+    if (componentType.isPrimitive()) {
+      if (componentType == int.class) {
+        return ArrayUtils.toObject((int[]) array);
+      }
+      if (componentType == long.class) {
+        return ArrayUtils.toObject((long[]) array);
+      }
+      if (componentType == float.class) {
+        return ArrayUtils.toObject((float[]) array);
+      }
+      if (componentType == double.class) {
+        return ArrayUtils.toObject((double[]) array);
+      }
+      if (componentType == boolean.class) {
+        return ArrayUtils.toObject((boolean[]) array);
+      }
+      throw new UnsupportedOperationException("Unsupported primitive array type: " + componentType);
+    } else {
+      return (Object[]) array;
+    }
+  }
+
   public Object convert(Object value, PinotDataType sourceType) {
     throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to " + this);
   }
 
-  /**
-   * Converts to the internal representation of the value.
-   * <ul>
-   *   <li>BOOLEAN -> int</li>
-   *   <li>TIMESTAMP -> long</li>
-   *   <li>BOOLEAN_ARRAY -> int[]</li>
-   *   <li>TIMESTAMP_ARRAY -> long[]</li>
-   * </ul>
-   */
+  /// Converts to the internal representation of the value.
+  /// - `BOOLEAN` → `Integer` (0/1)
+  /// - `TIMESTAMP` → `Long` (epoch millis)
+  /// - `PRIMITIVE_BOOLEAN_ARRAY` / `BOOLEAN_ARRAY` → `Integer[]` (per-element 0/1)
+  /// - `TIMESTAMP_ARRAY` → `Long[]` (per-element epoch millis)
   public Object toInternal(Object value) {
     return value;
   }
@@ -1774,6 +1809,7 @@ public enum PinotDataType {
         return DOUBLE;
       case BIG_DECIMAL_ARRAY:
         return BIG_DECIMAL;
+      case PRIMITIVE_BOOLEAN_ARRAY:
       case BOOLEAN_ARRAY:
         return BOOLEAN;
       case TIMESTAMP_ARRAY:
@@ -1796,121 +1832,126 @@ public enum PinotDataType {
     }
   }
 
-  public static PinotDataType getSingleValueType(Class<?> cls) {
-    if (cls == Integer.class) {
+  /// Returns the [PinotDataType] for the given single value, dispatched on the runtime class via
+  /// `instanceof`. Returns [#OBJECT] for any unrecognized type. Subclasses of non-final types
+  /// (e.g. vendor `Timestamp` subclasses returned by JDBC drivers) are matched by their parent type.
+  public static PinotDataType getSingleValueType(Object value) {
+    if (value instanceof Integer) {
       return INTEGER;
     }
-    if (cls == Long.class) {
+    if (value instanceof Long) {
       return LONG;
     }
-    if (cls == Float.class) {
+    if (value instanceof Float) {
       return FLOAT;
     }
-    if (cls == Double.class) {
+    if (value instanceof Double) {
       return DOUBLE;
     }
-    if (cls == BigDecimal.class) {
+    if (value instanceof BigDecimal) {
       return BIG_DECIMAL;
     }
-    if (cls == String.class) {
-      return STRING;
-    }
-    if (cls == byte[].class) {
-      return BYTES;
-    }
-    if (cls == UUID.class) {
-      return UUID;
-    }
-    if (cls == Boolean.class) {
+    if (value instanceof Boolean) {
       return BOOLEAN;
     }
-    if (cls == Timestamp.class) {
+    if (value instanceof Timestamp) {
       return TIMESTAMP;
     }
-    if (cls != null && Map.class.isAssignableFrom(cls)) {
+    if (value instanceof String) {
+      return STRING;
+    }
+    if (value instanceof byte[]) {
+      return BYTES;
+    }
+    if (value instanceof Map) {
       return MAP;
     }
-    if (cls == LocalDate.class) {
+    if (value instanceof LocalDate) {
       return DATE;
     }
-    if (cls == LocalTime.class) {
+    if (value instanceof LocalTime) {
       return TIME;
     }
-    if (cls == Byte.class) {
+    if (value instanceof UUID) {
+      return UUID;
+    }
+    if (value instanceof Byte) {
       return BYTE;
     }
-    if (cls == Character.class) {
+    if (value instanceof Character) {
       return CHARACTER;
     }
-    if (cls == Short.class) {
+    if (value instanceof Short) {
       return SHORT;
     }
     return OBJECT;
   }
 
-  public static PinotDataType getMultiValueType(Class<?> cls) {
-    if (cls == Integer.class) {
+  /// Returns the multi-value [PinotDataType] for the given sample element, dispatched on the runtime class
+  /// via `instanceof`. Returns [#OBJECT_ARRAY] for any unrecognized type.
+  public static PinotDataType getMultiValueType(Object element) {
+    if (element instanceof Integer) {
       return INTEGER_ARRAY;
     }
-    if (cls == Long.class) {
+    if (element instanceof Long) {
       return LONG_ARRAY;
     }
-    if (cls == Float.class) {
+    if (element instanceof Float) {
       return FLOAT_ARRAY;
     }
-    if (cls == Double.class) {
+    if (element instanceof Double) {
       return DOUBLE_ARRAY;
     }
-    if (cls == BigDecimal.class) {
+    if (element instanceof BigDecimal) {
       return BIG_DECIMAL_ARRAY;
     }
-    if (cls == String.class) {
-      return STRING_ARRAY;
-    }
-    if (cls == byte[].class) {
-      return BYTES_ARRAY;
-    }
-    if (cls == Boolean.class) {
+    if (element instanceof Boolean) {
       return BOOLEAN_ARRAY;
     }
-    if (cls == Timestamp.class) {
+    if (element instanceof Timestamp) {
       return TIMESTAMP_ARRAY;
     }
-    if (cls == LocalDate.class) {
+    if (element instanceof String) {
+      return STRING_ARRAY;
+    }
+    if (element instanceof byte[]) {
+      return BYTES_ARRAY;
+    }
+    if (element instanceof LocalDate) {
       return DATE_ARRAY;
     }
-    if (cls == LocalTime.class) {
+    if (element instanceof LocalTime) {
       return TIME_ARRAY;
     }
-    if (cls == UUID.class) {
+    if (element instanceof UUID) {
       return UUID_ARRAY;
     }
-    if (cls == Byte.class) {
+    if (element instanceof Byte) {
       return BYTE_ARRAY;
     }
-    if (cls == Character.class) {
+    if (element instanceof Character) {
       return CHARACTER_ARRAY;
     }
-    if (cls == Short.class) {
+    if (element instanceof Short) {
       return SHORT_ARRAY;
     }
     return OBJECT_ARRAY;
   }
 
   private static int anyToInt(Object val) {
-    return getSingleValueType(val.getClass()).toInt(val);
+    return getSingleValueType(val).toInt(val);
   }
 
   private static long anyToLong(Object val) {
-    return getSingleValueType(val.getClass()).toLong(val);
+    return getSingleValueType(val).toLong(val);
   }
 
   private static float anyToFloat(Object val) {
-    return getSingleValueType(val.getClass()).toFloat(val);
+    return getSingleValueType(val).toFloat(val);
   }
 
   private static double anyToDouble(Object val) {
-    return getSingleValueType(val.getClass()).toDouble(val);
+    return getSingleValueType(val).toDouble(val);
   }
 
   /**
