@@ -309,6 +309,119 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
   }
 
   /**
+   * Comprehensive mixed-predicate matrix on the column with RAW forward + dictionary + inverted index.
+   *
+   * <p>Exercises every predicate type that takes the dict-consuming inverted-index path together with a RANGE
+   * predicate that drops the dict and scans raw values.
+   * {@code PredicateEvaluatorProvider#getDictionaryUsableForFiltering} decides per-predicate-type whether the
+   * dictionary is preserved or dropped, so each combination below routes one
+   * predicate through {@code InvertedIndexBasedFilterOperator} (with dict IDs) and another through
+   * {@code ScanBasedFilterOperator} (with raw values) on the same physical column.
+   *
+   * <p>Predicate-to-operator mapping for the int column ({@link #RAW_DICT_INV_INT_DIMENSION}) used here:
+   * <ul>
+   *   <li>{@code EQ}, {@code NOT_EQ}, {@code IN}, {@code NOT_IN} → inverted index, dict preserved</li>
+   *   <li>{@code RANGE} → scan, dict dropped, raw-value evaluator</li>
+   * </ul>
+   * Results are compared against the dictionary-encoded baseline column, which always uses the dict path.
+   * The deterministic dataset has values {@code 0..19}, each appearing 50 times in 1000 rows. Each sub-case
+   * also asserts an explicit non-zero expected count to defuse vacuous-pass risk if both sides silently
+   * returned 0 (e.g. due to a planner short-circuit on a contradictory predicate).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAllPredicateTypesMixedWithRangeOnSameColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // EQ (inverted, dict) AND RANGE (scan, raw): {7} satisfies both -> 50 rows.
+    assertScalarLongMatchesExpected(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 7 AND %s > 5", getTableName(),
+            DICT_INT_DIMENSION, DICT_INT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 7 AND %s > 5", getTableName(),
+            RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION),
+        50);
+
+    // IN (inverted, dict) OR RANGE (scan, raw): {1,3,5} union {15,16,17,18} = 7 values * 50 = 350 rows.
+    assertScalarLongMatchesExpected(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s IN (1, 3, 5) OR (%s >= 15 AND %s < 19)",
+            getTableName(), DICT_INT_DIMENSION, DICT_INT_DIMENSION, DICT_INT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s IN (1, 3, 5) OR (%s >= 15 AND %s < 19)",
+            getTableName(), RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION),
+        350);
+
+    // NOT_EQ (inverted, dict) AND RANGE (scan, raw): not-{9} intersect {7..12} = {7,8,10,11,12} -> 5 * 50 = 250 rows.
+    assertScalarLongMatchesExpected(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s != 9 AND %s BETWEEN 7 AND 12", getTableName(),
+            DICT_INT_DIMENSION, DICT_INT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s != 9 AND %s BETWEEN 7 AND 12", getTableName(),
+            RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION),
+        250);
+
+    // NOT_IN (inverted, dict) AND RANGE (scan, raw):
+    //   not-{2,4,6} intersect {0..10} = {0,1,3,5,7,8,9,10} -> 8 * 50 = 400 rows.
+    assertScalarLongMatchesExpected(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s NOT IN (2, 4, 6) AND %s <= 10", getTableName(),
+            DICT_INT_DIMENSION, DICT_INT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s NOT IN (2, 4, 6) AND %s <= 10", getTableName(),
+            RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION),
+        400);
+
+    // Three-way mix on the same column: EQ via inverted, NOT_IN via inverted, RANGE via scan.
+    //   ({0} union not-{1,2,3}) intersect {5..19} = {5..19} -> 15 * 50 = 750 rows.
+    assertScalarLongMatchesExpected(
+        String.format("SELECT COUNT(*) FROM %s WHERE (%s = 0 OR %s NOT IN (1, 2, 3)) AND %s > 4",
+            getTableName(), DICT_INT_DIMENSION, DICT_INT_DIMENSION, DICT_INT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE (%s = 0 OR %s NOT IN (1, 2, 3)) AND %s > 4",
+            getTableName(), RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION),
+        750);
+  }
+
+  /**
+   * Mixed-predicate query on the STRING column with RAW forward + dictionary + inverted index. Validates that
+   * REGEXP_LIKE (inverted-index, dict-id evaluator) and string EQ on the same column both return correct results
+   * and can be combined in a single query.
+   *
+   * <p>Note: there is no string analogue of RANGE that drops the dict in this column shape (no raw-value evaluator
+   * is exercised here), so this is a sanity check for the inverted-index path on strings — including the
+   * REGEXP_LIKE-on-RAW-forward path that the dict-drop logic enables.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMixedRegexpAndEqOnStringRawDictInvertedColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    assertScalarLongMatches(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 'value-1' OR REGEXP_LIKE(%s, 'value-1.*')",
+            getTableName(), DICT_DIMENSION, DICT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 'value-1' OR REGEXP_LIKE(%s, 'value-1.*')",
+            getTableName(), RAW_DICT_INV_DIMENSION, RAW_DICT_INV_DIMENSION));
+    assertScalarLongMatches(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s != 'value-3' AND REGEXP_LIKE(%s, 'value-1.*')",
+            getTableName(), DICT_DIMENSION, DICT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s != 'value-3' AND REGEXP_LIKE(%s, 'value-1.*')",
+            getTableName(), RAW_DICT_INV_DIMENSION, RAW_DICT_INV_DIMENSION));
+  }
+
+  /**
+   * Cross-column mixed-predicate query: the predicates target different physical columns but each routes through
+   * a different operator within the same query plan. Validates that the planner does not entangle the per-column
+   * dict-drop decisions: the EQ on the inverted+dict+raw column takes the inverted-index path (dict preserved),
+   * while the two RANGE predicates on a raw+dict column with and without an inverted index both take the scan
+   * path (dict dropped). The dict-encoded baseline column is run as a separate query and supplies the expected
+   * value of 50 rows ({@code dim = 7} matching once per appearance).
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMixedPredicatesAcrossDifferentColumnShapesReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    assertScalarLongMatchesExpected(
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 7 AND %s > 3 AND %s < 17",
+            getTableName(), DICT_INT_DIMENSION, DICT_INT_DIMENSION, DICT_INT_DIMENSION),
+        String.format("SELECT COUNT(*) FROM %s WHERE %s = 7 AND %s > 3 AND %s < 17",
+            getTableName(), RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INV_INT_DIMENSION, RAW_DICT_INT_DIMENSION),
+        50);
+  }
+
+  /**
    * Column with dict + RAW forward + range index. {@code RangeIndexType#createIndexCreator} chooses the
    * dict-id-based range index when a dictionary exists at segment build time, so the planner must keep the dict
    * for RANGE predicates and the range-index path is used.
@@ -444,6 +557,21 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
     assertEquals(rawResult, dictResult,
         "Result mismatch.\n  dict query: " + dictQuery + " => " + dictResult + "\n  raw query:  " + rawQuery
             + " => " + rawResult);
+  }
+
+  /// Like {@link #assertScalarLongMatches} but additionally pins the expected count, so the assertion does not
+  /// pass vacuously if both sides silently return 0 (e.g. due to a planner short-circuit on a
+  /// contradictory predicate).
+  private void assertScalarLongMatchesExpected(String dictQuery, String rawQuery, long expected)
+      throws Exception {
+    long dictResult = scalarLong(dictQuery);
+    long rawResult = scalarLong(rawQuery);
+    assertEquals(dictResult, expected,
+        "Dict baseline does not match expected count.\n  dict query: " + dictQuery + " => " + dictResult
+            + " (expected " + expected + ")");
+    assertEquals(rawResult, expected,
+        "Raw result does not match expected count.\n  raw query:  " + rawQuery + " => " + rawResult
+            + " (expected " + expected + ")");
   }
 
   private long scalarLong(String query)
