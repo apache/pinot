@@ -75,6 +75,8 @@ public class PeriodicTaskScheduler {
       LOGGER.warn("Periodic task scheduler already started");
       return;
     }
+    Preconditions.checkState(_periodicTasks != null,
+        "Periodic task scheduler has not been initialized");
 
     if (_periodicTasks.isEmpty()) {
       LOGGER.warn("No periodic task scheduled");
