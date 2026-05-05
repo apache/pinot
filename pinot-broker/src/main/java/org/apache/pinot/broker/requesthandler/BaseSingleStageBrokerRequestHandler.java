@@ -211,8 +211,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
-    _enableQueryFingerprinting = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
+    boolean fingerprintingConfigured = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    boolean redactionNeedsFingerprinting =
+        _queryLogger.getSqlRedactionMode() == QueryLogger.SqlRedactionMode.LITERAL_VALUES;
+    if (redactionNeedsFingerprinting && !fingerprintingConfigured) {
+      LOGGER.warn("SQL redaction mode 'literal_values' requires query fingerprinting. "
+          + "Enabling query fingerprinting automatically.");
+    }
+    _enableQueryFingerprinting = fingerprintingConfigured || redactionNeedsFingerprinting;
     if (_enableMultistageMigrationMetric) {
       _multistageCompileExecutor = Executors.newSingleThreadExecutor();
       _multistageCompileQueryQueue = new LinkedBlockingQueue<>(1000);
@@ -343,12 +350,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
-    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query);
-
+    QueryFingerprint queryFingerprint = null;
     String queryHash = CommonConstants.Broker.DEFAULT_QUERY_HASH;
     if (_enableQueryFingerprinting) {
       try {
-        QueryFingerprint queryFingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+        queryFingerprint = QueryFingerprintUtils.generateFingerprint(query);
         if (queryFingerprint != null) {
           queryHash = queryFingerprint.getQueryHash();
           requestContext.setQueryFingerprint(queryFingerprint);
@@ -357,6 +363,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
       }
     }
+
+    boolean queryWasLogged = _queryLogger.logQueryReceived(requestId, query, queryFingerprint);
 
     String cid = extractClientRequestId(sqlNodeAndOptions);
     if (cid == null) {
