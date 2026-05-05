@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.dialect.AnsiSqlDialect;
 import org.apache.pinot.spi.trace.QueryFingerprint;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,14 @@ public class QueryFingerprintUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryFingerprintUtils.class);
 
   private QueryFingerprintUtils() {
+  }
+
+  /**
+   * Generates a fingerprint by re-parsing the SQL string to avoid mutating the caller's AST.
+   */
+  @Nullable
+  public static QueryFingerprint generateFingerprint(String sql) throws Exception {
+    return generateFingerprint(CalciteSqlParser.compileToSqlNodeAndOptions(sql));
   }
 
   @Nullable
