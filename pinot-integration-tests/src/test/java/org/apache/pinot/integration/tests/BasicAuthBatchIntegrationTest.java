@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -156,9 +157,9 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     FileUtils.copyURLToFile(getClass().getResource(BOOTSTRAP_DATA_DIR + "/" + JOB_FILE), jobFile);
 
     // patch ingestion job file
-    String jobFileContents = IOUtils.toString(new FileInputStream(jobFile));
+    String jobFileContents = IOUtils.toString(new FileInputStream(jobFile), StandardCharsets.UTF_8);
     IOUtils.write(jobFileContents.replaceAll("9000", String.valueOf(getControllerPort())),
-        new FileOutputStream(jobFile));
+        new FileOutputStream(jobFile), StandardCharsets.UTF_8);
 
     new BootstrapTableTool("http", "localhost", getControllerPort(), baseDir.getAbsolutePath(),
         AuthProviderUtils.makeAuthProvider(AUTH_TOKEN)).execute();

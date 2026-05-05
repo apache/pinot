@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
-import java.util.Set;
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.StringUtils;
@@ -27,23 +27,30 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Extractor for CSV records
- */
+/// Extracts Pinot [GenericRow] from an Apache Commons CSV [CSVRecord]. CSV is fundamentally untyped — every
+/// cell arrives as a `String`. The extractor only does two things on top of that:
+/// - empty / unset cell → `null`
+/// - if a multi-value delimiter is configured, split the cell:
+///   - 0 or 1 element → the single `String` (NOT wrapped in an array)
+///   - 2+ elements → `Object[]` of `String`
 public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
   private Character _multiValueDelimiter = null;
-  private Set<String> _fields;
 
+  /// CSV's `_fields` differs from the base contract: when the caller doesn't pass an include list, the CSV
+  /// header column names from the config are used (CSV has no schema beyond the header). The base's
+  /// `_extractAll` flag is unused by this extractor — `_fields` is always populated. `recordExtractorConfig`
+  /// is required (CSV needs the column names and the multi-value delimiter), narrowing the
+  /// interface's `@Nullable` contract.
   @Override
-  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    CSVRecordExtractorConfig csvRecordExtractorConfig = (CSVRecordExtractorConfig) recordExtractorConfig;
-    if (fields == null || fields.isEmpty()) {
-      _fields = csvRecordExtractorConfig.getColumnNames();
-    } else {
-      _fields = Set.copyOf(fields);
+  protected void initConfig(RecordExtractorConfig config) {
+    Preconditions.checkArgument(config instanceof CSVRecordExtractorConfig,
+        "CSVRecordExtractor requires a CSVRecordExtractorConfig");
+    CSVRecordExtractorConfig csvConfig = (CSVRecordExtractorConfig) config;
+    if (_extractAll) {
+      _fields = csvConfig.getColumnNames();
     }
-    _multiValueDelimiter = csvRecordExtractorConfig.getMultiValueDelimiter();
+    _multiValueDelimiter = csvConfig.getMultiValueDelimiter();
   }
 
   @Override

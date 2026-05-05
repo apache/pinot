@@ -21,6 +21,8 @@ package org.apache.pinot.common.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -211,6 +213,37 @@ public class PinotDataTypeTest {
   }
 
   @Test
+  public void testDate() {
+    // 2022-04-14 = 19_096 days since epoch. `LocalDate` is TZ-independent — round-trips identically in any
+    // JVM timezone.
+    LocalDate date = LocalDate.parse("2022-04-14");
+    assertEquals(DATE.convert(19_096, INTEGER), date);
+    assertEquals(DATE.convert(19_096L, LONG), date);
+    assertEquals(DATE.convert("2022-04-14", STRING), date);
+    assertEquals(DATE.convert("2022-04-14", JSON), date);
+    assertEquals(DATE.convert(new Timestamp(19_096L * 86_400_000L), TIMESTAMP), date);
+    assertEquals(DATE.toInt(date), 19_096);
+    assertEquals(DATE.toLong(date), 19_096L);
+    assertEquals(DATE.toInternal(date), 19_096);
+    assertEquals(DATE.toString(date), "2022-04-14");
+  }
+
+  @Test
+  public void testTime() {
+    // 08:51:32 = 31_892_000 ms since midnight. `LocalTime` is TZ-independent, so this round-trips
+    // identically in any JVM timezone.
+    LocalTime time = LocalTime.parse("08:51:32");
+    assertEquals(TIME.convert(31_892_000L, LONG), time);
+    assertEquals(TIME.convert(31_892_000, INTEGER), time);
+    assertEquals(TIME.convert("08:51:32", STRING), time);
+    assertEquals(TIME.convert("08:51:32", JSON), time);
+    assertEquals(TIME.toLong(time), 31_892_000L);
+    assertEquals(TIME.toInt(time), 31_892_000);
+    assertEquals(TIME.toInternal(time), 31_892_000L);
+    assertEquals(TIME.toString(time), "08:51:32");
+  }
+
+  @Test
   public void testJSON() {
     assertEquals(JSON.convert(false, BOOLEAN), "false");
     assertEquals(JSON.convert(true, BOOLEAN), "true");
@@ -276,6 +309,8 @@ public class PinotDataTypeTest {
     testCases.put(Double.class, DOUBLE);
     testCases.put(BigDecimal.class, BIG_DECIMAL);
     testCases.put(Timestamp.class, TIMESTAMP);
+    testCases.put(LocalDate.class, DATE);
+    testCases.put(LocalTime.class, TIME);
     testCases.put(String.class, STRING);
     testCases.put(byte[].class, BYTES);
 

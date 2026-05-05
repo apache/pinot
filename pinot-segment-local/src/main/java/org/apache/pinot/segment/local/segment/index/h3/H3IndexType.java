@@ -126,6 +126,18 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, H3IndexConfig indexConfig) {
+    // H3 index is built directly from geospatial values; it does not depend on a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, H3IndexConfig indexConfig) {
+    // H3 cell IDs are derived from geometry values, independent of dictionary representation.
+    return false;
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return EXTENSIONS;
   }

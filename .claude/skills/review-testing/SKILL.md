@@ -1,6 +1,6 @@
 ---
 name: review-testing
-description: Review Apache Pinot diffs for test coverage and test quality — positive + negative cases, real dictionaries vs mocks, rolling-upgrade / mixed-version tests, null-handling toggle coverage, exhaustive type coverage for aggregators/operators, integration-test base-class choice (prefer `CustomDataQueryClusterIntegrationTest` unless cluster-level setup differs), assertion quality, and regression tests that reproduce the bug. Trigger keywords — Test, TestNG, JUnit, Mockito, mock, integration test, assertEquals, assertThrows, regression, null handling test, mixed version, CustomDataQueryClusterIntegrationTest, BaseClusterIntegrationTest.
+description: Review Apache Pinot diffs for test coverage and test quality — positive + negative cases, real dictionaries vs mocks, rolling-upgrade / mixed-version tests, null-handling toggle coverage, exhaustive type coverage for aggregators/operators, integration-test base-class choice (reject standalone clusters unless special setup is needed; prefer `CustomDataQueryClusterIntegrationTest`), assertion quality, and regression tests that reproduce the bug. Trigger keywords — Test, TestNG, JUnit, Mockito, mock, integration test, assertEquals, assertThrows, regression, null handling test, mixed version, CustomDataQueryClusterIntegrationTest, BaseClusterIntegrationTest.
 domain: kb/code-review-principles.md#6-testing-strategies
 triggers:
   - diff adds or modifies any src/test/** file
@@ -29,7 +29,12 @@ Severity:
   - Missing `@Test(dataProvider=...)` when the production code has a type-dispatch switch — a single type is insufficient coverage.
   - Timing assumptions: `Thread.sleep`, `System.currentTimeMillis()` in assertions → flakiness.
 - Integration tests: new REST / Thrift / wire-format changes need a `*IntegrationTest` case; check `pinot-integration-tests/`.
-- Integration-test base class: any new test under `pinot-integration-tests/src/test/java/org/apache/pinot/integration/tests/custom/` should extend `CustomDataQueryClusterIntegrationTest`. A new test that extends `BaseClusterIntegrationTest` (or spins up its own controller/broker/server) directly is a red flag unless the change requires a non-default cluster topology or component config.
+- Integration-test base class: reject new standalone Pinot integration test classes that use `BaseClusterIntegrationTest`
+  or spin up their own controller/broker/server when no special cluster setup is required. For ordinary schema/data/query
+  behavior, require reusing an existing `CustomDataQueryClusterIntegrationTest` test or adding a focused subclass under
+  `pinot-integration-tests/src/test/java/org/apache/pinot/integration/tests/custom/` with
+  `@Test(suiteName = "CustomClusterIntegrationTest")`, so it is included by
+  `pinot-integration-tests/src/test/resources/custom-cluster-integration-test-suite.xml`.
 
 ## 2. Deep analysis
 
@@ -43,7 +48,7 @@ Severity:
 
 ### Core-functionality + integration-test base-class selection
 
-Every non-trivial change must exercise the **core functionality** it introduces. For query-semantics changes (new function, index type, aggregator, transform, SQL construct, stored-type behavior) that can be validated with ordinary table data and the default cluster topology, the integration test **must** extend `CustomDataQueryClusterIntegrationTest` — not a fresh `BaseClusterIntegrationTest` subclass.
+Every non-trivial change must exercise the **core functionality** it introduces. For query-semantics changes (new function, index type, aggregator, transform, SQL construct, stored-type behavior) that can be validated with ordinary table data and the default cluster topology, the integration test **must** reuse an existing `CustomDataQueryClusterIntegrationTest` test or add a focused subclass under `pinot-integration-tests/src/test/java/org/apache/pinot/integration/tests/custom/` — not a fresh `BaseClusterIntegrationTest` subclass.
 
 Rationale: `CustomDataQueryClusterIntegrationTest` shares one controller / broker / server / ZK across the whole test suite (`@BeforeSuite`, `_sharedClusterTestSuite`). Spinning up a second cluster per test costs ~30–60 s of ZK/Helix startup and inflates CI time linearly with test count. The custom base lets each test bring its own schema, data, and SQL assertions on top of the shared cluster. Nearly all feature validation (window functions, sketches, vector indexes, geo, JSON, timestamp, bytes, distinct, group-by options, star-tree, unnest, SSB queries, etc.) already follows this pattern — look for neighbors in `pinot-integration-tests/src/test/java/org/apache/pinot/integration/tests/custom/` before adding a new top-level cluster test.
 
@@ -53,7 +58,7 @@ A new test may extend `BaseClusterIntegrationTest` (or a specialized base) **onl
 - Different Helix / ZK layout or tenant isolation that can't be simulated with table-level config.
 - Realtime/streaming wiring that the custom base does not already provide, or lifecycle transitions that require cluster restart.
 
-Flag as **MAJOR**: a new test under `pinot-integration-tests/` whose class body only defines schema, data, and SQL assertions but extends `BaseClusterIntegrationTest` directly. The fix is to re-parent to `CustomDataQueryClusterIntegrationTest` and move into the `custom/` package. Require the PR to state, in the description, which of the four "only-when" conditions above applies if the fresh cluster is justified.
+Flag as **MAJOR / C6.10**: a new test under `pinot-integration-tests/` whose class body only defines schema, data, and SQL assertions but extends `BaseClusterIntegrationTest` directly or otherwise creates a dedicated cluster. The fix is to re-parent to `CustomDataQueryClusterIntegrationTest`, move it into the `custom/` package, annotate it with `@Test(suiteName = "CustomClusterIntegrationTest")`, and ensure it is covered by `custom-cluster-integration-test-suite.xml`. Require the PR to state, in the description, which of the four "only-when" conditions above applies if the fresh cluster is justified.
 
 Independently, flag as **CRITICAL** a change to core functionality (new SQL function, new index type, behavior change of an existing operator/aggregator) that ships with only unit tests and no integration test of any kind — unit coverage alone doesn't prove the feature works end-to-end through planner → broker → server → segment.
 

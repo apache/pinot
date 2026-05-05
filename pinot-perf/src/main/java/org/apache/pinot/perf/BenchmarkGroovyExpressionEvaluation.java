@@ -80,11 +80,11 @@ public class BenchmarkGroovyExpressionEvaluation {
   }
 
   private String getFirstName() {
-    return RandomStringUtils.randomAlphabetic(10);
+    return RandomStringUtils.secure().nextAlphabetic(10);
   }
 
   private String getLastName() {
-    return RandomStringUtils.randomAlphabetic(20);
+    return RandomStringUtils.secure().nextAlphabetic(20);
   }
 
   private List<String> getLongList() {

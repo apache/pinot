@@ -7,7 +7,6 @@
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "3",
     "replicasPerPartition": "1"
   },

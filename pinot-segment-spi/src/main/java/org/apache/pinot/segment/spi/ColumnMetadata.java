@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -62,9 +63,14 @@ public interface ColumnMetadata {
   /// [Constants#UNKNOWN_CARDINALITY].
   int getCardinality();
 
-  /// Returns `true` when the column is dictionary-encoded, `false` otherwise.
+  /// Returns `true` when the column has a dictionary, `false` otherwise.
   @JsonProperty("hasDictionary")
   boolean hasDictionary();
+
+  /// Returns the forward-index encoding for this column. The value is persisted under
+  /// [V1Constants.MetadataKeys.Column#FORWARD_INDEX_ENCODING]; for old segments that lack the key, implementations
+  /// derive it from [#hasDictionary()].
+  EncodingType getForwardIndexEncoding();
 
   /// Returns `true` when all values in a SV column are sorted in ascending order, `false` otherwise.
   boolean isSorted();

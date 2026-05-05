@@ -293,15 +293,13 @@ public class DictionaryIndexType
       throws IOException {
 
     DataType dataType = metadata.getDataType();
-    String columnName = metadata.getColumnName();
-    int length = metadata.getCardinality();
-
     boolean loadOnHeap = indexConfig.isOnHeap();
-    Intern internConfig = indexConfig.getIntern();
+    String columnName = metadata.getColumnName();
 
     // If interning is enabled, get the required interners.
     FALFInterner<String> strInterner = null;
     FALFInterner<byte[]> byteInterner = null;
+    Intern internConfig = indexConfig.getIntern();
     if (loadOnHeap) {
       LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
       if (internConfig != null && !internConfig.isDisabled()) {
@@ -312,6 +310,7 @@ public class DictionaryIndexType
       }
     }
 
+    int length = metadata.getCardinality();
     switch (dataType.getStoredType()) {
       case INT:
         return loadOnHeap ? new OnHeapIntDictionary(dataBuffer, length)
@@ -351,6 +350,18 @@ public class DictionaryIndexType
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // The dictionary index is the dictionary itself; the question of whether it requires a dictionary is moot.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // Enable/disable of the dictionary IS the change being driven; the dictionary handler owns its own rebuild.
+    return false;
   }
 
   public static String getFileExtension() {

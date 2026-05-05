@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -61,6 +62,11 @@ public class SimpleColumnMetadata implements ColumnMetadata {
   @Override
   public boolean hasDictionary() {
     return false;
+  }
+
+  @Override
+  public FieldConfig.EncodingType getForwardIndexEncoding() {
+    return FieldConfig.EncodingType.RAW;
   }
 
   @Override

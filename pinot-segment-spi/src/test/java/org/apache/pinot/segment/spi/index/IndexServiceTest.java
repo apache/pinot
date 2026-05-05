@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
@@ -124,6 +125,16 @@ public class IndexServiceTest {
     public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
         Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
       throw new UnsupportedOperationException(IndexType.class.getName() + " should not be created");
+    }
+
+    @Override
+    public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+      return false;
+    }
+
+    @Override
+    public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+      return false;
     }
 
     @Override

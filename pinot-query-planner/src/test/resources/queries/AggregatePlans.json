@@ -205,6 +205,44 @@
           "\n      PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "SUM on MV LONG column plans natively as SUM (no broker rewrite)",
+        "sql": "EXPLAIN PLAN FOR SELECT SUM(mcol2) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($8)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "AVG on MV LONG column plans natively as AVG (no broker rewrite)",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(mcol2) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($8)], agg#1=[COUNT()], aggType=[LEAF])",
+          "\n        PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "MIN/MAX on MV LONG column plan natively (no broker rewrite)",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(mcol2), MAX(mcol2) FROM e",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], agg#1=[MAX($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[MIN($8)], agg#1=[MAX($8)], aggType=[LEAF])",
+          "\n      PinotLogicalTableScan(table=[[default, e]])",
+          "\n"
+        ]
       }
     ]
   }

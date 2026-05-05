@@ -138,6 +138,10 @@ public class V1Constants {
       public static final String CARDINALITY = "cardinality";
       // Mandatory, treated as `true` when missing for backward compatibility
       public static final String HAS_DICTIONARY = "hasDictionary";
+      // Mandatory for new segments. Records the forward-index encoding (RAW or DICTIONARY). Old segments written
+      // before this key was introduced do not have it; readers fall back to inferring the encoding from
+      // HAS_DICTIONARY in that case.
+      public static final String FORWARD_INDEX_ENCODING = "forwardIndexEncoding";
       // Mandatory, treated as `false` when missing for backward compatibility
       public static final String IS_SORTED = "isSorted";
       // Optional

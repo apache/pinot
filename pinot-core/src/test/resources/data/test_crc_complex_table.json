@@ -77,7 +77,6 @@
   "routing": {},
   "segmentsConfig": {
     "timeColumn": "eventTime",
-    "replication": 1,
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    "replication": 1
   }
 }

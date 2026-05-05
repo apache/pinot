@@ -1,0 +1,168 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: Pinot Integration Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "contrib/**"
+      - "docs/**"
+      - "docker/**"
+      - "kubernetes/**"
+      - "licenses/**"
+      - "licenses-binary/**"
+      - "**.md"
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "contrib/**"
+      - "docs/**"
+      - "docker/**"
+      - "kubernetes/**"
+      - "licenses/**"
+      - "licenses-binary/**"
+      - "**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    if: github.repository == 'apache/pinot'
+    runs-on: ubuntu-latest
+    strategy:
+      # Changed to false in order to improve coverage using unsafe buffers
+      fail-fast: false
+      matrix:
+        testset: [ 1, 2 ]
+        java: [ 21 ]
+        distribution: [ "temurin" ]
+    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: ${{ matrix.distribution }}
+          cache: 'maven'
+      # Step that does that actual cache save and restore
+      - uses: actions/cache@v5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      - name: Build Project
+        env:
+          RUN_INTEGRATION_TESTS: true
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -B -ntp
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        timeout-minutes: 120
+        run: |
+          .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
+      - name: Integration Test
+        env:
+          RUN_INTEGRATION_TESTS: true
+          RUN_TEST_SET: ${{ matrix.testset }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -B -ntp
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        timeout-minutes: 120
+        run: |
+          .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6
+        continue-on-error: true
+        timeout-minutes: 5
+        with:
+          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-integration-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Custom Integration Test
+        if : ${{ matrix.testset == 1 }}
+        env:
+          RUN_INTEGRATION_TESTS: true
+          RUN_TEST_SET: ${{ matrix.testset }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          MAVEN_OPTS: >
+            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -B -ntp
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
+            --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+        timeout-minutes: 120
+        run: |
+          .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
+      - name: Upload coverage to Codecov
+        if : ${{ matrix.testset == 1 }}
+        uses: codecov/codecov-action@v6
+        continue-on-error: true
+        timeout-minutes: 5
+        with:
+          flags: integration,custom-integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          name: codecov-custom-integration-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+      - name: Generate Surefire Report
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        continue-on-error: true
+        timeout-minutes: 120
+        run: |
+          mvn surefire-report:report-only -P github-actions,codecoverage
+      - name: Upload Surefire Reports
+        if: ${{ !cancelled() && github.ref == 'refs/heads/master' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-reports-integration-test-${{ matrix.testset }}-${{matrix.distribution}}-${{matrix.java}}
+          path: |
+            **/target/surefire-reports/
+            **/target/site/surefire-report.html
+          retention-days: 30

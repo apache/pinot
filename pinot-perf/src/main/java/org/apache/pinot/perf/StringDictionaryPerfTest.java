@@ -100,7 +100,7 @@ public class StringDictionaryPerfTest {
 
     int i = 0;
     while (i < dictLength) {
-      String randomString = RandomStringUtils.randomAlphanumeric(
+      String randomString = RandomStringUtils.secure().nextAlphanumeric(
           USE_FIXED_SIZE_STRING ? MAX_STRING_LENGTH : (1 + random.nextInt(MAX_STRING_LENGTH)));
       if (!uniqueStrings.add(randomString)) {
         continue;

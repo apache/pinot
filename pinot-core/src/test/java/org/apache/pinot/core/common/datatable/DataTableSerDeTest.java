@@ -356,15 +356,15 @@ public class DataTableSerDeTest {
             dataTableBuilder.setColumn(colId, BOOLEANS[rowId]);
             break;
           case STRING:
-            STRINGS[rowId] = isNull ? "" : RandomStringUtils.random(RANDOM.nextInt(20));
+            STRINGS[rowId] = isNull ? "" : RandomStringUtils.secure().next(RANDOM.nextInt(20));
             dataTableBuilder.setColumn(colId, STRINGS[rowId]);
             break;
           case JSON:
-            JSONS[rowId] = isNull ? "" : "{\"key\": \"" + RandomStringUtils.random(RANDOM.nextInt(20)) + "\"}";
+            JSONS[rowId] = isNull ? "" : "{\"key\": \"" + RandomStringUtils.secure().next(RANDOM.nextInt(20)) + "\"}";
             dataTableBuilder.setColumn(colId, JSONS[rowId]);
             break;
           case BYTES:
-            BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.random(RANDOM.nextInt(20)).getBytes();
+            BYTES[rowId] = isNull ? new byte[0] : RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes();
             dataTableBuilder.setColumn(colId, new ByteArray(BYTES[rowId]));
             break;
           case INT_ARRAY:
@@ -435,7 +435,7 @@ public class DataTableSerDeTest {
             ByteArray[] bytesArray = new ByteArray[length];
             for (int i = 0; i < length; i++) {
               bytesArray[i] =
-                  new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes(StandardCharsets.UTF_8));
+                  new ByteArray(RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes(StandardCharsets.UTF_8));
             }
             BYTES_ARRAYS[rowId] = bytesArray;
             dataTableBuilder.setColumn(colId, bytesArray);
@@ -444,7 +444,7 @@ public class DataTableSerDeTest {
             length = RANDOM.nextInt(20);
             String[] stringArray = new String[length];
             for (int i = 0; i < length; i++) {
-              stringArray[i] = RandomStringUtils.random(RANDOM.nextInt(20));
+              stringArray[i] = RandomStringUtils.secure().next(RANDOM.nextInt(20));
             }
             STRING_ARRAYS[rowId] = stringArray;
             dataTableBuilder.setColumn(colId, stringArray);
@@ -452,7 +452,7 @@ public class DataTableSerDeTest {
           case MAP:
             Map<String, Object> map = new HashMap<>();
             for (int j = 0; j < 1 + RANDOM.nextInt(20); j++) {
-              map.put("k" + j, RandomStringUtils.random(RANDOM.nextInt(20)));
+              map.put("k" + j, RandomStringUtils.secure().next(RANDOM.nextInt(20)));
             }
             MAPS[rowId] = map;
             dataTableBuilder.setColumn(colId, map);

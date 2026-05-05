@@ -160,6 +160,19 @@ public class RangeIndexType
     return new RangeIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
+    // Range index supports both dict-encoded (range over dict IDs) and raw (range over values) columns.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
+    // The on-disk format differs: dict-encoded ranges use dict IDs while raw ranges use raw values. Transitioning
+    // between the two states requires rebuilding the index against the new domain.
+    return true;
+  }
+
   private static class ReaderFactory extends IndexReaderFactory.Default<RangeIndexConfig, RangeIndexReader> {
 
     public static final ReaderFactory INSTANCE = new ReaderFactory();

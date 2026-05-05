@@ -333,7 +333,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   @Override
   public long getNumSegmentsPrunedByBroker() {
-    return 0;
+    return _brokerStats.getLong(StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER);
   }
 
   @Override
@@ -474,6 +474,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
         return StatMap.Key.minPositive(value1, value2);
       }
     },
+    NUM_SEGMENTS_PRUNED_BY_BROKER(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),

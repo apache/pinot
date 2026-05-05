@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -230,7 +230,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     FakeDeletionManager deletionManager = new FakeDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, propertyStore, 7);
@@ -385,7 +385,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
@@ -441,7 +441,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
@@ -510,7 +510,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);

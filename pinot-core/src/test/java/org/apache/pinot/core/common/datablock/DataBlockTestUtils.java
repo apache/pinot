@@ -68,10 +68,10 @@ public class DataBlockTestUtils {
           row[colId] = RANDOM.nextLong();
           break;
         case STRING:
-          row[colId] = RandomStringUtils.random(RANDOM.nextInt(20));
+          row[colId] = RandomStringUtils.secure().next(RANDOM.nextInt(20));
           break;
         case BYTES:
-          row[colId] = new ByteArray(RandomStringUtils.random(RANDOM.nextInt(20)).getBytes());
+          row[colId] = new ByteArray(RandomStringUtils.secure().next(RANDOM.nextInt(20)).getBytes());
           break;
         case INT_ARRAY:
           int length = RANDOM.nextInt(ARRAY_SIZE);
@@ -133,7 +133,7 @@ public class DataBlockTestUtils {
           length = RANDOM.nextInt(ARRAY_SIZE);
           String[] stringArray = new String[length];
           for (int i = 0; i < length; i++) {
-            stringArray[i] = RandomStringUtils.random(RANDOM.nextInt(20));
+            stringArray[i] = RandomStringUtils.secure().next(RANDOM.nextInt(20));
           }
           row[colId] = stringArray;
           break;
@@ -153,9 +153,9 @@ public class DataBlockTestUtils {
           for (int i = 0; i < length; i++) {
             int mapSize = RANDOM.nextInt(20);
             for (int j = 0; j < mapSize; j++) {
-              map.put("k0", RandomStringUtils.random(RANDOM.nextInt(5)));
-              map.put("k1", RandomStringUtils.random(RANDOM.nextInt(10)));
-              map.put("k2", RandomStringUtils.random(RANDOM.nextInt(20)));
+              map.put("k0", RandomStringUtils.secure().next(RANDOM.nextInt(5)));
+              map.put("k1", RandomStringUtils.secure().next(RANDOM.nextInt(10)));
+              map.put("k2", RandomStringUtils.secure().next(RANDOM.nextInt(20)));
             }
           }
           row[colId] = map;

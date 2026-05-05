@@ -1776,10 +1776,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
+    // Pre-populate the current ZK metadata with a controller-side customMap entry to verify that the controller's
+    // additive merge preserves existing keys when the server response is propagated.
+    Map<String, String> existingCustomMap = new HashMap<>();
+    existingCustomMap.put("controllerKey", "controllerValue");
+    segmentsZKMetadata.get(0).setCustomMap(existingCustomMap);
+
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
 
     segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
+    // Simulate the server-side merge of segment-file customMap entries into the uploaded ZK metadata. The controller
+    // must propagate these entries to the persisted ZK metadata.
+    Map<String, String> uploadedCustomMap = new HashMap<>();
+    uploadedCustomMap.put("segmentFileKey", "segmentFileValue");
+    segmentZKMetadataCopy.setCustomMap(uploadedCustomMap);
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
         serverUploadRequestUrl0)).thenReturn(segmentZKMetadataCopy);
 
@@ -1833,6 +1844,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
         expectedSegmentLocation);
     assertFalse(tempSegmentFileLocation.exists(),
         "Deep-store retry task should move the file from temp location to permanent location");
+    Map<String, String> persistedCustomMap =
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getCustomMap();
+    assertNotNull(persistedCustomMap);
+    assertEquals(persistedCustomMap.get("segmentFileKey"), "segmentFileValue");
+    assertEquals(persistedCustomMap.get("controllerKey"), "controllerValue");
 
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
         METADATA_URI_FOR_PEER_DOWNLOAD);

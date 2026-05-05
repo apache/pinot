@@ -108,7 +108,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -144,24 +143,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression TRUE = RequestUtils.getLiteralExpression(true);
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
-  // TODO: After the next release, remove overrides here for consolidated aggregation functions
-  //  (see https://github.com/apache/pinot/issues/17061)
-  private static final Map<String, String> MV_COL_AGG_FUNCTION_OVERRIDE_MAP = Map.ofEntries(
-      Map.entry("distinctcount", "distinctcountmv"),
-      Map.entry("distinctcountbitmap", "distinctcountbitmapmv"),
-      Map.entry("distinctcounthll", "distinctcounthllmv"),
-      Map.entry("distinctcountrawhll", "distinctcountrawhllmv"),
-      Map.entry("distinctsum", "distinctsummv"),
-      Map.entry("distinctavg", "distinctavgmv"),
-      Map.entry("count", "countmv"),
-      Map.entry("min", "minmv"),
-      Map.entry("max", "maxmv"),
-      Map.entry("avg", "avgmv"),
-      Map.entry("sum", "summv"),
-      Map.entry("minmaxrange", "minmaxrangemv"),
-      Map.entry("distinctcounthllplus", "distinctcounthllplusmv"),
-      Map.entry("distinctcountrawhllplus", "distinctcountrawhllplusmv")
-  );
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   protected final boolean _disableGroovy;
@@ -1072,9 +1053,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     Schema schema = _tableCache.getSchema(rawTableName);
-    if (schema != null) {
-      handleAggFunctionMVOverride(serverPinotQuery, schema);
-    }
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
     return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
@@ -1368,19 +1346,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   /**
-   * Retrieve multivalued columns for a table.
-   * From the table Schema , we get the multi valued columns of dimension fields.
-   *
-   * @param tableSchema
-   * @param columnName
-   * @return multivalued columns of the table .
-   */
-  private static boolean isMultiValueColumn(Schema tableSchema, String columnName) {
-    DimensionFieldSpec dimensionFieldSpec = tableSchema.getDimensionSpec(columnName);
-    return dimensionFieldSpec != null && !dimensionFieldSpec.isSingleValueField();
-  }
-
-  /**
    * Sets the table name in the given broker request.
    * NOTE: Set table name in broker request because it is used for access control, query routing etc.
    */
@@ -1510,52 +1475,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       handleDistinctCountBitmapOverride(havingExpression);
-    }
-  }
-
-  /**
-   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
-   */
-  @VisibleForTesting
-  static void handleAggFunctionMVOverride(PinotQuery pinotQuery, Schema tableSchema) {
-    for (Expression expression : pinotQuery.getSelectList()) {
-      handleAggFunctionMVOverride(expression, tableSchema);
-    }
-    List<Expression> orderByExpressions = pinotQuery.getOrderByList();
-    if (orderByExpressions != null) {
-      for (Expression expression : orderByExpressions) {
-        // NOTE: Order-by is always a Function with the ordering of the Expression
-        handleAggFunctionMVOverride(expression.getFunctionCall().getOperands().get(0), tableSchema);
-      }
-    }
-    Expression havingExpression = pinotQuery.getHavingExpression();
-    if (havingExpression != null) {
-      handleAggFunctionMVOverride(havingExpression, tableSchema);
-    }
-  }
-
-  /**
-   * Rewrites aggregation functions to MV equivalents if the function operand is an MV column
-   */
-  private static void handleAggFunctionMVOverride(Expression expression, Schema tableSchema) {
-    Function function = expression.getFunctionCall();
-    if (function == null) {
-      return;
-    }
-
-    String overrideOperator = MV_COL_AGG_FUNCTION_OVERRIDE_MAP.get(function.getOperator());
-    if (overrideOperator != null) {
-      List<Expression> operands = function.getOperands();
-      if (!operands.isEmpty() && operands.get(0).isSetIdentifier() && isMultiValueColumn(tableSchema,
-          operands.get(0).getIdentifier().getName())) {
-        // we are only checking the first operand that if its a MV column as all the overriding agg. fn.'s have
-        // first operator is column name
-        function.setOperator(overrideOperator);
-      }
-    } else {
-      for (Expression operand : function.getOperands()) {
-        handleAggFunctionMVOverride(operand, tableSchema);
-      }
     }
   }
 
