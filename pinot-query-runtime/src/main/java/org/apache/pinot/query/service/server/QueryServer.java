@@ -36,6 +36,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
@@ -447,6 +448,172 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     QueryExecutionContext executionContext = QueryExecutionContext.forTseServerRequest(metadataMap, _instanceId);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       _queryRunner.processTimeSeriesQuery(request.getDispatchPlanList(), metadataMap, responseObserver);
+    }
+  }
+
+  /// Stream-mode submission handler. The broker keeps the stream open for the query lifetime; the server replies
+  /// with a {@code submit_ack} as the first message and (in subsequent commits) per-opchain
+  /// {@link Worker.OpChainComplete} messages followed by a final {@link Worker.ServerDone}.
+  ///
+  /// This skeleton wires up the gRPC mechanics + plan submission via the existing submission path. It does NOT yet
+  /// emit OpChainComplete / ServerDone — those need a per-opchain completion hook on
+  /// {@link org.apache.pinot.query.runtime.executor.OpChainSchedulerService}, which is layered on next.
+  /// Cancel still routes through the existing unary {@link #cancel(Worker.CancelRequest, StreamObserver)} RPC; broker
+  /// stream-close also triggers a cancel here.
+  @Override
+  public StreamObserver<Worker.BrokerToServer> submitWithStream(
+      StreamObserver<Worker.ServerToBroker> responseObserver) {
+    return new SubmitWithStreamObserver(responseObserver);
+  }
+
+  /// Per-query state for an open {@code SubmitWithStream} call. Owns the response stream and serialises every
+  /// {@code onNext} call on it via a {@code synchronized} block — gRPC requires {@code StreamObserver.onNext} to be
+  /// called serially.
+  ///
+  /// All blocking work (plan deserialization, opchain construction) runs on
+  /// {@link QueryServer#_submissionExecutorService}.
+  private final class SubmitWithStreamObserver implements StreamObserver<Worker.BrokerToServer> {
+    private final StreamObserver<Worker.ServerToBroker> _responseObserver;
+    /// Serialises onNext calls on the response stream and guards mutable session state.
+    private final Object _streamLock = new Object();
+    /// True once we've received the first {@code submit} and dispatched it.
+    private final AtomicBoolean _submitted = new AtomicBoolean(false);
+    /// True once we've completed the response stream (success or error). Idempotent guard.
+    private final AtomicBoolean _completed = new AtomicBoolean(false);
+    /// Set once we successfully parse the request id from the submit metadata. Used by cancel-via-stream.
+    private volatile long _requestId = -1;
+
+    SubmitWithStreamObserver(StreamObserver<Worker.ServerToBroker> responseObserver) {
+      _responseObserver = responseObserver;
+    }
+
+    @Override
+    public void onNext(Worker.BrokerToServer message) {
+      switch (message.getPayloadCase()) {
+        case SUBMIT:
+          handleSubmit(message.getSubmit());
+          break;
+        case CANCEL:
+          handleCancel(message.getCancel());
+          break;
+        case PAYLOAD_NOT_SET:
+        default:
+          sendErrorAndComplete("Unexpected BrokerToServer payload: " + message.getPayloadCase());
+          break;
+      }
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      // Broker-side stream error / disconnect. Treat like a cancel and clean up; do not reply on the response stream
+      // (the underlying transport is gone).
+      LOGGER.warn("SubmitWithStream stream error for request {}: {}", _requestId, t.getMessage());
+      _completed.set(true);
+      cancelIfSubmitted();
+    }
+
+    @Override
+    public void onCompleted() {
+      // Broker has half-closed (no more inbound messages). At this point the server may still be running opchains.
+      // Until we have the per-opchain completion hook (next sub-commit), we have no way to know when stats are ready,
+      // so we just complete the response stream immediately. This means stream-mode queries currently lose stats —
+      // resolved by the next commit.
+      sendDoneAndComplete();
+    }
+
+    private void handleSubmit(Worker.QueryRequest request) {
+      if (!_submitted.compareAndSet(false, true)) {
+        sendErrorAndComplete("Multiple submit messages on the same stream are not allowed");
+        return;
+      }
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
+      Map<String, String> reqMetadata;
+      try {
+        reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while deserializing request metadata", e);
+        sendErrorAndComplete("Caught exception while deserializing request metadata: " + e.getMessage());
+        return;
+      }
+      try {
+        _requestId = Long.parseLong(reqMetadata.get(MetadataKeys.REQUEST_ID));
+      } catch (Exception ignored) {
+        // _requestId stays at -1; cancel-on-stream-close will just be a no-op.
+      }
+      long timeoutMs = Long.parseLong(reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
+      CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
+          .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+          .whenComplete((result, error) -> {
+            if (error != null) {
+              LOGGER.error("Caught exception while submitting request: {}", _requestId, error);
+              sendSubmitAck(buildErrorResponse("Caught exception while submitting request: " + error.getMessage()));
+            } else {
+              sendSubmitAck(buildOkResponse());
+            }
+          });
+    }
+
+    private void handleCancel(Worker.CancelRequest cancel) {
+      // The broker still uses the unary Cancel RPC in Phase A; cancel-via-stream is plumbed through here so that
+      // future Phase B brokers can use the same channel without server-side changes.
+      try {
+        _queryRunner.cancel(cancel.getRequestId());
+      } catch (Throwable t) {
+        LOGGER.warn("Caught exception cancelling request {} via SubmitWithStream", cancel.getRequestId(), t);
+      }
+    }
+
+    private void cancelIfSubmitted() {
+      if (_submitted.get() && _requestId >= 0) {
+        try {
+          _queryRunner.cancel(_requestId);
+        } catch (Throwable t) {
+          LOGGER.warn("Caught exception cancelling request {} after stream error", _requestId, t);
+        }
+      }
+    }
+
+    private void sendSubmitAck(Worker.QueryResponse ack) {
+      synchronized (_streamLock) {
+        if (_completed.get()) {
+          return;
+        }
+        _responseObserver.onNext(Worker.ServerToBroker.newBuilder().setSubmitAck(ack).build());
+      }
+    }
+
+    private void sendDoneAndComplete() {
+      synchronized (_streamLock) {
+        if (_completed.compareAndSet(false, true)) {
+          _responseObserver.onNext(Worker.ServerToBroker.newBuilder()
+              .setDone(Worker.ServerDone.getDefaultInstance())
+              .build());
+          _responseObserver.onCompleted();
+        }
+      }
+    }
+
+    private void sendErrorAndComplete(String errorMsg) {
+      synchronized (_streamLock) {
+        if (_completed.compareAndSet(false, true)) {
+          _responseObserver.onNext(Worker.ServerToBroker.newBuilder()
+              .setSubmitAck(buildErrorResponse(errorMsg))
+              .build());
+          _responseObserver.onCompleted();
+        }
+      }
+    }
+
+    private Worker.QueryResponse buildOkResponse() {
+      return Worker.QueryResponse.newBuilder()
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")
+          .build();
+    }
+
+    private Worker.QueryResponse buildErrorResponse(String errorMsg) {
+      return Worker.QueryResponse.newBuilder()
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR, errorMsg)
+          .build();
     }
   }
 
