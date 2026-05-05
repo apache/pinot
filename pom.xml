@@ -50,6 +50,7 @@
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
     <module>pinot-tools</module>
+    <module>pinot-plugin-verifier</module>
     <module>pinot-perf</module>
     <module>pinot-integration-test-base</module>
     <module>pinot-integration-tests</module>

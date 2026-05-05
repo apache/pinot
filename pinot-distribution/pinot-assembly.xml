@@ -240,6 +240,21 @@
     </file>
     <!-- End Include Pinot Time Series Plugins -->
     <!-- End Include Pinot Plugins-->
+    <!--
+      Plugin verifier: a standalone main-class tool used to validate plugin loading against a
+      built distribution (lib/pinot-all.jar + plugins/). Ships as a separate jar in lib/ —
+      not included in the shaded uber-jar so its classes don't leak into the broker / server
+      / controller / minion classpath. See bin/verify-plugins.sh.
+    -->
+    <file>
+      <source>${pinot.root}/pinot-plugin-verifier/target/pinot-plugin-verifier-${project.version}.jar</source>
+      <destName>lib/pinot-plugin-verifier-${project.version}.jar</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/pinot-plugin-verifier/src/main/resources/bin/verify-plugins.sh</source>
+      <destName>bin/verify-plugins.sh</destName>
+      <fileMode>0755</fileMode>
+    </file>
   </files>
   <fileSets>
     <!-- Rename licenses-binary directory to licenses and include it to a distribution tarbell -->
