@@ -55,6 +55,11 @@ public class SyntheticBlockValSets {
     }
 
     @Override
+    public boolean isDictionaryEncoded() {
+      return false;
+    }
+
+    @Override
     public int[] getDictionaryIdsSV() {
       throw new UnsupportedOperationException();
     }

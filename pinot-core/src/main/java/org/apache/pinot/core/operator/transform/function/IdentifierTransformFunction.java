@@ -41,8 +41,11 @@ public class IdentifierTransformFunction implements TransformFunction {
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
     _dictionary = columnContext.getDictionary();
-    _resultMetadata =
-        new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
+    // Advertise hasDictionary only when the forward index is itself dictionary-encoded. For shared-dict + RAW
+    // columns the dictionary exists but transformToDictIdsSV/MV would force a per-row dictionary lookup, so
+    // downstream operators should pick the raw-value path instead.
+    _resultMetadata = new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(),
+        columnContext.isDictionaryEncoded());
   }
 
   public String getColumnName() {

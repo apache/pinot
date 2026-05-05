@@ -24,6 +24,7 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -52,6 +53,21 @@ public class ColumnContext {
   @Nullable
   public Dictionary getDictionary() {
     return _dictionary;
+  }
+
+  /// Returns true iff dict-id reads from the forward index are cheap, i.e. the forward index itself is
+  /// dictionary-encoded. Operators that need dict IDs (e.g. {@code DictionaryBasedGroupKeyGenerator},
+  /// {@code DictionaryBasedSingleColumnDistinctExecutor}) should gate on this rather than on
+  /// {@link #getDictionary} alone, because a column may have a shared standalone dictionary while the forward
+  /// index is RAW — in that case a dict-id fetch would require a per-row dictionary lookup, which is much more
+  /// expensive than just reading raw values.
+  public boolean isDictionaryEncoded() {
+    if (_dataSource != null) {
+      ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
+      return forwardIndex != null && forwardIndex.isDictionaryEncoded();
+    }
+    // Transform functions that publish a dictionary always emit dict IDs from the dictionary directly.
+    return _dictionary != null;
   }
 
   @Nullable

@@ -182,8 +182,9 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
    * Generic helper for processing values with dictionary optimization for all supported data types
    */
   private void aggregateHelper(int length, BlockValSet bvs, ValueProcessor<Object> processor) {
-    // Use dictionary-based access for efficiency when available
-    if (bvs.getDictionary() != null) {
+    // Use dictionary-based access for efficiency when available — gate on isDictionaryEncoded() so a shared
+    // dictionary on a RAW forward index falls back to direct value reads instead of triggering per-row lookups.
+    if (bvs.isDictionaryEncoded()) {
       final int[] dictIds = bvs.getDictionaryIdsSV();
       final Dictionary dict = bvs.getDictionary();
       forEachNotNull(length, bvs, (from, to) -> {

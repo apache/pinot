@@ -79,6 +79,15 @@ public class TransformBlockValSet implements BlockValSet {
     return _transformFunction.getDictionary();
   }
 
+  /// Delegates to the transform function's {@link TransformResultMetadata#hasDictionary()} contract: a transform
+  /// advertises a dictionary only when {@link TransformFunction#transformToDictIdsSV} can produce dict IDs
+  /// directly. {@code IdentifierTransformFunction} sets this to {@code false} for shared-dict + RAW columns
+  /// (where dict-id reads would require per-row dictionary lookups).
+  @Override
+  public boolean isDictionaryEncoded() {
+    return _transformFunction.getResultMetadata().hasDictionary();
+  }
+
   @Override
   public int[] getDictionaryIdsSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {

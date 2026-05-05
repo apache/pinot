@@ -54,6 +54,19 @@ public interface BlockValSet {
   Dictionary getDictionary();
 
   /**
+   * Returns {@code true} iff dict-id reads are cheap, i.e. the underlying source produces dict IDs directly.
+   * Operators choosing between a dict-id-based and a raw-value-based execution path must gate on this, not on
+   * {@link #getDictionary()} alone: a column may carry a shared standalone dictionary while the forward index
+   * is RAW, and in that case requesting dict IDs would force a per-row dictionary lookup which is more
+   * expensive than reading raw values directly.
+   *
+   * <p>This method is intentionally abstract so every {@code BlockValSet} implementation has to declare its own
+   * answer — silently inheriting a default would let new implementations slip through and re-introduce the
+   * shared-dict + RAW perf trap that this gating exists to prevent.
+   */
+  boolean isDictionaryEncoded();
+
+  /**
    * SINGLE-VALUED COLUMN APIs
    */
 

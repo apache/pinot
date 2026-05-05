@@ -78,7 +78,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       _storedTypes[i] = columnContext.getDataType().getStoredType();
-      Dictionary dictionary = _nullHandlingEnabled ? null : columnContext.getDictionary();
+      // Same gating as the single-column / DISTINCT factories: only take the dict-id key path when dict-id reads
+      // are cheap (forward index is dict-encoded). For shared-dict + RAW columns fall back to building an
+      // on-the-fly value-to-id map.
+      Dictionary dictionary = (_nullHandlingEnabled || !columnContext.isDictionaryEncoded())
+          ? null : columnContext.getDictionary();
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {

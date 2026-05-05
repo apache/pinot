@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -96,6 +97,15 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return _dataSource.getDictionary();
+  }
+
+  /// Reports dict-id reads as cheap only when the underlying forward index is itself dictionary-encoded.
+  /// For shared-dict + RAW columns the dictionary exists but a dict-id fetch would require a per-row
+  /// dictionary lookup, so callers should fall back to the raw-value path.
+  @Override
+  public boolean isDictionaryEncoded() {
+    ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
+    return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
 
   @Override
