@@ -304,8 +304,10 @@ public class QueryLoggerTest {
       Assert.assertTrue(firstDroppedLogAttempted.await(5, TimeUnit.SECONDS),
           "expected the first successful log to reach the dropped-log rate limiter");
 
-      Assert.assertFalse(queryLogger.logQueryReceived(123, "SELECT * FROM foo", null)); // 3 this one gets dropped
-      Assert.assertTrue(queryLogger.logQueryReceived(123, "SELECT * FROM foo", null)); // 4 this one drains the dropped count
+      // 3 this one gets dropped
+      Assert.assertFalse(queryLogger.logQueryReceived(123, "SELECT * FROM foo", null));
+      // 4 this one drains the dropped count
+      Assert.assertTrue(queryLogger.logQueryReceived(123, "SELECT * FROM foo", null));
 
       releaseFirstDroppedLogAttempt.countDown();
       Assert.assertTrue(blockedLogger.get(5, TimeUnit.SECONDS));
