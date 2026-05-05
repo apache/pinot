@@ -24,6 +24,9 @@ import com.google.cloud.storage.Storage;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -76,6 +79,9 @@ public class GcsPinotFSPaginatedListTest {
     when(blob.getName()).thenReturn(name);
     when(blob.getSize()).thenReturn(size);
     when(blob.getUpdateTime()).thenReturn(updateTime);
+    OffsetDateTime offsetDateTime = updateTime != null
+        ? OffsetDateTime.ofInstant(Instant.ofEpochMilli(updateTime), ZoneOffset.UTC) : null;
+    when(blob.getUpdateTimeOffsetDateTime()).thenReturn(offsetDateTime);
     return blob;
   }
 
