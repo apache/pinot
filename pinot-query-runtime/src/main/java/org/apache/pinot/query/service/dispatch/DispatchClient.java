@@ -35,6 +35,8 @@ import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingDispatchObserver;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
 
 
 /**
@@ -128,6 +130,37 @@ class DispatchClient {
   public void submit(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
       Consumer<AsyncResponse<Worker.QueryResponse>> callback) {
     _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
+  }
+
+  /**
+   * Opens a {@code SubmitWithStream} bidi RPC for one server, sends the initial {@code submit}, and registers the
+   * resulting {@link StreamingDispatchObserver} with {@code session} for cancel fan-out and {@code OpChainComplete}
+   * accumulation.
+   *
+   * <p>The submit-ack callback is invoked exactly once: with the {@link Worker.QueryResponse} on the first
+   * {@code submit_ack} from the server, or with a non-null {@link Throwable} if the stream errors before the ack
+   * arrives.
+   *
+   * @param request               the plan submission
+   * @param virtualServer         server identity (used in callbacks for routing decisions on failure)
+   * @param deadline              gRPC deadline for the call
+   * @param session               broker-side streaming session — the returned observer registers itself here
+   * @param expectedOpChainsForThisServer  number of opchains this server is expected to report; used to drain the
+   *                              session latch correctly when the stream errors before all opchains have responded
+   * @param ackCallback           receives the submit-ack response or a failure throwable
+   * @return the observer, also exposed as {@link org.apache.pinot.query.service.dispatch.streaming.StreamingServerHandle}
+   *         on the session for cancel fan-out
+   */
+  public StreamingDispatchObserver submitWithStream(Worker.QueryRequest request, QueryServerInstance virtualServer,
+      Deadline deadline, StreamingQuerySession session, int expectedOpChainsForThisServer,
+      java.util.function.BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(virtualServer, session,
+        expectedOpChainsForThisServer, ackCallback);
+    StreamObserver<Worker.BrokerToServer> outbound = _dispatchStub.withDeadline(deadline).submitWithStream(observer);
+    observer.attachOutboundStream(outbound);
+    session.registerStream(observer);
+    observer.sendSubmit(request);
+    return observer;
   }
 
   public void cancelAsync(long requestId) {
