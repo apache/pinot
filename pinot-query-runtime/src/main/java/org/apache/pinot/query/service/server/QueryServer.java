@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
@@ -58,7 +59,11 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.MultiStageStatsTreeEncoder;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -470,6 +475,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// {@code onNext} call on it via a {@code synchronized} block — gRPC requires {@code StreamObserver.onNext} to be
   /// called serially.
   ///
+  /// Tracks the expected number of opchains for the request (sum of WorkerMetadata across all stages). An
+  /// {@link OpChainCompletionListener} registered with {@link QueryRunner#registerOpChainCompletionListener}
+  /// fires once per opchain finishing, encodes its stats via {@link MultiStageStatsTreeEncoder}, and emits an
+  /// {@link Worker.OpChainComplete} on the response stream. When the per-request completed-count reaches the
+  /// expected total, {@link Worker.ServerDone} is emitted and the stream is closed.
+  ///
   /// All blocking work (plan deserialization, opchain construction) runs on
   /// {@link QueryServer#_submissionExecutorService}.
   private final class SubmitWithStreamObserver implements StreamObserver<Worker.BrokerToServer> {
@@ -480,6 +491,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     private final AtomicBoolean _submitted = new AtomicBoolean(false);
     /// True once we've completed the response stream (success or error). Idempotent guard.
     private final AtomicBoolean _completed = new AtomicBoolean(false);
+    /// Number of opchains we expect to report for this request — set after we deserialize the plan.
+    private final AtomicInteger _expectedOpChains = new AtomicInteger(-1);
+    /// Number of opchains that have reported so far via the completion listener.
+    private final AtomicInteger _completedOpChains = new AtomicInteger(0);
     /// Set once we successfully parse the request id from the submit metadata. Used by cancel-via-stream.
     private volatile long _requestId = -1;
 
@@ -509,16 +524,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       // (the underlying transport is gone).
       LOGGER.warn("SubmitWithStream stream error for request {}: {}", _requestId, t.getMessage());
       _completed.set(true);
+      cleanupListener();
       cancelIfSubmitted();
     }
 
     @Override
     public void onCompleted() {
-      // Broker has half-closed (no more inbound messages). At this point the server may still be running opchains.
-      // Until we have the per-opchain completion hook (next sub-commit), we have no way to know when stats are ready,
-      // so we just complete the response stream immediately. This means stream-mode queries currently lose stats —
-      // resolved by the next commit.
-      sendDoneAndComplete();
+      // Broker has half-closed (no more inbound messages). The server stream stays open until all opchains have
+      // reported via the completion listener — it's the listener's job to emit ServerDone and complete the stream.
+      // If the broker half-closes before the server is done, that's OK; we keep emitting on the response stream
+      // until our own completion criterion is met.
     }
 
     private void handleSubmit(Worker.QueryRequest request) {
@@ -540,6 +555,20 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       } catch (Exception ignored) {
         // _requestId stays at -1; cancel-on-stream-close will just be a no-op.
       }
+      // Count how many opchains will run on this server: sum of WorkerMetadata across all stage plans.
+      int opChainCount = 0;
+      for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
+        opChainCount += stagePlan.getStageMetadata().getWorkerMetadataCount();
+      }
+      final int expected = opChainCount;
+      _expectedOpChains.set(expected);
+
+      // Register the per-request completion listener BEFORE submitting. Otherwise short opchains could finish before
+      // we've registered and we'd miss their events.
+      if (_requestId >= 0 && expected > 0) {
+        _queryRunner.registerOpChainCompletionListener(_requestId, this::onOpChainComplete);
+      }
+
       long timeoutMs = Long.parseLong(reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
       CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
           .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
@@ -547,10 +576,63 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             if (error != null) {
               LOGGER.error("Caught exception while submitting request: {}", _requestId, error);
               sendSubmitAck(buildErrorResponse("Caught exception while submitting request: " + error.getMessage()));
+              // Submission failed — no opchains will run, so emit ServerDone immediately and clean up.
+              cleanupListener();
+              sendDoneAndComplete();
             } else {
               sendSubmitAck(buildOkResponse());
+              // If for some reason expected was 0 (empty plan), close the stream now.
+              if (expected == 0) {
+                cleanupListener();
+                sendDoneAndComplete();
+              }
             }
           });
+    }
+
+    /**
+     * Fires once per opchain on this server completing. Encodes the stats into a {@link Worker.MultiStageStatsTree},
+     * emits an {@link Worker.OpChainComplete}, and emits {@link Worker.ServerDone} once all expected opchains have
+     * reported.
+     */
+    private void onOpChainComplete(OpChainId opChainId, MultiStageOperator rootOperator,
+        @Nullable MultiStageQueryStats stats, OpChainExecutionContext context, @Nullable Throwable error) {
+      Worker.OpChainComplete.Builder builder = Worker.OpChainComplete.newBuilder()
+          .setStageId(opChainId.getStageId())
+          .setWorkerId(opChainId.getVirtualServerId())
+          .setSuccess(error == null);
+      if (error != null) {
+        builder.setErrorMsg(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage());
+      }
+      if (stats != null) {
+        try {
+          builder.setStats(MultiStageStatsTreeEncoder.encode(rootOperator, stats, context));
+        } catch (Throwable t) {
+          // Encoding failed (operator tree / flat list mismatch on error path is the most likely cause). Surface the
+          // error on the OpChainComplete so the broker can mark mergeFailed, but don't block stream completion.
+          LOGGER.warn("Failed to encode stats tree for opchain {}", opChainId, t);
+          builder.setSuccess(false);
+          builder.setErrorMsg(builder.getErrorMsg().isEmpty() ? "stats encode failed: " + t.getMessage()
+              : builder.getErrorMsg() + "; stats encode failed: " + t.getMessage());
+        }
+      }
+      Worker.ServerToBroker message = Worker.ServerToBroker.newBuilder().setOpchain(builder).build();
+      synchronized (_streamLock) {
+        if (!_completed.get()) {
+          _responseObserver.onNext(message);
+        }
+      }
+      // After all expected opchains have reported, emit ServerDone and close.
+      if (_completedOpChains.incrementAndGet() >= _expectedOpChains.get()) {
+        cleanupListener();
+        sendDoneAndComplete();
+      }
+    }
+
+    private void cleanupListener() {
+      if (_requestId >= 0) {
+        _queryRunner.unregisterOpChainCompletionListener(_requestId);
+      }
     }
 
     private void handleCancel(Worker.CancelRequest cancel) {

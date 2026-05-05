@@ -52,6 +52,7 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
@@ -525,6 +526,23 @@ public class QueryRunner {
 
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
     return _opChainScheduler.cancel(requestId);
+  }
+
+  /**
+   * Registers an opchain completion listener for the given request id. Used by the stream-mode stats reporting path
+   * (gRPC {@code SubmitWithStream}) so the {@link org.apache.pinot.query.service.server.QueryServer} can be notified
+   * each time an opchain finishes and emit a corresponding {@code OpChainComplete} message on the broker stream.
+   *
+   * <p>The listener fires once per opchain that runs on this server for the request and must be unregistered by the
+   * caller (typically when the per-request opchain count reaches the expected total) via
+   * {@link #unregisterOpChainCompletionListener(long)}.
+   */
+  public void registerOpChainCompletionListener(long requestId, OpChainCompletionListener listener) {
+    _opChainScheduler.registerCompletionListener(requestId, listener);
+  }
+
+  public void unregisterOpChainCompletionListener(long requestId) {
+    _opChainScheduler.unregisterCompletionListener(requestId);
   }
 
   public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,

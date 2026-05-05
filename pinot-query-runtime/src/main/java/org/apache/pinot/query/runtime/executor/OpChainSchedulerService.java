@@ -28,11 +28,15 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -69,6 +73,10 @@ public class OpChainSchedulerService {
   private final ReadWriteLock[] _queryLocks;
   private final Cache<Long, Boolean> _cancelledQueryCache;
   private final Metrics _metrics = new Metrics();
+  /// Per-request opchain completion listeners used by the stream-mode stats-reporting path. A listener is registered
+  /// before the broker submits the query and fires once for every opchain that runs on this server for that request.
+  /// Listeners are responsible for unregistering themselves once they've consumed all expected events.
+  private final ConcurrentMap<Long, OpChainCompletionListener> _completionListeners = new ConcurrentHashMap<>();
 
   public OpChainSchedulerService(String instanceId, ExecutorService executorService, PinotConfiguration config) {
     this(instanceId, executorService, config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
@@ -152,6 +160,10 @@ public class OpChainSchedulerService {
     OpChainId opChainId = operatorChain.getId();
     MultiStageOperator rootOperator = operatorChain.getRoot();
     _opChainCache.put(opChainId, Pair.of(rootOperator, executionContext));
+    // Captured by the runJob and read by the FutureCallback so we can hand the calculated stats to the per-request
+    // completion listener (stream-mode stats reporting). On error we may not have stats; the FutureCallback handles
+    // that by passing null.
+    AtomicReference<MultiStageQueryStats> statsRef = new AtomicReference<>();
 
     // Create a ListenableFutureTask to ensure the opChain is cancelled even if the task is not scheduled
     ListenableFutureTask<Void> listenableFutureTask = ListenableFutureTask.create(new TraceRunnable() {
@@ -164,6 +176,7 @@ public class OpChainSchedulerService {
           result = rootOperator.nextBlock();
         }
         MultiStageQueryStats stats = rootOperator.calculateStats();
+        statsRef.set(stats);
         if (result.isError()) {
           ErrorMseBlock errorBlock = (ErrorMseBlock) result;
           throw errorBlock.getMainErrorCode().asException("Error block "
@@ -180,6 +193,7 @@ public class OpChainSchedulerService {
       @Override
       public void onSuccess(Void result) {
         _metrics.onOpChainFinished(rootOperator);
+        notifyCompletionListener(opChainId, operatorChain, statsRef.get(), null);
         operatorChain.close();
       }
 
@@ -200,12 +214,46 @@ public class OpChainSchedulerService {
         } else {
           LOGGER.error(logMsg, t);
         }
+        notifyCompletionListener(opChainId, operatorChain, statsRef.get(), t);
         operatorChain.cancel(t);
         operatorChain.close();
       }
     }, MoreExecutors.directExecutor());
 
     _executorService.submit(listenableFutureTask);
+  }
+
+  private void notifyCompletionListener(OpChainId opChainId, OpChain operatorChain,
+      @Nullable MultiStageQueryStats stats, @Nullable Throwable error) {
+    OpChainCompletionListener listener = _completionListeners.get(opChainId.getRequestId());
+    if (listener == null) {
+      return;
+    }
+    try {
+      listener.onOpChainComplete(opChainId, operatorChain.getRoot(), stats, operatorChain.getContext(), error);
+    } catch (Throwable listenerError) {
+      // The listener is best-effort observability; never let it interfere with opchain teardown.
+      LOGGER.warn("OpChain completion listener threw for {}", opChainId, listenerError);
+    }
+  }
+
+  /**
+   * Registers an {@link OpChainCompletionListener} that fires once per opchain finishing for the given request id.
+   * Used by the stream-mode stats reporting path. Returns the previously-registered listener, or {@code null} if
+   * none — callers should always pass {@code null}.
+   */
+  @Nullable
+  public OpChainCompletionListener registerCompletionListener(long requestId, OpChainCompletionListener listener) {
+    return _completionListeners.put(requestId, listener);
+  }
+
+  /**
+   * Removes any registered listener for the given request id. Idempotent — safe to call even if no listener was
+   * registered. Returns the removed listener, or {@code null}.
+   */
+  @Nullable
+  public OpChainCompletionListener unregisterCompletionListener(long requestId) {
+    return _completionListeners.remove(requestId);
   }
 
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {

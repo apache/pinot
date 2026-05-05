@@ -24,6 +24,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -49,6 +52,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -189,6 +193,78 @@ public class OpChainSchedulerServiceTest {
 
     assertTrue(cancelLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be cancelled");
     Mockito.verify(_operatorA, Mockito.times(1)).cancel(Mockito.any());
+  }
+
+  @Test
+  public void shouldFireCompletionListenerOnSuccess()
+      throws InterruptedException {
+    CountDownLatch completed = new CountDownLatch(1);
+    Mockito.when(_operatorA.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.doAnswer(inv -> MultiStageQueryStats.emptyStats(0)).when(_operatorA).calculateStats();
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    AtomicBoolean errorWasNull = new AtomicBoolean(false);
+    AtomicReference<MultiStageQueryStats> seenStats =
+        new AtomicReference<>();
+    schedulerService.registerCompletionListener(123L, (id, root, stats, ctx, error) -> {
+      errorWasNull.set(error == null);
+      seenStats.set(stats);
+      completed.countDown();
+    });
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      schedulerService.register(getChain(_operatorA));
+    }
+
+    assertTrue(completed.await(10, TimeUnit.SECONDS), "expected completion listener to fire");
+    assertTrue(errorWasNull.get(), "expected error to be null on successful opchain");
+    assertTrue(seenStats.get() != null, "expected stats to be passed to listener");
+  }
+
+  @Test
+  public void shouldFireCompletionListenerOnError()
+      throws InterruptedException {
+    CountDownLatch completed = new CountDownLatch(1);
+    Mockito.when(_operatorA.nextBlock()).thenThrow(new RuntimeException("boom"));
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    AtomicReference<Throwable> seenError =
+        new AtomicReference<>();
+    schedulerService.registerCompletionListener(123L, (id, root, stats, ctx, error) -> {
+      seenError.set(error);
+      completed.countDown();
+    });
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      schedulerService.register(getChain(_operatorA));
+    }
+
+    assertTrue(completed.await(10, TimeUnit.SECONDS), "expected completion listener to fire on error");
+    assertTrue(seenError.get() != null, "expected error to be propagated to listener");
+  }
+
+  @Test
+  public void shouldNotFireCompletionListenerAfterUnregister()
+      throws InterruptedException {
+    CountDownLatch opChainCloseLatch = new CountDownLatch(1);
+    Mockito.when(_operatorA.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.doAnswer(inv -> MultiStageQueryStats.emptyStats(0)).when(_operatorA).calculateStats();
+    Mockito.doAnswer(inv -> {
+      opChainCloseLatch.countDown();
+      return null;
+    }).when(_operatorA).close();
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    AtomicInteger fired = new AtomicInteger();
+    OpChainCompletionListener listener = (id, root, stats, ctx, error) -> fired.incrementAndGet();
+    schedulerService.registerCompletionListener(123L, listener);
+    schedulerService.unregisterCompletionListener(123L);
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      schedulerService.register(getChain(_operatorA));
+    }
+
+    assertTrue(opChainCloseLatch.await(10, TimeUnit.SECONDS), "expected opchain to finish");
+    // Listener was unregistered before the opchain ran, so it must not fire.
+    assertEquals(fired.get(), 0, "listener should not fire after unregister");
   }
 
   @Test
