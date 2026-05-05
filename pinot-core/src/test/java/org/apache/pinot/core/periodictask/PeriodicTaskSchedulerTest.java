@@ -26,10 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class PeriodicTaskSchedulerTest {
@@ -253,5 +250,24 @@ public class PeriodicTaskSchedulerTest {
     }
 
     assertTrue(numTimesRunCalled.get() >= 1, "Task should have been triggered by legacy fixed-delay scheduler");
+  }
+
+  @Test
+  public void testInvalidCronExpression() throws Exception {
+    AtomicInteger numTimesRunCalled = new AtomicInteger();
+
+    List<PeriodicTask> periodicTasks = List.of(new BasePeriodicTask("InvalidCronTask", 1L, 1L, "60 * * * *") {
+      @Override
+      protected void runTask(Properties periodicTaskProperties) {
+        numTimesRunCalled.incrementAndGet();
+      }
+    });
+
+    PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
+    taskScheduler.init(periodicTasks);
+
+    assertThrows(IllegalArgumentException.class, taskScheduler::start);
+
+    assertEquals(numTimesRunCalled.get(), 0, "Task should never run if the CRON expression is invalid");
   }
 }

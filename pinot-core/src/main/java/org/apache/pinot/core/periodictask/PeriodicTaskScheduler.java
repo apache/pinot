@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.quartz.CronExpression;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -72,65 +73,80 @@ public class PeriodicTaskScheduler {
   public synchronized void start() {
     if (_executorService != null) {
       LOGGER.warn("Periodic task scheduler already started");
+      return;
     }
 
     if (_periodicTasks.isEmpty()) {
       LOGGER.warn("No periodic task scheduled");
-    } else {
-      Collection<PeriodicTask> periodicTasks = _periodicTasks.values();
-      LOGGER.info("Starting periodic task scheduler with tasks: {}", periodicTasks);
-      _executorService = Executors.newScheduledThreadPool(_periodicTasks.size());
-      boolean hasCronTasks = periodicTasks.stream().map(PeriodicTask::getCronExpression)
-          .anyMatch(cronExpression -> cronExpression != null && !cronExpression.trim().isEmpty());
-      if (hasCronTasks) {
-        try {
-          _quartzScheduler = StdSchedulerFactory.getDefaultScheduler();
-          _quartzScheduler.start();
-        } catch (SchedulerException e) {
-          LOGGER.error("Failed to initialize Quartz scheduler.", e);
-        }
-      }
+      return;
+    }
 
+    Collection<PeriodicTask> periodicTasks = _periodicTasks.values();
+    LOGGER.info("Starting periodic task scheduler with tasks: {}", periodicTasks);
+
+    for (PeriodicTask task : periodicTasks) {
+      String cron = task.getCronExpression();
+      if (cron != null && !cron.trim().isEmpty() && !CronExpression.isValidExpression(cron)) {
+        throw new IllegalArgumentException(
+            String.format("Invalid CRON expression '%s' for task '%s'. Halting controller startup.",
+                cron, task.getTaskName())
+        );
+      }
+    }
+
+    boolean hasCronTasks = periodicTasks.stream()
+        .map(PeriodicTask::getCronExpression)
+        .anyMatch(cron -> cron != null && !cron.trim().isEmpty());
+
+    if (hasCronTasks) {
+      try {
+        _quartzScheduler = StdSchedulerFactory.getDefaultScheduler();
+        _quartzScheduler.start();
+      } catch (SchedulerException e) {
+        throw new RuntimeException("Failed to initialize Quartz scheduler. Halting controller startup.", e);
+      }
+    }
+
+    _executorService = Executors.newScheduledThreadPool(periodicTasks.size());
+
+    try {
       for (PeriodicTask periodicTask : periodicTasks) {
         periodicTask.start();
+
         String cronExpression = periodicTask.getCronExpression();
-        String periodicTaskTaskName = periodicTask.getTaskName();
+        String taskName = periodicTask.getTaskName();
 
         if (cronExpression != null && !cronExpression.trim().isEmpty()) {
-          try {
-            LOGGER.info("Scheduling periodic task {} with cron expression: {}", periodicTaskTaskName, cronExpression);
+          LOGGER.info("Scheduling periodic task {} with cron expression: {}", taskName, cronExpression);
+          JobDetail jobDetail = JobBuilder.newJob(PeriodicTaskCronJob.class)
+              .withIdentity(taskName)
+              .build();
+          jobDetail.getJobDataMap().put(PeriodicTaskCronJob.PERIODIC_TASK_KEY, periodicTask);
 
-            JobDetail jobDetail = JobBuilder.newJob(PeriodicTaskCronJob.class)
-                .withIdentity(periodicTaskTaskName)
-                .build();
-            jobDetail.getJobDataMap().put(PeriodicTaskCronJob.PERIODIC_TASK_KEY, periodicTask);
-            CronTrigger trigger = TriggerBuilder.newTrigger()
-                .withIdentity(periodicTaskTaskName + "-CronTrigger")
-                .withSchedule(CronScheduleBuilder.cronSchedule(cronExpression))
-                .build();
-            _quartzScheduler.scheduleJob(jobDetail, trigger);
-          } catch (SchedulerException | RuntimeException e) {
-            LOGGER.error("Failed to schedule Quartz job for task: {}. "
-                    + "Task will NOT be scheduled! Please verify the cron expression: {}",
-                periodicTaskTaskName, cronExpression, e);
-          }
+          CronTrigger trigger = TriggerBuilder.newTrigger()
+              .withIdentity(taskName + "-CronTrigger")
+              .withSchedule(CronScheduleBuilder.cronSchedule(cronExpression))
+              .build();
+
+          _quartzScheduler.scheduleJob(jobDetail, trigger);
         } else {
+          // Legacy fallback for blank/unset crons
           long intervalInSeconds = periodicTask.getIntervalInSeconds();
-          if (intervalInSeconds <= 0) {
-            LOGGER.info("Skip scheduling periodic task: {} for periodic execution (it can be manually triggered)",
-                periodicTaskTaskName);
-            continue;
+          if (intervalInSeconds > 0) {
+            _executorService.scheduleWithFixedDelay(() -> {
+              try {
+                periodicTask.run();
+              } catch (Throwable e) {
+                LOGGER.warn("Caught exception while running Task: {}", taskName, e);
+              }
+            }, periodicTask.getInitialDelayInSeconds(), intervalInSeconds, TimeUnit.SECONDS);
           }
-          _executorService.scheduleWithFixedDelay(() -> {
-            try {
-              LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTaskTaskName, intervalInSeconds);
-              periodicTask.run();
-            } catch (Throwable e) {
-              LOGGER.warn("Caught exception while running Task: {}", periodicTaskTaskName, e);
-            }
-          }, periodicTask.getInitialDelayInSeconds(), intervalInSeconds, TimeUnit.SECONDS);
         }
       }
+    } catch (Exception e) {
+      LOGGER.error("Fatal error scheduling periodic tasks. Cleaning up and halting startup.", e);
+      this.stop();
+      throw new RuntimeException("Controller startup failed due to periodic task scheduling error", e);
     }
   }
 
