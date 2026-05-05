@@ -81,13 +81,10 @@ public class RangeIndexType
     if (rangeIndexConfig.isEnabled()) {
       String column = fieldSpec.getName();
       DataType storedType = fieldSpec.getDataType().getStoredType();
-      Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
-          "Cannot create range index on column: %s without dictionary", column);
-      // Range index needs an order over the values. MAP has no natural order; BYTES has no defined comparison
-      // semantics under range filters and would crash later at ingestion time. Reject both upfront so the user
-      // gets a clear message at table-config validation rather than a generic ingestion error.
+      Preconditions.checkState(
+          storedType.isNumeric() || indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create range index on non-numeric column: %s without dictionary", column);
       Preconditions.checkState(storedType != DataType.MAP, "Cannot create range index on MAP column: %s", column);
-      Preconditions.checkState(storedType != DataType.BYTES, "Cannot create range index on BYTES column: %s", column);
     }
   }
 
@@ -165,17 +162,14 @@ public class RangeIndexType
 
   @Override
   public boolean requiresDictionary(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
-    // Range index is always built over dictionary IDs. RAW forward columns that want a range index must opt in to a
-    // shared standalone dictionary (`fieldConfig.indexes.dictionary: {}`); the loader auto-creates one on segment
-    // load, and segment generation keeps the dictionary because of this requirement.
-    return true;
+    // Range index supports both dict-encoded (range over dict IDs) and raw (range over values) columns.
+    return false;
   }
 
   @Override
   public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, RangeIndexConfig indexConfig) {
-    // Even though range now always requires a dictionary, the dictionary itself can change (added on a previously
-    // raw column, or its cardinality bucket changed). The range index is keyed by dict IDs and must be rebuilt
-    // whenever the dictionary state on disk changes.
+    // The on-disk format differs: dict-encoded ranges use dict IDs while raw ranges use raw values. Transitioning
+    // between the two states requires rebuilding the index against the new domain.
     return true;
   }
 

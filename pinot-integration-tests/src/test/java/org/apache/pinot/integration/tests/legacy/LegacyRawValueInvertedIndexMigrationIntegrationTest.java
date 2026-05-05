@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LegacyRawValueInvertedIndexCleanup;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -280,7 +280,7 @@ public class LegacyRawValueInvertedIndexMigrationIntegrationTest extends BaseClu
 
       try (PinotDataBuffer invBuffer =
           reader.getIndexFor(CATEGORY_COLUMN, StandardIndexes.inverted())) {
-        assertFalse(InvertedIndexHandler.isLegacyRawValueInvertedIndexFormat(invBuffer, categoryMeta),
+        assertFalse(LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(invBuffer, categoryMeta),
             formatLabel + ": rebuilt inverted index must NOT be in legacy embedded-dict format");
       }
     }

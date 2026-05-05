@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.queries;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -42,7 +40,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -720,39 +717,26 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
   /**
    * As a part of segmentReload, the ForwardIndexHandler will perform the following operations:
    *
-   * column1  -> change compression (SNAPPY -> ZSTANDARD), keep RAW forward.
-   * column6  -> disable dictionary (no other dict-requiring index).
-   * column9  -> RAW forward + range index. Range now requires a dictionary
-   *             (RangeIndexType.requiresDictionary == true), so the column opts in to a shared
-   *             standalone dictionary via fieldConfig.indexes.dictionary; on reload the dictionary is
-   *             materialized but the forward index stays RAW.
-   * column3  -> enable dictionary.
-   * column2  -> enable dictionary. Add inverted index.
-   * column7  -> enable dictionary. Add inverted index.
+   * column1 -> change compression (SNAPPY -> ZSTANDARD).
+   * column6 -> disable dictionary.
+   * column9 -> disable dictionary. Add range index.
+   * column3 -> enable dictionary.
+   * column2 -> enable dictionary. Add inverted index.
+   * column7 -> enable dictionary. Add inverted index.
    * column10 -> enable dictionary. Add range index.
    */
   private void changePropertiesAndReloadSegment()
       throws Exception {
-    // Columns that should be RAW-encoded with no dictionary at all.
-    List<String> noDictionaryColumns = List.of("column1", "column5", "column6");
-    // RAW forward + dict-requiring index (here only column9: RAW + range). The explicit
-    // `indexes.dictionary: {}` in the FieldConfig opts in to the shared standalone dictionary; the column is
-    // intentionally NOT in noDictionaryColumns to avoid conflicting dictionary declarations.
-    Set<String> sharedDictColumns = Set.of("column9");
+    List<String> noDictionaryColumns = List.of("column1", "column5", "column6", "column9");
     List<String> invertedIndexColumns = List.of("column2", "column7", "column8");
     List<String> rangeIndexColumns = List.of("column9", "column10");
-
-    List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size() + sharedDictColumns.size());
+    List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size());
     for (String column : noDictionaryColumns) {
-      FieldConfig.CompressionCodec compressionCodec =
-          column.equals("column1") ? FieldConfig.CompressionCodec.ZSTANDARD : FieldConfig.CompressionCodec.SNAPPY;
+      FieldConfig.CompressionCodec compressionCodec = FieldConfig.CompressionCodec.SNAPPY;
+      if (column.equals("column1")) {
+        compressionCodec = FieldConfig.CompressionCodec.ZSTANDARD;
+      }
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), compressionCodec, null));
-    }
-    for (String column : sharedDictColumns) {
-      ObjectNode indexes = JsonUtils.newObjectNode();
-      indexes.set("dictionary", JsonUtils.newObjectNode());
-      fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, null, null,
-          FieldConfig.CompressionCodec.SNAPPY, null, indexes, null, null));
     }
     TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns,
         fieldConfigs);
@@ -767,7 +751,6 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
         assertFalse(metadata.hasDictionary());
         assertNull(segment.getDictionary(column));
       } else {
-        // Both regular dict columns and shared-dict opt-in columns end up with a dictionary on disk.
         assertTrue(metadata.hasDictionary());
         assertNotNull(segment.getDictionary(column));
       }

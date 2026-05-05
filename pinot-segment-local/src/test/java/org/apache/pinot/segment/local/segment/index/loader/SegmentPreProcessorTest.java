@@ -580,31 +580,23 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     checkForwardIndexCreation(_schema, COLUMN1_NAME, DataType.INT, true, 51594, false, false, 4, 100000, 0, false,
         null);
 
-    // TEST 3: Try to disable dictionary while range index is still configured. Range now requires a dictionary
-    // (RangeIndexType.requiresDictionary == true), so disabling the dictionary is rejected by ForwardIndexHandler.
-    // Disabling dictionary requires also removing the range index in the same config change.
+    // TEST 3: Disable dictionary for a column (Column10) that has range index.
     _rangeIndexColumns.add(COLUMN10_NAME);
     buildV3Segment();
     validateIndex(StandardIndexes.forward(), COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
         null, false);
     validateIndex(StandardIndexes.range(), COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
         null, false);
+    long oldRangeIndexSize =
+        new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
     _noDictionaryColumns.add(COLUMN10_NAME);
-    // Dictionary refused: the column should still have a dictionary and range index.
-    checkForwardIndexCreation(_schema, COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
-        null);
-    validateIndex(StandardIndexes.range(), COLUMN10_NAME, DataType.INT, true, 3960, true, false, 4, 100000, 0, false,
-        null, false);
-
-    // Now also remove range from the config — dictionary disable is allowed and the range index is dropped.
-    _rangeIndexColumns.remove(COLUMN10_NAME);
     checkForwardIndexCreation(_schema, COLUMN10_NAME, DataType.INT, true, 3960, false, false, 4, 100000, 0, false,
         ChunkCompressionType.LZ4);
-    try (SegmentDirectory directory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
-        SegmentDirectory.Reader reader = directory.createReader()) {
-      assertFalse(reader.hasIndexFor(COLUMN10_NAME, StandardIndexes.range()),
-          "Range index should be removed when dictionary is disabled together with the range config entry");
-    }
+    validateIndex(StandardIndexes.range(), COLUMN10_NAME, DataType.INT, true, 3960, false, false, 4, 100000, 0, false,
+        ChunkCompressionType.LZ4, false);
+    long newRangeIndexSize =
+        new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(COLUMN10_NAME).getIndexSizeFor(StandardIndexes.range());
+    assertNotEquals(oldRangeIndexSize, newRangeIndexSize);
 
     // TEST4: Disable dictionary but add text index.
     validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_DICT, DataType.STRING, true, 9, true, false, 26,
@@ -629,23 +621,12 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688,
         13, false, null, false);
 
-    // TEST 1: Try to disable dictionary while range index is still configured. Range now requires a dictionary, so
-    // ForwardIndexHandler rejects the disable; the column keeps both dictionary and range index.
+    // TEST 1: Disable dictionary on a column where range index is already enabled.
     _noDictionaryColumns.add(EXISTING_INT_COL_RAW_MV);
-    checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688, 13,
-        false, null);
-    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, true, false, 4, 106688,
-        13, false, null, false);
-
-    // Also remove range from config: dictionary can now be disabled and the range index is dropped.
-    _rangeIndexColumns.remove(EXISTING_INT_COL_RAW_MV);
     checkForwardIndexCreation(_schema, EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, false, false, 4, 106688, 13,
         false, null);
-    try (SegmentDirectory directory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
-        SegmentDirectory.Reader reader = directory.createReader()) {
-      assertFalse(reader.hasIndexFor(EXISTING_INT_COL_RAW_MV, StandardIndexes.range()),
-          "Range index should be removed when dictionary and range are disabled together");
-    }
+    validateIndex(StandardIndexes.range(), EXISTING_INT_COL_RAW_MV, DataType.INT, false, 18499, false, false, 4, 106688,
+        13, false, null, false);
 
     // TEST 2. Disable dictionary on a column where inverted index is enabled. Should be a no-op.
     validateIndex(StandardIndexes.forward(), COLUMN7_NAME, DataType.INT, false, 359, true, false, 4, 134090, 24, false,

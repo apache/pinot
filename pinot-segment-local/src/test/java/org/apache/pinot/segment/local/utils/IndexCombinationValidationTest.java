@@ -295,28 +295,28 @@ public class IndexCombinationValidationTest {
     assertValid(tc);
   }
 
-  // ============================================================
-  // 5. Range index always requires a dictionary (numeric and non-numeric)
-  // ============================================================
-
   @Test
-  public void testRawWithRangeIndexNumericColumnNoDictFails() {
-    // Range index always requires a dictionary under the shared-dict design, even on numeric columns.
+  public void testRawWithRangeIndexNumericColumnNoDictPasses() {
+    // Range index on numeric (INT) column does NOT require a dictionary
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(INT_COL))
         .setRangeIndexColumns(List.of(INT_COL))
         .build();
-    assertInvalid(tc, "Cannot create range index on column");
+    assertValid(tc);
   }
 
   @Test
-  public void testRawWithRangeIndexFloatColumnNoDictFails() {
+  public void testRawWithRangeIndexFloatColumnNoDictPasses() {
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(FLOAT_COL))
         .setRangeIndexColumns(List.of(FLOAT_COL))
         .build();
-    assertInvalid(tc, "Cannot create range index on column");
+    assertValid(tc);
   }
+
+  // ============================================================
+  // 5. Range index on non-numeric column: requires dictionary
+  // ============================================================
 
   @Test
   public void testDictWithRangeIndexStringColumnPasses() {
@@ -329,34 +329,21 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithRangeIndexStringColumnNoDictFails() {
+    // RAW STRING + range without dict: invalid (range on non-numeric needs dict)
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setRangeIndexColumns(List.of(STR_COL))
         .build();
-    assertInvalid(tc, "Cannot create range index on column");
+    assertInvalid(tc, "Cannot create range index on non-numeric column");
   }
 
   @Test
   public void testRawWithRangeIndexStringColumnWithExplicitDictPasses() {
-    // RAW + explicit shared dictionary + range: valid (the dict opt-in keeps the dictionary on disk).
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
     FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setRangeIndexColumns(List.of(STR_COL))
-        .setFieldConfigList(List.of(fc))
-        .build();
-    assertValid(tc);
-  }
-
-  @Test
-  public void testRawWithRangeIndexNumericColumnWithExplicitDictPasses() {
-    // RAW INT + explicit shared dictionary + range: valid — same opt-in path as for string columns.
-    ObjectNode indexes = JsonUtils.newObjectNode();
-    indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
-    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setRangeIndexColumns(List.of(INT_COL))
         .setFieldConfigList(List.of(fc))
         .build();
     assertValid(tc);

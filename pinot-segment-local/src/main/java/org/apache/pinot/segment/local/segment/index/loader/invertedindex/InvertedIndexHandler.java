@@ -37,7 +37,6 @@ import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCr
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -139,58 +138,19 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     return columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary();
   }
 
+  /// Detects legacy RAW inverted-index files (PR #17060, reverted by PR #18410) that may still exist on disk.
+  /// All detection + cleanup logic is isolated in [LegacyRawValueInvertedIndexCleanup] so it can be deleted as
+  /// a single unit after Pinot 1.7.
   private boolean shouldRebuildInvertedIndex(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
       throws Exception {
-    // Check both dict-encoded columns (new shared-dict or old standard dict) and legacy RAW columns that may carry
-    // an old embedded-dictionary inverted index written by the now-deleted RawValueBitmapInvertedIndexCreator.
-    return isLegacyRawValueInvertedIndexFormat(
+    return LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
         segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.inverted()), columnMetadata);
   }
 
   private boolean shouldRebuildInvertedIndex(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
-    return isLegacyRawValueInvertedIndexFormat(
+    return LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
         segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.inverted()), columnMetadata);
-  }
-
-  /// Returns `true` if the inverted index buffer uses the legacy raw-value format written by the now-deleted
-  /// `RawValueBitmapInvertedIndexCreator` (before this format was replaced by a shared standalone dictionary +
-  /// standard bitmap inverted index).
-  ///
-  /// Both the legacy file and modern bitmap inverted index files are mapped via [PinotDataBuffer] in
-  /// big-endian order (see `FilePerIndexDirectory`), so all reads here are big-endian. The legacy format starts
-  /// with a 44-byte header:
-  ///
-  /// - offset 0: version int (always 1)
-  /// - offset 4: cardinality int
-  /// - offset 8: max-length int (0 for fixed-width data types)
-  /// - offsets 12, 20, 28, 36: 8-byte longs (dict offset, dict length, inverted-index offset, inverted-index length)
-  ///
-  /// The modern format written by
-  /// [org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter] starts with an offset
-  /// table whose first int is the start offset of bitmap 0, equal to `(cardinality + 1) * 4` — the size of the
-  /// offset table itself. False positives against a legacy-format check are therefore effectively impossible
-  /// because:
-  ///
-  /// - For a modern file to pass `getInt(0) == 1`, the offset table size would have to be 1 byte, which is
-  ///   impossible (each entry is 4 bytes and the smallest valid value with one bitmap is 8).
-  /// - The follow-up `getInt(4) == cardinality` further narrows: in the modern format that position holds the
-  ///   end-offset of bitmap 0 (typically a large number unrelated to cardinality).
-  /// - The trailing offset/length range checks against `dataBuffer.size()` reject random byte patterns.
-  public static boolean isLegacyRawValueInvertedIndexFormat(PinotDataBuffer dataBuffer, ColumnMetadata columnMetadata) {
-    if (dataBuffer.size() < 44) {
-      return false;
-    }
-    if (dataBuffer.getInt(0) != 1 || dataBuffer.getInt(4) != columnMetadata.getCardinality()) {
-      return false;
-    }
-    long dictionaryOffset = dataBuffer.getLong(12);
-    long dictionaryLength = dataBuffer.getLong(20);
-    long invertedIndexOffset = dataBuffer.getLong(28);
-    long invertedIndexLength = dataBuffer.getLong(36);
-    long dataBufferSize = dataBuffer.size();
-    return dictionaryOffset >= 44 && dictionaryLength >= 0 && invertedIndexOffset >= dictionaryOffset + dictionaryLength
-        && invertedIndexLength >= 0 && invertedIndexOffset + invertedIndexLength <= dataBufferSize;
   }
 
   private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)

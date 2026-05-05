@@ -403,15 +403,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return false;
     }
 
-    // Allow disabling dictionary only if no other index that requires a dictionary is still configured. Inverted,
-    // FST, IFST, and (under the shared-dict design) range indexes are all keyed by dictionary IDs, so disabling
-    // the dictionary while any of them remain in the config would leave a stale or wrongly-typed index on disk.
-    // The user must remove every dict-requiring index in the same config change.
-    FieldIndexConfigs newConfig = _fieldIndexConfigs.get(column);
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
-    if (DictionaryIndexConfig.requiresDictionary(fieldSpec, newConfig)) {
-      LOGGER.warn("Cannot disable dictionary on column={}: dictionary is still required by {}",
-          column, DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(fieldSpec, newConfig));
+    // Allow disabling dictionary only if the new config specifies that inverted index and FST index should not
+    // be present. So for existing segments where inverted index and FST index are already present, disabling
+    // dictionary will only be allowed if FST and inverted index are also disabled.
+    if (hasIndex(column, StandardIndexes.inverted()) || hasIndex(column, StandardIndexes.fst())) {
+      LOGGER.warn("Cannot disable dictionary as column={} has FST index or inverted index or both.", column);
       return false;
     }
 

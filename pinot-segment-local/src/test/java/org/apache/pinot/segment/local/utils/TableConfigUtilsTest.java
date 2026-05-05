@@ -1501,8 +1501,7 @@ public class TableConfigUtilsTest {
         .setRangeIndexColumns(Arrays.asList("intCol"))
         .build();
     try {
-      // Range index now requires a dictionary regardless of column type, so RAW + range without an explicit
-      // shared-dict opt-in must be rejected even when forward-index-disabled is set.
+      // Enable forward index disabled flag for a column with FST index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
       FieldConfig fieldConfigWithRange =
@@ -1510,11 +1509,8 @@ public class TableConfigUtilsTest {
               fieldConfigProperties);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfigWithRange));
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Range index on RAW column without explicit dictionary should be rejected");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("require a dictionary")
-              || e.getMessage().contains("without dictionary"),
-          "Expected dictionary-related error but got: " + e.getMessage());
+      fail("Range index with forward index disabled no dictionary column is allowed");
     }
 
     // Disabling forward index for realtime table will make the validation failed.

@@ -31,10 +31,10 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/// Unit tests for the [InvertedIndexHandler#isLegacyRawValueInvertedIndexFormat] format detector. The
-/// end-to-end rebuild path (preprocessor detects legacy bytes, drops the file, handler rebuilds in modern format)
-/// is covered by `LegacyRawValueInvertedIndexMigrationIntegrationTest` against real v1 and v3 fixtures, so this
-/// file only pins down the byte-pattern detector itself.
+/// Unit tests for the [LegacyRawValueInvertedIndexCleanup#isLegacyRawValueInvertedIndexFormat] format detector.
+/// The end-to-end rebuild path (preprocessor detects legacy bytes, drops the file, handler rebuilds in modern
+/// format) is covered by `LegacyRawValueInvertedIndexMigrationIntegrationTest` against real v1 and v3 fixtures,
+/// so this file only pins down the byte-pattern detector itself.
 public class InvertedIndexHandlerTest {
 
   @Test
@@ -53,7 +53,7 @@ public class InvertedIndexHandlerTest {
       dataBuffer.putLong(28, 60);
       dataBuffer.putLong(36, 32);
 
-      assertTrue(InvertedIndexHandler.isLegacyRawValueInvertedIndexFormat(dataBuffer, columnMetadata));
+      assertTrue(LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(dataBuffer, columnMetadata));
     } finally {
       FileUtils.deleteQuietly(indexFile);
     }
@@ -72,7 +72,7 @@ public class InvertedIndexHandlerTest {
       dataBuffer.putInt(8, 40);
       dataBuffer.putInt(12, 64);
 
-      assertFalse(InvertedIndexHandler.isLegacyRawValueInvertedIndexFormat(dataBuffer, columnMetadata));
+      assertFalse(LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(dataBuffer, columnMetadata));
     } finally {
       FileUtils.deleteQuietly(indexFile);
     }
