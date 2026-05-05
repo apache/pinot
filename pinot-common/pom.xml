@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-common</artifactId>
   <name>Pinot Common</name>
@@ -45,23 +45,28 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- Pinned to Java 11 bytecode for external consumers (e.g. plugins
+               loaded by older JVMs). Hard-coded literal so -Djdk.version=21
+               on the CLI cannot silently bump the bytecode level. -->
+          <release>11</release>
+          <source>11</source>
+          <target>11</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration  combine.children="override">
+        <configuration>
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
           <properties>
             <property>
               <name>usedefaultlisteners</name>
-              <value>false</value>  <!-- This will disable all default listeners -->
+              <value>false</value>
             </property>
           </properties>
-          <!--Disabling tests as Pinot currently uses Yammer and these tests fail for DropwizardMetricsFactory-->
-          <excludes>
-            <exclude>**/DropwizardBrokerPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardServerPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardMinionPrometheusMetricsTest.java</exclude>
-            <exclude>**/DropwizardControllerPrometheusMetricsTest.java</exclude>
-          </excludes>
         </configuration>
       </plugin>
 
@@ -119,7 +124,13 @@
   <dependencies>
     <dependency>
       <groupId>io.prometheus.jmx</groupId>
-      <artifactId>jmx_prometheus_javaagent</artifactId>
+      <artifactId>collector</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -203,7 +214,7 @@
       <artifactId>zstd-jni</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.lz4</groupId>
+      <groupId>at.yawk.lz4</groupId>
       <artifactId>lz4-java</artifactId>
     </dependency>
     <dependency>
@@ -277,11 +288,6 @@
 
     <!-- Test -->
     <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-yammer</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
@@ -294,11 +300,6 @@
     <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>
       <artifactId>equalsverifier</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-dropwizard</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -398,7 +399,7 @@
       <id>sqlparser</id>
       <activation>
         <file>
-          <missing>${project.build.directory}/generated-sources/javacc/Parser.jj</missing>
+          <missing>${basedir}/target/generated-sources/javacc/Parser.jj</missing>
         </file>
       </activation>
       <build>
@@ -417,10 +418,8 @@
                 </goals>
                 <configuration>
                   <target name="generate-code">
-                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
-                    <fmpp configuration="src/main/codegen/config.fmpp"
-                        sourceRoot="src/main/codegen/templates"
-                        outputRoot="${project.build.directory}/generated-sources/"/>
+                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath" />
+                    <fmpp configuration="src/main/codegen/config.fmpp" sourceRoot="src/main/codegen/templates" outputRoot="${project.build.directory}/generated-sources/" />
                   </target>
                 </configuration>
               </execution>

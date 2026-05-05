@@ -66,6 +66,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -97,7 +98,6 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
-import org.apache.pinot.controller.cursors.ResponseStoreCleaner;
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -144,9 +144,10 @@ import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -232,6 +233,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
   protected final List<UtilizationChecker> _utilizationCheckers = new ArrayList<>();
+  protected ResourceUtilizationChecker _resourceUtilizationChecker;
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
@@ -671,6 +673,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         LOGGER.info("Registered {} as config change listener", controllerPeriodicTask.getTaskName());
       }
     }
+    // Register PinotLLCRealtimeSegmentManager before _adminApp.start() so that
+    // max.segment.completion.time.millis is seeded from cluster config before serving requests.
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_pinotLLCRealtimeSegmentManager);
+    LOGGER.info("Registered PinotLLCRealtimeSegmentManager as cluster config change listener");
+
     LOGGER.info("Init controller periodic tasks scheduler");
     _periodicTaskScheduler = new PeriodicTaskScheduler();
     _periodicTaskScheduler.init(controllerPeriodicTasks);
@@ -685,7 +692,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
     final AccessControlFactory accessControlFactory;
     try {
-      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+      accessControlFactory =
+          (AccessControlFactory) Class.forName(accessControlFactoryClass).getDeclaredConstructor().newInstance();
       accessControlFactory.init(_config, _helixResourceManager);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
@@ -766,6 +774,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     });
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixParticipantManager));
+    if (_config.isResourceUtilizationCheckerCollectUsageAtStartup()) {
+      _serviceStatusCallbackList.add(generateResourceUtilizationCheckerStatusCallback());
+    }
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
@@ -844,6 +855,31 @@ public abstract class BaseControllerStarter implements ServiceStartable {
           _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
           return ServiceStatus.Status.GOOD;
         }
+      }
+
+      @Override
+      public String getStatusDescription() {
+        return _statusDescription;
+      }
+    };
+  }
+
+  /**
+   * Service status callback that waits for the resource utilization checker to fetch servers' resource information.
+   */
+  private ServiceStatus.ServiceStatusCallback generateResourceUtilizationCheckerStatusCallback() {
+    return new ServiceStatus.ServiceStatusCallback() {
+      private volatile String _statusDescription =
+          "Waiting for resource utilization checker to fetch servers' resource information";
+
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        if (_resourceUtilizationChecker.hasCompletedAtLeastOnce()) {
+          _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
+          return ServiceStatus.Status.GOOD;
+        }
+
+        return ServiceStatus.Status.STARTING;
       }
 
       @Override
@@ -1015,12 +1051,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);
     periodicTasks.add(_taskMetricsEmitter);
-    PeriodicTask responseStoreCleaner = new ResponseStoreCleaner(_config, _helixResourceManager, _leadControllerManager,
-        _controllerMetrics, _executorService, _connectionManager);
-    periodicTasks.add(responseStoreCleaner);
-    PeriodicTask resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
+    _resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
         _controllerMetrics, _utilizationCheckers, _executorService, _helixResourceManager);
-    periodicTasks.add(resourceUtilizationChecker);
+    periodicTasks.add(_resourceUtilizationChecker);
     PeriodicTask tenantRebalanceChecker =
         new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
     periodicTasks.add(tenantRebalanceChecker);
@@ -1084,6 +1117,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     ServiceStatus.removeServiceStatusCallback(_helixParticipantInstanceId);
     LOGGER.info("Shutdown Controller Metrics Registry");
     _metricsRegistry.shutdown();
+    // Clear validator registries so in-process restart (e.g. integration tests reusing one JVM) does not leak
+    // validators that hold references to the now-disconnected HelixAdmin/HelixManager.
+    LOGGER.info("Clearing config validator registries");
+    TableConfigValidatorRegistry.reset();
+    InstanceConfigValidatorRegistry.reset();
     LOGGER.info("Finish shutting down Pinot controller for {}", _helixParticipantInstanceId);
   }
 

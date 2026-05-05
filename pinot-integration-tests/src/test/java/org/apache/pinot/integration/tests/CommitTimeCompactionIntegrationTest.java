@@ -332,7 +332,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       throws Exception {
     // Test Case: Multi-Value Fields with Commit-Time Compaction
     // Goal: Ensure commit-time compaction correctly handles multi-value dictionary columns
-    // (like arrays/lists) during segment conversion, validating the fix for CompactedDictEncodedColumnStatistics
+    // (like arrays/lists) during segment conversion, validating the fix for CompactedColumnStatistics
 
     // Create test data with multi-value fields similar to user's "tags" column
     List<String> testRecords = List.of("200,Player200,game1,85.5,1681054200000,false,action;shooter",
@@ -1154,9 +1154,9 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
 
   protected void forceCommit(String tableName1, String tableName2, String tableName3)
       throws Exception {
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName1));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName2));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName3));
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName1);
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName2);
+    getOrCreateAdminClient().getTableClient().forceCommit(tableName3);
   }
 
   protected void validatePostCommitCompaction(String tableNameBaseline, String tableNameCompacted1,

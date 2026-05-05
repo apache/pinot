@@ -95,7 +95,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest implements PinotBuf
       _readerWriter.setDouble(row, 3, doubleValue);
       Assert.assertEquals(_readerWriter.getDouble(row, 3), doubleValue);
 
-      String stringValue = RandomStringUtils.randomAlphabetic(STRING_LENGTH);
+      String stringValue = RandomStringUtils.secure().nextAlphabetic(STRING_LENGTH);
       _readerWriter.setString(row, 4, stringValue);
       Assert.assertEquals(_readerWriter.getString(row, 4), stringValue);
     }
@@ -122,7 +122,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest implements PinotBuf
       doubleValues[i] = _random.nextDouble();
       _readerWriter.setDouble(row, 3, doubleValues[i]);
 
-      stringValues[i] = RandomStringUtils.randomAlphanumeric(STRING_LENGTH);
+      stringValues[i] = RandomStringUtils.secure().nextAlphanumeric(STRING_LENGTH);
       _readerWriter.setString(row, 4, stringValues[i]);
     }
 

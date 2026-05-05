@@ -20,7 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -152,7 +152,7 @@ public class ArrayMaxTransformFunction extends BaseTransformFunction {
     for (int i = 0; i < length; i++) {
       String maxRes = null;
       for (String value : stringValuesMV[i]) {
-        if (StringUtils.compare(maxRes, value) < 0) {
+        if (Strings.CS.compare(maxRes, value) < 0) {
           maxRes = value;
         }
       }

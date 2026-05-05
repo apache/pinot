@@ -17,6 +17,9 @@
  * under the License.
  */
 
+// Suppress known third-party library warnings
+import "./utils/suppress-warnings";
+
 import { MuiThemeProvider } from "@material-ui/core";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import CustomNotification from "./components/CustomNotification";

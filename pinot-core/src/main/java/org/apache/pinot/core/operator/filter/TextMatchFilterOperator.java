@@ -56,7 +56,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   private static int getSearchableDocCount(TextIndexReader reader, int numDocs) {
     int searchableDocCount = reader.getSearchableDocCount();
-    return searchableDocCount > 0 && searchableDocCount < numDocs ? searchableDocCount : numDocs;
+    return searchableDocCount >= 0 && searchableDocCount < numDocs ? searchableDocCount : numDocs;
   }
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {

@@ -62,6 +62,10 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Class to handle realtime offset auto reset")
   private String _realtimeOffsetAutoResetHandlerClass;
 
+  @JsonPropertyDescription("If true, drop records whose partition column value does not map to the segment's designated"
+      + " partition during realtime ingestion. Defaults to false.")
+  private boolean _dropRecordOnPartitionMismatch;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -135,5 +139,13 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setRealtimeOffsetAutoResetHandlerClass(String realtimeOffsetAutoResetHandlerClass) {
     _realtimeOffsetAutoResetHandlerClass = realtimeOffsetAutoResetHandlerClass;
+  }
+
+  public boolean isDropRecordOnPartitionMismatch() {
+    return _dropRecordOnPartitionMismatch;
+  }
+
+  public void setDropRecordOnPartitionMismatch(boolean dropRecordOnPartitionMismatch) {
+    _dropRecordOnPartitionMismatch = dropRecordOnPartitionMismatch;
   }
 }

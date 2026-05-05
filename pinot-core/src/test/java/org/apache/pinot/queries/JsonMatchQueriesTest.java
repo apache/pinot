@@ -154,7 +154,7 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
     ObjectNode indexes = JsonUtils.newObjectNode();
     JsonIndexConfig config = new JsonIndexConfig();
     config.setDisableCrossArrayUnnest(isDisableCrossArrayUnnest());
-    indexes.put("json", config.toJsonNode());
+    indexes.set("json", config.toJsonNode());
 
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(RAW_TABLE_NAME)

@@ -86,11 +86,12 @@ public class MergeRollupTaskExecutorTest {
       String segmentName = MERGED_SEGMENT_NAME + i;
       RecordReader recordReader = new GenericRowRecordReader(rows);
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+      config.setInstanceType(InstanceType.MINION);
       config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
       config.setTableName(TABLE_NAME);
       config.setSegmentName(segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader, InstanceType.MINION);
+      driver.init(config, recordReader);
       driver.build();
       _segmentIndexDirList.add(new File(ORIGINAL_SEGMENT_DIR, segmentName));
     }

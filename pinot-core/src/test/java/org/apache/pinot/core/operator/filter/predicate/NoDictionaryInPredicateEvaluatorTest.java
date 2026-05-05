@@ -251,7 +251,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     Set<String> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String value = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
       stringValues.add(value);
       valueSet.add(value);
     }
@@ -270,7 +270,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     }
 
     for (int i = 0; i < 100; i++) {
-      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String value = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
       Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
       Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
@@ -292,8 +292,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     for (int i = 0; i < 100; i++) {
       String jsonString = String.format(jsonStringTemplate,
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
       jsonValues.add(jsonString);
       jsonValueSet.add(jsonString);
     }
@@ -313,8 +313,8 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     for (int i = 0; i < 100; i++) {
       String randomJsonValue = String.format(jsonStringTemplate,
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
       Assert.assertEquals(inPredicateEvaluator.applySV(randomJsonValue), jsonValueSet.contains(randomJsonValue));
       Assert.assertEquals(notInPredicateEvaluator.applySV(randomJsonValue), !jsonValueSet.contains(randomJsonValue));
     }
@@ -333,7 +333,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     Set<byte[]> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      byte[] value = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      byte[] value = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
       valueSet.add(value);
       stringValues.add(BytesUtils.toHexString(value));
     }
@@ -352,7 +352,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     }
 
     for (int i = 0; i < 100; i++) {
-      byte[] value = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      byte[] value = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
       Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
       Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }

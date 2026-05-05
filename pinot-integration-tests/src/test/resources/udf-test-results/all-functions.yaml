@@ -27,7 +27,7 @@
 
 ---
 abs:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.abs}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.AbsScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction"
   udf: "org.apache.pinot.query.runtime.function.AbsUdf"
 acos:
@@ -808,7 +808,7 @@ greaterthanorequal:
   transform: "org.apache.pinot.core.operator.transform.function.GreaterThanOrEqualTransformFunction"
   udf: null
 greatest:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.greatest}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.GreatestScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.GreatestTransformFunction"
   udf: null
 griddisk:
@@ -1042,7 +1042,7 @@ lcm:
   transform: null
   udf: null
 least:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.least}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.LeastScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.LeastTransformFunction"
   udf: null
 left:
@@ -1114,7 +1114,7 @@ mapvalue:
   transform: "org.apache.pinot.core.operator.transform.function.MapValueTransformFunction"
   udf: null
 max:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.max}"
+  scalar: null
   transform: null
   udf: null
 md2:
@@ -1136,7 +1136,7 @@ millisecondmv:
   transform: null
   udf: null
 min:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.min}"
+  scalar: null
   transform: null
   udf: null
 minus:
@@ -1154,11 +1154,11 @@ minutemv:
   transform: null
   udf: null
 mod:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.mod}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.ModScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.ModuloTransformFunction"
   udf: null
 moduloorzero:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.moduloOrZero}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.ModuloOrZeroScalarFunction"
   transform: null
   udf: null
 month:
@@ -1223,7 +1223,7 @@ murmurhash3x64bit64:
   transform: null
   udf: null
 negate:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.negate}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction"
   transform: null
   udf: null
 normalize:
@@ -1260,7 +1260,7 @@ plus:
   transform: "org.apache.pinot.core.operator.transform.function.AdditionTransformFunction"
   udf: "org.apache.pinot.query.runtime.function.PlusUdf"
 positivemodulo:
-  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.positiveModulo}"
+  scalar: "org.apache.pinot.common.function.scalar.arithmetic.PositiveModuloScalarFunction"
   transform: null
   udf: null
 pow:

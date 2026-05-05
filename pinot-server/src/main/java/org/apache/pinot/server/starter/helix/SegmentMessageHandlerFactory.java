@@ -55,8 +55,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   // We only allow limited number of segments refresh/reload happen at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
-  private final InstanceDataManager _instanceDataManager;
-  private final ServerMetrics _metrics;
+  protected final InstanceDataManager _instanceDataManager;
+  protected final ServerMetrics _metrics;
 
   public SegmentMessageHandlerFactory(InstanceDataManager instanceDataManager, ServerMetrics metrics) {
     _instanceDataManager = instanceDataManager;

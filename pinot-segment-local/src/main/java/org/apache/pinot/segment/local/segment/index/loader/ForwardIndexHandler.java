@@ -36,7 +36,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCrea
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
-import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
@@ -51,7 +51,6 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
-import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
@@ -69,6 +68,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -343,6 +343,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
@@ -358,18 +359,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return false;
     }
 
-    // Sorted columns should always have a dictionary.
-    if (existingColumnMetadata.isSorted()) {
-      LOGGER.warn("Cannot disable dictionary for column={} as it is sorted.", column);
-      return false;
-    }
-
     // Allow disabling dictionary only if the new config specifies that inverted index and FST index should not
     // be present. So for existing segments where inverted index and FST index are already present, disabling
     // dictionary will only be allowed if FST and inverted index are also disabled.
     if (hasIndex(column, StandardIndexes.inverted()) || hasIndex(column, StandardIndexes.fst())) {
       LOGGER.warn("Cannot disable dictionary as column={} has FST index or inverted index or both.", column);
       return false;
+    }
+
+    if (existingColumnMetadata.isSorted()) {
+      LOGGER.warn("Disabling dictionary for sorted column={}. The sorted index will not be used for query "
+          + "filtering (equality/range predicates will fall back to column scans). Consider adding a range index "
+          + "on this column to maintain query performance.", column);
     }
 
     return true;
@@ -617,6 +618,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
+      case BIG_DECIMAL: {
+        for (int i = 0; i < numDocs; i++) {
+          if (isSVColumn) {
+            BigDecimal val = reader.getBigDecimal(i, readerContext);
+            creator.putBigDecimal(val);
+          } else {
+            BigDecimal[] bigDecimals = reader.getBigDecimalMV(i, readerContext);
+            creator.putBigDecimalMV(bigDecimals);
+          }
+        }
+        break;
+      }
       case STRING: {
         for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
@@ -638,14 +651,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             byte[][] bytesArray = reader.getBytesMV(i, readerContext);
             creator.putBytesMV(bytesArray);
           }
-        }
-        break;
-      }
-      case BIG_DECIMAL: {
-        Preconditions.checkState(isSVColumn, "BigDecimal is not supported for MV columns");
-        for (int i = 0; i < numDocs; i++) {
-          BigDecimal val = reader.getBigDecimal(i, readerContext);
-          creator.putBigDecimal(val);
         }
         break;
       }
@@ -733,17 +738,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
-      case BYTES: {
+      case BIG_DECIMAL: {
         for (int i = 0; i < numDocs; i++) {
           if (isSVColumn) {
             int dictId = reader.getDictId(i, readerContext);
-            byte[] val = dictionaryReader.getBytesValue(dictId);
-            creator.putBytes(val);
+            BigDecimal val = dictionaryReader.getBigDecimalValue(dictId);
+            creator.putBigDecimal(val);
           } else {
             int[] dictIds = reader.getDictIdMV(i, readerContext);
-            byte[][] bytes = new byte[dictIds.length][];
-            dictionaryReader.readBytesValues(dictIds, dictIds.length, bytes);
-            creator.putBytesMV(bytes);
+            BigDecimal[] bigDecimals = new BigDecimal[dictIds.length];
+            dictionaryReader.readBigDecimalValues(dictIds, dictIds.length, bigDecimals);
+            creator.putBigDecimalMV(bigDecimals);
           }
         }
         break;
@@ -763,12 +768,18 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
         break;
       }
-      case BIG_DECIMAL: {
-        Preconditions.checkState(isSVColumn, "BigDecimal is not supported for MV columns");
+      case BYTES: {
         for (int i = 0; i < numDocs; i++) {
-          int dictId = reader.getDictId(i, readerContext);
-          BigDecimal val = dictionaryReader.getBigDecimalValue(dictId);
-          creator.putBigDecimal(val);
+          if (isSVColumn) {
+            int dictId = reader.getDictId(i, readerContext);
+            byte[] val = dictionaryReader.getBytesValue(dictId);
+            creator.putBytes(val);
+          } else {
+            int[] dictIds = reader.getDictIdMV(i, readerContext);
+            byte[][] bytes = new byte[dictIds.length][];
+            dictionaryReader.readBytesValues(dictIds, dictIds.length, bytes);
+            creator.putBytesMV(bytes);
+          }
         }
         break;
       }
@@ -861,12 +872,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
-      ColumnIndexCreationInfo creationInfo =
-          new ColumnIndexCreationInfo(statsCollector, true, useVarLength, false, fieldSpec.getDefaultNullValue());
       IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(indexDir)
           .withFieldSpec(fieldSpec)
-          .withColumnIndexCreationInfo(creationInfo)
+          .withColumnStatistics(statsCollector)
           .withTotalDocs(numDocs)
           .withDictionary(true)
           .withTableNameWithType(_tableConfig.getTableName())
@@ -891,6 +900,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.DICTIONARY.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
         String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
     // If realtime segments were completed when the column was RAW, the cardinality value is populated as Integer
@@ -954,6 +964,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
@@ -986,7 +997,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       if (!columnMetadata.getDataType().getStoredType().isFixedWidth()) {
         if (columnMetadata.isSingleValue()) {
           // lengthOfLongestEntry is available for dict columns from metadata.
-          builder.withLengthOfLongestEntry(columnMetadata.getColumnMaxLength());
+          builder.withLengthOfLongestEntry(columnMetadata.getLengthOfLongestElement());
         } else {
           // maxRowLength can only be determined by scanning the column.
           builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, reader, dictionary));
@@ -1021,7 +1032,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         statsCollector.collect(columnReader.getValue(i));
       }
       // NOTE: No need to seal the stats collector because value length is updated while collecting stats.
-      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLargestElement()
+      return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLongestElement()
           : statsCollector.getMaxRowLengthInBytes();
     }
   }
@@ -1049,7 +1060,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(column, statsCollectorConfig);
       case MAP:
         return new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
       default:

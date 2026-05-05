@@ -53,12 +53,12 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.*;
+import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -167,9 +167,9 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
       throws IOException {
     INDEX_DIR.mkdir();
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
-    Schema enumSchema = createEnum("direction", null, null, Arrays.asList("UP", "DOWN", "LEFT", "RIGHT"));
+    Schema enumSchema = createEnum("direction", null, null, List.of("UP", "DOWN", "LEFT", "RIGHT"));
     Schema fixedSchema = createFixed("fixed", null, null, 4);
-    List<Field> fields = Arrays.asList(
+    List<Field> fields = List.of(
         new Field(INT_COLUMN, createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
         new Field(STRING_COLUMN, createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
         new Field(JSON_COLUMN_1,
@@ -187,51 +187,107 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     avroSchema.setFields(fields);
     List<GenericRow> inputRecords = new ArrayList<>();
     // Insert ARRAY
-    inputRecords.add(
-        createTableRecord(1, "daffy duck", Arrays.asList("this", "is", "a", "test"), createEnumField(enumSchema, "UP"),
-            createFixedField(fixedSchema, 1), new byte[] {0, 0, 0, 1}, Arrays.asList(
-                new GenericRecordBuilder(createJson5RecordSchema())
-                    .set("timestamp", 1719390721)
-                    .set("data", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")})).build())));
+    inputRecords.add(createTableRecord(
+        1,
+        "daffy duck",
+        List.of("this", "is", "a", "test"),
+        createEnumField(enumSchema, "UP"),
+        createFixedField(fixedSchema, 1),
+        new byte[]{0, 0, 0, 1},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390721)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}))
+            .build()
+        )
+    ));
 
-    // Insert MAP
-    inputRecords.add(
-        createTableRecord(2, "mickey mouse", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 2), new byte[] {0, 0, 0, 2},
-            Arrays.asList(new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390722)
-                    .set("data", createMapField(new Pair[]{Pair.of("a", "2"), Pair.of("b", "4")})).build())));
+    // Insert MAP, keys should be sorted
+    inputRecords.add(createTableRecord(
+        2,
+        "mickey mouse",
+        createMapField(new Pair[]{Pair.of("b", "2"), Pair.of("a", "1")}),
+        createEnumField(enumSchema, "DOWN"),
+        createFixedField(fixedSchema, 2),
+        new byte[]{0, 0, 0, 2},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390722)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "2"), Pair.of("b", "4")}))
+            .build()
+        )
+    ));
 
-    inputRecords.add(
-        createTableRecord(3, "donald duck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "UP"), createFixedField(fixedSchema, 3), new byte[] {0, 0, 0, 3}, Arrays.asList(
-                new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390723)
-                    .set("data", createMapField(new Pair[]{Pair.of("a", "3"), Pair.of("b", "6")})).build())));
+    inputRecords.add(createTableRecord(
+        3,
+        "donald duck",
+        createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
+        createEnumField(enumSchema, "UP"),
+        createFixedField(fixedSchema, 3),
+        new byte[]{0, 0, 0, 3},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390723)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "3"), Pair.of("b", "6")}))
+            .build()
+        )
+    ));
 
-    inputRecords.add(
-        createTableRecord(4, "scrooge mcduck", createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
-            createEnumField(enumSchema, "LEFT"), createFixedField(fixedSchema, 4), new byte[] {0, 0, 0, 4},
-            Arrays.asList(new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390724)
-                    .set("data", createMapField(new Pair[]{Pair.of("a", "4"), Pair.of("b", "8")})).build())));
+    inputRecords.add(createTableRecord(
+        4,
+        "scrooge mcduck",
+        createMapField(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
+        createEnumField(enumSchema, "LEFT"),
+        createFixedField(fixedSchema, 4),
+        new byte[]{0, 0, 0, 4},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390724)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "4"), Pair.of("b", "8")}))
+            .build()
+        )
+    ));
 
-    // insert RECORD
-    inputRecords.add(createTableRecord(5, "minney mouse", createRecordField("id", 1, "name", "minney"),
-        createEnumField(enumSchema, "RIGHT"), createFixedField(fixedSchema, 5), new byte[] {0, 0, 0, 5}, Arrays.asList(
-            new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390725)
-                .set("data", createMapField(new Pair[]{Pair.of("a", "5"), Pair.of("b", "10")})).build())));
+    // Insert MAP, keys should be sorted
+    inputRecords.add(createTableRecord(
+        5,
+        "minney mouse",
+        createRecordField("id", 1, "name", "minney"),
+        createEnumField(enumSchema, "RIGHT"),
+        createFixedField(fixedSchema, 5),
+        new byte[]{0, 0, 0, 5},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390725)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "5"), Pair.of("b", "10")}))
+            .build()
+        )
+    ));
 
     // Insert simple Java String (gets converted into JSON value)
-    inputRecords.add(
-        createTableRecord(6, "pluto", "test", createEnumField(enumSchema, "DOWN"), createFixedField(fixedSchema, 6),
-            new byte[] {0, 0, 0, 6}, Arrays.asList(
-                new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390726)
-                    .set("data", createMapField(new Pair[]{Pair.of("a", "6"), Pair.of("b", "12")})).build())));
+    inputRecords.add(createTableRecord(
+        6,
+        "pluto",
+        "test",
+        createEnumField(enumSchema, "DOWN"),
+        createFixedField(fixedSchema, 6),
+        new byte[]{0, 0, 0, 6},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390726)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "6"), Pair.of("b", "12")}))
+            .build()
+        )
+    ));
 
-    // Insert JSON string (gets converted into JSON document)
-    inputRecords.add(
-        createTableRecord(7, "scooby doo", "{\"name\":\"scooby\",\"id\":7}", createEnumField(enumSchema, "UP"),
-            createFixedField(fixedSchema, 7), new byte[] {0, 0, 0, 7}, Arrays.asList(
-                new GenericRecordBuilder(createJson5RecordSchema()).set("timestamp", 1719390727)
-                    .set("data", createMapField(new Pair[]{Pair.of("a", "7"), Pair.of("b", "14")})).build())));
+    // Insert JSON string (gets converted into canonical JSON)
+    inputRecords.add(createTableRecord(
+        7,
+        "scooby doo",
+        "{\"name\":  \"scooby\",   \"id\":7}",
+        createEnumField(enumSchema, "UP"),
+        createFixedField(fixedSchema, 7),
+        new byte[]{0, 0, 0, 7},
+        List.of(new GenericRecordBuilder(createJson5RecordSchema())
+            .set("timestamp", 1719390727)
+            .set("data", createMapField(new Pair[]{Pair.of("a", "7"), Pair.of("b", "14")}))
+            .build()
+        )
+    ));
 
     try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
       fileWriter.create(avroSchema, AVRO_DATA_FILE);
@@ -275,45 +331,49 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   @Test
   public void testSimpleSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator =
-        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM " + "testTable limit 100");
+        getOperator("select intColumn, stringColumn, jsonColumn1, jsonColumn2 FROM testTable limit 100");
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
+    assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    assertEquals(block.getDataSchema().getColumnDataType(2), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds = Arrays.asList("[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
-        "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]", "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
+    List<String> expecteds = List.of(
+        "[1, daffy duck, [\"this\",\"is\",\"a\",\"test\"], \"UP\"]",
+        "[2, mickey mouse, {\"a\":\"1\",\"b\":\"2\"}, \"DOWN\"]",
+        "[3, donald duck, {\"a\":\"1\",\"b\":\"2\"}, \"UP\"]",
         "[4, scrooge mcduck, {\"a\":\"1\",\"b\":\"2\"}, \"LEFT\"]",
-        "[5, minney mouse, {\"name\":\"minney\",\"id\":1}, \"RIGHT\"]", "[6, pluto, \"test\", \"DOWN\"]",
-        "[7, scooby doo, {\"name\":\"scooby\",\"id\":7}, \"UP\"]");
+        "[5, minney mouse, {\"id\":1,\"name\":\"minney\"}, \"RIGHT\"]",
+        "[6, pluto, \"test\", \"DOWN\"]",
+        "[7, scooby doo, {\"name\":\"scooby\",\"id\":7}, \"UP\"]"
+    );
 
     int index = 0;
     Iterator<Object[]> iterator = rows.iterator();
     while (iterator.hasNext()) {
       Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
   /** Verify simple path expression query on ingested Avro file. */
   @Test
   public void testJsonPathSelectOnJsonColumn() {
-    Operator<SelectionResultsBlock> operator = getOperator(
-        "select intColumn, json_extract_scalar(jsonColumn1, '$.name', " + "'STRING', 'null') FROM testTable");
+    Operator<SelectionResultsBlock> operator =
+        getOperator("select intColumn, json_extract_scalar(jsonColumn1, '$.name', 'STRING', 'null') FROM testTable");
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(block.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
 
     List<String> expecteds =
-        Arrays.asList("[1, null]", "[2, null]", "[3, null]", "[4, null]", "[5, minney]", "[6, null]", "[7, scooby]");
+        List.of("[1, null]", "[2, null]", "[3, null]", "[4, null]", "[5, minney]", "[6, null]", "[7, scooby]");
     int index = 0;
 
     Iterator<Object[]> iterator = rows.iterator();
     while (iterator.hasNext()) {
       Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
@@ -321,19 +381,19 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   @Test
   public void testStringValueSelectOnJsonColumn() {
     Operator<SelectionResultsBlock> operator = getOperator(
-        "SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM "
-            + "testTable WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
+        "SELECT json_extract_scalar(jsonColumn1, '$', 'STRING') FROM testTable"
+            + " WHERE JSON_MATCH(jsonColumn1, '\"$\" = ''test''')");
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
 
-    List<String> expecteds = Arrays.asList("[test]");
+    List<String> expecteds = List.of("[test]");
     int index = 0;
 
     Iterator<Object[]> iterator = rows.iterator();
     while (iterator.hasNext()) {
       Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
@@ -355,22 +415,23 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
         "select jsonColumn5 FROM testTable");
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+    assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
-    List<String> expecteds = Arrays.asList(
+    List<String> expecteds = List.of(
         "[[{\"data\":{\"a\":\"1\",\"b\":\"2\"},\"timestamp\":1719390721}]]",
         "[[{\"data\":{\"a\":\"2\",\"b\":\"4\"},\"timestamp\":1719390722}]]",
         "[[{\"data\":{\"a\":\"3\",\"b\":\"6\"},\"timestamp\":1719390723}]]",
         "[[{\"data\":{\"a\":\"4\",\"b\":\"8\"},\"timestamp\":1719390724}]]",
         "[[{\"data\":{\"a\":\"5\",\"b\":\"10\"},\"timestamp\":1719390725}]]",
         "[[{\"data\":{\"a\":\"6\",\"b\":\"12\"},\"timestamp\":1719390726}]]",
-        "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]");
+        "[[{\"data\":{\"a\":\"7\",\"b\":\"14\"},\"timestamp\":1719390727}]]"
+    );
 
     int index = 0;
     Iterator<Object[]> iterator = rows.iterator();
     while (iterator.hasNext()) {
       Object[] row = iterator.next();
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 
@@ -378,16 +439,16 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Operator<SelectionResultsBlock> operator = getOperator(query);
     SelectionResultsBlock block = operator.nextBlock();
     Collection<Object[]> rows = block.getRows();
-    Assert.assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
+    assertEquals(block.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.JSON);
 
     List<String> expecteds = IntStream.range(1, 8)
-        .mapToObj(i -> new byte[] {0, 0, 0, (byte) i})
+        .mapToObj(i -> new byte[]{0, 0, 0, (byte) i})
         .map(byteArray -> "[\"" + StringFunctions.toBase64(byteArray) + "\"]")
         .collect(Collectors.toList());
 
     int index = 0;
     for (Object[] row : rows) {
-      Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
+      assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }
 

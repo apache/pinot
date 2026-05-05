@@ -18,32 +18,29 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
-import org.apache.commons.configuration2.Configuration;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Config for ParquetRecordReader
- */
+/// Config for [ParquetRecordReader] (and the underlying [ParquetAvroRecordReader] / [ParquetNativeRecordReader]).
+/// Three settings, all default `false`:
+/// - `useParquetAvroRecordReader` — force the parquet-avro reader.
+/// - `useParquetNativeRecordReader` — force the native parquet reader. When neither flag is set, the dispatcher
+///   auto-detects via the file's `avro.schema` metadata (Avro reader if present, native otherwise).
+/// - `extractRawTimeValues` — opt out of TIMESTAMP / DATE / TIME conversion at the extractor boundary,
+///   surfacing the raw underlying integer in the column's declared unit instead of the contract Java type.
+///   DECIMAL and UUID always convert. See [ParquetAvroRecordExtractor] / [ParquetNativeRecordExtractor] for
+///   the per-type matrix.
 public class ParquetRecordReaderConfig implements RecordReaderConfig {
-  private static final String USE_PARQUET_AVRO_RECORDER_READER = "useParquetAvroRecordReader";
-  private static final String USE_PARQUET_NATIVE_RECORDER_READER = "useParquetNativeRecordReader";
-
   private boolean _useParquetAvroRecordReader;
   private boolean _useParquetNativeRecordReader;
-  private Configuration _conf;
-
-  public ParquetRecordReaderConfig() {
-  }
-
-  public ParquetRecordReaderConfig(Configuration conf) {
-    _conf = conf;
-    _useParquetAvroRecordReader = conf.getBoolean(USE_PARQUET_AVRO_RECORDER_READER, false);
-    _useParquetNativeRecordReader = conf.getBoolean(USE_PARQUET_NATIVE_RECORDER_READER, false);
-  }
+  private boolean _extractRawTimeValues;
 
   public boolean useParquetAvroRecordReader() {
     return _useParquetAvroRecordReader;
+  }
+
+  public void setUseParquetAvroRecordReader(boolean useParquetAvroRecordReader) {
+    _useParquetAvroRecordReader = useParquetAvroRecordReader;
   }
 
   public boolean useParquetNativeRecordReader() {
@@ -54,11 +51,11 @@ public class ParquetRecordReaderConfig implements RecordReaderConfig {
     _useParquetNativeRecordReader = useParquetNativeRecordReader;
   }
 
-  public void setUseParquetAvroRecordReader(boolean useParquetAvroRecordReader) {
-    _useParquetAvroRecordReader = useParquetAvroRecordReader;
+  public boolean isExtractRawTimeValues() {
+    return _extractRawTimeValues;
   }
 
-  public Configuration getConfig() {
-    return _conf;
+  public void setExtractRawTimeValues(boolean extractRawTimeValues) {
+    _extractRawTimeValues = extractRawTimeValues;
   }
 }

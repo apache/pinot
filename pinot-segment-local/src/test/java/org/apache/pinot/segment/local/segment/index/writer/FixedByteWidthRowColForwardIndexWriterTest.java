@@ -22,7 +22,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Random;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
@@ -218,8 +218,8 @@ public class FixedByteWidthRowColForwardIndexWriterTest implements PinotBuffersA
       for (int i = 0; i < rows; i++) {
         String stringInFile = dataFileReader.getString(i, 0);
         Assert.assertEquals(stringInFile, data[i]);
-        Assert.assertEquals(StringUtils.remove(stringInFile, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)),
-            StringUtils.remove(data[i], String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
+        Assert.assertEquals(Strings.CS.remove(stringInFile, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)),
+            Strings.CS.remove(data[i], String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
       }
     }
     file.delete();
@@ -267,8 +267,8 @@ public class FixedByteWidthRowColForwardIndexWriterTest implements PinotBuffersA
         for (int i = 0; i < rows; i++) {
           String stringInFile = dataFileReader.getString(i, 0);
           Assert.assertEquals(stringInFile, data[i]);
-          Assert.assertEquals(StringUtils.remove(stringInFile, String.valueOf(paddingChar)),
-              StringUtils.remove(data[i], String.valueOf(paddingChar)));
+          Assert.assertEquals(Strings.CS.remove(stringInFile, String.valueOf(paddingChar)),
+              Strings.CS.remove(data[i], String.valueOf(paddingChar)));
         }
       }
       file.delete();

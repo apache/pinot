@@ -98,7 +98,7 @@ public class RegexpReplaceConstFunctions {
 
   /**
    * See #regexpReplace(String, String, String, int, int, String). Matches against entire inputStr and replaces all
-   * occurences. Match is performed in case-sensitive mode.
+   * occurrences. Match is performed in case-sensitive mode.
    *
    * @param inputStr      Input string to apply the regexpReplace
    * @param matchStr      Regexp or string to match against inputStr

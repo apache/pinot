@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Longs;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,7 +40,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.pinot.controller.api.resources.PauseStatusDetails;
+import org.apache.pinot.common.restlet.resources.PauseStatusDetails;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
@@ -370,7 +369,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
   }
 
   private void addLogicalTableConfig(String logicalTableName, List<String> physicalTableNames)
-      throws IOException {
+      throws Exception {
     Map<String, PhysicalTableConfig> physicalTableConfigMap = new HashMap<>();
     for (String physicalTableName : physicalTableNames) {
       physicalTableConfigMap.put(physicalTableName, new PhysicalTableConfig());
@@ -388,8 +387,8 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
         .setPhysicalTableConfigMap(physicalTableConfigMap)
         .build();
 
-    String addUrl = _controllerRequestURLBuilder.forLogicalTableCreate();
-    String resp = sendPostRequest(addUrl, logicalTableConfig.toSingleLineJsonString());
+    String resp = getOrCreateAdminClient().getLogicalTableClient()
+        .createLogicalTable(logicalTableConfig.toSingleLineJsonString());
     assertEquals(resp, "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName
         + " logical table successfully added.\"}");
   }
@@ -524,7 +523,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
 
   private String forceCommit(String realtimeTableName)
       throws Exception {
-    String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(realtimeTableName), null);
+    String response = getOrCreateAdminClient().getTableClient().forceCommit(realtimeTableName);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
@@ -550,7 +549,7 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
 
   private boolean isForceCommitJobCompleted(String jobId)
       throws Exception {
-    String resp = sendGetRequest(_controllerRequestURLBuilder.forForceCommitJobStatus(jobId));
+    String resp = getOrCreateAdminClient().getTableClient().getForceCommitJobStatus(jobId);
     JsonNode status = JsonUtils.stringToJsonNode(resp);
     assertEquals(status.get("jobType").asText(), "FORCE_COMMIT");
 
@@ -579,11 +578,12 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
 
   private void pauseConsumptionAndWait(String realtimeTableName)
       throws Exception {
-    getControllerRequestClient().pauseConsumption(realtimeTableName);
+    getOrCreateAdminClient().getTableClient().pauseConsumption(realtimeTableName);
     // After a successful pause no segments should remain in CONSUMING state
     TestUtils.waitForCondition(aVoid -> {
       try {
-        PauseStatusDetails details = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
+        PauseStatusDetails details =
+            getOrCreateAdminClient().getTableClient().getPauseStatusDetails(realtimeTableName);
         return details != null && details.getPauseFlag()
             && (details.getConsumingSegments() == null || details.getConsumingSegments().isEmpty());
       } catch (Exception e) {
@@ -594,10 +594,11 @@ public class KafkaPartitionSubsetChaosIntegrationTest extends BaseClusterIntegra
 
   private void resumeConsumptionAndWait(String realtimeTableName)
       throws Exception {
-    getControllerRequestClient().resumeConsumption(realtimeTableName);
+    getOrCreateAdminClient().getTableClient().resumeConsumption(realtimeTableName, null);
     TestUtils.waitForCondition(aVoid -> {
       try {
-        PauseStatusDetails details = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
+        PauseStatusDetails details =
+            getOrCreateAdminClient().getTableClient().getPauseStatusDetails(realtimeTableName);
         return details != null && !details.getPauseFlag();
       } catch (Exception e) {
         return false;

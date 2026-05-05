@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.inputformat.clplog;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
@@ -72,46 +73,36 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
   private static final int MAX_VARIABLES_PER_CELL = ForwardIndexType.MAX_MULTI_VALUES_PER_ROW;
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
-  private Set<String> _fields;
-  // Used to indicate whether the caller wants us to extract all fields. See
-  // org.apache.pinot.spi.data.readers.RecordExtractor.init for details.
-  private boolean _extractAll = false;
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
+
   private CLPLogRecordExtractorConfig _config;
+  private String _topicName;
 
   private EncodedMessage _clpEncodedMessage;
   private MessageEncoder _clpMessageEncoder;
-  private String _unencodableFieldErrorLogtype = null;
-  private String[] _unencodableFieldErrorDictionaryVars = null;
-  private Long[] _unencodableFieldErrorEncodedVars = null;
+  private String _unencodableFieldErrorLogtype;
+  private String[] _unencodableFieldErrorDictionaryVars;
+  private Long[] _unencodableFieldErrorEncodedVars;
 
-  private String _topicName;
-  private ServerMetrics _serverMetrics;
-  PinotMeter _realtimeClpTooManyEncodedVarsMeter = null;
-  PinotMeter _realtimeClpUnencodableMeter = null;
-  PinotMeter _realtimeClpEncodedNonStringsMeter = null;
+  private PinotMeter _realtimeClpTooManyEncodedVarsMeter;
+  private PinotMeter _realtimeClpUnencodableMeter;
+  private PinotMeter _realtimeClpEncodedNonStringsMeter;
 
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig, String topicName,
-      ServerMetrics serverMetrics) {
-    init(fields, recordExtractorConfig);
-    _topicName = topicName;
-    _serverMetrics = serverMetrics;
-  }
-
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig, String topicName) {
-    init(fields, recordExtractorConfig);
+  public void init(@Nullable Set<String> fields, RecordExtractorConfig config, String topicName) {
+    init(fields, config);
     _topicName = topicName;
   }
 
   @Override
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-    _config = (CLPLogRecordExtractorConfig) recordExtractorConfig;
-    if (fields == null || fields.isEmpty()) {
-      _extractAll = true;
-      _fields = Set.of();
-    } else {
-      _fields = new HashSet<>(fields);
-      // Remove the fields to be CLP-encoded to make it easier to work with them
-      // in `extract`
+  protected void initConfig(RecordExtractorConfig config) {
+    Preconditions.checkArgument(config instanceof CLPLogRecordExtractorConfig,
+        "CLPLogRecordExtractor requires a CLPLogRecordExtractorConfig");
+    _config = (CLPLogRecordExtractorConfig) config;
+    if (!_extractAll) {
+      // Drop the CLP-encoded fields from `_fields` so the un-encoded loop in `extract` doesn't visit them —
+      // they're handled separately. The base sets `_fields` to an immutable copy, so re-create as a
+      // mutable `HashSet` first.
+      _fields = new HashSet<>(_fields);
       _fields.removeAll(_config.getFieldsForClpEncoding());
     }
 
@@ -142,16 +133,16 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     }
 
     if (_extractAll) {
-      for (Map.Entry<String, Object> recordEntry : from.entrySet()) {
-        String recordKey = recordEntry.getKey();
-        Object recordValue = recordEntry.getValue();
-        if (clpEncodedFieldNames.contains(recordKey)) {
-          encodeFieldWithClp(recordKey, recordValue, to);
+      for (Map.Entry<String, Object> entry : from.entrySet()) {
+        String key = entry.getKey();
+        Object value = entry.getValue();
+        if (clpEncodedFieldNames.contains(key)) {
+          encodeFieldWithClp(key, value, to);
         } else {
-          if (null != recordValue) {
-            recordValue = convert(recordValue);
+          if (value != null) {
+            value = convert(value);
           }
-          to.putValue(recordKey, recordValue);
+          to.putValue(key, value);
         }
       }
       return to;
@@ -160,7 +151,7 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     // Handle un-encoded fields
     for (String fieldName : _fields) {
       Object value = from.get(fieldName);
-      if (null != value) {
+      if (value != null) {
         value = convert(value);
       }
       to.putValue(fieldName, value);
@@ -172,17 +163,6 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
       encodeFieldWithClp(fieldName, value, to);
     }
     return to;
-  }
-
-  /**
-   * In addition to the basic conversion, we also needs to retain the type info of Boolean input.
-   */
-  @Override
-  protected Object convertSingleValue(Object value) {
-    if (value instanceof Boolean) {
-      return value;
-    }
-    return super.convertSingleValue(value);
   }
 
   /**

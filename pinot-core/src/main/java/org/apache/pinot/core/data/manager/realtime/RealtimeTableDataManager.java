@@ -832,8 +832,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         k -> new ConsumerCoordinator(_enforceConsumptionInOrder, this));
   }
 
-  @VisibleForTesting
-  void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
+  public boolean isEnforceConsumptionInOrderEnabled() {
+    return _enforceConsumptionInOrder;
+  }
+
+  public void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
   }
 

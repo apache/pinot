@@ -91,6 +91,7 @@ public class LazyRow {
   public void clear() {
     _fieldToValueMap.clear();
     _nullValueFields.clear();
+    _segment = null;
   }
 
   public Set<String> getColumnNames() {

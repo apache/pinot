@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.services;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +39,9 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.response.server.SegmentReloadFailureResponse;
 import org.apache.pinot.common.response.server.ServerReloadStatusResponse;
+import org.apache.pinot.common.restlet.resources.PinotControllerJobMetadataDto;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.api.dto.PinotControllerJobMetadataDto;
-import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
@@ -49,7 +51,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.google.common.base.Preconditions.checkState;
 
 
 @Singleton
@@ -252,6 +253,14 @@ public class PinotTableReloadStatusReporter {
 
   @VisibleForTesting
   Map<String, List<String>> getServerToSegments(PinotControllerJobMetadataDto job) {
+    if (job.getInstanceToSegmentsMap() != null) {
+      try {
+        return JsonUtils.stringToObject(job.getInstanceToSegmentsMap(), new TypeReference<>() {
+        });
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Failed to parse controller job instanceToSegmentsMap", e);
+      }
+    }
     return getServerToSegments(job.getTableNameWithType(), job.getSegmentName(), job.getInstanceName());
   }
 
@@ -268,14 +277,32 @@ public class PinotTableReloadStatusReporter {
     if (instanceName != null) {
       return Map.of(instanceName, segmentNames);
     }
-    // If instance is null, then either one or all segments are being reloaded via current segment reload restful APIs.
-    // And the if-check at the beginning of this method has handled the case of reloading all segments. So here we
-    // expect only one segment name.
-    checkState(segmentNames.size() == 1, "Only one segment is expected but got: %s", segmentNames);
+    if (segmentNames.size() == 1) {
+      String segmentName = segmentNames.get(0);
+      Map<String, List<String>> serverToSegments = new HashMap<>();
+      Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+      for (String server : servers) {
+        serverToSegments.put(server, Collections.singletonList(segmentName));
+      }
+      return serverToSegments;
+    }
+    // TODO: For large tables with many segments, consider adding a HelixResourceManager helper
+    //  that maps servers for a provided segment set directly, rather than fetching the full
+    //  server-to-all-segments map and filtering.
+    Set<String> targetSegments = new HashSet<>(segmentNames);
     Map<String, List<String>> serverToSegments = new HashMap<>();
-    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNamesString);
-    for (String server : servers) {
-      serverToSegments.put(server, Collections.singletonList(segmentNamesString));
+    Map<String, List<String>> serverToAllSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, null, true);
+    for (Map.Entry<String, List<String>> entry : serverToAllSegments.entrySet()) {
+      List<String> filteredSegments = new ArrayList<>();
+      for (String segmentName : entry.getValue()) {
+        if (targetSegments.contains(segmentName)) {
+          filteredSegments.add(segmentName);
+        }
+      }
+      if (!filteredSegments.isEmpty()) {
+        serverToSegments.put(entry.getKey(), filteredSegments);
+      }
     }
     return serverToSegments;
   }

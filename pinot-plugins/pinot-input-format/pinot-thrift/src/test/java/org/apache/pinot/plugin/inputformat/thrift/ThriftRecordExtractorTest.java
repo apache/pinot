@@ -18,178 +18,234 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
-import com.google.common.collect.Sets;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.transport.TIOStreamTransport;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.thrift.TBase;
+import org.apache.thrift.TFieldIdEnum;
+import org.apache.thrift.meta_data.FieldMetaData;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
-/**
- * Tests for the {@link ThriftRecordExtractor}
- */
-public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
+/// Tests [ThriftRecordExtractor] — see its class Javadoc for the thrift source type → Java output type
+/// matrix. Out of scope: thrift `i8` / `binary` are not declared in `complex_types.thrift`; they follow the
+/// same `convert` contract — mirror the pattern below if added.
+public class ThriftRecordExtractorTest {
 
-  private File _tempFile = new File(_tempDir, "test_complex_thrift.data");
+  // === Single value — order follows the type list in the class Javadoc ===
 
-  private static final String INT_FIELD = "intField";
-  private static final String LONG_FIELD = "longField";
-  private static final String BOOL_FIELD = "booleanField";
-  private static final String DOUBLE_FIELD = "doubleField";
-  private static final String STRING_FIELD = "stringField";
-  private static final String ENUM_FIELD = "enumField";
-  private static final String OPTIONAL_STRING_FIELD = "optionalStringField";
-  private static final String NESTED_STRUCT_FIELD = "nestedStructField";
-  private static final String SIMPLE_LIST = "simpleListField";
-  private static final String COMPLEX_LIST = "complexListField";
-  private static final String SIMPLE_MAP = "simpleMapField";
-  private static final String COMPLEX_MAP = "complexMapField";
-  private static final String NESTED_STRING_FIELD = "nestedStringField";
-  private static final String NESTED_INT_FIELD = "nestedIntField";
-
-  @Override
-  protected List<Map<String, Object>> getInputRecords() {
-    return Arrays.asList(createRecord1(), createRecord2());
+  @Test
+  public void testBooleanPreserved() {
+    ComplexTypes record = baseRecord();
+    record.setBooleanField(true);
+    Object result = extract(record, "booleanField");
+    assertEquals(result, true);
   }
 
-  @Override
-  protected Set<String> getSourceFields() {
-    return Sets
-        .newHashSet(INT_FIELD, LONG_FIELD, BOOL_FIELD, DOUBLE_FIELD, STRING_FIELD, ENUM_FIELD, OPTIONAL_STRING_FIELD,
-            NESTED_STRUCT_FIELD, SIMPLE_LIST, COMPLEX_LIST, SIMPLE_MAP, COMPLEX_MAP);
+  @Test
+  public void testShortWidenedToInteger() {
+    // ComplexTypes has no top-level i16 field; ThriftSampleData uses i16 as list element type. The extractor
+    // widens `Short` → `Integer` so all small-int thrift types unify behind `Integer`.
+    ThriftSampleData record = new ThriftSampleData();
+    record.setActive(false);
+    record.setCreated_at(0L);
+    record.setId(0);
+    record.setGroups(List.of((short) 1, (short) 4));
+    Object[] result = (Object[]) extract(record, "groups");
+    assertEquals(result.length, 2);
+    assertEquals(result, new Object[]{1, 4});
   }
 
-  /**
-   * Creates a ThriftRecordReader
-   */
-  @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
-      throws IOException {
-    ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
-    return recordReader;
+  @Test
+  public void testIntegerPreserved() {
+    ComplexTypes record = baseRecord();
+    record.setIntField(42);
+    Object result = extract(record, "intField");
+    assertEquals(result, 42);
   }
 
-  private ThriftRecordReaderConfig getThriftRecordReaderConfig() {
-    ThriftRecordReaderConfig config = new ThriftRecordReaderConfig();
-    config.setThriftClass("org.apache.pinot.plugin.inputformat.thrift.ComplexTypes");
-    return config;
+  @Test
+  public void testLongPreserved() {
+    ComplexTypes record = baseRecord();
+    record.setLongField(1_588_469_340_000L);
+    Object result = extract(record, "longField");
+    assertEquals(result, 1_588_469_340_000L);
   }
 
-  /**
-   * Create a data input file using input records containing various Thrift record types
-   */
-  @Override
-  protected void createInputFile()
-      throws IOException {
-    List<ComplexTypes> thriftRecords = new ArrayList<>(2);
+  @Test
+  public void testDoublePreserved() {
+    ComplexTypes record = baseRecord();
+    record.setDoubleField(1.5d);
+    Object result = extract(record, "doubleField");
+    assertEquals(result, 1.5d);
+  }
 
-    for (Map<String, Object> inputRecord : _inputRecords) {
-      ComplexTypes thriftRecord = new ComplexTypes();
-      thriftRecord.setIntField((int) inputRecord.get(INT_FIELD));
-      thriftRecord.setLongField((long) inputRecord.get(LONG_FIELD));
+  @Test
+  public void testStringPreserved() {
+    ComplexTypes record = baseRecord();
+    record.setStringField("hello");
+    Object result = extract(record, "stringField");
+    assertEquals(result, "hello");
+  }
 
-      Map<String, Object> nestedStructValues = (Map<String, Object>) inputRecord.get(NESTED_STRUCT_FIELD);
-      thriftRecord.setNestedStructField(createNestedType((String) nestedStructValues.get(NESTED_STRING_FIELD),
-          (int) nestedStructValues.get(NESTED_INT_FIELD)));
+  @Test
+  public void testEnumExtractedAsString() {
+    // BaseRecordExtractor.convertSingleValue falls back to toString() for unknown types; TestEnum.toString()
+    // returns the enum constant name.
+    ComplexTypes record = baseRecord();
+    record.setEnumField(TestEnum.GAMMA);
+    Object result = extract(record, "enumField");
+    assertEquals(result, "GAMMA");
+  }
 
-      thriftRecord.setSimpleListField((List<String>) inputRecord.get(SIMPLE_LIST));
+  @Test
+  public void testNullForUnsetOptionalField() {
+    // optionalStringField is left unset; thrift returns null for unset optional fields.
+    assertNull(extract(baseRecord(), "optionalStringField"));
+  }
 
-      List<NestedType> nestedTypeList = new ArrayList<>();
-      for (Map element : (List<Map>) inputRecord.get(COMPLEX_LIST)) {
-        nestedTypeList
-            .add(createNestedType((String) element.get(NESTED_STRING_FIELD), (Integer) element.get(NESTED_INT_FIELD)));
-      }
+  // === Nested struct → Map ===
 
-      thriftRecord.setComplexListField(nestedTypeList);
-      thriftRecord.setBooleanField(Boolean.valueOf((String) inputRecord.get(BOOL_FIELD)));
-      thriftRecord.setDoubleField((Double) inputRecord.get(DOUBLE_FIELD));
-      thriftRecord.setStringField((String) inputRecord.get(STRING_FIELD));
-      thriftRecord.setEnumField(TestEnum.valueOf((String) inputRecord.get(ENUM_FIELD)));
-      thriftRecord.setSimpleMapField((Map<String, Integer>) inputRecord.get(SIMPLE_MAP));
+  @Test
+  public void testNestedStructExtractedAsMap() {
+    ComplexTypes record = baseRecord();
+    record.setNestedStructField(nestedOf("hello", 42));
+    Map<?, ?> result = (Map<?, ?>) extract(record, "nestedStructField");
+    assertEquals(result.get("nestedStringField"), "hello");
+    assertEquals(result.get("nestedIntField"), 42);
+  }
 
-      Map<String, NestedType> complexMap = new HashMap<>();
-      for (Map.Entry<String, Map<String, Object>> entry : ((Map<String, Map<String, Object>>) inputRecord
-          .get(COMPLEX_MAP)).entrySet()) {
-        complexMap.put(entry.getKey(), createNestedType((String) entry.getValue().get(NESTED_STRING_FIELD),
-            (int) entry.getValue().get(NESTED_INT_FIELD)));
-      }
-      thriftRecord.setComplexMapField(complexMap);
-      thriftRecords.add(thriftRecord);
+  // === List / Set (thrift list / set) → Object[] ===
+
+  @Test
+  public void testListOfStrings() {
+    ComplexTypes record = baseRecord();
+    record.setSimpleListField(List.of("a", "b", "c"));
+    Object[] result = (Object[]) extract(record, "simpleListField");
+    assertEquals(result, new Object[]{"a", "b", "c"});
+  }
+
+  @Test
+  public void testListOfStructs() {
+    ComplexTypes record = baseRecord();
+    record.setComplexListField(List.of(
+        nestedOf("a", 1),
+        nestedOf("b", 2)
+    ));
+    Object[] result = (Object[]) extract(record, "complexListField");
+    assertEquals(result.length, 2);
+    Map<?, ?> r0 = (Map<?, ?>) result[0];
+    assertEquals(r0.get("nestedStringField"), "a");
+    assertEquals(r0.get("nestedIntField"), 1);
+    Map<?, ?> r1 = (Map<?, ?>) result[1];
+    assertEquals(r1.get("nestedStringField"), "b");
+    assertEquals(r1.get("nestedIntField"), 2);
+  }
+
+  @Test
+  public void testSetOfStrings() {
+    // ComplexTypes has no set<> field; ThriftSampleData has set<string>. Sets convert to Object[] like lists.
+    ThriftSampleData record = new ThriftSampleData();
+    record.setActive(false);
+    record.setCreated_at(0L);
+    record.setId(0);
+    record.setSet_values(Set.of("alpha", "beta"));
+    Object[] result = (Object[]) extract(record, "set_values");
+    assertEquals(result.length, 2);
+    // Set has no defined order — assert content via a set
+    assertEquals(Set.of(result), Set.of("alpha", "beta"));
+  }
+
+  @Test
+  public void testEmptyListExtractedAsEmptyArray() {
+    ComplexTypes record = baseRecord();
+    record.setSimpleListField(List.of());
+    Object[] result = (Object[]) extract(record, "simpleListField");
+    assertEquals(result, new Object[]{});
+  }
+
+  // === Map (thrift map) ===
+
+  @Test
+  public void testMapStringToInt() {
+    ComplexTypes record = baseRecord();
+    record.setSimpleMapField(Map.of(
+        "a", 1,
+        "b", 2
+    ));
+    Map<?, ?> result = (Map<?, ?>) extract(record, "simpleMapField");
+    assertEquals(result.size(), 2);
+    assertEquals(result.get("a"), 1);
+    assertEquals(result.get("b"), 2);
+  }
+
+  @Test
+  public void testMapStringToStruct() {
+    ComplexTypes record = baseRecord();
+    record.setComplexMapField(Map.of(
+        "x", nestedOf("hello", 10),
+        "y", nestedOf("world", 20)
+    ));
+    Map<?, ?> result = (Map<?, ?>) extract(record, "complexMapField");
+    assertEquals(result.size(), 2);
+    Map<?, ?> x = (Map<?, ?>) result.get("x");
+    assertEquals(x.get("nestedStringField"), "hello");
+    assertEquals(x.get("nestedIntField"), 10);
+    Map<?, ?> y = (Map<?, ?>) result.get("y");
+    assertEquals(y.get("nestedStringField"), "world");
+    assertEquals(y.get("nestedIntField"), 20);
+  }
+
+  // === Helpers ===
+
+  /// Run the extractor with `null` field-set (extract-all) and return the value of the named column. Builds
+  /// the field-id map by introspecting the generated TBase class (same logic used by [ThriftRecordReader]).
+  private static <T extends TBase<?, ?>> Object extract(T record, String column) {
+    ThriftRecordExtractorConfig config = new ThriftRecordExtractorConfig();
+    config.setFieldIds(buildFieldIdMap(record));
+    ThriftRecordExtractor extractor = new ThriftRecordExtractor();
+    extractor.init(null, config);
+    GenericRow row = new GenericRow();
+    extractor.extract(record, row);
+    return row.getValue(column);
+  }
+
+  @SuppressWarnings("rawtypes")
+  private static Map<String, Integer> buildFieldIdMap(TBase record) {
+    Map<? extends TFieldIdEnum, FieldMetaData> metaDataMap =
+        FieldMetaData.getStructMetaDataMap(record.getClass());
+    Map<String, Integer> fieldIds = new HashMap<>();
+    for (TFieldIdEnum field : metaDataMap.keySet()) {
+      fieldIds.put(field.getFieldName(), Short.toUnsignedInt(field.getThriftFieldId()));
     }
-
-    try (BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream(_tempFile))) {
-      TBinaryProtocol binaryOut = new TBinaryProtocol(new TIOStreamTransport(bufferedOut));
-      for (ComplexTypes record : thriftRecords) {
-        record.write(binaryOut);
-      }
-    } catch (TException e) {
-      throw new IOException(e);
-    }
+    return fieldIds;
   }
 
-  private Map<String, Object> createRecord1() {
-    Map<String, Object> record = new HashMap<>();
-    record.put(STRING_FIELD, "hello");
-    record.put(INT_FIELD, 10);
-    record.put(LONG_FIELD, 1000L);
-    record.put(DOUBLE_FIELD, 1.0);
-    record.put(BOOL_FIELD, "false");
-    record.put(ENUM_FIELD, TestEnum.DELTA.toString());
-    record.put(NESTED_STRUCT_FIELD, createNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 5));
-    record.put(SIMPLE_LIST, Arrays.asList("aaa", "bbb", "ccc"));
-    record.put(COMPLEX_LIST, Arrays.asList(createNestedMap(NESTED_STRING_FIELD, "hows", NESTED_INT_FIELD, 10),
-        createNestedMap(NESTED_STRING_FIELD, "it", NESTED_INT_FIELD, 20),
-        createNestedMap(NESTED_STRING_FIELD, "going", NESTED_INT_FIELD, 30)));
-    record.put(SIMPLE_MAP, createNestedMap("Tuesday", 3, "Wednesday", 4));
-    record.put(COMPLEX_MAP,
-        createNestedMap("fruit1", createNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
-            createNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
+  /// Builds a [ComplexTypes] with all required fields populated to defaults so the extract-all loop doesn't
+  /// trip over unset required fields. Tests override only the field they care about.
+  private static ComplexTypes baseRecord() {
+    ComplexTypes record = new ComplexTypes();
+    record.setIntField(0);
+    record.setLongField(0L);
+    record.setBooleanField(false);
+    record.setDoubleField(0.0d);
+    record.setStringField("");
+    record.setEnumField(TestEnum.ALPHA);
+    record.setNestedStructField(nestedOf("", 0));
+    record.setSimpleListField(List.of());
+    record.setComplexListField(List.of());
     return record;
   }
 
-  private Map<String, Object> createRecord2() {
-    Map<String, Object> record = new HashMap<>();
-    record.put(STRING_FIELD, "world");
-    record.put(INT_FIELD, 20);
-    record.put(LONG_FIELD, 2000L);
-    record.put(DOUBLE_FIELD, 2.0);
-    record.put(BOOL_FIELD, "false");
-    record.put(ENUM_FIELD, TestEnum.GAMMA.toString());
-    record.put(NESTED_STRUCT_FIELD, createNestedMap(NESTED_STRING_FIELD, "ice cream", NESTED_INT_FIELD, 5));
-    record.put(SIMPLE_LIST, Arrays.asList("aaa", "bbb", "ccc"));
-    record.put(COMPLEX_LIST, Arrays.asList(createNestedMap(NESTED_STRING_FIELD, "hows", NESTED_INT_FIELD, 10),
-        createNestedMap(NESTED_STRING_FIELD, "it", NESTED_INT_FIELD, 20),
-        createNestedMap(NESTED_STRING_FIELD, "going", NESTED_INT_FIELD, 30)));
-    record.put(SIMPLE_MAP, createNestedMap("Tuesday", 3, "Wednesday", 4));
-    record.put(COMPLEX_MAP,
-        createNestedMap("fruit1", createNestedMap(NESTED_STRING_FIELD, "apple", NESTED_INT_FIELD, 1), "fruit2",
-            createNestedMap(NESTED_STRING_FIELD, "orange", NESTED_INT_FIELD, 2)));
-    return record;
-  }
-
-  private Map<String, Object> createNestedMap(String key1, Object value1, String key2, Object value2) {
-    Map<String, Object> nestedMap = new HashMap<>(2);
-    nestedMap.put(key1, value1);
-    nestedMap.put(key2, value2);
-    return nestedMap;
-  }
-
-  private NestedType createNestedType(String stringField, int intField) {
-    NestedType nestedRecord = new NestedType();
-    nestedRecord.setNestedStringField(stringField);
-    nestedRecord.setNestedIntField(intField);
-    return nestedRecord;
+  private static NestedType nestedOf(String stringValue, int intValue) {
+    NestedType n = new NestedType();
+    n.setNestedStringField(stringValue);
+    n.setNestedIntField(intValue);
+    return n;
   }
 }

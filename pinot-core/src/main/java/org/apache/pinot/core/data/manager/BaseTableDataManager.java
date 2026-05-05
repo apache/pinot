@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
@@ -116,6 +117,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +144,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _resourceTmpDir;
   protected Logger _logger;
   protected SegmentReloadSemaphore _segmentReloadSemaphore;
+  /**
+   * @deprecated Use {@link #_segmentReloadExecutor} or {@link #_segmentRefreshExecutor} instead. Kept for binary
+   * compatibility with downstream extensions; refers to the shared underlying executor pool.
+   */
+  @Deprecated
   protected ExecutorService _segmentReloadRefreshExecutor;
+  protected ExecutorService _segmentReloadExecutor;
+  protected ExecutorService _segmentRefreshExecutor;
   @Nullable
   protected ExecutorService _segmentPreloadExecutor;
   protected AuthProvider _authProvider;
@@ -188,8 +197,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _propertyStore = helixManager.getHelixPropertyStore();
     _segmentLocks = segmentLocks;
     _segmentReloadSemaphore = segmentReloadSemaphore;
-    _segmentReloadRefreshExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
-        SegmentOperationsTaskType.REFRESH_OR_RELOAD, tableConfig.getTableName());
+    _segmentReloadRefreshExecutor = segmentReloadRefreshExecutor;
+    // These two executors are using the same underlying thread pool, only that they're wrapped with different decorator
+    _segmentReloadExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
+        SegmentOperationsTaskType.RELOAD, tableConfig.getTableName());
+    _segmentRefreshExecutor = new SegmentOperationsExecutorService(segmentReloadRefreshExecutor,
+        SegmentOperationsTaskType.REFRESH, tableConfig.getTableName());
     _segmentPreloadExecutor = segmentPreloadExecutor != null
         ? new SegmentOperationsExecutorService(segmentPreloadExecutor, SegmentOperationsTaskType.PRELOAD,
         tableConfig.getTableName())
@@ -218,7 +231,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    updateCachedTableConfigAndSchema(tableConfig, schema);
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -419,13 +432,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    updateCachedTableConfigAndSchema(tableConfig, schema);
     return indexLoadingConfig;
   }
 
   @Override
   public Pair<TableConfig, Schema> getCachedTableConfigAndSchema() {
     return _cachedTableConfigAndSchema;
+  }
+
+  @Override
+  public void updateCachedTableConfigAndSchema(TableConfig tableConfig, Schema schema) {
+    _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
   }
 
   @Override
@@ -493,7 +511,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return;
     }
     _logger.info("Enqueuing segment: {} to be replaced", segmentName);
-    _segmentReloadRefreshExecutor.submit(() -> {
+    _segmentRefreshExecutor.submit(() -> {
       try {
         replaceSegmentInternal(segmentName);
       } catch (Exception e) {
@@ -717,7 +735,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void closeSegment(SegmentDataManager segmentDataManager) {
+  protected void closeSegment(SegmentDataManager segmentDataManager) {
     String segmentName = segmentDataManager.getSegmentName();
     _logger.info("Closing segment: {}", segmentName);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, -1L);
@@ -921,7 +939,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
+  protected void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
       boolean forceDownload, String reloadJobId)
       throws Exception {
     List<String> failedSegments = new ArrayList<>();
@@ -943,7 +961,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _reloadJobStatusCache.recordFailure(reloadJobId, segmentName, t);
         }
       }
-    }, _segmentReloadRefreshExecutor)).toArray(CompletableFuture[]::new)).get();
+    }, _segmentReloadExecutor)).toArray(CompletableFuture[]::new)).get();
     if (sampleException.get() != null) {
       throw new RuntimeException(
           String.format("Failed to reload %d/%d segments: %s in table: %s", failedSegments.size(),
@@ -951,7 +969,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private void reloadSegment(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig,
+  protected void reloadSegment(SegmentDataManager segmentDataManager, IndexLoadingConfig indexLoadingConfig,
       boolean forceDownload)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
@@ -1078,12 +1096,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger.info("Reloaded segment: {}", segmentName);
   }
 
-  private boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
+  protected boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
     return zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
         || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
-  private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
+  protected boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
       SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     SegmentDirectoryLoader segmentDirectoryLoader =
@@ -1277,7 +1295,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File untarSegment(String segmentName, File segmentTarFile, File tempRootDir)
+  protected File untarSegment(String segmentName, File segmentTarFile, File tempRootDir)
       throws IOException {
     File untarDir = new File(tempRootDir, segmentName);
     _logger.info("Untarring segment: {} from: {} to: {}", segmentName, segmentTarFile, untarDir);
@@ -1293,7 +1311,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File moveSegment(String segmentName, File untarredSegmentDir)
+  protected File moveSegment(String segmentName, File untarredSegmentDir)
       throws IOException {
     File indexDir = getSegmentDataDir(segmentName);
     try {
@@ -1332,7 +1350,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  private String getSegmentCurrentTier(String segmentName) {
+  protected String getSegmentCurrentTier(String segmentName) {
     SegmentDataManager segment = _segmentDataManagerMap.get(segmentName);
     if (segment != null && segment.getSegment() instanceof ImmutableSegment) {
       return ((ImmutableSegment) segment.getSegment()).getTier();
@@ -1358,7 +1376,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * The original index directory is restored lazily, as depending on the conditions,
    * it may be restored from the backup directory or segment downloaded from deep store.
    */
-  private void createBackup(File indexDir) {
+  protected void createBackup(File indexDir) {
     if (!indexDir.exists()) {
       return;
     }
@@ -1375,7 +1393,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * When we rename the segment backup directory to segment temporary directory, we know the reload
    * already succeeded, so that we can safely delete the segment temporary directory.
    */
-  private void removeBackup(File indexDir)
+  protected void removeBackup(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
@@ -1465,7 +1483,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Nullable
-  private SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory tryInitSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata) {
     try {
       return initSegmentDirectory(segmentName, segmentCrc, indexLoadingConfig, zkMetadata);
@@ -1564,8 +1582,25 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     Set<String> columnsInSegment = segmentMetadata.getAllColumns();
 
-    // Column is added
-    if (!columnsInSegment.containsAll(schema.getPhysicalColumnNames())) {
+    // Timestamp index changed: compare the set of $col$GRANULARITY columns expected by the current table config
+    // against those physically present in the segment. Any mismatch (granularity added, granularity removed, or
+    // index fully removed) means the segment must be reloaded so SegmentPreProcessor can add/drop the derived
+    // columns. This check runs before the generic "column added" check to prevent $col$GRANULARITY columns from
+    // being misreported as "column added" when a timestamp index is first configured.
+    Set<String> expectedTimestampColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
+    Set<String> segmentTimestampColumns = segmentPhysicalColumns.stream()
+        .filter(TimestampIndexUtils::isValidColumnWithGranularity)
+        .collect(Collectors.toSet());
+    if (!expectedTimestampColumns.equals(segmentTimestampColumns)) {
+      LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: timestamp index", tableNameWithType, segmentName);
+      return new StaleSegment(segmentName, true, "timestamp index changed");
+    }
+
+    // Column is added (exclude $col$GRANULARITY columns, which are managed by the timestamp index check above)
+    Set<String> nonTimestampSchemaColumns = schema.getPhysicalColumnNames().stream()
+        .filter(col -> !TimestampIndexUtils.isValidColumnWithGranularity(col))
+        .collect(Collectors.toSet());
+    if (!columnsInSegment.containsAll(nonTimestampSchemaColumns)) {
       LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: column added", tableNameWithType, segmentName);
       return new StaleSegment(segmentName, true, "column added");
     }
@@ -1618,6 +1653,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
 
     for (String columnName : segmentPhysicalColumns) {
+      // $col$GRANULARITY columns are fully managed by the dedicated timestamp index check above.
+      // Skip them here to avoid false positives on "column deleted", "range index changed", etc.
+      if (TimestampIndexUtils.isValidColumnWithGranularity(columnName)) {
+        continue;
+      }
+
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
       DataSource source = segment.getDataSource(columnName);
       assert columnMetadata != null && source != null;
@@ -1781,7 +1822,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return new StaleSegment(segmentName, false, null);
   }
 
-  private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
+  protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
       IndexLoadingConfig indexLoadingConfig, @Nullable SegmentZKMetadata zkMetadata)
       throws Exception {
     Map<String, String> segmentCustomConfigs = zkMetadata != null ? zkMetadata.getCustomMap() : new HashMap<>();
@@ -1806,7 +1847,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
   // useDataCRC.
-  private static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+  protected static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
       return true;
     }
@@ -1816,7 +1857,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         && zkMetadata.getDataCrc() == Long.parseLong(localMetadata.getDataCrc());
   }
 
-  private static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {
+  protected static void recoverReloadFailureQuietly(String tableNameWithType, String segmentName, File indexDir) {
     try {
       LoaderUtils.reloadFailureRecovery(indexDir);
     } catch (Exception e) {
@@ -1825,7 +1866,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private static void closeSegmentDirectoryQuietly(SegmentDirectory segmentDirectory) {
+  protected static void closeSegmentDirectoryQuietly(SegmentDirectory segmentDirectory) {
     if (segmentDirectory != null) {
       try {
         segmentDirectory.close();

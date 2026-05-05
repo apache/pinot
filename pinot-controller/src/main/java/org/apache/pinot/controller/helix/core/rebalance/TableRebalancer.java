@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
@@ -63,13 +62,17 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
-import org.apache.pinot.controller.api.resources.BatchConfig;
 import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.assignment.segment.BaseStrictRealtimeSegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
@@ -1234,8 +1237,8 @@ public class TableRebalancer {
         tableRebalanceLogger.info("COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED "
             + "instance partitions for table: {}", tableNameWithType);
         if (!dryRun) {
-          String instancePartitionsName = InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-              InstancePartitionsType.COMPLETED.toString());
+          String instancePartitionsName =
+              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, InstancePartitionsType.COMPLETED);
           tableRebalanceLogger.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
           InstancePartitionsUtils.removeInstancePartitions(_helixManager.getHelixPropertyStore(),
               instancePartitionsName);
@@ -1253,7 +1256,7 @@ public class TableRebalancer {
       Enablement minimizeDataMovement, Logger tableRebalanceLogger) {
     String tableNameWithType = tableConfig.getTableName();
     String instancePartitionsName =
-        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString());
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType);
     InstancePartitions existingInstancePartitions =
         InstancePartitionsUtils.fetchInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitionsName);
 

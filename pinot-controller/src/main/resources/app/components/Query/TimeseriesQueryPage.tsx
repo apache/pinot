@@ -38,7 +38,7 @@ import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
 import { getTimeSeriesLanguages } from '../../requests';
-import { useHistory, useLocation } from 'react-router';
+import { useHistory, useLocation } from 'react-router-dom';
 import TableToolbar from '../TableToolbar';
 import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';
@@ -345,6 +345,9 @@ const TimeseriesQueryPage = () => {
     records: [],
   });
   const [executedExplainMode, setExecutedExplainMode] = useState<boolean>(false);
+  const selectedQueryLanguage = supportedLanguages.includes(config.queryLanguage)
+    ? config.queryLanguage
+    : '';
 
   // Fetch supported languages from controller configuration
   useEffect(() => {
@@ -644,12 +647,17 @@ const TimeseriesQueryPage = () => {
             <Typography className={classes.queryControlLabel}>Query Language</Typography>
             <div className={classes.queryControlInput}>
               <Select
-                value={config.queryLanguage}
+                value={selectedQueryLanguage}
                 onChange={(e) => handleConfigChange('queryLanguage', e.target.value as string)}
                 disabled={languagesLoading || supportedLanguages.length === 0}
                 variant="outlined"
                 className={classes.controlSelect}
               >
+                {supportedLanguages.length === 0 && (
+                  <MenuItem value="" disabled>
+                    No languages available
+                  </MenuItem>
+                )}
                 {supportedLanguages.map((lang) => (
                   <MenuItem key={lang} value={lang}>
                     {lang}

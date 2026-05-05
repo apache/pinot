@@ -33,7 +33,7 @@ import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
@@ -44,8 +44,8 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
 
   @Override
   public ThreadAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
-    int period = config.getProperty(CommonConstants.Accounting.CONFIG_OF_HEAP_USAGE_PUBLISHING_PERIOD_MS,
-        CommonConstants.Accounting.DEFAULT_HEAP_USAGE_PUBLISH_PERIOD);
+    int period = config.getProperty(Accounting.Keys.HEAP_USAGE_PUBLISHING_PERIOD_MS,
+        Accounting.DEFAULT_HEAP_USAGE_PUBLISH_PERIOD);
     return new HeapUsagePublishingAccountant(period);
   }
 

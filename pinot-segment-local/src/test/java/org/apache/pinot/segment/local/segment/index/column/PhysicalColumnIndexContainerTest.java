@@ -74,7 +74,7 @@ public class PhysicalColumnIndexContainerTest {
   static {
     ObjectNode indexes = JsonUtils.newObjectNode();
     JsonIndexConfig config = new JsonIndexConfig();
-    indexes.put(JsonIndexType.INDEX_DISPLAY_NAME, config.toJsonNode());
+    indexes.set(JsonIndexType.INDEX_DISPLAY_NAME, config.toJsonNode());
 
     TABLE_CONFIG =
         new TableConfigBuilder(TableType.OFFLINE)

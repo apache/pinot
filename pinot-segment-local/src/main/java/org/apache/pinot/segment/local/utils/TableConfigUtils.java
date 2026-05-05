@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -47,8 +48,6 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
@@ -83,6 +82,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -96,12 +96,14 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -178,6 +180,7 @@ public final class TableConfigUtils {
     }
 
     validateValidationConfig(tableConfig, schema);
+    validateSegmentAssignmentConfig(tableConfig);
     validateIngestionConfig(tableConfig, schema);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
@@ -348,7 +351,7 @@ public final class TableConfigUtils {
    *
    * 2. For OFFLINE table
    * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
-   * - for Dimension tables checks the primary key requirement
+   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
    *
    * 3. Checks peerDownloadSchema
    * 4. Checks time column existence if null handling for time column is enabled
@@ -386,6 +389,29 @@ public final class TableConfigUtils {
     }
 
     validateRetentionConfig(tableConfig);
+  }
+
+  private static void validateSegmentAssignmentConfig(TableConfig tableConfig) {
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap == null) {
+      return;
+    }
+    if (tableConfig.isDimTable()) {
+      SegmentAssignmentConfig segmentAssignmentConfig =
+          segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
+      if (segmentAssignmentConfig == null) {
+        return;
+      }
+      String segmentAssignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
+      if (segmentAssignmentStrategy != null
+          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
+        throw new IllegalStateException(
+            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
+                tableConfig.getTableName(),
+                CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
+                segmentAssignmentStrategy));
+      }
+    }
   }
 
   private static boolean isValidPeerDownloadScheme(String peerSegmentDownloadScheme) {
@@ -789,6 +815,8 @@ public final class TableConfigUtils {
     if (tableConfig.getTableType() == TableType.OFFLINE) {
       Preconditions.checkState(isUpsertEnabled && !isDedupEnabled,
           "Dedup is not supported for OFFLINE table. Only upsert is supported for OFFLINE table");
+      Preconditions.checkState(tableConfig.getUpsertMode() != UpsertConfig.Mode.PARTIAL,
+          "Partial upsert is not supported for OFFLINE table");
       // Offline upsert tables require segment partition config so that segments are assigned to servers
       // based on partition, ensuring all segments of a partition land on the same server for correct dedup.
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -898,6 +926,61 @@ public final class TableConfigUtils {
                 || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
             "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
                 + " / UpsertCompactMergeTask for upsert table");
+      }
+
+      // Validate post-partial-upsert transform configs
+      List<TransformConfig> postPartialUpsertTransformConfigs =
+          upsertConfig.getPostPartialUpsertTransformConfigs();
+      if (postPartialUpsertTransformConfigs != null) {
+        Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
+            "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
+        Set<String> primaryKeyColumns = new HashSet<>(schema.getPrimaryKeyColumns());
+        Set<String> transformColumns = new HashSet<>();
+        for (TransformConfig transformConfig : postPartialUpsertTransformConfigs) {
+          String columnName = transformConfig.getColumnName();
+          String transformFunction = transformConfig.getTransformFunction();
+          if (columnName == null || transformFunction == null) {
+            throw new IllegalStateException(
+                "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs "
+                    + transformConfig);
+          }
+          Preconditions.checkState(!primaryKeyColumns.contains(columnName),
+              "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
+          Preconditions.checkState(comparisonColumns == null || !comparisonColumns.contains(columnName),
+              "Post-partial-upsert transform cannot target comparison column '%s'", columnName);
+          Preconditions.checkState(!columnName.equals(deleteRecordColumn),
+              "Post-partial-upsert transform cannot target delete record column '%s'", columnName);
+          Preconditions.checkState(!columnName.equals(outOfOrderRecordColumn),
+              "Post-partial-upsert transform cannot target out-of-order record column '%s'", columnName);
+          if (!transformColumns.add(columnName)) {
+            throw new IllegalStateException(
+                "Duplicate post-partial-upsert transform config found for column '" + columnName + "'");
+          }
+          Preconditions.checkState(schema.hasColumn(columnName),
+              "The destination column '%s' of the post-partial-upsert transform function must be present in the "
+                  + "schema", columnName);
+          if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
+            throw new IllegalStateException(
+                "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '"
+                    + columnName + "' in postPartialUpsertTransformConfigs");
+          }
+          try {
+            FunctionEvaluator expressionEvaluator =
+                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+            List<String> arguments = expressionEvaluator.getArguments();
+            if (arguments.contains(columnName)) {
+              throw new IllegalStateException(
+                  "Arguments of a post-partial-upsert transform function '" + arguments
+                      + "' cannot contain the destination column '" + columnName + "'");
+            }
+          } catch (IllegalStateException e) {
+            throw e;
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '"
+                    + columnName + "'", e);
+          }
+        }
       }
 
       if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
@@ -1219,8 +1302,10 @@ public final class TableConfigUtils {
   /**
    * Validates that critical upsert configuration fields are not changed during table config update.
    * Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn,
-   * partialUpsertStrategies, defaultPartialUpsertStrategy.
+   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+   *
+   * <p>Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
+   * not validated here — they may be added, removed, or changed on existing tables.
    *
    * @param newConfig the new table config being applied
    * @param existingConfig the existing table config
@@ -1278,19 +1363,6 @@ public final class TableConfigUtils {
           newUpsertConfig.getOutOfOrderRecordColumn())) {
         violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
-      }
-      if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-        if (!Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
-            newUpsertConfig.getPartialUpsertStrategies())) {
-          violations.add(String.format("upsertConfig.partialUpsertStrategies (%s -> %s)",
-              existingUpsertConfig.getPartialUpsertStrategies(), newUpsertConfig.getPartialUpsertStrategies()));
-        }
-        if (existingUpsertConfig.getDefaultPartialUpsertStrategy()
-            != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
-          violations.add(String.format("upsertConfig.defaultPartialUpsertStrategy (%s -> %s)",
-              existingUpsertConfig.getDefaultPartialUpsertStrategy(),
-              newUpsertConfig.getDefaultPartialUpsertStrategy()));
-        }
       }
     }
   }
@@ -1423,8 +1495,10 @@ public final class TableConfigUtils {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (CollectionUtils.isNotEmpty(fieldConfigs)) {
+      Set<String> seenColumns = new HashSet<>();
       for (FieldConfig fieldConfig : fieldConfigs) {
         String column = fieldConfig.getName();
+        Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
 
         // Validate DELTA / DELTADELTA compression codecs compatibility

@@ -24,7 +24,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
@@ -186,11 +186,11 @@ public class ColumnMinMaxValueGenerator {
       case DOUBLE:
         return new DoubleDictionary(dictionaryBuffer, length);
       case BIG_DECIMAL:
-        return new BigDecimalDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
+        return new BigDecimalDictionary(dictionaryBuffer, length, columnMetadata.getLengthOfLongestElement());
       case STRING:
-        return new StringDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
+        return new StringDictionary(dictionaryBuffer, length, columnMetadata.getLengthOfLongestElement());
       case BYTES:
-        return new BytesDictionary(dictionaryBuffer, length, columnMetadata.getColumnMaxLength());
+        return new BytesDictionary(dictionaryBuffer, length, columnMetadata.getLengthOfLongestElement());
       default:
         throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
     }
@@ -205,8 +205,8 @@ public class ColumnMinMaxValueGenerator {
     boolean isSingleValue = columnMetadata.isSingleValue();
     PinotDataBuffer rawIndexBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
     try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
-        .createIndexReader(rawIndexBuffer, columnMetadata);
-        ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
+        .createRawIndexReader(rawIndexBuffer, storedType,
+        isSingleValue); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       int numDocs = columnMetadata.getTotalDocs();
       Object minValue;
       Object maxValue;
@@ -300,16 +300,29 @@ public class ColumnMinMaxValueGenerator {
           break;
         }
         case BIG_DECIMAL: {
-          Preconditions.checkState(isSingleValue, "Unsupported multi-value BIG_DECIMAL column: %s", columnName);
           BigDecimal min = null;
           BigDecimal max = null;
-          for (int docId = 0; docId < numDocs; docId++) {
-            BigDecimal value = rawIndexReader.getBigDecimal(docId, readerContext);
-            if (min == null || min.compareTo(value) > 0) {
-              min = value;
+          if (isSingleValue) {
+            for (int docId = 0; docId < numDocs; docId++) {
+              BigDecimal value = rawIndexReader.getBigDecimal(docId, readerContext);
+              if (min == null || min.compareTo(value) > 0) {
+                min = value;
+              }
+              if (max == null || max.compareTo(value) < 0) {
+                max = value;
+              }
             }
-            if (max == null || max.compareTo(value) < 0) {
-              max = value;
+          } else {
+            for (int docId = 0; docId < numDocs; docId++) {
+              BigDecimal[] values = rawIndexReader.getBigDecimalMV(docId, readerContext);
+              for (BigDecimal value : values) {
+                if (min == null || min.compareTo(value) > 0) {
+                  min = value;
+                }
+                if (max == null || max.compareTo(value) < 0) {
+                  max = value;
+                }
+              }
             }
           }
           minValue = min;
@@ -322,10 +335,10 @@ public class ColumnMinMaxValueGenerator {
           if (isSingleValue) {
             for (int docId = 0; docId < numDocs; docId++) {
               String value = rawIndexReader.getString(docId, readerContext);
-              if (min == null || StringUtils.compare(min, value) > 0) {
+              if (min == null || Strings.CS.compare(min, value) > 0) {
                 min = value;
               }
-              if (max == null || StringUtils.compare(max, value) < 0) {
+              if (max == null || Strings.CS.compare(max, value) < 0) {
                 max = value;
               }
             }
@@ -333,10 +346,10 @@ public class ColumnMinMaxValueGenerator {
             for (int docId = 0; docId < numDocs; docId++) {
               String[] values = rawIndexReader.getStringMV(docId, readerContext);
               for (String value : values) {
-                if (min == null || StringUtils.compare(min, value) > 0) {
+                if (min == null || Strings.CS.compare(min, value) > 0) {
                   min = value;
                 }
-                if (max == null || StringUtils.compare(max, value) < 0) {
+                if (max == null || Strings.CS.compare(max, value) < 0) {
                   max = value;
                 }
               }

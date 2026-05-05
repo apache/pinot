@@ -29,15 +29,12 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * Partitioner which computes partition values based on the ColumnPartitionConfig from the table config
  */
 public class TableConfigPartitioner implements Partitioner {
-
   private final String _column;
   private final PartitionFunction _partitionFunction;
 
   public TableConfigPartitioner(String columnName, ColumnPartitionConfig columnPartitionConfig) {
     _column = columnName;
-    _partitionFunction = PartitionFunctionFactory
-        .getPartitionFunction(columnPartitionConfig.getFunctionName(), columnPartitionConfig.getNumPartitions(),
-            columnPartitionConfig.getFunctionConfig());
+    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(columnPartitionConfig);
   }
 
   @Override

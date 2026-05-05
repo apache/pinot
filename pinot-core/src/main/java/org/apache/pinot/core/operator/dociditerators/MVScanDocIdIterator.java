@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.OptionalInt;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -151,6 +152,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
           return new FloatMatcher();
         case DOUBLE:
           return new DoubleMatcher();
+        case BIG_DECIMAL:
+          return new BigDecimalMatcher();
         case STRING:
           return new StringMatcher();
         case BYTES:
@@ -225,6 +228,18 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesValueMatch(int docId) {
       int length = _reader.getDoubleMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class BigDecimalMatcher implements ValueMatcher {
+
+    private final BigDecimal[] _buffer = new BigDecimal[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getBigDecimalMV(docId, _buffer, _readerContext);
       _numEntriesScanned += length;
       return _predicateEvaluator.applyMV(_buffer, length);
     }

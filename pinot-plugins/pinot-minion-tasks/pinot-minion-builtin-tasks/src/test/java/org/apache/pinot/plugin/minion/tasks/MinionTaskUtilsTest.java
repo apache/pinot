@@ -19,19 +19,23 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
@@ -649,5 +653,394 @@ public class MinionTaskUtilsTest {
         BatchConfigProperties.SegmentPushType.METADATA.toString());
     assertEquals(pushTaskConfigs.get(BatchConfigProperties.PUSH_CONTROLLER_URI), "http://localhost:9000");
     assertEquals(pushTaskConfigs.size(), 4);
+  }
+
+  private static SegmentZKMetadata makeSegmentWithEndTimeMs(String name, long endTimeMs) {
+    SegmentZKMetadata segment = new SegmentZKMetadata(name);
+    segment.setEndTime(endTimeMs);
+    segment.setTimeUnit(TimeUnit.MILLISECONDS);
+    return segment;
+  }
+
+  private static SegmentZKMetadata makeSegmentWithCreationTime(String name, long endTimeMs, long creationTimeMs) {
+    SegmentZKMetadata segment = new SegmentZKMetadata(name);
+    segment.setEndTime(endTimeMs);
+    segment.setTimeUnit(TimeUnit.MILLISECONDS);
+    segment.setCreationTime(creationTimeMs);
+    return segment;
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionExcludesExpiredSegments() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    SegmentZKMetadata recentSegment = makeSegmentWithEndTimeMs("segment_recent", nowMs - 2 * oneDayMs);
+    SegmentZKMetadata expiredSegment = makeSegmentWithEndTimeMs("segment_expired", nowMs - 10 * oneDayMs);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(recentSegment, expiredSegment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1);
+    assertEquals(filtered.get(0).getSegmentName(), "segment_recent");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionReturnsAllWhenNoRetention() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+
+    SegmentZKMetadata segment1 = makeSegmentWithEndTimeMs("segment_1", nowMs - 365L * 86_400_000L);
+    SegmentZKMetadata segment2 = makeSegmentWithEndTimeMs("segment_2", nowMs - 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(segment1, segment2));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 2);
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionKeepsSegmentsWithInvalidEndTime() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    SegmentZKMetadata invalidTimeSegment = new SegmentZKMetadata("segment_invalid_time");
+    invalidTimeSegment.setEndTime(-1);
+    invalidTimeSegment.setTimeUnit(TimeUnit.MILLISECONDS);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(invalidTimeSegment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, System.currentTimeMillis(), false);
+
+    assertEquals(filtered.size(), 1);
+    assertEquals(filtered.get(0).getSegmentName(), "segment_invalid_time");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionMalformedRetentionConfigReturnsAll() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("INVALID_UNIT")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithEndTimeMs("segment_1", nowMs - 365L * 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(segment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1, "Malformed unit should fall through to catch block and return original list");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionMalformedRetentionValueReturnsAll() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("abc")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithEndTimeMs("segment_1", nowMs - 365L * 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(segment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1, "Malformed value should fall through to catch block and return original list");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionZeroRetentionReturnsAll() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("0")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithEndTimeMs("segment_1", nowMs - 365L * 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(segment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1, "Zero retention should return original list unchanged");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionNegativeRetentionReturnsAll() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("-1")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithEndTimeMs("segment_1", nowMs - 365L * 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(segment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1, "Negative retention should return original list unchanged");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionExactBoundaryIsKept() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long sevenDaysMs = 7L * 86_400_000L;
+
+    // Exact boundary: endTime is exactly 7 days ago, so (now - endTime) == retentionMs. The filter uses
+    // strict greater-than, so this segment should be kept.
+    SegmentZKMetadata boundarySegment = makeSegmentWithEndTimeMs("segment_boundary", nowMs - sevenDaysMs);
+    // 1ms past boundary: (now - endTime) > retentionMs, so this should be excluded.
+    SegmentZKMetadata justExpiredSegment = makeSegmentWithEndTimeMs("segment_just_expired", nowMs - sevenDaysMs - 1);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(boundarySegment, justExpiredSegment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1);
+    assertEquals(filtered.get(0).getSegmentName(), "segment_boundary",
+        "Segment at exact retention boundary should be kept (strict greater-than comparison)");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionWithBuffer() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    // 5 days old — within 7d retention but outside effective retention of (7d - 3d = 4d)
+    SegmentZKMetadata borderlineSegment = makeSegmentWithEndTimeMs("segment_borderline", nowMs - 5 * oneDayMs);
+    // 2 days old — within both retention and effective retention
+    SegmentZKMetadata recentSegment = makeSegmentWithEndTimeMs("segment_recent", nowMs - 2 * oneDayMs);
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(MinionTaskUtils.RETENTION_EXPIRY_BUFFER_PERIOD_KEY, "3d");
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(borderlineSegment, recentSegment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, taskConfigs, nowMs, false);
+
+    assertEquals(filtered.size(), 1);
+    assertEquals(filtered.get(0).getSegmentName(), "segment_recent",
+        "With 3d buffer, effective retention is 4d — 5-day-old segment should be excluded");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionBufferExceedsRetentionReturnsAll() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata segment = makeSegmentWithEndTimeMs("segment_1", nowMs - 365L * 86_400_000L);
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(MinionTaskUtils.RETENTION_EXPIRY_BUFFER_PERIOD_KEY, "10d");
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(segment));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, taskConfigs, nowMs, false);
+
+    assertEquals(filtered.size(), 1,
+        "Buffer exceeding retention should fail-open and return all segments");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionNullTaskConfigsNoBuffer() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata expired = makeSegmentWithEndTimeMs("segment_expired", nowMs - 10L * 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(expired));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 0, "Null taskConfigs means no buffer — expired segment should be filtered");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionMalformedBufferReturnsZeroBuffer() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+    SegmentZKMetadata expired = makeSegmentWithEndTimeMs("segment_expired", nowMs - 10 * oneDayMs);
+    SegmentZKMetadata recent = makeSegmentWithEndTimeMs("segment_recent", nowMs - 2 * oneDayMs);
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(MinionTaskUtils.RETENTION_EXPIRY_BUFFER_PERIOD_KEY, "invalid_period");
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(expired, recent));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, taskConfigs, nowMs, false);
+
+    assertEquals(filtered.size(), 1,
+        "Malformed buffer should fall back to 0 — expired segment still filtered by raw retention");
+    assertEquals(filtered.get(0).getSegmentName(), "segment_recent");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionEmptyTaskConfigsNoBuffer() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    SegmentZKMetadata expired = makeSegmentWithEndTimeMs("segment_expired", nowMs - 10L * 86_400_000L);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(expired));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, new HashMap<>(), nowMs, false);
+
+    assertEquals(filtered.size(), 0,
+        "Empty taskConfigs (no buffer key) means no buffer — expired segment should be filtered");
+  }
+
+  // --- isCreationTimeFallbackEnabled tests ---
+
+  @Test
+  public void testIsCreationTimeFallbackEnabledReturnsDefaultWhenKeyAbsent() {
+    ClusterInfoAccessor mockAccessor = mock(ClusterInfoAccessor.class);
+    when(mockAccessor.getClusterConfig(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK)).thenReturn(null);
+    assertFalse(MinionTaskUtils.isCreationTimeFallbackEnabled(mockAccessor));
+  }
+
+  @Test
+  public void testIsCreationTimeFallbackEnabledReturnsTrueWhenSet() {
+    ClusterInfoAccessor mockAccessor = mock(ClusterInfoAccessor.class);
+    when(mockAccessor.getClusterConfig(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK)).thenReturn("true");
+    assertTrue(MinionTaskUtils.isCreationTimeFallbackEnabled(mockAccessor));
+  }
+
+  @Test
+  public void testIsCreationTimeFallbackEnabledReturnsFalseWhenExplicitlyDisabled() {
+    ClusterInfoAccessor mockAccessor = mock(ClusterInfoAccessor.class);
+    when(mockAccessor.getClusterConfig(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK)).thenReturn("false");
+    assertFalse(MinionTaskUtils.isCreationTimeFallbackEnabled(mockAccessor));
+  }
+
+  @Test
+  public void testIsCreationTimeFallbackEnabledNonBooleanStringReturnsFalse() {
+    ClusterInfoAccessor mockAccessor = mock(ClusterInfoAccessor.class);
+    when(mockAccessor.getClusterConfig(
+        ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK)).thenReturn("abc");
+    assertFalse(MinionTaskUtils.isCreationTimeFallbackEnabled(mockAccessor));
+  }
+
+  // --- filterSegmentsPastRetention with creation-time fallback tests ---
+
+  @Test
+  public void testFilterSegmentsPastRetentionFallbackEnabledFiltersInvalidEndTimeOldCreationTime() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    SegmentZKMetadata invalidEndTimeOldCreation =
+        makeSegmentWithCreationTime("segment_invalid_old", -1, nowMs - 10 * oneDayMs);
+    SegmentZKMetadata recent = makeSegmentWithEndTimeMs("segment_recent", nowMs - 2 * oneDayMs);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(invalidEndTimeOldCreation, recent));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, true);
+
+    assertEquals(filtered.size(), 1);
+    assertEquals(filtered.get(0).getSegmentName(), "segment_recent",
+        "With fallback enabled, segment with invalid end time and old creation time should be filtered");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionFallbackDisabledKeepsInvalidEndTimeOldCreationTime() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    SegmentZKMetadata invalidEndTimeOldCreation =
+        makeSegmentWithCreationTime("segment_invalid_old", -1, nowMs - 10 * oneDayMs);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(invalidEndTimeOldCreation));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, false);
+
+    assertEquals(filtered.size(), 1,
+        "With fallback disabled, segment with invalid end time should be kept regardless of creation time");
+  }
+
+  @Test
+  public void testFilterSegmentsPastRetentionFallbackEnabledKeepsRecentCreationTime() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("7")
+        .build();
+
+    long nowMs = System.currentTimeMillis();
+    long oneDayMs = 86_400_000L;
+
+    SegmentZKMetadata invalidEndTimeRecentCreation =
+        makeSegmentWithCreationTime("segment_invalid_recent", -1, nowMs - 2 * oneDayMs);
+
+    List<SegmentZKMetadata> segments = new ArrayList<>(List.of(invalidEndTimeRecentCreation));
+    List<SegmentZKMetadata> filtered =
+        MinionTaskUtils.filterSegmentsPastRetention(segments, tableConfig, null, nowMs, true);
+
+    assertEquals(filtered.size(), 1,
+        "With fallback enabled, segment with invalid end time but recent creation time should be kept");
   }
 }

@@ -21,80 +21,133 @@ package org.apache.pinot.segment.spi.creator;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-/**
- * An interface to read the column statistics from statistics collectors.
- */
+/// Statistics for a column, collected before creating indexes.
+/// For MV column, the stats are on individual elements within the MV values.
+@SuppressWarnings("rawtypes")
 public interface ColumnStatistics extends Serializable {
-  /**
-   * @return Minimum value of the column
-   */
-  Object getMinValue();
 
-  /**
-   * @return Maximum value of the column
-   */
-  Object getMaxValue();
+  /// Returns the [FieldSpec] of the column.
+  FieldSpec getFieldSpec();
 
-  /**
-   *
-   * @return An array of elements that has the unique values for this column, sorted order.
-   */
+  /// Returns the stored [DataType] of the column.
+  default DataType getValueType() {
+    return getFieldSpec().getDataType().getStoredType();
+  }
+
+  /// Returns whether the column is single-valued.
+  default boolean isSingleValue() {
+    return getFieldSpec().isSingleValueField();
+  }
+
+  /// Returns the minimum value, or `null` if the column is empty.
+  @Nullable
+  Comparable getMinValue();
+
+  /// Returns the maximum value, or `null` if the column is empty.
+  @Nullable
+  Comparable getMaxValue();
+
+  /// Returns a sorted (ascending) array of all unique values for non-empty dictionary-encoded columns, `null`
+  /// otherwise.
+  /// - INT: int[]
+  /// - LONG: long[]
+  /// - FLOAT: float[]
+  /// - DOUBLE: double[]
+  /// - BIG_DECIMAL: BigDecimal[]
+  /// - STRING: String[]
+  /// - BYTES: ByteArray[]
+  @Nullable
   Object getUniqueValuesSet();
 
-  /**
-   *
-   * @return The number of unique values of this column.
-   */
+  /// Returns the cardinality of the column.
+  /// - For dictionary-encoded columns, returns the exact cardinality.
+  /// - For raw columns:
+  ///   - When stats are collected from an input file, returns an estimated cardinality
+  ///   - When stats are derived from a mutable segment, returns
+  ///     [org.apache.pinot.segment.spi.Constants#UNKNOWN_CARDINALITY]
+  // TODO: Consider generating estimated cardinality when converting from a mutable segment
   int getCardinality();
 
-  /**
-   *
-   * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
-   */
-  int getLengthOfShortestElement();
-
-  /**
-   *
-   * @return For variable length objects, returns the length of the longest value. For others, returns -1.
-   */
-  int getLengthOfLargestElement();
-
-  default boolean isFixedLength() {
-    return getLengthOfShortestElement() == getLengthOfLargestElement();
+  /// Returns the minimum serialized byte length across all elements.
+  /// - For fixed-width types, returns the fixed size
+  /// - For empty column of var-length types, returns `0`
+  /// Override it for var-length types.
+  default int getLengthOfShortestElement() {
+    return getValueType().size();
   }
 
-  /**
-   * Whether or not the data in this column is in ascending order.
-   * @return true if the data is in ascending order.
-   */
+  /// Returns the maximum serialized byte length across all elements.
+  /// - For fixed-width types, returns the fixed size
+  /// - For empty column of var-length types, returns `0`
+  /// Override it for var-length types.
+  default int getLengthOfLongestElement() {
+    return getValueType().size();
+  }
+
+  @Deprecated
+  default int getLengthOfLargestElement() {
+    return getLengthOfLongestElement();
+  }
+
+  /// Returns `true` when all the elements are of the same serialized byte length.
+  default boolean isFixedLength() {
+    return getLengthOfShortestElement() == getLengthOfLongestElement();
+  }
+
+  /// Returns `true` when all elements of a non-empty STRING column contain only ASCII characters, `false` otherwise.
+  /// Override it for STRING type.
+  default boolean isAscii() {
+    return false;
+  }
+
+  /// Returns `true` when all values in a SV column are sorted in ascending order, `false` otherwise.
   boolean isSorted();
 
-  /**
-   * @return total number of entries
-   */
+  /// Returns the total number of entries.
+  /// - For SV columns, equals the number of rows
+  /// - For MV columns, sums the number of elements across all rows
   int getTotalNumberOfEntries();
 
-  /**
-   * @return For multi-valued columns, returns the max number of values in a single occurrence of the column,
-   * otherwise 0.
-   */
+  /// Returns the maximum number of elements within a single MV value, or `0` for SV or empty columns.
   int getMaxNumberOfMultiValues();
 
-  /**
-   * @return the length of the largest row in bytes for variable length types
-   */
+  /// Returns the maximum serialized byte length of a single row.
+  /// - For SV columns, row length is the same as value length
+  /// - For MV columns, row length is total length of all elements within the MV value
+  /// - Returns `0` for empty columns
+  /// Override it for MV var-length types.
   default int getMaxRowLengthInBytes() {
-    return -1;
+    if (isSingleValue()) {
+      return getLengthOfLongestElement();
+    } else {
+      return getMaxNumberOfMultiValues() * getValueType().size();
+    }
   }
 
+  /// Returns the [PartitionFunction] for the column.
+  @Nullable
   PartitionFunction getPartitionFunction();
 
-  int getNumPartitions();
-
-  Map<String, String> getPartitionFunctionConfig();
-
+  /// Returns the partitions within which the values exist.
+  @Nullable
   Set<Integer> getPartitions();
+
+  @Deprecated
+  default int getNumPartitions() {
+    PartitionFunction partitionFunction = getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getNumPartitions() : 0;
+  }
+
+  @Deprecated
+  @Nullable
+  default Map<String, String> getPartitionFunctionConfig() {
+    PartitionFunction partitionFunction = getPartitionFunction();
+    return partitionFunction != null ? partitionFunction.getFunctionConfig() : null;
+  }
 }

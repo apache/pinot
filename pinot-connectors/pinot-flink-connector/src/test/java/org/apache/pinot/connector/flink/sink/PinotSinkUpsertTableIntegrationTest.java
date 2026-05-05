@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.connector.flink.sink;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,7 +48,6 @@ import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -133,9 +130,9 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
 
     // Single-thread write
     execEnv.setParallelism(1);
-    DataStream<Row> srcDs = execEnv.fromCollection(_data).returns(_typeInfo);
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
-        PinotSinkFunction.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
+    DataStream<Row> srcDs = execEnv.fromData(_data, _typeInfo);
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
+        PinotSink.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSink.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
         1724045185L));
     execEnv.execute();
     // 1 uploaded, 2 realtime in progress segment
@@ -145,19 +142,19 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
     execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
     execEnv.setParallelism(2);
 
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo)
+    srcDs = execEnv.fromData(_data, _typeInfo)
         .partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
-        PinotSinkFunction.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema,
+        PinotSink.DEFAULT_SEGMENT_FLUSH_MAX_NUM_RECORDS, PinotSink.DEFAULT_EXECUTOR_POOL_SIZE, "batch",
         1724045186L));
     execEnv.execute();
     verifySegments(5, 8);
 
     // Generate next sequence segments in partitioned segments
-    srcDs = execEnv.fromCollection(_data).returns(_typeInfo)
+    srcDs = execEnv.fromData(_data, _typeInfo)
         .partitionCustom((Partitioner<Integer>) (key, partitions) -> key % partitions, r -> (Integer) r.getField(0));
-    srcDs.addSink(new PinotSinkFunction<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema, 1,
-        PinotSinkFunction.DEFAULT_EXECUTOR_POOL_SIZE, "batch", 1724045187L));
+    srcDs.sinkTo(new PinotSink<>(new FlinkRowGenericRowConverter(_typeInfo), _tableConfig, _schema, 1,
+        PinotSink.DEFAULT_EXECUTOR_POOL_SIZE, "batch", 1724045187L));
     execEnv.execute();
     verifySegments(9, 12);
     verifyContainsSegments(Arrays.asList("batch__mytable__0__1724045187__0", "batch__mytable__0__1724045187__1",
@@ -165,16 +162,11 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
   }
 
   private void verifyContainsSegments(List<String> segmentsToCheck)
-      throws IOException {
+      throws Exception {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
-    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
-        .get("REALTIME");
-    Set<String> segmentNames = new HashSet<>();
-    for (int i = 0; i < segments.size(); i++) {
-      String segmentName = segments.get(i).asText();
-      segmentNames.add(segmentName);
-    }
+    List<String> segments = getOrCreateAdminClient().getSegmentClient()
+        .listSegments(tableNameWithType, TableType.REALTIME.toString(), false);
+    Set<String> segmentNames = new HashSet<>(segments);
 
     for (String segmentName : segmentsToCheck) {
       assertTrue(segmentNames.contains(segmentName));
@@ -182,22 +174,26 @@ public class PinotSinkUpsertTableIntegrationTest extends BaseClusterIntegrationT
   }
 
   private void verifySegments(int numSegments, int numTotalDocs)
-      throws IOException {
+      throws Exception {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
-    JsonNode segments = JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(tableNameWithType, TableType.REALTIME.toString()))).get(0)
-        .get("REALTIME");
+    List<String> segments = getOrCreateAdminClient().getSegmentClient()
+        .listSegments(tableNameWithType, TableType.REALTIME.toString(), false);
     assertEquals(segments.size(), numSegments);
     int actualNumTotalDocs = 0;
     // count docs in completed segments only
-    for (int i = 0; i < numSegments; i++) {
-      String segmentName = segments.get(i).asText();
-      JsonNode segmentMetadata = JsonUtils.stringToJsonNode(
-          sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(tableNameWithType, segmentName)));
-      if (segmentMetadata.get("segment.realtime.status").asText().equals("IN_PROGRESS")) {
+    for (String segmentName : segments) {
+      Map<String, Object> segmentMetadata =
+          getOrCreateAdminClient().getSegmentClient().getSegmentMetadata(tableNameWithType, segmentName, null);
+      Object status = segmentMetadata.get("segment.realtime.status");
+      if (status != null && "IN_PROGRESS".equals(status.toString())) {
         continue;
       }
-      actualNumTotalDocs += segmentMetadata.get("segment.total.docs").asInt();
+      Object totalDocs = segmentMetadata.get("segment.total.docs");
+      if (totalDocs instanceof Number) {
+        actualNumTotalDocs += ((Number) totalDocs).intValue();
+      } else if (totalDocs != null) {
+        actualNumTotalDocs += Integer.parseInt(totalDocs.toString());
+      }
     }
     assertEquals(actualNumTotalDocs, numTotalDocs);
   }

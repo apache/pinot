@@ -23,6 +23,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,15 +31,22 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
@@ -47,16 +55,27 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.MDC;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -74,6 +93,8 @@ public class QueryServerTest extends QueryTestSet {
   @BeforeClass
   public void setUp()
       throws Exception {
+    ServerMetrics.deregister();
+    ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = mock(QueryRunner.class);
@@ -96,6 +117,35 @@ public class QueryServerTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+    ServerMetrics.deregister();
+  }
+
+  @AfterMethod
+  public void tearDownMethod() {
+    MDC.clear();
+  }
+
+  @Test
+  public void testPermitKeepAliveDefaultsMatchNettyDefaults() {
+    // Defaults must match Netty's gRPC server defaults so that operators not configuring keep-alive on the broker
+    // dispatch side keep observing the same behavior as before this configurability was added.
+    QueryServer server = new QueryServer(QueryTestUtils.getAvailablePort(), mock(QueryRunner.class));
+    assertEquals(server.getPermitKeepAliveTimeMs(),
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS);
+    assertFalse(server.isPermitKeepAliveWithoutCalls());
+  }
+
+  @Test
+  public void testPermitKeepAliveOverridesPickedUpFromConfig() {
+    // Verify the config keys are wired to the server fields. Using values that mirror what an operator would set
+    // when tuning the broker-side dispatch keep-alive down (e.g. keepAliveTime=30s, keepAliveWithoutCalls=true).
+    Map<String, Object> overrides = new HashMap<>();
+    overrides.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS, 30_000);
+    overrides.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS, true);
+    QueryServer server = new QueryServer(new PinotConfiguration(overrides), "serverId",
+        QueryTestUtils.getAvailablePort(), mock(QueryRunner.class), null, ThreadAccountantUtils.getNoOpAccountant());
+    assertEquals(server.getPermitKeepAliveTimeMs(), 30_000);
+    assertTrue(server.isPermitKeepAliveWithoutCalls());
   }
 
   @Test
@@ -114,6 +164,72 @@ public class QueryServerTest extends QueryTestSet {
     // should contain error message pattern
     String errorMessage = resp.getMetadataMap().get(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR);
     assertTrue(errorMessage.contains("foo"), "Error message should contain 'foo' but it is: " + errorMessage);
+  }
+
+  @Test
+  public void testMseQueriesMetricIncrementedOnSuccessfulSubmit()
+      throws Exception {
+    long mseBefore = ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count();
+    long grpcBefore = ServerMetrics.get().getMeteredValue(ServerMeter.GRPC_QUERIES).count();
+    DispatchableSubPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, 1);
+    Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+    Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
+    assertTrue(resp.getMetadataMap().containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK));
+    TestUtils.waitForCondition(
+        aVoid -> ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count() == mseBefore + 1,
+        5000L, "MSE_QUERIES was not incremented");
+    assertEquals(ServerMetrics.get().getMeteredValue(ServerMeter.GRPC_QUERIES).count(), grpcBefore,
+        "GRPC_QUERIES should NOT be incremented by the MSE path");
+  }
+
+  @Test
+  public void testMseQueriesMetricIncrementedOnFailedSubmit()
+      throws Exception {
+    long mseBefore = ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count();
+    DispatchableSubPlan queryPlan = _queryEnvironment.planQuery("SELECT * FROM a");
+    Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, 1);
+    Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
+    QueryRunner mockRunner = _queryRunnerMap.get(Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT)));
+    doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(any(), any(), any());
+
+    Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
+    reset(mockRunner);
+
+    String errorMessage = resp.getMetadataMap().get(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR);
+    assertTrue(errorMessage.contains("foo"), "Error message should contain 'foo' but it is: " + errorMessage);
+    TestUtils.waitForCondition(
+        aVoid -> ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count() == mseBefore + 1,
+        5000L, "MSE_QUERIES was not incremented");
+  }
+
+  @Test
+  public void testMseQueriesMetricIncrementedBeforeMetadataDeserialization() {
+    long mseBefore = ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count();
+    QueryServer queryServer = _queryServerMap.values().iterator().next();
+    Worker.QueryResponse[] responseHolder = new Worker.QueryResponse[1];
+
+    queryServer.submit(Worker.QueryRequest.newBuilder().setMetadata(ByteString.copyFromUtf8("invalid")).build(),
+        new StreamObserver<>() {
+          @Override
+          public void onNext(Worker.QueryResponse value) {
+            responseHolder[0] = value;
+          }
+
+          @Override
+          public void onError(Throwable t) {
+          }
+
+          @Override
+          public void onCompleted() {
+          }
+        });
+
+    assertEquals(ServerMetrics.get().getMeteredValue(ServerMeter.MSE_QUERIES).count(), mseBefore + 1,
+        "MSE_QUERIES should be incremented before metadata deserialization");
+    assertTrue(responseHolder[0].getMetadataMap()
+            .containsKey(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR),
+        "Malformed metadata should still return an error response");
   }
 
   @Test(dataProvider = "testSql")
@@ -232,5 +348,115 @@ public class QueryServerTest extends QueryTestSet {
 
     return Worker.QueryRequest.newBuilder().addStagePlan(protoStagePlan)
         .setMetadata(QueryPlanSerDeUtils.toProtoProperties(requestMetadata)).build();
+  }
+
+  @Test
+  public void testMdcRegistersUpstreamDownstreamStageIds() {
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseTest();
+    QueryThreadContext.MseWorkerInfo workerInfo =
+        new QueryThreadContext.MseWorkerInfo(1, 0, Set.of(2, 3), Set.of(0));
+
+    try (QueryThreadContext ignored = QueryThreadContext.open(executionContext, workerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      assertEquals(MDC.get(LoggerConstants.UPSTREAM_STAGE_IDS_KEY.getKey()), "2,3");
+      assertEquals(MDC.get(LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.getKey()), "0");
+      assertEquals(MDC.get(LoggerConstants.STAGE_ID_KEY.getKey()), "1");
+      assertEquals(MDC.get(LoggerConstants.WORKER_ID_KEY.getKey()), "0");
+    }
+
+    assertNull(MDC.get(LoggerConstants.UPSTREAM_STAGE_IDS_KEY.getKey()));
+    assertNull(MDC.get(LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.getKey()));
+    assertNull(MDC.get(LoggerConstants.STAGE_ID_KEY.getKey()));
+    assertNull(MDC.get(LoggerConstants.WORKER_ID_KEY.getKey()));
+  }
+
+  @Test
+  public void testMdcSkipsEmptyStageIds() {
+    QueryExecutionContext executionContext = QueryExecutionContext.forMseTest();
+    QueryThreadContext.MseWorkerInfo workerInfo =
+        new QueryThreadContext.MseWorkerInfo(2, 0);
+
+    try (QueryThreadContext ignored = QueryThreadContext.open(executionContext, workerInfo,
+        ThreadAccountantUtils.getNoOpAccountant())) {
+      assertNull(MDC.get(LoggerConstants.UPSTREAM_STAGE_IDS_KEY.getKey()));
+      assertNull(MDC.get(LoggerConstants.DOWNSTREAM_STAGE_IDS_KEY.getKey()));
+    }
+  }
+
+  private static final DataSchema DUMMY_SCHEMA =
+      new DataSchema(new String[]{"col"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+
+  private static MailboxReceiveNode receiveNode(int stageId, int senderStageId) {
+    return new MailboxReceiveNode(stageId, DUMMY_SCHEMA, senderStageId,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        null, null, false, false, null);
+  }
+
+  private static MailboxSendNode sendNode(int stageId, List<PlanNode> inputs, int receiverStageId) {
+    return new MailboxSendNode(stageId, DUMMY_SCHEMA, inputs, receiverStageId,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        null, false, null, false, "murmur");
+  }
+
+  private static MailboxSendNode sendNode(int stageId, List<PlanNode> inputs, List<Integer> receiverStageIds) {
+    return new MailboxSendNode(stageId, DUMMY_SCHEMA, inputs, receiverStageIds,
+        PinotRelExchangeType.STREAMING, RelDistribution.Type.HASH_DISTRIBUTED,
+        null, false, null, false, "murmur");
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsSingleReceive() {
+    // SendNode(stage=1) → ReceiveNode(sender=2)
+    MailboxReceiveNode receive = receiveNode(1, 2);
+    MailboxSendNode root = sendNode(1, List.of(receive), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(2));
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsMultipleReceives() {
+    // SendNode(stage=1) → [ReceiveNode(sender=2), ReceiveNode(sender=3)]
+    MailboxReceiveNode receive1 = receiveNode(1, 2);
+    MailboxReceiveNode receive2 = receiveNode(1, 3);
+    MailboxSendNode root = sendNode(1, List.of(receive1, receive2), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(2, 3));
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsNestedReceive() {
+    // SendNode(stage=1) → SendNode(stage=1, inner) → ReceiveNode(sender=3)
+    MailboxReceiveNode receive = receiveNode(1, 3);
+    MailboxSendNode inner = sendNode(1, List.of(receive), 0);
+    MailboxSendNode root = sendNode(1, List.of(inner), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(3));
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsNoReceives() {
+    MailboxSendNode root = sendNode(1, List.of(), 0);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of());
+  }
+
+  @Test
+  public void testCollectUpstreamStageIdsReceiveAtRoot() {
+    MailboxReceiveNode root = receiveNode(1, 5);
+    assertEquals(QueryServer.collectUpstreamStageIds(root), Set.of(5));
+  }
+
+  @Test
+  public void testCollectDownstreamStageIdsSingleReceiver() {
+    MailboxSendNode root = sendNode(1, List.of(), 0);
+    assertEquals(QueryServer.collectDownstreamStageIds(root), Set.of(0));
+  }
+
+  @Test
+  public void testCollectDownstreamStageIdsMultipleReceivers() {
+    MailboxSendNode root = sendNode(1, List.of(), List.of(0, 4));
+    assertEquals(QueryServer.collectDownstreamStageIds(root), Set.of(0, 4));
+  }
+
+  @Test
+  public void testCollectDownstreamStageIdsNonSendNode() {
+    MailboxReceiveNode root = receiveNode(1, 2);
+    assertEquals(QueryServer.collectDownstreamStageIds(root), Set.of());
   }
 }

@@ -415,6 +415,7 @@ public class LeafOperator extends MultiStageOperator {
           _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
           break;
         case SORTED:
+        case EARLY_TERMINATION_REASON:
           break;
         default:
           throw new IllegalArgumentException("Unhandled leaf execution stat: " + key);

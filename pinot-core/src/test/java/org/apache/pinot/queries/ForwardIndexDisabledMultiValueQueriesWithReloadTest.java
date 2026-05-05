@@ -152,9 +152,12 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
       fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.DICTIONARY, List.of(), null,
           Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
     }
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
-        .setNoDictionaryColumns(noDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
-        .setCreateInvertedIndexDuringSegmentGeneration(true).setFieldConfigList(fieldConfigs).build();
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setFieldConfigList(fieldConfigs)
+        .build();
   }
 
   @AfterMethod

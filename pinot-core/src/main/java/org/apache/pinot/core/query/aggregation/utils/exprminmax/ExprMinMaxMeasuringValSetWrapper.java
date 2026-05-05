@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.utils.exprminmax;
 
-import org.apache.pinot.common.utils.DataSchema;
+import com.google.common.base.Preconditions;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 
 
@@ -26,52 +27,55 @@ import org.apache.pinot.core.common.BlockValSet;
  * Wrapper class for measuring columns in exprmin/max aggregation function.
  * Meanly used to do comparison without boxing primitive types.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ExprMinMaxMeasuringValSetWrapper extends ExprMinMaxWrapperValSet {
 
-  public ExprMinMaxMeasuringValSetWrapper(boolean isSingleValue, DataSchema.ColumnDataType dataType,
-      BlockValSet blockValSet) {
-    super(dataType, isSingleValue);
+  public ExprMinMaxMeasuringValSetWrapper(BlockValSet blockValSet) {
+    super(resolveStoredType(blockValSet));
     setNewBlock(blockValSet);
   }
 
+  private static ColumnDataType resolveStoredType(BlockValSet blockValSet) {
+    Preconditions.checkState(blockValSet.isSingleValue(),
+        "ExprMinMax only supports single-valued measuring columns");
+    return ColumnDataType.fromDataType(blockValSet.getValueType().getStoredType(), true);
+  }
+
   public Comparable getComparable(int i) {
-    switch (_dataType) {
+    switch (_storedType) {
       case INT:
-      case BOOLEAN:
         return _intValues[i];
       case LONG:
-      case TIMESTAMP:
         return _longValues[i];
       case FLOAT:
         return _floatValues[i];
       case DOUBLE:
         return _doublesValues[i];
-      case STRING:
       case BIG_DECIMAL:
-        return (Comparable) _objectsValues[i];
+      case STRING:
+      case BYTES:
+        return _objectsValues[i];
       default:
-        throw new IllegalStateException("Unsupported data type: " + _dataType);
+        throw new IllegalStateException("Unsupported stored type: " + _storedType);
     }
   }
 
-  public int compare(int i, Object o) {
-      switch (_dataType) {
-        case INT:
-        case BOOLEAN:
-          return Integer.compare((Integer) o, _intValues[i]);
-        case LONG:
-        case TIMESTAMP:
-          return Long.compare((Long) o, _longValues[i]);
-        case FLOAT:
-          return Float.compare((Float) o, _floatValues[i]);
-        case DOUBLE:
-          return Double.compare((Double) o, _doublesValues[i]);
-        case STRING:
-          return ((String) o).compareTo((String) _objectsValues[i]);
-        case BIG_DECIMAL:
-          return ((java.math.BigDecimal) o).compareTo((java.math.BigDecimal) _objectsValues[i]);
-        default:
-          throw new IllegalStateException("Unsupported data type in comparison" + _dataType);
-      }
+  public int compare(int i, Comparable value) {
+    switch (_storedType) {
+      case INT:
+        return Integer.compare((Integer) value, _intValues[i]);
+      case LONG:
+        return Long.compare((Long) value, _longValues[i]);
+      case FLOAT:
+        return Float.compare((Float) value, _floatValues[i]);
+      case DOUBLE:
+        return Double.compare((Double) value, _doublesValues[i]);
+      case BIG_DECIMAL:
+      case STRING:
+      case BYTES:
+        return value.compareTo(_objectsValues[i]);
+      default:
+        throw new IllegalStateException("Unsupported stored type: " + _storedType);
+    }
   }
 }

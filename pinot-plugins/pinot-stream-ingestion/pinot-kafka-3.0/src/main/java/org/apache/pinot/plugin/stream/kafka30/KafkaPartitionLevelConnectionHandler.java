@@ -36,7 +36,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.BytesDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
@@ -63,7 +62,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected final String _clientId;
   protected final int _partition;
   protected final String _topic;
-  protected final Consumer<String, Bytes> _consumer;
+  protected final Consumer<Bytes, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
   protected final Properties _consumerProp;
   protected volatile KafkaAdminClientManager.AdminClientReference _sharedAdminClientRef;
@@ -93,7 +92,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     Properties consumerProp = new Properties();
     consumerProp.putAll(streamConfig.getStreamConfigsMap());
     consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _config.getBootstrapHosts());
-    consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
     consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
     if (_config.getKafkaIsolationLevel() != null) {
       consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
@@ -120,8 +119,8 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return filteredProps;
   }
 
-  private Consumer<String, Bytes> createConsumer(Properties consumerProp, RetryPolicy retryPolicy) {
-    AtomicReference<Consumer<String, Bytes>> consumer = new AtomicReference<>();
+  private Consumer<Bytes, Bytes> createConsumer(Properties consumerProp, RetryPolicy retryPolicy) {
+    AtomicReference<Consumer<Bytes, Bytes>> consumer = new AtomicReference<>();
     try {
       retryPolicy.attempt(() -> {
         try {
@@ -140,7 +139,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   }
 
   @VisibleForTesting
-  protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
+  protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
     return retry(() -> new KafkaConsumer<>(filterKafkaProperties(consumerProp, CONSUMER_CONFIG_NAMES)), 5);
   }
 

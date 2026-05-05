@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -39,14 +40,12 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column.*;
 
 
@@ -264,7 +263,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         int finalDictId = dictId;
         docIdsBitmap.stream().forEach(docId -> putInt(_forwardIndexValueBuffer, docId, finalDictId));
         if (!isFixedWidth) {
-          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+          lengthOfLongestEntry = Math.max(lengthOfLongestEntry, dictionary.getValueSize(dictId));
         }
       }
 
@@ -283,10 +282,12 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
       // Setup and return the metadata properties to update
       if (_dictionaryEnabled) {
-        return Map.of();
+        return Map.of(
+            getKeyFor(_columnName, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.DICTIONARY.name());
       } else {
         return Map.of(
             getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false),
+            getKeyFor(_columnName, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name(),
             getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0)
             // TODO: See https://github.com/apache/pinot/pull/16921 for details
             // getKeyFor(_columnName, BITS_PER_ELEMENT), String.valueOf(-1)
@@ -316,7 +317,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         });
 
         if (!isFixedWidth) {
-          lengthOfLongestEntry = trackLengthOfLongestEntry(dictionary, lengthOfLongestEntry, dictId);
+          lengthOfLongestEntry = Math.max(lengthOfLongestEntry, dictionary.getValueSize(dictId));
         }
       }
 
@@ -378,6 +379,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
       metadataProperties.put(getKeyFor(_columnName, MAX_MULTI_VALUE_ELEMENTS),
           String.valueOf(maxNumberOfMultiValues[0]));
       metadataProperties.put(getKeyFor(_columnName, TOTAL_NUMBER_OF_ENTRIES), String.valueOf(_nextValueId));
+      metadataProperties.put(getKeyFor(_columnName, FORWARD_INDEX_ENCODING),
+          (_dictionaryEnabled ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW).name());
       if (!_dictionaryEnabled) {
         metadataProperties.put(getKeyFor(_columnName, HAS_DICTIONARY), String.valueOf(false));
         metadataProperties.put(getKeyFor(_columnName, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
@@ -388,51 +391,11 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     }
   }
 
-  private int trackLengthOfLongestEntry(Dictionary dictionary, int lengthOfLongestEntry, int dictId) {
-    int updatedLengthOfLongestEntry;
-    switch (_storedType) {
-      case STRING:
-        updatedLengthOfLongestEntry = Math.max(dictionary.getStringValue(dictId).getBytes(UTF_8).length,
-            lengthOfLongestEntry);
-        break;
-      case BYTES:
-        ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        updatedLengthOfLongestEntry = Math.max(value.length(), lengthOfLongestEntry);
-        break;
-      case BIG_DECIMAL:
-        updatedLengthOfLongestEntry = Math.max(
-            BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)), lengthOfLongestEntry);
-        break;
-      default:
-        throw new IllegalStateException("Trying to calculate lengthOfLongestEntry for invalid stored type: "
-            + _storedType);
-    }
-    return updatedLengthOfLongestEntry;
-  }
-
   private void trackMaxRowLengthInBytes(Dictionary dictionary, int[] maxRowLengthInBytes, int docId, int dictId) {
     int curSizeOfRow = getInt(_forwardIndexMaxSizeBuffer, docId);
-    switch (_storedType) {
-      case STRING:
-        int newSizeOfEntry = dictionary.getStringValue(dictId).length() + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      case BYTES:
-        ByteArray value = new ByteArray(dictionary.getBytesValue(dictId));
-        newSizeOfEntry = value.length() + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      case BIG_DECIMAL:
-        newSizeOfEntry = BigDecimalUtils.byteSize(dictionary.getBigDecimalValue(dictId)) + curSizeOfRow;
-        putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
-        maxRowLengthInBytes[0] = Math.max(newSizeOfEntry, maxRowLengthInBytes[0]);
-        break;
-      default:
-        throw new IllegalStateException("Trying to calculate maxRowLengthInBytes for invalid stored type: "
-            + _storedType);
-    }
+    int newSizeOfEntry = dictionary.getValueSize(dictId) + curSizeOfRow;
+    putInt(_forwardIndexMaxSizeBuffer, docId, newSizeOfEntry);
+    maxRowLengthInBytes[0] = Math.max(maxRowLengthInBytes[0], newSizeOfEntry);
   }
 
   private void writeToForwardIndex(Dictionary dictionary, IndexCreationContext context)
@@ -534,6 +497,25 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
               }
             }
             break;
+          case BIG_DECIMAL:
+            if (_singleValue) {
+              for (int docId = 0; docId < _numDocs; docId++) {
+                creator.putBigDecimal(dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, docId)));
+              }
+            } else {
+              int startIdx = 0;
+              for (int docId = 0; docId < _numDocs; docId++) {
+                int endIdx = getInt(_forwardIndexLengthBuffer, docId);
+                BigDecimal[] values = new BigDecimal[endIdx - startIdx];
+                int valuesIdx = 0;
+                for (int i = startIdx; i < endIdx; i++) {
+                  values[valuesIdx++] = dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, i));
+                }
+                creator.putBigDecimalMV(values);
+                startIdx = endIdx;
+              }
+            }
+            break;
           case STRING:
             if (_singleValue) {
               for (int docId = 0; docId < _numDocs; docId++) {
@@ -570,12 +552,6 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
                 creator.putBytesMV(values);
                 startIdx = endIdx;
               }
-            }
-            break;
-          case BIG_DECIMAL:
-            Preconditions.checkState(_singleValue, "BIG_DECIMAL type not supported for multi-value columns");
-            for (int docId = 0; docId < _numDocs; docId++) {
-              creator.putBigDecimal(dictionary.getBigDecimalValue(getInt(_forwardIndexValueBuffer, docId)));
             }
             break;
           default:

@@ -189,8 +189,7 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
     // default hash-based computation would have chosen for this segment name.
     String segmentName = "uploadedSegment_0";
     String consumingPartitionsName =
-        InstancePartitionsUtils.getInstancePartitionsName(realtimeTableName,
-            InstancePartitionsType.CONSUMING.toString());
+        InstancePartitionsUtils.getInstancePartitionsName(realtimeTableName, InstancePartitionsType.CONSUMING);
 
     for (String pinnedServer : realtimeServers) {
       // Overwrite the stored CONSUMING instance partition to pin exclusively to this server

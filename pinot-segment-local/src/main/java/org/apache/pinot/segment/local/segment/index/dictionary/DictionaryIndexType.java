@@ -171,15 +171,6 @@ public class DictionaryIndexType
     return !context.isFixedLength();
   }
 
-  public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
-      DataType storedType, ColumnStatistics columnProfile) {
-    if (varLengthDictColumns.contains(columnName)) {
-      return true;
-    }
-
-    return shouldUseVarLengthDictionary(storedType, columnProfile);
-  }
-
   public static boolean shouldUseVarLengthDictionary(DataType storedType, ColumnStatistics profile) {
     if (storedType == DataType.BYTES || storedType == DataType.BIG_DECIMAL) {
       return !profile.isFixedLength();
@@ -302,15 +293,13 @@ public class DictionaryIndexType
       throws IOException {
 
     DataType dataType = metadata.getDataType();
-    String columnName = metadata.getColumnName();
-    int length = metadata.getCardinality();
-
     boolean loadOnHeap = indexConfig.isOnHeap();
-    Intern internConfig = indexConfig.getIntern();
+    String columnName = metadata.getColumnName();
 
     // If interning is enabled, get the required interners.
     FALFInterner<String> strInterner = null;
     FALFInterner<byte[]> byteInterner = null;
+    Intern internConfig = indexConfig.getIntern();
     if (loadOnHeap) {
       LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
       if (internConfig != null && !internConfig.isDisabled()) {
@@ -321,6 +310,7 @@ public class DictionaryIndexType
       }
     }
 
+    int length = metadata.getCardinality();
     switch (dataType.getStoredType()) {
       case INT:
         return loadOnHeap ? new OnHeapIntDictionary(dataBuffer, length)
@@ -335,15 +325,15 @@ public class DictionaryIndexType
         return loadOnHeap ? new OnHeapDoubleDictionary(dataBuffer, length)
             : new DoubleDictionary(dataBuffer, length);
       case BIG_DECIMAL:
-        int numBytesPerValue = metadata.getColumnMaxLength();
+        int numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapBigDecimalDictionary(dataBuffer, length, numBytesPerValue)
             : new BigDecimalDictionary(dataBuffer, length, numBytesPerValue);
       case STRING:
-        numBytesPerValue = metadata.getColumnMaxLength();
+        numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue, strInterner, byteInterner)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
-        numBytesPerValue = metadata.getColumnMaxLength();
+        numBytesPerValue = metadata.getLengthOfLongestElement();
         return loadOnHeap ? new OnHeapBytesDictionary(dataBuffer, length, numBytesPerValue, byteInterner)
             : new BytesDictionary(dataBuffer, length, numBytesPerValue);
       default:
@@ -360,6 +350,18 @@ public class DictionaryIndexType
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
+  }
+
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // The dictionary index is the dictionary itself; the question of whether it requires a dictionary is moot.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, DictionaryIndexConfig indexConfig) {
+    // Enable/disable of the dictionary IS the change being driven; the dictionary handler owns its own rebuild.
+    return false;
   }
 
   public static String getFileExtension() {
@@ -424,6 +426,7 @@ public class DictionaryIndexType
     for (FieldConfig fieldConfig : fieldConfigList) {
       // skip further computation of field configs which already has RAW encodingType
       if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+        noDictionaryColumns.remove(fieldConfig.getName());
         continue;
       }
       // ensure encodingType is RAW on noDictionaryColumns

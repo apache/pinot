@@ -19,13 +19,12 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-integration-tests</artifactId>
   <name>Pinot Integration Tests</name>
@@ -231,7 +230,6 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.compat.version}</artifactId>
-      <version>${kafka3.version}</version>
       <classifier>test</classifier>
       <scope>test</scope>
       <exclusions>
@@ -244,14 +242,12 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka3.version}</version>
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-server-common</artifactId>
-      <version>${kafka3.version}</version>
       <classifier>test</classifier>
       <scope>test</scope>
     </dependency>
@@ -297,6 +293,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-protobuf</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
       <scope>test</scope>
@@ -314,8 +315,13 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.compat.version}</artifactId>
-      <version>${spark3.version}</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.lz4</groupId>
+          <artifactId>lz4-java</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>

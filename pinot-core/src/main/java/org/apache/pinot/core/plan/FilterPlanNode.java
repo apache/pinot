@@ -31,13 +31,15 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
+import org.apache.pinot.common.request.context.predicate.VectorSimilarityRadiusPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import org.apache.pinot.core.operator.filter.BitmapCollection;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
+import org.apache.pinot.core.operator.filter.ExactVectorScanFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
 import org.apache.pinot.core.operator.filter.H3InclusionIndexFilterOperator;
@@ -45,8 +47,12 @@ import org.apache.pinot.core.operator.filter.H3IndexFilterOperator;
 import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MapFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
-import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorDistanceUtils;
+import org.apache.pinot.core.operator.filter.VectorRadiusFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSearchMode;
+import org.apache.pinot.core.operator.filter.VectorSearchParams;
+import org.apache.pinot.core.operator.filter.VectorSearchStrategy;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
@@ -54,14 +60,15 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
-import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -221,7 +228,13 @@ public class FilterPlanNode implements PlanNode {
         childFilters = filter.getChildren();
         childFilterOperators = new ArrayList<>(childFilters.size());
         for (FilterContext childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
+          BaseFilterOperator childFilterOperator;
+          if (isVectorSimilarityFilter(childFilter) && hasNonVectorSibling(childFilters)) {
+            // Pass filtered context so vector operator reports correct execution mode
+            childFilterOperator = constructFilteredVectorOperator(childFilter, numDocs);
+          } else {
+            childFilterOperator = constructPhysicalOperator(childFilter, numDocs);
+          }
           if (childFilterOperator.isResultEmpty()) {
             // Return empty filter operator if any of the child filter operator's result is empty
             return EmptyFilterOperator.getInstance();
@@ -230,6 +243,11 @@ public class FilterPlanNode implements PlanNode {
             childFilterOperators.add(childFilterOperator);
           }
         }
+        // Wire pre-filter bitmaps for filter-aware ANN: if an AND contains a
+        // VectorSimilarityFilterOperator alongside other filter children, evaluate the
+        // non-vector filters first and pass the resulting bitmap to the vector operator
+        // so it can restrict HNSW graph traversal to the pre-filtered document set.
+        wirePreFilterForVectorOperators(childFilterOperators, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, childFilterOperators, numDocs);
       case OR:
         childFilters = filter.getChildren();
@@ -270,13 +288,6 @@ public class FilterPlanNode implements PlanNode {
           PredicateEvaluator predicateEvaluator;
           TextIndexReader textIndexReader;
           switch (predicate.getType()) {
-            case TEXT_CONTAINS:
-              textIndexReader = dataSource.getTextIndex();
-              if (!(textIndexReader instanceof NativeTextIndexReader)
-                  && !(textIndexReader instanceof NativeMutableTextIndex)) {
-                throw new UnsupportedOperationException("TEXT_CONTAINS is supported only on native text index");
-              }
-              return new TextContainsFilterOperator(textIndexReader, (TextContainsPredicate) predicate, numDocs);
             case TEXT_MATCH:
               textIndexReader = dataSource.getTextIndex();
               if (textIndexReader == null) {
@@ -288,11 +299,6 @@ public class FilterPlanNode implements PlanNode {
 
               Preconditions.checkState(textIndexReader != null,
                   "Cannot apply TEXT_MATCH on column: %s without text index", column);
-              // We could check for real time and segment Lucene reader, but easier to check the other way round
-              if (textIndexReader instanceof NativeTextIndexReader
-                  || textIndexReader instanceof NativeMutableTextIndex) {
-                throw new UnsupportedOperationException("TEXT_MATCH is not supported on native text index");
-              }
 
               if (textIndexReader.isMultiColumn()) {
                 return new TextMatchFilterOperator(column, textIndexReader, (TextMatchPredicate) predicate, numDocs);
@@ -339,10 +345,11 @@ public class FilterPlanNode implements PlanNode {
                   column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
             case VECTOR_SIMILARITY:
-              VectorIndexReader vectorIndex = dataSource.getVectorIndex();
-              Preconditions.checkState(vectorIndex != null,
-                  "Cannot apply VECTOR_SIMILARITY on column: %s without vector index", column);
-              return new VectorSimilarityFilterOperator(vectorIndex, (VectorSimilarityPredicate) predicate, numDocs);
+              return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
+                  numDocs, false);
+            case VECTOR_SIMILARITY_RADIUS:
+              return constructVectorRadiusOperator(dataSource,
+                  (VectorSimilarityRadiusPredicate) predicate, column, numDocs);
             case IS_NULL: {
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
@@ -371,5 +378,232 @@ public class FilterPlanNode implements PlanNode {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  /**
+   * Constructs the appropriate vector similarity filter operator based on index availability.
+   *
+   * <p>Decision tree:</p>
+   * <ol>
+   *   <li>If the segment has a vector index for the column, use {@link VectorSimilarityFilterOperator}
+   *       with query options (nprobe, rerank, maxCandidates).</li>
+   *   <li>If no vector index exists, fall back to {@link ExactVectorScanFilterOperator} which
+   *       performs brute-force scan of the forward index.</li>
+   * </ol>
+   *
+   * @param hasMetadataFilter true if this vector predicate is combined with metadata filters (AND)
+   */
+  private BaseFilterOperator constructVectorSimilarityOperator(DataSource dataSource,
+      VectorSimilarityPredicate predicate, String column, int numDocs, boolean hasMetadataFilter) {
+    VectorIndexReader vectorIndex = dataSource.getVectorIndex();
+    VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
+    boolean isMutableSegment = _indexSegment.getSegmentMetadata().isMutableSegment();
+    VectorSearchParams searchParams = VectorSearchParams.fromQueryOptions(_queryContext.getQueryOptions());
+
+    if (vectorIndex != null) {
+      // ANN index path: pass forward index reader if rerank or threshold search requires exact distances
+      ForwardIndexReader<?> forwardIndexReader = null;
+      VectorBackendType backendType = VectorDistanceUtils.resolveBackendType(vectorIndexConfig);
+      if (searchParams.isExactRerank(backendType) || searchParams.hasDistanceThreshold()) {
+        forwardIndexReader = dataSource.getForwardIndex();
+        Preconditions.checkState(!searchParams.hasDistanceThreshold() || forwardIndexReader != null,
+            "Cannot apply vectorDistanceThreshold on column: %s -- forward index required for threshold refinement",
+            column);
+      }
+      return new VectorSimilarityFilterOperator(vectorIndex, predicate, numDocs, searchParams, forwardIndexReader,
+          vectorIndexConfig, hasMetadataFilter);
+    }
+
+    // Exact scan fallback: no vector index on this segment
+    ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkState(forwardIndexReader != null,
+        "Cannot apply VECTOR_SIMILARITY on column: %s -- no vector index and no forward index available", column);
+    return new ExactVectorScanFilterOperator(forwardIndexReader, predicate, column, numDocs, vectorIndexConfig,
+        getVectorFallbackReason(vectorIndexConfig, isMutableSegment), searchParams);
+  }
+
+  /**
+   * Constructs a vector operator for a VECTOR_SIMILARITY predicate that is part of an AND
+   * with metadata filters. This sets the hasMetadataFilter flag so the operator reports
+   * the correct filtered ANN execution mode.
+   */
+  private BaseFilterOperator constructFilteredVectorOperator(FilterContext filter, int numDocs) {
+    Predicate predicate = filter.getPredicate();
+    String column = predicate.getLhs().getIdentifier();
+    DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
+    return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
+        numDocs, true);
+  }
+
+  /**
+   * Returns true if the child list contains at least one non-VECTOR_SIMILARITY predicate
+   * (i.e., a real metadata filter sibling).
+   */
+  private static boolean hasNonVectorSibling(List<FilterContext> childFilters) {
+    for (FilterContext child : childFilters) {
+      if (!isVectorSimilarityFilter(child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if the filter is a VECTOR_SIMILARITY predicate.
+   */
+  private static boolean isVectorSimilarityFilter(FilterContext filter) {
+    return filter.getType() == FilterContext.Type.PREDICATE
+        && filter.getPredicate().getType() == Predicate.Type.VECTOR_SIMILARITY;
+  }
+
+  /**
+   * Constructs the vector radius filter operator based on index availability.
+   *
+   * <p>The radius operator always needs the forward index for exact distance computation.
+   * When a vector index is available, it is used for candidate retrieval before exact filtering.</p>
+   */
+  private BaseFilterOperator constructVectorRadiusOperator(DataSource dataSource,
+      VectorSimilarityRadiusPredicate predicate, String column, int numDocs) {
+    ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkState(forwardIndexReader != null,
+        "Cannot apply VECTOR_SIMILARITY_RADIUS on column: %s -- no forward index available", column);
+    VectorIndexReader vectorIndex = dataSource.getVectorIndex();
+    VectorIndexConfig vectorIndexConfig = dataSource.getVectorIndexConfig();
+    return new VectorRadiusFilterOperator(forwardIndexReader, vectorIndex, predicate, column, numDocs,
+        vectorIndexConfig);
+  }
+
+  /**
+   * Wires pre-filter bitmaps for filter-aware ANN search when an AND node contains both
+   * vector similarity operators and non-vector filter operators.
+   *
+   * <p>When the vector index reader supports pre-filtering (implements
+   * {@link org.apache.pinot.segment.spi.index.reader.FilterAwareVectorIndexReader}), the non-vector
+   * siblings are evaluated eagerly to produce a combined bitmap. This bitmap is passed to the
+   * {@link VectorSimilarityFilterOperator} so that the HNSW graph traversal is restricted to
+   * pre-filtered documents, improving recall for selective filters.</p>
+   *
+   * <p><b>Trade-off: eager filter evaluation.</b> The non-vector filter predicates are materialized
+   * into bitmaps before the vector search begins. This is intentional because the filter bitmap must
+   * be fully materialized before it can be passed to the vector index for pre-filtered ANN search.
+   * The {@link VectorSearchStrategy} selectivity check below ensures we only pay this cost when the
+   * estimated cardinality suggests pre-filtering is worthwhile.</p>
+   *
+   * <p>If no vector operators are found or the reader does not support pre-filtering,
+   * this method is a no-op and the AND operator falls back to the default post-filter path.</p>
+   *
+   * @param childOperators the list of child filter operators under an AND node
+   * @param numDocs total documents in the segment
+   */
+  private void wirePreFilterForVectorOperators(List<BaseFilterOperator> childOperators, int numDocs) {
+    if (childOperators.size() < 2) {
+      return;
+    }
+
+    // Find vector similarity operators that support pre-filtering
+    List<VectorSimilarityFilterOperator> vectorOps = new ArrayList<>();
+    List<BaseFilterOperator> nonVectorOps = new ArrayList<>();
+    for (BaseFilterOperator op : childOperators) {
+      if (op instanceof VectorSimilarityFilterOperator) {
+        vectorOps.add((VectorSimilarityFilterOperator) op);
+      } else {
+        nonVectorOps.add(op);
+      }
+    }
+
+    if (vectorOps.isEmpty() || nonVectorOps.isEmpty()) {
+      return;
+    }
+
+    // Early exit: only proceed if at least one vector operator actually supports pre-filtering.
+    // This avoids eagerly materializing non-vector filter bitmaps when they can't be used.
+    boolean anySupportsPreFilter = false;
+    for (VectorSimilarityFilterOperator vectorOp : vectorOps) {
+      if (vectorOp.supportsPreFilter()) {
+        anySupportsPreFilter = true;
+        break;
+      }
+    }
+    if (!anySupportsPreFilter) {
+      return;
+    }
+
+    // Evaluate non-vector filters and combine their bitmaps to produce a pre-filter.
+    // Only do this if the non-vector operators can produce bitmaps efficiently.
+    boolean allCanProduceBitmaps = true;
+    for (BaseFilterOperator op : nonVectorOps) {
+      if (!op.canProduceBitmaps()) {
+        allCanProduceBitmaps = false;
+        break;
+      }
+    }
+
+    if (!allCanProduceBitmaps) {
+      return;
+    }
+
+    // Combine non-vector filter bitmaps via AND.
+    // Note: this eagerly evaluates non-vector filters. BaseFilterOperator subclasses cache
+    // their results, so the subsequent evaluation by AndFilterOperator will reuse the cached
+    // bitmaps without double-evaluation.
+    MutableRoaringBitmap combinedBitmap = null;
+    for (BaseFilterOperator op : nonVectorOps) {
+      BitmapCollection bitmapCollection = op.getBitmaps();
+      org.roaringbitmap.buffer.ImmutableRoaringBitmap reduced = bitmapCollection.reduce();
+      if (combinedBitmap == null) {
+        combinedBitmap = reduced.toMutableRoaringBitmap();
+      } else {
+        combinedBitmap.and(reduced);
+      }
+    }
+
+    if (combinedBitmap == null || combinedBitmap.isEmpty()) {
+      return;
+    }
+
+    // Use VectorSearchStrategy to decide whether pre-filtering is worthwhile based on
+    // the estimated selectivity. Only pass the bitmap if the strategy recommends
+    // FILTER_THEN_ANN; otherwise fall back to the default post-filter path.
+    int estimatedFilteredDocs = combinedBitmap.getCardinality();
+    // isMutableSegment=false is acceptable here because the supportsPreFilter() check above
+    // already ensures we only reach this point for immutable segments with
+    // FilterAwareVectorIndexReader. MutableVectorIndex does not implement
+    // FilterAwareVectorIndexReader, so mutable segments exit early via the
+    // anySupportsPreFilter guard.
+    // backendType and searchParams are passed as null here because at the pre-filter wiring
+    // stage we are deciding whether to activate pre-filtering at all, not per-backend tuning.
+    // The strategy currently uses only selectivity (numDocs, estimatedFilteredDocs) for this
+    // decision. Per-backend and per-query-option tuning is handled later inside the operator.
+    VectorSearchStrategy.Decision decision = VectorSearchStrategy.decide(
+        numDocs, estimatedFilteredDocs,
+        /* hasVectorIndex= */ true,
+        /* indexSupportsPreFilter= */ true,
+        /* isMutableSegment= */ false,
+        /* backendType= */ null,
+        /* searchParams= */ null);
+
+    if (decision.getMode() != VectorSearchMode.FILTER_THEN_ANN) {
+      return;
+    }
+
+    // Pass the pre-filter bitmap only to vector operators that support pre-filtering
+    for (VectorSimilarityFilterOperator vectorOp : vectorOps) {
+      if (vectorOp.supportsPreFilter()) {
+        vectorOp.setPreFilterBitmap(combinedBitmap);
+      }
+    }
+  }
+
+  private static String getVectorFallbackReason(@Nullable VectorIndexConfig vectorIndexConfig,
+      boolean isMutableSegment) {
+    if (vectorIndexConfig == null || vectorIndexConfig.isDisabled()) {
+      return isMutableSegment ? "vector_index_missing_on_mutable_segment" : "vector_index_missing";
+    }
+    VectorBackendType backendType = vectorIndexConfig.resolveBackendType();
+    if (isMutableSegment && !backendType.supportsMutableSegments()) {
+      return backendType.name().toLowerCase() + "_mutable_segment_unavailable";
+    }
+    return backendType.supportsMutableSegments() ? "vector_index_missing"
+        : backendType.name().toLowerCase() + "_index_unavailable";
   }
 }

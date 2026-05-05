@@ -168,8 +168,8 @@ public abstract class BaseTransformFunctionTest {
           RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
           BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(RANDOM.nextInt())),
           df.format(RANDOM.nextInt() * RANDOM.nextDouble()));
-      _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
-      _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
+      _stringAlphaNumericSVValues[i] = RandomStringUtils.secure().nextAlphanumeric(26);
+      _bytesSVValues[i] = RandomStringUtils.secure().nextAlphanumeric(26).getBytes();
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
@@ -194,7 +194,7 @@ public abstract class BaseTransformFunctionTest {
         _floatMVValues[i][j] = 1 + RANDOM.nextFloat();
         _doubleMVValues[i][j] = 1 + RANDOM.nextDouble();
         _stringMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextDouble());
-        _stringAlphaNumericMVValues[i][j] = RandomStringUtils.randomAlphanumeric(26);
+        _stringAlphaNumericMVValues[i][j] = RandomStringUtils.secure().nextAlphanumeric(26);
         _stringAlphaNumericMV2Values[i][j] = "a";
         _stringLongFormatMVValues[i][j] = df.format(_intSVValues[i] * RANDOM.nextLong());
         _intMonoIncreasingMV1Values[i][j] = j;

@@ -86,6 +86,12 @@ public class TextIndexHandler extends BaseIndexHandler {
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
+    Set<String> legacyNativeColumns = getColumnsWithLegacyNativeTextIndex();
+    if (!legacyNativeColumns.isEmpty()) {
+      LOGGER.info("Need to replace legacy native text index files from segment: {}, columns: {}", segmentName,
+          legacyNativeColumns);
+      return true;
+    }
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Check if any existing index need to be removed.
     // Check if existing indexes need configuration updates based on storeInSegmentFile
@@ -124,6 +130,10 @@ public class TextIndexHandler extends BaseIndexHandler {
     // Remove indices not set in table config any more
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
+    for (String column : getColumnsWithLegacyNativeTextIndex()) {
+      LOGGER.info("Removing legacy native text index file from segment: {}, column: {}", segmentName, column);
+      segmentWriter.removeIndex(column, StandardIndexes.text());
+    }
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Handle configuration changes for existing indexes
     for (String column : existingColumns) {
@@ -184,6 +194,8 @@ public class TextIndexHandler extends BaseIndexHandler {
   private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     int numDocs = columnMetadata.getTotalDocs();
@@ -210,9 +222,6 @@ public class TextIndexHandler extends BaseIndexHandler {
       // Clean up any existing text index files
       cleanupExistingTextIndexFiles(indexDir, columnName);
     }
-
-    File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
-        _segmentDirectory.getSegmentMetadata().getVersion());
 
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
@@ -383,5 +392,24 @@ public class TextIndexHandler extends BaseIndexHandler {
     LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, combinedTextIndexFile, StandardIndexes.text());
 
     LOGGER.info("Successfully converted text index to V3 combined format for column: {}", columnName);
+  }
+
+  private Set<String> getColumnsWithLegacyNativeTextIndex() {
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
+    Set<String> columns = new HashSet<>();
+    for (String column : _segmentDirectory.getSegmentMetadata().getAllColumns()) {
+      if (hasLegacyNativeTextIndex(indexDir, segmentDirectory, column)) {
+        columns.add(column);
+      }
+    }
+    return columns;
+  }
+
+  private boolean hasLegacyNativeTextIndex(File indexDir, File segmentDirectory, String column) {
+    String legacyNativeTextIndexFile = column + V1Constants.Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION;
+    return new File(indexDir, legacyNativeTextIndexFile).exists()
+        || (!segmentDirectory.equals(indexDir) && new File(segmentDirectory, legacyNativeTextIndexFile).exists());
   }
 }

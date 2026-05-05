@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.MultiValueResult;
@@ -97,6 +98,11 @@ public class InMemoryColumnReader implements ColumnReader {
   }
 
   @Override
+  public boolean isBigDecimal() {
+    return _dataType == BigDecimal.class;
+  }
+
+  @Override
   public boolean isString() {
     return _dataType == String.class;
   }
@@ -127,6 +133,11 @@ public class InMemoryColumnReader implements ColumnReader {
   }
 
   @Override
+  public BigDecimal nextBigDecimal() {
+    return (BigDecimal) next();
+  }
+
+  @Override
   public String nextString() {
     return (String) next();
   }
@@ -154,6 +165,11 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<double[]> nextDoubleMV() {
     return MultiValueResult.of((double[]) next(), null);
+  }
+
+  @Override
+  public BigDecimal[] nextBigDecimalMV() {
+    return (BigDecimal[]) next();
   }
 
   @Override
@@ -207,6 +223,11 @@ public class InMemoryColumnReader implements ColumnReader {
   }
 
   @Override
+  public BigDecimal getBigDecimal(int docId) {
+    return (BigDecimal) _values[docId];
+  }
+
+  @Override
   public String getString(int docId) {
     return (String) _values[docId];
   }
@@ -239,6 +260,11 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<double[]> getDoubleMV(int docId) {
     return MultiValueResult.of((double[]) _values[docId], null);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId) {
+    return (BigDecimal[]) _values[docId];
   }
 
   @Override

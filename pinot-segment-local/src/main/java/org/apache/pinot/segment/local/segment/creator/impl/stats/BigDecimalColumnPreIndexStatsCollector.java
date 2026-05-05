@@ -45,7 +45,20 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
     assert !_sealed;
 
     if (entry instanceof Object[]) {
-      throw new UnsupportedOperationException();
+      Object[] values = (Object[]) entry;
+      int rowLength = 0;
+      for (Object obj : values) {
+        BigDecimal value = (BigDecimal) obj;
+        int length = BigDecimalUtils.byteSize(value);
+        if (_values.add(value)) {
+          _minLength = Math.min(_minLength, length);
+          _maxLength = Math.max(_maxLength, length);
+        }
+        rowLength += length;
+      }
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
+      updateTotalNumberOfEntries(values);
     } else {
       BigDecimal value = (BigDecimal) entry;
       int length = BigDecimalUtils.byteSize(value);
@@ -88,11 +101,11 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
 
   @Override
   public int getLengthOfShortestElement() {
-    return _minLength;
+    return _minLength != Integer.MAX_VALUE ? _minLength : 0;
   }
 
   @Override
-  public int getLengthOfLargestElement() {
+  public int getLengthOfLongestElement() {
     return _maxLength;
   }
 

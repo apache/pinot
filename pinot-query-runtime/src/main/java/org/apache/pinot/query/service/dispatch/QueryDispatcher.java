@@ -78,12 +78,14 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -111,6 +113,7 @@ public class QueryDispatcher {
   private final TlsConfig _tlsConfig;
   @Nullable
   private final SslContext _clientGrpcSslContext;
+  private final DispatchClient.KeepAliveConfig _keepAliveConfig;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
@@ -118,12 +121,28 @@ public class QueryDispatcher {
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        DispatchClient.KeepAliveConfig.DISABLED);
+  }
+
+  /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
+  /// disables keep-alive.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls));
+  }
+
+  private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig) {
     _cancelTimeout = cancelTimeout;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
     _clientGrpcSslContext = initClientSslContext(tlsConfig);
+    _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
 
     if (enableCancellation) {
@@ -341,7 +360,7 @@ public class QueryDispatcher {
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
     while (!deadline.isExpired() && numSuccessCalls < numServers) {
       AsyncResponse<E> resp =
-          dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+          dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
           // If it's a connectivity issue between the broker and the server, mark the server as unhealthy to prevent
@@ -520,7 +539,7 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
-        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext));
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig));
   }
 
   /**
@@ -590,27 +609,16 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, opChainExecutionContext, (a, b) -> {
+    try (OpChain opChain = OpChainConverterDispatcher.convert(rootNode, opChainExecutionContext, (a, b) -> {
     })) {
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {
-        DataBlock dataBlock = ((MseBlock.Data) block).asSerialized().getDataBlock();
-        int numRows = dataBlock.getNumberOfRows();
-        if (numRows > 0) {
-          resultRows.ensureCapacity(resultRows.size() + numRows);
-          List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
-          for (Object[] rawRow : rawRows) {
-            Object[] row = new Object[numColumns];
-            for (int i = 0; i < numColumns; i++) {
-              Object rawValue = rawRow[resultFields.get(i).getKey()];
-              if (rawValue != null) {
-                ColumnDataType dataType = columnTypes[i];
-                row[i] = dataType.format(dataType.toExternal(rawValue));
-              }
-            }
-            resultRows.add(row);
-          }
+        MseBlock.Data dataBlock = (MseBlock.Data) block;
+        if (dataBlock.isSerialized()) {
+          reduceSerialized(dataBlock.asSerialized(), resultRows, numColumns, resultFields, columnTypes);
+        } else {
+          reduceRowHeap(dataBlock.asRowHeap(), resultRows, numColumns, resultFields, columnTypes);
         }
         block = rootOperator.nextBlock();
       }
@@ -647,6 +655,39 @@ public class QueryDispatcher {
     assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  private static void reduceSerialized(SerializedDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    DataBlock dataBlock = block.getDataBlock();
+    if (dataBlock.getNumberOfRows() > 0) {
+      List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rawRows);
+    }
+  }
+
+  private static void reduceRowHeap(RowHeapDataBlock block, ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes) {
+    List<Object[]> rows = block.getRows();
+    if (!rows.isEmpty()) {
+      toExternalList(resultRows, numColumns, resultFields, columnTypes, rows);
+    }
+  }
+
+  private static void toExternalList(ArrayList<Object[]> resultRows, int numColumns,
+      PairList<Integer, String> resultFields, ColumnDataType[] columnTypes, List<Object[]> rows) {
+    resultRows.ensureCapacity(resultRows.size() + rows.size());
+    for (Object[] rawRow : rows) {
+      Object[] row = new Object[numColumns];
+      for (int i = 0; i < numColumns; i++) {
+        Object rawValue = rawRow[resultFields.get(i).getKey()];
+        if (rawValue != null) {
+          ColumnDataType dataType = columnTypes[i];
+          row[i] = dataType.format(dataType.toExternal(rawValue));
+        }
+      }
+      resultRows.add(row);
+    }
   }
 
   // TODO: Improve the way the errors are compared

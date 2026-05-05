@@ -20,10 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -39,7 +37,6 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -64,8 +61,6 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   private static final String NULL_INDEX_COLUMN = "nullField";
 
   private static final String JSON_INDEX_COLUMN = "jsonField";
-  private static final String FST_TEST_COLUMN = "DestCityName";
-
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -110,17 +105,6 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   private FieldConfig getH3FieldConfig() {
     return new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
         H3_INDEX_PROPERTIES);
-  }
-
-  private FieldConfig getTextFieldConfig() {
-    return new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null, null);
-  }
-
-  private FieldConfig getFstFieldConfig() {
-    Map<String, String> propertiesMap = new HashMap<>();
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
-    return new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.RAW, FieldConfig.IndexType.TEXT, null,
-        propertiesMap);
   }
 
   @Override
@@ -179,10 +163,9 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private Map<String, TableStaleSegmentResponse> getStaleSegmentsResponse()
-      throws IOException {
-    return JsonUtils.stringToObject(sendGetRequest(
-            _controllerRequestURLBuilder.forStaleSegments(
-                TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
+      throws Exception {
+    return getOrCreateAdminClient().getSegmentClient().getStaleSegments(
+        TableNameBuilder.OFFLINE.tableNameWithType(getTableName()),
         new TypeReference<Map<String, TableStaleSegmentResponse>>() { });
   }
 

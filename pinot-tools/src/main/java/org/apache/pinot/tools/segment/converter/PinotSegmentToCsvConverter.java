@@ -37,21 +37,29 @@ public class PinotSegmentToCsvConverter implements PinotSegmentConverter {
   private final char _delimiter;
   private final char _listDelimiter;
   private final boolean _withHeader;
+  private final boolean _forwardIndexOnly;
 
   PinotSegmentToCsvConverter(String segmentDir, String outputFile, char delimiter, char listDelimiter,
       boolean withHeader) {
+    this(segmentDir, outputFile, delimiter, listDelimiter, withHeader, false);
+  }
+
+  PinotSegmentToCsvConverter(String segmentDir, String outputFile, char delimiter, char listDelimiter,
+      boolean withHeader, boolean forwardIndexOnly) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
     _delimiter = delimiter;
     _listDelimiter = listDelimiter;
     _withHeader = withHeader;
+    _forwardIndexOnly = forwardIndexOnly;
   }
 
   @Override
   public void convert()
       throws Exception {
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
-        BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
+    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
+    recordReader.init(new File(_segmentDir), null, null, false, _forwardIndexOnly);
+    try (recordReader; BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
       GenericRow row = new GenericRow();
       row = recordReader.next(row);
       String[] fields = row.getFieldToValueMap().keySet().toArray(new String[0]);

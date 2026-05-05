@@ -20,7 +20,7 @@ package org.apache.pinot.common.metrics.prometheus;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -97,7 +97,7 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
       _brokerMetrics.addMeteredGlobalValue(meter, 5L);
       if (GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX.contains(meter)) {
         String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
-            StringUtils.remove(meter.getMeterName(), "Exceptions"));
+            Strings.CS.remove(meter.getMeterName(), "Exceptions"));
         assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
       } else {
         assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);

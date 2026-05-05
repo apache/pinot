@@ -60,6 +60,7 @@ import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -97,8 +98,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 
@@ -106,8 +105,6 @@ import org.testng.Assert;
  * Shared implementation details of the cluster integration tests.
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
-
   // Default settings
   protected static final String DEFAULT_TABLE_NAME = "mytable";
   protected static final String DEFAULT_LOGICAL_TABLE_NAME = "mytable_logical";
@@ -123,8 +120,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final int DEFAULT_LLC_NUM_KAFKA_BROKERS = 2;
   protected static final int DEFAULT_LLC_NUM_KAFKA_PARTITIONS = 2;
   protected static final int DEFAULT_MAX_NUM_KAFKA_MESSAGES_PER_BATCH = 10000;
-  private static final long KAFKA_CLUSTER_READY_TIMEOUT_MS = 120_000L;
-  private static final long KAFKA_TOPIC_READY_TIMEOUT_MS = 120_000L;
+  private static final long KAFKA_CLUSTER_READY_TIMEOUT_MS = 180_000L;
+  private static final long KAFKA_TOPIC_READY_TIMEOUT_MS = 180_000L;
   protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
@@ -231,10 +228,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Nullable
   protected List<String> getInvertedIndexColumns() {
     return new ArrayList<>(DEFAULT_INVERTED_INDEX_COLUMNS);
-  }
-
-  protected boolean isCreateInvertedIndexDuringSegmentGeneration() {
-    return false;
   }
 
   @Nullable
@@ -367,7 +360,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setTimeColumnName(getTimeColumnName())
         .setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns())
-        .setCreateInvertedIndexDuringSegmentGeneration(isCreateInvertedIndexDuringSegmentGeneration())
         .setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns())
         .setBloomFilterColumns(getBloomFilterColumns())
@@ -478,11 +470,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * The schema for the logical table should be created separately before calling this method.
    */
   protected void createLogicalTable()
-      throws IOException {
+      throws Exception {
     LogicalTableConfig logicalTableConfig = createLogicalTableConfig();
-    sendPostRequest(
-        _controllerRequestURLBuilder.forLogicalTableCreate(),
-        logicalTableConfig.toSingleLineJsonString());
+    getOrCreateAdminClient().getLogicalTableClient().createLogicalTable(logicalTableConfig.toSingleLineJsonString());
   }
 
   // TODO - Use this method to create table config for all table types to avoid redundant code
@@ -781,7 +771,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L,
         timeoutMs, "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(),
-        true, Duration.ofMillis(timeoutMs / 10));
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   protected List<File> getAllAvroFiles()
@@ -847,7 +837,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         KAFKA_CLUSTER_READY_TIMEOUT_MS,
         "Kafka brokers are not ready");
     if (requireTransactions) {
-      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 500L, KAFKA_CLUSTER_READY_TIMEOUT_MS,
+      // Wait for transaction coordinator with longer initial delay and timeout
+      TestUtils.waitForCondition(aVoid -> canInitTransactions(brokerList), 1000L, KAFKA_CLUSTER_READY_TIMEOUT_MS,
           "Kafka transaction coordinator is not ready");
     }
   }
@@ -876,6 +867,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     producerProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "5000");
     try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps)) {
       producer.initTransactions();
+      // Complete a full transaction cycle to verify coordinator is truly ready
+      producer.beginTransaction();
+      producer.commitTransaction();
       return true;
     } catch (Exception e) {
       return false;
@@ -1062,33 +1056,34 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void waitForAllDocsLoaded(long timeoutMs)
       throws Exception {
-    waitForDocsLoaded(timeoutMs, true, getTableName());
+    waitForAllDocsLoaded(getTableName(), timeoutMs);
   }
 
+  protected void waitForAllDocsLoaded(String tableName, long timeoutMs) {
+    long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
+        "Failed to load " + countStarResult + " documents", Duration.ofMillis(timeoutMs / 10));
+  }
+
+  protected void waitForAnyDocLoaded(String tableName, long timeoutMs) {
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
+        "Failed to load any document", Duration.ofMillis(timeoutMs / 10));
+  }
+
+  /// @deprecated Always raise error when condition is not met.
+  @Deprecated
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
-        "Failed to load " + countStarResult + " documents", false, Duration.ofMillis(timeoutMs / 10));
-    if (raiseError) {
-      long currentCount = getCurrentCountStarResult(tableName);
-      Assert.assertEquals(currentCount, countStarResult,
-          "Failed to load " + countStarResult + " documents; current count=" + currentCount + " for table="
-              + tableName);
-    }
+        "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   protected void waitForAllRealtimePartitionsConsuming(String tableNameWithType, long timeoutMs) {
     int expectedPartitions = getNumKafkaPartitions();
-    TestUtils.waitForCondition(() -> hasConsumingSegmentsForAllPartitions(tableNameWithType, expectedPartitions), 200L,
-        timeoutMs, "Failed to get CONSUMING segments for all " + expectedPartitions + " partitions for table "
-            + tableNameWithType, false, Duration.ofMillis(timeoutMs / 10));
-    int consumingPartitions = getNumConsumingPartitions(tableNameWithType);
-    Assert.assertEquals(consumingPartitions, expectedPartitions, "Expected CONSUMING segments for "
-        + expectedPartitions + " partitions, found " + consumingPartitions + " for table " + tableNameWithType);
-  }
-
-  private boolean hasConsumingSegmentsForAllPartitions(String tableNameWithType, int expectedPartitions) {
-    return getNumConsumingPartitions(tableNameWithType) >= expectedPartitions;
+    TestUtils.waitForCondition(() -> getNumConsumingPartitions(tableNameWithType) == expectedPartitions, 200L,
+        timeoutMs,
+        "Failed to get CONSUMING segments for all " + expectedPartitions + " partitions for table " + tableNameWithType,
+        Duration.ofMillis(timeoutMs / 10));
   }
 
   private int getNumConsumingPartitions(String tableNameWithType) {
@@ -1110,11 +1105,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return consumingPartitions.size();
   }
 
-  protected void waitForNonZeroDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
-    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) > 0, 100L, timeoutMs,
-        "Failed to load non zero documents", raiseError, Duration.ofMillis(timeoutMs / 10));
-  }
-
   /**
    * Wait for servers to remove the table data manager after the table is deleted.
    */
@@ -1134,8 +1124,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected void resetTable(String tableName, TableType tableType, @Nullable String targetInstance)
       throws IOException {
-    getControllerRequestClient().resetTable(TableNameBuilder.forType(tableType).tableNameWithType(tableName),
-        targetInstance);
+    try {
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      getOrCreateAdminClient().getSegmentClient().resetSegments(tableNameWithType, false, targetInstance);
+    } catch (org.apache.pinot.client.admin.PinotAdminException e) {
+      throw new IOException(e);
+    }
   }
 
   /**
@@ -1179,9 +1173,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected JsonNode getColumnIndexSize(String column)
       throws Exception {
-    return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
-        .get("columnIndexSizeMap").get(column);
+    TableMetadataInfo metadata = getOrCreateAdminClient().getTableClient()
+        .getAggregateMetadata(getTableName(), String.join(",", List.of(column)));
+    return JsonUtils.objectToJsonNode(metadata).get("columnIndexSizeMap").get(column);
   }
 
   /**
@@ -1189,16 +1183,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected List<String> getSegmentNames(String tableName, @Nullable String tableType)
       throws Exception {
-    return getControllerRequestClient().listSegments(tableName, tableType, true);
+    return getOrCreateAdminClient().getSegmentClient().listSegments(tableName, tableType, true);
   }
 
   protected List<ValidDocIdsMetadataInfo> getValidDocIdsMetadata(String tableNameWithType,
       ValidDocIdsType validDocIdsType)
       throws Exception {
 
-    StringBuilder urlBuilder = new StringBuilder(
-        _controllerRequestURLBuilder.forValidDocIdsMetadata(tableNameWithType, validDocIdsType.toString()));
-    String responseString = sendGetRequest(urlBuilder.toString());
+    String responseString = getOrCreateAdminClient().getTableClient()
+        .getValidDocIdsMetadata(tableNameWithType, validDocIdsType.toString());
     return JsonUtils.stringToObject(responseString, new TypeReference<>() { });
   }
 }

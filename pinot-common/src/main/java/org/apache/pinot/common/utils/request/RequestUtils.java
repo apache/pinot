@@ -41,6 +41,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.DataSource;
@@ -255,7 +256,7 @@ public class RequestUtils {
           break;
         default:
           literal.setStringValue(
-              _useLegacyLiteralUnescaping ? StringUtils.replace(node.toValue(), "''", "'") : node.toValue());
+              _useLegacyLiteralUnescaping ? Strings.CS.replace(node.toValue(), "''", "'") : node.toValue());
           break;
       }
     }

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -148,6 +149,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     TRIM_LENGTH, ERROR, SUBSTITUTE_DEFAULT_VALUE, NO_ACTION
   }
 
+  @JsonProperty("description")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected String _description;
+
+  @JsonProperty("tags")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  protected List<String> _tags;
+
   protected String _name;
   protected DataType _dataType;
   protected boolean _singleValueField = true;
@@ -208,6 +219,24 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(String name) {
     _name = name;
+  }
+
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
   }
 
   public DataType getDataType() {
@@ -275,6 +304,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return DEFAULT_MAX_LENGTH;
   }
 
+  /// Returns the max length of the column if it is not using the default length, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public Integer getNonDefaultMaxLength() {
+    int effectiveMaxLength = getEffectiveMaxLength();
+    return effectiveMaxLength != DEFAULT_MAX_LENGTH ? effectiveMaxLength : null;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   // Use getEffectiveMaxLength() for default-aware access.
   @Nullable
@@ -306,6 +344,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         return getDefaultJsonMaxLengthExceedStrategy();
       default:
         return MaxLengthExceedStrategy.NO_ACTION;
+    }
+  }
+
+  /// Returns the max length exceed strategy of the column if it is not using the default strategy, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public MaxLengthExceedStrategy getNonDefaultMaxLengthExceedStrategy() {
+    MaxLengthExceedStrategy effectiveMaxLengthExceedStrategy = getEffectiveMaxLengthExceedStrategy();
+    if (_dataType == DataType.STRING) {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.TRIM_LENGTH ? effectiveMaxLengthExceedStrategy
+          : null;
+    } else {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.NO_ACTION ? effectiveMaxLengthExceedStrategy
+          : null;
     }
   }
 
@@ -519,6 +572,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (_virtualColumnProvider != null) {
       jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
     }
+    if (_description != null) {
+      jsonObject.put("description", _description);
+    }
+    if (_tags != null && !_tags.isEmpty()) {
+      ArrayNode tagsArray = JsonUtils.newArrayNode();
+      for (String tag : _tags) {
+        tagsArray.add(tag);
+      }
+      jsonObject.set("tags", tagsArray);
+    }
     return jsonObject;
   }
 
@@ -589,13 +652,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && _allowTrailingZeros == that._allowTrailingZeros
         && _dataType.equals(_defaultNullValue, that._defaultNullValue)
         && Objects.equals(_transformFunction, that._transformFunction)
-        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider);
+        && Objects.equals(_virtualColumnProvider, that._virtualColumnProvider)
+        && Objects.equals(_description, that._description)
+        && Objects.equals(_tags, that._tags);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(_name, _dataType, _singleValueField, _notNull, _maxLength, _maxLengthExceedStrategy,
-        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider);
+        _allowTrailingZeros, _dataType.hashCode(_defaultNullValue), _transformFunction, _virtualColumnProvider,
+        _description, _tags);
   }
 
   /**

@@ -20,12 +20,12 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.ThrottledLogger;
-import org.apache.pinot.segment.local.function.FunctionEvaluator;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

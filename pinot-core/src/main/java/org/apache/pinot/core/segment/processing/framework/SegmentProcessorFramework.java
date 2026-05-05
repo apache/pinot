@@ -303,6 +303,7 @@ public class SegmentProcessorFramework {
     String segmentNamePostfix = _segmentProcessorConfig.getSegmentConfig().getSegmentNamePostfix();
     String fixedSegmentName = _segmentProcessorConfig.getSegmentConfig().getFixedSegmentName();
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    generatorConfig.setInstanceType(InstanceType.MINION);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     generatorConfig.setCreationTime(String.valueOf(_segmentProcessorConfig.getCustomCreationTime()));
@@ -343,7 +344,7 @@ public class SegmentProcessorFramework {
           GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
           SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
           driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
-              TransformPipeline.getPassThroughPipeline(tableConfig.getTableName()), InstanceType.MINION);
+              TransformPipeline.getPassThroughPipeline(tableConfig.getTableName()));
           driver.build();
           _incompleteRowsFound += driver.getIncompleteRowsFound();
           _skippedRowsFound += driver.getSkippedRowsFound();

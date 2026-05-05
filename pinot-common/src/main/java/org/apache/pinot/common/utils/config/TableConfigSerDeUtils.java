@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
@@ -184,10 +185,23 @@ public class TableConfigSerDeUtils {
       });
     }
 
-    return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig,
-        dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable, tunerConfigList,
-        instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
+    String description = simpleFields.get(TableConfig.DESCRIPTION_KEY);
+
+    List<String> tags = null;
+    String tagsString = simpleFields.get(TableConfig.TAGS_KEY);
+    if (tagsString != null) {
+      tags = JsonUtils.stringToObject(tagsString, new TypeReference<>() {
+      });
+    }
+
+    TableConfig tableConfig =
+        new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+            quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
+            upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
+            tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
+    tableConfig.setDescription(description);
+    tableConfig.setTags(tags);
+    return tableConfig;
   }
 
   public static ZNRecord toZNRecord(TableConfig tableConfig)
@@ -265,6 +279,14 @@ public class TableConfigSerDeUtils {
     List<TableSamplerConfig> tableSamplerConfigs = tableConfig.getTableSamplers();
     if (tableSamplerConfigs != null) {
       simpleFields.put(TableConfig.TABLE_SAMPLERS_KEY, JsonUtils.objectToString(tableSamplerConfigs));
+    }
+    String description = tableConfig.getDescription();
+    if (StringUtils.isNotBlank(description)) {
+      simpleFields.put(TableConfig.DESCRIPTION_KEY, description);
+    }
+    List<String> tags = tableConfig.getTags();
+    if (tags != null && !tags.isEmpty()) {
+      simpleFields.put(TableConfig.TAGS_KEY, JsonUtils.objectToString(tags));
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());

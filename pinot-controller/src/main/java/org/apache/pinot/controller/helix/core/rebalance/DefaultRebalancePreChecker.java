@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,6 +33,9 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalancePreCheckerResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.util.TableMetadataReader;

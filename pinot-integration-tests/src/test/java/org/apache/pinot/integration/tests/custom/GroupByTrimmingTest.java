@@ -221,10 +221,15 @@ public class GroupByTrimmingTest extends CustomDataQueryClusterIntegrationTest {
 
     // Assert the header exactly
     assertEquals(lines[0], "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]");
-    // Assert col3 of all data rows is 4
+    // With segment-level trimming on COUNT(*), some groups may only appear in a subset of segments,
+    // so the count can be less than 4. Verify counts are > 0 and in DESC order.
+    long prevCount = Long.MAX_VALUE;
     for (int i = 1; i < lines.length; i++) {
       String[] cols = lines[i].split("\t");
-      assertEquals(cols[2], "4");
+      long count = Long.parseLong(cols[2].trim());
+      assertTrue(count > 0, "Count should be positive, got: " + count);
+      assertTrue(count <= prevCount, "Counts should be in DESC order, got: " + count + " after " + prevCount);
+      prevCount = count;
     }
 
 

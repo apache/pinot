@@ -29,13 +29,13 @@ import 'codemirror/addon/lint/json-lint';
 import {FormControlLabel, FormGroup, makeStyles, Switch} from '@material-ui/core';
 import clsx from 'clsx';
 
+import '../utils/jsonlint-wrapper';
+
 declare global {
   interface Window {
     jsonlint:any;
   }
 }
-
-window.jsonlint = require('jsonlint');
 
 type Props = {
   data: Object,

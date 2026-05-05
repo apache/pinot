@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -33,4 +35,14 @@ public interface VectorIndexReader extends IndexReader {
    * @return bitmap of top k closest vectors
    */
   ImmutableRoaringBitmap getDocIds(float[] vector, int topK);
+
+  /**
+   * Returns a map of effective runtime state for debug and explain output.
+   * Implementations should report actual loaded values, not just requested config.
+   *
+   * @return map of debug key-value pairs, or empty map if not supported
+   */
+  default Map<String, Object> getIndexDebugInfo() {
+    return Collections.emptyMap();
+  }
 }

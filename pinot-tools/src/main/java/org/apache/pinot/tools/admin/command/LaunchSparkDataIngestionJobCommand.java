@@ -330,7 +330,6 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   }
 
   enum SparkType {
-    SPARK_2("2.4.0", "pinot-batch-ingestion-spark-2.4", JavaVersion.JAVA_1_8),
     SPARK_3("3.2.1", "pinot-batch-ingestion-spark-3.2", JavaVersion.JAVA_11);
 
     private final String _sparkVersion;

@@ -64,7 +64,9 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
         break;
       }
     }
-    return new DistinctResultsBlock(executor.getResult(), _queryContext);
+    DistinctResultsBlock resultsBlock = new DistinctResultsBlock(executor.getResult(), _queryContext);
+    resultsBlock.setNumDocsScanned(_numDocsScanned);
+    return resultsBlock;
   }
 
   @Override

@@ -37,13 +37,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReplicaGroupSegmentAssignmentStrategy.class);
 
-  private HelixManager _helixManager;
-  private String _tableName;
-  private String _partitionColumn;
-  private int _replication;
+  protected HelixManager _helixManager;
+  protected String _tableName;
+  protected String _partitionColumn;
+  protected int _replication;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
@@ -54,16 +54,19 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
     _replication = tableConfig.getReplication();
     _partitionColumn = TableConfigUtils.getPartitionColumn(tableConfig);
     if (_partitionColumn == null) {
-      LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
-          + "with replication: {} without partition column for table: {} ", _replication, _tableName);
+      LOGGER.info("Initialized {} "
+              + "with replication: {} without partition column for table: {} ", this.getClass().getSimpleName(),
+          _replication, _tableName);
     } else {
-      LOGGER.info("Initialized ReplicaGroupSegmentAssignmentStrategy "
-          + "with replication: {} and partition column: {} for table: {}", _replication, _partitionColumn, _tableName);
+      LOGGER.info("Initialized {} "
+              + "with replication: {} and partition column: {} for table: {}", this.getClass().getSimpleName(),
+          _replication, _partitionColumn, _tableName);
     }
   }
 
   /**
    * Assigns the segment for the replica-group based segment assignment strategy and returns the assigned instances.
+   * Assign to the instance with the least number of segments for each replica-group.
    */
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
@@ -128,7 +131,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
    * mismatch can happen when table is not configured correctly (table replication and numReplicaGroups does not match
    * or replication changed without reassigning instances).
    */
-  private static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
+  protected static void checkReplication(InstancePartitions instancePartitions, int replication, String tableName) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     if (numReplicaGroups != replication) {
       LOGGER.warn(

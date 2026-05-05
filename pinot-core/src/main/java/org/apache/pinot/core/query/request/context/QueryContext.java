@@ -141,6 +141,8 @@ public class QueryContext {
       Server.DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD;
   // Segment trim size for group by operator
   private int _effectiveSegmentGroupTrimSize;
+  // Flush threshold for streaming group-by (0 = disabled)
+  private int _streamingGroupByFlushThreshold;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -493,6 +495,14 @@ public class QueryContext {
 
   public void setChunkSizeExtractFinalResult(int chunkSizeExtractFinalResult) {
     _chunkSizeExtractFinalResult = chunkSizeExtractFinalResult;
+  }
+
+  public int getStreamingGroupByFlushThreshold() {
+    return _streamingGroupByFlushThreshold;
+  }
+
+  public void setStreamingGroupByFlushThreshold(int streamingGroupByFlushThreshold) {
+    _streamingGroupByFlushThreshold = streamingGroupByFlushThreshold;
   }
 
   public boolean isNullHandlingEnabled() {

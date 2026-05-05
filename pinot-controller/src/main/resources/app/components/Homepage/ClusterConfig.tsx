@@ -31,13 +31,20 @@ const ClusterConfig = () => {
     records: []
   });
 
-  const fetchData = async () => {
-    const result = await PinotMethodUtils.getClusterConfigData();
-    setTableData(result);
-    setFetching(false);
-  };
   useEffect(() => {
-    fetchData();
+    let isMounted = true;
+
+    PinotMethodUtils.getClusterConfigData().then((result) => {
+      if (!isMounted) {
+        return;
+      }
+      setTableData(result);
+      setFetching(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

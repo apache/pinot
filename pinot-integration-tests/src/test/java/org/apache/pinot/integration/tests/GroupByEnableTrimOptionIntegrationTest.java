@@ -76,8 +76,7 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
 
     // Wait for all documents loaded
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(DEFAULT_TABLE_NAME) == FILES_NO * RECORDS_NO, 100L,
-        60_000,
-        "Failed to load  documents", true, Duration.ofMillis(60_000 / 10));
+        60_000L, "Failed to load  documents", Duration.ofMillis(60_000 / 10));
 
     setUseMultiStageQueryEngine(true);
 

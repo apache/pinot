@@ -312,4 +312,9 @@ public class ServerInstance {
   public QueryScheduler getQueryScheduler() {
     return _queryScheduler;
   }
+
+  @Nullable
+  public WorkerQueryServer getWorkerQueryServer() {
+    return _workerQueryServer;
+  }
 }

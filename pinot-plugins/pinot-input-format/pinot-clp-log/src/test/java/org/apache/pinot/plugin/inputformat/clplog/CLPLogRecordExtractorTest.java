@@ -22,12 +22,10 @@ import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_CONFIG_KEY;
@@ -36,185 +34,103 @@ import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorCo
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.fail;
 
 
 public class CLPLogRecordExtractorTest {
-  private static final String _TIMESTAMP_FIELD_NAME = "timestamp";
-  private static final int _TIMESTAMP_FIELD_VALUE = 10;
-  private static final String _LEVEL_FIELD_NAME = "level";
-  private static final String _LEVEL_FIELD_VALUE = "INFO";
-  private static final String _BOOLEAN_FIELD_NAME = "booleanField";
-  private static final boolean _BOOLEAN_FIELD_VALUE = true;
-  private static final String _MESSAGE_1_FIELD_NAME = "message1";
-  private static final String _MESSAGE_1_FIELD_VALUE = "Started job_123 on node-987: 4 cores, 8 threads and "
-      + "51.4% memory used.";
-  private static final String _MESSAGE_2_FIELD_NAME = "message2";
-  private static final String _MESSAGE_2_FIELD_VALUE = "Stopped job_123 on node-987: 3 cores, 6 threads and "
-      + "22.0% memory used.";
-  private static final String _TOPIC_NAME = "test-topic";
-  private static final String _TOPIC_NAME_DEST_COLUMN = "_streamTopicName";
+  private static final String MESSAGE_1_FIELD_NAME = "message1";
+  private static final String MESSAGE_1_FIELD_VALUE =
+      "Started job_123 on node-987: 4 cores, 8 threads and 51.4% memory used.";
+  private static final String MESSAGE_2_FIELD_NAME = "message2";
+  private static final String MESSAGE_2_FIELD_VALUE =
+      "Stopped job_123 on node-987: 3 cores, 6 threads and 22.0% memory used.";
+  private static final String TOPIC_NAME = "testTopic";
+  private static final String TOPIC_NAME_DEST_COLUMN = "topicName";
 
-  @Test
-  public void testCLPEncoding() {
-    testCLPEncoding(true);
-    testCLPEncoding(false);
+  @DataProvider(name = "removeProcessedField")
+  public Object[][] removeProcessedField() {
+    return new Object[][]{{true}, {false}};
   }
 
-  public void testCLPEncoding(boolean removeProcessedField) {
-    Map<String, String> props = new HashMap<>();
-    Set<String> fieldsToRead = new HashSet<>();
-    // Add some fields for CLP encoding
-    props.put(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY,
-        _MESSAGE_1_FIELD_NAME + FIELDS_FOR_CLP_ENCODING_SEPARATOR + _MESSAGE_2_FIELD_NAME);
-    props.put(REMOVE_PROCESSED_FIELDS_CONFIG_KEY, String.valueOf(removeProcessedField));
-    addCLPEncodedField(_MESSAGE_1_FIELD_NAME, fieldsToRead);
-    addCLPEncodedField(_MESSAGE_2_FIELD_NAME, fieldsToRead);
-    // Add some unencoded fields
-    fieldsToRead.add(_TIMESTAMP_FIELD_NAME);
-
-    GenericRow row;
-
-    // Test extracting specific fields
-    row = extract(props, fieldsToRead);
-    assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
-    assertNull(row.getValue(_LEVEL_FIELD_NAME));
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
-
-    // Test extracting all fields
-    row = extract(props, null);
-    assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
-    assertEquals(row.getValue(_LEVEL_FIELD_NAME), _LEVEL_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
+  @Test(dataProvider = "removeProcessedField")
+  public void testCLPEncoding(boolean removeProcessedField)
+      throws IOException {
+    GenericRow row = extract(Map.of(
+        FIELDS_FOR_CLP_ENCODING_CONFIG_KEY,
+        MESSAGE_1_FIELD_NAME + FIELDS_FOR_CLP_ENCODING_SEPARATOR + MESSAGE_2_FIELD_NAME,
+        REMOVE_PROCESSED_FIELDS_CONFIG_KEY, String.valueOf(removeProcessedField)
+    ));
+    validateClpEncodedField(row, MESSAGE_1_FIELD_NAME, MESSAGE_1_FIELD_VALUE, removeProcessedField);
+    validateClpEncodedField(row, MESSAGE_2_FIELD_NAME, MESSAGE_2_FIELD_VALUE, removeProcessedField);
   }
 
   @Test
-  public void testBadCLPEncodingConfig() {
-    Map<String, String> props = new HashMap<>();
-    Set<String> fieldsToRead = new HashSet<>();
-    boolean removeProcessedField = true;
-    // Add some fields for CLP encoding with some mistakenly empty field names
+  public void testBadCLPEncodingConfig()
+      throws IOException {
+    // Empty entries in the field-list config (leading / trailing / consecutive separators) are tolerated;
+    // valid entries still get encoded.
     String separator = FIELDS_FOR_CLP_ENCODING_SEPARATOR;
-    props.put(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY, separator + _MESSAGE_1_FIELD_NAME
-        + separator + separator + _MESSAGE_2_FIELD_NAME + separator);
-    props.put(REMOVE_PROCESSED_FIELDS_CONFIG_KEY, String.valueOf(removeProcessedField));
-    addCLPEncodedField(_MESSAGE_1_FIELD_NAME, fieldsToRead);
-    addCLPEncodedField(_MESSAGE_2_FIELD_NAME, fieldsToRead);
-    // Add some unencoded fields
-    fieldsToRead.add(_TIMESTAMP_FIELD_NAME);
-
-    GenericRow row;
-
-    // Test extracting specific fields
-    row = extract(props, fieldsToRead);
-    assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
-    assertNull(row.getValue(_LEVEL_FIELD_NAME));
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
-
-    // Test extracting all fields
-    row = extract(props, null);
-    assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
-    assertEquals(row.getValue(_LEVEL_FIELD_NAME), _LEVEL_FIELD_VALUE);
-    assertEquals(row.getValue(_BOOLEAN_FIELD_NAME), _BOOLEAN_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
+    GenericRow row = extract(Map.of(
+        FIELDS_FOR_CLP_ENCODING_CONFIG_KEY,
+        separator + MESSAGE_1_FIELD_NAME + separator + separator + MESSAGE_2_FIELD_NAME + separator,
+        REMOVE_PROCESSED_FIELDS_CONFIG_KEY, "true"
+    ));
+    validateClpEncodedField(row, MESSAGE_1_FIELD_NAME, MESSAGE_1_FIELD_VALUE, true);
+    validateClpEncodedField(row, MESSAGE_2_FIELD_NAME, MESSAGE_2_FIELD_VALUE, true);
   }
 
   @Test
   public void testEmptyCLPEncodingConfig() {
-    Map<String, String> props = new HashMap<>();
-    Set<String> fieldsToRead = new HashSet<>();
-    // Add some unencoded fields
-    fieldsToRead.add(_MESSAGE_1_FIELD_NAME);
-    fieldsToRead.add(_MESSAGE_2_FIELD_NAME);
-    fieldsToRead.add(_TIMESTAMP_FIELD_NAME);
-
-    GenericRow row;
-
-    // Test extracting specific fields
-    row = extract(props, fieldsToRead);
-    assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
-    assertNull(row.getValue(_LEVEL_FIELD_NAME));
-    assertEquals(row.getValue(_MESSAGE_1_FIELD_NAME), _MESSAGE_1_FIELD_VALUE);
-    assertEquals(row.getValue(_MESSAGE_2_FIELD_NAME), _MESSAGE_2_FIELD_VALUE);
-
-    // Test extracting all fields
-    row = extract(props, null);
-    assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
-    assertEquals(row.getValue(_LEVEL_FIELD_NAME), _LEVEL_FIELD_VALUE);
-    assertEquals(row.getValue(_MESSAGE_1_FIELD_NAME), _MESSAGE_1_FIELD_VALUE);
-    assertEquals(row.getValue(_MESSAGE_2_FIELD_NAME), _MESSAGE_2_FIELD_VALUE);
+    // No fields configured for CLP encoding — message fields pass through as plain Strings, not split into
+    // logtype / dict / encoded triples.
+    GenericRow row = extract(Map.of());
+    assertEquals(row.getValue(MESSAGE_1_FIELD_NAME), MESSAGE_1_FIELD_VALUE);
+    assertEquals(row.getValue(MESSAGE_2_FIELD_NAME), MESSAGE_2_FIELD_VALUE);
+    assertNull(row.getValue(MESSAGE_1_FIELD_NAME + ClpRewriter.LOGTYPE_COLUMN_SUFFIX));
   }
 
   @Test
   public void testPreserveTopicName() {
-    Map<String, String> props = new HashMap<>();
-    Set<String> fieldsToRead = new HashSet<>();
-    fieldsToRead.add(_MESSAGE_1_FIELD_NAME);
+    // Without the destination-column config, the topic is not surfaced.
+    assertNull(extract(Map.of()).getValue(TOPIC_NAME_DEST_COLUMN));
 
-    // Test null topicNameDestinationColumn config
-    GenericRow row;
-    row = extract(props, fieldsToRead);
-    assertNull(row.getValue(_TOPIC_NAME_DEST_COLUMN));
-
-    // Test with valid topicNameDestinationColumn config
-    props.put(CLPLogRecordExtractorConfig.TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY, _TOPIC_NAME_DEST_COLUMN);
-    row = extract(props, fieldsToRead);
-    assertEquals(row.getValue(_TOPIC_NAME_DEST_COLUMN), _TOPIC_NAME);
+    // With the destination-column config, the topic name is surfaced under the configured column.
+    GenericRow row = extract(Map.of(
+        CLPLogRecordExtractorConfig.TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY, TOPIC_NAME_DEST_COLUMN
+    ));
+    assertEquals(row.getValue(TOPIC_NAME_DEST_COLUMN), TOPIC_NAME);
   }
 
-  private void addCLPEncodedField(String fieldName, Set<String> fields) {
-    fields.add(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
-    fields.add(fieldName + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
-    fields.add(fieldName + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX);
-  }
-
-  private GenericRow extract(Map<String, String> props, Set<String> fieldsToRead) {
+  private GenericRow extract(Map<String, String> props) {
     CLPLogRecordExtractorConfig extractorConfig = new CLPLogRecordExtractorConfig();
     CLPLogRecordExtractor extractor = new CLPLogRecordExtractor();
     extractorConfig.init(props);
-    extractor.init(fieldsToRead, extractorConfig, _TOPIC_NAME);
-
-    // Assemble record
-    Map<String, Object> record = new HashMap<>();
-    record.put(_TIMESTAMP_FIELD_NAME, _TIMESTAMP_FIELD_VALUE);
-    record.put(_MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE);
-    record.put(_MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE);
-    record.put(_LEVEL_FIELD_NAME, _LEVEL_FIELD_VALUE);
-    record.put(_BOOLEAN_FIELD_NAME, _BOOLEAN_FIELD_VALUE);
+    extractor.init(null, extractorConfig, TOPIC_NAME);
 
     GenericRow row = new GenericRow();
-    extractor.extract(record, row);
+    extractor.extract(Map.of(
+        MESSAGE_1_FIELD_NAME, MESSAGE_1_FIELD_VALUE,
+        MESSAGE_2_FIELD_NAME, MESSAGE_2_FIELD_VALUE
+    ), row);
     return row;
   }
 
   private void validateClpEncodedField(GenericRow row, String fieldName, String expectedFieldValue,
-      boolean removeProcessedField) {
-    try {
-      // Decode and validate field
-      if (removeProcessedField) {
-        assertNull(row.getValue(fieldName));
-      }
-      String logtype = (String) row.getValue(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
-      assertNotEquals(logtype, null);
-      String[] dictionaryVars =
-          (String[]) row.getValue(fieldName + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
-      assertNotEquals(dictionaryVars, null);
-      Long[] encodedVars = (Long[]) row.getValue(fieldName + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX);
-      assertNotEquals(encodedVars, null);
-      long[] encodedVarsAsPrimitives = Arrays.stream(encodedVars).mapToLong(Long::longValue).toArray();
-
-      MessageDecoder messageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
-          BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
-      String decodedMessage = messageDecoder.decodeMessage(logtype, dictionaryVars, encodedVarsAsPrimitives);
-      assertEquals(expectedFieldValue, decodedMessage);
-    } catch (ClassCastException e) {
-      fail(e.getMessage(), e);
-    } catch (IOException e) {
-      fail("Could not decode " + fieldName + " with CLP - " + e.getMessage());
+      boolean removeProcessedField)
+      throws IOException {
+    if (removeProcessedField) {
+      assertNull(row.getValue(fieldName));
     }
+    String logtype = (String) row.getValue(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
+    assertNotEquals(logtype, null);
+    String[] dictionaryVars = (String[]) row.getValue(fieldName + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
+    assertNotEquals(dictionaryVars, null);
+    Long[] encodedVars = (Long[]) row.getValue(fieldName + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX);
+    assertNotEquals(encodedVars, null);
+    long[] encodedVarsAsPrimitives = Arrays.stream(encodedVars).mapToLong(Long::longValue).toArray();
+
+    MessageDecoder messageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
+        BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+    String decodedMessage = messageDecoder.decodeMessage(logtype, dictionaryVars, encodedVarsAsPrimitives);
+    assertEquals(expectedFieldValue, decodedMessage);
   }
 }

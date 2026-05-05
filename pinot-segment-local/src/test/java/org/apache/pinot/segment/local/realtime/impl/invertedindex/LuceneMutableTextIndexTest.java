@@ -32,11 +32,14 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -52,10 +55,24 @@ public class LuceneMutableTextIndexTest {
   private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
       RealtimeLuceneTextIndexSearcherPool.init(1);
   private RealtimeLuceneTextIndex _realtimeLuceneTextIndex;
+  private QueryThreadContext _queryThreadContext;
 
   public LuceneMutableTextIndexTest() {
     RealtimeLuceneIndexRefreshManager.init(1, 10);
     ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  @BeforeMethod
+  public void setUpMethod() {
+    _queryThreadContext = QueryThreadContext.openForSseTest();
+  }
+
+  @AfterMethod
+  public void tearDownMethod() {
+    if (_queryThreadContext != null) {
+      _queryThreadContext.close();
+      _queryThreadContext = null;
+    }
   }
 
   @Test
@@ -259,9 +276,12 @@ public class LuceneMutableTextIndexTest {
   public void testQueryCancellationIsSuccessful()
       throws InterruptedException, ExecutionException {
     // Avoid early finalization by not using Executors.newSingleThreadExecutor (java <= 20, JDK-8145304)
-    ExecutorService executor = Executors.newFixedThreadPool(1);
+    ExecutorService baseExecutor = Executors.newFixedThreadPool(1);
+    // Wrap with contextAwareExecutorService to propagate QueryThreadContext to child threads
+    ExecutorService executor = QueryThreadContext.contextAwareExecutorService(baseExecutor);
     Future<MutableRoaringBitmap> res = executor.submit(() -> _realtimeLuceneTextIndex.getDocIds("/.*read.*/"));
-    executor.shutdownNow();
+    // Shutdown the base executor to trigger interrupt on the worker thread
+    baseExecutor.shutdownNow();
     res.get();
   }
 }
