@@ -77,13 +77,13 @@ public class PrometheusTemplateRegexpTest {
   // ---- Broker patterns ----
 
   /**
-   * broker.yml: meters/timers scoped to tableNameWithType.
+   * broker.yml rule 0: meters/timers scoped to tableNameWithType.
    * e.g. pinot.broker.myTable_REALTIME.queries
    */
   @Test
-  public void testBrokerTableWithTypeMeterPattern() {
-    String pattern = "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, "
-        + "name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)";
+  public void testBrokerTableWithTypeMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("broker.yml", 0);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", "
             + "name=\"pinot.broker.myTable_REALTIME.queries\"><>Count");
@@ -96,13 +96,13 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * broker.yml: meters/timers scoped to tableNameWithType with database prefix.
+   * broker.yml rule 0: meters/timers scoped to tableNameWithType with database prefix.
    * e.g. pinot.broker.myDb.myTable_OFFLINE.queries
    */
   @Test
-  public void testBrokerTableWithTypeMeterPatternWithDatabase() {
-    String pattern = "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, "
-        + "name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)";
+  public void testBrokerTableWithTypeMeterPatternWithDatabase()
+      throws Exception {
+    String pattern = loadPattern("broker.yml", 0);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", "
             + "name=\"pinot.broker.myDb.myTable_OFFLINE.queries\"><>Count");
@@ -116,13 +116,13 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * broker.yml: meters/timers scoped to rawTableName.
+   * broker.yml rule 3: meters/timers scoped to rawTableName.
    * e.g. pinot.broker.myTable.queries
    */
   @Test
-  public void testBrokerRawTableNameMeterPattern() {
-    String pattern = "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, "
-        + "name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)";
+  public void testBrokerRawTableNameMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("broker.yml", 3);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", "
             + "name=\"pinot.broker.myTable.queries\"><>Count");
@@ -134,13 +134,13 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * broker.yml: global gauge/meter/timer (no table scope).
+   * broker.yml rule 5: global gauge/meter/timer (no table scope).
    * e.g. pinot.broker.totalDocuments
    */
   @Test
-  public void testBrokerGlobalMeterPattern() {
-    String pattern = "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, "
-        + "name=\"?pinot\\.broker\\.(\\w+)\"?><>(\\w+)";
+  public void testBrokerGlobalMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("broker.yml", 5);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", "
             + "name=\"pinot.broker.totalDocuments\"><>Value");
@@ -152,13 +152,13 @@ public class PrometheusTemplateRegexpTest {
   // ---- Server patterns ----
 
   /**
-   * server.yml: meters/timers scoped to tableNameWithType.
+   * server.yml rule 7: meters/timers scoped to tableNameWithType.
    * e.g. pinot.server.myTable_OFFLINE.segmentUploadFailure
    */
   @Test
-  public void testServerTableWithTypeMeterPattern() {
-    String pattern = "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", "
-        + "name=\"pinot\\.server\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)";
+  public void testServerTableWithTypeMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("server.yml", 7);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
             + "name=\"pinot.server.myTable_OFFLINE.segmentUploadFailure\"><>Count");
@@ -170,13 +170,13 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * server.yml: gauge scoped to tableNameWithType with partition.
+   * server.yml rule 2: gauge scoped to tableNameWithType with partition.
    * e.g. pinot.server.queries.myTable_REALTIME.3
    */
   @Test
-  public void testServerTableWithTypeAndPartitionGaugePattern() {
-    String pattern = "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", "
-        + "name=\"pinot\\.server\\.(\\w+)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)";
+  public void testServerTableWithTypeAndPartitionGaugePattern()
+      throws Exception {
+    String pattern = loadPattern("server.yml", 2);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", "
             + "name=\"pinot.server.queries.myTable_REALTIME.3\"><>Value");
@@ -191,16 +191,13 @@ public class PrometheusTemplateRegexpTest {
   // ---- Controller patterns ----
 
   /**
-   * controller.yml: minion task-type gauge.
+   * controller.yml rule 2: minion task-type gauge.
    * e.g. pinot.controller.numMinionTasksInProgress.SegmentGenerationAndPush
    */
   @Test
-  public void testControllerTaskTypeGaugePattern() {
-    String pattern = "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", "
-        + "name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|"
-        + "numMinionSubtasksWaiting|numMinionSubtasksError|numMinionSubtasksUnknown|"
-        + "numMinionSubtasksDropped|numMinionSubtasksTimedOut|numMinionSubtasksAborted|"
-        + "percentMinionSubtasksInQueue|percentMinionSubtasksInError|tasksTrackedForTaskType)\\.(\\w+)\"><>(\\w+)";
+  public void testControllerTaskTypeGaugePattern()
+      throws Exception {
+    String pattern = loadPattern("controller.yml", 2);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", "
             + "name=\"pinot.controller.numMinionTasksInProgress.SegmentGenerationAndPush\"><>Value");
@@ -211,13 +208,13 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * controller.yml: meters/timers scoped to tableNameWithType.
+   * controller.yml rule 10: meters/timers scoped to tableNameWithType.
    * e.g. pinot.controller.myTable_OFFLINE.segmentUploadFailure
    */
   @Test
-  public void testControllerTableWithTypeMeterPattern() {
-    String pattern = "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, "
-        + "name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)";
+  public void testControllerTableWithTypeMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("controller.yml", 10);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", "
             + "name=\"pinot.controller.myTable_OFFLINE.segmentUploadFailure\"><>Count");
@@ -232,13 +229,13 @@ public class PrometheusTemplateRegexpTest {
   // ---- Minion patterns ----
 
   /**
-   * minion.yml: meters/timers scoped to tableNameWithType and taskType.
+   * minion.yml rule 0: meters/timers scoped to tableNameWithType and taskType.
    * e.g. pinot.minion.myTable_REALTIME.SegmentGenerationAndPush.segmentUploadFailure
    */
   @Test
-  public void testMinionTableWithTypeAndTaskTypeMeterPattern() {
-    String pattern = "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", "
-        + "name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.(\\w+)\"><>(\\w+)";
+  public void testMinionTableWithTypeAndTaskTypeMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("minion.yml", 0);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", "
             + "name=\"pinot.minion.myTable_REALTIME.SegmentGenerationAndPush.segmentUploadFailure\"><>Count");
@@ -251,13 +248,13 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * minion.yml: meters/timers accepting either rawTableName or tableNameWithType.
+   * minion.yml rule 1: meters/timers accepting either rawTableName or tableNameWithType.
    * e.g. pinot.minion.myTable.queries
    */
   @Test
-  public void testMinionTableOrIdScopedMeterPattern() {
-    String pattern = "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", "
-        + "name=\"pinot\\.minion\\.(\\w+)\\.(\\w+)\"><>(\\w+)";
+  public void testMinionTableOrIdScopedMeterPattern()
+      throws Exception {
+    String pattern = loadPattern("minion.yml", 1);
     Matcher m = Pattern.compile(pattern).matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"MinionMetrics\", "
             + "name=\"pinot.minion.myTable.numberOfSegmentsQueued\"><>Value");
@@ -265,6 +262,19 @@ public class PrometheusTemplateRegexpTest {
     Assert.assertEquals(m.group(1), "myTable");
     Assert.assertEquals(m.group(2), "numberOfSegmentsQueued");
     Assert.assertEquals(m.group(3), "Value");
+  }
+
+  /**
+   * Returns the pattern string at the given index from the named config file.
+   * Only rules that contain a {@code pattern} field are counted.
+   */
+  private String loadPattern(String configFile, int ruleIndex)
+      throws Exception {
+    List<String> patterns = extractPatterns(CONFIG_BASE_PATH + "/" + configFile);
+    Assert.assertTrue(ruleIndex < patterns.size(),
+        "Rule index " + ruleIndex + " out of bounds for " + configFile
+            + " (has " + patterns.size() + " pattern rules)");
+    return patterns.get(ruleIndex);
   }
 
   @SuppressWarnings("unchecked")
