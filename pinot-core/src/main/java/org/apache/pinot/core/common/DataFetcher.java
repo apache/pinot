@@ -32,6 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
 
 
@@ -99,6 +100,17 @@ public class DataFetcher implements AutoCloseable {
    */
   public void fetchDictIds(String column, int[] inDocIds, int length, int[] outDictIds) {
     _columnValueReaderMap.get(column).readDictIds(inDocIds, length, outDictIds);
+  }
+
+  /// Explicit per-row dictionary lookup for a column whose forward index is RAW but a (shared) dictionary
+  /// exists. Reads the raw value at each docId and returns the dict id from the dictionary.
+  ///
+  /// **This is expensive — `O(numDocs * dictionary lookup cost)`.** Callers must opt in deliberately; the
+  /// regular {@link #fetchDictIds} path will throw {@link UnsupportedOperationException} on a RAW forward
+  /// index rather than fall back to this implicitly. Use only when the operator genuinely needs dict ids and
+  /// has no raw-value alternative.
+  public void fetchDictIdsFromRawValues(String column, int[] inDocIds, int length, int[] outDictIds) {
+    _columnValueReaderMap.get(column).readDictIdsFromRawValues(inDocIds, length, outDictIds);
   }
 
   /**
@@ -217,6 +229,13 @@ public class DataFetcher implements AutoCloseable {
     _columnValueReaderMap.get(column).readDictIdsMV(inDocIds, length, outDictIds);
   }
 
+  /// Multi-value counterpart to {@link #fetchDictIdsFromRawValues}. Same caller contract: opt-in only,
+  /// expensive per-row dictionary lookups, used when the operator needs dict ids on a RAW MV column with a
+  /// shared dictionary.
+  public void fetchDictIdsFromRawValues(String column, int[] inDocIds, int length, int[][] outDictIds) {
+    _columnValueReaderMap.get(column).readDictIdsFromRawValuesMV(inDocIds, length, outDictIds);
+  }
+
   /**
    * Fetch the int values for a multi-valued column.
    *
@@ -329,6 +348,12 @@ public class DataFetcher implements AutoCloseable {
 
     boolean _readerContextCreated;
     ForwardIndexReaderContext _readerContext;
+    /// Lazily-initialized typed value buffer for the RAW MV path in {@link #readDictIdsFromRawValuesMV}. Sized
+    /// to the outer-class {@code _maxNumValuesPerMVEntry}. Held as {@code Object} because the type depends on
+    /// {@code _storedType}; cast in the per-type switch arm. Allocated once per ColumnValueReader (which is
+    /// per-column), then reused across every call to avoid per-batch allocations under the shared-dict + RAW
+    /// MV workload.
+    private Object _rawMVValueBuffer;
 
     ColumnValueReader(ForwardIndexReader reader, @Nullable Dictionary dictionary, boolean dictionaryEncoded) {
       _reader = reader;
@@ -626,6 +651,162 @@ public class DataFetcher implements AutoCloseable {
       Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
       for (int i = 0; i < length; i++) {
         numValuesBuffer[i] = _reader.getNumValuesMV(docIds[i], getReaderContext());
+      }
+    }
+
+    /// Per-row dictionary lookup for a RAW SV forward index that has a (shared) dictionary attached. Reads each
+    /// raw value and returns the dict id from the dictionary. Cost: {@code O(numDocs * Dictionary#indexOf)}.
+    /// Callers must opt in via {@link DataFetcher#fetchDictIdsFromRawValues} — {@link #readDictIds} does not
+    /// fall back to this implicitly.
+    void readDictIdsFromRawValues(int[] docIds, int length, int[] dictIdBuffer) {
+      Preconditions.checkState(_dictionary != null,
+          "Dictionary required for fetchDictIdsFromRawValues on column with storedType=%s", _storedType);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      switch (_storedType) {
+        case INT:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(_reader.getInt(docIds[i], readerContext));
+          }
+          return;
+        case LONG:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(_reader.getLong(docIds[i], readerContext));
+          }
+          return;
+        case FLOAT:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(_reader.getFloat(docIds[i], readerContext));
+          }
+          return;
+        case DOUBLE:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(_reader.getDouble(docIds[i], readerContext));
+          }
+          return;
+        case BIG_DECIMAL:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(_reader.getBigDecimal(docIds[i], readerContext));
+          }
+          return;
+        case STRING:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(_reader.getString(docIds[i], readerContext));
+          }
+          return;
+        case BYTES:
+          for (int i = 0; i < length; i++) {
+            dictIdBuffer[i] = _dictionary.indexOf(new ByteArray(_reader.getBytes(docIds[i], readerContext)));
+          }
+          return;
+        default:
+          throw new IllegalStateException("Unsupported storedType=" + _storedType + " for dictionary lookup");
+      }
+    }
+
+    /// Multi-value counterpart to {@link #readDictIdsFromRawValues}. Reads each raw MV cell, looks up every
+    /// element in the dictionary, and emits the resulting dict-id array. Reuses {@link #_rawMVValueBuffer} to
+    /// avoid per-batch allocations of the typed value scratch space; the per-doc {@code int[] dictIds} array is
+    /// allocated fresh because each entry escapes via {@code dictIdsBuffer[i]}.
+    void readDictIdsFromRawValuesMV(int[] docIds, int length, int[][] dictIdsBuffer) {
+      Preconditions.checkState(_dictionary != null,
+          "Dictionary required for fetchDictIdsFromRawValues on MV column with storedType=%s", _storedType);
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      switch (_storedType) {
+        case INT: {
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new int[_maxNumValuesPerMVEntry];
+          }
+          int[] valueBuffer = (int[]) _rawMVValueBuffer;
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getIntMV(docIds[i], valueBuffer, readerContext);
+            int[] dictIds = new int[numValues];
+            for (int j = 0; j < numValues; j++) {
+              dictIds[j] = _dictionary.indexOf(valueBuffer[j]);
+            }
+            dictIdsBuffer[i] = dictIds;
+          }
+          return;
+        }
+        case LONG: {
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new long[_maxNumValuesPerMVEntry];
+          }
+          long[] valueBuffer = (long[]) _rawMVValueBuffer;
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getLongMV(docIds[i], valueBuffer, readerContext);
+            int[] dictIds = new int[numValues];
+            for (int j = 0; j < numValues; j++) {
+              dictIds[j] = _dictionary.indexOf(valueBuffer[j]);
+            }
+            dictIdsBuffer[i] = dictIds;
+          }
+          return;
+        }
+        case FLOAT: {
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new float[_maxNumValuesPerMVEntry];
+          }
+          float[] valueBuffer = (float[]) _rawMVValueBuffer;
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getFloatMV(docIds[i], valueBuffer, readerContext);
+            int[] dictIds = new int[numValues];
+            for (int j = 0; j < numValues; j++) {
+              dictIds[j] = _dictionary.indexOf(valueBuffer[j]);
+            }
+            dictIdsBuffer[i] = dictIds;
+          }
+          return;
+        }
+        case DOUBLE: {
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new double[_maxNumValuesPerMVEntry];
+          }
+          double[] valueBuffer = (double[]) _rawMVValueBuffer;
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getDoubleMV(docIds[i], valueBuffer, readerContext);
+            int[] dictIds = new int[numValues];
+            for (int j = 0; j < numValues; j++) {
+              dictIds[j] = _dictionary.indexOf(valueBuffer[j]);
+            }
+            dictIdsBuffer[i] = dictIds;
+          }
+          return;
+        }
+        case STRING: {
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new String[_maxNumValuesPerMVEntry];
+          }
+          String[] valueBuffer = (String[]) _rawMVValueBuffer;
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getStringMV(docIds[i], valueBuffer, readerContext);
+            int[] dictIds = new int[numValues];
+            for (int j = 0; j < numValues; j++) {
+              dictIds[j] = _dictionary.indexOf(valueBuffer[j]);
+            }
+            dictIdsBuffer[i] = dictIds;
+          }
+          return;
+        }
+        case BYTES: {
+          if (_rawMVValueBuffer == null) {
+            _rawMVValueBuffer = new byte[_maxNumValuesPerMVEntry][];
+          }
+          byte[][] valueBuffer = (byte[][]) _rawMVValueBuffer;
+          for (int i = 0; i < length; i++) {
+            int numValues = _reader.getBytesMV(docIds[i], valueBuffer, readerContext);
+            int[] dictIds = new int[numValues];
+            for (int j = 0; j < numValues; j++) {
+              dictIds[j] = _dictionary.indexOf(new ByteArray(valueBuffer[j]));
+            }
+            dictIdsBuffer[i] = dictIds;
+          }
+          return;
+        }
+        default:
+          throw new IllegalStateException(
+              "Unsupported storedType=" + _storedType + " for MV dictionary lookup on raw forward index");
       }
     }
 
