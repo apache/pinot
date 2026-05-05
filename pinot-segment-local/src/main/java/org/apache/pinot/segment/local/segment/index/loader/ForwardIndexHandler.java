@@ -102,8 +102,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       Arrays.asList(StandardIndexes.range(), StandardIndexes.fst(), StandardIndexes.inverted());
 
   protected enum Operation {
-    DISABLE_FORWARD_INDEX, ENABLE_FORWARD_INDEX, DISABLE_DICTIONARY, ENABLE_DICTIONARY,
-    CHANGE_INDEX_COMPRESSION_TYPE
+    DISABLE_FORWARD_INDEX, ENABLE_FORWARD_INDEX, DISABLE_DICTIONARY, ENABLE_DICTIONARY, CHANGE_INDEX_COMPRESSION_TYPE
   }
 
   @VisibleForTesting
@@ -162,7 +161,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             }
             break;
           case DISABLE_DICTIONARY:
-            handleDisableDictionary(column, forwardIndexDisabledColumns, segmentWriter);
+            if (forwardIndexDisabledColumns.contains(column)) {
+              disableDictionary(column, segmentWriter, "Disable dictionary when no forward index exists");
+              if (segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
+                throw new IllegalStateException(
+                    String.format("Dictionary should not exist after disabling dictionary for column: %s", column));
+              }
+            } else if (isForwardIndexDictionaryEncoded(column)) {
+              disableDictionaryAndCreateRawForwardIndex(column, segmentWriter);
+            } else {
+              disableDictionary(column, segmentWriter, "Disable dictionary while keeping raw forward index");
+            }
             break;
           case ENABLE_DICTIONARY:
             if (_fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward()).getEncodingType()
@@ -182,25 +191,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             throw new IllegalStateException("Unsupported operation for column " + column);
         }
       }
-    }
-  }
-
-  private void handleDisableDictionary(String column, Set<String> forwardIndexDisabledColumns,
-      SegmentDirectory.Writer segmentWriter)
-      throws Exception {
-    if (forwardIndexDisabledColumns.contains(column)) {
-      disableDictionary(column, segmentWriter, "Disable dictionary when only no forward index exists");
-      if (segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
-        throw new IllegalStateException(
-            String.format("Dictionary should not exist after disabling dictionary for column: %s", column));
-      }
-      return;
-    }
-
-    if (isForwardIndexDictionaryEncoded(column)) {
-      disableDictionaryAndCreateRawForwardIndex(column, segmentWriter);
-    } else {
-      disableDictionary(column, segmentWriter, "Disable dictionary while keeping raw forward index");
     }
   }
 

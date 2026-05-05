@@ -82,7 +82,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         return true;
       }
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      if (shouldRebuildInvertedIndex(segmentReader, columnMetadata)) {
+      if (LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
+          segmentReader.getIndexFor(column, StandardIndexes.inverted()), columnMetadata)) {
         LOGGER.info("Need to rebuild inverted index for segment: {}, column: {}", segmentName, column);
         return true;
       }
@@ -113,7 +114,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         LOGGER.info("Removed existing inverted index from segment: {}, column: {}", segmentName, column);
       } else {
         ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (shouldRebuildInvertedIndex(segmentWriter, columnMetadata)) {
+        if (LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
+            segmentWriter.getIndexFor(column, StandardIndexes.inverted()), columnMetadata)) {
           LOGGER.info("Rebuilding existing inverted index for segment: {}, column: {}", segmentName, column);
           segmentWriter.removeIndex(column, StandardIndexes.inverted());
           columnsToAddIdx.add(column);
@@ -136,21 +138,6 @@ public class InvertedIndexHandler extends BaseIndexHandler {
   private boolean shouldCreateInvertedIndex(ColumnMetadata columnMetadata) {
     // Only create inverted index on dictionary-encoded unsorted columns.
     return columnMetadata != null && !columnMetadata.isSorted() && columnMetadata.hasDictionary();
-  }
-
-  /// Detects legacy RAW inverted-index files (PR #17060, reverted by PR #18410) that may still exist on disk.
-  /// All detection + cleanup logic is isolated in [LegacyRawValueInvertedIndexCleanup] so it can be deleted as
-  /// a single unit after Pinot 1.7.
-  private boolean shouldRebuildInvertedIndex(SegmentDirectory.Reader segmentReader, ColumnMetadata columnMetadata)
-      throws Exception {
-    return LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
-        segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.inverted()), columnMetadata);
-  }
-
-  private boolean shouldRebuildInvertedIndex(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
-      throws Exception {
-    return LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
-        segmentWriter.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.inverted()), columnMetadata);
   }
 
   private void createInvertedIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
