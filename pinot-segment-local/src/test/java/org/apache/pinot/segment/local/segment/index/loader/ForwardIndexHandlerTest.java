@@ -878,8 +878,10 @@ public class ForwardIndexHandlerTest {
             + "testSegment or refresh / back-fill the forward index");
       }
 
-      // TEST13: Disable dictionary on a column that already has forward index disabled and inverted index enabled with
-      // a range index. Should fail because range index requires dictionary on forward-index-disabled columns.
+      // TEST13: Disable dictionary on a column that already has forward index disabled and inverted index
+      // enabled with a range index. The new config still has inverted index enabled, which requires a
+      // dictionary — so the auto-keep-dictionary-when-required-by-index logic prevents removing the dict at
+      // all. The range Preconditions never fires because no DISABLE_DICTIONARY operation is ever queued.
       resetIndexConfigs();
       _noDictionaryColumns.add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
       _rangeIndexColumns.add(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER);
@@ -887,12 +889,10 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER, FieldConfig.EncodingType.RAW,
               List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), CompressionCodec.LZ4,
               Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
-      try {
-        computeOperations();
-        fail("Should fail: cannot disable dictionary for forward-index-disabled column with range index");
-      } catch (IllegalStateException e) {
-        assertTrue(e.getMessage().contains("Must disable range index"));
-      }
+      Map<String, List<ForwardIndexHandler.Operation>> ops = computeOperations();
+      assertFalse(ops.containsKey(DIM_SV_FORWARD_INDEX_DISABLED_INTEGER),
+          "Dictionary must stay because the new config still requires it for the inverted index; "
+              + "no operation should be queued.");
     }
   }
 

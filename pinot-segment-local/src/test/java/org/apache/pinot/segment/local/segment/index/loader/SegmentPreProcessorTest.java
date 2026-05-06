@@ -644,6 +644,73 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         null);
   }
 
+  /// Verifies that the range index is rebuilt every time the dictionary state of a column changes — both via
+  /// the explicit toggle path and via the auto-toggle path triggered by an index that requires a dictionary
+  /// (e.g. inverted). The on-disk range index format differs between dict-id-based (when a dictionary exists)
+  /// and raw-value-based (when not), so the index size must change in lockstep with the dictionary state.
+  @Test
+  public void testRangeIndexRebuiltOnDictionaryToggle()
+      throws Exception {
+    // Setup: V3 segment with a raw INT column carrying a range index. The range index is built against raw
+    // values at this point.
+    buildV3Segment();
+    _rangeIndexColumns.add(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    long rawRangeSize1 = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertTrue(rawRangeSize1 > 0, "Range index must exist before toggling dictionary state");
+    assertFalse(new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Column must start without a dictionary");
+
+    // (1) Auto-enable dictionary by adding an inverted index. ForwardIndexHandler now queues
+    // ENABLE_DICTIONARY because the inverted index requires a dictionary. The range index must be rebuilt
+    // against dict ids — its on-disk size therefore changes.
+    _invertedIndexColumns.add(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterAutoEnable = new SegmentMetadataImpl(INDEX_DIR);
+    long dictRangeSize = afterAutoEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertTrue(afterAutoEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must be auto-created when inverted index requires it");
+    assertNotEquals(dictRangeSize, rawRangeSize1,
+        "Range index must be rebuilt with dict-id format when dictionary is auto-enabled");
+
+    // (2) Auto-disable dictionary by removing the inverted index. The dictionary is no longer required and
+    // gets dropped; the range index must be rebuilt against raw values again.
+    _invertedIndexColumns.remove(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterAutoDisable = new SegmentMetadataImpl(INDEX_DIR);
+    long rawRangeSize2 = afterAutoDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertFalse(afterAutoDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must be auto-removed when no enabled index requires it");
+    assertNotEquals(rawRangeSize2, dictRangeSize,
+        "Range index must be rebuilt with raw-value format when dictionary is auto-disabled");
+
+    // (3) Explicit toggle path: enable dictionary by removing the column from noDictionaryColumns. Range
+    // index must be rebuilt yet again.
+    _noDictionaryColumns.remove(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterExplicitEnable = new SegmentMetadataImpl(INDEX_DIR);
+    long dictRangeSize2 = afterExplicitEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertTrue(afterExplicitEnable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must exist after explicit ENABLE_DICTIONARY");
+    assertNotEquals(dictRangeSize2, rawRangeSize2,
+        "Range index must be rebuilt with dict-id format when dictionary is explicitly enabled");
+
+    // (4) Explicit disable: re-add to noDictionaryColumns. Range index rebuilt back to raw-value format.
+    _noDictionaryColumns.add(EXISTING_INT_COL_RAW);
+    runPreProcessor(_schema);
+    SegmentMetadataImpl afterExplicitDisable = new SegmentMetadataImpl(INDEX_DIR);
+    long rawRangeSize3 = afterExplicitDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW)
+        .getIndexSizeFor(StandardIndexes.range());
+    assertFalse(afterExplicitDisable.getColumnMetadataFor(EXISTING_INT_COL_RAW).hasDictionary(),
+        "Dictionary must be removed after explicit DISABLE_DICTIONARY");
+    assertNotEquals(rawRangeSize3, dictRangeSize2,
+        "Range index must be rebuilt with raw-value format when dictionary is explicitly disabled");
+  }
+
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
@@ -1539,10 +1606,22 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _rangeIndexColumns.add("daysSinceEpoch");
     verifyProcessNotNeeded();
     _rangeIndexColumns.remove("daysSinceEpoch");
-    // Add inverted index to raw column
+    // Add inverted index to raw column. On v3 segments the inverted index requires a dictionary, so the
+    // auto-create-dictionary path now triggers ENABLE_DICTIONARY (and InvertedIndexHandler then builds the
+    // inverted index against it). v1 segments still skip ForwardIndexHandler entirely, so the result is a
+    // no-op there. Pre-PR behavior on v3 was the same silent no-op as v1, leaving the inverted-index request
+    // orphaned. Removing inverted on v3 then triggers DISABLE_DICTIONARY to put the column back to its
+    // original raw-no-dict state so the rest of this test's "no processing needed" assertions hold.
     _invertedIndexColumns.add(EXISTING_STRING_COL_RAW);
-    verifyProcessNotNeeded();
+    if (segmentVersion == SegmentVersion.v3) {
+      verifyProcessNeeded();
+    } else {
+      verifyProcessNotNeeded();
+    }
     _invertedIndexColumns.remove(EXISTING_STRING_COL_RAW);
+    if (segmentVersion == SegmentVersion.v3) {
+      verifyProcessNeeded();
+    }
     // Add inverted index to non-existing column
     _invertedIndexColumns.add("newColumnX");
     verifyProcessNotNeeded();

@@ -23,8 +23,8 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -204,11 +204,13 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return columnOperationsMap;
     }
 
-    // Get all physical columns, excluding virtual columns like $docId, $hostName and $segmentName.
     Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getSchema().getPhysicalColumnNames();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
+    Set<String> existingInvertedIndexColumns =
+        segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.inverted());
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+
     for (String column : existingAllColumns) {
       if (!_schema.hasColumn(column)) {
         // _schema will be null only in tests
@@ -220,139 +222,12 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       if (fieldSpec instanceof ComplexFieldSpec) {
         continue;
       }
-      boolean existingHasDict = existingDictColumns.contains(column);
-      boolean existingHasFwd = existingForwardIndexColumns.contains(column);
-      FieldIndexConfigs newConf = _fieldIndexConfigs.get(column);
-      boolean newIsFwd = newConf.getConfig(StandardIndexes.forward()).isEnabled();
-      boolean newIsDict = newConf.getConfig(StandardIndexes.dictionary()).isEnabled();
-      boolean newIsRange = newConf.getConfig(StandardIndexes.range()).isEnabled();
 
-      if (existingHasFwd && !newIsFwd) {
-        // Existing column has a forward index. New column config disables the forward index
-
-        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (columnMetadata.isSorted()) {
-          // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
-          // operation for this column related to disabling forward index.
-          LOGGER.warn("Trying to disable the forward index for a sorted column: {} of segment: {}, ignoring", column,
-              segmentName);
-          continue;
-        }
-
-        if (existingHasDict) {
-          if (!newIsDict) {
-            // Dictionary was also disabled. Just disable the dictionary and remove it along with the forward index
-            // If range index exists, don't try to regenerate it on toggling the dictionary, throw an error instead
-            Preconditions.checkState(!newIsRange, String.format(
-                "Must disable range index (enabled) to disable the dictionary and forward index for column: %s of "
-                    + "segment: %s or refresh / back-fill the forward index", column, segmentName));
-            columnOperationsMap.put(column,
-                Arrays.asList(Operation.DISABLE_FORWARD_INDEX, Operation.DISABLE_DICTIONARY));
-          } else {
-            // Dictionary is still enabled, keep it but remove the forward index
-            columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_FORWARD_INDEX));
-          }
-        } else {
-          if (!newIsDict) {
-            // Dictionary remains disabled and we should not reconstruct temporary forward index as dictionary based
-            columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_FORWARD_INDEX));
-          } else {
-            // Dictionary is enabled, creation of dictionary and conversion to dictionary based forward index is needed
-            columnOperationsMap.put(column,
-                Arrays.asList(Operation.DISABLE_FORWARD_INDEX, Operation.ENABLE_DICTIONARY));
-          }
-        }
-      } else if (!existingHasFwd && newIsFwd) {
-        // Existing column does not have a forward index. New column config enables the forward index
-
-        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (columnMetadata != null && columnMetadata.isSorted()) {
-          // Check if the column is sorted. If sorted, disabling forward index should be a no-op and forward index
-          // should already exist. Do not return an operation for this column related to enabling forward index.
-          LOGGER.warn("Trying to enable the forward index for a sorted column: {} of segment: {}, ignoring", column,
-              segmentName);
-          continue;
-        }
-
-        // Get list of columns with inverted index
-        Set<String> existingInvertedIndexColumns =
-            segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.inverted());
-        if (!existingHasDict || !existingInvertedIndexColumns.contains(column)) {
-          // If either dictionary or inverted index is missing on the column there is no way to re-generate the forward
-          // index. Treat this as a no-op and log a warning.
-          LOGGER.warn(
-              "Trying to enable the forward index for a column: {} of segment: {} missing either the dictionary ({}) "
-                  + "and / or the inverted index ({}) is not possible. Either a refresh or back-fill is required to "
-                  + "get the forward index, ignoring", column, segmentName, existingHasDict ? "enabled" : "disabled",
-              existingInvertedIndexColumns.contains(column) ? "enabled" : "disabled");
-          continue;
-        }
-
-        columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_FORWARD_INDEX));
-      } else if (!existingHasFwd) {
-        // Forward index is disabled for the existing column and should remain disabled based on the latest config
-        // Need some checks to see whether the dictionary is being enabled or disabled here and take appropriate actions
-
-        // If the dictionary is not enabled on the existing column it must be on the new noDictionary column list.
-        // Cannot enable the dictionary for a column with forward index disabled.
-        Preconditions.checkState(existingHasDict || !newIsDict, String.format(
-            "Cannot regenerate the dictionary for column: %s of segment: %s with forward index disabled. Please "
-                + "refresh or back-fill the data to add back the forward index", column, segmentName));
-
-        if (existingHasDict && !newIsDict) {
-          // Dictionary is currently enabled on this column but is supposed to be disabled. Remove the dictionary
-          // and update the segment metadata If the range index exists then throw an error since we are not
-          // regenerating the range index on toggling the dictionary
-          Preconditions.checkState(!newIsRange, String.format(
-              "Must disable range index (enabled) to disable the dictionary for a forwardIndexDisabled column: %s of "
-                  + "segment: %s or refresh / back-fill the forward index", column, segmentName));
-          columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_DICTIONARY));
-        }
-      } else if (!existingHasDict && newIsDict) {
-        // Existing column is raw forward without a shared dictionary. New config requires a dictionary.
-        // If any enabled index requires a dictionary, always enable it regardless of optimize-dictionary
-        // heuristics. Otherwise, apply the heuristics so reload doesn't force a dictionary onto a
-        // high-cardinality column that segment creation would have kept raw.
-        boolean indexRequiresDict = fieldSpec != null
-            && DictionaryIndexConfig.requiresDictionary(fieldSpec, newConf);
-        if (indexRequiresDict) {
-          columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
-        } else {
-          ColumnMetadata colMeta = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-          if (fieldSpec != null && colMeta != null && !colMeta.isSorted()) {
-            boolean keepDict = DictionaryIndexType.ignoreDictionaryOverride(
-                _tableConfig.getIndexingConfig().isOptimizeDictionary(),
-                _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
-                _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
-                _tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(),
-                fieldSpec, newConf, colMeta.getCardinality(), colMeta.getTotalNumberOfEntries());
-            if (keepDict) {
-              columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
-            } else {
-              LOGGER.info("Skipping ENABLE_DICTIONARY for column: {} of segment: {} because optimize-dictionary "
-                  + "heuristics determined dictionary is not beneficial (cardinality={}, totalNumberOfEntries={})",
-                  column, segmentName, colMeta.getCardinality(), colMeta.getTotalNumberOfEntries());
-            }
-          } else {
-            columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
-          }
-        }
-      } else if (existingHasDict && !newIsDict) {
-        // Existing column has dictionary. New config for the column is RAW.
-        if (shouldDisableDictionary(column, _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column))) {
-          columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_DICTIONARY));
-        }
-      } else if (!isForwardIndexDictionaryEncoded(column)) {
-        // Forward index remains raw encoded. Check if raw compression needs to be changed.
-        // TODO: Also check if raw index version needs to be changed
-        if (shouldChangeRawCompressionType(column, segmentReader)) {
-          columnOperationsMap.put(column, Collections.singletonList(Operation.CHANGE_INDEX_COMPRESSION_TYPE));
-        }
-      } else {
-        // Forward index remains dictionary encoded. Check if dict-id compression needs to be changed.
-        if (shouldChangeDictIdCompressionType(column, segmentReader)) {
-          columnOperationsMap.put(column, Collections.singletonList(Operation.CHANGE_INDEX_COMPRESSION_TYPE));
-        }
+      List<Operation> ops = computeColumnOperations(column, fieldSpec, segmentReader,
+          existingDictColumns.contains(column), existingForwardIndexColumns.contains(column),
+          existingInvertedIndexColumns.contains(column), segmentName);
+      if (!ops.isEmpty()) {
+        columnOperationsMap.put(column, ops);
       }
     }
     if (!columnOperationsMap.isEmpty()) {
@@ -360,6 +235,131 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           segmentName);
     }
     return columnOperationsMap;
+  }
+
+  /// Compute the operations needed to bring one column from its existing on-disk state to the desired state in
+  /// the new config. The logic decomposes into four orthogonal questions, computed in this order:
+  ///
+  /// 1. **Forward-index transition** — based purely on `existingHasFwd` vs `newIsFwd`.
+  /// 2. **Dictionary transition** — based on `existingHasDict` vs `desiredDict`, where
+  ///    `desiredDict = newIsDict || any-enabled-index-requires-dict`. The "force on if required" rule is the
+  ///    only place this method consults other indexes — once `desiredDict` is computed, the rest of the logic
+  ///    treats it as the source of truth.
+  /// 3. **Compression-type change** — only when no encoding change happened (forward + dict both unchanged).
+  /// 4. **Cross-cutting guards** — sorted columns can't toggle forward; range index format is incompatible
+  ///    with disabling the dictionary; enabling forward needs dict + inverted on disk; enabling dict needs
+  ///    forward to be on so the dict can be bootstrapped.
+  private List<Operation> computeColumnOperations(String column, FieldSpec fieldSpec,
+      SegmentDirectory.Reader segmentReader, boolean existingHasDict, boolean existingHasFwd,
+      boolean existingHasInverted, String segmentName)
+      throws Exception {
+    FieldIndexConfigs newConf = _fieldIndexConfigs.get(column);
+    boolean newIsFwd = newConf.getConfig(StandardIndexes.forward()).isEnabled();
+    boolean newIsDict = newConf.getConfig(StandardIndexes.dictionary()).isEnabled();
+    boolean newIsRange = newConf.getConfig(StandardIndexes.range()).isEnabled();
+    ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+
+    // Force the dictionary on whenever any enabled index requires it — otherwise that index would be left
+    // orphaned after reload. This is the only place where index-level dependencies feed into the dictionary
+    // decision; the rest of this method treats `desiredDict` as authoritative.
+    boolean dictRequiredByIndex = fieldSpec != null && DictionaryIndexConfig.requiresDictionary(fieldSpec, newConf);
+    boolean desiredDict = newIsDict || dictRequiredByIndex;
+
+    List<Operation> ops = new ArrayList<>(2);
+
+    // 1. Forward-index transition.
+    if (existingHasFwd != newIsFwd) {
+      if (columnMetadata != null && columnMetadata.isSorted()) {
+        LOGGER.warn("Trying to {} the forward index for a sorted column: {} of segment: {}, ignoring",
+            existingHasFwd ? "disable" : "enable", column, segmentName);
+        return ops;
+      }
+      if (existingHasFwd) {
+        ops.add(Operation.DISABLE_FORWARD_INDEX);
+      } else {
+        // Re-creating the forward index requires both dict and inverted on disk. After re-enable the dict
+        // status stays whatever was needed for the rebuild — independent dict transitions don't run in this
+        // combo (the rebuild needs the dict, so dropping it in the same reload is not supported).
+        if (!existingHasDict || !existingHasInverted) {
+          LOGGER.warn(
+              "Trying to enable the forward index for a column: {} of segment: {} missing either the dictionary ({}) "
+                  + "and / or the inverted index ({}) is not possible. Either a refresh or back-fill is required to "
+                  + "get the forward index, ignoring", column, segmentName, existingHasDict ? "enabled" : "disabled",
+              existingHasInverted ? "enabled" : "disabled");
+          return ops;
+        }
+        ops.add(Operation.ENABLE_FORWARD_INDEX);
+        return ops;
+      }
+    }
+
+    // 2. Dictionary transition.
+    if (existingHasDict && !desiredDict) {
+      // When the forward index is being kept, the range index can be rebuilt against raw values, additional
+      // guards (auto-generated cardinality-1 columns, on-disk inverted/FST) apply via shouldDisableDictionary.
+      // When the forward index is also being removed — or was already off — the range index can't be rebuilt,
+      // so dropping the dictionary while range stays in the new config leaves the segment inconsistent.
+      if (!existingHasFwd) {
+        Preconditions.checkState(!newIsRange, String.format(
+            "Must disable range index (enabled) to disable the dictionary for a forwardIndexDisabled column: %s "
+                + "of segment: %s or refresh / back-fill the forward index", column, segmentName));
+        ops.add(Operation.DISABLE_DICTIONARY);
+      } else if (ops.contains(Operation.DISABLE_FORWARD_INDEX)) {
+        Preconditions.checkState(!newIsRange, String.format(
+            "Must disable range index (enabled) to disable the dictionary and forward index for column: %s of "
+                + "segment: %s or refresh / back-fill the forward index", column, segmentName));
+        ops.add(Operation.DISABLE_DICTIONARY);
+      } else if (shouldDisableDictionary(column, columnMetadata, fieldSpec, newConf)) {
+        ops.add(Operation.DISABLE_DICTIONARY);
+      }
+    } else if (!existingHasDict && desiredDict) {
+      // Dict can only be created from forward values, so refuse if forward will be off in the final state.
+      Preconditions.checkState(existingHasFwd || newIsFwd, String.format(
+          "Cannot regenerate the dictionary for column: %s of segment: %s with forward index disabled. Please "
+              + "refresh or back-fill the data to add back the forward index", column, segmentName));
+      // If an index requires the dict, always enable it. Otherwise apply the optimize-dictionary heuristic so
+      // reload doesn't force a dictionary onto a high-cardinality column that segment creation would have kept raw.
+      if (dictRequiredByIndex || shouldEnableDictionaryHeuristically(column, fieldSpec, newConf, columnMetadata,
+          segmentName)) {
+        ops.add(Operation.ENABLE_DICTIONARY);
+      }
+    }
+
+    // 3. Compression-type change (only when no encoding change happened).
+    if (ops.isEmpty() && existingHasFwd && newIsFwd && existingHasDict == desiredDict) {
+      if (!isForwardIndexDictionaryEncoded(column)) {
+        // TODO: Also check if raw index version needs to be changed
+        if (shouldChangeRawCompressionType(column, segmentReader)) {
+          ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
+        }
+      } else if (shouldChangeDictIdCompressionType(column, segmentReader)) {
+        ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);
+      }
+    }
+
+    return ops;
+  }
+
+  /// Optimize-dictionary heuristic for ENABLE_DICTIONARY. Used when the new config wants a dictionary but no
+  /// secondary index actually requires it; the heuristic decides whether the column's cardinality / size
+  /// characteristics make a dictionary worthwhile, mirroring what segment creation would have chosen.
+  private boolean shouldEnableDictionaryHeuristically(String column, FieldSpec fieldSpec, FieldIndexConfigs newConf,
+      @Nullable ColumnMetadata colMeta, String segmentName) {
+    if (fieldSpec == null || colMeta == null || colMeta.isSorted()) {
+      return true;
+    }
+    boolean keepDict = DictionaryIndexType.ignoreDictionaryOverride(
+        _tableConfig.getIndexingConfig().isOptimizeDictionary(),
+        _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
+        _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
+        _tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(),
+        fieldSpec, newConf, colMeta.getCardinality(), colMeta.getTotalNumberOfEntries());
+    if (!keepDict) {
+      LOGGER.info("Skipping ENABLE_DICTIONARY for column: {} of segment: {} because optimize-dictionary "
+          + "heuristics determined dictionary is not beneficial (cardinality={}, totalNumberOfEntries={})",
+          column, segmentName, colMeta.getCardinality(), colMeta.getTotalNumberOfEntries());
+    }
+    return keepDict;
   }
 
   private void disableDictionary(String column, SegmentDirectory.Writer segmentWriter, String reason)
@@ -387,15 +387,33 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         == FieldConfig.EncodingType.DICTIONARY;
   }
 
-  private boolean shouldDisableDictionary(String column, ColumnMetadata existingColumnMetadata) {
+  /// Returns {@code true} when removing the dictionary on this column would leave another enabled index
+  /// orphaned. Aggregates {@link IndexType#requiresDictionary} over every enabled index in the new config
+  /// via {@link DictionaryIndexConfig#requiresDictionary(FieldSpec, FieldIndexConfigs)}, so this automatically
+  /// covers inverted, FST, IFST, and any future dict-requiring index type. Only the new config matters — any
+  /// existing on-disk index no longer present in the new config is removed by its own handler later in
+  /// preprocessing and does not need to keep the dictionary alive.
+  private boolean dictionaryRequiredByOtherIndex(String column, @Nullable FieldSpec fieldSpec,
+      FieldIndexConfigs newConf) {
+    if (fieldSpec != null && DictionaryIndexConfig.requiresDictionary(fieldSpec, newConf)) {
+      LOGGER.warn("Cannot disable dictionary for column={} because at least one enabled index in the new "
+          + "config still requires a dictionary.", column);
+      return true;
+    }
+    return false;
+  }
+
+  private boolean shouldDisableDictionary(String column, ColumnMetadata existingColumnMetadata,
+      @Nullable FieldSpec fieldSpec, FieldIndexConfigs newConf) {
     if (existingColumnMetadata.isAutoGenerated() && existingColumnMetadata.getCardinality() == 1) {
       LOGGER.warn("Cannot disable dictionary for auto-generated column={} with cardinality=1.", column);
       return false;
     }
 
-    // Allow disabling dictionary only if the new config specifies that inverted index and FST index should not
-    // be present. So for existing segments where inverted index and FST index are already present, disabling
-    // dictionary will only be allowed if FST and inverted index are also disabled.
+    if (dictionaryRequiredByOtherIndex(column, fieldSpec, newConf)) {
+      return false;
+    }
+
     if (hasIndex(column, StandardIndexes.inverted()) || hasIndex(column, StandardIndexes.fst())) {
       LOGGER.warn("Cannot disable dictionary as column={} has FST index or inverted index or both.", column);
       return false;
@@ -888,7 +906,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
       int numDocs = existingColMetadata.getTotalDocs();
-      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType());
+      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
       // NOTE:
       //   Special null handling is not necessary here. This is because, the existing default null value in the raw
       //   forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also, null
@@ -981,7 +999,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> reader = StandardIndexes.forward().getReaderFactory()
         .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
       AbstractColumnStatisticsCollector statsCollector =
-          getStatsCollector(column, fieldSpec.getDataType().getStoredType());
+          getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
       try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < existingColMetadata.getTotalDocs(); i++) {
@@ -1148,10 +1166,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
+    return getStatsCollector(column, storedType, false);
+  }
+
+  private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType,
+      boolean requireUniqueValues) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
-    // MAP collector is optimised for no-dictionary collection
-    if (!dictionaryEnabled && storedType != DataType.MAP) {
+    // The no-dict-optimized collector skips unique-value tracking — it's only safe when the column is
+    // staying no-dict. Callers building a dictionary out of the raw values must opt out of the optimization
+    // by setting requireUniqueValues=true. MAP collector is also optimised for no-dictionary collection.
+    if (!requireUniqueValues && !dictionaryEnabled && storedType != DataType.MAP) {
       if (ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig)) {
         return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
       }
