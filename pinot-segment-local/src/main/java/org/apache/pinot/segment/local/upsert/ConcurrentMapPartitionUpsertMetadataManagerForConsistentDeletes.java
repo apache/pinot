@@ -508,11 +508,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               int currentDocId = currentRecordLocation.getDocId();
               if (segment == currentSegment) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
-                if (recordInfo.isDeleteRecord()) {
-                  _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_DELETED, 1L);
-                } else {
-                  _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_EXISTING_KEYS_UPDATED, 1L);
-                }
+                emitUpsertMetrics(recordInfo, false);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     currentRecordLocation.getDistinctSegmentCount());
               } else {
@@ -524,11 +520,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
                   _previousKeyToRecordLocationMap.put(primaryKey, currentRecordLocation);
                 }
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
-                if (recordInfo.isDeleteRecord()) {
-                  _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_DELETED, 1L);
-                } else {
-                  _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_EXISTING_KEYS_UPDATED, 1L);
-                }
+                emitUpsertMetrics(recordInfo, false);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentRecordLocation.getDistinctSegmentCount()));
               }
@@ -548,11 +540,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
           } else {
             // New primary key
             addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-            if (recordInfo.isDeleteRecord()) {
-              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_KEYS_DELETED, 1L);
-            } else {
-              _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_NEW_KEYS_INSERTED, 1L);
-            }
+            emitUpsertMetrics(recordInfo, true);
             return new RecordLocation(segment, newDocId, newComparisonValue, 1);
           }
         });
