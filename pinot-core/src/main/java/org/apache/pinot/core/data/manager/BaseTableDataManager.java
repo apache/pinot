@@ -613,6 +613,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
+      if (hasSegment(segmentName)) {
+        _logger.warn("Segment: {} is still loaded, offloading it before delete", segmentName);
+        offloadSegment(segmentName);
+      }
       doDeleteSegment(segmentName);
     } catch (Exception e) {
       addSegmentError(segmentName,
@@ -625,10 +629,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   protected void doDeleteSegment(String segmentName)
       throws Exception {
-    if (hasSegment(segmentName)) {
-      _logger.warn("Segment: {} is still loaded, offloading it before delete", segmentName);
-      offloadSegment(segmentName);
-    }
     deleteSegmentFilesFromDisk(_tableDataDir, segmentName, _instanceDataManagerConfig);
     _logger.info("Deleted segment: {}", segmentName);
   }
@@ -656,7 +656,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File segmentDir = new File(tableDataDir, segmentName);
     if (segmentDir.exists()) {
       FileUtils.deleteQuietly(segmentDir);
-      LOGGER.info("Deleted segment directory: {}", segmentDir);
+      LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
     }
     SegmentDirectoryLoader segmentLoader =
         SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(instanceConfig.getSegmentDirectoryLoader());
