@@ -394,6 +394,11 @@ public class DataFetcherTest {
     }
   }
 
+  /// Verifies the dict-id contract on a column with a shared standalone dictionary on a RAW forward index:
+  /// 1. {@link DataFetcher#fetchDictIds} must throw {@link UnsupportedOperationException} (no implicit
+  ///    per-row dictionary lookup).
+  /// 2. {@link DataFetcher#fetchDictIdsFromRawValues} is the explicit opt-in path and produces the dict ids
+  ///    via per-row {@link Dictionary#indexOf} lookups.
   @Test
   public void testFetchDictIdsFromRawForwardIndexWithSharedDictionary() {
     @SuppressWarnings("unchecked")
@@ -419,9 +424,14 @@ public class DataFetcherTest {
     when(dataSourceMetadata.isSingleValue()).thenReturn(true);
 
     DataFetcher dataFetcher = new DataFetcher(Collections.singletonMap("rawInt", dataSource), Collections.emptyMap());
-    int[] dictIds = new int[3];
-    dataFetcher.fetchDictIds("rawInt", new int[] {0, 1, 2}, 3, dictIds);
 
+    // (1) fetchDictIds must refuse the RAW forward index — no implicit fallback.
+    int[] dictIds = new int[3];
+    Assert.expectThrows(UnsupportedOperationException.class,
+        () -> dataFetcher.fetchDictIds("rawInt", new int[] {0, 1, 2}, 3, dictIds));
+
+    // (2) fetchDictIdsFromRawValues is the explicit per-row dictionary-lookup path.
+    dataFetcher.fetchDictIdsFromRawValues("rawInt", new int[] {0, 1, 2}, 3, dictIds);
     Assert.assertEquals(dictIds, new int[] {1, 2, 3});
   }
 
