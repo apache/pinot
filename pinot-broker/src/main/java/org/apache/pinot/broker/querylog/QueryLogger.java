@@ -60,8 +60,10 @@ public class QueryLogger {
       try {
         return valueOf(value.toUpperCase());
       } catch (IllegalArgumentException e) {
-        LOGGER.warn("Invalid SQL redaction mode '{}', defaulting to NONE", value);
-        return NONE;
+        // The default config value is NONE. If the user intended to enable redaction but made a typo,
+        // it's safer to default to FULL instead of NONE to avoid accidentally logging sensitive information.
+        LOGGER.warn("Invalid SQL redaction mode '{}', defaulting to FULL", value);
+        return FULL;
       }
     }
   }
