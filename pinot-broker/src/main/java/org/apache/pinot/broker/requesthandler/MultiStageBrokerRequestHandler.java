@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Duration;
@@ -736,7 +737,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
-      fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
+      fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,
+          queryResults.getStageCoverage());
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 
@@ -826,7 +828,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
-      List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
+      List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan,
+      @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage) {
     try {
       Map<Integer, DispatchablePlanFragment> queryStageMap = dispatchableSubPlan.getQueryStageMap();
 
@@ -841,6 +844,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       LOGGER.warn("Error encountered while collecting multi-stage stats", e);
       brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode()
           .put("error", "Error encountered while collecting multi-stage stats - " + e));
+    }
+    if (stageCoverage != null) {
+      ArrayNode coverageArray = JsonNodeFactory.instance.arrayNode();
+      for (QueryDispatcher.QueryResult.StageCoverage sc : stageCoverage) {
+        if (sc == null) {
+          coverageArray.addNull();
+        } else {
+          coverageArray.addObject()
+              .put("responded", sc.getResponded())
+              .put("mergeFailed", sc.getMergeFailed())
+              .put("missing", sc.getMissing());
+        }
+      }
+      brokerResponse.setStreamStatsCoverage(coverageArray);
     }
   }
 

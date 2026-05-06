@@ -223,10 +223,15 @@ public class QueryDispatcher {
     // stage) pair — that's how many OpChainComplete messages we expect to receive.
     Set<DispatchablePlanFragment> stagePlansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
     int totalExpected = 0;
+    Map<Integer, Integer> expectedByStage = new HashMap<>();
     for (DispatchablePlanFragment stagePlan : stagePlansWithoutRoot) {
+      int stageId = stagePlan.getPlanFragment().getFragmentId();
+      int stageCount = 0;
       for (List<Integer> workerIds : stagePlan.getServerInstanceToWorkerIdMap().values()) {
-        totalExpected += workerIds.size();
+        stageCount += workerIds.size();
       }
+      totalExpected += stageCount;
+      expectedByStage.put(stageId, stageCount);
     }
     StreamingQuerySession session = new StreamingQuerySession(requestId, totalExpected);
 
@@ -246,7 +251,7 @@ public class QueryDispatcher {
       if (brokerResult.getProcessingException() != null) {
         cancel(requestId);
       }
-      return mergeSessionStatsIntoResult(brokerResult, session);
+      return mergeSessionStatsIntoResult(brokerResult, session, expectedByStage);
     } catch (Exception ex) {
       return tryRecover(requestId, servers, ex);
     } catch (Throwable e) {
@@ -325,7 +330,11 @@ public class QueryDispatcher {
   /// list typically only contains stage 0 plus any pipeline-breaker stages. The session's accumulator carries
   /// stages 1..N. Where both have an entry for the same stage id, the session wins (avoids double-counting
   /// pipeline-breaker stats that the upstream server also reported).
-  private QueryResult mergeSessionStatsIntoResult(QueryResult brokerResult, StreamingQuerySession session) {
+  ///
+  /// @param expectedByStage map from stage id to the number of opchain reports expected for that stage (used to
+  ///                        compute the {@link QueryResult.StageCoverage#getMissing()} count per stage)
+  private QueryResult mergeSessionStatsIntoResult(QueryResult brokerResult, StreamingQuerySession session,
+      Map<Integer, Integer> expectedByStage) {
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
     Map<Integer, StageStatsTreeNode> accumulator = coverage.getStageAccumulator();
 
@@ -335,8 +344,14 @@ public class QueryDispatcher {
         maxStageId = stageId;
       }
     }
+    for (Integer stageId : expectedByStage.keySet()) {
+      if (stageId > maxStageId) {
+        maxStageId = stageId;
+      }
+    }
 
     List<MultiStageQueryStats.StageStats.Closed> merged = new ArrayList<>(maxStageId + 1);
+    List<QueryResult.StageCoverage> stageCoverage = new ArrayList<>(maxStageId + 1);
     for (int i = 0; i <= maxStageId; i++) {
       StageStatsTreeNode sessionTree = accumulator.get(i);
       if (sessionTree != null) {
@@ -346,9 +361,15 @@ public class QueryDispatcher {
       } else {
         merged.add(null);
       }
+      int responded = coverage.getRespondedByStage().getOrDefault(i, 0);
+      int mergeFailed = coverage.getMergeFailedByStage().getOrDefault(i, 0);
+      int expected = expectedByStage.getOrDefault(i, 0);
+      int missing = Math.max(0, expected - responded - mergeFailed);
+      // Stage 0 is broker-local and not tracked by the session; leave its entry null.
+      stageCoverage.add(expected == 0 ? null : new QueryResult.StageCoverage(responded, mergeFailed, missing));
     }
     return new QueryResult(brokerResult.getResultTable(), brokerResult.getProcessingException(), merged,
-        brokerResult.getBrokerReduceTimeMs());
+        brokerResult.getBrokerReduceTimeMs(), stageCoverage);
   }
 
   /// Tries to recover from an exception thrown during query dispatching.
@@ -881,6 +902,12 @@ public class QueryDispatcher {
     private final QueryProcessingException _processingException;
     private final List<MultiStageQueryStats.StageStats.Closed> _queryStats;
     private final long _brokerReduceTimeMs;
+    /**
+     * Non-null only in stream-mode queries. Indexed by stage id; entries may be null for stages with no coverage data
+     * (e.g. stage 0 which runs broker-local and is not tracked by the session).
+     */
+    @Nullable
+    private final List<StageCoverage> _stageCoverage;
 
     /**
      * Creates a successful query result.
@@ -897,6 +924,7 @@ public class QueryDispatcher {
       }
       _brokerReduceTimeMs = brokerReduceTimeMs;
       _processingException = null;
+      _stageCoverage = null;
     }
 
     /**
@@ -917,6 +945,7 @@ public class QueryDispatcher {
       for (int i = 1; i < numStages; i++) {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
       }
+      _stageCoverage = null;
     }
 
     /**
@@ -925,11 +954,13 @@ public class QueryDispatcher {
      * constructing the result.
      */
     public QueryResult(@Nullable ResultTable resultTable, @Nullable QueryProcessingException processingException,
-        List<MultiStageQueryStats.StageStats.Closed> queryStats, long brokerReduceTimeMs) {
+        List<MultiStageQueryStats.StageStats.Closed> queryStats, long brokerReduceTimeMs,
+        @Nullable List<StageCoverage> stageCoverage) {
       _resultTable = resultTable;
       _processingException = processingException;
       _queryStats = queryStats;
       _brokerReduceTimeMs = brokerReduceTimeMs;
+      _stageCoverage = stageCoverage;
     }
 
     @Nullable
@@ -948,6 +979,46 @@ public class QueryDispatcher {
 
     public long getBrokerReduceTimeMs() {
       return _brokerReduceTimeMs;
+    }
+
+    /**
+     * Returns per-stage coverage data from the stream-mode session, or {@code null} when the query ran in legacy mode.
+     * The list is indexed by stage id; entries may be {@code null} for stages with no coverage info (e.g. stage 0).
+     */
+    @Nullable
+    public List<StageCoverage> getStageCoverage() {
+      return _stageCoverage;
+    }
+
+    /**
+     * Per-stage stats coverage for a stream-mode query. Captures how many opchain reports the broker received vs.
+     * expected, and how many it couldn't merge (version-skew or shape mismatch).
+     */
+    public static final class StageCoverage {
+      private final int _responded;
+      private final int _mergeFailed;
+      private final int _missing;
+
+      public StageCoverage(int responded, int mergeFailed, int missing) {
+        _responded = responded;
+        _mergeFailed = mergeFailed;
+        _missing = missing;
+      }
+
+      /** Opchains that reported and whose stats were merged successfully. */
+      public int getResponded() {
+        return _responded;
+      }
+
+      /** Opchains that reported but whose stats the broker could not merge (shape mismatch / decode error). */
+      public int getMergeFailed() {
+        return _mergeFailed;
+      }
+
+      /** Opchains that were expected but never reported (timed out or stream error before reporting). */
+      public int getMissing() {
+        return _missing;
+      }
     }
   }
 
