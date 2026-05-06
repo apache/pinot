@@ -18,13 +18,20 @@ process.
 ## Running against a built distribution
 
 ```bash
-mvn -Pbin-dist install -DskipTests          # produces apache-pinot-VERSION-bin/
-build/bin/verify-plugins.sh                 # default: all checks against ./build
+mvn -Pbin-dist -P!pinot-fastdev install -DskipTests   # produces apache-pinot-VERSION-bin/
+build/bin/verify-plugins.sh                           # default: all checks against ./build
 build/bin/verify-plugins.sh build/ --check input-format,fs
 build/bin/verify-plugins.sh build/ --strict-realm
 build/bin/verify-plugins.sh build/ --plugin org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory
 build/bin/verify-plugins.sh build/ --verbose
 ```
+
+> **Disable `pinot-fastdev` when building the distribution to verify.** That profile sets
+> `shade.phase.prop=none`, which suppresses the per-plugin shaded jar that the assembly copies
+> into `plugins/<type>/<name>/`. Production `bin-dist` builds always run with it disabled —
+> match that here. Local dev environments that auto-activate it via
+> `~/.m2/settings.xml` need the explicit `-P!pinot-fastdev` flag (or
+> `-Dshade.phase.prop=package`); CI builds typically don't.
 
 `--verbose` prints `getProtectionDomain().getCodeSource().getLocation()` for each loaded
 class — useful for confirming whether a class came from `pinot-all.jar` (system
