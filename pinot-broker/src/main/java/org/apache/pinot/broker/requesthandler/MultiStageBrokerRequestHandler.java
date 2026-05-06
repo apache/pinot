@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -138,6 +139,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
+  private final boolean _useStreamStatsReporting;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -203,6 +205,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _enableQueryFingerprinting = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
+    _useStreamStatsReporting = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_STREAM_STATS_REPORTING,
+        CommonConstants.Broker.DEFAULT_USE_STREAM_STATS_REPORTING);
   }
 
   @Override
@@ -650,10 +655,18 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _stagesStartedMeter.mark(stageCount);
       _opchainsStartedMeter.mark(opChainCount);
 
+      // Inject the cluster-default stream-stats mode unless the query already overrides it.
+      Map<String, String> effectiveOptions = query.getOptions();
+      if (_useStreamStatsReporting && !effectiveOptions.containsKey(
+          CommonConstants.Broker.Request.QueryOptionKey.USE_STREAM_STATS_REPORTING)) {
+        effectiveOptions = new HashMap<>(effectiveOptions);
+        effectiveOptions.put(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAM_STATS_REPORTING, "true");
+      }
+
       QueryDispatcher.QueryResult queryResults;
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
-            query.getOptions());
+            effectiveOptions);
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {

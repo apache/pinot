@@ -525,6 +525,15 @@ public class CommonConstants {
         "pinot.broker.mse.use.leaf.server.for.intermediate.stage";
     public static final boolean DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = false;
 
+    /// Cluster-level default for stream-mode stats reporting. When {@code true} the broker opens a
+    /// {@code SubmitWithStream} bidi RPC for every multi-stage query instead of the legacy unary Submit, enabling
+    /// reliable per-operator stats delivery even on the error path. Individual queries may override this default
+    /// via the {@link Request.QueryOptionKey#USE_STREAM_STATS_REPORTING} query option. Requires all servers to
+    /// implement the {@code SubmitWithStream} RPC; enabling it on a mixed-version cluster will cause query failures.
+    public static final String CONFIG_OF_USE_STREAM_STATS_REPORTING =
+        "pinot.broker.multistage.use.stream.stats.reporting";
+    public static final boolean DEFAULT_USE_STREAM_STATS_REPORTING = false;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
