@@ -87,7 +87,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (ExpressionContext groupByExpression : groupByExpressions) {
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       hasMVGroupByExpression |= !columnContext.isSingleValue();
-      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null;
+      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null
+          || (columnContext.getDataSource() != null
+          && !columnContext.getDataSource().getForwardIndex().isDictionaryEncoded());
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
 
