@@ -204,6 +204,14 @@ public class QueryDispatcher {
   /// The wait window is bounded by the query's remaining timeout: if {@code submitWithStream + runReducer} consumed
   /// most of the budget, the per-stage stats may end up partial (visible via the per-stage {@code mergeFailed} /
   /// {@code missing} counts the session exposes).
+  ///
+  /// <b>Mixed-version policy.</b> No automatic fallback to the unary {@link #submit} path. Enabling
+  /// {@link CommonConstants.Broker.Request.QueryOptionKey#USE_STREAM_STATS_REPORTING} requires every server in the
+  /// cluster to implement {@code SubmitWithStream}; if any server returns {@code UNIMPLEMENTED} or any other
+  /// transport error during dispatch, {@link #submitWithStream} surfaces the throwable through the ack queue,
+  /// {@link #processResults} throws, this method's {@code catch} cancels every other server via {@link #tryRecover}
+  /// and propagates the failure to the caller. Mixed-version safety is the operator's responsibility — only enable
+  /// this option once the whole fleet has been upgraded.
   private QueryResult submitAndReduceWithStream(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
       long timeoutMs, Map<String, String> queryOptions)
       throws Exception {

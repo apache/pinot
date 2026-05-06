@@ -733,10 +733,16 @@ public class CommonConstants {
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
          * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The
-         * broker awaits stats completion as soon as the receiving mailbox finishes, with a configurable wait window
-         * for any outstanding opchains.
+         * broker awaits stats completion as soon as the receiving mailbox finishes (early completion), bounded by
+         * the query's remaining timeout.
          *
          * <p>When unset / false, the legacy unary {@code Submit} path is used and stats travel via mailbox EOS.
+         *
+         * <p><b>Mixed-version note.</b> All servers in the cluster must support {@code SubmitWithStream} when this
+         * option is enabled. Operators are responsible for setting it only after the entire fleet has been upgraded
+         * — there is no automatic fallback to the unary path. If any server returns {@code UNIMPLEMENTED} (or any
+         * other transport error) during dispatch, the broker cancels the query and surfaces the error to the
+         * client.
          */
         public static final String USE_STREAM_STATS_REPORTING = "useStreamStatsReporting";
         /**
