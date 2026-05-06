@@ -100,7 +100,7 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, use adaptive conversion strategy
-    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
+    Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
       Object result = aggregationResultHolder.getResult();
       // If already converted to HLL, aggregate directly

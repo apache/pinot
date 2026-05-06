@@ -73,12 +73,8 @@ public class DistinctExecutorFactory {
         orderByExpression = null;
       }
       Dictionary dictionary = columnContext.getDictionary();
-      // Notes:
-      // 1. Use raw value based when ordering is needed and dictionary is not sorted (consuming segments).
-      // 2. Require {@code isDictionaryEncoded()} (not just dictionary presence). For the shared-dict + RAW forward
-      //    index case the dictionary exists but dict-id reads require per-row dictionary lookups, so the raw-value
-      //    executor is faster.
-      if (columnContext.isDictionaryEncoded() && (orderByExpression == null || dictionary.isSorted())) {
+      // Note: Use raw value based when ordering is needed and dictionary is not sorted (consuming segments).
+      if (dictionary != null && (orderByExpression == null || dictionary.isSorted())) {
         // Dictionary based
         return new DictionaryBasedSingleColumnDistinctExecutor(expression, dictionary, dataType, limit,
             nullHandlingEnabled, orderByExpression);
@@ -119,10 +115,9 @@ public class DistinctExecutorFactory {
         columnNames[i] = expression.toString();
         columnDataTypes[i] = ColumnDataType.fromDataTypeSV(columnContext.getDataType());
         if (dictionaryBased) {
-          // Same gating as the single-column path: require dict-id reads to be cheap (forward index is
-          // dict-encoded), not just that a dictionary exists.
-          if (columnContext.isDictionaryEncoded()) {
-            dictionaries.add(columnContext.getDictionary());
+          Dictionary dictionary = columnContext.getDictionary();
+          if (dictionary != null) {
+            dictionaries.add(dictionary);
           } else {
             dictionaryBased = false;
           }

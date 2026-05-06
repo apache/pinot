@@ -270,11 +270,6 @@ public class BenchmarkDistinctCountHLLThreshold {
     }
 
     @Override
-    public boolean isDictionaryEncoded() {
-      return _dictionary != null;
-    }
-
-    @Override
     public int[] getDictionaryIdsSV() {
       return _dictIds;
     }

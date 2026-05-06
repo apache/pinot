@@ -96,13 +96,6 @@ public class RowBasedBlockValSet implements BlockValSet {
     return null;
   }
 
-  /// Row-based blocks materialize raw values from the source rows; there is no dictionary, so dict-id reads
-  /// are not supported.
-  @Override
-  public boolean isDictionaryEncoded() {
-    return false;
-  }
-
   @Override
   public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();

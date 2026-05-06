@@ -74,13 +74,6 @@ public class DataBlockValSet implements BlockValSet {
     return null;
   }
 
-  /// DataBlock values are materialized as raw values; there is no dictionary, so dict-id reads are not
-  /// supported.
-  @Override
-  public boolean isDictionaryEncoded() {
-    return false;
-  }
-
   @Override
   public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();
