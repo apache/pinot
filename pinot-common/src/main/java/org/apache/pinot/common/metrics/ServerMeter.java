@@ -75,6 +75,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_PRELOAD_FAILURE("count", false),
   UPSERT_NEW_KEYS_INSERTED("rows", false),
   UPSERT_EXISTING_KEYS_UPDATED("rows", false),
+  UPSERT_KEYS_DELETED("rows", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
