@@ -890,32 +890,52 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  static OfflineTableDataManager createTableManager() {
+  protected BaseTableDataManager createTableManager() {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
 
-  static OfflineTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled() {
+  protected BaseTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled() {
     return createTableManagerWithAsyncSegmentRefreshEnabled(createDefaultInstanceDataManagerConfig());
   }
 
-  private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
-    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
+  protected BaseTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
+    BaseTableDataManager tableDataManager = newTableDataManager();
+    tableDataManager.init(instanceDataManagerConfig, createHelixManagerMock(), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
         SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
         SEGMENT_OPERATIONS_THROTTLER, false, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
 
-  private static OfflineTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled(
+  protected BaseTableDataManager createTableManagerWithAsyncSegmentRefreshEnabled(
       InstanceDataManagerConfig instanceDataManagerConfig) {
-    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
+    BaseTableDataManager tableDataManager = newTableDataManager();
+    tableDataManager.init(instanceDataManagerConfig, createHelixManagerMock(), new SegmentLocks(), DEFAULT_TABLE_CONFIG,
         SCHEMA, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null,
         SEGMENT_OPERATIONS_THROTTLER, true, mock(ServerReloadJobStatusCache.class));
     return tableDataManager;
   }
 
-  private static InstanceDataManagerConfig createDefaultInstanceDataManagerConfig() {
+  /**
+   * Returns the concrete {@link BaseTableDataManager} instance under test. Default returns a stock
+   * {@link OfflineTableDataManager}; subclasses override to test a different implementation while inheriting
+   * all test bodies.
+   */
+  protected BaseTableDataManager newTableDataManager() {
+    return new OfflineTableDataManager();
+  }
+
+  /**
+   * Returns the {@link HelixManager} mock wired into the TDM under test. Default returns a bare Mockito mock
+   * (no property store stubbed) — fine for the inherited test bodies which never read ZK directly. Subclasses
+   * that exercise paths reading {@code _propertyStore} (e.g. {@code fetchZKMetadata}, {@code fetchIndexLoadingConfig})
+   * override to stub {@code helixManager.getHelixPropertyStore()} with a {@code FakePropertyStore} pre-seeded
+   * with table config + schema + per-segment ZK metadata.
+   */
+  protected HelixManager createHelixManagerMock() {
+    return mock(HelixManager.class);
+  }
+
+  protected static InstanceDataManagerConfig createDefaultInstanceDataManagerConfig() {
     InstanceDataManagerConfig config = mock(InstanceDataManagerConfig.class);
     when(config.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     // Check CRC matching on segment load time.
@@ -923,7 +943,7 @@ public class BaseTableDataManagerTest {
     return config;
   }
 
-  private static File createSegment(SegmentVersion segmentVersion, int numRows)
+  protected static File createSegment(SegmentVersion segmentVersion, int numRows)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(DEFAULT_TABLE_CONFIG, SCHEMA);
     config.setOutDir(TABLE_DATA_DIR.getAbsolutePath());
@@ -942,14 +962,14 @@ public class BaseTableDataManagerTest {
     return new File(TABLE_DATA_DIR, SEGMENT_NAME);
   }
 
-  private static SegmentZKMetadata createRawSegment(SegmentVersion segmentVersion, int numRows)
+  protected static SegmentZKMetadata createRawSegment(SegmentVersion segmentVersion, int numRows)
       throws Exception {
     File indexDir = createSegment(segmentVersion, numRows);
     return makeRawSegment(indexDir,
         new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION), true);
   }
 
-  private static SegmentZKMetadata makeRawSegment(File indexDir, File rawSegmentFile, boolean deleteIndexDir)
+  protected static SegmentZKMetadata makeRawSegment(File indexDir, File rawSegmentFile, boolean deleteIndexDir)
       throws Exception {
     long crc = getCRC(indexDir);
     SegmentZKMetadata zkMetadata = new SegmentZKMetadata(SEGMENT_NAME);
@@ -962,7 +982,7 @@ public class BaseTableDataManagerTest {
     return zkMetadata;
   }
 
-  private static long getCRC(File indexDir)
+  protected static long getCRC(File indexDir)
       throws IOException {
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     assertNotNull(creationMetaFile);
@@ -971,7 +991,7 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  private IndexLoadingConfig createTierIndexLoadingConfig(TableConfig tableConfig) {
+  protected IndexLoadingConfig createTierIndexLoadingConfig(TableConfig tableConfig) {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getSegmentDirectoryLoader()).thenReturn(TIER_SEGMENT_DIRECTORY_LOADER);
     when(instanceDataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
@@ -981,7 +1001,7 @@ public class BaseTableDataManagerTest {
     return indexLoadingConfig;
   }
 
-  private ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName, long crc) {
+  protected ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName, long crc) {
     ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
     when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
     ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
