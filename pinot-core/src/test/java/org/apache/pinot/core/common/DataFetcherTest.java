@@ -57,6 +57,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -394,6 +395,11 @@ public class DataFetcherTest {
     }
   }
 
+  /// Verifies the dict-id contract on a column with a shared standalone dictionary on a RAW forward index:
+  /// 1. {@link DataFetcher#fetchDictIds} does **not** fall back to a per-row dictionary lookup. Calling it on
+  ///    a RAW forward index propagates the {@link UnsupportedOperationException} from the underlying reader.
+  /// 2. {@link DataFetcher#fetchDictIdsFromRawValues} is the explicit opt-in path; it produces the dict ids
+  ///    via per-row {@link Dictionary#indexOf} lookups.
   @Test
   public void testFetchDictIdsFromRawForwardIndexWithSharedDictionary() {
     @SuppressWarnings("unchecked")
@@ -407,6 +413,9 @@ public class DataFetcherTest {
     when(forwardIndexReader.isSingleValue()).thenReturn(true);
     when(forwardIndexReader.getStoredType()).thenReturn(DataType.INT);
     doReturn(readerContext).when((ForwardIndexReader) forwardIndexReader).createContext(anyMap());
+    // The RAW reader's readDictIds throws (matches the SPI default for non-dict-encoded readers).
+    doThrow(new UnsupportedOperationException()).when((ForwardIndexReader) forwardIndexReader)
+        .readDictIds(any(int[].class), eq(3), any(int[].class), any());
     when(forwardIndexReader.getInt(eq(0), any())).thenReturn(11);
     when(forwardIndexReader.getInt(eq(1), any())).thenReturn(22);
     when(forwardIndexReader.getInt(eq(2), any())).thenReturn(33);
@@ -419,9 +428,14 @@ public class DataFetcherTest {
     when(dataSourceMetadata.isSingleValue()).thenReturn(true);
 
     DataFetcher dataFetcher = new DataFetcher(Collections.singletonMap("rawInt", dataSource), Collections.emptyMap());
-    int[] dictIds = new int[3];
-    dataFetcher.fetchDictIds("rawInt", new int[] {0, 1, 2}, 3, dictIds);
 
+    // (1) fetchDictIds must not fall back — the RAW reader's readDictIds throws.
+    int[] dictIds = new int[3];
+    Assert.expectThrows(UnsupportedOperationException.class,
+        () -> dataFetcher.fetchDictIds("rawInt", new int[] {0, 1, 2}, 3, dictIds));
+
+    // (2) fetchDictIdsFromRawValues is the explicit per-row dictionary-lookup path.
+    dataFetcher.fetchDictIdsFromRawValues("rawInt", new int[] {0, 1, 2}, 3, dictIds);
     Assert.assertEquals(dictIds, new int[] {1, 2, 3});
   }
 

@@ -90,33 +90,25 @@ public class DataFetcher implements AutoCloseable {
    * SINGLE-VALUED COLUMN API
    */
 
-  /// Fetch the dictionary ids for a single-valued column. Routes between two distinct read paths based on
-  /// whether the underlying forward index is itself dictionary-encoded:
-  /// - **Dict-encoded forward** → {@link ColumnValueReader#readDictIds} reads dict ids directly from the index.
-  /// - **RAW forward + shared dictionary** → {@link ColumnValueReader#readDictIdsFromRawValues} reads each raw
-  ///   value and looks it up in the dictionary. This is {@code O(numDocs * Dictionary#indexOf)}; callers that
-  ///   want to avoid the lookup should consult the column metadata before fetching dict ids.
+  /// Fetch the dictionary ids for a single-valued column whose forward index is itself dictionary-encoded.
+  /// Reads dict ids directly from the index; does **not** fall back to a per-row dictionary lookup when the
+  /// forward index is RAW. Callers that want to fetch dict ids for a RAW + shared-dict column must call
+  /// {@link #fetchDictIdsFromRawValues(String, int[], int, int[])} explicitly.
   ///
   /// @param column Column name
   /// @param inDocIds Input document ids buffer
   /// @param length Number of input document ids
   /// @param outDictIds Buffer for output
   public void fetchDictIds(String column, int[] inDocIds, int length, int[] outDictIds) {
-    ColumnValueReader reader = _columnValueReaderMap.get(column);
-    if (reader._dictionaryEncoded) {
-      reader.readDictIds(inDocIds, length, outDictIds);
-    } else {
-      reader.readDictIdsFromRawValues(inDocIds, length, outDictIds);
-    }
+    _columnValueReaderMap.get(column).readDictIds(inDocIds, length, outDictIds);
   }
 
   /// Explicit per-row dictionary lookup for a column whose forward index is RAW but a (shared) dictionary
-  /// exists. Reads the raw value at each docId and returns the dict id from the dictionary.
+  /// exists. Reads each raw value and returns its dict id from the dictionary.
   ///
-  /// **This is expensive — `O(numDocs * Dictionary#indexOf)`.** Callers should normally use
-  /// {@link #fetchDictIds(String, int[], int, int[])}, which routes to the cheap path when the forward index
-  /// is itself dictionary-encoded. This method is for callers that have already verified the column is
-  /// RAW + shared-dict and want to be explicit about taking the per-row lookup path.
+  /// **This is expensive — `O(numDocs * Dictionary#indexOf)`.** It exists as an opt-in escape hatch for
+  /// callers that have already verified the column is RAW + shared-dict and have decided to pay the lookup
+  /// cost. {@link #fetchDictIds(String, int[], int, int[])} does **not** route to this method.
   public void fetchDictIdsFromRawValues(String column, int[] inDocIds, int length, int[] outDictIds) {
     _columnValueReaderMap.get(column).readDictIdsFromRawValues(inDocIds, length, outDictIds);
   }
@@ -234,12 +226,7 @@ public class DataFetcher implements AutoCloseable {
    * @param outDictIds Buffer for output
    */
   public void fetchDictIds(String column, int[] inDocIds, int length, int[][] outDictIds) {
-    ColumnValueReader reader = _columnValueReaderMap.get(column);
-    if (reader._dictionaryEncoded) {
-      reader.readDictIdsMV(inDocIds, length, outDictIds);
-    } else {
-      reader.readDictIdsFromRawValuesMV(inDocIds, length, outDictIds);
-    }
+    _columnValueReaderMap.get(column).readDictIdsMV(inDocIds, length, outDictIds);
   }
 
   /// Multi-value counterpart to {@link #fetchDictIdsFromRawValues(String, int[], int, int[])}. Same caller
