@@ -531,7 +531,7 @@ public class CommonConstants {
     /// via the {@link Request.QueryOptionKey#USE_STREAM_STATS_REPORTING} query option. Requires all servers to
     /// implement the {@code SubmitWithStream} RPC; enabling it on a mixed-version cluster will cause query failures.
     public static final String CONFIG_OF_USE_STREAM_STATS_REPORTING =
-        "pinot.broker.multistage.use.stream.stats.reporting";
+        "pinot.broker.mse.use.stream.stats.reporting";
     public static final boolean DEFAULT_USE_STREAM_STATS_REPORTING = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
