@@ -381,26 +381,23 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception {
     LOGGER.info("Deleting segment: {} from table: {}", segmentName, tableNameWithType);
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      // The TDM owns the per-segment lock, the offload-if-loaded prelude, the on-disk dir delete, and the tier-aware
-      // segment-directory-loader cleanup.
-      tableDataManager.deleteSegment(segmentName);
-    } else {
-      // Fallback: TDM can be null if it was never instantiated, or has already been removed via deleteTable.
-      // In that case, do a path-only cleanup keyed by segment name.
-      deleteSegmentFilesFallback(tableNameWithType, segmentName);
-      LOGGER.info("Deleted segment: {} from table: {} ", segmentName, tableNameWithType);
-    }
-  }
-
-  private void deleteSegmentFilesFallback(String tableNameWithType, String segmentName)
-      throws Exception {
+    // Hold the per-segment lock around the TDM lookup so the lookup + delete is atomic vs. removeTableDataManager
+    // shutting the TDM down concurrently. The TDM's own deleteSegment re-acquires the same lock (ReentrantLock).
     Lock segmentLock = _segmentLocks.getLock(tableNameWithType, segmentName);
     segmentLock.lock();
     try {
-      String tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType;
-      BaseTableDataManager.deleteSegmentFilesFromDisk(tableDataDir, segmentName, _instanceDataManagerConfig);
+      TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+      if (tableDataManager != null) {
+        // The TDM owns the offload-if-loaded prelude, the on-disk dir delete, and the tier-aware
+        // segment-directory-loader cleanup.
+        tableDataManager.deleteSegment(segmentName);
+      } else {
+        // Fallback: TDM can be null if it was never instantiated, or has already been removed via deleteTable.
+        // In that case, do a path-only cleanup keyed by segment name.
+        String tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType;
+        BaseTableDataManager.deleteSegmentFilesFromDisk(tableDataDir, segmentName, _instanceDataManagerConfig);
+        LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
+      }
     } finally {
       segmentLock.unlock();
     }

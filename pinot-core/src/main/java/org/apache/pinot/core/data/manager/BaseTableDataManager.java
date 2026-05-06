@@ -606,12 +606,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  /**
-   * Default per-segment delete: takes the segment lock, offloads if currently loaded (using the standard
-   * {@link #offloadSegment(String)} entry point — the per-segment lock is a {@link
-   * java.util.concurrent.locks.ReentrantLock}, so re-acquiring it inside {@code offloadSegment} is safe), then removes
-   * the on-disk directory and any tier-specific artefacts via {@link #deleteSegmentFilesFromDisk}.
-   */
   @Override
   public void deleteSegment(String segmentName)
       throws Exception {
@@ -619,15 +613,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
-      if (hasSegment(segmentName)) {
-        _logger.warn("Segment: {} is still loaded, offloading it before delete", segmentName);
-        offloadSegment(segmentName);
-      }
-      deleteSegmentFilesFromDisk(_tableDataDir, segmentName, _instanceDataManagerConfig);
-      _logger.info("Deleted segment: {}", segmentName);
+      doDeleteSegment(segmentName);
+    } catch (Exception e) {
+      addSegmentError(segmentName,
+          new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while deleting segment", e));
+      throw e;
     } finally {
       segmentLock.unlock();
     }
+  }
+
+  protected void doDeleteSegment(String segmentName)
+      throws Exception {
+    if (hasSegment(segmentName)) {
+      _logger.warn("Segment: {} is still loaded, offloading it before delete", segmentName);
+      offloadSegment(segmentName);
+    }
+    deleteSegmentFilesFromDisk(_tableDataDir, segmentName, _instanceDataManagerConfig);
+    _logger.info("Deleted segment: {}", segmentName);
   }
 
   /**
