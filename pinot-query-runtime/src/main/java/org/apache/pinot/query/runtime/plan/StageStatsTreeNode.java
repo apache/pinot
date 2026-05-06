@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.plan;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.common.datatable.StatMap;
@@ -97,6 +98,31 @@ public class StageStatsTreeNode {
     for (int i = 0; i < _children.size(); i++) {
       _children.get(i).merge(other._children.get(i));
     }
+  }
+
+  /**
+   * Flattens this tree into a {@link MultiStageQueryStats.StageStats.Closed} via inorder traversal (leftmost-leaf
+   * first), mirroring the order in which operators emit their stats today
+   * ({@link MultiStageQueryStats.StageStats.Open#addLastOperator} call order). The result is compatible with the
+   * legacy {@link QueryDispatcher.QueryResult} contract that exposes per-stage stats as a flat
+   * {@code List<StageStats.Closed>}.
+   *
+   * <p>The flattening is lossy in the same way the legacy format is: tree shape is not preserved. Callers that need
+   * tree shape should use this {@link StageStatsTreeNode} directly.
+   */
+  public MultiStageQueryStats.StageStats.Closed flattenInorder() {
+    List<MultiStageOperator.Type> types = new ArrayList<>();
+    List<StatMap<?>> stats = new ArrayList<>();
+    flattenInto(types, stats);
+    return new MultiStageQueryStats.StageStats.Closed(types, stats);
+  }
+
+  private void flattenInto(List<MultiStageOperator.Type> types, List<StatMap<?>> stats) {
+    for (StageStatsTreeNode child : _children) {
+      child.flattenInto(types, stats);
+    }
+    types.add(_type);
+    stats.add(_statMap);
   }
 
   @Override

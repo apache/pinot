@@ -731,6 +731,15 @@ public class CommonConstants {
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         /**
+         * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
+         * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The
+         * broker awaits stats completion as soon as the receiving mailbox finishes, with a configurable wait window
+         * for any outstanding opchains.
+         *
+         * <p>When unset / false, the legacy unary {@code Submit} path is used and stats travel via mailbox EOS.
+         */
+        public static final String USE_STREAM_STATS_REPORTING = "useStreamStatsReporting";
+        /**
          * If set, changes the explain behavior in multi-stage engine.
          *
          * {@code true} means to ask servers for the physical plan while false means to just use logical plan.

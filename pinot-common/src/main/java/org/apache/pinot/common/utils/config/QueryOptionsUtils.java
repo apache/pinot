@@ -528,6 +528,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
+  /**
+   * Reads the {@code useStreamStatsReporting} query option that opts a single query into the {@code SubmitWithStream}
+   * dispatch path. See {@link QueryOptionKey#USE_STREAM_STATS_REPORTING}.
+   */
+  public static boolean isUseStreamStatsReporting(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_STREAM_STATS_REPORTING);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
   public static boolean isMultiClusterRoutingEnabled(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.ENABLE_MULTI_CLUSTER_ROUTING);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;

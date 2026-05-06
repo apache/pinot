@@ -60,6 +60,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -86,6 +87,8 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
+import org.apache.pinot.query.service.dispatch.streaming.StreamingQuerySession;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -167,6 +170,9 @@ public class QueryDispatcher {
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
+    if (QueryOptionsUtils.isUseStreamStatsReporting(queryOptions, false)) {
+      return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions);
+    }
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
@@ -187,6 +193,154 @@ public class QueryDispatcher {
         _serversByQuery.remove(requestId);
       }
     }
+  }
+
+  /// Streaming variant of {@link #submitAndReduce}: opens one {@code SubmitWithStream} bidi RPC per server, runs the
+  /// broker's stage 0 reducer, and once the receiving mailbox finishes awaits the per-stage stats with early
+  /// completion (returns as soon as every expected opchain has reported, or when the wait window fires — whichever
+  /// happens first). Stats from the session accumulator are then merged into the broker's local stage 0 stats to
+  /// build the final {@link QueryResult}.
+  ///
+  /// The wait window is bounded by the query's remaining timeout: if {@code submitWithStream + runReducer} consumed
+  /// most of the budget, the per-stage stats may end up partial (visible via the per-stage {@code mergeFailed} /
+  /// {@code missing} counts the session exposes).
+  private QueryResult submitAndReduceWithStream(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
+      long timeoutMs, Map<String, String> queryOptions)
+      throws Exception {
+    long requestId = context.getRequestId();
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
+    Set<QueryServerInstance> servers = new HashSet<>();
+
+    // The session's expected-opchain count must equal the total number of opchains across every (server, non-root
+    // stage) pair — that's how many OpChainComplete messages we expect to receive.
+    Set<DispatchablePlanFragment> stagePlansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
+    int totalExpected = 0;
+    for (DispatchablePlanFragment stagePlan : stagePlansWithoutRoot) {
+      for (List<Integer> workerIds : stagePlan.getServerInstanceToWorkerIdMap().values()) {
+        totalExpected += workerIds.size();
+      }
+    }
+    StreamingQuerySession session = new StreamingQuerySession(requestId, totalExpected);
+
+    try {
+      submitWithStream(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, session);
+      QueryResult brokerResult = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+
+      // Receiving mailbox finished. Wait for stats: returns true as soon as every opchain has reported, or false
+      // when the timeout fires.
+      long remainingMs = Math.max(0, deadlineMs - System.currentTimeMillis());
+      boolean fullCoverage = session.awaitCompletion(remainingMs, TimeUnit.MILLISECONDS);
+      if (!fullCoverage) {
+        LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
+            requestId);
+      }
+
+      if (brokerResult.getProcessingException() != null) {
+        cancel(requestId);
+      }
+      return mergeSessionStatsIntoResult(brokerResult, session);
+    } catch (Exception ex) {
+      return tryRecover(requestId, servers, ex);
+    } catch (Throwable e) {
+      cancel(requestId);
+      throw e;
+    } finally {
+      if (isQueryCancellationEnabled()) {
+        _serversByQuery.remove(requestId);
+      }
+    }
+  }
+
+  /// Streaming variant of {@link #submit}: opens one {@code SubmitWithStream} bidi RPC per server, registers each
+  /// open stream with {@code session} (so cancel fan-out and {@code OpChainComplete} accumulation work), and waits
+  /// for every server's submit-ack before returning. Errors during ack-await trigger {@link #cancel} on all peers.
+  @VisibleForTesting
+  void submitWithStream(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Set<QueryServerInstance> serversOut, Map<String, String> queryOptions, StreamingQuerySession session)
+      throws Exception {
+    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+
+    Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
+    Map<DispatchablePlanFragment, StageInfo> stageInfos = serializePlanFragments(plansWithoutRoot, serversOut);
+    if (serversOut.isEmpty()) {
+      return;
+    }
+
+    Map<String, String> requestMetadata =
+        prepareRequestMetadata(QueryThreadContext.get().getExecutionContext(), queryOptions, deadline);
+    ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
+
+    // Per-server expected opchain count = sum across the server's non-root stages of (workers on this server in
+    // that stage). The streaming observer uses this to drain the session latch correctly when its stream errors
+    // before all opchains have responded.
+    BlockingQueue<AsyncResponse<Worker.QueryResponse>> ackQueue = new ArrayBlockingQueue<>(serversOut.size());
+    for (QueryServerInstance server : serversOut) {
+      Worker.QueryRequest request = createRequest(server, stageInfos, protoRequestMetadata);
+      int expectedForServer = 0;
+      for (DispatchablePlanFragment stagePlan : plansWithoutRoot) {
+        List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(server);
+        if (workerIds != null) {
+          expectedForServer += workerIds.size();
+        }
+      }
+      DispatchClient client = getOrCreateDispatchClient(server);
+      try {
+        client.submitWithStream(request, server, deadline, session, expectedForServer,
+            (resp, err) -> ackQueue.offer(new AsyncResponse<>(server, resp, err)));
+      } catch (Throwable t) {
+        LOGGER.warn("Caught exception while opening stream to server: {}", server, t);
+        ackQueue.offer(new AsyncResponse<>(server, null, t));
+        _failureDetector.markServerUnhealthy(server.getInstanceId(), server.getHostname());
+      }
+    }
+
+    processResults(requestId, serversOut.size(), (response, server) -> {
+      if (response.containsMetadata(ServerResponseStatus.STATUS_ERROR)) {
+        cancel(requestId, serversOut);
+        throw new RuntimeException(
+            String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId, server,
+                response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
+      }
+    }, deadline, ackQueue);
+
+    if (isQueryCancellationEnabled()) {
+      _serversByQuery.put(requestId, serversOut);
+    }
+  }
+
+  /// Builds the final {@link QueryResult} for a stream-mode query: takes the broker's local stage-0 stats from
+  /// {@code brokerResult} and overlays the per-stage trees from the session accumulator (flattened to
+  /// {@link MultiStageQueryStats.StageStats.Closed} via inorder traversal so the resulting list shape matches the
+  /// legacy {@link QueryResult#_queryStats} contract).
+  ///
+  /// In stream mode the broker's local mailbox path is suppressed for stages 1..N, so brokerResult's _queryStats
+  /// list typically only contains stage 0 plus any pipeline-breaker stages. The session's accumulator carries
+  /// stages 1..N. Where both have an entry for the same stage id, the session wins (avoids double-counting
+  /// pipeline-breaker stats that the upstream server also reported).
+  private QueryResult mergeSessionStatsIntoResult(QueryResult brokerResult, StreamingQuerySession session) {
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    Map<Integer, StageStatsTreeNode> accumulator = coverage.getStageAccumulator();
+
+    int maxStageId = brokerResult.getQueryStats().size() - 1;
+    for (Integer stageId : accumulator.keySet()) {
+      if (stageId > maxStageId) {
+        maxStageId = stageId;
+      }
+    }
+
+    List<MultiStageQueryStats.StageStats.Closed> merged = new ArrayList<>(maxStageId + 1);
+    for (int i = 0; i <= maxStageId; i++) {
+      StageStatsTreeNode sessionTree = accumulator.get(i);
+      if (sessionTree != null) {
+        merged.add(sessionTree.flattenInorder());
+      } else if (i < brokerResult.getQueryStats().size()) {
+        merged.add(brokerResult.getQueryStats().get(i));
+      } else {
+        merged.add(null);
+      }
+    }
+    return new QueryResult(brokerResult.getResultTable(), brokerResult.getProcessingException(), merged,
+        brokerResult.getBrokerReduceTimeMs());
   }
 
   /// Tries to recover from an exception thrown during query dispatching.
@@ -755,6 +909,19 @@ public class QueryDispatcher {
       for (int i = 1; i < numStages; i++) {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
       }
+    }
+
+    /**
+     * Creates a query result from a pre-built per-stage stats list. Used by the {@code SubmitWithStream} path so
+     * the caller can merge the broker's local stage-0 stats with the session accumulator's stages 1..N before
+     * constructing the result.
+     */
+    public QueryResult(@Nullable ResultTable resultTable, @Nullable QueryProcessingException processingException,
+        List<MultiStageQueryStats.StageStats.Closed> queryStats, long brokerReduceTimeMs) {
+      _resultTable = resultTable;
+      _processingException = processingException;
+      _queryStats = queryStats;
+      _brokerReduceTimeMs = brokerReduceTimeMs;
     }
 
     @Nullable
