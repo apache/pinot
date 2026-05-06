@@ -19,7 +19,11 @@
 package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.sql.Timestamp;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -32,16 +36,23 @@ import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 public class ParquetUtils {
+  private ParquetUtils() {
+  }
+
   private static final String DEFAULT_FS = "file:///";
   private static final String AVRO_SCHEMA_METADATA_KEY = "parquet.avro.schema";
   private static final String OLD_AVRO_SCHEMA_METADATA_KEY = "avro.schema";
 
-  private ParquetUtils() {
-  }
+  /// Number of days from the Julian day epoch (4713-01-01 BC) to the Unix day epoch (1970-01-01).
+  public static final long JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH = 2440588;
+
+  private static final long NANOS_PER_DAY = TimeUnit.DAYS.toNanos(1);
 
   /**
    * Returns a ParquetReader with the given path.
@@ -101,5 +112,31 @@ public class ParquetUtils {
     conf.set("parquet.avro.add-list-element-records", "false");
     conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     return conf;
+  }
+
+  /// Converts an epoch `value` interpreted in `unit` (millis / micros / nanos) to [Timestamp].
+  /// Sub-millisecond precision is preserved via [Timestamp#setNanos] (delegates to [TimestampUtils]).
+  public static Timestamp convertLongToTimestamp(long value, LogicalTypeAnnotation.TimeUnit unit) {
+    switch (unit) {
+      case MILLIS:
+        return new Timestamp(value);
+      case MICROS:
+        return TimestampUtils.fromMicrosSinceEpoch(value);
+      case NANOS:
+        return TimestampUtils.fromNanosSinceEpoch(value);
+      default:
+        throw new IllegalArgumentException("Unsupported timestamp unit: " + unit);
+    }
+  }
+
+  /// Converts a 12-byte INT96 timestamp to `Long` epoch nanos. INT96 stores the timestamp split as bytes
+  /// 0..7 (nanos within the day, long, little-endian) and bytes 8..11 (Julian day number, int, little-endian).
+  /// Nanos is INT96's natural unit since this physical encoding carries nanosecond precision; pair with
+  /// [TimestampUtils#fromNanosSinceEpoch] for a [Timestamp].
+  public static long convertInt96ToEpochNanos(byte[] int96Bytes) {
+    ByteBuffer buf = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
+    long days = buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH;
+    long nanosOfDay = buf.getLong(0);
+    return days * NANOS_PER_DAY + nanosOfDay;
   }
 }

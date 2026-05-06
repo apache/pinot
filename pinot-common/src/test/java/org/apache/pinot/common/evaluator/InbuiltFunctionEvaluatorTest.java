@@ -27,7 +27,6 @@ import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -108,9 +107,7 @@ public class InbuiltFunctionEvaluatorTest {
   private void checkBooleanLiteralExpression(String expression, int value) {
     InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
     Object output = evaluator.evaluate(new GenericRow());
-    Class<?> outputValueClass = output.getClass();
-    PinotDataType outputType = FunctionUtils.getArgumentType(outputValueClass);
-    assertNotNull(outputType);
+    PinotDataType outputType = FunctionUtils.getArgumentType(output);
     // as INT is the stored type for BOOLEAN
     assertEquals(outputType.toInt(output), value);
   }

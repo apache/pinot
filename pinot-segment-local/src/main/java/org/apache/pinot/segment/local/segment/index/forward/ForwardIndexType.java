@@ -19,12 +19,18 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
@@ -58,6 +64,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +99,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public ForwardIndexConfig getDefaultConfig() {
-    return ForwardIndexConfig.getDefault();
+    return ForwardIndexConfig.getDefault(FieldConfig.EncodingType.DICTIONARY);
   }
 
   @Override
@@ -110,6 +117,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     String column = fieldSpec.getName();
     CompressionCodec compressionCodec = forwardIndexConfig.getCompressionCodec();
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
+    // Dictionary-encoded forward index requires a dictionary to translate dict ids back to values.
+    if (forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      Preconditions.checkState(dictionaryConfig.isEnabled(),
+          "Dictionary must be enabled for dictionary-encoded forward index column: %s", column);
+    }
     if (dictionaryConfig.isEnabled()) {
       Preconditions.checkState(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
           "Compression codec: %s is not applicable to dictionary encoded column: %s", compressionCodec, column);
@@ -166,32 +178,97 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     return INDEX_DISPLAY_NAME;
   }
 
+  /// Resolves per-column [ForwardIndexConfig] in a single pass over [TableConfig], reconciling the legacy signals
+  /// (`indexingConfig.noDictionaryColumns`, `indexingConfig.noDictionaryConfig`, `fieldConfig.encodingType`,
+  /// `fieldConfig.compressionCodec`) with the modern `fieldConfig.indexes.forward` JSON block. The deserializer
+  /// fails fast on conflicting signals.
   @Override
-  protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializerForLegacyConfigs() {
-    // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
+  protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     return (tableConfig, schema) -> {
-      Map<String, DictionaryIndexConfig> dictConfigs = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+      Map<String, ForwardIndexConfig> result = new HashMap<>();
 
-      Map<String, ForwardIndexConfig> fwdConfig =
-          Maps.newHashMapWithExpectedSize(Math.max(dictConfigs.size(), schema.size()));
+      // Legacy noDictionary signals — both indicate RAW forward index for the listed columns.
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      Set<String> noDictionaryColumns = new HashSet<>();
+      if (indexingConfig.getNoDictionaryColumns() != null) {
+        noDictionaryColumns.addAll(indexingConfig.getNoDictionaryColumns());
+      }
+      Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
+      if (noDictionaryConfig != null) {
+        noDictionaryColumns.addAll(noDictionaryConfig.keySet());
+      }
 
       Collection<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
       if (fieldConfigs != null) {
         for (FieldConfig fieldConfig : fieldConfigs) {
+          String column = fieldConfig.getName();
+          // Pop processed columns so the post-loop scan only emits defaults for columns with no FieldConfig at all.
+          boolean inNoDictionaryList = noDictionaryColumns.remove(column);
+
+          // `forwardIndexDisabled` short-circuits everything else.
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.getDisabled());
-          } else {
-            ForwardIndexConfig config = createConfigFromFieldConfig(fieldConfig);
-            if (!config.equals(ForwardIndexConfig.getDefault())) {
-              fwdConfig.put(fieldConfig.getName(), config);
+            result.put(column, ForwardIndexConfig.getDisabled());
+            continue;
+          }
+
+          // Resolve the forward-index encoding. `FieldConfig.encodingType` is never null (the FieldConfig constructor
+          // defaults it to DICTIONARY when unset), so the per-column override here is the legacy
+          // `noDictionaryColumns` / `noDictionaryConfig` membership — historically these may be set alongside a
+          // FieldConfig that left `encodingType` at the default DICTIONARY.
+          FieldConfig.CompressionCodec fcCodec = fieldConfig.getCompressionCodec();
+          FieldConfig.EncodingType encodingType =
+              inNoDictionaryList ? FieldConfig.EncodingType.RAW : fieldConfig.getEncodingType();
+
+          JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
+          if (forwardIndexNode != null) {
+            Preconditions.checkState(forwardIndexNode.isObject(), "Invalid forward index config for column: %s",
+                column);
+
+            // Conflict: encodingType mismatch between resolved FieldConfig encoding and indexes.forward.
+            JsonNode innerEncodingNode = forwardIndexNode.get("encodingType");
+            if (innerEncodingNode != null && !innerEncodingNode.isNull()) {
+              FieldConfig.EncodingType inner = FieldConfig.EncodingType.valueOf(innerEncodingNode.asText());
+              Preconditions.checkState(inner == encodingType,
+                  "Conflicting forward-index encoding for column: %s — FieldConfig.encodingType=%s but "
+                      + "indexes.forward.encodingType=%s", column, encodingType, inner);
             }
-            // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
-            // the default `fromIndexes` deserializer.
+
+            // Conflict: compressionCodec mismatch between FieldConfig and indexes.forward.
+            JsonNode innerCodecNode = forwardIndexNode.get("compressionCodec");
+            if (innerCodecNode != null && !innerCodecNode.isNull() && fcCodec != null) {
+              FieldConfig.CompressionCodec inner = FieldConfig.CompressionCodec.valueOf(innerCodecNode.asText());
+              Preconditions.checkState(inner == fcCodec,
+                  "Conflicting forward-index compressionCodec for column: %s — FieldConfig.compressionCodec=%s "
+                      + "but indexes.forward.compressionCodec=%s", column, fcCodec, inner);
+            }
+
+            // Inject the resolved encodingType / compressionCodec into the JSON when absent so the resulting
+            // ForwardIndexConfig always matches the column-level signals.
+            ObjectNode configNode = (ObjectNode) forwardIndexNode.deepCopy();
+            if (innerEncodingNode == null || innerEncodingNode.isNull()) {
+              configNode.put("encodingType", encodingType.name());
+            }
+            if ((innerCodecNode == null || innerCodecNode.isNull()) && fcCodec != null) {
+              configNode.put("compressionCodec", fcCodec.name());
+            }
+            try {
+              result.put(column, JsonUtils.jsonNodeToObject(configNode, ForwardIndexConfig.class));
+            } catch (IOException e) {
+              throw new UncheckedIOException(e);
+            }
+          } else {
+            result.put(column, createConfigFromFieldConfig(fieldConfig, encodingType));
           }
         }
       }
-      return fwdConfig;
+
+      // Columns listed in noDictionaryColumns/noDictionaryConfig that have no FieldConfig at all — emit a RAW default.
+      // (Columns with a FieldConfig were already removed from `noDictionaryColumns` above.)
+      for (String column : noDictionaryColumns) {
+        result.put(column, ForwardIndexConfig.getDefault(FieldConfig.EncodingType.RAW));
+      }
+      return result;
     };
   }
 
@@ -200,9 +277,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         props.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED, FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
   }
 
-  private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
-    ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
-    builder.withCompressionCodec(fieldConfig.getCompressionCodec());
+  private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig,
+      FieldConfig.EncodingType resolvedEncodingType) {
+    ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder(resolvedEncodingType)
+        .withCompressionCodec(fieldConfig.getCompressionCodec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);
@@ -250,15 +328,16 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   public String getFileExtension(ColumnMetadata columnMetadata) {
+    boolean isRaw = columnMetadata.getForwardIndexEncoding() == FieldConfig.EncodingType.RAW;
     if (columnMetadata.isSingleValue()) {
-      if (!columnMetadata.hasDictionary()) {
+      if (isRaw) {
         return V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else if (columnMetadata.isSorted()) {
         return V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
       } else {
         return V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
       }
-    } else if (!columnMetadata.hasDictionary()) {
+    } else if (isRaw) {
       return V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
     } else {
       return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;

@@ -68,6 +68,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -342,6 +343,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));
@@ -898,6 +900,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     LOGGER.info("Created forwardIndex. Updating metadata properties for segment={} and column={}", segmentName, column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(true));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.DICTIONARY.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
         String.valueOf(dictionaryCreator.getNumBytesPerEntry()));
     // If realtime segments were completed when the column was RAW, the cardinality value is populated as Integer
@@ -961,6 +964,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         column);
     Map<String, String> metadataProperties = new HashMap<>();
     metadataProperties.put(getKeyFor(column, HAS_DICTIONARY), String.valueOf(false));
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
     metadataProperties.put(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(0));
     // TODO: See https://github.com/apache/pinot/pull/16921 for details
     // metadataProperties.put(getKeyFor(column, BITS_PER_ELEMENT), String.valueOf(-1));

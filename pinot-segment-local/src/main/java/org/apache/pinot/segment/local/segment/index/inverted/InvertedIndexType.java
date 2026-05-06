@@ -30,7 +30,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInve
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
-import org.apache.pinot.segment.local.segment.index.readers.RawValueBitmapInvertedIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -84,6 +83,8 @@ public class InvertedIndexType
     IndexConfig invertedIndexConfig = indexConfigs.getConfig(StandardIndexes.inverted());
     if (invertedIndexConfig.isEnabled()) {
       String column = fieldSpec.getName();
+      Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create inverted index on column: %s without dictionary", column);
       Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
           "Cannot create inverted index on MAP column: %s", column);
     }
@@ -185,7 +186,11 @@ public class InvertedIndexType
       if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.inverted())) {
         return null;
       }
-      if (metadata.isSorted() && metadata.isSingleValue() && metadata.hasDictionary()) {
+      if (!metadata.hasDictionary()) {
+        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+            + "index if it has no dictionary");
+      }
+      if (metadata.isSorted() && metadata.isSingleValue()) {
         ForwardIndexReader fwdReader =
             StandardIndexes.forward().getReaderFactory().createIndexReader(segmentReader, fieldIndexConfigs, metadata);
         Preconditions.checkState(fwdReader instanceof SortedIndexReader);
@@ -203,12 +208,12 @@ public class InvertedIndexType
      */
     public InvertedIndexReader createSkippingForward(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata)
         throws IOException {
-      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
-      if (metadata.hasDictionary()) {
-        return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
-      } else {
-        return new RawValueBitmapInvertedIndexReader(dataBuffer, metadata.getDataType());
+      if (!metadata.hasDictionary()) {
+        throw new IllegalStateException("Column " + metadata.getColumnName() + " cannot be indexed by an inverted "
+            + "index if it has no dictionary");
       }
+      PinotDataBuffer dataBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.inverted());
+      return new BitmapInvertedIndexReader(dataBuffer, metadata.getCardinality());
     }
   }
 

@@ -64,7 +64,6 @@ public enum AggregationFunctionType {
   SUMINT("sumInt", ReturnTypes.AGG_SUM, OperandTypes.INTEGER),
   SUMLONG("sumLong", ReturnTypes.AGG_SUM, OperandTypes.or(OperandTypes.INTEGER, OperandTypes.ARRAY_OF_INTEGER)),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
-  // TODO: Support MV types after next release (see https://github.com/apache/pinot/pull/17109)
   AVG("avg", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   MODE("mode", SqlTypeName.OTHER, SqlTypeName.DOUBLE),
   ANYVALUE("anyValue", ReturnTypes.ARG0, OperandTypes.ANY, SqlTypeName.OTHER),

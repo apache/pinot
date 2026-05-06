@@ -3,7 +3,6 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "1"
   },
   "tenants": {
@@ -11,6 +10,7 @@
   "tableIndexConfig": {
     "loadMode": "HEAP",
     "invertedIndexColumns": [
+      "playerID",
       "teamID"
     ]
   },
@@ -38,11 +38,5 @@
       "SegmentGenerationAndPushTask": {
       }
     }
-  },
-  "fieldConfigList": [
-    {
-      "name": "playerID",
-      "encodingType": "RAW"
-    }
-  ]
+  }
 }

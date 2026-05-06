@@ -25,6 +25,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class ColumnIndexCreators implements Closeable {
   private final String _columnName;
   private final FieldSpec _fieldSpec;
+  private final FieldIndexConfigs _indexConfigs;
   private final SegmentDictionaryCreator _dictionaryCreator; // null for raw columns
   // Indexes whose build lifecycle is not DURING_SEGMENT_CREATION are not included
   private final List<IndexCreator> _indexCreators;
@@ -44,12 +46,13 @@ public class ColumnIndexCreators implements Closeable {
   private volatile boolean _isSealed = false;
   private volatile boolean _isClosed = false;
 
-  public ColumnIndexCreators(String columnName, FieldSpec fieldSpec,
+  public ColumnIndexCreators(String columnName, FieldSpec fieldSpec, FieldIndexConfigs indexConfigs,
       @Nullable SegmentDictionaryCreator dictionaryCreator,
       List<IndexCreator> indexCreators,
       @Nullable NullValueVectorCreator nullValueVectorCreator) {
     _columnName = columnName;
     _fieldSpec = fieldSpec;
+    _indexConfigs = indexConfigs;
     _dictionaryCreator = dictionaryCreator;
     _indexCreators = indexCreators;
     _nullValueVectorCreator = nullValueVectorCreator;
@@ -80,6 +83,13 @@ public class ColumnIndexCreators implements Closeable {
 
   public boolean isDictionaryEncoded() {
     return _isDictionaryEncoded;
+  }
+
+  /// Returns the per-column [FieldIndexConfigs] after `BaseSegmentCreator.adaptConfig` ran. This is the source of
+  /// truth for what was actually built on disk (in particular, the forward-index encoding may have been flipped to
+  /// RAW by the dictionary optimizer even though the original config said DICTIONARY).
+  public FieldIndexConfigs getIndexConfigs() {
+    return _indexConfigs;
   }
 
   public void seal() throws IOException {

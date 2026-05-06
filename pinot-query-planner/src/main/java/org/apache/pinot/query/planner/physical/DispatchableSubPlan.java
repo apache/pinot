@@ -50,14 +50,17 @@ public class DispatchableSubPlan {
   private final Map<Integer, DispatchablePlanFragment> _queryStageMap;
   private final Set<String> _tableNames;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
+  private final long _numSegmentsPrunedByBroker;
 
   public DispatchableSubPlan(PairList<Integer, String> fields,
       Map<Integer, DispatchablePlanFragment> queryStageMap,
-      Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap) {
+      Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap,
+      long numSegmentsPrunedByBroker) {
     _queryResultFields = fields;
     _queryStageMap = queryStageMap;
     _tableNames = tableNames;
     _tableToUnavailableSegmentsMap = tableToUnavailableSegmentsMap;
+    _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
   }
 
   /**
@@ -120,6 +123,10 @@ public class DispatchableSubPlan {
    */
   public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {
     return _tableToUnavailableSegmentsMap;
+  }
+
+  public long getNumSegmentsPrunedByBroker() {
+    return _numSegmentsPrunedByBroker;
   }
 
   /**

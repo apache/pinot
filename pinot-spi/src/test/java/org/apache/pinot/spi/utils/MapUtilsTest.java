@@ -19,6 +19,8 @@
 package org.apache.pinot.spi.utils;
 
 import java.nio.BufferUnderflowException;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -250,5 +252,42 @@ public class MapUtilsTest {
   void testDeserializeInvalidData() {
     // First 4 bytes parse as size = 66051, which the loop then tries to read past end-of-buffer.
     MapUtils.deserializeMap(new byte[]{0, 1, 2, 3});
+  }
+
+  // === JSR-310 — LocalDate / LocalTime values must reach Jackson via the configured ObjectMapper, NOT
+  // crash. The MAP serialization path goes through MapUtils' own writers, separate from JsonUtils', so
+  // this is its own coverage layer. ===
+
+  @Test
+  void testToStringSerializesLocalDateAsIsoString() {
+    Map<String, Object> map = new HashMap<>();
+    map.put("d", LocalDate.of(2022, 2, 8));
+    assertEquals(MapUtils.toString(map), "{\"d\":\"2022-02-08\"}");
+  }
+
+  @Test
+  void testToStringSerializesLocalTimeAsIsoString() {
+    Map<String, Object> map = new HashMap<>();
+    map.put("t", LocalTime.of(12, 34, 56));
+    assertEquals(MapUtils.toString(map), "{\"t\":\"12:34:56\"}");
+  }
+
+  @Test
+  void testSerializeMapWithLocalDateRoundTrips() {
+    // LocalDate goes in, ISO string comes out — serialization is lossy for type info; the contract is
+    // "values are JSON-encoded, downstream coerces by column type".
+    Map<String, Object> map = new HashMap<>();
+    map.put("d", LocalDate.of(2022, 2, 8));
+    Map<String, Object> deserialized = MapUtils.deserializeMap(MapUtils.serializeMap(map));
+    assertEquals(deserialized.get("d"), "2022-02-08");
+  }
+
+  @Test
+  void testToStringSerializesNestedMapWithLocalDate() {
+    Map<String, Object> nested = new HashMap<>();
+    nested.put("d", LocalDate.of(2022, 2, 8));
+    Map<String, Object> map = new HashMap<>();
+    map.put("nested", nested);
+    assertEquals(MapUtils.toString(map), "{\"nested\":{\"d\":\"2022-02-08\"}}");
   }
 }

@@ -3,7 +3,6 @@
   "tableType": "REALTIME",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "timeColumnName": "ts",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",

@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -148,7 +149,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       } else {
         FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
         _colIndexes.put(columnName,
-            new ColumnIndexCreators(columnName, fieldSpec, null, List.of(), null));
+            new ColumnIndexCreators(columnName, fieldSpec,
+                _config.getIndexConfigsByColName().get(columnName), null, List.of(), null));
       }
     }
   }
@@ -172,7 +174,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
     IndexCreationContext.Common context = getIndexCreationContext(fieldSpec, dictEnabledColumn);
 
-    FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnStatistics, _config);
+    FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnStatistics, _config, dictEnabledColumn);
 
     SegmentDictionaryCreator dictionaryCreator = null;
     if (dictEnabledColumn) {
@@ -181,7 +183,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     List<IndexCreator> indexCreators = getIndexCreatorsByColumn(fieldSpec, context, config, dictEnabledColumn);
 
-    return new ColumnIndexCreators(columnName, fieldSpec, dictionaryCreator,
+    return new ColumnIndexCreators(columnName, fieldSpec, config, dictionaryCreator,
         indexCreators, getNullValueCreator(fieldSpec));
   }
 
@@ -307,7 +309,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    * Adapts field index configs based on column properties.
    */
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
-      ColumnStatistics columnStatistics, SegmentGeneratorConfig segmentCreationSpec) {
+      ColumnStatistics columnStatistics, SegmentGeneratorConfig segmentCreationSpec, boolean dictEnabledColumn) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
     // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
     ForwardIndexConfig fwdConfig = config.getConfig(StandardIndexes.forward());
@@ -315,6 +317,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       builder.add(StandardIndexes.forward(),
           new ForwardIndexConfig.Builder(fwdConfig).withLegacyProperties(segmentCreationSpec.getColumnProperties(),
               columnName).build());
+    } else if (fwdConfig.isEnabled() && !dictEnabledColumn
+        && fwdConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      // Segment-time dictionary optimizers (`optimizeDictionary` / `optimizeDictionaryForMetrics`) can flip
+      // dictEnabledColumn=false for a column whose configured encoding is DICTIONARY. Without a dictionary the
+      // forward index must be RAW, so reconcile here before the creator factory branches on encoding.
+      builder.add(StandardIndexes.forward(),
+          new ForwardIndexConfig.Builder(fwdConfig, FieldConfig.EncodingType.RAW).build());
     }
     // Initialize inverted index creator; skip creating inverted index if sorted
     if (columnStatistics.isSorted()) {
@@ -530,10 +539,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     for (Map.Entry<String, ColumnStatistics> entry : _columnStatisticsMap.entrySet()) {
       String column = entry.getKey();
       ColumnStatistics columnStatistics = entry.getValue();
-      SegmentDictionaryCreator dictionaryCreator = _colIndexes.get(column).getDictionaryCreator();
-      int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
+      ColumnIndexCreators columnIndexCreators = _colIndexes.get(column);
+      SegmentDictionaryCreator dictionaryCreator = columnIndexCreators.getDictionaryCreator();
+      boolean hasDictionary = dictionaryCreator != null;
+      int dictionaryElementSize = hasDictionary ? dictionaryCreator.getNumBytesPerEntry() : 0;
+      // Use the adapted (post-`adaptConfig`) FieldIndexConfigs so the persisted encoding matches what was actually
+      // built on disk (the dictionary optimizer may have flipped DICTIONARY to RAW at segment-creation time).
+      ForwardIndexConfig fwdConfig =
+          columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
       addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
-          dictionaryCreator != null, dictionaryElementSize, false);
+          hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
@@ -544,17 +559,18 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
-  /**
-   * Adds column metadata information to the properties configuration.
-   */
+  /// Adds column metadata information to the properties configuration. The `forwardIndexEncoding` is persisted under
+  /// [V1Constants.MetadataKeys.Column#FORWARD_INDEX_ENCODING]; readers loading older segments that lack this key fall
+  /// back to inferring the encoding from `HAS_DICTIONARY`.
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
-      int dictionaryElementSize, boolean autoGenerated) {
+      int dictionaryElementSize, FieldConfig.EncodingType forwardIndexEncoding, boolean autoGenerated) {
     addFieldSpec(properties, column, fieldSpec);
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     int cardinality = columnStatistics.getCardinality();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
+    properties.setProperty(getKeyFor(column, FORWARD_INDEX_ENCODING), forwardIndexEncoding.name());
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnStatistics.isSorted()));
     DataType storedType = fieldSpec.getDataType().getStoredType();
     if (!storedType.isFixedWidth()) {

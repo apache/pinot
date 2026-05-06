@@ -43,8 +43,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _timeColumnName;
   private TimeUnit _timeType;
   @Deprecated  // Use SegmentAssignmentConfig instead
-  private String _segmentAssignmentStrategy;
-  @Deprecated  // Use SegmentAssignmentConfig instead
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
@@ -58,19 +56,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _untrackedSegmentsDeletionBatchSize;
   private String _untrackedSegmentsRetentionTimeUnit;
   private String _untrackedSegmentsRetentionTimeValue;
-
-  /**
-   * @deprecated Use {@link InstanceAssignmentConfig} instead
-   */
-  @Deprecated
-  public String getSegmentAssignmentStrategy() {
-    return _segmentAssignmentStrategy;
-  }
-
-  @Deprecated
-  public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
-    _segmentAssignmentStrategy = segmentAssignmentStrategy;
-  }
 
   public String getTimeColumnName() {
     return _timeColumnName;

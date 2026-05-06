@@ -439,6 +439,38 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         case BIG_DECIMAL_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToBigDecimalValuesMV(valueBlock);
           break;
+        case PRIMITIVE_BOOLEAN_ARRAY: {
+          int[][] intValuesMV = transformFunction.transformToIntValuesMV(valueBlock);
+          int numRows = intValuesMV.length;
+          boolean[][] booleanValuesMV = new boolean[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            int[] intValues = intValuesMV[j];
+            int numValues = intValues.length;
+            boolean[] booleanValues = new boolean[numValues];
+            for (int k = 0; k < numValues; k++) {
+              booleanValues[k] = intValues[k] == 1;
+            }
+            booleanValuesMV[j] = booleanValues;
+          }
+          _nonLiteralValues[i] = booleanValuesMV;
+          break;
+        }
+        case TIMESTAMP_ARRAY: {
+          long[][] longValuesMV = transformFunction.transformToLongValuesMV(valueBlock);
+          int numRows = longValuesMV.length;
+          Timestamp[][] timestampValuesMV = new Timestamp[numRows][];
+          for (int j = 0; j < numRows; j++) {
+            long[] longValues = longValuesMV[j];
+            int numValues = longValues.length;
+            Timestamp[] timestampValues = new Timestamp[numValues];
+            for (int k = 0; k < numValues; k++) {
+              timestampValues[k] = new Timestamp(longValues[k]);
+            }
+            timestampValuesMV[j] = timestampValues;
+          }
+          _nonLiteralValues[i] = timestampValuesMV;
+          break;
+        }
         case STRING_ARRAY:
           _nonLiteralValues[i] = transformFunction.transformToStringValuesMV(valueBlock);
           break;

@@ -51,7 +51,7 @@ public abstract class AbstractRecordReaderTest {
   protected final File _dataFile = new File(_tempDir, getDataFileName());
   protected List<Map<String, Object>> _records;
   protected List<Object[]> _primaryKeys;
-  protected org.apache.pinot.spi.data.Schema _pinotSchema;
+  protected Schema _pinotSchema;
   protected Set<String> _sourceFields;
 
   protected static List<Map<String, Object>> generateRandomRecords(Schema pinotSchema) {
@@ -157,8 +157,8 @@ public abstract class AbstractRecordReaderTest {
     }
   }
 
-  protected org.apache.pinot.spi.data.Schema getPinotSchema() {
-    return new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+  protected Schema getPinotSchema() {
+    return new Schema.SchemaBuilder()
         .addSingleValueDimension("dim_sv_int", FieldSpec.DataType.INT)
         .addSingleValueDimension("dim_sv_long", FieldSpec.DataType.LONG)
         .addSingleValueDimension("dim_sv_float", FieldSpec.DataType.FLOAT)

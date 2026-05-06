@@ -1531,7 +1531,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Convert 'DestCityName' to v6 raw index (delta-encoded chunk header)
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(6).build();
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(6)
+        .build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     FieldConfig fieldConfig =
@@ -1552,7 +1554,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Convert 'DestCityName' to v2 raw index by modifying existing FieldConfig
     fieldConfigs = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigs);
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(2).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withRawIndexWriterVersion(2)
+        .build();
     indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
@@ -1567,7 +1571,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(v2RawIndexSize > v4rawIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.SNAPPY)
+        .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
@@ -1590,7 +1596,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4SnappyRawIndexSize);
 
     // Adding 'LZ4' compression explicitly should trigger the conversion
-    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.LZ4).build();
+    forwardIndexConfig = new ForwardIndexConfig.Builder(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(CompressionCodec.LZ4)
+        .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
     fieldConfig =
         new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();

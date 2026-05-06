@@ -283,7 +283,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
    */
   private AbstractColumnStatisticsCollector createKeyStatsCollector(String key, Object value) {
     // Get the type of the value
-    PinotDataType type = PinotDataType.getSingleValueType(value.getClass());
+    PinotDataType type = PinotDataType.getSingleValueType(value);
     return createKeyStatsCollector(key, convertToDataType(type));
   }
 

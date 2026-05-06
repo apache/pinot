@@ -824,7 +824,9 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         assertFalse(hasDictionary);
         IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
         FieldIndexConfigs fieldIndexConfigs =
-            new FieldIndexConfigs.Builder().add(StandardIndexes.forward(), ForwardIndexConfig.getDefault()).build();
+            new FieldIndexConfigs.Builder()
+                .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
+                .build();
         try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
             columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
@@ -1514,8 +1516,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     // Require to add some default columns with new schema.
     verifyProcessNeeded();
 
-    // No preprocessing needed if required to add certain index on non-existing or sorted column.
-    // Note: Inverted indexes on raw columns are now supported and will require processing.
+    // No preprocessing needed if required to add certain index on non-existing, sorted or raw column.
     // Add inverted index to sorted column
     _invertedIndexColumns.add("daysSinceEpoch");
     verifyProcessNotNeeded();
@@ -1524,6 +1525,10 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
     _rangeIndexColumns.add("daysSinceEpoch");
     verifyProcessNotNeeded();
     _rangeIndexColumns.remove("daysSinceEpoch");
+    // Add inverted index to raw column
+    _invertedIndexColumns.add(EXISTING_STRING_COL_RAW);
+    verifyProcessNotNeeded();
+    _invertedIndexColumns.remove(EXISTING_STRING_COL_RAW);
     // Add inverted index to non-existing column
     _invertedIndexColumns.add("newColumnX");
     verifyProcessNotNeeded();
