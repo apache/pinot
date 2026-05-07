@@ -50,9 +50,6 @@ public class IdentifierTransformFunction implements TransformFunction {
   }
 
   private static boolean forwardIndexIsDictEncoded(ColumnContext columnContext) {
-    if (columnContext.getDataSource() == null) {
-      return false;
-    }
     var forwardIndex = columnContext.getDataSource().getForwardIndex();
     return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
