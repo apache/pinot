@@ -101,8 +101,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   private static final List<IndexType<?, ?, ?>> DICTIONARY_BASED_INDEXES_TO_REWRITE =
       Arrays.asList(StandardIndexes.range(), StandardIndexes.fst(), StandardIndexes.inverted());
 
+  /// Re-enable operations are split by target encoding so the intent is explicit at the operation level: a
+  /// `forwardIndex.disabled` column being re-enabled may want to come back as either dict-encoded or raw,
+  /// depending on the new config. Both variants flow through the same regenerate-from-inverted-index path
+  /// (only the output writer differs), but having them as distinct operations makes the call site readable
+  /// and the test assertions specific.
   protected enum Operation {
-    DISABLE_FORWARD_INDEX, ENABLE_FORWARD_INDEX, DISABLE_DICTIONARY, ENABLE_DICTIONARY, CHANGE_INDEX_COMPRESSION_TYPE
+    DISABLE_FORWARD_INDEX, ENABLE_DICT_FORWARD_INDEX, ENABLE_RAW_FORWARD_INDEX, DISABLE_DICTIONARY,
+    ENABLE_DICTIONARY, CHANGE_INDEX_COMPRESSION_TYPE
   }
 
   @VisibleForTesting
@@ -145,21 +151,23 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             // handlers that need the forward index to construct their own indexes will have it available.
             _tmpForwardIndexColumns.add(column);
             break;
-          case ENABLE_FORWARD_INDEX:
+          case ENABLE_DICT_FORWARD_INDEX: {
             ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, column, false);
-            if (columnMetadata.hasDictionary()) {
-              if (!segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
-                throw new IllegalStateException(String.format(
-                    "Dictionary should still exist after rebuilding forward index for dictionary column: %s", column));
-              }
-            } else {
-              if (segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
-                throw new IllegalStateException(
-                    String.format("Dictionary should not exist after rebuilding forward index for raw column: %s",
-                        column));
-              }
+            if (!columnMetadata.hasDictionary() || !segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
+              throw new IllegalStateException(String.format(
+                  "Dictionary should still exist after rebuilding dict-encoded forward index for column: %s", column));
             }
             break;
+          }
+          case ENABLE_RAW_FORWARD_INDEX: {
+            ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, column, false);
+            if (columnMetadata.hasDictionary() || segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
+              throw new IllegalStateException(
+                  String.format("Dictionary should not exist after rebuilding raw forward index for column: %s",
+                      column));
+            }
+            break;
+          }
           case DISABLE_DICTIONARY:
             if (forwardIndexDisabledColumns.contains(column)) {
               disableDictionary(column, segmentWriter, "Disable dictionary when no forward index exists");
@@ -223,8 +231,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         continue;
       }
 
+      // Forward-index encoding is the source-of-truth for "does forward exist and how is it laid out". Three
+      // states: DICTIONARY (dict-encoded forward), RAW (raw forward), null (forward disabled / not on disk).
+      FieldConfig.EncodingType existingFwdEncoding = existingForwardIndexColumns.contains(column)
+          ? _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column).getForwardIndexEncoding() : null;
+      ForwardIndexConfig newFwdConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
+      FieldConfig.EncodingType newFwdEncoding = newFwdConf.isEnabled() ? newFwdConf.getEncodingType() : null;
+
       List<Operation> ops = computeColumnOperations(column, fieldSpec, segmentReader,
-          existingDictColumns.contains(column), existingForwardIndexColumns.contains(column),
+          existingDictColumns.contains(column), existingFwdEncoding, newFwdEncoding,
           existingInvertedIndexColumns.contains(column), segmentName);
       if (!ops.isEmpty()) {
         columnOperationsMap.put(column, ops);
@@ -240,7 +255,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   /// Compute the operations needed to bring one column from its existing on-disk state to the desired state in
   /// the new config. The logic decomposes into four orthogonal questions, computed in this order:
   ///
-  /// 1. **Forward-index transition** — based purely on `existingHasFwd` vs `newIsFwd`.
+  /// 1. **Forward-index transition** — based on `existingFwdEncoding` vs `newFwdEncoding` (each is one of
+  ///    `DICTIONARY`, `RAW`, or `null` for "forward index disabled / not on disk").
   /// 2. **Dictionary transition** — based on `existingHasDict` vs `desiredDict`, where
   ///    `desiredDict = newIsDict || any-enabled-index-requires-dict`. The "force on if required" rule is the
   ///    only place this method consults other indexes — once `desiredDict` is computed, the rest of the logic
@@ -250,14 +266,16 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   ///    with disabling the dictionary; enabling forward needs dict + inverted on disk; enabling dict needs
   ///    forward to be on so the dict can be bootstrapped.
   private List<Operation> computeColumnOperations(String column, FieldSpec fieldSpec,
-      SegmentDirectory.Reader segmentReader, boolean existingHasDict, boolean existingHasFwd,
+      SegmentDirectory.Reader segmentReader, boolean existingHasDict,
+      @Nullable FieldConfig.EncodingType existingFwdEncoding, @Nullable FieldConfig.EncodingType newFwdEncoding,
       boolean existingHasInverted, String segmentName)
       throws Exception {
     FieldIndexConfigs newConf = _fieldIndexConfigs.get(column);
-    boolean newIsFwd = newConf.getConfig(StandardIndexes.forward()).isEnabled();
     boolean newIsDict = newConf.getConfig(StandardIndexes.dictionary()).isEnabled();
     boolean newIsRange = newConf.getConfig(StandardIndexes.range()).isEnabled();
     ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    boolean existingHasFwd = existingFwdEncoding != null;
+    boolean newHasFwd = newFwdEncoding != null;
 
     // Force the dictionary on whenever any enabled index requires it — otherwise that index would be left
     // orphaned after reload. This is the only place where index-level dependencies feed into the dictionary
@@ -267,8 +285,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     List<Operation> ops = new ArrayList<>(2);
 
-    // 1. Forward-index transition.
-    if (existingHasFwd != newIsFwd) {
+    // 1. Forward-index transition (purely on/off — encoding flips DICT⇄RAW are driven by dict transitions).
+    if (existingHasFwd != newHasFwd) {
       if (columnMetadata != null && columnMetadata.isSorted()) {
         LOGGER.warn("Trying to {} the forward index for a sorted column: {} of segment: {}, ignoring",
             existingHasFwd ? "disable" : "enable", column, segmentName);
@@ -288,7 +306,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
               existingHasInverted ? "enabled" : "disabled");
           return ops;
         }
-        ops.add(Operation.ENABLE_FORWARD_INDEX);
+        ops.add(newFwdEncoding == FieldConfig.EncodingType.RAW
+            ? Operation.ENABLE_RAW_FORWARD_INDEX : Operation.ENABLE_DICT_FORWARD_INDEX);
         return ops;
       }
     }
@@ -314,7 +333,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
     } else if (!existingHasDict && desiredDict) {
       // Dict can only be created from forward values, so refuse if forward will be off in the final state.
-      Preconditions.checkState(existingHasFwd || newIsFwd, String.format(
+      Preconditions.checkState(existingHasFwd || newHasFwd, String.format(
           "Cannot regenerate the dictionary for column: %s of segment: %s with forward index disabled. Please "
               + "refresh or back-fill the data to add back the forward index", column, segmentName));
       // If an index requires the dict, always enable it. Otherwise apply the optimize-dictionary heuristic so
@@ -326,8 +345,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
 
     // 3. Compression-type change (only when no encoding change happened).
-    if (ops.isEmpty() && existingHasFwd && newIsFwd && existingHasDict == desiredDict) {
-      if (!isForwardIndexDictionaryEncoded(column)) {
+    if (ops.isEmpty() && existingFwdEncoding != null && existingFwdEncoding == newFwdEncoding
+        && existingHasDict == desiredDict) {
+      if (existingFwdEncoding == FieldConfig.EncodingType.RAW) {
         // TODO: Also check if raw index version needs to be changed
         if (shouldChangeRawCompressionType(column, segmentReader)) {
           ops.add(Operation.CHANGE_INDEX_COMPRESSION_TYPE);

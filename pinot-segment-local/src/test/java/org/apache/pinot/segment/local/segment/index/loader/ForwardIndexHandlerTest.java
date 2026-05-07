@@ -913,13 +913,15 @@ public class ForwardIndexHandlerTest {
       _invertedIndexColumns.remove(column);
       _fieldConfigMap.put(column,
           new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
-      assertEquals(computeOperations(), Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+      assertEquals(computeOperations(),
+          Map.of(column, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
 
       // TEST2: Enable forward index in dictionary format for a column with forward index disabled
       resetIndexConfigs();
       _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_BYTES);
       assertEquals(computeOperations(),
-          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_BYTES, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_BYTES,
+              List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX)));
 
       // TEST3: Enable forward index in raw format for a column with forward index disabled. Remove column from inverted
       // index as well (inverted index needs dictionary)
@@ -930,7 +932,8 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_MV_FORWARD_INDEX_DISABLED_INTEGER, FieldConfig.EncodingType.RAW, List.of(),
               CompressionCodec.LZ4, null));
       assertEquals(computeOperations(),
-          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_INTEGER, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_INTEGER,
+              List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
 
       // TEST4: Enable forward index in dictionary format for two columns with forward index disabled. Disable inverted
       // index for one of them
@@ -939,8 +942,8 @@ public class ForwardIndexHandlerTest {
       _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_LONG);
       _fieldConfigMap.remove(DIM_MV_FORWARD_INDEX_DISABLED_STRING);
       assertEquals(computeOperations(),
-          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX),
-              DIM_MV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX),
+              DIM_MV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX)));
 
       // TEST5: Enable forward index in raw format for two columns with forward index disabled. Remove column from
       // inverted index as well (inverted index needs dictionary)
@@ -956,8 +959,8 @@ public class ForwardIndexHandlerTest {
           new FieldConfig(DIM_MV_FORWARD_INDEX_DISABLED_LONG, FieldConfig.EncodingType.RAW, List.of(),
               CompressionCodec.LZ4, null));
       assertEquals(computeOperations(),
-          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX),
-              DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_SV_FORWARD_INDEX_DISABLED_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX),
+              DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
 
       // TEST6: Enable forward index in dictionary format and one in raw format for columns with forward index disabled
       resetIndexConfigs();
@@ -968,8 +971,8 @@ public class ForwardIndexHandlerTest {
               CompressionCodec.LZ4, null));
       _fieldConfigMap.remove(DIM_SV_FORWARD_INDEX_DISABLED_BYTES);
       assertEquals(computeOperations(),
-          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX),
-              DIM_SV_FORWARD_INDEX_DISABLED_BYTES, List.of(ForwardIndexHandler.Operation.ENABLE_FORWARD_INDEX)));
+          Map.of(DIM_MV_FORWARD_INDEX_DISABLED_LONG, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX),
+              DIM_SV_FORWARD_INDEX_DISABLED_BYTES, List.of(ForwardIndexHandler.Operation.ENABLE_DICT_FORWARD_INDEX)));
 
       // TEST7: Enable forward index for a raw column with forward index disabled and keep it as raw
       resetIndexConfigs();
