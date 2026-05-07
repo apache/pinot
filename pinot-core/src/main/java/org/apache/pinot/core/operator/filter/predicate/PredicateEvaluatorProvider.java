@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
@@ -41,11 +42,13 @@ public class PredicateEvaluatorProvider {
   }
 
   /// Single public entry point. Callers must decide what to pass:
-  /// - Column callers (FilterPlanNode, ExpressionFilterOperator, etc.) pass the column's `DataSource` so the
-  ///   gating logic in {@link #getDictionaryUsableForFiltering} can pick between dict-based and raw-value
-  ///   evaluation for shared-dict + RAW columns.
-  /// - Callers without a `DataSource` (post-reduction matchers, non-column transforms) pass `null`. The
-  ///   evaluator will be built from raw values using the supplied `dataType`.
+  /// - Leaf-filter callers (FilterPlanNode, ExpressionFilterOperator) pass the column's `DataSource` so the
+  ///   gating logic in {@link #getDictionaryUsableForFiltering} can keep the dictionary when a dict-consuming
+  ///   filter operator (sorted/inverted/range) will actually run.
+  /// - Callers without a `DataSource` (post-reduction matchers, intermediate-result aggregators) pass `null`.
+  /// - Transform-layer callers (BinaryOperatorTransformFunction) must only pass `DataSource` when the inner
+  ///   transform's `getDictionary()` is non-null — i.e. the underlying forward index is dict-encoded so the
+  ///   transform can supply dict ids cheaply. For shared-dict + RAW forward, pass `null` here.
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable DataSource dataSource,
       DataType dataType, @Nullable QueryContext queryContext) {
     Dictionary dictionary = dataSource != null ? getDictionaryUsableForFiltering(dataSource, queryContext, predicate)
@@ -111,23 +114,23 @@ public class PredicateEvaluatorProvider {
   ///
   /// When the forward index is RAW, scan-based filtering reads raw values rather than dict IDs, so a dict-based
   /// predicate evaluator (which only implements `applySV(int dictId)`) cannot be applied during scan. The
-  /// dictionary is only useful when the planner will pick a dict-consuming filter operator AND that operator is
-  /// enabled for this query. The decision must be made per-predicate-type because each predicate type uses a
+  /// dictionary is only useful when the planner will pick a dict-consuming filter operator that resolves the
+  /// predicate fully (no scan fallback). The decision is per-predicate-type because each predicate type uses a
   /// different subset of dict-consuming operators (see `FilterOperatorUtils.getLeafFilterOperator`):
   ///
-  /// - `RANGE`: sorted-index and range-index paths consume the dictionary. The range-index format is chosen at
-  ///   segment build time based on whether a dictionary exists (`RangeIndexType#createIndexCreator`) — when a
-  ///   dictionary is present, the range index stores dict IDs, even if the forward index is RAW.
-  /// - `REGEXP_LIKE`: sorted and inverted paths consume the dictionary (when a dict-id-based regex evaluator is
-  ///   built). FST/IFST handle their own evaluators upstream of this method.
-  /// - `EQ`: sorted, inverted, and exact-range paths consume the dictionary. Range-index serves EQ only when
-  ///   `isExact()` is true (see `RangeIndexBasedFilterOperator#canEvaluate`).
-  /// - `NOT_EQ / IN / NOT_IN`: only sorted and inverted paths consume the dictionary.
+  /// - `RANGE`: only the range-index path can consume the dictionary on a RAW column. (Sorted index implies a
+  ///   dict-encoded forward index, so it cannot apply here.) Furthermore, the range index must be exact —
+  ///   non-exact (legacy) range readers fall back to `ScanBasedFilterOperator` for partial matches, which feeds
+  ///   raw forward-index values into the predicate evaluator and breaks if the evaluator is dict-based.
+  /// - `REGEXP_LIKE / NOT_EQ / IN / NOT_IN`: only the inverted-index path consumes the dictionary on a RAW
+  ///   column. FST/IFST handle their own evaluators upstream of this method.
+  /// - `EQ`: inverted index, plus exact range index (see `RangeIndexBasedFilterOperator#canEvaluate`).
   ///
   /// If the forward index itself is missing (explicitly disabled), scan is impossible and dict-based eval is the
   /// only option, so the dictionary is preserved regardless of predicate type.
+  @VisibleForTesting
   @Nullable
-  public static Dictionary getDictionaryUsableForFiltering(DataSource dataSource, @Nullable QueryContext queryContext,
+  static Dictionary getDictionaryUsableForFiltering(DataSource dataSource, @Nullable QueryContext queryContext,
       Predicate predicate) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary == null) {
@@ -138,27 +141,23 @@ public class PredicateEvaluatorProvider {
       return dictionary;
     }
     // RAW forward index: keep the dictionary only if a dict-consuming filter operator is available AND enabled for
-    // this predicate type.
-    boolean sortedAvailable = dataSource.getDataSourceMetadata().isSorted()
-        && isIndexAllowedForQuery(queryContext, dataSource, FieldConfig.IndexType.SORTED);
+    // this predicate type. NOTE: a sorted forward index is run-length dict-encoded by definition, so the sorted
+    // path is unreachable from this RAW branch — only inverted and (exact) range remain.
     boolean invertedAvailable = dataSource.getInvertedIndex() != null
         && isIndexAllowedForQuery(queryContext, dataSource, FieldConfig.IndexType.INVERTED);
     RangeIndexReader<?> rangeIndex = dataSource.getRangeIndex();
-    boolean rangeAvailable = rangeIndex != null
+    boolean exactRangeAvailable = rangeIndex != null && rangeIndex.isExact()
         && isIndexAllowedForQuery(queryContext, dataSource, FieldConfig.IndexType.RANGE);
     switch (predicate.getType()) {
       case RANGE:
-        // Range index always serves RANGE predicates; when a dictionary exists the range index is built over dict
-        // IDs and requires the dict-based evaluator.
-        return (sortedAvailable || rangeAvailable) ? dictionary : null;
+        return exactRangeAvailable ? dictionary : null;
       case EQ:
-        // Range index serves EQ only when isExact() is true; otherwise EQ falls through to scan.
-        return (sortedAvailable || invertedAvailable || (rangeAvailable && rangeIndex.isExact())) ? dictionary : null;
+        return (invertedAvailable || exactRangeAvailable) ? dictionary : null;
       case REGEXP_LIKE:
       case NOT_EQ:
       case IN:
       case NOT_IN:
-        return (sortedAvailable || invertedAvailable) ? dictionary : null;
+        return invertedAvailable ? dictionary : null;
       default:
         return dictionary;
     }

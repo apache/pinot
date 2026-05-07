@@ -99,19 +99,6 @@ public class PredicateEvaluatorProviderTest {
   }
 
   /**
-   * RAW forward index with dictionary on a sorted column — keep the dictionary so the sorted-index path can be used.
-   */
-  @Test
-  public void rawForwardWithDictAndSortedColumnKeepsDictEvaluator() {
-    DataSource dataSource = mockDataSource("col", FieldSpec.DataType.STRING, /*sorted=*/true,
-        /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/false, /*range=*/false, /*rangeExact=*/false);
-    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(eqPredicate("col", "value-1"),
-        dataSource, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
-    assertTrue(evaluator.isDictionaryBased(),
-        "Sorted column with dict must keep dict-based evaluator for sorted-index lookup");
-  }
-
-  /**
    * Forward index disabled (e.g. forward-index-disabled column) — leave dictionary in place because scan is impossible.
    */
   @Test
@@ -153,6 +140,21 @@ public class PredicateEvaluatorProviderTest {
         mockQueryContext(/*allowAllIndexes=*/true), rangePredicate("col", "(5\t\t15)"));
     assertNotNull(result,
         "RANGE predicate on dict-id-based range index must keep dict so range reader receives dict-id evaluator");
+  }
+
+  /**
+   * RAW forward + dictionary + non-exact (legacy) range index + RANGE predicate. Non-exact range readers fall
+   * back to ScanBasedFilterOperator for partial matches; that scan applies the predicate evaluator on raw forward
+   * values, so a dict-based evaluator would be misapplied. The dictionary must be dropped.
+   */
+  @Test
+  public void rawForwardWithDictAndNonExactRangeIndexDropsDictForRangePredicate() {
+    DataSource dataSource = mockDataSource("col", FieldSpec.DataType.INT, /*sorted=*/false,
+        /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/false, /*range=*/true, /*rangeExact=*/false);
+    Dictionary result = PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource,
+        mockQueryContext(/*allowAllIndexes=*/true), rangePredicate("col", "(5\t\t15)"));
+    assertNull(result,
+        "Non-exact range index falls back to scan; dict must be dropped so scan uses raw-value evaluator");
   }
 
   /**
@@ -211,20 +213,6 @@ public class PredicateEvaluatorProviderTest {
             ExpressionContext.forIdentifier("col"), "7"));
     assertNull(result,
         "NOT_EQ never consults the range index; dict must be dropped so scan uses raw-value evaluator");
-  }
-
-  /**
-   * RAW forward + dictionary + sorted column + RANGE predicate. The sorted-index path consumes the dictionary, so
-   * the planner must keep it.
-   */
-  @Test
-  public void rawForwardWithDictAndSortedKeepsDictForRangePredicate() {
-    DataSource dataSource = mockDataSource("col", FieldSpec.DataType.INT, /*sorted=*/true,
-        /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/false, /*range=*/false, /*rangeExact=*/false);
-    Dictionary result = PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource,
-        mockQueryContext(/*allowAllIndexes=*/true), rangePredicate("col", "(5\t\t15)"));
-    assertNotNull(result,
-        "Sorted column must keep dict for sorted-index path on RANGE predicate");
   }
 
   /**

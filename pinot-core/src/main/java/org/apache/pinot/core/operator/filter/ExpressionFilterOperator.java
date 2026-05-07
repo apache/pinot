@@ -37,7 +37,6 @@ import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.operator.transform.function.IdentifierTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -75,15 +74,13 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       _predicateEvaluator = null;
     } else {
 
-      // When the inner expression is a direct column reference, hand its DataSource to the evaluator so
-      // gating logic picks the right path; otherwise (computed transform) the evaluator falls back to
-      // raw-value matching against the transform output.
-      DataSource innerDataSource = null;
-      if (_transformFunction instanceof IdentifierTransformFunction) {
-        innerDataSource = _dataSourceMap.get(((IdentifierTransformFunction) _transformFunction).getColumnName());
-      }
+      // The inner expression is a function (FilterPlanNode dispatches direct column refs through the
+      // leaf-filter path), and ExpressionScanDocIdIterator scans the transform output and applies
+      // applySV(value) on raw values. So no DataSource is propagated — the evaluator is always built
+      // against raw values. (If a future caller passes an Identifier here, it must mirror the gate in
+      // BinaryOperatorTransformFunction: only pass DataSource when the inner getDictionary() is non-null.)
       _predicateEvaluator =
-          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, innerDataSource,
+          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null,
               _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }

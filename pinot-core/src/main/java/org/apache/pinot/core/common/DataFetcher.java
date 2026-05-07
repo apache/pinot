@@ -84,7 +84,14 @@ public class DataFetcher implements AutoCloseable {
     // looking up dict ids would require a per-row Dictionary#indexOf call. Drop the dictionary here so
     // ColumnValueReader takes the raw-value paths uniformly; callers that genuinely need dict ids on a
     // RAW + shared-dict column must read raw values and consult the dictionary directly.
-    Dictionary dictionary = forwardIndexReader.isDictionaryEncoded() ? dataSource.getDictionary() : null;
+    Dictionary dictionary;
+    if (forwardIndexReader.isDictionaryEncoded()) {
+      dictionary = dataSource.getDictionary();
+      Preconditions.checkState(dictionary != null,
+          "Forward index for column: %s is dictionary-encoded but no dictionary is available", column);
+    } else {
+      dictionary = null;
+    }
     ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dictionary);
     _columnValueReaderMap.put(column, columnValueReader);
   }

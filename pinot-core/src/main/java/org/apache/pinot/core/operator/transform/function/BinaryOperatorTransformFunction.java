@@ -121,12 +121,15 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           _rightTransformFunction.getName(), _rightStoredType));
     }
 
-    // Create predicate evaluator when the right side is a literal. When the LHS is a direct column
-    // reference, hand its DataSource to the evaluator so the gating logic can pick the right path; for
-    // computed transforms the predicate evaluator falls back to raw-value matching.
+    // Create predicate evaluator when the right side is a literal. Hand the column's DataSource to the
+    // evaluator only when the inner transform exposes a usable dictionary — i.e. its forward index is
+    // dict-encoded so transformToDictIdsSV can serve dict ids cheaply. For RAW (including shared-dict +
+    // RAW) the inner transform returns null from getDictionary(), and we must pass null here so the
+    // predicate evaluator falls back to raw-value matching.
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
       DataSource leftDataSource = null;
-      if (_leftTransformFunction instanceof IdentifierTransformFunction) {
+      if (_leftTransformFunction instanceof IdentifierTransformFunction
+          && _leftTransformFunction.getDictionary() != null) {
         IdentifierTransformFunction lhs = (IdentifierTransformFunction) _leftTransformFunction;
         leftDataSource = columnContextMap.get(lhs.getColumnName()).getDataSource();
       }

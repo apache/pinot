@@ -91,6 +91,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       // forward index to actually be dict-encoded. Columns with a shared dictionary on a RAW forward index
       // (dict file exists but forward stores raw values) would otherwise be misrouted into the dict-id
       // path; gate on forward-index encoding so they take the no-dict GROUP BY path instead.
+      // ColumnContext.getDataSource() is null for computed (non-identifier) transforms; in that case
+      // getDictionary() == null already covers them via the first condition.
       hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null
           || (columnContext.getDataSource() != null
           && columnContext.getDataSource().getForwardIndex() != null
