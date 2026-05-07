@@ -83,6 +83,9 @@ public class IdentifierTransformFunctionTest {
     when(_blockValSet.getIntValuesSV()).thenReturn(INT_VALUES);
     when(_blockValSet.getNullBitmap()).thenReturn(NULL_BITMAP);
     when(_projectionBlock.getBlockValueSet(TEST_COLUMN_NAME)).thenReturn(_blockValSet);
+    when(_columnContext.getDataType()).thenReturn(FieldSpec.DataType.INT);
+    when(_columnContext.isSingleValue()).thenReturn(true);
+    when(_columnContext.getDictionary()).thenReturn(_dictionary);
     when(_columnContext.getDataSource()).thenReturn(_dataSource);
     when(_dataSource.getDictionary()).thenReturn(_dictionary);
     when(_dataSource.getDataSourceMetadata()).thenReturn(_metadata);
@@ -103,5 +106,18 @@ public class IdentifierTransformFunctionTest {
     RoaringBitmap bitmap = identifierTransformFunction.getNullBitmap(_projectionBlock);
     Assert.assertEquals(bitmap, NULL_BITMAP);
     Assert.assertEquals(identifierTransformFunction.transformToIntValuesSV(_projectionBlock), INT_VALUES);
+  }
+
+  @Test
+  public void testDataSource() {
+    IdentifierTransformFunction identifierTransformFunction =
+        new IdentifierTransformFunction(TEST_COLUMN_NAME, _columnContext);
+
+    Assert.assertSame(identifierTransformFunction.getDataSource(), _dataSource);
+    ColumnContext transformColumnContext = ColumnContext.fromTransformFunction(identifierTransformFunction);
+    Assert.assertSame(transformColumnContext.getDataSource(), _dataSource);
+    Assert.assertSame(transformColumnContext.getDictionary(), _dictionary);
+    Assert.assertEquals(transformColumnContext.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertTrue(transformColumnContext.isSingleValue());
   }
 }

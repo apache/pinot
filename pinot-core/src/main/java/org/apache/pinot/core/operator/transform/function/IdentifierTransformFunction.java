@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -36,11 +37,13 @@ import org.roaringbitmap.RoaringBitmap;
 public class IdentifierTransformFunction implements TransformFunction {
   private final String _columnName;
   private final Dictionary _dictionary;
+  private final DataSource _dataSource;
   private final TransformResultMetadata _resultMetadata;
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
     _dictionary = columnContext.getDictionary();
+    _dataSource = columnContext.getDataSource();
     _resultMetadata =
         new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
   }
@@ -68,6 +71,12 @@ public class IdentifierTransformFunction implements TransformFunction {
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
+  }
+
+  @Nullable
+  @Override
+  public DataSource getDataSource() {
+    return _dataSource;
   }
 
   @Override

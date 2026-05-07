@@ -50,15 +50,16 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     super.init(arguments, columnContextMap);
 
     TransformFunction columnArg = arguments.get(0);
-    if (!(columnArg instanceof IdentifierTransformFunction && columnArg.getResultMetadata().isSingleValue())) {
+    if (!columnArg.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
           "The first argument of TEXT_MATCH transform function must be a single-valued column");
     }
-    String columnName = ((IdentifierTransformFunction) columnArg).getColumnName();
-    DataSource dataSource = columnContextMap.get(columnName).getDataSource();
+    DataSource dataSource = columnArg.getDataSource();
     if (dataSource == null) {
-      throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
+      throw new IllegalArgumentException(
+          "The first argument of TEXT_MATCH transform function must be backed by a segment data source");
     }
+    String columnName = dataSource.getDataSourceMetadata().getFieldSpec().getName();
     TextIndexReader indexReader = dataSource.getTextIndex();
     if (indexReader == null) {
       indexReader = dataSource.getMultiColumnTextIndex();

@@ -68,6 +68,6 @@ public class ColumnContext {
   public static ColumnContext fromTransformFunction(TransformFunction transformFunction) {
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
     return new ColumnContext(resultMetadata.getDataType(), resultMetadata.isSingleValue(),
-        transformFunction.getDictionary(), null);
+        transformFunction.getDictionary(), transformFunction.getDataSource());
   }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -41,6 +42,7 @@ public class ItemTransformFunction extends BaseTransformFunction {
   TransformFunction _mapValue;
   TransformFunction _keyValue;
   Dictionary _keyDictionary;
+  private DataSource _dataSource;
   private TransformResultMetadata _resultMetadata;
 
   @Override
@@ -72,11 +74,12 @@ public class ItemTransformFunction extends BaseTransformFunction {
 
     // The metadata about the values that this operation will resolve to is determined by the type of the data
     // under the key, not by the Map column.  So we need to look up the Key's Metadata.
-    DataSource dataSource = columnContextMap.get(_column).getDataSource();
+    DataSource dataSource = _mapValue.getDataSource();
 
     if (dataSource instanceof MapDataSource) {
       MapDataSource mapDS = (MapDataSource) dataSource;
       DataSource keyDS = mapDS.getKeyDataSource(_key);
+      _dataSource = keyDS;
       FieldSpec.DataType keyType = keyDS.getDataSourceMetadata().getDataType().getStoredType();
       _keyDictionary = keyDS.getDictionary();
       _resultMetadata =
@@ -101,6 +104,12 @@ public class ItemTransformFunction extends BaseTransformFunction {
   @Override
   public Dictionary getDictionary() {
     return _keyDictionary;
+  }
+
+  @Nullable
+  @Override
+  public DataSource getDataSource() {
+    return _dataSource;
   }
 
   @Override

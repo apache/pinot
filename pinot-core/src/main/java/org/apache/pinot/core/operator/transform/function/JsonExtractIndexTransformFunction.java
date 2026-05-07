@@ -28,6 +28,7 @@ import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
@@ -70,22 +71,21 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
 
     TransformFunction firstArgument = arguments.get(0);
-    if (firstArgument instanceof IdentifierTransformFunction) {
-      String columnName = ((IdentifierTransformFunction) firstArgument).getColumnName();
-      _jsonIndexReader = columnContextMap.get(columnName).getDataSource().getJsonIndex();
-      if (_jsonIndexReader == null) { //TODO: rework
-        Optional<IndexType<?, ?, ?>> compositeIndex =
-            IndexService.getInstance().getOptional("composite_json_index");
+    DataSource dataSource = firstArgument.getDataSource();
+    if (dataSource != null) {
+      _jsonIndexReader = dataSource.getJsonIndex();
+      if (_jsonIndexReader == null) { // TODO: rework
+        Optional<IndexType<?, ?, ?>> compositeIndex = IndexService.getInstance().getOptional("composite_json_index");
         if (compositeIndex.isPresent()) {
-          _jsonIndexReader = (JsonIndexReader) columnContextMap.get(columnName)
-              .getDataSource().getIndex(compositeIndex.get());
+          _jsonIndexReader = (JsonIndexReader) dataSource.getIndex(compositeIndex.get());
         }
       }
       if (_jsonIndexReader == null) {
         throw new IllegalStateException("jsonExtractIndex can only be applied on a column with JSON index");
       }
     } else {
-      throw new IllegalArgumentException("jsonExtractIndex can only be applied to a raw column");
+      throw new IllegalArgumentException(
+          "The first argument of jsonExtractIndex must be backed by a segment DataSource");
     }
     _jsonFieldTransformFunction = firstArgument;
 

@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -78,6 +79,13 @@ public interface TransformFunction {
    */
   @Nullable
   Dictionary getDictionary();
+
+  /**
+   * Returns the data source backing the transform result when the result maps directly to a segment data source, or
+   * {@code null} otherwise.
+   */
+  @Nullable
+  DataSource getDataSource();
 
   /**
    * Transforms the data from the given value block to single-valued dictionary ids.

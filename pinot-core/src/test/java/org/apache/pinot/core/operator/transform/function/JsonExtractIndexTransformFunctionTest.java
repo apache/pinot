@@ -33,6 +33,7 @@ import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -162,6 +163,17 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
           throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
       }
     }
+  }
+
+  @Test
+  public void testJsonExtractIndexRequiresSegmentDataSource() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("jsonExtractIndex('jsonSV','$.intVal','INT')");
+    BadQueryRequestException exception =
+        Assert.expectThrows(BadQueryRequestException.class, () -> TransformFunctionFactory.get(expression,
+            _dataSourceMap));
+    Assert.assertEquals(exception.getCause().getMessage(),
+        "The first argument of jsonExtractIndex must be backed by a segment DataSource");
   }
 
   @DataProvider(name = "testJsonExtractIndexTransformFunction")

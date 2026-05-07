@@ -117,7 +117,7 @@ public class TextMatchTransformFunctionTest {
       Assert.fail();
     } catch (BadQueryRequestException e) {
       Assert.assertEquals(e.getCause().getMessage(),
-          "The first argument of TEXT_MATCH transform function must be a single-valued column");
+          "The first argument of TEXT_MATCH transform function must be backed by a segment data source");
     }
 
     try {
