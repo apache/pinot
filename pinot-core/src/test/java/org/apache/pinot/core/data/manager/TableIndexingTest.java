@@ -243,9 +243,12 @@ public class TableIndexingTest {
     String getErrorMessage() {
       if (_error == null) {
         return null;
-      } else {
-        return _error.getMessage().replaceAll("\n", " ");
       }
+      String message = _error.getMessage();
+      if (message == null) {
+        return _error.getClass().getSimpleName();
+      }
+      return message.replaceAll("\n", " ");
     }
   }
 
@@ -291,7 +294,7 @@ public class TableIndexingTest {
               ...
             } */
           // no params
-          indexes.put("bloom", JsonUtils.newObjectNode());
+          indexes.set("bloom", JsonUtils.newObjectNode());
 
           break;
         case "fst_index":
@@ -342,7 +345,7 @@ public class TableIndexingTest {
                  old:
                -> "tableIndexConfig": {  "invertedIndexColumns": ["uuid"], */
           // no params, has to be dictionary
-          indexes.put("inverted", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("inverted", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "json_index":
             /* json index (string or json column), should be no-dictionary
@@ -358,7 +361,7 @@ public class TableIndexingTest {
               ...
               } */
           // no params, should be no dictionary, only string or json
-          indexes.put("json", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("json", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "text_index":
             /* text index
@@ -545,7 +548,7 @@ public class TableIndexingTest {
           .append(test._error == null).append(';');
       //@formatter:on
       if (test._error != null) {
-        summary.append(test._error.getMessage().replaceAll("\n", " "));
+        summary.append(test.getErrorMessage());
       }
       summary.append('\n');
     }

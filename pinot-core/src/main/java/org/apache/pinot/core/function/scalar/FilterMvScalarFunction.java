@@ -233,7 +233,8 @@ public class FilterMvScalarFunction implements PinotScalarFunction {
     if (_evaluator == null || _dataType != dataType || !_predicate.equals(predicate)) {
       // Build the new evaluator first so cached state is only updated after successful creation
       // Scalar invocation: no dictionary is available — the evaluator builds against raw values only.
-      FilterMvPredicateEvaluator newEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, dataType, null);
+      FilterMvPredicateEvaluator newEvaluator =
+          FilterMvPredicateEvaluator.forPredicate(predicate, dataType, null, null);
       _predicate = predicate;
       _dataType = dataType;
       _evaluator = newEvaluator;

@@ -26,7 +26,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -67,14 +66,6 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
     _mainTransformFunction = firstArgument;
     TransformResultMetadata innerMetadata = _mainTransformFunction.getResultMetadata();
     _dataType = innerMetadata.getDataType();
-    // The inner transform's getDictionary() always returns the column dictionary if one exists.
-    // filterMv reads dict ids via transformToDictIdsMV — that path is only cheap when the underlying
-    // forward index is dict-encoded. For shared-dict + RAW forward (or any inner whose forward stores
-    // raw values), drop the dictionary so filterMv falls back to per-value raw matching.
-    _dictionary = dictionaryUsableForFilterMv(firstArgument, columnContextMap);
-    // Report hasDictionary based on the gated dictionary actually used here, so downstream consumers
-    // (e.g. ExpressionScanDocIdIterator) take the right value-stream path.
-    _resultMetadata = new TransformResultMetadata(_dataType, innerMetadata.isSingleValue(), _dictionary != null);
 
     TransformFunction predicateArgument = arguments.get(1);
     if (!(predicateArgument instanceof LiteralTransformFunction) || !predicateArgument.getResultMetadata()
@@ -84,19 +75,15 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
     }
     String predicate = ((LiteralTransformFunction) predicateArgument).getStringLiteral();
 
-    _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType, _dictionary);
-  }
-
-  @Nullable
-  private static Dictionary dictionaryUsableForFilterMv(TransformFunction inner,
-      Map<String, ColumnContext> columnContextMap) {
-    Dictionary dictionary = inner.getDictionary();
-    if (dictionary == null || !(inner instanceof IdentifierTransformFunction)) {
-      return dictionary;
-    }
-    DataSource dataSource = columnContextMap.get(((IdentifierTransformFunction) inner).getColumnName()).getDataSource();
-    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-    return (forwardIndex != null && forwardIndex.isDictionaryEncoded()) ? dictionary : null;
+    // Hand the inner column's DataSource (when available) to FilterMvPredicateEvaluator; it drops the
+    // dictionary internally when the forward index is RAW (per-value dict-id reads aren't viable).
+    DataSource innerDataSource = (firstArgument instanceof IdentifierTransformFunction)
+        ? columnContextMap.get(((IdentifierTransformFunction) firstArgument).getColumnName()).getDataSource()
+        : null;
+    _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType,
+        _mainTransformFunction.getDictionary(), innerDataSource);
+    _dictionary = _predicateEvaluator.isDictionaryBased() ? _mainTransformFunction.getDictionary() : null;
+    _resultMetadata = new TransformResultMetadata(_dataType, innerMetadata.isSingleValue(), _dictionary != null);
   }
 
   @Override

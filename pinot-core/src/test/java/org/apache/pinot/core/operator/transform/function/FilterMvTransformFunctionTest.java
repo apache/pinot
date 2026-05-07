@@ -400,15 +400,9 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   /// filterMv on a column with a shared dictionary on a RAW forward index AND an inverted index. The
-  /// inverted index should NOT influence filterMv's evaluation: filterMv applies its predicate per-value to
-  /// the already-fetched MV array, not at filter-plan time, so result selection happens entirely inside
-  /// FilterMvPredicateEvaluator. Asserts that:
-  /// - The on-disk shape is RAW + dict + inverted (sanity).
-  /// - The transform reports getDictionary() == null and hasDictionary() == false (same gating as the
-  ///   bare RAW + dict variant — IdentifierTransformFunction drops the dictionary because the forward index
-  ///   is RAW, regardless of secondary indexes).
-  /// - The result is exactly equal to {@link #testFilterMvOnSharedDictRawForwardColumn}'s output and to the
-  ///   dict-encoded baseline, proving the inverted index does not change predicate-evaluation semantics.
+  /// inverted index does not influence filterMv's per-value evaluation — FilterMvPredicateEvaluator
+  /// drops the dictionary internally for RAW forward, so the evaluator runs the raw-value path. The
+  /// result must still match the dict-encoded baseline.
   @Test(dataProvider = "filterMvIntPredicates")
   public void testFilterMvOnSharedDictRawForwardWithInvertedColumn(String predicate, IntPredicate matcher) {
     // Sanity: confirm the on-disk shape is dict + inverted + RAW forward.
@@ -429,8 +423,9 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
     assertEquals(resultMetadata.getDataType(), DataType.INT);
     assertFalse(resultMetadata.isSingleValue());
-    // Same gating as the bare RAW + dict variant — the inverted index sitting on disk doesn't change the
-    // fact that the forward index is RAW, so the dict-id path is suppressed for this column too.
+    // FilterMvPredicateEvaluator drops the dictionary internally for RAW forward — the dict-id path is
+    // not viable when the forward index can't serve dict ids cheaply. The inverted index sitting on disk
+    // does not change this; filterMv runs the raw-value path regardless of secondary indexes.
     assertFalse(resultMetadata.hasDictionary(),
         "FilterMvTransformFunction over a RAW forward column must report hasDictionary=false even when an "
             + "inverted index sits on the column");

@@ -41,29 +41,27 @@ public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  /// Filter-plan-time entry point. Callers pass the column's `DataSource` (or `null` if there is none) so
-  /// the gating logic in {@link #getDictionaryUsableForFiltering} can keep the dictionary only when a
-  /// dict-consuming filter operator (sorted/inverted/range) will actually run for this predicate type.
-  /// - Leaf-filter callers (FilterPlanNode, ExpressionFilterOperator) pass the column's `DataSource`.
-  /// - Callers without a column-bound `DataSource` (post-reduction matchers, intermediate-result
-  ///   aggregators) pass `null`.
-  /// - Transform-layer callers (BinaryOperatorTransformFunction) must only pass a `DataSource` when the
-  ///   inner transform's `getDictionary()` is non-null — i.e. the forward index is dict-encoded so the
-  ///   transform can supply dict ids cheaply. For shared-dict + RAW forward, pass `null` here.
+  /// Single public entry point. Callers supply at most one of `dataSource` / `dictionary`:
+  /// - Leaf-filter callers (FilterPlanNode, ExpressionFilterOperator) pass `dataSource` and `dictionary=null`;
+  ///   the gating logic in {@link #getDictionaryUsableForFiltering} derives the dictionary, keeping it only
+  ///   when a dict-consuming filter operator (inverted / exact range) will actually run for this predicate
+  ///   type on the column's forward-index encoding.
+  /// - Transform-layer callers (BinaryOperatorTransformFunction) pass `dataSource` only when the inner
+  ///   transform exposes dict ids cheaply (forward is dict-encoded); otherwise pass `null` for both.
+  /// - Per-value transform callers (filterMv) bypass gating and pass `dataSource=null` with the dictionary
+  ///   they want directly — they know statically that the value stream carries either dict ids (when
+  ///   dictionary is non-null) or raw values (when null).
+  /// - Callers with no column at all (post-reduction matchers, intermediate-result aggregators) pass `null`
+  ///   for both.
   public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable DataSource dataSource,
-      DataType dataType, @Nullable QueryContext queryContext) {
-    Dictionary dictionary = dataSource != null ? getDictionaryUsableForFiltering(dataSource, queryContext, predicate)
-        : null;
+      @Nullable Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
+    if (dataSource != null) {
+      dictionary = getDictionaryUsableForFiltering(dataSource, queryContext, predicate);
+    }
     return buildEvaluator(predicate, dictionary, dataType, queryContext);
   }
 
-  /// Direct (no-gating) entry point: dispatches to the appropriate predicate evaluator factory based solely
-  /// on whether a dictionary is supplied. Use this when the caller's value stream is statically known to
-  /// carry dict ids (when `dictionary` is non-null) or raw values (when `null`) — e.g. per-value transform
-  /// evaluation like filterMv. Filter-plan-time callers should use
-  /// {@link #getPredicateEvaluator(Predicate, DataSource, DataType, QueryContext)} instead, which applies
-  /// gating to avoid producing a dict-based evaluator that scan-fallback paths can't apply.
-  public static PredicateEvaluator buildEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
+  private static PredicateEvaluator buildEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType, @Nullable QueryContext queryContext) {
     try {
       if (dictionary != null) {

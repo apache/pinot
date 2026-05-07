@@ -1552,7 +1552,7 @@ public class DistinctCountThetaSketchAggregationFunction
       Object valueArray = valueArrays[_expressionIndex];
       if (_predicateEvaluator == null) {
         // Intermediate-result predicate evaluation has no DataSource — pass null to take the raw-value path.
-        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, valueType, null);
+        _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(_predicate, null, null, valueType, null);
       }
       if (singleValue) {
         switch (valueType) {

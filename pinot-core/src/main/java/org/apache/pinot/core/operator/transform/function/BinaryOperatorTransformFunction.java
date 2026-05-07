@@ -157,7 +157,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     if (predicate == null) {
       return null;
     }
-    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDataSource, leftDataType, null);
+    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDataSource, null, leftDataType, null);
   }
 
   /**

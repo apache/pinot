@@ -30,7 +30,9 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -42,31 +44,41 @@ public final class FilterMvPredicateEvaluator {
           Predicate.Type.RANGE, Predicate.Type.REGEXP_LIKE);
 
   private final EvalNode _root;
+  private final boolean _dictionaryBased;
 
-  private FilterMvPredicateEvaluator(EvalNode root) {
+  private FilterMvPredicateEvaluator(EvalNode root, boolean dictionaryBased) {
     _root = root;
+    _dictionaryBased = dictionaryBased;
   }
 
-  /// Build a predicate evaluator for filterMv. Filtering happens per-value at transform time, so the choice
-  /// between dict-id matching and raw-value matching is determined by whether the caller has a dictionary
-  /// of dict ids for the values being filtered:
-  /// - Pass a non-null `dictionary` only when the inner expression's value stream actually carries dict ids
-  ///   (e.g. an Identifier wrapping a dict-encoded forward column whose `getDictionary()` is non-null).
-  ///   filterMv's `matchesDictId` path will be exercised against that dictionary.
-  /// - Pass `null` when the value stream is raw (RAW forward column, computed transform output, or scalar
-  ///   invocation). filterMv's `matchesInt`/`matchesString`/etc. will be exercised.
-  /// This deliberately bypasses {@link PredicateEvaluatorProvider}'s filter-plan-time gating, which is
-  /// designed for operator selection and would route shared-dict + RAW columns through the dict-based
-  /// evaluator — incorrect at filterMv's per-value evaluation layer.
+  /// Build a predicate evaluator for filterMv. filterMv evaluates per-value at transform time, so the
+  /// dict-id path is only viable when the inner forward index is dict-encoded (forward.getDictIdMV is
+  /// cheap). For RAW forward — even with a shared dictionary on disk — drop the dictionary internally so
+  /// the predicate evaluator falls back to raw-value matching. For scalar/non-column invocations, pass
+  /// both `dictionary` and `dataSource` as `null`.
   public static FilterMvPredicateEvaluator forPredicate(String predicate, DataType dataType,
-      @Nullable Dictionary dictionary) {
+      @Nullable Dictionary dictionary, @Nullable DataSource dataSource) {
     if (StringUtils.isBlank(predicate)) {
       throw new IllegalArgumentException("filterMv predicate must be a non-empty string");
     }
+    if (dictionary != null && dataSource != null) {
+      ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+      if (forwardIndex == null || !forwardIndex.isDictionaryEncoded()) {
+        dictionary = null;
+      }
+    }
     FilterContext filterContext = parseFilterContext(predicate);
     validateFilter(filterContext);
-    EvalNode root = buildNode(filterContext, dictionary, dataType);
-    return new FilterMvPredicateEvaluator(root);
+    boolean[] dictBased = new boolean[]{false};
+    EvalNode root = buildNode(filterContext, null, dictionary, dataType, dictBased);
+    return new FilterMvPredicateEvaluator(root, dictBased[0]);
+  }
+
+  /// Returns true if the underlying predicate evaluator(s) consume dict ids — i.e. callers should feed
+  /// dict ids into `matchesDictId`. False means the evaluator(s) consume raw values, and callers should
+  /// use the typed `matchesInt`/`matchesString`/etc. paths.
+  public boolean isDictionaryBased() {
+    return _dictionaryBased;
   }
 
   private static FilterContext parseFilterContext(String predicate) {
@@ -106,7 +118,8 @@ public final class FilterMvPredicateEvaluator {
     }
   }
 
-  private static EvalNode buildNode(FilterContext filterContext, @Nullable Dictionary dictionary, DataType dataType) {
+  private static EvalNode buildNode(FilterContext filterContext, @Nullable DataSource dataSource,
+      @Nullable Dictionary dictionary, DataType dataType, boolean[] dictBased) {
     switch (filterContext.getType()) {
       case CONSTANT:
         return EvalNode.constant(filterContext.isConstantTrue());
@@ -116,7 +129,11 @@ public final class FilterMvPredicateEvaluator {
           throw new IllegalArgumentException(
               "filterMv does not support predicate type: " + predicate.getType());
         }
-        PredicateEvaluator evaluator = PredicateEvaluatorProvider.buildEvaluator(predicate, dictionary, dataType, null);
+        PredicateEvaluator evaluator =
+            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, dictionary, dataType, null);
+        if (evaluator.isDictionaryBased()) {
+          dictBased[0] = true;
+        }
         if (evaluator.isAlwaysTrue()) {
           return EvalNode.constant(true);
         }
@@ -127,7 +144,7 @@ public final class FilterMvPredicateEvaluator {
       case AND: {
         List<EvalNode> children = new ArrayList<>();
         for (FilterContext child : filterContext.getChildren()) {
-          EvalNode node = buildNode(child, dictionary, dataType);
+          EvalNode node = buildNode(child, dataSource, dictionary, dataType, dictBased);
           if (node.isConstantFalse()) {
             return EvalNode.constant(false);
           }
@@ -146,7 +163,7 @@ public final class FilterMvPredicateEvaluator {
       case OR: {
         List<EvalNode> children = new ArrayList<>();
         for (FilterContext child : filterContext.getChildren()) {
-          EvalNode node = buildNode(child, dictionary, dataType);
+          EvalNode node = buildNode(child, dataSource, dictionary, dataType, dictBased);
           if (node.isConstantTrue()) {
             return EvalNode.constant(true);
           }
@@ -163,7 +180,7 @@ public final class FilterMvPredicateEvaluator {
         return EvalNode.or(children);
       }
       case NOT: {
-        EvalNode child = buildNode(filterContext.getChildren().get(0), dictionary, dataType);
+        EvalNode child = buildNode(filterContext.getChildren().get(0), dataSource, dictionary, dataType, dictBased);
         if (child.isConstant()) {
           return EvalNode.constant(!child.getConstantValue());
         }

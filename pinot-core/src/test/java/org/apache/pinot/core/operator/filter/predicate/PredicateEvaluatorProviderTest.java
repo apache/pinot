@@ -51,7 +51,7 @@ public class PredicateEvaluatorProviderTest {
     DataSource dataSource = mockDataSource("col", FieldSpec.DataType.STRING, /*sorted=*/false,
         /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/false, /*range=*/false, /*rangeExact=*/false);
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(eqPredicate("col", "value-1"),
-        dataSource, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
+        dataSource, null, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
     assertFalse(evaluator.isDictionaryBased(),
         "RAW forward + dict + no secondary index must produce raw-value evaluator");
   }
@@ -65,7 +65,7 @@ public class PredicateEvaluatorProviderTest {
     DataSource dataSource = mockDataSource("col", FieldSpec.DataType.STRING, /*sorted=*/false,
         /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/true, /*range=*/false, /*rangeExact=*/false);
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(eqPredicate("col", "value-1"),
-        dataSource, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
+        dataSource, null, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
     assertTrue(evaluator.isDictionaryBased(),
         "RAW forward + dict + inverted index must keep dict-based evaluator for inverted-index lookup");
   }
@@ -80,7 +80,7 @@ public class PredicateEvaluatorProviderTest {
         /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/true, /*range=*/false, /*rangeExact=*/false);
     QueryContext queryContext = mockQueryContext(/*allowAllIndexes=*/false);
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(eqPredicate("col", "value-1"),
-        dataSource, FieldSpec.DataType.STRING, queryContext);
+        dataSource, null, FieldSpec.DataType.STRING, queryContext);
     assertFalse(evaluator.isDictionaryBased(),
         "Inverted index disallowed via skipIndexes must trigger raw-value evaluator on raw forward");
   }
@@ -93,7 +93,7 @@ public class PredicateEvaluatorProviderTest {
     DataSource dataSource = mockDataSource("col", FieldSpec.DataType.STRING, /*sorted=*/false,
         /*dict=*/true, /*forwardDictEncoded=*/true, /*inverted=*/false, /*range=*/false, /*rangeExact=*/false);
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(eqPredicate("col", "value-1"),
-        dataSource, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
+        dataSource, null, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
     assertTrue(evaluator.isDictionaryBased(),
         "Dict-encoded forward index must always keep dict-based evaluator");
   }
@@ -107,7 +107,7 @@ public class PredicateEvaluatorProviderTest {
         /*dict=*/true, /*forwardDictEncoded=*/false, /*inverted=*/true, /*range=*/false, /*rangeExact=*/false);
     Mockito.when(dataSource.getForwardIndex()).thenReturn(null);
     PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateEvaluator(eqPredicate("col", "value-1"),
-        dataSource, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
+        dataSource, null, FieldSpec.DataType.STRING, mockQueryContext(/*allowAllIndexes=*/true));
     assertTrue(evaluator.isDictionaryBased(),
         "Disabled forward index must keep dict-based evaluator (scan is impossible)");
   }

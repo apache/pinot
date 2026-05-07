@@ -80,7 +80,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       // against raw values. (If a future caller passes an Identifier here, it must mirror the gate in
       // BinaryOperatorTransformFunction: only pass DataSource when the inner getDictionary() is non-null.)
       _predicateEvaluator =
-          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null,
+          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, null,
               _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }
