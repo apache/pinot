@@ -292,7 +292,7 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.0.15</jline.version>
+    <jline.version>4.1.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.5</jettison.version>
     <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
