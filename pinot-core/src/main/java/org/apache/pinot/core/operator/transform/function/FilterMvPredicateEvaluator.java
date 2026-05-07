@@ -27,20 +27,9 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.request.context.predicate.EqPredicate;
-import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
-import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RangePredicate;
-import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.RegexpLikePredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -127,7 +116,7 @@ public final class FilterMvPredicateEvaluator {
           throw new IllegalArgumentException(
               "filterMv does not support predicate type: " + predicate.getType());
         }
-        PredicateEvaluator evaluator = buildPerValueEvaluator(predicate, dictionary, dataType);
+        PredicateEvaluator evaluator = PredicateEvaluatorProvider.buildEvaluator(predicate, dictionary, dataType, null);
         if (evaluator.isAlwaysTrue()) {
           return EvalNode.constant(true);
         }
@@ -182,55 +171,6 @@ public final class FilterMvPredicateEvaluator {
       }
       default:
         throw new IllegalArgumentException("Unsupported filter type: " + filterContext.getType());
-    }
-  }
-
-  /// Build a predicate evaluator for filterMv's per-value evaluation. Dispatches directly on the predicate
-  /// type instead of going through {@link PredicateEvaluatorProvider}, because filterMv evaluates each MV
-  /// element with a known dictionary stance — the per-predicate-type filter-plan-time gating that
-  /// PredicateEvaluatorProvider applies is not what filterMv wants here.
-  private static PredicateEvaluator buildPerValueEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType) {
-    if (dictionary != null) {
-      switch (predicate.getType()) {
-        case EQ:
-          return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary,
-              dataType);
-        case NOT_EQ:
-          return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotEqPredicate) predicate,
-              dictionary, dataType);
-        case IN:
-          return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary,
-              dataType, null);
-        case NOT_IN:
-          return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary,
-              dataType, null);
-        case RANGE:
-          return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary,
-              dataType);
-        case REGEXP_LIKE:
-          return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
-              dictionary, dataType, null);
-        default:
-          throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
-      }
-    }
-    switch (predicate.getType()) {
-      case EQ:
-        return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
-      case NOT_EQ:
-        return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotEqPredicate) predicate, dataType);
-      case IN:
-        return InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
-      case NOT_IN:
-        return NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotInPredicate) predicate, dataType);
-      case RANGE:
-        return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
-      case REGEXP_LIKE:
-        return RegexpLikePredicateEvaluatorFactory.newRawValueBasedEvaluator((RegexpLikePredicate) predicate,
-            dataType);
-      default:
-        throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
     }
   }
 

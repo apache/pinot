@@ -1461,19 +1461,16 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
     }
 
-    // Tests the case when the field-config list marks a column as raw (non-dictionary) and enables
-    // inverted index on it
+    // FieldConfig with encoding=RAW + INVERTED: dictionary is auto-enabled (INVERTED requires it),
+    // producing a shared-dict + RAW forward index. No validation error expected.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    try {
+    {
       FieldConfig fieldConfig =
           new FieldConfig.Builder("myCol2").withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
               .withEncodingType(FieldConfig.EncodingType.RAW)
               .build();
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should not be able to disable dictionary but keep inverted index");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1534,20 +1531,15 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(), "Cannot disable forward index for column: intCol, as the table type is REALTIME");
     }
 
-    // Validate that inverted index on RAW column without explicit dictionary fails validation. Either of two
-    // validations may fire first: the legacy "Cannot create inverted index ... without dictionary" check, or the
-    // new `validateExplicitDictionaryForRawForwardIndex` check that requires an explicit dictionary block.
+    // Inverted index on a RAW column auto-enables the dictionary (see DictionaryIndexType.fromFieldConfigs)
+    // and validation passes — the runtime builds a shared-dict + RAW forward index.
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    try {
+    {
       FieldConfig rawInvertedConfig =
           new FieldConfig("intCol", FieldConfig.EncodingType.RAW,
               Arrays.asList(FieldConfig.IndexType.INVERTED), null, null);
       tableConfig.setFieldConfigList(Arrays.asList(rawInvertedConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail since inverted index requires dictionary but column is RAW without explicit dictionary");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("require a dictionary") || e.getMessage().contains("without dictionary"),
-          "Expected dictionary-related error but got: " + e.getMessage());
     }
 
     // Validate that inverted index on RAW column WITH explicit dictionary passes validation

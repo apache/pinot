@@ -38,6 +38,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvide
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -122,16 +123,19 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     }
 
     // Create predicate evaluator when the right side is a literal. Hand the column's DataSource to the
-    // evaluator only when the inner transform exposes a usable dictionary — i.e. its forward index is
-    // dict-encoded so transformToDictIdsSV can serve dict ids cheaply. For RAW (including shared-dict +
-    // RAW) the inner transform returns null from getDictionary(), and we must pass null here so the
-    // predicate evaluator falls back to raw-value matching.
+    // evaluator only when the LHS is a direct column reference whose forward index is dict-encoded —
+    // transformToDictIdsSV is then cheap. For shared-dict + RAW forward (or any non-Identifier transform)
+    // pass null DataSource so the predicate evaluator is built against raw values, matching the value
+    // stream that BinaryOperator's scan path actually feeds into applySV.
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
       DataSource leftDataSource = null;
-      if (_leftTransformFunction instanceof IdentifierTransformFunction
-          && _leftTransformFunction.getDictionary() != null) {
+      if (_leftTransformFunction instanceof IdentifierTransformFunction) {
         IdentifierTransformFunction lhs = (IdentifierTransformFunction) _leftTransformFunction;
-        leftDataSource = columnContextMap.get(lhs.getColumnName()).getDataSource();
+        DataSource ds = columnContextMap.get(lhs.getColumnName()).getDataSource();
+        ForwardIndexReader<?> forwardIndex = ds.getForwardIndex();
+        if (forwardIndex != null && forwardIndex.isDictionaryEncoded()) {
+          leftDataSource = ds;
+        }
       }
       _predicateEvaluator = createPredicateEvaluator(leftDataType, leftDataSource,
           ((LiteralTransformFunction) _rightTransformFunction).getLiteralContext());

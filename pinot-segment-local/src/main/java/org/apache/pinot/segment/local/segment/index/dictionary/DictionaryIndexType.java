@@ -130,8 +130,14 @@ public class DictionaryIndexType
             (accum, column) -> accum.put(column, DictionaryIndexConfig.DISABLED));
     ColumnConfigDeserializer<DictionaryIndexConfig> fromFieldConfigs =
         IndexConfigDeserializer.fromCollection(TableConfig::getFieldConfigList, (accum, fieldConfig) -> {
+          // encoding=RAW disables the dictionary unless an explicit dictionary config is given OR an
+          // index that requires a dictionary is enabled (FST/IFST/INVERTED). In the latter case let
+          // the dictionary fall through to its default-enabled state so the runtime can build it; the
+          // auto-creation paths in BaseSegmentCreator/ForwardIndexHandler will produce a shared-dict +
+          // RAW forward index.
           if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
-              && !hasExplicitDictionaryConfig(fieldConfig)) {
+              && !hasExplicitDictionaryConfig(fieldConfig)
+              && !hasIndexRequiringDictionary(fieldConfig)) {
             accum.put(fieldConfig.getName(), DictionaryIndexConfig.DISABLED);
           }
         });
@@ -159,6 +165,25 @@ public class DictionaryIndexType
   private static boolean hasExplicitDictionaryConfig(FieldConfig fieldConfig) {
     JsonNode indexes = fieldConfig.getIndexes();
     return indexes != null && indexes.isObject() && indexes.has(StandardIndexes.DICTIONARY_ID);
+  }
+
+  /// FST, IFST, and INVERTED always require a dictionary (their `requiresDictionary` returns true
+  /// unconditionally). When any of these is configured on a column, the dictionary must be present
+  /// even if the user wrote `encoding=RAW`. Detects either form: legacy `indexTypes` list or the
+  /// new-style `indexes` map keyed by [StandardIndexes].
+  private static boolean hasIndexRequiringDictionary(FieldConfig fieldConfig) {
+    for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
+      if (indexType == FieldConfig.IndexType.INVERTED || indexType == FieldConfig.IndexType.FST
+          || indexType == FieldConfig.IndexType.IFST) {
+        return true;
+      }
+    }
+    JsonNode indexes = fieldConfig.getIndexes();
+    if (indexes != null && indexes.isObject()) {
+      return indexes.has(StandardIndexes.FST_ID) || indexes.has(StandardIndexes.IFST_ID)
+          || indexes.has(StandardIndexes.INVERTED_ID);
+    }
+    return false;
   }
 
   @Override

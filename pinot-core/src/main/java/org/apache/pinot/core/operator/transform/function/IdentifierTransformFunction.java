@@ -40,18 +40,13 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
-    // transformToDictIdsSV/MV requires the underlying forward index to actually serve dict ids cheaply.
-    // For shared-dict + RAW forward columns the dictionary file exists but the forward index stores raw
-    // values, so dict-id reads would force per-row Dictionary#indexOf lookups. Drop the dictionary here so
-    // result metadata advertises hasDictionary=false and downstream operators take the raw-value path.
-    _dictionary = forwardIndexIsDictEncoded(columnContext) ? columnContext.getDictionary() : null;
+    // Always expose the column's dictionary if one exists. Callers that read the forward index for dict
+    // ids (transformToDictIdsSV/MV) must additionally consult the column's forward-index encoding to
+    // decide whether dict-id reads are cheap (dict-encoded forward) or would force per-row
+    // Dictionary#indexOf lookups (RAW forward + shared dict).
+    _dictionary = columnContext.getDictionary();
     _resultMetadata =
         new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
-  }
-
-  private static boolean forwardIndexIsDictEncoded(ColumnContext columnContext) {
-    var forwardIndex = columnContext.getDataSource().getForwardIndex();
-    return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
 
   public String getColumnName() {

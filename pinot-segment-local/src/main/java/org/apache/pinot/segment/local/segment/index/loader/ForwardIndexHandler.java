@@ -1250,7 +1250,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndex, dictionary, null,
         columnMetadata.getMaxNumberOfMultiValues())) {
-      AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, storedType);
+      AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, storedType, false);
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         statsCollector.collect(columnReader.getValue(i));
@@ -1259,10 +1259,6 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       return columnMetadata.isSingleValue() ? statsCollector.getLengthOfLongestElement()
           : statsCollector.getMaxRowLengthInBytes();
     }
-  }
-
-  private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
-    return getStatsCollector(column, storedType, false);
   }
 
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType,
