@@ -33,7 +33,6 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,9 +129,8 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
         SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn);
     // For multi-stream realtime tables, translate the Pinot partition ID (which encodes stream index and stream
     // partition as streamIndex * 10000 + streamPartitionId) to the stream partition id before computing the slot.
-    if (_tableConfig.getTableType() == TableType.REALTIME) {
-      rawPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, rawPartitionId);
-    }
+    // getStreamPartitionIdFromPinotPartitionId is a no-op for offline tables and single-stream realtime tables.
+    rawPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_tableConfig, rawPartitionId);
     return rawPartitionId % numPartitions;
   }
 

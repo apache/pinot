@@ -102,11 +102,6 @@ public final class IngestionConfigUtils {
     return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }
 
-  /// Returns `true` if the table contains multiple streams.
-  public static boolean hasMultipleStreams(TableConfig tableConfig) {
-    return getStreamConfigMaps(tableConfig).size() > 1;
-  }
-
   /**
    * Getting the Pinot segment level partition id from the stream partition id.
    * @param partitionId the partition id from the stream
@@ -117,8 +112,19 @@ public final class IngestionConfigUtils {
   }
 
   /// Returns the stream partition id from the Pinot segment partition id.
+  /// Safe to call for any table type: returns `partitionId` unchanged for OFFLINE tables or REALTIME tables
+  /// that lack stream configs (treat as single-stream).
   public static int getStreamPartitionIdFromPinotPartitionId(TableConfig tableConfig, int partitionId) {
-    return hasMultipleStreams(tableConfig) ? getStreamPartitionIdFromPinotPartitionId(partitionId) : partitionId;
+    if (tableConfig.getTableType() != TableType.REALTIME) {
+      return partitionId;
+    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null || ingestionConfig.getStreamIngestionConfig() == null) {
+      return partitionId;
+    }
+    List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
+    return streamConfigMaps != null && streamConfigMaps.size() > 1
+        ? getStreamPartitionIdFromPinotPartitionId(partitionId) : partitionId;
   }
 
   /// Returns the stream partition id from the Pinot segment partition id.
