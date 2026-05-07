@@ -87,9 +87,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (ExpressionContext groupByExpression : groupByExpressions) {
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       hasMVGroupByExpression |= !columnContext.isSingleValue();
-      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null
-          || (columnContext.getDataSource() != null
-          && !columnContext.getDataSource().getForwardIndex().isDictionaryEncoded());
+      // ColumnContext#fromDataSource drops the dictionary on RAW forward, so this check correctly routes
+      // shared-dict + RAW columns to the no-dict GROUP BY path.
+      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null;
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
 

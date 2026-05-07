@@ -40,6 +40,9 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
+    // ColumnContext#fromDataSource already drops the dictionary when the underlying forward index is RAW,
+    // so getDictionary() returns null for shared-dict + RAW columns and the result metadata correctly
+    // advertises hasDictionary=false in that case.
     _dictionary = columnContext.getDictionary();
     _resultMetadata =
         new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
