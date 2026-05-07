@@ -39,10 +39,9 @@ import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /// Extracts Pinot [GenericRow] from Parquet [Group] objects, using Parquet [LogicalTypeAnnotation]s to drive
-/// LIST and MAP handling per the Parquet LogicalTypes spec backward-compatibility rules. Output adheres to
-/// the `RecordExtractor` contract.
+/// LIST and MAP handling per the Parquet LogicalTypes spec backward-compatibility rules.
 ///
-/// **Primitive types** — preserved as their boxed Java type:
+/// **Primitive types:**
 /// - `BOOLEAN` → `Boolean`
 /// - `INT32` → `Integer`
 /// - `INT64` → `Long`
@@ -51,32 +50,22 @@ import org.apache.pinot.spi.utils.UuidUtils;
 /// - `BINARY` with `STRING` / `ENUM` annotation → `String`
 /// - `BINARY` / `FIXED_LEN_BYTE_ARRAY` without annotation → `byte[]`
 ///
-/// **Logical types** — Parquet logical-type annotations decoded into uniform Java types regardless of the
-/// underlying physical encoding:
-/// - `DECIMAL` (on `INT32` / `INT64` / `BINARY` / `FIXED_LEN_BYTE_ARRAY`) → `BigDecimal`. Always converted —
-///   raw bytes aren't interpretable without external precision / scale
-/// - `INT64` + `TIMESTAMP_MILLIS` / `MICROS` / `NANOS` → `Timestamp` (sub-millisecond nanos preserved via
-///   `Timestamp#setNanos`), or `Long` raw value in the column's declared unit when raw
-/// - `INT96` → `Timestamp` (sub-millisecond nanos preserved), or `Long` epoch nanos when raw (nanos is
-///   INT96's natural unit since its physical encoding — nanos-of-day + Julian day — carries nanosecond
-///   precision)
-/// - `INT32` + `DATE` → `LocalDate`, or `Integer` raw days-since-epoch when raw
-/// - `INT32` + `TIME_MILLIS` → `LocalTime`, or `Integer` raw ms-since-midnight when raw
-/// - `INT64` + `TIME_MICROS` / `TIME_NANOS` → `LocalTime` (full nanosecond precision), or `Long` raw
-///   value-since-midnight in the column's declared unit when raw
-/// - `FIXED_LEN_BYTE_ARRAY(16)` + `UUID` → `java.util.UUID`. Always converted; the downstream type
-///   transformer adapts to the Pinot column's storage type — `STRING` → canonical form, `BYTES` →
-///   16-byte big-endian form
+/// **Logical types:**
+/// - `DECIMAL` (on `INT32` / `INT64` / `BINARY` / `FIXED_LEN_BYTE_ARRAY`) → `BigDecimal`
+/// - `INT64` + `TIMESTAMP_MILLIS` / `MICROS` / `NANOS` → `Timestamp`, or `Long` in the column's declared unit
+///   when `extractRawTimeValues` is `true`
+/// - `INT96` → `Timestamp`, or `Long` epoch nanos when `extractRawTimeValues` is `true`
+/// - `INT32` + `DATE` → `LocalDate`, or `Integer` days-since-epoch when `extractRawTimeValues` is `true`
+/// - `INT32` + `TIME_MILLIS` → `LocalTime`, or `Integer` ms-since-midnight when `extractRawTimeValues` is `true`
+/// - `INT64` + `TIME_MICROS` / `TIME_NANOS` → `LocalTime`, or `Long` value-since-midnight in the column's
+///   declared unit when `extractRawTimeValues` is `true`
+/// - `FIXED_LEN_BYTE_ARRAY(16)` + `UUID` → `java.util.UUID`
 ///
-/// [ParquetNativeRecordExtractorConfig#isExtractRawTimeValues] opts out of TIMESTAMP / DATE / TIME conversion.
-/// DECIMAL and UUID always convert.
-///
-/// **Multi-value:** `LIST`-annotated group (standard 3-level wrapper or legacy non-wrapper forms) → `Object[]`.
-///
-/// **Map / nested complex:** `MAP`-annotated group → `Map<Object, Object>`; plain non-annotated group →
-/// `Map<String, Object>` (struct).
-///
-/// **Null:** field with zero repetition count → `null`.
+/// **Complex types:**
+/// - `LIST`-annotated group (standard 3-level wrapper or legacy non-wrapper forms) → `Object[]`
+/// - `MAP`-annotated group → `Map<String, Object>` (keys stringified via [BaseRecordExtractor#stringifyMapKey])
+/// - plain non-annotated group → `Map<String, Object>` (struct)
+/// - field with zero repetition count → `null`
 public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   private boolean _extractRawTimeValues;
@@ -90,10 +79,6 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   @Override
   public GenericRow extract(Group from, GenericRow to) {
-    // Parquet values bypass `convert()` — `extractValue` produces contract-typed values directly (Number,
-    // Boolean, byte[], String, BigDecimal, LocalDate, LocalTime, Timestamp, plus Object[] / Map for nested
-    // complex types via recursive extractValue). The base's universal normalizations (Byte/Short widening,
-    // ByteBuffer slicing, BigInteger → BigDecimal) don't apply to anything Parquet produces.
     GroupType fromType = from.getType();
     if (_extractAll) {
       List<Type> fields = fromType.getFields();

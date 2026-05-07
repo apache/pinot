@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
+import com.google.common.collect.Maps;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -27,15 +31,15 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /// no native bytes / float / big-decimal type.
 ///
 /// **JSON source type → Java input → Java output type:**
-/// - JSON `true` / `false` → `Boolean` → `Boolean`
-/// - JSON int that fits in 32 bits → `Integer` → `Integer`
-/// - JSON int that overflows 32 bits but fits in 64 → `Long` → `Long`
-/// - JSON int that overflows 64 bits → `BigInteger` → `BigDecimal` (widened by [BaseRecordExtractor])
-/// - JSON decimal → `Double` → `Double` (never `Float` or `BigDecimal` with default Jackson config)
-/// - JSON string → `String` → `String`
-/// - JSON `null` → `null` → `null`
-/// - JSON array → `List` → `Object[]` (each element recursively converted)
-/// - JSON object → `Map` → `Map<String, Object>` (each value recursively converted)
+/// - `true` / `false` → `Boolean` → `Boolean`
+/// - int that fits in 32 bits → `Integer` → `Integer`
+/// - int that overflows 32 bits but fits in 64 → `Long` → `Long`
+/// - int that overflows 64 bits → `BigInteger` → `BigDecimal` (Pinot has no `BigInteger` data type)
+/// - decimal → `Double` → `Double` (never `Float` or `BigDecimal` with default Jackson config)
+/// - string → `String` → `String`
+/// - `null` → `null` → `null`
+/// - array → `List` → `Object[]` (each element recursively converted)
+/// - object → `Map` → `Map<String, Object>` (each value recursively converted)
 public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
 
   @Override
@@ -43,20 +47,55 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
     if (_extractAll) {
       for (Map.Entry<String, Object> entry : from.entrySet()) {
         Object value = entry.getValue();
-        if (value != null) {
-          value = convert(value);
-        }
-        to.putValue(entry.getKey(), value);
+        to.putValue(entry.getKey(), value != null ? convert(value) : null);
       }
     } else {
       for (String fieldName : _fields) {
         Object value = from.get(fieldName);
-        if (value != null) {
-          value = convert(value);
-        }
-        to.putValue(fieldName, value);
+        to.putValue(fieldName, value != null ? convert(value) : null);
       }
     }
     return to;
+  }
+
+  /// Walks a non-null Jackson-parsed value and produces the contract shape: `BigDecimal` for `BigInteger`
+  /// (oversized ints), `Object[]` for JSON arrays, `Map<String, Object>` for JSON objects, pass-through for
+  /// the other Jackson scalar types (`Boolean`, `Integer`, `Long`, `Double`, `String`).
+  private static Object convert(Object value) {
+    // BigInteger widens (Pinot has no BigInteger type)
+    if (value instanceof BigInteger) {
+      return new BigDecimal((BigInteger) value);
+    }
+    // List
+    if (value instanceof List) {
+      //noinspection unchecked
+      return convertList((List<Object>) value);
+    }
+    // Map
+    if (value instanceof Map) {
+      //noinspection unchecked
+      return convertMap((Map<String, Object>) value);
+    }
+    // Single value pass-through (Boolean / Integer / Long / Double / String)
+    return value;
+  }
+
+  private static Object[] convertList(List<Object> list) {
+    int n = list.size();
+    Object[] result = new Object[n];
+    for (int i = 0; i < n; i++) {
+      Object v = list.get(i);
+      result[i] = v != null ? convert(v) : null;
+    }
+    return result;
+  }
+
+  private static Map<String, Object> convertMap(Map<String, Object> map) {
+    Map<String, Object> result = Maps.newHashMapWithExpectedSize(map.size());
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      Object v = entry.getValue();
+      result.put(entry.getKey(), v != null ? convert(v) : null);
+    }
+    return result;
   }
 }

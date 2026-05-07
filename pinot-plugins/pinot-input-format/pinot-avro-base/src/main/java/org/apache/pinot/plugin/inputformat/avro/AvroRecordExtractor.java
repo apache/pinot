@@ -44,39 +44,32 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/// Extracts Pinot [GenericRow] from an Avro [GenericRecord]. A single schema-driven walk produces values
-/// that satisfy the `RecordExtractor` contract directly — no second pass through `BaseRecordExtractor#convert`.
+/// Extracts Pinot [GenericRow] from an Avro [GenericRecord].
 ///
 /// **Avro source type → Java input → Java output type:**
-/// - avro `boolean` → `Boolean` → `Boolean`
-/// - avro `int` → `Integer` → `Integer`
-/// - avro `long` → `Long` → `Long`
-/// - avro `float` → `Float` → `Float`
-/// - avro `double` → `Double` → `Double`
-/// - avro `string` → `Utf8` → `String` (via `Utf8.toString()`)
-/// - avro `bytes` → `ByteBuffer` → `byte[]` (materialized from the buffer's remaining content)
-/// - avro `fixed` → `GenericFixed` / `GenericData.Fixed` → `byte[]`
-/// - avro `enum` → `GenericData.EnumSymbol` → `String` (enum name)
-/// - avro `array<T>` → `List<T>` → `Object[]` (each element recursively converted)
-/// - avro `map<string, T>` → `Map<Utf8, T>` → `Map<String, Object>` (each value recursively converted)
-/// - avro nested `record` → `GenericRecord` → `Map<String, Object>`
-/// - avro `union[null, X]` with the `null` branch selected → `null`
+/// - `boolean` → `Boolean` → `Boolean`
+/// - `int` → `Integer` → `Integer`
+/// - `long` → `Long` → `Long`
+/// - `float` → `Float` → `Float`
+/// - `double` → `Double` → `Double`
+/// - `string` → `Utf8` → `String` (via `Utf8.toString()`)
+/// - `bytes` → `ByteBuffer` → `byte[]` (materialized from the buffer's remaining content)
+/// - `fixed` → `GenericFixed` / `GenericData.Fixed` → `byte[]`
+/// - `enum` → `GenericData.EnumSymbol` → `String` (enum name)
+/// - `array<T>` → `List<T>` → `Object[]` (each element recursively converted)
+/// - `map<string, T>` → `Map<Utf8, T>` → `Map<String, Object>` (each value recursively converted)
+/// - `record` → `GenericRecord` → `Map<String, Object>`
+/// - `union[null, X]` with the `null` branch selected → `null`
 ///
-/// **Logical types** (the reader emits the raw Avro physical type; this extractor applies the conversion via
-///   [#CONVERSION_MAP] to produce the Pinot contract type):
-/// - `decimal` / `big-decimal` → raw `ByteBuffer` → [BigDecimal] (always converted; raw bytes aren't interpretable
-///   without external precision/scale)
-/// - `timestamp-millis` → raw `Long` → [Timestamp], or `Long` raw epoch millis when `extractRawTimeValues` is `true`
-/// - `timestamp-micros` → raw `Long` → [Timestamp] (sub-millisecond micros preserved), or `Long` raw epoch micros when
-///   `extractRawTimeValues` is `true`
-/// - `timestamp-nanos` → raw `Long` → [Timestamp] (nanosecond precision preserved), or `Long` raw epoch nanos when
-///   `extractRawTimeValues` is `true`
-/// - `date` → raw `Integer` → [LocalDate], or `Integer` raw days-since-epoch when `extractRawTimeValues` is `true`
-/// - `time-millis` → raw `Integer` → [LocalTime], or `Integer` raw ms-since-midnight when `extractRawTimeValues` is
-///   `true`
-/// - `time-micros` → raw `Long` → [LocalTime], or `Long` raw µs-since-midnight when `extractRawTimeValues` is `true`
-/// - `uuid` → raw `Utf8` / `GenericFixed` → [UUID] (always converted; downstream type transformer adapts to the Pinot
-///   column type — `STRING` column gets canonical UUID string, `BYTES` column gets 16-byte big-endian form)
+/// **Logical types:**
+/// - `decimal` / `big-decimal` → `ByteBuffer` → [BigDecimal]
+/// - `timestamp-millis` → `Long` → [Timestamp], or `Long` epoch millis when `extractRawTimeValues` is `true`
+/// - `timestamp-micros` → `Long` → [Timestamp], or `Long` epoch micros when `extractRawTimeValues` is `true`
+/// - `timestamp-nanos` → `Long` → [Timestamp], or `Long` epoch nanos when `extractRawTimeValues` is `true`
+/// - `date` → `Integer` → [LocalDate], or `Integer` days-since-epoch when `extractRawTimeValues` is `true`
+/// - `time-millis` → `Integer` → [LocalTime], or `Integer` ms-since-midnight when `extractRawTimeValues` is `true`
+/// - `time-micros` → `Long` → [LocalTime], or `Long` µs-since-midnight when `extractRawTimeValues` is `true`
+/// - `uuid` → `Utf8` / `GenericFixed` → [UUID]
 public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   private static final Conversion<BigDecimal> DECIMAL_CONVERSION = new Conversions.DecimalConversion();
   private static final Conversion<BigDecimal> BIG_DECIMAL_CONVERSION = new Conversions.BigDecimalConversion();
