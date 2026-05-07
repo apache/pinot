@@ -961,7 +961,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
       int numDocs = existingColMetadata.getTotalDocs();
-      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
+      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType());
       // NOTE:
       //   Special null handling is not necessary here. This is because, the existing default null value in the raw
       //   forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also, null
@@ -1054,7 +1054,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> reader = StandardIndexes.forward().getReaderFactory()
         .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
       AbstractColumnStatisticsCollector statsCollector =
-          getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
+          getStatsCollector(column, fieldSpec.getDataType().getStoredType());
       try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < existingColMetadata.getTotalDocs(); i++) {
@@ -1250,7 +1250,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndex, dictionary, null,
         columnMetadata.getMaxNumberOfMultiValues())) {
-      AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, storedType, false);
+      AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, storedType);
       int numDocs = columnMetadata.getTotalDocs();
       for (int i = 0; i < numDocs; i++) {
         statsCollector.collect(columnReader.getValue(i));
@@ -1261,14 +1261,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType,
-      boolean requireUniqueValues) {
+  private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
-    // The no-dict-optimized collector skips unique-value tracking — it's only safe when the column is
-    // staying no-dict. Callers building a dictionary out of the raw values must opt out of the optimization
-    // by setting requireUniqueValues=true. MAP collector is also optimised for no-dictionary collection.
-    if (!requireUniqueValues && !dictionaryEnabled && storedType != DataType.MAP) {
+    // MAP collector is optimised for no-dictionary collection.
+    if (!dictionaryEnabled && storedType != DataType.MAP) {
       if (ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig)) {
         return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
       }
