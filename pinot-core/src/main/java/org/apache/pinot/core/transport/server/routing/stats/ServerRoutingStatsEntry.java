@@ -61,6 +61,7 @@ public class ServerRoutingStatsEntry {
             periodicTaskExecutor);
 
     _hybridScoreExponent = scoreExponent;
+    Preconditions.checkArgument(queueSizeOffset >= 0, "queueSizeOffset must be non-negative, got: %s", queueSizeOffset);
     _hybridScoreQueueSizeOffset = queueSizeOffset;
   }
 
