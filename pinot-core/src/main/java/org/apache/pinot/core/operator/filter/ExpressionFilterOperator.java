@@ -73,11 +73,8 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
     } else {
-      // ExpressionScanDocIdIterator follows resultMetadata.hasDictionary() to pick between the dict-id
-      // and raw-value paths against the transform output, so the evaluator must match the dictionary
-      // exposed by the transform: hand the transform's getDictionary() through directly.
       _predicateEvaluator =
-          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _transformFunction.getDictionary(),
+          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
               _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }

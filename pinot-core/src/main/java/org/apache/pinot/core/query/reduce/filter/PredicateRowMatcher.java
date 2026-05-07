@@ -44,9 +44,7 @@ public class PredicateRowMatcher implements RowMatcher {
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
     } else {
-      // Post-reduction matcher — there's no DataSource here, so the unified getPredicateEvaluator builds a
-      // raw-value-based evaluator from the dataType alone.
-      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, null, _valueType, null);
+      _predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _valueType, null);
     }
     _nullHandlingEnabled = nullHandlingEnabled;
   }

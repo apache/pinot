@@ -37,8 +37,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
-import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -122,22 +121,9 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           _rightTransformFunction.getName(), _rightStoredType));
     }
 
-    // Create predicate evaluator when the right side is a literal. Hand the column's DataSource to the
-    // evaluator only when the LHS is a direct column reference whose forward index is dict-encoded —
-    // transformToDictIdsSV is then cheap. For shared-dict + RAW forward (or any non-Identifier transform)
-    // pass null DataSource so the predicate evaluator is built against raw values, matching the value
-    // stream that BinaryOperator's scan path actually feeds into applySV.
+    // Create predicate evaluator when the right side is a literal
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
-      DataSource leftDataSource = null;
-      if (_leftTransformFunction instanceof IdentifierTransformFunction) {
-        IdentifierTransformFunction lhs = (IdentifierTransformFunction) _leftTransformFunction;
-        DataSource ds = columnContextMap.get(lhs.getColumnName()).getDataSource();
-        ForwardIndexReader<?> forwardIndex = ds.getForwardIndex();
-        if (forwardIndex != null && forwardIndex.isDictionaryEncoded()) {
-          leftDataSource = ds;
-        }
-      }
-      _predicateEvaluator = createPredicateEvaluator(leftDataType, leftDataSource,
+      _predicateEvaluator = createPredicateEvaluator(leftDataType, _leftTransformFunction.getDictionary(),
           ((LiteralTransformFunction) _rightTransformFunction).getLiteralContext());
     }
   }
@@ -147,7 +133,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
    * evaluates to the same value (true/false/null) where the predicate evaluator is not needed.
    */
   @Nullable
-  private PredicateEvaluator createPredicateEvaluator(DataType leftDataType, @Nullable DataSource leftDataSource,
+  private PredicateEvaluator createPredicateEvaluator(DataType leftDataType, @Nullable Dictionary leftDictionary,
       LiteralContext rightLiteral) {
     if (rightLiteral.isNull()) {
       _alwaysNull = true;
@@ -157,7 +143,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     if (predicate == null) {
       return null;
     }
-    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDataSource, null, leftDataType, null);
+    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDictionary, leftDataType, null);
   }
 
   /**

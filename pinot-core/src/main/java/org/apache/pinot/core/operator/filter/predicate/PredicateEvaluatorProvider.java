@@ -41,23 +41,24 @@ public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  /// Single public entry point. Callers supply at most one of `dataSource` / `dictionary`:
-  /// - Leaf-filter callers (FilterPlanNode, ExpressionFilterOperator) pass `dataSource` and `dictionary=null`;
-  ///   the gating logic in {@link #getDictionaryUsableForFiltering} derives the dictionary, keeping it only
-  ///   when a dict-consuming filter operator (inverted / exact range) will actually run for this predicate
-  ///   type on the column's forward-index encoding.
-  /// - Transform-layer callers (BinaryOperatorTransformFunction) pass `dataSource` only when the inner
-  ///   transform exposes dict ids cheaply (forward is dict-encoded); otherwise pass `null` for both.
-  /// - Per-value transform callers (filterMv) bypass gating and pass `dataSource=null` with the dictionary
-  ///   they want directly — they know statically that the value stream carries either dict ids (when
-  ///   dictionary is non-null) or raw values (when null).
-  /// - Callers with no column at all (post-reduction matchers, intermediate-result aggregators) pass `null`
-  ///   for both.
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable DataSource dataSource,
-      @Nullable Dictionary dictionary, DataType dataType, @Nullable QueryContext queryContext) {
-    if (dataSource != null) {
-      dictionary = getDictionaryUsableForFiltering(dataSource, queryContext, predicate);
-    }
+  /// Builds a [PredicateEvaluator] for a leaf filter on the column backed by `dataSource`. The dictionary is derived
+  /// via [#getDictionaryUsableForFiltering], which keeps it only when a dict-consuming filter operator (inverted /
+  /// exact range) will actually run for this predicate type on the column's forward-index encoding. The data type is
+  /// taken from the data-source metadata.
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
+      QueryContext queryContext) {
+    Dictionary dictionary = getDictionaryUsableForFiltering(dataSource, queryContext, predicate);
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType();
+    return buildEvaluator(predicate, dictionary, dataType, queryContext);
+  }
+
+  /// Builds a [PredicateEvaluator] when the value source and `dictionary` are already in sync by construction: when
+  /// `dictionary` is non-null the source produces dict ids decodable by that dictionary; when `dictionary` is null
+  /// the source produces raw values. No gating logic runs — the dictionary (if any) is taken as-is, so the caller is
+  /// responsible for the match.
+  // TODO: Always pass in query context
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
+      DataType dataType, @Nullable QueryContext queryContext) {
     return buildEvaluator(predicate, dictionary, dataType, queryContext);
   }
 

@@ -74,15 +74,8 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
           "The second argument of filterMv transform function must be a single-valued string literal");
     }
     String predicate = ((LiteralTransformFunction) predicateArgument).getStringLiteral();
-
-    // Hand the inner column's DataSource (when available) to FilterMvPredicateEvaluator; it drops the
-    // dictionary internally when the forward index is RAW (per-value dict-id reads aren't viable).
-    DataSource innerDataSource = (firstArgument instanceof IdentifierTransformFunction)
-        ? columnContextMap.get(((IdentifierTransformFunction) firstArgument).getColumnName()).getDataSource()
-        : null;
-    _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType,
-        _mainTransformFunction.getDictionary(), innerDataSource);
-    _dictionary = _predicateEvaluator.isDictionaryBased() ? _mainTransformFunction.getDictionary() : null;
+    _dictionary = _mainTransformFunction.getDictionary();
+    _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType, _dictionary);
     _resultMetadata = new TransformResultMetadata(_dataType, innerMetadata.isSingleValue(), _dictionary != null);
   }
 

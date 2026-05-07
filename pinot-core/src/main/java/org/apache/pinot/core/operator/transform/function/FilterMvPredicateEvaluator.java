@@ -23,6 +23,7 @@ import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -30,9 +31,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -44,41 +43,20 @@ public final class FilterMvPredicateEvaluator {
           Predicate.Type.RANGE, Predicate.Type.REGEXP_LIKE);
 
   private final EvalNode _root;
-  private final boolean _dictionaryBased;
 
-  private FilterMvPredicateEvaluator(EvalNode root, boolean dictionaryBased) {
+  private FilterMvPredicateEvaluator(EvalNode root) {
     _root = root;
-    _dictionaryBased = dictionaryBased;
   }
 
-  /// Build a predicate evaluator for filterMv. filterMv evaluates per-value at transform time, so the
-  /// dict-id path is only viable when the inner forward index is dict-encoded (forward.getDictIdMV is
-  /// cheap). For RAW forward — even with a shared dictionary on disk — drop the dictionary internally so
-  /// the predicate evaluator falls back to raw-value matching. For scalar/non-column invocations, pass
-  /// both `dictionary` and `dataSource` as `null`.
   public static FilterMvPredicateEvaluator forPredicate(String predicate, DataType dataType,
-      @Nullable Dictionary dictionary, @Nullable DataSource dataSource) {
+      @Nullable Dictionary dictionary) {
     if (StringUtils.isBlank(predicate)) {
       throw new IllegalArgumentException("filterMv predicate must be a non-empty string");
     }
-    if (dictionary != null && dataSource != null) {
-      ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-      if (forwardIndex == null || !forwardIndex.isDictionaryEncoded()) {
-        dictionary = null;
-      }
-    }
     FilterContext filterContext = parseFilterContext(predicate);
     validateFilter(filterContext);
-    boolean[] dictBased = new boolean[]{false};
-    EvalNode root = buildNode(filterContext, null, dictionary, dataType, dictBased);
-    return new FilterMvPredicateEvaluator(root, dictBased[0]);
-  }
-
-  /// Returns true if the underlying predicate evaluator(s) consume dict ids — i.e. callers should feed
-  /// dict ids into `matchesDictId`. False means the evaluator(s) consume raw values, and callers should
-  /// use the typed `matchesInt`/`matchesString`/etc. paths.
-  public boolean isDictionaryBased() {
-    return _dictionaryBased;
+    EvalNode root = buildNode(filterContext, dictionary, dataType);
+    return new FilterMvPredicateEvaluator(root);
   }
 
   private static FilterContext parseFilterContext(String predicate) {
@@ -98,7 +76,7 @@ public final class FilterMvPredicateEvaluator {
           throw new IllegalArgumentException(
               "filterMv only supports predicates on placeholder '" + VALUE_PLACEHOLDER + "' without functions");
         }
-        if (!StringUtils.equalsIgnoreCase(lhs.getIdentifier(), VALUE_PLACEHOLDER)) {
+        if (!Strings.CI.equals(lhs.getIdentifier(), VALUE_PLACEHOLDER)) {
           throw new IllegalArgumentException(
               "filterMv predicate must reference placeholder '" + VALUE_PLACEHOLDER + "', but found '"
                   + lhs.getIdentifier() + "'");
@@ -118,8 +96,7 @@ public final class FilterMvPredicateEvaluator {
     }
   }
 
-  private static EvalNode buildNode(FilterContext filterContext, @Nullable DataSource dataSource,
-      @Nullable Dictionary dictionary, DataType dataType, boolean[] dictBased) {
+  private static EvalNode buildNode(FilterContext filterContext, @Nullable Dictionary dictionary, DataType dataType) {
     switch (filterContext.getType()) {
       case CONSTANT:
         return EvalNode.constant(filterContext.isConstantTrue());
@@ -130,10 +107,7 @@ public final class FilterMvPredicateEvaluator {
               "filterMv does not support predicate type: " + predicate.getType());
         }
         PredicateEvaluator evaluator =
-            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, dictionary, dataType, null);
-        if (evaluator.isDictionaryBased()) {
-          dictBased[0] = true;
-        }
+            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dictionary, dataType, null);
         if (evaluator.isAlwaysTrue()) {
           return EvalNode.constant(true);
         }
@@ -144,7 +118,7 @@ public final class FilterMvPredicateEvaluator {
       case AND: {
         List<EvalNode> children = new ArrayList<>();
         for (FilterContext child : filterContext.getChildren()) {
-          EvalNode node = buildNode(child, dataSource, dictionary, dataType, dictBased);
+          EvalNode node = buildNode(child, dictionary, dataType);
           if (node.isConstantFalse()) {
             return EvalNode.constant(false);
           }
@@ -163,7 +137,7 @@ public final class FilterMvPredicateEvaluator {
       case OR: {
         List<EvalNode> children = new ArrayList<>();
         for (FilterContext child : filterContext.getChildren()) {
-          EvalNode node = buildNode(child, dataSource, dictionary, dataType, dictBased);
+          EvalNode node = buildNode(child, dictionary, dataType);
           if (node.isConstantTrue()) {
             return EvalNode.constant(true);
           }
@@ -180,7 +154,7 @@ public final class FilterMvPredicateEvaluator {
         return EvalNode.or(children);
       }
       case NOT: {
-        EvalNode child = buildNode(filterContext.getChildren().get(0), dataSource, dictionary, dataType, dictBased);
+        EvalNode child = buildNode(filterContext.getChildren().get(0), dictionary, dataType);
         if (child.isConstant()) {
           return EvalNode.constant(!child.getConstantValue());
         }
