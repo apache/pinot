@@ -24,7 +24,6 @@ import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -62,17 +61,8 @@ public class ColumnContext {
 
   public static ColumnContext fromDataSource(DataSource dataSource) {
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-    // Only expose the dictionary when dict-id reads from the forward index are cheap. Columns with a shared
-    // standalone dictionary on a RAW forward index would otherwise force every dict-id consumer (group key
-    // generators, distinct executors, identifier transforms) into per-row Dictionary#indexOf lookups; hiding
-    // the dictionary at the source routes them all to the raw-value path uniformly. Callers that legitimately
-    // need the dictionary (e.g. iterating it directly in DictionaryBasedDistinctOperator) can still get it
-    // via getDataSource().getDictionary().
-    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-    Dictionary dictionary = forwardIndex != null && forwardIndex.isDictionaryEncoded()
-        ? dataSource.getDictionary() : null;
     return new ColumnContext(dataSourceMetadata.getDataType(), dataSourceMetadata.isSingleValue(),
-        dictionary, dataSource);
+        dataSource.getDictionary(), dataSource);
   }
 
   public static ColumnContext fromTransformFunction(TransformFunction transformFunction) {
