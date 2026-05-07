@@ -27,6 +27,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -95,6 +96,22 @@ public class VectorIndexConfigSerializationTest {
     JsonNode node = serializeToNode(config);
 
     assertOnlyKeys(node);
+    assertNotNull(config.getProperties());
+    assertTrue(config.getProperties().isEmpty());
+  }
+
+  @Test
+  public void testPropertiesNullAndEmptyMapRoundTripToNonNull()
+      throws Exception {
+    VectorIndexConfig fromNull = JsonUtils.stringToObject("{\"properties\":null}", VectorIndexConfig.class);
+    assertNotNull(fromNull.getProperties());
+    assertTrue(fromNull.getProperties().isEmpty());
+    assertOnlyKeys(serializeToNode(fromNull));
+
+    VectorIndexConfig fromEmpty = JsonUtils.stringToObject("{\"properties\":{}}", VectorIndexConfig.class);
+    assertNotNull(fromEmpty.getProperties());
+    assertTrue(fromEmpty.getProperties().isEmpty());
+    assertOnlyKeys(serializeToNode(fromEmpty));
   }
 
   @Test

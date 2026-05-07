@@ -20,9 +20,13 @@ package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.vector.VectorIndexType;
+import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,6 +36,20 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 public class VectorIndexTest {
+  @Test
+  public void testEmptyPropertiesSurviveRoundTripForRuntimeDefaults()
+      throws Exception {
+    VectorIndexConfig original = new VectorIndexConfig(false, "HNSW", 128, 1,
+        VectorIndexConfig.VectorDistanceFunction.COSINE, Map.of());
+    String serialized = JsonUtils.objectToString(original);
+    VectorIndexConfig roundTripped = JsonUtils.stringToObject(serialized, VectorIndexConfig.class);
+
+    assertNotNull(roundTripped.getProperties());
+    assertTrue(roundTripped.getProperties().isEmpty());
+    // Regression guard: this used to NPE when properties became null after round-trip.
+    assertNotNull(VectorIndexUtils.getIndexWriterConfig(roundTripped));
+  }
+
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     @Test

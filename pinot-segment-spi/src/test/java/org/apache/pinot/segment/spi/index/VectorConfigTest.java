@@ -42,7 +42,7 @@ public class VectorConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -56,7 +56,7 @@ public class VectorConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -70,7 +70,7 @@ public class VectorConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
@@ -84,7 +84,7 @@ public class VectorConfigTest {
     assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getVectorIndexType(), "Unexpected vectorIndexType");
     assertNull(config.getVectorDistanceFunction(), "Unexpected vectorDistanceFunction");
-    assertNull(config.getProperties(), "unexpected properties");
+    assertTrue(config.getProperties().isEmpty(), "unexpected properties");
     assertEquals(config.getVectorDimension(), 0);
     assertEquals(config.getVersion(), 0);
   }
