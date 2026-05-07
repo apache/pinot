@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -74,7 +75,18 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
           "The second argument of filterMv transform function must be a single-valued string literal");
     }
     String predicate = ((LiteralTransformFunction) predicateArgument).getStringLiteral();
-    _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType, _dictionary);
+
+    // When the inner argument is a direct column reference, hand the DataSource to the predicate evaluator
+    // so it can ignore the dictionary on shared-dict + RAW columns (where dict-id matching would be wrong
+    // because the forward index serves raw values). For transform-function arguments fall back to the
+    // dictionary-only constructor — the transform's metadata already advertises the right hasDictionary.
+    if (_mainTransformFunction instanceof IdentifierTransformFunction) {
+      IdentifierTransformFunction identifierTransformFunction = (IdentifierTransformFunction) _mainTransformFunction;
+      DataSource dataSource = columnContextMap.get(identifierTransformFunction.getColumnName()).getDataSource();
+      _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, dataSource);
+    } else {
+      _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType, _dictionary);
+    }
   }
 
   @Override

@@ -399,6 +399,73 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
+  /// filterMv on a column with a shared dictionary on a RAW forward index AND an inverted index. The
+  /// inverted index should NOT influence filterMv's evaluation: filterMv applies its predicate per-value to
+  /// the already-fetched MV array, not at filter-plan time, so result selection happens entirely inside
+  /// FilterMvPredicateEvaluator. Asserts that:
+  /// - The on-disk shape is RAW + dict + inverted (sanity).
+  /// - The transform reports getDictionary() == null and hasDictionary() == false (same gating as the
+  ///   bare RAW + dict variant — IdentifierTransformFunction drops the dictionary because the forward index
+  ///   is RAW, regardless of secondary indexes).
+  /// - The result is exactly equal to {@link #testFilterMvOnSharedDictRawForwardColumn}'s output and to the
+  ///   dict-encoded baseline, proving the inverted index does not change predicate-evaluation semantics.
+  @Test(dataProvider = "filterMvIntPredicates")
+  public void testFilterMvOnSharedDictRawForwardWithInvertedColumn(String predicate, IntPredicate matcher) {
+    // Sanity: confirm the on-disk shape is dict + inverted + RAW forward.
+    DataSource dataSource = _dataSourceMap.get(INT_MV_DICT_RAW_INV_COLUMN);
+    assertNotNull(dataSource);
+    assertFalse(dataSource.getForwardIndex().isDictionaryEncoded(),
+        "Pre-condition: " + INT_MV_DICT_RAW_INV_COLUMN + " must have a RAW forward index");
+    assertNotNull(dataSource.getDictionary(),
+        "Pre-condition: " + INT_MV_DICT_RAW_INV_COLUMN + " must carry a shared dictionary");
+    assertNotNull(dataSource.getInvertedIndex(),
+        "Pre-condition: " + INT_MV_DICT_RAW_INV_COLUMN + " must carry an inverted index");
+
+    String escaped = predicate.replace("'", "''");
+    String expressionStr = String.format("filterMv(%s, '%s')", INT_MV_DICT_RAW_INV_COLUMN, escaped);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof FilterMvTransformFunction);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.INT);
+    assertFalse(resultMetadata.isSingleValue());
+    // Same gating as the bare RAW + dict variant — the inverted index sitting on disk doesn't change the
+    // fact that the forward index is RAW, so the dict-id path is suppressed for this column too.
+    assertFalse(resultMetadata.hasDictionary(),
+        "FilterMvTransformFunction over a RAW forward column must report hasDictionary=false even when an "
+            + "inverted index sits on the column");
+    assertNull(transformFunction.getDictionary());
+
+    // Compute filterMv on the same predicate over INT_MV_COLUMN (dict-encoded baseline) and over
+    // INT_MV_DICT_RAW_COLUMN (RAW + dict, no inverted) and assert all three produce identical results.
+    int[][] resultWithInverted = transformFunction.transformToIntValuesMV(_projectionBlock);
+    int[][] resultDictBaseline = filterMvIntValues(INT_MV_COLUMN, predicate);
+    int[][] resultRawDictNoInverted = filterMvIntValues(INT_MV_DICT_RAW_COLUMN, predicate);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      IntList expectedList = new IntArrayList();
+      for (int value : _intMVValues[i]) {
+        if (matcher.test(value)) {
+          expectedList.add(value);
+        }
+      }
+      int[] expected = expectedList.toIntArray();
+      assertEquals(resultWithInverted[i], expected, "RAW + dict + inverted, row=" + i + " predicate=" + predicate);
+      assertEquals(resultDictBaseline[i], expected, "dict-encoded baseline, row=" + i + " predicate=" + predicate);
+      assertEquals(resultRawDictNoInverted[i], expected,
+          "RAW + dict (no inverted), row=" + i + " predicate=" + predicate);
+    }
+  }
+
+  /// Helper: run filterMv on a named column with the given predicate string and return the resulting
+  /// per-row int MV arrays. Used for cross-column result-equivalence assertions.
+  private int[][] filterMvIntValues(String columnName, String predicate) {
+    String escaped = predicate.replace("'", "''");
+    String expressionStr = String.format("filterMv(%s, '%s')", columnName, escaped);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    return transformFunction.transformToIntValuesMV(_projectionBlock);
+  }
+
   @Test(dataProvider = "illegalArguments", expectedExceptions = {BadQueryRequestException.class})
   public void testIllegalArguments(String expressionStr) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);

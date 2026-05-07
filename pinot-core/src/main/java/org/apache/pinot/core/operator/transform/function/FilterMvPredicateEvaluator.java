@@ -30,7 +30,9 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -56,6 +58,17 @@ public final class FilterMvPredicateEvaluator {
     validateFilter(filterContext);
     EvalNode root = buildNode(filterContext, dictionary, dataType);
     return new FilterMvPredicateEvaluator(root);
+  }
+
+  /// Build a predicate evaluator from a column's data source. The dictionary is used only when the
+  /// underlying forward index is itself dictionary-encoded — for shared-dict + RAW columns the dictionary
+  /// file exists but dict-id reads aren't cheap, so the evaluator falls back to raw-value matching.
+  public static FilterMvPredicateEvaluator forPredicate(String predicate, DataSource dataSource) {
+    DataType dataType = dataSource.getDataSourceMetadata().getDataType();
+    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+    Dictionary dictionary =
+        forwardIndex != null && forwardIndex.isDictionaryEncoded() ? dataSource.getDictionary() : null;
+    return forPredicate(predicate, dataType, dictionary);
   }
 
   private static FilterContext parseFilterContext(String predicate) {

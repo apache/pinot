@@ -45,7 +45,7 @@ public class PredicateEvaluatorProvider {
     return getPredicateEvaluator(predicate, dictionary, dataType, null);
   }
 
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
+  private static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType, @Nullable QueryContext queryContext) {
     try {
       if (dictionary != null) {

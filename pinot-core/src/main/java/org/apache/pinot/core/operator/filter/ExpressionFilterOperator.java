@@ -73,6 +73,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
     } else {
+
       _predicateEvaluator =
           PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
               _transformFunction.getResultMetadata().getDataType(), _queryContext);
