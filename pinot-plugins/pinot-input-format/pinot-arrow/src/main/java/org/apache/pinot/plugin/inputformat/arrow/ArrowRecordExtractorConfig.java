@@ -18,24 +18,23 @@
  */
 package org.apache.pinot.plugin.inputformat.arrow;
 
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import java.util.Map;
+import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/// Config for [ArrowRecordReader]. Carries the Arrow allocator limit plus the
-/// [ArrowRecordExtractorConfig] `extractRawTimeValues` flag so the reader can construct the
-/// extractor's config at init time.
-public class ArrowRecordReaderConfig implements RecordReaderConfig {
-  public static final long DEFAULT_ALLOCATOR_LIMIT = 268435456L; // 256MB
+/// Config for [ArrowRecordExtractor]. One flag:
+/// - `extractRawTimeValues` (default `false`) — opt out of `Date` / `Time` / `Timestamp` conversion
+///   at the extractor boundary, surfacing the raw integer in the column's declared `TimeUnit`
+///   (`DateUnit` for `Date`) instead of the contract Java type. See [ArrowRecordExtractor] for
+///   the per-type matrix.
+public class ArrowRecordExtractorConfig implements RecordExtractorConfig {
+  public static final String EXTRACT_RAW_TIME_VALUES = "extractRawTimeValues";
 
-  private long _allocatorLimit = DEFAULT_ALLOCATOR_LIMIT;
   private boolean _extractRawTimeValues;
 
-  public long getAllocatorLimit() {
-    return _allocatorLimit;
-  }
-
-  public void setAllocatorLimit(long allocatorLimit) {
-    _allocatorLimit = allocatorLimit;
+  @Override
+  public void init(Map<String, String> props) {
+    _extractRawTimeValues = Boolean.parseBoolean(props.get(EXTRACT_RAW_TIME_VALUES));
   }
 
   public boolean isExtractRawTimeValues() {
