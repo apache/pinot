@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -67,7 +68,8 @@ public class RangeIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
@@ -75,10 +77,14 @@ public class RangeIndexHandler extends BaseIndexHandler {
     // Check if any index updates are required.
     boolean rangeIndexUpdated = false;
 
-    // Check if any existing index need to be removed.
+    // Check if any existing index need to be removed or rebuilt due to a version change.
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing range index from segment: {}, column: {}", segmentName, column);
+        rangeIndexUpdated = true;
+      } else if (existingRangeIndexVersionDiffers(segmentReader, column)) {
+        LOGGER.info("Need to rebuild range index for segment: {}, column: {} due to version change", segmentName,
+            column);
         rangeIndexUpdated = true;
       }
     }
@@ -98,10 +104,23 @@ public class RangeIndexHandler extends BaseIndexHandler {
     return rangeIndexUpdated;
   }
 
+  /// Returns `true` if the on-disk range index version doesn't match the configured version. Range index v1
+  /// (RangeIndexCreator) and v2 (BitSlicedRangeIndexCreator) have incompatible on-disk layouts and serve
+  /// different query semantics (v1 is non-exact, v2 is exact), so a version change requires rebuild.
+  private boolean existingRangeIndexVersionDiffers(SegmentDirectory.Reader segmentReader, String column)
+      throws Exception {
+    int configuredVersion = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.range()).getVersion();
+    // The buffer is owned by SegmentDirectory; don't close it here (mmap regions are shared).
+    PinotDataBuffer rangeIndexBuffer = segmentReader.getIndexFor(column, StandardIndexes.range());
+    int onDiskVersion = rangeIndexBuffer.getInt(0);
+    return onDiskVersion != configuredVersion;
+  }
+
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    // Remove indices not set in table config any more
+    // Remove indices not set in table config any more, or those whose on-disk version differs from the
+    // configured version (v1↔v2 require rebuild).
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.range());
@@ -110,6 +129,13 @@ public class RangeIndexHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing range index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.range());
         LOGGER.info("Removed existing range index from segment: {}, column: {}", segmentName, column);
+      } else if (existingRangeIndexVersionDiffers(segmentWriter, column)) {
+        LOGGER.info("Rebuilding range index for segment: {}, column: {} due to version change", segmentName, column);
+        segmentWriter.removeIndex(column, StandardIndexes.range());
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (columnMetadata != null && !columnMetadata.isSorted()) {
+          createRangeIndexForColumn(segmentWriter, columnMetadata);
+        }
       }
     }
     for (String column : columnsToAddIdx) {

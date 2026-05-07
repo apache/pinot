@@ -85,6 +85,18 @@ public class RangeIndexType
           storedType.isNumeric() || indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
           "Cannot create range index on non-numeric column: %s without dictionary", column);
       Preconditions.checkState(storedType != DataType.MAP, "Cannot create range index on MAP column: %s", column);
+      // Legacy range index (version 1) over dict IDs is non-exact: query-time partial matches fall back to
+      // ScanBasedFilterOperator, which on a RAW forward column would have to apply a dict-based evaluator
+      // against raw values — silently producing wrong results. Reject this combination upfront and require
+      // the BitSliced range index (version 2) for shared-dict + RAW forward columns.
+      boolean rawForward = indexConfigs.getConfig(StandardIndexes.forward()).getEncodingType()
+          == FieldConfig.EncodingType.RAW;
+      boolean dictionaryEnabled = indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
+      Preconditions.checkState(
+          !(rawForward && dictionaryEnabled && rangeIndexConfig.getVersion() == RangeIndexCreator.VERSION),
+          "Cannot create range index version %s on column: %s with RAW forward index and dictionary; "
+              + "use BitSliced range index version %s instead",
+          RangeIndexCreator.VERSION, column, BitSlicedRangeIndexCreator.VERSION);
     }
   }
 
