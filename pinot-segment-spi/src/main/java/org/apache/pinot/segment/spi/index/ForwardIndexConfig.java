@@ -276,9 +276,7 @@ public class ForwardIndexConfig extends IndexConfig {
   @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode node = super.toJsonObject();
-    if (_encodingType != EncodingType.DICTIONARY) {
-      node.put("encodingType", _encodingType.name());
-    }
+    node.put("encodingType", _encodingType.name());
     if (_compressionCodec != null) {
       node.put("compressionCodec", _compressionCodec.name());
     }

@@ -59,10 +59,9 @@ public class ForwardIndexConfigSerializationTest {
     ForwardIndexConfig.setDefaultTargetDocsPerChunk(_savedTargetDocsPerChunk);
   }
 
-  // The cluster-tunable trio is always materialized by the slim serializer (see class Javadoc).
-  // The keys are: rawIndexWriterVersion, targetMaxChunkSize, targetDocsPerChunk.
+  // encodingType and the cluster-tunable trio are always materialized by the slim serializer.
   private static final String[] ALWAYS_EMITTED = {
-      "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk"
+      "encodingType", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk"
   };
 
   @Test
@@ -73,6 +72,7 @@ public class ForwardIndexConfigSerializationTest {
     JsonNode node = serializeToNode(config);
 
     assertOnlyKeys(node, ALWAYS_EMITTED);
+    assertEquals(node.get("encodingType").asText(), EncodingType.DICTIONARY.name());
     assertEquals(node.get("rawIndexWriterVersion").asInt(), ForwardIndexConfig.getDefaultRawWriterVersion());
     assertEquals(node.get("targetMaxChunkSize").asText(), ForwardIndexConfig.getDefaultTargetMaxChunkSize());
     assertEquals(node.get("targetDocsPerChunk").asInt(), ForwardIndexConfig.getDefaultTargetDocsPerChunk());
@@ -87,7 +87,8 @@ public class ForwardIndexConfigSerializationTest {
 
     // getDisabled() builds via the explicit ctor with all-null settings, so the cluster-tunable
     // trio is materialized to live defaults.
-    assertOnlyKeys(node, "disabled", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk");
+    assertOnlyKeys(node, "disabled", "encodingType", "rawIndexWriterVersion", "targetMaxChunkSize",
+        "targetDocsPerChunk");
     assertTrue(node.get("disabled").asBoolean());
   }
 
@@ -99,7 +100,8 @@ public class ForwardIndexConfigSerializationTest {
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node, "compressionCodec", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk");
+    assertOnlyKeys(node, "compressionCodec", "encodingType", "rawIndexWriterVersion", "targetMaxChunkSize",
+        "targetDocsPerChunk");
     assertEquals(node.get("compressionCodec").asText(), "SNAPPY");
   }
 
@@ -111,7 +113,8 @@ public class ForwardIndexConfigSerializationTest {
 
     JsonNode node = serializeToNode(config);
 
-    assertOnlyKeys(node, "deriveNumDocsPerChunk", "rawIndexWriterVersion", "targetMaxChunkSize", "targetDocsPerChunk");
+    assertOnlyKeys(node, "deriveNumDocsPerChunk", "encodingType", "rawIndexWriterVersion", "targetMaxChunkSize",
+        "targetDocsPerChunk");
     assertTrue(node.get("deriveNumDocsPerChunk").asBoolean());
   }
 
