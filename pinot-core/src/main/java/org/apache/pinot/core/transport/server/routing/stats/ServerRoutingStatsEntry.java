@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport.server.routing.stats;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
