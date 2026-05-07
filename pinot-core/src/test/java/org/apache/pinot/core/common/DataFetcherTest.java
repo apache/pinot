@@ -35,10 +35,6 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -53,13 +49,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 
 public class DataFetcherTest {
@@ -393,50 +382,6 @@ public class DataFetcherTest {
       Assert.assertEquals(new String(BytesUtils.toBytes(hexStringValues[i]), UTF_8),
           Integer.toString(_values[docIds[i]]), ERROR_MESSAGE);
     }
-  }
-
-  /// Verifies the dict-id contract on a column with a shared standalone dictionary on a RAW forward index:
-  /// 1. {@link DataFetcher#fetchDictIds} does **not** fall back to a per-row dictionary lookup. Calling it on
-  ///    a RAW forward index propagates the {@link UnsupportedOperationException} from the underlying reader.
-  /// 2. {@link DataFetcher#fetchDictIdsFromRawValues} is the explicit opt-in path; it produces the dict ids
-  ///    via per-row {@link Dictionary#indexOf} lookups.
-  @Test
-  public void testFetchDictIdsFromRawForwardIndexWithSharedDictionary() {
-    @SuppressWarnings("unchecked")
-    ForwardIndexReader<?> forwardIndexReader = mock(ForwardIndexReader.class);
-    ForwardIndexReaderContext readerContext = mock(ForwardIndexReaderContext.class);
-    Dictionary dictionary = mock(Dictionary.class);
-    DataSource dataSource = mock(DataSource.class);
-    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
-
-    when(forwardIndexReader.isDictionaryEncoded()).thenReturn(false);
-    when(forwardIndexReader.isSingleValue()).thenReturn(true);
-    when(forwardIndexReader.getStoredType()).thenReturn(DataType.INT);
-    doReturn(readerContext).when((ForwardIndexReader) forwardIndexReader).createContext(anyMap());
-    // The RAW reader's readDictIds throws (matches the SPI default for non-dict-encoded readers).
-    doThrow(new UnsupportedOperationException()).when((ForwardIndexReader) forwardIndexReader)
-        .readDictIds(any(int[].class), eq(3), any(int[].class), any());
-    when(forwardIndexReader.getInt(eq(0), any())).thenReturn(11);
-    when(forwardIndexReader.getInt(eq(1), any())).thenReturn(22);
-    when(forwardIndexReader.getInt(eq(2), any())).thenReturn(33);
-    when(dictionary.indexOf(11)).thenReturn(1);
-    when(dictionary.indexOf(22)).thenReturn(2);
-    when(dictionary.indexOf(33)).thenReturn(3);
-    when(dataSource.getForwardIndex()).thenReturn((ForwardIndexReader) forwardIndexReader);
-    when(dataSource.getDictionary()).thenReturn(dictionary);
-    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
-    when(dataSourceMetadata.isSingleValue()).thenReturn(true);
-
-    DataFetcher dataFetcher = new DataFetcher(Collections.singletonMap("rawInt", dataSource), Collections.emptyMap());
-
-    // (1) fetchDictIds must not fall back — the RAW reader's readDictIds throws.
-    int[] dictIds = new int[3];
-    Assert.expectThrows(UnsupportedOperationException.class,
-        () -> dataFetcher.fetchDictIds("rawInt", new int[] {0, 1, 2}, 3, dictIds));
-
-    // (2) fetchDictIdsFromRawValues is the explicit per-row dictionary-lookup path.
-    dataFetcher.fetchDictIdsFromRawValues("rawInt", new int[] {0, 1, 2}, 3, dictIds);
-    Assert.assertEquals(dictIds, new int[] {1, 2, 3});
   }
 
   @AfterClass
