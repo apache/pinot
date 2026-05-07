@@ -40,12 +40,20 @@ public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
-      DataType dataType) {
-    return getPredicateEvaluator(predicate, dictionary, dataType, null);
+  /// Single public entry point. Callers must decide what to pass:
+  /// - Column callers (FilterPlanNode, ExpressionFilterOperator, etc.) pass the column's `DataSource` so the
+  ///   gating logic in {@link #getDictionaryUsableForFiltering} can pick between dict-based and raw-value
+  ///   evaluation for shared-dict + RAW columns.
+  /// - Callers without a `DataSource` (post-reduction matchers, non-column transforms) pass `null`. The
+  ///   evaluator will be built from raw values using the supplied `dataType`.
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable DataSource dataSource,
+      DataType dataType, @Nullable QueryContext queryContext) {
+    Dictionary dictionary = dataSource != null ? getDictionaryUsableForFiltering(dataSource, queryContext, predicate)
+        : null;
+    return getPredicateEvaluatorInternal(predicate, dictionary, dataType, queryContext);
   }
 
-  private static PredicateEvaluator getPredicateEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
+  private static PredicateEvaluator getPredicateEvaluatorInternal(Predicate predicate, @Nullable Dictionary dictionary,
       DataType dataType, @Nullable QueryContext queryContext) {
     try {
       if (dictionary != null) {
@@ -96,12 +104,6 @@ public class PredicateEvaluatorProvider {
       // Exception here is caused by mismatch between the column data type and the predicate value in the query
       throw new BadQueryRequestException(e);
     }
-  }
-
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource,
-      QueryContext queryContext) {
-    return getPredicateEvaluator(predicate, getDictionaryUsableForFiltering(dataSource, queryContext, predicate),
-        dataSource.getDataSourceMetadata().getDataType(), queryContext);
   }
 
   /// Returns the column dictionary if the planner can actually use it for filtering this specific predicate, otherwise

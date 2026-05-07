@@ -27,12 +27,21 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.RegexpLikePredicateEvaluatorFactory;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -49,6 +58,17 @@ public final class FilterMvPredicateEvaluator {
     _root = root;
   }
 
+  /// Build a predicate evaluator for filterMv. Filtering happens per-value at transform time, so the choice
+  /// between dict-id matching and raw-value matching is determined by whether the caller has a dictionary
+  /// of dict ids for the values being filtered:
+  /// - Pass a non-null `dictionary` only when the inner expression's value stream actually carries dict ids
+  ///   (e.g. an Identifier wrapping a dict-encoded forward column whose `getDictionary()` is non-null).
+  ///   filterMv's `matchesDictId` path will be exercised against that dictionary.
+  /// - Pass `null` when the value stream is raw (RAW forward column, computed transform output, or scalar
+  ///   invocation). filterMv's `matchesInt`/`matchesString`/etc. will be exercised.
+  /// This deliberately bypasses {@link PredicateEvaluatorProvider}'s filter-plan-time gating, which is
+  /// designed for operator selection and would route shared-dict + RAW columns through the dict-based
+  /// evaluator — incorrect at filterMv's per-value evaluation layer.
   public static FilterMvPredicateEvaluator forPredicate(String predicate, DataType dataType,
       @Nullable Dictionary dictionary) {
     if (StringUtils.isBlank(predicate)) {
@@ -58,17 +78,6 @@ public final class FilterMvPredicateEvaluator {
     validateFilter(filterContext);
     EvalNode root = buildNode(filterContext, dictionary, dataType);
     return new FilterMvPredicateEvaluator(root);
-  }
-
-  /// Build a predicate evaluator from a column's data source. The dictionary is used only when the
-  /// underlying forward index is itself dictionary-encoded — for shared-dict + RAW columns the dictionary
-  /// file exists but dict-id reads aren't cheap, so the evaluator falls back to raw-value matching.
-  public static FilterMvPredicateEvaluator forPredicate(String predicate, DataSource dataSource) {
-    DataType dataType = dataSource.getDataSourceMetadata().getDataType();
-    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-    Dictionary dictionary =
-        forwardIndex != null && forwardIndex.isDictionaryEncoded() ? dataSource.getDictionary() : null;
-    return forPredicate(predicate, dataType, dictionary);
   }
 
   private static FilterContext parseFilterContext(String predicate) {
@@ -118,8 +127,7 @@ public final class FilterMvPredicateEvaluator {
           throw new IllegalArgumentException(
               "filterMv does not support predicate type: " + predicate.getType());
         }
-        PredicateEvaluator evaluator =
-            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dictionary, dataType);
+        PredicateEvaluator evaluator = buildPerValueEvaluator(predicate, dictionary, dataType);
         if (evaluator.isAlwaysTrue()) {
           return EvalNode.constant(true);
         }
@@ -174,6 +182,55 @@ public final class FilterMvPredicateEvaluator {
       }
       default:
         throw new IllegalArgumentException("Unsupported filter type: " + filterContext.getType());
+    }
+  }
+
+  /// Build a predicate evaluator for filterMv's per-value evaluation. Dispatches directly on the predicate
+  /// type instead of going through {@link PredicateEvaluatorProvider}, because filterMv evaluates each MV
+  /// element with a known dictionary stance — the per-predicate-type filter-plan-time gating that
+  /// PredicateEvaluatorProvider applies is not what filterMv wants here.
+  private static PredicateEvaluator buildPerValueEvaluator(Predicate predicate, @Nullable Dictionary dictionary,
+      DataType dataType) {
+    if (dictionary != null) {
+      switch (predicate.getType()) {
+        case EQ:
+          return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary,
+              dataType);
+        case NOT_EQ:
+          return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotEqPredicate) predicate,
+              dictionary, dataType);
+        case IN:
+          return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary,
+              dataType, null);
+        case NOT_IN:
+          return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary,
+              dataType, null);
+        case RANGE:
+          return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary,
+              dataType);
+        case REGEXP_LIKE:
+          return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
+              dictionary, dataType, null);
+        default:
+          throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
+      }
+    }
+    switch (predicate.getType()) {
+      case EQ:
+        return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
+      case NOT_EQ:
+        return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotEqPredicate) predicate, dataType);
+      case IN:
+        return InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
+      case NOT_IN:
+        return NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotInPredicate) predicate, dataType);
+      case RANGE:
+        return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
+      case REGEXP_LIKE:
+        return RegexpLikePredicateEvaluatorFactory.newRawValueBasedEvaluator((RegexpLikePredicate) predicate,
+            dataType);
+      default:
+        throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
     }
   }
 

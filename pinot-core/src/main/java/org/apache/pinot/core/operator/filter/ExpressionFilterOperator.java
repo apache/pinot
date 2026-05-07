@@ -37,6 +37,7 @@ import org.apache.pinot.core.operator.docidsets.ExpressionDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.operator.transform.function.IdentifierTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -74,8 +75,15 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       _predicateEvaluator = null;
     } else {
 
+      // When the inner expression is a direct column reference, hand its DataSource to the evaluator so
+      // gating logic picks the right path; otherwise (computed transform) the evaluator falls back to
+      // raw-value matching against the transform output.
+      DataSource innerDataSource = null;
+      if (_transformFunction instanceof IdentifierTransformFunction) {
+        innerDataSource = _dataSourceMap.get(((IdentifierTransformFunction) _transformFunction).getColumnName());
+      }
       _predicateEvaluator =
-          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
+          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, innerDataSource,
               _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }

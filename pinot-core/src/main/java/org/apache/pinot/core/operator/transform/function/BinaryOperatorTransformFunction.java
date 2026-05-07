@@ -37,7 +37,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -121,9 +121,16 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
           _rightTransformFunction.getName(), _rightStoredType));
     }
 
-    // Create predicate evaluator when the right side is a literal
+    // Create predicate evaluator when the right side is a literal. When the LHS is a direct column
+    // reference, hand its DataSource to the evaluator so the gating logic can pick the right path; for
+    // computed transforms the predicate evaluator falls back to raw-value matching.
     if (_rightTransformFunction instanceof LiteralTransformFunction) {
-      _predicateEvaluator = createPredicateEvaluator(leftDataType, _leftTransformFunction.getDictionary(),
+      DataSource leftDataSource = null;
+      if (_leftTransformFunction instanceof IdentifierTransformFunction) {
+        IdentifierTransformFunction lhs = (IdentifierTransformFunction) _leftTransformFunction;
+        leftDataSource = columnContextMap.get(lhs.getColumnName()).getDataSource();
+      }
+      _predicateEvaluator = createPredicateEvaluator(leftDataType, leftDataSource,
           ((LiteralTransformFunction) _rightTransformFunction).getLiteralContext());
     }
   }
@@ -133,7 +140,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
    * evaluates to the same value (true/false/null) where the predicate evaluator is not needed.
    */
   @Nullable
-  private PredicateEvaluator createPredicateEvaluator(DataType leftDataType, @Nullable Dictionary leftDictionary,
+  private PredicateEvaluator createPredicateEvaluator(DataType leftDataType, @Nullable DataSource leftDataSource,
       LiteralContext rightLiteral) {
     if (rightLiteral.isNull()) {
       _alwaysNull = true;
@@ -143,7 +150,7 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     if (predicate == null) {
       return null;
     }
-    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDictionary, leftDataType);
+    return PredicateEvaluatorProvider.getPredicateEvaluator(predicate, leftDataSource, leftDataType, null);
   }
 
   /**
