@@ -243,12 +243,9 @@ public class TableIndexingTest {
     String getErrorMessage() {
       if (_error == null) {
         return null;
+      } else {
+        return _error.getMessage().replaceAll("\n", " ");
       }
-      String message = _error.getMessage();
-      if (message == null) {
-        return _error.getClass().getSimpleName();
-      }
-      return message.replaceAll("\n", " ");
     }
   }
 
@@ -548,7 +545,7 @@ public class TableIndexingTest {
           .append(test._error == null).append(';');
       //@formatter:on
       if (test._error != null) {
-        summary.append(test.getErrorMessage());
+        summary.append(test._error.getMessage().replaceAll("\n", " "));
       }
       summary.append('\n');
     }
