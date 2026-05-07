@@ -108,6 +108,11 @@ public abstract class BaseTransformFunctionTest {
   protected static final String DOUBLE_MV_COLUMN_2 = "doubleMV2";
   protected static final String JSON_COLUMN = "json";
   protected static final String DEFAULT_JSON_COLUMN = "defaultJson";
+  /// MV INT column configured as RAW forward with a shared dictionary (driven by an inverted index in the
+  /// FieldConfig). Carries the same values as {@link #INT_MV_COLUMN} so callers can compare results against
+  /// the dict-encoded baseline. Exists to exercise the predicate-evaluator code paths for shared-dict + RAW
+  /// columns: the forward index serves raw values while a dictionary file lives alongside.
+  protected static final String INT_MV_DICT_RAW_COLUMN = "intMVDictRaw";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
   private static final Random RANDOM = new Random();
@@ -242,6 +247,8 @@ public abstract class BaseTransformFunctionTest {
       map.put(BYTES_SV_COLUMN, _bytesSVValues[i]);
 
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
+      // Same values as INT_MV_COLUMN so callers can compare results against the dict-encoded baseline.
+      map.put(INT_MV_DICT_RAW_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       if (isNullRow(i)) {
         map.put(INT_MV_NULL_COLUMN, null);
       } else {
@@ -292,6 +299,7 @@ public abstract class BaseTransformFunctionTest {
         .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(DEFAULT_JSON_COLUMN, FieldSpec.DataType.JSON)
         .addMultiValueDimension(INT_MV_COLUMN, FieldSpec.DataType.INT)
+        .addMultiValueDimension(INT_MV_DICT_RAW_COLUMN, FieldSpec.DataType.INT)
         .addMultiValueDimension(INT_MV_NULL_COLUMN, FieldSpec.DataType.INT)
         .addMultiValueDimension(LONG_MV_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(FLOAT_MV_COLUMN, FieldSpec.DataType.FLOAT)
@@ -344,6 +352,14 @@ public abstract class BaseTransformFunctionTest {
         new FieldConfig(JSON_STRING_SV_COLUMN, FieldConfig.EncodingType.DICTIONARY, null, null, null, null, indexNode,
             null, null);
     fieldConfigList.add(jsonFieldConfig);
+    // Configure INT_MV_DICT_RAW_COLUMN as RAW forward with both an explicit dictionary and an inverted index.
+    // The result on disk is the shared-dict + RAW shape: forward stores raw values, a dictionary file lives
+    // alongside, and an inverted index reads against that dictionary.
+    ObjectNode dictAndInvertedIndexes = JsonNodeFactory.instance.objectNode();
+    dictAndInvertedIndexes.set("dictionary", JsonNodeFactory.instance.objectNode());
+    dictAndInvertedIndexes.set("inverted", JsonNodeFactory.instance.objectNode());
+    fieldConfigList.add(new FieldConfig(INT_MV_DICT_RAW_COLUMN, FieldConfig.EncodingType.RAW, null, null, null, null,
+        dictAndInvertedIndexes, null, null));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
             .setFieldConfigList(fieldConfigList).setNullHandlingEnabled(true).build();
