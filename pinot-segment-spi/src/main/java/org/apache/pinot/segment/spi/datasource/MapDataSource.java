@@ -25,20 +25,53 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 
 /// DataSource for a MAP column. Provides per-key DataSources that can be used for filtering,
 /// aggregation, and projection on individual MAP keys.
+///
+/// **Migration note:** the `getKeyXXX` methods are deprecated in favor of shorter names without
+/// the `Key` infix (e.g. `getDataSource`, `getDataSources`). New implementations should override
+/// the new names and leave the deprecated ones alone. Existing implementations that override only
+/// the old names will continue to work — the new-name defaults delegate to the deprecated methods.
 public interface MapDataSource extends DataSource {
 
   /// Returns the map FieldSpec.
   ComplexFieldSpec.MapFieldSpec getFieldSpec();
 
+  // ---- Preferred API (new names) — override these in new implementations ----
+
   /// Returns the DataSource for the given map key's values.
-  DataSource getDataSource(String key);
+  default DataSource getDataSource(String key) {
+    return getKeyDataSource(key);
+  }
 
   /// Returns DataSources for all keys present in this segment.
-  Map<String, DataSource> getDataSources();
+  default Map<String, DataSource> getDataSources() {
+    return getKeyDataSources();
+  }
 
   /// Returns the DataSourceMetadata for the given key's values.
-  DataSourceMetadata getDataSourceMetadata(String key);
+  default DataSourceMetadata getDataSourceMetadata(String key) {
+    return getKeyDataSourceMetadata(key);
+  }
 
   /// Returns the ColumnIndexContainer for the given key's values.
-  ColumnIndexContainer getIndexContainer(String key);
+  default ColumnIndexContainer getIndexContainer(String key) {
+    return getKeyIndexContainer(key);
+  }
+
+  // ---- Deprecated API (old names) — still abstract for backward compatibility ----
+
+  /// @deprecated Use {@link #getDataSource(String)} instead.
+  @Deprecated
+  DataSource getKeyDataSource(String key);
+
+  /// @deprecated Use {@link #getDataSources()} instead.
+  @Deprecated
+  Map<String, DataSource> getKeyDataSources();
+
+  /// @deprecated Use {@link #getDataSourceMetadata(String)} instead.
+  @Deprecated
+  DataSourceMetadata getKeyDataSourceMetadata(String key);
+
+  /// @deprecated Use {@link #getIndexContainer(String)} instead.
+  @Deprecated
+  ColumnIndexContainer getKeyIndexContainer(String key);
 }

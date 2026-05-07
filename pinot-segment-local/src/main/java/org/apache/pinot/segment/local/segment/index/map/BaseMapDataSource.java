@@ -68,7 +68,8 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
    * @param key to get the DataSource for
    * @return DataSource for the key
    */
-  public DataSource getDataSource(String key) {
+  @Override
+  public DataSource getKeyDataSource(String key) {
     if (_keyDataSources.containsKey(key)) {
       return _keyDataSources.get(key);
     }
@@ -92,22 +93,23 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
 
   public abstract MapIndexReader getMapIndexReader();
 
-  public Map<String, DataSource> getDataSources() {
+  @Override
+  public Map<String, DataSource> getKeyDataSources() {
     MapIndexReader mapIndexReader = (MapIndexReader) getForwardIndex();
     assert mapIndexReader != null;
     Map<String, DataSource> keyDataSources = new HashMap<>();
     Set<String> allKeys = mapIndexReader.getKeys();
-    allKeys.forEach(key -> keyDataSources.put(key, getDataSource(key)));
+    allKeys.forEach(key -> keyDataSources.put(key, getKeyDataSource(key)));
     return keyDataSources;
   }
 
   @Override
-  public DataSourceMetadata getDataSourceMetadata(String key) {
+  public DataSourceMetadata getKeyDataSourceMetadata(String key) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public ColumnIndexContainer getIndexContainer(String key) {
+  public ColumnIndexContainer getKeyIndexContainer(String key) {
     throw new UnsupportedOperationException();
   }
 }

@@ -53,12 +53,12 @@ public class ImmutableMapDataSource extends BaseMapDataSource {
   }
 
   @Override
-  public DataSourceMetadata getDataSourceMetadata(String key) {
+  public DataSourceMetadata getKeyDataSourceMetadata(String key) {
     return null;
   }
 
   @Override
-  public ColumnIndexContainer getIndexContainer(String key) {
+  public ColumnIndexContainer getKeyIndexContainer(String key) {
     return null;
   }
 
