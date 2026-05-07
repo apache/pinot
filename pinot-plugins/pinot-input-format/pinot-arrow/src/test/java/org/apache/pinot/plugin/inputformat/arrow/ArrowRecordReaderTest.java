@@ -93,7 +93,8 @@ public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
 
     try (RootAllocator allocator = new RootAllocator();
         VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
-        FileOutputStream fos = new FileOutputStream(_dataFile); FileChannel channel = fos.getChannel();
+        FileOutputStream fos = new FileOutputStream(_dataFile);
+        FileChannel channel = fos.getChannel();
         ArrowFileWriter writer = new ArrowFileWriter(root, null, channel)) {
 
       writer.start();
