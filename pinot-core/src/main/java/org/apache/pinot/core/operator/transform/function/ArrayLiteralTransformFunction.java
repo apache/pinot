@@ -28,7 +28,6 @@ import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -219,11 +218,6 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   @Override
   public TransformResultMetadata getResultMetadata() {
     return new TransformResultMetadata(_dataType, false, false);
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return null;
   }
 
   @Override

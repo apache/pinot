@@ -110,9 +110,6 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
-    if (_dictionary == null) {
-      return super.transformToDictIdsMV(valueBlock);
-    }
     int length = valueBlock.getNumDocs();
     if (_dictIdsMV == null || _dictIdsMV.length < length) {
       _dictIdsMV = new int[length][];
