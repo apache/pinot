@@ -93,7 +93,7 @@ public class PredicateEvaluatorProviderTest {
     assertTrue(evaluator.isDictionaryBased(), "Dict-encoded forward index must always keep dict-based evaluator");
   }
 
-  /// Forward index disabled (e.g. forward-index-disabled column) — leave dictionary in place because scan is impossible.
+  /// Forward index disabled (e.g. forward-index-disabled column) — keep dictionary in place since scan is impossible.
   @Test
   public void forwardIndexDisabledKeepsDictEvaluator() {
     DataSource dataSource = mockDataSource("col", DataType.STRING, /*sorted=*/false,

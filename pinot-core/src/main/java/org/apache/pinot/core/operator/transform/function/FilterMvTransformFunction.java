@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -74,9 +75,26 @@ public class FilterMvTransformFunction extends BaseTransformFunction {
           "The second argument of filterMv transform function must be a single-valued string literal");
     }
     String predicate = ((LiteralTransformFunction) predicateArgument).getStringLiteral();
-    _dictionary = _mainTransformFunction.getDictionary();
+    // IdentifierTransformFunction always exposes the column dictionary if one exists, but the dict-id
+    // matching path requires forward.getDictIdMV() to actually serve dict ids cheaply. RAW forward indexes
+    // throw UnsupportedOperationException from getDictIdMV — so when the inner Identifier wraps a RAW
+    // forward column (with or without a shared dictionary), drop the dictionary here so filterMv falls
+    // back to per-value raw matching.
+    _dictionary = dictionaryUsableForFilterMv(firstArgument, columnContextMap);
     _predicateEvaluator = FilterMvPredicateEvaluator.forPredicate(predicate, _dataType, _dictionary);
     _resultMetadata = new TransformResultMetadata(_dataType, innerMetadata.isSingleValue(), _dictionary != null);
+  }
+
+  @Nullable
+  private static Dictionary dictionaryUsableForFilterMv(TransformFunction inner,
+      Map<String, ColumnContext> columnContextMap) {
+    Dictionary dictionary = inner.getDictionary();
+    if (dictionary == null || !(inner instanceof IdentifierTransformFunction)) {
+      return dictionary;
+    }
+    DataSource dataSource = columnContextMap.get(((IdentifierTransformFunction) inner).getColumnName()).getDataSource();
+    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+    return (forwardIndex != null && forwardIndex.isDictionaryEncoded()) ? dictionary : null;
   }
 
   @Override

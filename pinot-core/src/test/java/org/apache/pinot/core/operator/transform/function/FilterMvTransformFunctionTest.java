@@ -350,11 +350,11 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     assertEquals(filteredAll.length, 3);
   }
 
-  /// filterMv on a column with a shared dictionary on a RAW forward index. Verifies that the predicate
-  /// evaluator constructed inside the transform function picks the raw-value matching path (no dict ids),
-  /// because the column's IdentifierTransformFunction reports `getDictionary() == null` even though the
-  /// dictionary file exists on disk. The transform output must still match the dict-encoded baseline
-  /// produced by the regular `INT_MV_COLUMN` (both columns hold the same values).
+  /// filterMv on a column with a shared dictionary on a RAW forward index. FilterMvTransformFunction
+  /// drops the dictionary internally because RAW forward indexes throw UnsupportedOperationException
+  /// from getDictIdMV — the dict-id path is not viable. The predicate evaluator falls back to per-value
+  /// raw matching, and the transform output must still match the dict-encoded baseline produced by the
+  /// regular `INT_MV_COLUMN` (both columns hold the same values).
   @Test(dataProvider = "filterMvIntPredicates")
   public void testFilterMvOnSharedDictRawForwardColumn(String predicate, IntPredicate matcher) {
     // Sanity: the data source must actually be RAW + dict for this test to be meaningful.
@@ -373,16 +373,14 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
     assertEquals(resultMetadata.getDataType(), DataType.INT);
     assertFalse(resultMetadata.isSingleValue());
-    // The IdentifierTransformFunction wrapping a RAW forward index drops the dictionary even when one is
-    // on disk, so the FilterMv transform's getDictionary() — and therefore its TransformResultMetadata —
-    // reports no dictionary. This forces FilterMvPredicateEvaluator to use raw-value matching
-    // (matchesInt / matchesString / etc.) instead of matchesDictId.
+    // FilterMvTransformFunction drops the dictionary internally for RAW forward — getDictIdMV throws
+    // UnsupportedOperationException on RAW forward indexes, so the dict-id path isn't viable. The
+    // predicate evaluator runs the raw-value matching path instead.
     assertFalse(resultMetadata.hasDictionary(),
         "FilterMvTransformFunction over a RAW forward column must report hasDictionary=false so the predicate "
             + "evaluator takes the raw-value matching path");
     assertNull(transformFunction.getDictionary());
 
-    // transformToIntValuesMV is the active path for INT data when the dictionary is null.
     int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       IntList expectedList = new IntArrayList();
@@ -400,9 +398,9 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
   }
 
   /// filterMv on a column with a shared dictionary on a RAW forward index AND an inverted index. The
-  /// inverted index does not influence filterMv's per-value evaluation — FilterMvPredicateEvaluator
-  /// drops the dictionary internally for RAW forward, so the evaluator runs the raw-value path. The
-  /// result must still match the dict-encoded baseline.
+  /// inverted index doesn't influence filterMv's per-value evaluation — FilterMvTransformFunction still
+  /// drops the dictionary internally because the underlying forward index is RAW (getDictIdMV would
+  /// throw), so the result matches the dict-encoded baseline via the raw-value matching path.
   @Test(dataProvider = "filterMvIntPredicates")
   public void testFilterMvOnSharedDictRawForwardWithInvertedColumn(String predicate, IntPredicate matcher) {
     // Sanity: confirm the on-disk shape is dict + inverted + RAW forward.
@@ -423,9 +421,8 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
     assertEquals(resultMetadata.getDataType(), DataType.INT);
     assertFalse(resultMetadata.isSingleValue());
-    // FilterMvPredicateEvaluator drops the dictionary internally for RAW forward — the dict-id path is
-    // not viable when the forward index can't serve dict ids cheaply. The inverted index sitting on disk
-    // does not change this; filterMv runs the raw-value path regardless of secondary indexes.
+    // FilterMvTransformFunction drops the dictionary internally for RAW forward — even with an inverted
+    // index sitting on disk, the dict-id path is not viable because getDictIdMV throws on RAW forward.
     assertFalse(resultMetadata.hasDictionary(),
         "FilterMvTransformFunction over a RAW forward column must report hasDictionary=false even when an "
             + "inverted index sits on the column");
