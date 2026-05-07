@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -67,7 +68,7 @@ public class ForwardIndexConfigSerializationTest {
   @Test
   public void testDefaultPojoSerializesOnlyClusterTunableTrio()
       throws Exception {
-    ForwardIndexConfig config = ForwardIndexConfig.getDefault();
+    ForwardIndexConfig config = ForwardIndexConfig.getDefault(EncodingType.DICTIONARY);
 
     JsonNode node = serializeToNode(config);
 
@@ -93,7 +94,7 @@ public class ForwardIndexConfigSerializationTest {
   @Test
   public void testCompressionCodecEmittedWhenSet()
       throws Exception {
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withCompressionCodec(CompressionCodec.SNAPPY).build();
 
     JsonNode node = serializeToNode(config);
@@ -105,7 +106,7 @@ public class ForwardIndexConfigSerializationTest {
   @Test
   public void testDeriveNumDocsPerChunkEmittedWhenTrue()
       throws Exception {
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withDeriveNumDocsPerChunk(true).build();
 
     JsonNode node = serializeToNode(config);
@@ -118,7 +119,7 @@ public class ForwardIndexConfigSerializationTest {
   public void testNonDefaultRawIndexWriterVersionEmitted()
       throws Exception {
     int nonDefault = ForwardIndexConfig.getDefaultRawWriterVersion() + 1;
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withRawIndexWriterVersion(nonDefault).build();
 
     JsonNode node = serializeToNode(config);
@@ -137,7 +138,7 @@ public class ForwardIndexConfigSerializationTest {
   public void testClusterTunableTrioAlwaysMaterialized()
       throws Exception {
     int original = ForwardIndexConfig.getDefaultRawWriterVersion();
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withRawIndexWriterVersion(original).build();
 
     JsonNode firstNode = serializeToNode(config);
@@ -155,7 +156,7 @@ public class ForwardIndexConfigSerializationTest {
   @Test
   public void testDeprecatedKeysNotEmitted()
       throws Exception {
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withCompressionCodec(CompressionCodec.SNAPPY).build();
 
     JsonNode node = serializeToNode(config);
@@ -186,7 +187,7 @@ public class ForwardIndexConfigSerializationTest {
   @Test
   public void testJacksonSerializationMatchesToJsonObject()
       throws Exception {
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withCompressionCodec(CompressionCodec.LZ4)
         .withDeriveNumDocsPerChunk(true)
         .build();
@@ -197,7 +198,7 @@ public class ForwardIndexConfigSerializationTest {
   @Test
   public void testFreshObjectMapperUsesJsonValue()
       throws Exception {
-    ForwardIndexConfig config = new ForwardIndexConfig.Builder()
+    ForwardIndexConfig config = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY)
         .withCompressionCodec(CompressionCodec.SNAPPY).build();
 
     String json = new ObjectMapper().writeValueAsString(config);
