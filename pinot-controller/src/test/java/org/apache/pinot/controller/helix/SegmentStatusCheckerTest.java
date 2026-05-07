@@ -716,6 +716,22 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
+  public void nullIdealStateTest()
+      throws Exception {
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(null);
+
+    TableSizeReader tableSizeReader = runSegmentStatusChecker(resourceManager, 0);
+    // Tables with null IdealState should not trigger the size scatter-gather either: getServerToSegmentsMap throws
+    // IllegalStateException when IdealState is missing, which would propagate to processTable's outer catch as an
+    // ERROR + stack trace per table per cycle.
+    verify(tableSizeReader, never()).getTableSizeDetails(anyString(), anyInt(), anyBoolean());
+    // Disabled-table count should not be inflated by null-IdealState entries.
+    assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT), 0);
+  }
+
+  @Test
   public void noSegmentTest() {
     noSegmentTest(0);
     noSegmentTest(5);
