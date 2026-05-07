@@ -681,11 +681,15 @@ public class ForwardIndexHandlerTest {
       assertEquals(computeOperations(),
           Map.of(DIM_DICT_MV_BYTES, List.of(ForwardIndexHandler.Operation.DISABLE_DICTIONARY)));
 
-      // TEST3: Disable dictionary and enable inverted index. Should be a no-op.
+      // TEST3: Disable dictionary and enable inverted index on a previously dict-encoded column. The inverted
+      // index requires a dictionary, so the auto-keep-dictionary-when-required-by-index logic keeps the dict.
+      // The forward index encoding still has to flip from DICT to RAW per the user's noDictionaryColumns
+      // request, so ENABLE_RAW_FORWARD_INDEX is queued (the encoding-flip handler keeps the dictionary).
       resetIndexConfigs();
       _noDictionaryColumns.add(DIM_DICT_STRING);
       _invertedIndexColumns.add(DIM_DICT_STRING);
-      assertTrue(computeOperations().isEmpty());
+      assertEquals(computeOperations(),
+          Map.of(DIM_DICT_STRING, List.of(ForwardIndexHandler.Operation.ENABLE_RAW_FORWARD_INDEX)));
     }
   }
 

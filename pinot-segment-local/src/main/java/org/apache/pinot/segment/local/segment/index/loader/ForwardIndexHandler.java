@@ -152,6 +152,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             _tmpForwardIndexColumns.add(column);
             break;
           case ENABLE_DICT_FORWARD_INDEX: {
+            // Rebuilding a dict-encoded forward index requires the dictionary to be present afterwards — the
+            // forward index stores dict ids that resolve through it.
             ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, column, false);
             if (!columnMetadata.hasDictionary() || !segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
               throw new IllegalStateException(String.format(
@@ -160,11 +162,22 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             break;
           }
           case ENABLE_RAW_FORWARD_INDEX: {
-            ColumnMetadata columnMetadata = createForwardIndexIfNeeded(segmentWriter, column, false);
-            if (columnMetadata.hasDictionary() || segmentWriter.hasIndexFor(column, StandardIndexes.dictionary())) {
+            // Two on-disk shapes can land here:
+            //   (a) Forward index is absent → rebuild from dict + inverted as raw forward (no dict change).
+            //   (b) Forward index exists and is DICT-encoded → flip the encoding to RAW in place, keeping the
+            //       dictionary because another enabled index requires it (e.g. dict + inverted + raw forward).
+            // The dictionary stays untouched in either case; if the new config wants the dictionary gone, the
+            // dict-transition step queues DISABLE_DICTIONARY separately (which on a dict-encoded forward
+            // already takes the convert-and-drop path, so the planner suppresses this op in that combo).
+            if (segmentWriter.hasIndexFor(column, StandardIndexes.forward())
+                && isForwardIndexDictionaryEncoded(column)) {
+              convertDictForwardToRawKeepingDictionary(column, segmentWriter);
+            } else {
+              createForwardIndexIfNeeded(segmentWriter, column, false);
+            }
+            if (!segmentWriter.hasIndexFor(column, StandardIndexes.forward())) {
               throw new IllegalStateException(
-                  String.format("Dictionary should not exist after rebuilding raw forward index for column: %s",
-                      column));
+                  String.format("Forward index was not created for column: %s", column));
             }
             break;
           }
@@ -285,7 +298,14 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
     List<Operation> ops = new ArrayList<>(2);
 
-    // 1. Forward-index transition (purely on/off — encoding flips DICT⇄RAW are driven by dict transitions).
+    // 1. Forward-index transition. Three sub-cases:
+    //    (a) existing has forward, new disables it      → DISABLE_FORWARD_INDEX
+    //    (b) existing disabled, new re-enables it       → ENABLE_{DICT|RAW}_FORWARD_INDEX (rebuild from dict+inverted)
+    //    (c) forward stays on but encoding flips DICT⇄RAW → ENABLE_{DICT|RAW}_FORWARD_INDEX (rewrite in place)
+    //  When the dictionary needs to stay (because another index requires it) the encoding-flip handler keeps
+    //  it. When the dictionary needs to go, the dict transition step (#2) queues DISABLE_DICTIONARY; the
+    //  existing DISABLE_DICTIONARY handler covers the DICT→RAW + drop-dict path on its own, so we don't
+    //  queue an ENABLE_RAW_FORWARD_INDEX in that combo to avoid double-rewrite.
     if (existingHasFwd != newHasFwd) {
       if (columnMetadata != null && columnMetadata.isSorted()) {
         LOGGER.warn("Trying to {} the forward index for a sorted column: {} of segment: {}, ignoring",
@@ -310,6 +330,21 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             ? Operation.ENABLE_RAW_FORWARD_INDEX : Operation.ENABLE_DICT_FORWARD_INDEX);
         return ops;
       }
+    } else if (existingHasFwd && existingFwdEncoding != newFwdEncoding && existingHasDict == desiredDict) {
+      // Encoding flip with forward staying on AND the dictionary state staying the same. The other two
+      // possibilities — DICT→RAW + drop-dict and RAW→DICT + create-dict — are already handled by the
+      // dict-transition step below: DISABLE_DICTIONARY's handler converts dict-encoded forward to raw and
+      // drops the dict together, and ENABLE_DICTIONARY's handler builds the dictionary and converts raw
+      // forward to dict-encoded. Only the dict-stays cases need this explicit op:
+      //   - DICT→RAW with dict kept (because another index requires it, e.g. inverted)
+      //   - RAW→DICT with shared dict already present
+      if (columnMetadata != null && columnMetadata.isSorted()) {
+        LOGGER.warn("Trying to flip forward-index encoding (DICT⇄RAW) for a sorted column: {} of segment: {}, "
+            + "ignoring", column, segmentName);
+        return ops;
+      }
+      ops.add(newFwdEncoding == FieldConfig.EncodingType.RAW
+          ? Operation.ENABLE_RAW_FORWARD_INDEX : Operation.ENABLE_DICT_FORWARD_INDEX);
     }
 
     // 2. Dictionary transition.
@@ -1124,6 +1159,47 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created raw based forward index for segment: {}, column: {}", segmentName, column);
+  }
+
+  /// Flip a dict-encoded forward index to RAW while keeping the dictionary intact. Used when an enabled
+  /// secondary index (e.g. inverted, FST, IFST) requires the dictionary to remain after the encoding flip —
+  /// the secondary index continues to operate against the same dict ids, so it does not need to be removed
+  /// or rebuilt. Compare with {@link #disableDictionaryAndCreateRawForwardIndex}, which performs the same
+  /// rewrite and additionally drops the dictionary plus all dict-dependent indexes.
+  private void convertDictForwardToRawKeepingDictionary(String column, SegmentDirectory.Writer segmentWriter)
+      throws Exception {
+    ColumnMetadata existingColMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+    boolean isSingleValue = existingColMetadata.isSingleValue();
+
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
+    File inProgress = new File(indexDir, column + ".fwdraw.inprogress");
+    String fileExtension = isSingleValue ? V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION
+        : V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION;
+    File fwdIndexFile = new File(indexDir, column + fileExtension);
+
+    if (!inProgress.exists()) {
+      FileUtils.touch(inProgress);
+    } else {
+      FileUtils.deleteQuietly(fwdIndexFile);
+    }
+
+    LOGGER.info("Converting dict-encoded forward index to raw (keeping dictionary) for segment={} column={}",
+        segmentName, column);
+    rewriteDictToRawForwardIndex(existingColMetadata, segmentWriter, indexDir);
+
+    // Remove the old dict-encoded forward index file and write the new raw forward index in its place.
+    // Crucially we do NOT remove the dictionary or any dict-dependent secondary indexes — the dictionary stays
+    // and those indexes remain valid against unchanged dict ids.
+    segmentWriter.removeIndex(column, StandardIndexes.forward());
+    LoaderUtils.writeIndexToV3Format(segmentWriter, column, fwdIndexFile, StandardIndexes.forward());
+
+    Map<String, String> metadataProperties = new HashMap<>();
+    metadataProperties.put(getKeyFor(column, FORWARD_INDEX_ENCODING), FieldConfig.EncodingType.RAW.name());
+    SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+
+    FileUtils.deleteQuietly(inProgress);
+    LOGGER.info("Converted forward index to raw (dictionary kept) for segment: {}, column: {}", segmentName, column);
   }
 
   private void rewriteDictToRawForwardIndex(ColumnMetadata columnMetadata, SegmentDirectory.Writer segmentWriter,

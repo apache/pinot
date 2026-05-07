@@ -711,6 +711,41 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
         "Range index must be rebuilt with raw-value format when dictionary is explicitly disabled");
   }
 
+  /// Verifies the encoding-flip transition where the forward index goes from dict-encoded to raw, while the
+  /// dictionary stays because an inverted index requires it. End state: dict + inverted + raw forward index.
+  @Test
+  public void testFlipDictForwardToRawForwardKeepingDictionaryForInvertedIndex()
+      throws Exception {
+    // Set up: COLUMN1 starts as dict-encoded INT with an inverted index.
+    _invertedIndexColumns.add(COLUMN1_NAME);
+    buildV3Segment();
+    SegmentMetadataImpl initial = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(initial.getColumnMetadataFor(COLUMN1_NAME).getForwardIndexEncoding(),
+        FieldConfig.EncodingType.DICTIONARY,
+        "Pre-condition: COLUMN1 must start dict-encoded so the encoding flip is meaningful");
+    assertTrue(initial.getColumnMetadataFor(COLUMN1_NAME).hasDictionary());
+
+    // Flip encoding to RAW while keeping the inverted index. The inverted index requires a dictionary, so
+    // the auto-keep-dictionary-when-required-by-index logic must keep the dictionary across the flip.
+    _noDictionaryColumns.add(COLUMN1_NAME);
+    runPreProcessor(_schema);
+
+    SegmentMetadataImpl afterFlip = new SegmentMetadataImpl(INDEX_DIR);
+    assertEquals(afterFlip.getColumnMetadataFor(COLUMN1_NAME).getForwardIndexEncoding(),
+        FieldConfig.EncodingType.RAW, "Forward index must be raw after the flip");
+    assertTrue(afterFlip.getColumnMetadataFor(COLUMN1_NAME).hasDictionary(),
+        "Dictionary must be kept because the inverted index still requires it");
+    try (SegmentDirectory dir = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Reader reader = dir.createReader()) {
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.dictionary()),
+          "Dictionary file must remain on disk");
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.inverted()),
+          "Inverted index must remain on disk and continue to point at the same dict ids");
+      assertTrue(reader.hasIndexFor(COLUMN1_NAME, StandardIndexes.forward()),
+          "Raw forward index must exist after the flip");
+    }
+  }
+
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
