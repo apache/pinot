@@ -73,14 +73,11 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     if (_predicateType == Predicate.Type.IS_NULL || _predicateType == Predicate.Type.IS_NOT_NULL) {
       _predicateEvaluator = null;
     } else {
-
-      // The inner expression is a function (FilterPlanNode dispatches direct column refs through the
-      // leaf-filter path), and ExpressionScanDocIdIterator scans the transform output and applies
-      // applySV(value) on raw values. So no DataSource is propagated — the evaluator is always built
-      // against raw values. (If a future caller passes an Identifier here, it must mirror the gate in
-      // BinaryOperatorTransformFunction: only pass DataSource when the inner getDictionary() is non-null.)
+      // ExpressionScanDocIdIterator follows resultMetadata.hasDictionary() to pick between the dict-id
+      // and raw-value paths against the transform output, so the evaluator must match the dictionary
+      // exposed by the transform: hand the transform's getDictionary() through directly.
       _predicateEvaluator =
-          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, null,
+          PredicateEvaluatorProvider.getPredicateEvaluator(predicate, null, _transformFunction.getDictionary(),
               _transformFunction.getResultMetadata().getDataType(), _queryContext);
     }
   }

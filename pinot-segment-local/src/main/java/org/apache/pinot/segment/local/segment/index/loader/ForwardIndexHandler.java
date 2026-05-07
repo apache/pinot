@@ -961,7 +961,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       LOGGER.info("Creating a new dictionary for segment={} and column={}", segmentName, column);
       int numDocs = existingColMetadata.getTotalDocs();
-      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType());
+      statsCollector = getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
       // NOTE:
       //   Special null handling is not necessary here. This is because, the existing default null value in the raw
       //   forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also, null
@@ -1054,7 +1054,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> reader = StandardIndexes.forward().getReaderFactory()
         .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
       AbstractColumnStatisticsCollector statsCollector =
-          getStatsCollector(column, fieldSpec.getDataType().getStoredType());
+          getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
       try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < existingColMetadata.getTotalDocs(); i++) {
@@ -1262,10 +1262,20 @@ public class ForwardIndexHandler extends BaseIndexHandler {
   }
 
   private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType) {
+    return getStatsCollector(column, storedType, false);
+  }
+
+  /// `requireUniqueValues=true` forces a per-type collector even when the no-dict optimization would apply.
+  /// Callers building a dictionary out of the raw values must opt in — `_fieldIndexConfigs` may still report
+  /// `dictionary=disabled` when the dictionary requirement was derived from a secondary-index need rather
+  /// than user config (e.g. legacy `invertedIndexColumns` triggering ENABLE_DICTIONARY in computeOperations),
+  /// in which case the optimized no-dict collector would be picked and `getUniqueValuesSet()` returns null.
+  private AbstractColumnStatisticsCollector getStatsCollector(String column, DataType storedType,
+      boolean requireUniqueValues) {
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
     boolean dictionaryEnabled = hasIndex(column, StandardIndexes.dictionary());
     // MAP collector is optimised for no-dictionary collection.
-    if (!dictionaryEnabled && storedType != DataType.MAP) {
+    if (!requireUniqueValues && !dictionaryEnabled && storedType != DataType.MAP) {
       if (ClusterConfigForTable.useOptimizedNoDictCollector(_tableConfig)) {
         return new NoDictColumnStatisticsCollector(column, statsCollectorConfig);
       }
