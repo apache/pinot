@@ -102,6 +102,11 @@ public final class IngestionConfigUtils {
     return new StreamConfig(tableConfig.getTableName(), getFirstStreamConfigMap(tableConfig));
   }
 
+  /// Returns `true` if the table contains multiple streams.
+  public static boolean hasMultipleStreams(TableConfig tableConfig) {
+    return getStreamConfigMaps(tableConfig).size() > 1;
+  }
+
   /**
    * Getting the Pinot segment level partition id from the stream partition id.
    * @param partitionId the partition id from the stream
