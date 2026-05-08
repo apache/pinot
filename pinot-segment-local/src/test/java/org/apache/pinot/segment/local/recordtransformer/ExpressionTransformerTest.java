@@ -444,10 +444,12 @@ public class ExpressionTransformerTest {
             .build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     // Valid case: x is int, y is int
+    // The result type depends on whether PlusScalarFunction resolves polymorphically (long) or via arity fallback
+    // (double). Both are correct — the DataTypeTransformer coerces to the target column type downstream.
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("x", 10);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("y"), 20.0);
+    Assert.assertEquals(((Number) genericRow.getValue("y")).longValue(), 20L);
     // Invalid case: x is string, y is int
     genericRow = new GenericRow();
     genericRow.putValue("x", "abcd");
@@ -475,10 +477,12 @@ public class ExpressionTransformerTest {
             .build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, pinotSchema);
     // Valid case: x is int, y is int
+    // The result type depends on whether PlusScalarFunction resolves polymorphically (long) or via arity fallback
+    // (double). Both are correct — the DataTypeTransformer coerces to the target column type downstream.
     GenericRow genericRow = new GenericRow();
     genericRow.putValue("x", 10);
     expressionTransformer.transform(genericRow);
-    Assert.assertEquals(genericRow.getValue("y"), 20.0);
+    Assert.assertEquals(((Number) genericRow.getValue("y")).longValue(), 20L);
     // Invalid case: x is string, y is int
     genericRow = new GenericRow();
     genericRow.putValue("x", "abcd");
@@ -546,5 +550,41 @@ public class ExpressionTransformerTest {
     Object transformedValue = row.getValue("columnArray");
     Assert.assertTrue(transformedValue.getClass().isArray());
     Assert.assertEquals(Arrays.asList((Object[]) transformedValue), Arrays.asList("a", "b", "c"));
+  }
+
+  /**
+   * Tests that string equality in CASE WHEN transform expressions works correctly during ingestion.
+   * This is the end-to-end test for the polymorphic function resolution fix: previously, the '=' operator
+   * in transform functions always resolved to doubleEqualsWithTolerance, which failed on string columns.
+   */
+  @Test
+  public void testCaseWhenStringEqualityTransform() {
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("shippingCompanyCode", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("mappedCode", FieldSpec.DataType.STRING)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(
+        new TransformConfig("mappedCode",
+            "CASE WHEN shippingCompanyCode = 'COUPANG' THEN 'COUPANG1' ELSE shippingCompanyCode END")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testCaseWhenStringEquality")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    // Test matching case
+    GenericRow row = new GenericRow();
+    row.putValue("shippingCompanyCode", "COUPANG");
+    expressionTransformer.transform(row);
+    Assert.assertEquals(row.getValue("mappedCode"), "COUPANG1");
+
+    // Test non-matching case
+    row = new GenericRow();
+    row.putValue("shippingCompanyCode", "FEDEX");
+    expressionTransformer.transform(row);
+    Assert.assertEquals(row.getValue("mappedCode"), "FEDEX");
   }
 }

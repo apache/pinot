@@ -77,7 +77,7 @@ public class RecordTransformerUtils {
     addRecordEnricherTransformers(tableConfig, transformers, false);
     addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
     if (!skipFilterTransformer) {
-      addIfNotNoOp(transformers, new FilterTransformer(tableConfig));
+      addIfNotNoOp(transformers, new FilterTransformer(tableConfig, schema));
     }
     addIfNotNoOp(transformers, SchemaConformingTransformer.create(tableConfig, schema));
     addIfNotNoOp(transformers, new DataTypeTransformer(tableConfig, schema));

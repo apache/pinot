@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.segment.local.function;
 
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.function.FunctionEvaluator;
+
 
 /**
  * Deprecated forwarding wrapper for the legacy inbuilt evaluator type name.
@@ -34,5 +38,9 @@ public class InbuiltFunctionEvaluator extends org.apache.pinot.common.evaluator.
     implements FunctionEvaluator {
   public InbuiltFunctionEvaluator(String functionExpression) {
     super(functionExpression);
+  }
+
+  public InbuiltFunctionEvaluator(String functionExpression, @Nullable Schema schema) {
+    super(functionExpression, schema);
   }
 }

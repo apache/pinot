@@ -20,6 +20,7 @@ package org.apache.pinot.common.evaluator;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.function.FunctionEvaluator;
@@ -36,20 +37,24 @@ public class FunctionEvaluatorFactory {
   private FunctionEvaluatorFactory() {
   }
 
+  @Nullable
+  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+    return getExpressionEvaluator(fieldSpec, null);
+  }
+
   /**
-   * Creates the {@link FunctionEvaluator} for the given field spec
+   * Creates the {@link FunctionEvaluator} for the given field spec with an optional schema for type-aware function
+   * resolution.
    *
    * 1. If transform expression is defined, use it to create the appropriate {@link FunctionEvaluator}
    * 2. For TIME column, if conversion is needed, {@link TimeSpecFunctionEvaluator} for backward compatible handling
-   * of time spec. This
-   * is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
+   * of time spec. This is needed until we migrate to {@link org.apache.pinot.spi.data.DateTimeFieldSpec}
    * 3. For columns ending with __KEYS or __VALUES (used for interpreting Map column in Avro), create default groovy
-   * functions for
-   * handing the Map
+   * functions for handling the Map
    * 4. Return null, if none of the above
    */
   @Nullable
-  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec) {
+  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec, @Nullable Schema schema) {
     FunctionEvaluator functionEvaluator = null;
 
     String columnName = fieldSpec.getName();
@@ -61,7 +66,7 @@ public class FunctionEvaluatorFactory {
 
       // if transform function expression present, use it to generate function evaluator
       try {
-        functionEvaluator = getExpressionEvaluator(transformExpression);
+        functionEvaluator = getExpressionEvaluator(transformExpression, schema);
       } catch (Exception e) {
         throw new IllegalStateException(
             "Caught exception while constructing expression evaluator for transform expression: " + transformExpression
@@ -88,22 +93,30 @@ public class FunctionEvaluatorFactory {
       // for backward compatible handling of Map type (currently only in Avro)
       String sourceMapName = columnName.substring(0, columnName.length() - MAP_KEY_COLUMN_SUFFIX.length());
       String defaultMapKeysTransformExpression = getDefaultMapKeysTransformExpression(sourceMapName);
-      functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression);
+      functionEvaluator = getExpressionEvaluator(defaultMapKeysTransformExpression, schema);
     } else if (columnName.endsWith(MAP_VALUE_COLUMN_SUFFIX)) {
       // for backward compatible handling of Map type in avro (currently only in Avro)
       String sourceMapName =
           columnName.substring(0, columnName.length() - MAP_VALUE_COLUMN_SUFFIX.length());
       String defaultMapValuesTransformExpression = getDefaultMapValuesTransformExpression(sourceMapName);
-      functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression);
+      functionEvaluator = getExpressionEvaluator(defaultMapValuesTransformExpression, schema);
     }
     return functionEvaluator;
   }
 
   public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
+    return getExpressionEvaluator(transformExpression, null);
+  }
+
+  /**
+   * Creates a {@link FunctionEvaluator} for the given transform expression with an optional schema for type-aware
+   * function resolution.
+   */
+  public static FunctionEvaluator getExpressionEvaluator(String transformExpression, @Nullable Schema schema) {
     if (isGroovyExpression(transformExpression)) {
       return new GroovyFunctionEvaluator(transformExpression);
     } else {
-      return new InbuiltFunctionEvaluator(transformExpression);
+      return new InbuiltFunctionEvaluator(transformExpression, schema);
     }
   }
 

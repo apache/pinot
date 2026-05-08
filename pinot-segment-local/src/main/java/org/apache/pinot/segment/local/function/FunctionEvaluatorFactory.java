@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.function;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
@@ -44,8 +45,18 @@ public class FunctionEvaluatorFactory {
     return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec);
   }
 
+  @Nullable
+  public static FunctionEvaluator getExpressionEvaluator(FieldSpec fieldSpec, @Nullable Schema schema) {
+    return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.getExpressionEvaluator(fieldSpec, schema);
+  }
+
   public static FunctionEvaluator getExpressionEvaluator(String transformExpression) {
     return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.getExpressionEvaluator(transformExpression);
+  }
+
+  public static FunctionEvaluator getExpressionEvaluator(String transformExpression, @Nullable Schema schema) {
+    return org.apache.pinot.common.evaluator.FunctionEvaluatorFactory.getExpressionEvaluator(transformExpression,
+        schema);
   }
 
   public static boolean isGroovyExpression(String transformExpression) {

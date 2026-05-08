@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
@@ -46,13 +48,18 @@ public class FilterTransformer implements RecordTransformer {
   private long _numRecordsFiltered;
 
   public FilterTransformer(TableConfig tableConfig) {
+    this(tableConfig, null);
+  }
+
+  public FilterTransformer(TableConfig tableConfig, @Nullable Schema schema) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
     if (ingestionConfig != null && ingestionConfig.getFilterConfig() != null) {
       _filterFunction = ingestionConfig.getFilterConfig().getFilterFunction();
     } else {
       _filterFunction = null;
     }
-    _evaluator = _filterFunction != null ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
+    _evaluator = _filterFunction != null ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction, schema)
+        : null;
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
   }
