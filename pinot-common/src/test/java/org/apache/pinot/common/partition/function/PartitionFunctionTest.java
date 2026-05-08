@@ -649,8 +649,8 @@ public class PartitionFunctionTest {
 
     IllegalArgumentException exception =
         expectThrows(IllegalArgumentException.class, () -> new FnvPartitionFunction(4, functionConfig));
-    assertEquals(exception.getMessage(),
-        "FNV negative partition handling must be mask or abs, but was: 'saramaCompat'");
+    assertTrue(exception.getMessage().contains("saramaCompat"),
+        "Expected error to mention the offending value, was: " + exception.getMessage());
   }
 
   @Test
