@@ -1210,11 +1210,11 @@ public class CalciteSqlCompilerTest {
     Assert.assertTrue(pinotQuery.isSetHavingExpression());
     Function lt = pinotQuery.getHavingExpression().getFunctionCall();
     Assert.assertEquals(lt.getOperator(), FilterKind.LESS_THAN.name());
-    // The negate(sum(col2)) goes through PredicateComparisonRewriter which can simplify the predicate.
-    // Either form is correct; we just verify the negate wrapper is present somewhere on the LHS.
     Function lhs = lt.getOperands().get(0).getFunctionCall();
-    Assert.assertTrue(lhs.getOperator().equals("negate") || lhs.getOperator().equals("sum"),
-        "LHS of HAVING comparison should be negate(sum(...)) or simplified equivalent, got: " + lhs.getOperator());
+    Assert.assertEquals(lhs.getOperator(), "negate");
+    Function inner = lhs.getOperands().get(0).getFunctionCall();
+    Assert.assertEquals(inner.getOperator(), "sum");
+    Assert.assertEquals(inner.getOperands().get(0).getIdentifier().getName(), "col2");
   }
 
   @Test
@@ -1319,14 +1319,16 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testUnaryMinusInInList() {
-    // WHERE col IN (-1, -2, -3) -- IN list with negative literals.
-    // PredicateComparisonRewriter rewrites IN to IN function. Negative literals can be folded to
-    // negative-valued literals or kept as negate(positive). Both are correct; we just verify the
-    // query compiles and we have an IN expression.
     PinotQuery pinotQuery = compileToPinotQuery("SELECT col1 FROM myTable WHERE col1 IN (-1, -2, -3)");
     Assert.assertTrue(pinotQuery.isSetFilterExpression());
     Function inFunc = pinotQuery.getFilterExpression().getFunctionCall();
     Assert.assertEquals(inFunc.getOperator(), FilterKind.IN.name());
+    // First operand is the column, remaining operands are the IN-list values.
+    Assert.assertEquals(inFunc.getOperands().get(0).getIdentifier().getName(), "col1");
+    // Calcite folds negative literals directly, so each IN-list entry should be a negative int literal.
+    Assert.assertEquals(inFunc.getOperands().get(1).getLiteral().getIntValue(), -1);
+    Assert.assertEquals(inFunc.getOperands().get(2).getLiteral().getIntValue(), -2);
+    Assert.assertEquals(inFunc.getOperands().get(3).getLiteral().getIntValue(), -3);
   }
 
   @Test

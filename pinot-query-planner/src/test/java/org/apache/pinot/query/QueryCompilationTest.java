@@ -145,7 +145,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         {"SELECT col3 FROM a WHERE -col3 BETWEEN -100 AND 0"},
         // negation in subquery
         {"SELECT col1 FROM a WHERE col3 > (SELECT AVG(-col3) FROM b)"},
-        // FLOAT (none in schema, skip) -- but verify mixed double/int negation
+        // FLOAT (none in schema, skip) -- verify mixed double/big_decimal negation
         {"SELECT CAST(-col3 AS DOUBLE) + col4 FROM a"},
     };
   }

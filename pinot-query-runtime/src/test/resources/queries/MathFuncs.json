@@ -628,7 +628,7 @@
         "sql": "SELECT +doubleCol FROM {numTbl}"
       },
       {
-        "description": "unary plus combined with unary minus cancels out",
+        "description": "unary plus over negated column is still negation",
         "sql": "SELECT +(-intCol) FROM {numTbl}"
       },
       {
@@ -731,8 +731,8 @@
         "sql": "SELECT groupKey, SUM(intCol) FROM {numTbl} GROUP BY groupKey HAVING -SUM(intCol) > -7 ORDER BY groupKey"
       },
       {
-        "description": "HAVING SUM(-col) < threshold",
-        "sql": "SELECT groupKey, SUM(longCol) FROM {numTbl} GROUP BY groupKey HAVING SUM(-longCol) < -20 ORDER BY groupKey"
+        "description": "HAVING SUM(-col) < threshold excludes a group",
+        "sql": "SELECT groupKey, SUM(longCol) FROM {numTbl} GROUP BY groupKey HAVING SUM(-longCol) < -40 ORDER BY groupKey"
       },
       {
         "description": "DISTINCT -col",
@@ -776,11 +776,11 @@
       },
       {
         "description": "IN with negative literals",
-        "sql": "SELECT intCol FROM {numTbl} WHERE intCol IN (1, 2, 3) ORDER BY intCol"
+        "sql": "SELECT -intCol FROM {numTbl} WHERE -intCol IN (-1, -2, -3) ORDER BY -intCol"
       },
       {
-        "description": "BETWEEN with negative bounds",
-        "sql": "SELECT intCol FROM {numTbl} WHERE intCol BETWEEN -10 AND 3 ORDER BY intCol"
+        "description": "BETWEEN with negative bounds on negated column",
+        "sql": "SELECT -intCol FROM {numTbl} WHERE -intCol BETWEEN -4 AND -2 ORDER BY -intCol"
       },
       {
         "description": "negation in CASE expression",
