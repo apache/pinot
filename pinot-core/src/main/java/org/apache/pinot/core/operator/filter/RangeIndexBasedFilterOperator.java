@@ -55,7 +55,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final FieldSpec.DataType _parameterType;
 
-  static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
+  public static boolean canEvaluate(PredicateEvaluator predicateEvaluator, DataSource dataSource) {
     RangeIndexReader<?> rangeIndex = dataSource.getRangeIndex();
     if (rangeIndex == null) {
       return false;
