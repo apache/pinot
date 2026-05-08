@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import org.apache.calcite.sql.dialect.AnsiSqlDialect;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -31,6 +32,24 @@ public class QueryFingerprintUtilsTest {
   public void testNullQuery() throws Exception {
     QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(null);
     Assert.assertNull(fingerprint, "Null query should return null fingerprint");
+  }
+
+  @Test
+  public void testGenerateFingerprintDoesNotMutateSqlNode()
+      throws Exception {
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(
+        "SELECT col1 FROM table1 WHERE col2 IN (1, 2, 3) AND col3 = 'abc' ORDER BY col1 LIMIT 10");
+    String originalSql = toAnsiSql(sqlNodeAndOptions);
+
+    QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
+
+    Assert.assertNotNull(fingerprint);
+    Assert.assertTrue(fingerprint.getFingerprint().contains("?"),
+        "Fingerprint should replace literals with dynamic parameters");
+    Assert.assertEquals(toAnsiSql(sqlNodeAndOptions), originalSql,
+        "Fingerprint generation should not mutate the SqlNode later used by query planning");
+    Assert.assertFalse(toAnsiSql(sqlNodeAndOptions).contains("?"),
+        "Original query SqlNode should not contain fingerprint dynamic parameters");
   }
 
   /**
@@ -309,5 +328,13 @@ public class QueryFingerprintUtilsTest {
         "Should not contain literal 100");
     Assert.assertFalse(normalizedQuery.contains("200"), "Should not contain literal 200");
     Assert.assertFalse(normalizedQuery.contains("300"), "Should not contain literal 300");
+  }
+
+  private String toAnsiSql(SqlNodeAndOptions sqlNodeAndOptions) {
+    return sqlNodeAndOptions.getSqlNode()
+        .toSqlString(c -> c.withDialect(AnsiSqlDialect.DEFAULT))
+        .getSql()
+        .replaceAll("\\s+", " ")
+        .trim();
   }
 }

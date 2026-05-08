@@ -121,8 +121,7 @@ public class QueryFingerprintVisitor extends SqlShuttle {
         // Skip the window specification (operand 1) due to its complex structure
         // with ORDER BY and frame clauses. This means literals in PARTITION BY,
         // ORDER BY, and window frames are preserved rather than replaced.
-        call.setOperand(0, call.getOperandList().get(0).accept(this));
-        result = call;
+        result = visitOver(call);
         break;
       case IN:
       case NOT_IN:
@@ -136,58 +135,43 @@ public class QueryFingerprintVisitor extends SqlShuttle {
 
   @Nullable
   private SqlNode visitCase(SqlCase sqlCase) {
-    List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode child : sqlCase.getOperandList()) {
-      if (child == null) {
-        newOperands.add(null);
-        continue;
-      }
-      newOperands.add(child.accept(this));
-    }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
-      sqlCase.setOperand(i++, operand);
-    }
-    return sqlCase;
+    return copyCall(sqlCase, visitOperands(sqlCase.getOperandList()));
   }
 
   @Nullable
   private SqlNode visitSelect(SqlSelect select) {
     List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode child : select.getOperandList()) {
-      newOperands.add(child != null ? child.accept(this) : null);
-    }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
+    List<SqlNode> operands = select.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
       // Preserve hints.
       if (i == SQLSELECT_HINTS_OPERAND_INDEX) {
-        break;
+        newOperands.add(operands.get(i));
+      } else {
+        SqlNode child = operands.get(i);
+        newOperands.add(child != null ? child.accept(this) : null);
       }
-      select.setOperand(i++, operand);
     }
-    return select;
+    return copyCall(select, newOperands);
   }
 
   @Nullable
   private SqlNode visitJoin(SqlJoin join) {
     List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode child : join.getOperandList()) {
-      newOperands.add(child != null ? child.accept(this) : null);
-    }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
+    List<SqlNode> operands = join.getOperandList();
+    for (int i = 0; i < operands.size(); i++) {
       // Preserve join metadata literals:
       // natural (true/false), joinType (INNER/LEFT/RIGHT/FULL) and conditionType (ON/USING)
       // These are structural keywords, not data literals.
       if (i == SQLJOIN_NATURAL_OPERAND_INDEX
             || i == SQLJOIN_JOIN_TYPE_OPERAND_INDEX
             || i == SQLJOIN_CONDITION_TYPE_OPERAND_INDEX) {
-        i++;
-        continue;
+        newOperands.add(operands.get(i));
+      } else {
+        SqlNode child = operands.get(i);
+        newOperands.add(child != null ? child.accept(this) : null);
       }
-      join.setOperand(i++, operand);
     }
-    return join;
+    return copyCall(join, newOperands);
   }
 
   @Nullable
@@ -197,9 +181,10 @@ public class QueryFingerprintVisitor extends SqlShuttle {
       newList.add(node.accept(this));
     }
     SqlNode newBody = with.body.accept(this);
-    with.setOperand(0, new SqlNodeList(newList, with.withList.getParserPosition()));
-    with.setOperand(1, newBody);
-    return with;
+    List<SqlNode> newOperands = new ArrayList<>();
+    newOperands.add(new SqlNodeList(newList, with.withList.getParserPosition()));
+    newOperands.add(newBody);
+    return copyCall(with, newOperands);
   }
 
   /**
@@ -211,21 +196,30 @@ public class QueryFingerprintVisitor extends SqlShuttle {
    */
   @Nullable
   private SqlNode visitWithItem(SqlWithItem withItem) {
+    List<SqlNode> newOperands = new ArrayList<>();
+    newOperands.add(withItem.name);
     if (withItem.columnList != null) {
-      for (int i = 0; i < withItem.columnList.size(); i++) {
-        SqlNode column = withItem.columnList.get(i);
-        if (column != null) {
-          withItem.columnList.set(i, column.accept(this));
-        }
-      }
+      newOperands.add(withItem.columnList.accept(this));
+    } else {
+      newOperands.add(null);
     }
 
     if (withItem.query != null) {
-      SqlNode newQuery = withItem.query.accept(this);
-      withItem.query = newQuery;
+      newOperands.add(withItem.query.accept(this));
+    } else {
+      newOperands.add(null);
     }
 
-    return withItem;
+    newOperands.add(withItem.recursive);
+    return copyCall(withItem, newOperands);
+  }
+
+  @Nullable
+  private SqlNode visitOver(SqlCall call) {
+    List<SqlNode> newOperands = new ArrayList<>(call.getOperandList());
+    SqlNode aggregateFunction = call.getOperandList().get(0);
+    newOperands.set(0, aggregateFunction != null ? aggregateFunction.accept(this) : null);
+    return copyCall(call, newOperands);
   }
 
   @Nullable
@@ -300,9 +294,10 @@ public class QueryFingerprintVisitor extends SqlShuttle {
       if (allDataLiterals && valueList.size() > 0) {
         SqlDynamicParam singleParam = new SqlDynamicParam(_dynamicParamIndex++, inCall.getParserPosition());
         SqlNodeList newValueList = new SqlNodeList(List.of(singleParam), valueList.getParserPosition());
-        inCall.setOperand(0, leftOperand);
-        inCall.setOperand(1, newValueList);
-        return inCall;
+        List<SqlNode> newOperands = new ArrayList<>(operands);
+        newOperands.set(0, leftOperand);
+        newOperands.set(1, newValueList);
+        return copyCall(inCall, newOperands);
       }
 
       // Otherwise, visit each value in the list normally
@@ -310,21 +305,27 @@ public class QueryFingerprintVisitor extends SqlShuttle {
       for (SqlNode value : valueList.getList()) {
         newValues.add(value.accept(this));
       }
-      inCall.setOperand(0, leftOperand);
-      inCall.setOperand(1, new SqlNodeList(newValues, valueList.getParserPosition()));
-      return inCall;
+      List<SqlNode> newOperands = new ArrayList<>(operands);
+      newOperands.set(0, leftOperand);
+      newOperands.set(1, new SqlNodeList(newValues, valueList.getParserPosition()));
+      return copyCall(inCall, newOperands);
     }
 
     // Fallback: for subqueries or other non-SqlNodeList cases, visit all operands normally
+    return copyCall(inCall, visitOperands(operands));
+  }
+
+  private List<SqlNode> visitOperands(List<SqlNode> operands) {
     List<SqlNode> newOperands = new ArrayList<>();
     for (SqlNode operand : operands) {
-      newOperands.add(operand.accept(this));
+      newOperands.add(operand != null ? operand.accept(this) : null);
     }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
-      inCall.setOperand(i++, operand);
-    }
-    return inCall;
+    return newOperands;
+  }
+
+  private SqlNode copyCall(SqlCall call, List<SqlNode> operands) {
+    return call.getOperator()
+        .createCall(call.getFunctionQuantifier(), call.getParserPosition(), operands.toArray(new SqlNode[0]));
   }
 
   /**
