@@ -21,8 +21,10 @@ package org.apache.pinot.segment.spi.partition;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -116,23 +118,37 @@ public class PartitionFunctionFactory {
   }
 
   /// Resolves the canonical name(s) under which to register `clazz`. Returns the annotation names
-  /// when present and non-empty, or falls back to a single-element array containing the value of
-  /// `getName()` from a probe instance. Returns `null` when neither path produces a usable name.
+  /// when present and non-empty (after trimming blanks), or falls back to a single-element array
+  /// containing the value of `getName()` from a probe instance. Returns `null` when neither path
+  /// produces a usable name.
   @Nullable
   private static String[] resolveNames(Class<? extends PartitionFunction> clazz,
       @Nullable PartitionFunctionType annotation, Constructor<? extends PartitionFunction> constructor) {
-    if (annotation != null && annotation.names().length > 0) {
-      return annotation.names();
+    if (annotation != null) {
+      String[] declared = annotation.names();
+      List<String> trimmed = new ArrayList<>(declared.length);
+      for (String name : declared) {
+        if (name != null && !name.trim().isEmpty()) {
+          trimmed.add(name.trim());
+        }
+      }
+      if (!trimmed.isEmpty()) {
+        return trimmed.toArray(new String[0]);
+      }
+      if (declared.length > 0) {
+        LOGGER.warn("@PartitionFunctionType on {} declares only blank names; falling back to getName()",
+            clazz.getName());
+      }
     }
     try {
       PartitionFunction probe = constructor.newInstance(1, null);
       String name = probe.getName();
-      if (name == null || name.isEmpty()) {
-        LOGGER.warn("Skipping {}: getName() returned null/empty and no @PartitionFunctionType annotation",
+      if (name == null || name.trim().isEmpty()) {
+        LOGGER.warn("Skipping {}: getName() returned null/blank and no usable @PartitionFunctionType",
             clazz.getName());
         return null;
       }
-      return new String[]{name};
+      return new String[]{name.trim()};
     } catch (ReflectiveOperationException e) {
       LOGGER.warn(
           "Skipping {}: no @PartitionFunctionType annotation and probing getName() with (1, null) failed: {}",
