@@ -57,7 +57,7 @@ public class VectorIndexTypeTest {
       Mockito.when(metadata.getFieldSpec())
           .thenReturn(new DimensionFieldSpec("embedding", FieldSpec.DataType.FLOAT, false));
 
-      VectorIndexConfig vectorIndexConfig = new VectorIndexConfig(false, "IVF_PQ", 4, 1,
+      VectorIndexConfig vectorIndexConfig = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 4, 1,
           VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
           Map.of("nlist", "2", "pqM", "2", "pqNbits", "4", "trainSampleSize", "8"));
       FieldIndexConfigs fieldIndexConfigs =

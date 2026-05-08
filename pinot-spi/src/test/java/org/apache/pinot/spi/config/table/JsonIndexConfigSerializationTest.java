@@ -26,34 +26,71 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that {@link JsonIndexConfig} Jackson serialization uses the curated
- * {@code @JsonValue toJsonObject()} method and emits each field only when it differs from its
- * class default.
- */
+/// Slim-serialization contract for [JsonIndexConfig].
 public class JsonIndexConfigSerializationTest {
 
   @Test
-  public void testDefaultPojoSerializesToEmptyJson()
+  public void testRoundTripAllNull()
       throws Exception {
     JsonIndexConfig config = new JsonIndexConfig();
 
-    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(serializeToNode(config));
+    assertRoundTripIdempotent(config);
 
-    assertOnlyKeys(node);
+    assertEquals(config.getMaxLevels(), -1);
+    assertEquals(config.isExcludeArray(), false);
+    assertEquals(config.isDisableCrossArrayUnnest(), false);
+    assertEquals(config.getMaxValueLength(), 0);
+    assertEquals(config.getSkipInvalidJson(), false);
+  }
+
+  @Test
+  public void testRoundTripPartial()
+      throws Exception {
+    JsonIndexConfig config = new JsonIndexConfig();
+    config.setMaxLevels(3);
+    config.setExcludeArray(true);
+
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "maxLevels", "excludeArray");
+    assertEquals(node.get("maxLevels").asInt(), 3);
+    assertTrue(node.get("excludeArray").asBoolean());
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.getMaxLevels(), 3);
+    assertTrue(config.isExcludeArray());
+    assertEquals(config.isDisableCrossArrayUnnest(), false);
+  }
+
+  @Test
+  public void testRoundTripAllSet()
+      throws Exception {
+    // Wrapper-typed args force selection of the @JsonCreator ctor over the deprecated primitive overload.
+    JsonIndexConfig config = new JsonIndexConfig(Boolean.FALSE, Integer.valueOf(5), Boolean.TRUE, Boolean.TRUE,
+        Set.of("$.a"), null, Set.of("c"), Set.of("$.d"), Integer.valueOf(128), Boolean.TRUE, Long.valueOf(1024L));
+
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "maxLevels", "excludeArray", "disableCrossArrayUnnest", "includePaths", "excludeFields",
+        "indexPaths", "maxValueLength", "skipInvalidJson", "maxBytesSize");
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.getMaxLevels(), 5);
+    assertTrue(config.isExcludeArray());
+    assertTrue(config.isDisableCrossArrayUnnest());
+    assertEquals(config.getMaxValueLength(), 128);
+    assertTrue(config.getSkipInvalidJson());
+    assertEquals(config.getMaxBytesSize(), Long.valueOf(1024L));
   }
 
   @Test
   public void testDisabledTrueIsMinimal()
       throws Exception {
     JsonIndexConfig config = new JsonIndexConfig(true);
-
     JsonNode node = serializeToNode(config);
-
     assertOnlyKeys(node, "disabled");
     assertTrue(node.get("disabled").asBoolean());
   }
@@ -61,62 +98,53 @@ public class JsonIndexConfigSerializationTest {
   @Test
   public void testEachNonDefaultFieldRoundTrips()
       throws Exception {
-    // maxLevels
     JsonIndexConfig config = new JsonIndexConfig();
     config.setMaxLevels(5);
     assertRoundTripsWithKey(config, "maxLevels");
 
-    // excludeArray
     config = new JsonIndexConfig();
     config.setExcludeArray(true);
     assertRoundTripsWithKey(config, "excludeArray");
 
-    // disableCrossArrayUnnest
     config = new JsonIndexConfig();
     config.setDisableCrossArrayUnnest(true);
     assertRoundTripsWithKey(config, "disableCrossArrayUnnest");
 
-    // includePaths
     config = new JsonIndexConfig();
     config.setIncludePaths(Set.of("$.a"));
     assertRoundTripsWithKey(config, "includePaths");
 
-    // excludePaths (mutex with includePaths)
     config = new JsonIndexConfig();
     config.setExcludePaths(Set.of("$.b"));
     assertRoundTripsWithKey(config, "excludePaths");
 
-    // excludeFields
     config = new JsonIndexConfig();
     config.setExcludeFields(Set.of("c"));
     assertRoundTripsWithKey(config, "excludeFields");
 
-    // indexPaths
     config = new JsonIndexConfig();
     config.setIndexPaths(Set.of("$.d"));
     assertRoundTripsWithKey(config, "indexPaths");
 
-    // maxValueLength
     config = new JsonIndexConfig();
     config.setMaxValueLength(128);
     assertRoundTripsWithKey(config, "maxValueLength");
 
-    // skipInvalidJson
     config = new JsonIndexConfig();
     config.setSkipInvalidJson(true);
     assertRoundTripsWithKey(config, "skipInvalidJson");
 
-    // maxBytesSize
     config = new JsonIndexConfig();
     config.setMaxBytesSize(1024L);
     assertRoundTripsWithKey(config, "maxBytesSize");
   }
 
   @Test
-  public void testFatJsonStillDeserializes()
+  public void testExplicitFalsePreservedThroughRoundTrip()
       throws Exception {
+    // Explicit false / 0 / -1 survives the round-trip — wrapper contract distinguishes "set" from
+    // "not set" so future default changes do not silently mutate user intent.
     String fat = "{"
-        + "\"disabled\":false,"
         + "\"maxLevels\":-1,"
         + "\"excludeArray\":false,"
         + "\"disableCrossArrayUnnest\":false,"
@@ -126,9 +154,10 @@ public class JsonIndexConfigSerializationTest {
 
     JsonIndexConfig config = JsonUtils.stringToObject(fat, JsonIndexConfig.class);
 
-    // Round-trips back to slim.
-    assertOnlyKeys(serializeToNode(config));
-    assertEquals(config, new JsonIndexConfig());
+    assertOnlyKeys(serializeToNode(config), "maxLevels", "excludeArray", "disableCrossArrayUnnest",
+        "maxValueLength", "skipInvalidJson");
+    assertNotEquals(config, new JsonIndexConfig(),
+        "Explicit-false config must NOT equal the all-null no-arg constructor");
   }
 
   @Test
@@ -137,7 +166,6 @@ public class JsonIndexConfigSerializationTest {
     JsonIndexConfig config = new JsonIndexConfig();
     config.setMaxLevels(3);
     config.setExcludeArray(true);
-
     assertEquals(serializeToNode(config), config.toJsonObject());
   }
 
@@ -146,9 +174,7 @@ public class JsonIndexConfigSerializationTest {
       throws Exception {
     JsonIndexConfig config = new JsonIndexConfig();
     config.setExcludeArray(true);
-
     String json = new ObjectMapper().writeValueAsString(config);
-
     assertEquals(JsonUtils.stringToJsonNode(json), config.toJsonObject());
   }
 
@@ -165,24 +191,19 @@ public class JsonIndexConfigSerializationTest {
     assertEquals(actual, Set.of(expectedKeys), "Unexpected key set: " + node);
   }
 
-  /**
-   * Asserts that the serialized output contains exactly {@code expectedKey} and that the
-   * deserialized POJO re-serializes to the same slim form (idempotent round-trip).
-   *
-   * <p>POJO-equality is intentionally not asserted here because {@code JsonIndexConfig._maxLevels}
-   * has a field-init default of {@code -1} but the {@code @JsonCreator} primitive parameter
-   * defaults to {@code 0} when absent. Both values are functionally equivalent (see
-   * {@code JsonUtils.flatten(...)}, which only consults {@code maxLevels} when {@code > 0}), so
-   * the slim wire form normalizes to "absent" and the runtime behavior is preserved even though
-   * the in-memory primitive value differs after round-trip.
-   */
-  private static void assertRoundTripsWithKey(JsonIndexConfig config, String expectedKey)
+  private static void assertRoundTripsWithKey(JsonIndexConfig config, String key)
       throws Exception {
     JsonNode node = serializeToNode(config);
-    assertTrue(node.has(expectedKey), "Expected key '" + expectedKey + "' in: " + node);
-    assertFalse(node.has("disabled"), "disabled should be absent (default false): " + node);
-    JsonIndexConfig roundTripped = JsonUtils.stringToObject(node.toString(), JsonIndexConfig.class);
-    JsonNode roundTrippedNode = serializeToNode(roundTripped);
-    assertEquals(roundTrippedNode, node, "Slim form must be idempotent under round-trip");
+    assertEquals(node.size(), 1, "Only the toggled key should be emitted: " + node);
+    assertTrue(node.has(key), "Missing key '" + key + "': " + node);
+    assertRoundTripIdempotent(config);
+  }
+
+  private static void assertRoundTripIdempotent(JsonIndexConfig original)
+      throws Exception {
+    JsonNode firstNode = serializeToNode(original);
+    JsonIndexConfig restored = JsonUtils.stringToObject(JsonUtils.objectToString(original), JsonIndexConfig.class);
+    JsonNode secondNode = serializeToNode(restored);
+    assertEquals(secondNode, firstNode, "Slim form must be byte-equivalent across a round-trip");
   }
 }

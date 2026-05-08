@@ -27,95 +27,124 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that {@link DictionaryIndexConfig} Jackson serialization uses the curated
- * {@code @JsonValue toJsonObject()} method and emits each field only when it differs from its
- * class default.
- */
+/// Slim-serialization contract for [DictionaryIndexConfig].
 public class DictionaryIndexConfigSerializationTest {
 
   @Test
-  public void testDefaultPojoSerializesToEmptyJson()
+  public void testRoundTripAllNull()
       throws Exception {
-    JsonNode node = serializeToNode(DictionaryIndexConfig.DEFAULT);
+    DictionaryIndexConfig config = new DictionaryIndexConfig((Boolean) null, null, null, null);
 
-    assertOnlyKeys(node);
+    assertOnlyKeys(serializeToNode(config));
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.isOnHeap(), false);
+    assertEquals(config.isUseVarLengthDictionary(), false);
+    assertEquals(config.getIntern(), null);
   }
 
   @Test
-  public void testDisabledTrueIsMinimal()
+  public void testRoundTripPartial()
+      throws Exception {
+    DictionaryIndexConfig config = new DictionaryIndexConfig(true, null);
+
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "onHeap");
+    assertTrue(node.get("onHeap").asBoolean());
+    assertRoundTripIdempotent(config);
+
+    assertTrue(config.isOnHeap());
+    assertEquals(config.isUseVarLengthDictionary(), false);
+  }
+
+  @Test
+  public void testRoundTripAllSet()
+      throws Exception {
+    DictionaryIndexConfig config = new DictionaryIndexConfig(false, true, true, new Intern(1024));
+
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "onHeap", "useVarLengthDictionary", "intern");
+    assertTrue(node.get("onHeap").asBoolean());
+    assertTrue(node.get("useVarLengthDictionary").asBoolean());
+    assertEquals(node.get("intern").get("capacity").asInt(), 1024);
+    assertRoundTripIdempotent(config);
+  }
+
+  @Test
+  public void testDefaultConstantSerializesEmpty()
+      throws Exception {
+    assertOnlyKeys(serializeToNode(DictionaryIndexConfig.DEFAULT));
+  }
+
+  @Test
+  public void testDisabledConstantOnlyEmitsDisabled()
       throws Exception {
     JsonNode node = serializeToNode(DictionaryIndexConfig.DISABLED);
-
     assertOnlyKeys(node, "disabled");
     assertTrue(node.get("disabled").asBoolean());
   }
 
   @Test
-  public void testOnHeapEmittedWhenTrue()
-      throws Exception {
-    DictionaryIndexConfig config = new DictionaryIndexConfig(true, false);
-
-    JsonNode node = serializeToNode(config);
-
-    assertOnlyKeys(node, "onHeap");
-  }
-
-  @Test
   public void testUseVarLengthDictionaryEmittedWhenTrue()
       throws Exception {
-    DictionaryIndexConfig config = new DictionaryIndexConfig(false, true);
-
+    // Cast disambiguates the (Boolean, Boolean) ctor from (DictionaryIndexConfig, boolean).
+    DictionaryIndexConfig config = new DictionaryIndexConfig((Boolean) null, true);
     JsonNode node = serializeToNode(config);
-
     assertOnlyKeys(node, "useVarLengthDictionary");
+    assertTrue(node.get("useVarLengthDictionary").asBoolean());
   }
 
   @Test
   public void testInternEmittedWhenSet()
       throws Exception {
     // Intern requires onHeap=true.
-    DictionaryIndexConfig config = new DictionaryIndexConfig(true, false, new Intern(1024));
-
+    DictionaryIndexConfig config = new DictionaryIndexConfig(true, null, new Intern(1024));
     JsonNode node = serializeToNode(config);
-
     assertOnlyKeys(node, "onHeap", "intern");
     assertEquals(node.get("intern").get("capacity").asInt(), 1024);
   }
 
   @Test
-  public void testFatJsonStillDeserializes()
+  public void testExplicitFalsePreserved()
       throws Exception {
-    String fat = "{"
-        + "\"disabled\":false,"
-        + "\"onHeap\":false,"
-        + "\"useVarLengthDictionary\":false,"
-        + "\"intern\":null"
-        + "}";
-
+    // Explicit false is preserved (not swallowed). Wrapper-based contract distinguishes "user set
+    // to false" (emit) from "user did not configure" (omit).
+    String fat = "{\"onHeap\":false,\"useVarLengthDictionary\":false}";
     DictionaryIndexConfig config = JsonUtils.stringToObject(fat, DictionaryIndexConfig.class);
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "onHeap", "useVarLengthDictionary");
+    assertEquals(node.get("onHeap").asBoolean(), false);
+    assertEquals(node.get("useVarLengthDictionary").asBoolean(), false);
 
-    assertOnlyKeys(serializeToNode(config));
+    assertNotEquals(config, DictionaryIndexConfig.DEFAULT,
+        "Explicit-false config must NOT equal the all-null DEFAULT constant");
+  }
+
+  // ---- Validation preserved ----
+
+  @Test
+  public void testInternRequiresOnHeap() {
+    assertThrows(IllegalStateException.class,
+        () -> new DictionaryIndexConfig((Boolean) null, null, null, new Intern(64)));
   }
 
   @Test
   public void testJacksonSerializationMatchesToJsonObject()
       throws Exception {
     DictionaryIndexConfig config = new DictionaryIndexConfig(true, true);
-
     assertEquals(serializeToNode(config), config.toJsonObject());
   }
 
   @Test
   public void testFreshObjectMapperUsesJsonValue()
       throws Exception {
-    DictionaryIndexConfig config = new DictionaryIndexConfig(true, false);
-
+    DictionaryIndexConfig config = new DictionaryIndexConfig(true, null);
     String json = new ObjectMapper().writeValueAsString(config);
-
     assertEquals(JsonUtils.stringToJsonNode(json), config.toJsonObject());
   }
 
@@ -130,5 +159,14 @@ public class DictionaryIndexConfigSerializationTest {
     Set<String> actual = new HashSet<>();
     node.fieldNames().forEachRemaining(actual::add);
     assertEquals(actual, Set.of(expectedKeys), "Unexpected key set: " + node);
+  }
+
+  private static void assertRoundTripIdempotent(DictionaryIndexConfig original)
+      throws Exception {
+    JsonNode firstNode = serializeToNode(original);
+    DictionaryIndexConfig restored =
+        JsonUtils.stringToObject(JsonUtils.objectToString(original), DictionaryIndexConfig.class);
+    JsonNode secondNode = serializeToNode(restored);
+    assertEquals(secondNode, firstNode, "Slim form must be byte-equivalent across a round-trip");
   }
 }

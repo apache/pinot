@@ -108,7 +108,7 @@ public class MutableVectorIndexTest {
     properties.put("commitDocs", "4");
     properties.put("vectorIndexType", "HNSW");
     properties.put("vectorDimension", "5");
-    return new VectorIndexConfig(false, "HNSW", 5, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
+    return new VectorIndexConfig(Boolean.FALSE, "HNSW", 5, 1, VectorIndexConfig.VectorDistanceFunction.EUCLIDEAN,
         properties);
   }
 }

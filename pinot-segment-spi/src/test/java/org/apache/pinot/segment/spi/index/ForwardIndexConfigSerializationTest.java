@@ -130,13 +130,11 @@ public class ForwardIndexConfigSerializationTest {
     assertEquals(node.get("rawIndexWriterVersion").asInt(), nonDefault);
   }
 
-  /**
-   * The cluster-tunable trio must be persisted regardless of whether the live JVM-local default
-   * matches the resolved value, so that a node with a different local default does not silently
-   * read a different effective forward-index setting from the same ZK payload. This test pins the
-   * "always materialize" contract: mutating the static after construction does not change what is
-   * emitted — both the original and mutated runs emit the value the POJO is carrying.
-   */
+  /// The cluster-tunable trio must be persisted regardless of whether the live JVM-local default matches the
+  /// resolved value, so that a node with a different local default does not silently read a different effective
+  /// forward-index setting from the same ZK payload. This test pins the "always materialize" contract: mutating the
+  /// static after construction does not change what is emitted — both the original and mutated runs emit the value
+  /// the POJO is carrying.
   @Test
   public void testClusterTunableTrioAlwaysMaterialized()
       throws Exception {
@@ -170,8 +168,11 @@ public class ForwardIndexConfigSerializationTest {
   }
 
   @Test
-  public void testFatJsonStillDeserializesAndReSerializesWithTrio()
+  public void testFatJsonRoundTripsPreservingExplicitFalse()
       throws Exception {
+    // Explicit false for deriveNumDocsPerChunk survives the round-trip — wrapper-based contract
+    // distinguishes "user set false" from "not configured." disabled=false is normalized to null
+    // by IndexConfig and stays omitted (universal default for every config).
     String fat = "{"
         + "\"disabled\":false,"
         + "\"compressionCodec\":null,"
@@ -184,7 +185,39 @@ public class ForwardIndexConfigSerializationTest {
     ForwardIndexConfig config = JsonUtils.stringToObject(fat, ForwardIndexConfig.class);
 
     JsonNode node = serializeToNode(config);
-    assertOnlyKeys(node, ALWAYS_EMITTED);
+    assertOnlyKeys(node, "deriveNumDocsPerChunk", "encodingType", "rawIndexWriterVersion", "targetMaxChunkSize",
+        "targetDocsPerChunk");
+    assertEquals(node.get("deriveNumDocsPerChunk").asBoolean(), false);
+  }
+
+  /// Cluster-tunable trio uses snapshot semantics: constructor coerces null to live JVM default at
+  /// init, field is stable for object lifetime, and never drifts even if the static is mutated
+  /// later. Different objects constructed under different live defaults each carry their own
+  /// snapshot.
+  @Test
+  public void testTrioSnapshotsAtConstruction()
+      throws Exception {
+    int original = ForwardIndexConfig.getDefaultRawWriterVersion();
+
+    ForwardIndexConfig configA = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY).build();
+    assertEquals(configA.getRawIndexWriterVersion(), original);
+
+    ForwardIndexConfig.setDefaultRawIndexWriterVersion(original + 1);
+    try {
+      ForwardIndexConfig configB = new ForwardIndexConfig.Builder(EncodingType.DICTIONARY).build();
+
+      // configA's snapshot is stable for its lifetime even after the static mutated.
+      assertEquals(configA.getRawIndexWriterVersion(), original);
+      // configB picked up the new live default at its construction.
+      assertEquals(configB.getRawIndexWriterVersion(), original + 1);
+
+      JsonNode nodeA = serializeToNode(configA);
+      JsonNode nodeB = serializeToNode(configB);
+      assertEquals(nodeA.get("rawIndexWriterVersion").asInt(), original);
+      assertEquals(nodeB.get("rawIndexWriterVersion").asInt(), original + 1);
+    } finally {
+      ForwardIndexConfig.setDefaultRawIndexWriterVersion(original);
+    }
   }
 
   @Test

@@ -39,10 +39,8 @@ public class FstIndexConfig extends IndexConfig {
     super(disabled);
   }
 
-  /**
-   * Curated slim serializer. {@code FstIndexConfig} adds no fields beyond {@code disabled}, so
-   * the override is for symmetry and direct test traceability — it inherits the base behavior.
-   */
+  /// Curated slim serializer. `FstIndexConfig` adds no fields beyond `disabled`, so the override is for
+  /// symmetry and direct test traceability — it inherits the base behavior.
   @Override
   @JsonValue
   public ObjectNode toJsonObject() {

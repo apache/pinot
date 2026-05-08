@@ -39,7 +39,7 @@ public class VectorIndexTest {
   @Test
   public void testEmptyPropertiesSurviveRoundTripForRuntimeDefaults()
       throws Exception {
-    VectorIndexConfig original = new VectorIndexConfig(false, "HNSW", 128, 1,
+    VectorIndexConfig original = new VectorIndexConfig(Boolean.FALSE, "HNSW", 128, 1,
         VectorIndexConfig.VectorDistanceFunction.COSINE, Map.of());
     String serialized = JsonUtils.objectToString(original);
     VectorIndexConfig roundTripped = JsonUtils.stringToObject(serialized, VectorIndexConfig.class);

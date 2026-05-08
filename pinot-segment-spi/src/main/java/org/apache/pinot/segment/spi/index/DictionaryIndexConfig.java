@@ -37,15 +37,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class DictionaryIndexConfig extends IndexConfig {
-  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false);
+  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig((Boolean) null);
   public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true);
 
-  private final boolean _onHeap;
-  private final boolean _useVarLengthDictionary;
+  private final Boolean _onHeap;
+  private final Boolean _useVarLengthDictionary;
   private final Intern _intern;
 
   public DictionaryIndexConfig(Boolean disabled) {
-    this(disabled, false, false, null);
+    this(disabled, null, null, null);
   }
 
   public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
@@ -56,9 +56,7 @@ public class DictionaryIndexConfig extends IndexConfig {
     this(false, onHeap, useVarLengthDictionary, intern);
   }
 
-  /**
-   * Constructor for patching an existing config, but overrides the useVarLengthDictionary property with the input
-   */
+  /// Constructor for patching an existing config, but overrides the useVarLengthDictionary property with the input.
   public DictionaryIndexConfig(DictionaryIndexConfig base, boolean useVarLengthDictionary) {
     this(base.isEnabled(), base.isOnHeap(), useVarLengthDictionary, base.getIntern());
   }
@@ -76,35 +74,34 @@ public class DictionaryIndexConfig extends IndexConfig {
           "Intern configs only work with on-heap dictionary");
     }
 
-    _onHeap = onHeap != null && onHeap;
-    _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
+    _onHeap = onHeap;
+    _useVarLengthDictionary = useVarLengthDictionary;
     _intern = intern;
   }
 
   public boolean isOnHeap() {
-    return _onHeap;
+    return Boolean.TRUE.equals(_onHeap);
   }
 
   public boolean isUseVarLengthDictionary() {
-    return _useVarLengthDictionary;
+    return Boolean.TRUE.equals(_useVarLengthDictionary);
   }
 
   public Intern getIntern() {
     return _intern;
   }
 
-  /**
-   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
-   */
+  /// Curated slim serializer. See [IndexConfig#toJsonObject()] for the rationale. Each field is emitted only
+  /// when explicitly configured (non-null wrapper).
   @Override
   @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode node = super.toJsonObject();
-    if (_onHeap) {
-      node.put("onHeap", true);
+    if (_onHeap != null) {
+      node.put("onHeap", _onHeap);
     }
-    if (_useVarLengthDictionary) {
-      node.put("useVarLengthDictionary", true);
+    if (_useVarLengthDictionary != null) {
+      node.put("useVarLengthDictionary", _useVarLengthDictionary);
     }
     if (_intern != null) {
       node.set("intern", JsonUtils.objectToJsonNode(_intern));
@@ -121,8 +118,9 @@ public class DictionaryIndexConfig extends IndexConfig {
       return false;
     }
     DictionaryIndexConfig that = (DictionaryIndexConfig) o;
-    return _onHeap == that._onHeap && _useVarLengthDictionary == that._useVarLengthDictionary && Objects.equals(_intern,
-        that._intern);
+    return Objects.equals(_onHeap, that._onHeap)
+        && Objects.equals(_useVarLengthDictionary, that._useVarLengthDictionary)
+        && Objects.equals(_intern, that._intern);
   }
 
   @Override
@@ -134,8 +132,8 @@ public class DictionaryIndexConfig extends IndexConfig {
   public String toString() {
     if (isEnabled()) {
       String internStr = _intern == null ? "null" : _intern.toString();
-      return "DictionaryIndexConfig{" + "\"onHeap\":" + _onHeap + ", \"useVarLengthDictionary\":"
-          + _useVarLengthDictionary + ", \"intern\":" + internStr + "}";
+      return "DictionaryIndexConfig{" + "\"onHeap\":" + isOnHeap() + ", \"useVarLengthDictionary\":"
+          + isUseVarLengthDictionary() + ", \"intern\":" + internStr + "}";
     } else {
       return "DictionaryIndexConfig{" + "\"disabled\": true}";
     }

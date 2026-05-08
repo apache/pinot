@@ -25,55 +25,106 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that {@link TextIndexConfig} Jackson serialization uses the curated
- * {@code @JsonValue toJsonObject()} method and emits each of the 18 lucene defaults only when
- * the field differs from its constant default. Empty / null lists are treated as defaults.
- *
- * <p>This module ({@code pinot-segment-spi}) does not contain a concrete builder, so the test
- * uses an in-line anonymous subclass of {@link TextIndexConfig.AbstractBuilder}.
- */
+/// Slim-serialization contract for [TextIndexConfig].
 public class TextIndexConfigSerializationTest {
 
   @Test
-  public void testDefaultBuiltConfigSerializesToEmptyJson()
+  public void testRoundTripAllNull()
       throws Exception {
     TextIndexConfig config = newBuilder().build();
 
-    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(serializeToNode(config));
+    assertRoundTripIdempotent(config);
 
-    assertOnlyKeys(node);
+    // Getters fall back to documented defaults.
+    assertEquals(config.isEnableQueryCache(), false);
+    assertEquals(config.isUseANDForMultiTermQueries(), false);
+    assertEquals(config.isLuceneUseCompoundFile(), true);
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 500);
+    assertEquals(config.getLuceneAnalyzerClass(), FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS);
+    assertEquals(config.getLuceneQueryParserClass(), FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_QUERY_PARSER_CLASS);
+    assertEquals(config.isEnablePrefixSuffixMatchingInPhraseQueries(), false);
+    assertEquals(config.isReuseMutableIndex(), false);
+    assertEquals(config.getLuceneNRTCachingDirectoryMaxBufferSizeMB(), 0);
+    assertEquals(config.isUseLogByteSizeMergePolicy(), false);
+    assertEquals(config.isCaseSensitive(), false);
+    assertEquals(config.isStoreInSegmentFile(), false);
   }
 
   @Test
-  public void testDisabledTrueIsMinimal()
+  public void testRoundTripPartial()
       throws Exception {
-    // TextIndexConfig.DISABLED is constructed with luceneUseCompoundFile=false (vs. default true),
-    // so the slim form correctly carries that one extra field beyond "disabled". This documents
-    // an intentional quirk of the DISABLED constant rather than a serializer bug.
-    JsonNode node = serializeToNode(TextIndexConfig.DISABLED);
-
-    assertOnlyKeys(node, "disabled", "luceneUseCompoundFile");
-    assertTrue(node.get("disabled").asBoolean());
-    assertTrue(!node.get("luceneUseCompoundFile").asBoolean());
-  }
-
-  @Test
-  public void testNonDefaultLuceneMaxBufferSizeMBEmitted()
-      throws Exception {
-    TextIndexConfig config = newBuilder().withLuceneMaxBufferSizeMB(1024).build();
+    TextIndexConfig config = newBuilder().withLuceneMaxBufferSizeMB(1024).withCaseSensitive(true).build();
 
     JsonNode node = serializeToNode(config);
-
-    assertOnlyKeys(node, "luceneMaxBufferSizeMB");
+    assertOnlyKeys(node, "luceneMaxBufferSizeMB", "caseSensitive");
     assertEquals(node.get("luceneMaxBufferSizeMB").asInt(), 1024);
+    assertTrue(node.get("caseSensitive").asBoolean());
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.getLuceneMaxBufferSizeMB(), 1024);
+    assertTrue(config.isCaseSensitive());
+    assertEquals(config.isLuceneUseCompoundFile(), true); // default applied
+  }
+
+  @Test
+  public void testRoundTripAllSet()
+      throws Exception {
+    TextIndexConfig config = newBuilder()
+        .withUseANDForMultiTermQueries(true)
+        .withStopWordsInclude(List.of("the", "a"))
+        .withStopWordsExclude(List.of("is"))
+        .withLuceneUseCompoundFile(false)
+        .withLuceneMaxBufferSizeMB(800)
+        .withLuceneAnalyzerClass("org.example.MyAnalyzer")
+        .withLuceneAnalyzerClassArgs(List.of("foo"))
+        .withLuceneAnalyzerClassArgTypes(List.of("java.lang.String"))
+        .withLuceneQueryParserClass("org.example.MyParser")
+        .withEnablePrefixSuffixMatchingInPhraseQueries(true)
+        .withReuseMutableIndex(true)
+        .withLuceneNRTCachingDirectoryMaxBufferSizeMB(64)
+        .withUseLogByteSizeMergePolicy(true)
+        .withDocIdTranslatorMode("Default")
+        .withCaseSensitive(true)
+        .withStoreInSegmentFile(true)
+        .build();
+    // queryCache is not exposed via the Builder; flip it via copy-constructor pattern.
+
+    JsonNode node = serializeToNode(config);
+    assertTrue(node.has("useANDForMultiTermQueries"));
+    assertTrue(node.has("stopWordsInclude"));
+    assertTrue(node.has("stopWordsExclude"));
+    assertTrue(node.has("luceneUseCompoundFile"));
+    assertTrue(node.has("luceneMaxBufferSizeMB"));
+    assertTrue(node.has("luceneAnalyzerClass"));
+    assertTrue(node.has("luceneAnalyzerClassArgs"));
+    assertTrue(node.has("luceneAnalyzerClassArgTypes"));
+    assertTrue(node.has("luceneQueryParserClass"));
+    assertTrue(node.has("enablePrefixSuffixMatchingInPhraseQueries"));
+    assertTrue(node.has("reuseMutableIndex"));
+    assertTrue(node.has("luceneNRTCachingDirectoryMaxBufferSizeMB"));
+    assertTrue(node.has("useLogByteSizeMergePolicy"));
+    assertTrue(node.has("docIdTranslatorMode"));
+    assertTrue(node.has("caseSensitive"));
+    assertTrue(node.has("storeInSegmentFile"));
+    assertRoundTripIdempotent(config);
+  }
+
+  @Test
+  public void testDisabledConstantOnlyEmitsDisabled()
+      throws Exception {
+    JsonNode node = serializeToNode(TextIndexConfig.DISABLED);
+    assertOnlyKeys(node, "disabled");
+    assertTrue(node.get("disabled").asBoolean());
   }
 
   @Test
@@ -89,33 +140,23 @@ public class TextIndexConfigSerializationTest {
   }
 
   @Test
-  public void testCaseSensitiveAndStoreInSegmentFileEmittedWhenNonDefault()
+  public void testExplicitDefaultPreserved()
       throws Exception {
-    TextIndexConfig config = newBuilder()
-        .withCaseSensitive(true)
-        .withStoreInSegmentFile(true)
-        .build();
-
+    // Build via the wrapper @JsonCreator directly (the Builder path uses primitive fields for binary
+    // compat and therefore can't preserve explicit-default). User explicitly sets
+    // luceneUseCompoundFile=true (today's default). Slim form keeps the key so a future default
+    // change does not silently swallow user intent.
+    TextIndexConfig config = new TextIndexConfig(Boolean.FALSE, null, null, null, null, null,
+        Boolean.TRUE, null, null, (Object) null, (Object) null, null, null, null, null, null, null,
+        null, null);
     JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "luceneUseCompoundFile");
+    assertEquals(node.get("luceneUseCompoundFile").asBoolean(), true);
 
-    assertOnlyKeys(node, "caseSensitive", "storeInSegmentFile");
-  }
-
-  @Test
-  public void testFatJsonStillDeserializes()
-      throws Exception {
-    String fat = "{"
-        + "\"disabled\":false,"
-        + "\"luceneUseCompoundFile\":true,"
-        + "\"luceneMaxBufferSizeMB\":500,"
-        + "\"reuseMutableIndex\":false,"
-        + "\"caseSensitive\":false,"
-        + "\"storeInSegmentFile\":false"
-        + "}";
-
-    TextIndexConfig config = JsonUtils.stringToObject(fat, TextIndexConfig.class);
-
-    assertOnlyKeys(serializeToNode(config));
+    TextIndexConfig nullConfig = new TextIndexConfig(Boolean.FALSE, null, null, null, null, null, null, null, null,
+        (Object) null, (Object) null, null, null, null, null, null, null, null, null);
+    assertNotEquals(config, nullConfig,
+        "Explicit-default-value config must NOT equal the all-null ctor output");
   }
 
   @Test
@@ -125,7 +166,6 @@ public class TextIndexConfigSerializationTest {
         .withLuceneMaxBufferSizeMB(800)
         .withCaseSensitive(true)
         .build();
-
     assertEquals(serializeToNode(config), config.toJsonObject());
   }
 
@@ -133,18 +173,13 @@ public class TextIndexConfigSerializationTest {
   public void testFreshObjectMapperUsesJsonValue()
       throws Exception {
     TextIndexConfig config = newBuilder().withCaseSensitive(true).build();
-
     String json = new ObjectMapper().writeValueAsString(config);
-
     assertEquals(JsonUtils.stringToJsonNode(json), config.toJsonObject());
   }
 
   // ---- Helpers ----
 
-  /**
-   * Builds a concrete subclass of the abstract builder that no-ops {@code withProperties()}.
-   * Tests do not exercise the property-bag path; they target the explicit fluent setters.
-   */
+  /// Anonymous concrete builder for tests; this module has no production builder subclass.
   private static TextIndexConfig.AbstractBuilder newBuilder() {
     return new TextIndexConfig.AbstractBuilder() {
       @Override
@@ -163,5 +198,14 @@ public class TextIndexConfigSerializationTest {
     Set<String> actual = new HashSet<>();
     node.fieldNames().forEachRemaining(actual::add);
     assertEquals(actual, Set.of(expectedKeys), "Unexpected key set: " + node);
+  }
+
+  private static void assertRoundTripIdempotent(TextIndexConfig original)
+      throws Exception {
+    JsonNode firstNode = serializeToNode(original);
+    TextIndexConfig restored =
+        JsonUtils.stringToObject(JsonUtils.objectToString(original), TextIndexConfig.class);
+    JsonNode secondNode = serializeToNode(restored);
+    assertEquals(secondNode, firstNode, "Slim form must be byte-equivalent across a round-trip");
   }
 }

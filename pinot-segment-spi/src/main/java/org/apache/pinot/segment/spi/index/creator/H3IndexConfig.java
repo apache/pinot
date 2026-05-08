@@ -71,12 +71,9 @@ public class H3IndexConfig extends IndexConfig {
     return _resolution;
   }
 
-  /**
-   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
-   *
-   * <p>The JSON key is {@code "resolution"} (singular) — matches the {@code @JsonProperty} on
-   * the {@code @JsonCreator} parameter.
-   */
+  /// Curated slim serializer. See [IndexConfig#toJsonObject()] for the rationale.
+  ///
+  /// The JSON key is `"resolution"` (singular) — matches the `@JsonProperty` on the `@JsonCreator` parameter.
   @Override
   @JsonValue
   public ObjectNode toJsonObject() {

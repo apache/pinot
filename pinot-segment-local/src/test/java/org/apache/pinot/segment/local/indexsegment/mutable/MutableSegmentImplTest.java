@@ -236,7 +236,7 @@ public class MutableSegmentImplTest {
         .addMultiValueDimension("embedding", FieldSpec.DataType.FLOAT)
         .build();
     VectorIndexConfig vectorIndexConfig =
-        new VectorIndexConfig(false, "IVF_PQ", 4, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
+        new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 4, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
             Map.of("nlist", "1", "pqM", "2", "pqNbits", "8", "trainSampleSize", "4"));
     MutableSegmentImpl mutableSegment =
         MutableSegmentImplTestUtils.createMutableSegmentImplWithVectorIndexConfigs(vectorSchema, Set.of(), Set.of(),

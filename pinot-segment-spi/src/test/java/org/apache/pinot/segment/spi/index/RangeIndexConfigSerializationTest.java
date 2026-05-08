@@ -26,60 +26,79 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that {@link RangeIndexConfig} Jackson serialization uses the curated
- * {@code @JsonValue toJsonObject()} method and emits {@code version} only when it differs from
- * its class default of {@code 2}.
- */
+/// Slim-serialization contract for [RangeIndexConfig].
 public class RangeIndexConfigSerializationTest {
 
   @Test
-  public void testDefaultPojoSerializesToEmptyJson()
+  public void testRoundTripAllNull()
       throws Exception {
-    JsonNode node = serializeToNode(RangeIndexConfig.DEFAULT);
+    RangeIndexConfig config = new RangeIndexConfig((Boolean) null, null);
 
-    assertOnlyKeys(node);
+    assertOnlyKeys(serializeToNode(config));
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.getVersion(), RangeIndexConfig.DEFAULT_VERSION);
   }
 
   @Test
-  public void testDisabledTrueIsMinimal()
+  public void testRoundTripPartial()
+      throws Exception {
+    RangeIndexConfig config = new RangeIndexConfig(3);
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "version");
+    assertEquals(node.get("version").asInt(), 3);
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.getVersion(), 3);
+  }
+
+  @Test
+  public void testRoundTripAllSet()
+      throws Exception {
+    RangeIndexConfig config = new RangeIndexConfig(true, 5);
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "disabled", "version");
+    assertTrue(node.get("disabled").asBoolean());
+    assertEquals(node.get("version").asInt(), 5);
+    assertRoundTripIdempotent(config);
+  }
+
+  @Test
+  public void testDefaultConstantSerializesEmpty()
+      throws Exception {
+    assertOnlyKeys(serializeToNode(RangeIndexConfig.DEFAULT));
+  }
+
+  @Test
+  public void testDisabledConstantOnlyEmitsDisabled()
       throws Exception {
     JsonNode node = serializeToNode(RangeIndexConfig.DISABLED);
-
     assertOnlyKeys(node, "disabled");
     assertTrue(node.get("disabled").asBoolean());
   }
 
   @Test
-  public void testNonDefaultVersionEmitted()
+  public void testExplicitDefaultVersionPreserved()
       throws Exception {
-    RangeIndexConfig config = new RangeIndexConfig(3);
-
+    // User says version=2 (today's default). Slim form keeps the key so a future default change
+    // does not silently swallow user intent.
+    RangeIndexConfig config = new RangeIndexConfig(RangeIndexConfig.DEFAULT_VERSION);
     JsonNode node = serializeToNode(config);
-
     assertOnlyKeys(node, "version");
-    assertEquals(node.get("version").asInt(), 3);
-  }
+    assertEquals(node.get("version").asInt(), RangeIndexConfig.DEFAULT_VERSION);
 
-  @Test
-  public void testFatJsonStillDeserializes()
-      throws Exception {
-    String fat = "{\"disabled\":false,\"version\":2}";
-
-    RangeIndexConfig config = JsonUtils.stringToObject(fat, RangeIndexConfig.class);
-
-    assertOnlyKeys(serializeToNode(config));
-    assertEquals(config.getVersion(), 2);
+    assertNotEquals(config, RangeIndexConfig.DEFAULT,
+        "Explicit-default-value config must NOT equal the all-null DEFAULT constant");
   }
 
   @Test
   public void testJacksonSerializationMatchesToJsonObject()
       throws Exception {
     RangeIndexConfig config = new RangeIndexConfig(3);
-
     assertEquals(serializeToNode(config), config.toJsonObject());
   }
 
@@ -87,9 +106,7 @@ public class RangeIndexConfigSerializationTest {
   public void testFreshObjectMapperUsesJsonValue()
       throws Exception {
     RangeIndexConfig config = new RangeIndexConfig(5);
-
     String json = new ObjectMapper().writeValueAsString(config);
-
     assertEquals(JsonUtils.stringToJsonNode(json), config.toJsonObject());
   }
 
@@ -104,5 +121,14 @@ public class RangeIndexConfigSerializationTest {
     Set<String> actual = new HashSet<>();
     node.fieldNames().forEachRemaining(actual::add);
     assertEquals(actual, Set.of(expectedKeys), "Unexpected key set: " + node);
+  }
+
+  private static void assertRoundTripIdempotent(RangeIndexConfig original)
+      throws Exception {
+    JsonNode firstNode = serializeToNode(original);
+    RangeIndexConfig restored =
+        JsonUtils.stringToObject(JsonUtils.objectToString(original), RangeIndexConfig.class);
+    JsonNode secondNode = serializeToNode(restored);
+    assertEquals(secondNode, firstNode, "Slim form must be byte-equivalent across a round-trip");
   }
 }

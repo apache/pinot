@@ -85,7 +85,7 @@ public class SegmentDirectoryPathsTest {
       FileUtils.touch(hnswFile);
       FileUtils.touch(ivfPqFile);
 
-      VectorIndexConfig ivfPqConfig = new VectorIndexConfig(false, "IVF_PQ", 16, 1,
+      VectorIndexConfig ivfPqConfig = new VectorIndexConfig(Boolean.FALSE, "IVF_PQ", 16, 1,
           VectorIndexConfig.VectorDistanceFunction.COSINE,
           Map.of("nlist", "4", "pqM", "4", "pqNbits", "8", "trainSampleSize", "16"));
 

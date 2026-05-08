@@ -28,49 +28,43 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-/**
- * This is the base class used to configure indexes.
- *
- * The common logic between all indexes is that they can be enabled or disabled.
- *
- * Indexes that do not require extra configuration can directly use this class.
- */
+/// Base class for index configs.
+///
+/// Common logic across all indexes: each can be enabled or disabled. Indexes with no extra
+/// configuration can use this class directly.
 public class IndexConfig extends BaseJsonConfig {
-  public static final IndexConfig ENABLED = new IndexConfig(false);
+  public static final IndexConfig ENABLED = new IndexConfig((Boolean) null);
   public static final IndexConfig DISABLED = new IndexConfig(true);
-  private final boolean _disabled;
+  private final Boolean _disabled;
 
-  /**
-   * @param disabled whether the config is disabled. Null is considered enabled.
-   */
+  /// @param disabled whether the config is disabled. `null` and `false` both mean enabled — explicit `false` is
+  /// normalized to `null` so the slim form omits the key (every index defaults to enabled and that default is
+  /// extremely unlikely to flip).
   @JsonCreator
   public IndexConfig(@JsonProperty("disabled") Boolean disabled) {
-    _disabled = Boolean.TRUE.equals(disabled);
+    _disabled = Boolean.TRUE.equals(disabled) ? Boolean.TRUE : null;
   }
 
   public boolean isDisabled() {
-    return _disabled;
+    return Boolean.TRUE.equals(_disabled);
   }
 
   @JsonIgnore
   public boolean isEnabled() {
-    return !_disabled;
+    return !isDisabled();
   }
 
-  /**
-   * Curated Jackson serializer. Annotated with {@link JsonValue} so Jackson skips default bean
-   * introspection and uses this method as the sole source of truth, emitting only fields whose
-   * value differs from the class default. Subclasses override and call {@code super.toJsonObject()}
-   * first to inherit the {@code disabled} key handling.
-   *
-   * <p>This mirrors the slim-serialization pattern introduced for {@code Schema} and
-   * {@code TableConfigs} in apache/pinot#17558 and ensures user-supplied slim index configs do not
-   * get fattened with defaults on the first round-trip through any Pinot {@code ObjectMapper}.
-   */
+  /// Curated Jackson serializer. Annotated with [JsonValue] so Jackson skips default bean introspection and uses
+  /// this method as the sole source of truth, emitting only fields that were explicitly configured (non-null).
+  /// Subclasses override and call `super.toJsonObject()` first to inherit the `disabled` key handling.
+  ///
+  /// This mirrors the slim-serialization pattern introduced for `Schema` and `TableConfigs` in apache/pinot#17558
+  /// and ensures user-supplied slim index configs do not get fattened with defaults on the first round-trip
+  /// through any Pinot `ObjectMapper`.
   @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode node = JsonUtils.newObjectNode();
-    if (_disabled) {
+    if (Boolean.TRUE.equals(_disabled)) {
       node.put("disabled", true);
     }
     return node;
@@ -85,7 +79,7 @@ public class IndexConfig extends BaseJsonConfig {
       return false;
     }
     IndexConfig that = (IndexConfig) o;
-    return _disabled == that._disabled;
+    return Objects.equals(_disabled, that._disabled);
   }
 
   @Override

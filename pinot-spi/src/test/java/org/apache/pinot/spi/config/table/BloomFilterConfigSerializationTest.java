@@ -26,120 +26,144 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Verifies that {@link BloomFilterConfig} Jackson serialization uses the curated
- * {@code @JsonValue toJsonObject()} method and emits each field only when it differs from its
- * class default.
- *
- * <p>Calls out the {@code fpp == 0.0 → DEFAULT_FPP} ctor coercion: an explicit {@code 0.0} input
- * is indistinguishable from "absent", so the only sane slim form for the default fpp is omission.
- */
+/// Slim-serialization contract for [BloomFilterConfig] under the wrapper-typed contract:
+/// fields are stored raw (null = not configured), runtime getters apply defaults, the slim form
+/// emits only fields that were explicitly configured.
 public class BloomFilterConfigSerializationTest {
 
+  // ---- Round-trip matrix ----
+
   @Test
-  public void testDefaultPojoSerializesToEmptyJson()
+  public void testRoundTripAllNull()
       throws Exception {
-    BloomFilterConfig config = BloomFilterConfig.DEFAULT;
+    BloomFilterConfig config = new BloomFilterConfig(null, null, null, null);
 
     JsonNode node = serializeToNode(config);
-
     assertOnlyKeys(node);
+    assertRoundTripIdempotent(config);
+
+    // Getters fall back to documented defaults.
+    assertEquals(config.getFpp(), BloomFilterConfig.DEFAULT_FPP);
+    assertEquals(config.getMaxSizeInBytes(), 0);
+    assertEquals(config.isLoadOnHeap(), false);
   }
 
   @Test
-  public void testDisabledTrueIsMinimal()
+  public void testRoundTripPartial()
       throws Exception {
-    BloomFilterConfig config = BloomFilterConfig.DISABLED;
+    BloomFilterConfig config = new BloomFilterConfig(null, 0.01, null, null);
 
     JsonNode node = serializeToNode(config);
-
-    assertOnlyKeys(node, "disabled");
-    assertTrue(node.get("disabled").asBoolean());
-  }
-
-  @Test
-  public void testNonDefaultFppEmitted()
-      throws Exception {
-    BloomFilterConfig config = new BloomFilterConfig(0.01, 0, false);
-
-    JsonNode node = serializeToNode(config);
-
     assertOnlyKeys(node, "fpp");
     assertEquals(node.get("fpp").asDouble(), 0.01);
+    assertRoundTripIdempotent(config);
+
+    // Explicit field returns its value; null fields fall back.
+    assertEquals(config.getFpp(), 0.01);
+    assertEquals(config.getMaxSizeInBytes(), 0);
+    assertEquals(config.isLoadOnHeap(), false);
   }
 
   @Test
-  public void testNonDefaultMaxSizeAndLoadOnHeapEmitted()
+  public void testRoundTripAllSet()
       throws Exception {
-    BloomFilterConfig config = new BloomFilterConfig(BloomFilterConfig.DEFAULT_FPP, 1024, true);
+    BloomFilterConfig config = new BloomFilterConfig(null, 0.02, 2048, true);
 
     JsonNode node = serializeToNode(config);
-
-    assertOnlyKeys(node, "maxSizeInBytes", "loadOnHeap");
-    assertEquals(node.get("maxSizeInBytes").asInt(), 1024);
+    assertOnlyKeys(node, "fpp", "maxSizeInBytes", "loadOnHeap");
+    assertEquals(node.get("fpp").asDouble(), 0.02);
+    assertEquals(node.get("maxSizeInBytes").asInt(), 2048);
     assertTrue(node.get("loadOnHeap").asBoolean());
+    assertRoundTripIdempotent(config);
+
+    assertEquals(config.getFpp(), 0.02);
+    assertEquals(config.getMaxSizeInBytes(), 2048);
+    assertEquals(config.isLoadOnHeap(), true);
   }
 
-  /**
-   * Documents the ctor coercion: {@code fpp == 0.0} → {@code DEFAULT_FPP}, so the slim output
-   * after a fat-input parse omits {@code fpp}, and the round-tripped POJO matches the default.
-   */
+  // ---- Constants ----
+
   @Test
-  public void testFppZeroInputCoercedToDefaultAndOmittedOnSerialization()
+  public void testDefaultConstantSerializesEmpty()
       throws Exception {
-    String fat = "{\"fpp\":0.0,\"maxSizeInBytes\":0,\"loadOnHeap\":false}";
+    assertOnlyKeys(serializeToNode(BloomFilterConfig.DEFAULT));
+    assertRoundTripIdempotent(BloomFilterConfig.DEFAULT);
+  }
 
-    BloomFilterConfig config = JsonUtils.stringToObject(fat, BloomFilterConfig.class);
+  @Test
+  public void testDisabledConstantOnlyEmitsDisabled()
+      throws Exception {
+    JsonNode node = serializeToNode(BloomFilterConfig.DISABLED);
+    assertOnlyKeys(node, "disabled");
+    assertTrue(node.get("disabled").asBoolean());
+    assertRoundTripIdempotent(BloomFilterConfig.DISABLED);
+  }
 
+  // ---- The load-bearing distinction ----
+
+  @Test
+  public void testExplicitDefaultValueIsPreserved()
+      throws Exception {
+    // User sets fpp explicitly to today's default (0.05). Slim form keeps the key so a future
+    // default change does not silently swallow the user's intent.
+    BloomFilterConfig config = new BloomFilterConfig(null, BloomFilterConfig.DEFAULT_FPP, null, null);
+
+    JsonNode node = serializeToNode(config);
+    assertOnlyKeys(node, "fpp");
+    assertEquals(node.get("fpp").asDouble(), BloomFilterConfig.DEFAULT_FPP);
+
+    assertNotEquals(config, BloomFilterConfig.DEFAULT,
+        "Explicit-default-value config must not equal the all-null DEFAULT constant");
+  }
+
+  @Test
+  public void testFppZeroInputPreservedAsExplicit()
+      throws Exception {
+    // The historical sentinel `fpp == 0.0` was previously coerced to DEFAULT_FPP. With wrappers we
+    // keep the raw input so the slim form preserves it; the runtime getter still returns
+    // DEFAULT_FPP for the sentinel.
+    BloomFilterConfig config = JsonUtils.stringToObject("{\"fpp\":0.0}", BloomFilterConfig.class);
     assertEquals(config.getFpp(), BloomFilterConfig.DEFAULT_FPP);
-    assertOnlyKeys(serializeToNode(config));
+    assertOnlyKeys(serializeToNode(config), "fpp");
+  }
+
+  // ---- Validation preserved ----
+
+  @Test
+  public void testFppValidationRejectsOutOfRange() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new BloomFilterConfig(null, 2.0, null, null));
+    assertThrows(IllegalArgumentException.class,
+        () -> new BloomFilterConfig(null, -0.5, null, null));
   }
 
   @Test
-  public void testFatJsonStillDeserializes()
-      throws Exception {
-    // Pre-fix output explicitly carried the default fpp, so verify it round-trips back to slim.
-    String fat = "{\"disabled\":false,\"fpp\":0.05,\"maxSizeInBytes\":0,\"loadOnHeap\":false}";
-
-    BloomFilterConfig config = JsonUtils.stringToObject(fat, BloomFilterConfig.class);
-
-    assertOnlyKeys(serializeToNode(config));
-    assertEquals(config, BloomFilterConfig.DEFAULT);
+  public void testFppNullSkipsValidation() {
+    // null bypasses validation — required so absent JSON keys don't throw.
+    new BloomFilterConfig(null, null, null, null);
   }
+
+  // ---- Helpers ----
 
   @Test
   public void testJacksonSerializationMatchesToJsonObject()
       throws Exception {
-    BloomFilterConfig config = new BloomFilterConfig(0.02, 2048, true);
-
+    BloomFilterConfig config = new BloomFilterConfig(null, 0.02, 2048, true);
     assertEquals(serializeToNode(config), config.toJsonObject());
   }
 
   @Test
   public void testFreshObjectMapperUsesJsonValue()
       throws Exception {
-    BloomFilterConfig config = new BloomFilterConfig(0.02, 0, false);
-
+    BloomFilterConfig config = new BloomFilterConfig(null, 0.02, null, null);
     String json = new ObjectMapper().writeValueAsString(config);
-
     assertEquals(JsonUtils.stringToJsonNode(json), config.toJsonObject());
   }
-
-  @Test
-  public void testEqualPojosProduceIdenticalJson()
-      throws Exception {
-    BloomFilterConfig a = new BloomFilterConfig(0.01, 100, true);
-    BloomFilterConfig b = new BloomFilterConfig(0.01, 100, true);
-
-    assertEquals(a, b);
-    assertEquals(serializeToNode(a), serializeToNode(b));
-  }
-
-  // ---- Helpers ----
 
   private static JsonNode serializeToNode(Object pojo)
       throws Exception {
@@ -150,9 +174,13 @@ public class BloomFilterConfigSerializationTest {
     Set<String> actual = new HashSet<>();
     node.fieldNames().forEachRemaining(actual::add);
     assertEquals(actual, Set.of(expectedKeys), "Unexpected key set: " + node);
-    // Defensive: ensure the resulting node doesn't accidentally carry stale "disabled" defaults.
-    if (!actual.contains("disabled")) {
-      assertFalse(node.has("disabled"));
-    }
+  }
+
+  private static void assertRoundTripIdempotent(BloomFilterConfig original)
+      throws Exception {
+    JsonNode firstNode = serializeToNode(original);
+    BloomFilterConfig restored = JsonUtils.stringToObject(JsonUtils.objectToString(original), BloomFilterConfig.class);
+    JsonNode secondNode = serializeToNode(restored);
+    assertEquals(secondNode, firstNode, "Slim form must be byte-equivalent across a round-trip");
   }
 }

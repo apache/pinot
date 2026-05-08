@@ -138,7 +138,9 @@ public class VectorConfigTest {
       throws JsonProcessingException {
     VectorIndexConfig initialConf = new VectorIndexConfig(false);
 
-    String serialized = "{\"disabled\":false,\"vectorDimension\":0,\"version\":0}";
+    // Slim form omits dim/version when not configured. The "{}" round-trip is the canonical
+    // shape; explicit zero values would survive as Integer.valueOf(0) and break field equality.
+    String serialized = "{}";
     VectorIndexConfig vectorIndexConfig = JsonUtils.stringToObject(serialized, VectorIndexConfig.class);
 
     Assert.assertEquals(vectorIndexConfig, initialConf, "Unexpected configuration after reading " + serialized);

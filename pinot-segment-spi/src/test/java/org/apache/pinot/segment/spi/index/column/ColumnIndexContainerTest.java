@@ -69,7 +69,7 @@ public class ColumnIndexContainerTest {
   }
 
   private static VectorIndexConfig createVectorConfig(String backend) {
-    return new VectorIndexConfig(false, backend, 8, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
+    return new VectorIndexConfig(Boolean.FALSE, backend, 8, 1, VectorIndexConfig.VectorDistanceFunction.COSINE,
         Map.of("vectorIndexType", backend));
   }
 

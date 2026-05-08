@@ -29,10 +29,11 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class RangeIndexConfig extends IndexConfig {
-  public static final RangeIndexConfig DEFAULT = new RangeIndexConfig(false, 2);
+  public static final int DEFAULT_VERSION = 2;
+  public static final RangeIndexConfig DEFAULT = new RangeIndexConfig((Boolean) null, null);
   public static final RangeIndexConfig DISABLED = new RangeIndexConfig(true, null);
 
-  private final int _version;
+  private final Integer _version;
 
   public RangeIndexConfig(int version) {
     this(false, version);
@@ -42,21 +43,19 @@ public class RangeIndexConfig extends IndexConfig {
   public RangeIndexConfig(@JsonProperty("disabled") Boolean disabled,
       @JsonProperty("version") @Nullable Integer version) {
     super(disabled);
-    _version = version != null ? version : 2;
+    _version = version;
   }
 
   public int getVersion() {
-    return _version;
+    return _version != null ? _version : DEFAULT_VERSION;
   }
 
-  /**
-   * Curated slim serializer. See {@link IndexConfig#toJsonObject()} for the rationale.
-   */
+  /// Curated slim serializer. See [IndexConfig#toJsonObject()] for the rationale.
   @Override
   @JsonValue
   public ObjectNode toJsonObject() {
     ObjectNode node = super.toJsonObject();
-    if (_version != 2) {
+    if (_version != null) {
       node.put("version", _version);
     }
     return node;
@@ -74,7 +73,7 @@ public class RangeIndexConfig extends IndexConfig {
       return false;
     }
     RangeIndexConfig that = (RangeIndexConfig) o;
-    return _version == that._version;
+    return Objects.equals(_version, that._version);
   }
 
   @Override
