@@ -25,7 +25,6 @@ import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
@@ -108,9 +107,10 @@ public class PartitionFunctionFactoryTest {
         PartitionIntNormalizer.MASK.name());
     assertEquals(new FnvPartitionFunction(4, Map.of("negativePartitionHandling", "abs")).getPartitionIdNormalizer(),
         PartitionIntNormalizer.ABS.name());
-    // BoundedColumnValue does not map onto any standard normalizer.
+    // BoundedColumnValue does not map onto any standard normalizer; falls back to the interface
+    // default (POSITIVE_MODULO), which is a safe label since its output is already in [0, N).
     PartitionFunction boundedColumnValue = new BoundedColumnValuePartitionFunction(2,
         Map.of("columnValues", "a", "columnValuesDelimiter", "|"));
-    assertNull(boundedColumnValue.getPartitionIdNormalizer());
+    assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIntNormalizer.POSITIVE_MODULO.name());
   }
 }

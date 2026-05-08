@@ -75,12 +75,12 @@ public interface PartitionFunction extends Serializable {
    * Do not assume that recomputing a partition id via {@code PartitionIntNormalizer.<X>.getPartitionId(rawHash, N)}
    * will reproduce the legacy function's output bit-for-bit.
    *
-   * <p>Returns {@code null} when the function does not map cleanly onto any standard normalizer
-   * (e.g. {@code BoundedColumnValue}).
+   * <p>Implementations that do not map cleanly onto any standard normalizer (e.g.
+   * {@code BoundedColumnValue}) should still return a non-null value; {@code POSITIVE_MODULO} is a
+   * safe choice when the function's output is already in {@code [0, numPartitions)}.
    */
   @JsonIgnore
-  @Nullable
   default String getPartitionIdNormalizer() {
-    return null;
+    return PartitionIntNormalizer.POSITIVE_MODULO.name();
   }
 }
