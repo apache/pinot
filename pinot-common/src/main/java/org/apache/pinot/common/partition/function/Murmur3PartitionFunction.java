@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
@@ -35,7 +34,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /// [PartitionFunction] backed by a 32-bit Murmur3 hash. The configured
 /// [PartitionIdNormalizer] (default [PartitionIdNormalizer#MASK]) is applied to the
 /// raw signed hash to derive the partition id.
-@PartitionFunctionType(names = "Murmur3")
 public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur3";
   private static final String SEED_KEY = "seed";

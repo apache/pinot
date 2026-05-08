@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.partition;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -30,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.reflections.Reflections;
@@ -44,18 +42,14 @@ import org.slf4j.LoggerFactory;
 /// Dynamic registry for [PartitionFunction] implementations.
 ///
 /// Discovery walks every public, concrete [PartitionFunction] subtype on the classpath under the
-/// `org.apache.pinot.*` package tree, then registers each under its canonical name(s):
-///
-/// - If the class is annotated with [PartitionFunctionType] (and `enabled()` is true), the
-///   annotation's `names()` are used. Multiple aliases register the same constructor under each
-///   name (e.g. `Murmur` and `Murmur2` for `MurmurPartitionFunction`).
-/// - Otherwise, the registry probes [PartitionFunction#getName()] by instantiating the class with
-///   `(numPartitions=1, functionConfig=null)` and registers under the value returned. This lets
-///   existing partition functions work without adding the annotation.
+/// `org.apache.pinot.*` package tree and registers each under the names returned by
+/// [PartitionFunction#getNames()] (defaults to `[getName()]`; override to declare aliases — e.g.
+/// `MurmurPartitionFunction` registers under both `Murmur` and `Murmur2`).
 ///
 /// Each registrable class must be public, concrete, and expose a public constructor with signature
-/// `(int numPartitions, Map<String, String> functionConfig)` — the constructor the registry calls
-/// when [#getPartitionFunction(String, int, Map)] is invoked.
+/// `(int numPartitions, Map<String, String> functionConfig)` — the constructor used both for the
+/// startup `getNames()` probe (called with `(1, null)`) and for [#getPartitionFunction(String, int,
+/// Map)] at lookup time.
 ///
 /// The static block scans the classpath once and builds an immutable (canonicalized name →
 /// constructor) map. To force eager initialization (e.g. so the scan happens before the first
@@ -78,10 +72,6 @@ public class PartitionFunctionFactory {
       if (!Modifier.isPublic(mods) || Modifier.isAbstract(mods) || clazz.isInterface()) {
         continue;
       }
-      PartitionFunctionType annotation = clazz.getAnnotation(PartitionFunctionType.class);
-      if (annotation != null && !annotation.enabled()) {
-        continue;
-      }
       Constructor<? extends PartitionFunction> constructor;
       try {
         constructor = clazz.getConstructor(int.class, Map.class);
@@ -89,12 +79,16 @@ public class PartitionFunctionFactory {
         LOGGER.warn("Skipping {}: missing public constructor (int, Map<String, String>)", clazz.getName());
         continue;
       }
-      String[] names = resolveNames(clazz, annotation, constructor);
+      List<String> names = probeNames(clazz, constructor);
       if (names == null) {
         continue;
       }
       for (String name : names) {
-        String canonical = canonicalize(name);
+        if (name == null || name.trim().isEmpty()) {
+          LOGGER.warn("Skipping blank name for {}", clazz.getName());
+          continue;
+        }
+        String canonical = canonicalize(name.trim());
         Constructor<? extends PartitionFunction> existing = registry.put(canonical, constructor);
         Preconditions.checkState(existing == null || existing.getDeclaringClass().equals(clazz),
             "Partition function name '%s' is registered to both %s and %s", name,
@@ -117,42 +111,25 @@ public class PartitionFunctionFactory {
     return (Set) result[0];
   }
 
-  /// Resolves the canonical name(s) under which to register `clazz`. Returns the annotation names
-  /// when present and non-empty (after trimming blanks), or falls back to a single-element array
-  /// containing the value of `getName()` from a probe instance. Returns `null` when neither path
-  /// produces a usable name.
+  /// Instantiates `clazz` with `(numPartitions = 1, functionConfig = null)` and returns the
+  /// names list reported by [PartitionFunction#getNames()]. Returns `null` (with a warning log)
+  /// when the probe construction fails — typically a function whose ctor requires non-null config
+  /// (e.g. `BoundedColumnValuePartitionFunction`); such functions need to either supply a usable
+  /// default config or skip auto-registration.
   @Nullable
-  private static String[] resolveNames(Class<? extends PartitionFunction> clazz,
-      @Nullable PartitionFunctionType annotation, Constructor<? extends PartitionFunction> constructor) {
-    if (annotation != null) {
-      String[] declared = annotation.names();
-      List<String> trimmed = new ArrayList<>(declared.length);
-      for (String name : declared) {
-        if (name != null && !name.trim().isEmpty()) {
-          trimmed.add(name.trim());
-        }
-      }
-      if (!trimmed.isEmpty()) {
-        return trimmed.toArray(new String[0]);
-      }
-      if (declared.length > 0) {
-        LOGGER.warn("@PartitionFunctionType on {} declares only blank names; falling back to getName()",
-            clazz.getName());
-      }
-    }
+  private static List<String> probeNames(Class<? extends PartitionFunction> clazz,
+      Constructor<? extends PartitionFunction> constructor) {
     try {
       PartitionFunction probe = constructor.newInstance(1, null);
-      String name = probe.getName();
-      if (name == null || name.trim().isEmpty()) {
-        LOGGER.warn("Skipping {}: getName() returned null/blank and no usable @PartitionFunctionType",
-            clazz.getName());
+      List<String> names = probe.getNames();
+      if (names == null || names.isEmpty()) {
+        LOGGER.warn("Skipping {}: getNames() returned null/empty", clazz.getName());
         return null;
       }
-      return new String[]{name.trim()};
+      return names;
     } catch (ReflectiveOperationException e) {
-      LOGGER.warn(
-          "Skipping {}: no @PartitionFunctionType annotation and probing getName() with (1, null) failed: {}",
-          clazz.getName(), e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+      LOGGER.warn("Skipping {}: probing getNames() with (1, null) failed: {}", clazz.getName(),
+          e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
       return null;
     }
   }

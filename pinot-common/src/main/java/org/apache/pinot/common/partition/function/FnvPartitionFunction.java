@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 
@@ -35,7 +34,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /// Stateless and thread-safe [PartitionFunction] backed by configurable FNV variants. The
 /// configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#MASK]) is applied
 /// to the raw FNV hash to derive the partition id.
-@PartitionFunctionType(names = "FNV")
 public class FnvPartitionFunction implements PartitionFunction {
   private static final String NAME = "FNV";
   private static final String VARIANT_KEY = "variant";

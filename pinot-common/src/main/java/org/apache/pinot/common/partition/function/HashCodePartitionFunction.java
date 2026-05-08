@@ -23,14 +23,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /// [PartitionFunction] that hashes the input via [String#hashCode()] and runs the
 /// configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#PRE_MODULO_ABS], the
 /// Pre-modulo abs (Kafka-style) `abs(hash) % N` that maps `Integer.MIN_VALUE -> 0`) to derive the
 /// partition id.
-@PartitionFunctionType(names = "HashCode")
 public class HashCodePartitionFunction implements PartitionFunction {
   private static final String NAME = "HashCode";
   private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.PRE_MODULO_ABS;

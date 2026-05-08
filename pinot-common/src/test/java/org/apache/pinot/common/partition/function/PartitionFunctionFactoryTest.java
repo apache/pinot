@@ -34,7 +34,8 @@ public class PartitionFunctionFactoryTest {
 
   @Test
   public void testAllBuiltInFunctionsRegistered() {
-    // Resolves every built-in name. The test fails if classpath-scan misses any annotated impl.
+    // Resolves every built-in name. The test fails if the classpath subtype scan misses any impl
+    // or if its `getNames()` doesn't surface the expected canonical name.
     assertTrue(
         PartitionFunctionFactory.getPartitionFunction("Modulo", 4, null) instanceof ModuloPartitionFunction);
     assertTrue(
@@ -66,9 +67,26 @@ public class PartitionFunctionFactoryTest {
 
   @Test
   public void testMurmurAndMurmur2AliasResolveToSameClass() {
-    // Aliases declared in @PartitionFunctionType(names = {"Murmur", "Murmur2"}) both register.
+    // MurmurPartitionFunction overrides getNames() to return ["Murmur", "Murmur2"] so both
+    // names register against the same impl.
     assertEquals(PartitionFunctionFactory.getPartitionFunction("Murmur", 4, null).getClass(),
         PartitionFunctionFactory.getPartitionFunction("Murmur2", 4, null).getClass());
+  }
+
+  @Test
+  public void testGetNamesDefaultsToSingletonOfGetName() {
+    // The interface's default getNames() returns [getName()]. Verify a non-overriding impl
+    // surfaces a single-entry list whose only entry equals getName().
+    Murmur3PartitionFunction fn = new Murmur3PartitionFunction(4, null);
+    assertEquals(fn.getNames(), java.util.List.of(fn.getName()));
+  }
+
+  @Test
+  public void testMurmurOverridesGetNamesWithTwoAliases() {
+    // MurmurPartitionFunction is the only built-in that overrides getNames(); verify the
+    // override surfaces both aliases.
+    MurmurPartitionFunction fn = new MurmurPartitionFunction(4, null);
+    assertEquals(fn.getNames(), java.util.List.of("Murmur", "Murmur2"));
   }
 
   @Test
@@ -111,15 +129,6 @@ public class PartitionFunctionFactoryTest {
     PartitionFunction boundedColumnValue = new BoundedColumnValuePartitionFunction(2,
         Map.of("columnValues", "a", "columnValuesDelimiter", "|"));
     assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIdNormalizer.POSITIVE_MODULO);
-  }
-
-  @Test
-  public void testUnannotatedPartitionFunctionDiscoveredViaGetName() {
-    // UnannotatedTestPartitionFunction has no @PartitionFunctionType annotation. The registry falls
-    // back to instantiating with (1, null) and calling getName() to discover its canonical name.
-    PartitionFunction fn =
-        PartitionFunctionFactory.getPartitionFunction(UnannotatedTestPartitionFunction.NAME, 8, null);
-    assertTrue(fn instanceof UnannotatedTestPartitionFunction);
   }
 
   @Test

@@ -20,11 +20,11 @@ package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
@@ -33,10 +33,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 /// [PartitionFunction] backed by a 32-bit Murmur2 hash. The configured
 /// [PartitionIdNormalizer] (default [PartitionIdNormalizer#MASK]) is applied to the
-/// raw signed hash to derive the partition id.
-@PartitionFunctionType(names = {"Murmur", "Murmur2"})
+/// raw signed hash to derive the partition id. Registered under both `Murmur` and `Murmur2`.
 public class MurmurPartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur";
+  private static final List<String> NAMES = List.of("Murmur", "Murmur2");
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.MASK;
 
@@ -63,6 +63,11 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public String getName() {
     return NAME;
+  }
+
+  @Override
+  public List<String> getNames() {
+    return NAMES;
   }
 
   @Override

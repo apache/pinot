@@ -23,13 +23,11 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /// Modulo operation based partition function. Treats the input string as a base-10 long and runs
 /// the configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#POSITIVE_MODULO])
 /// over it.
-@PartitionFunctionType(names = "Modulo")
 public class ModuloPartitionFunction implements PartitionFunction {
   private static final String NAME = "Modulo";
   private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.POSITIVE_MODULO;

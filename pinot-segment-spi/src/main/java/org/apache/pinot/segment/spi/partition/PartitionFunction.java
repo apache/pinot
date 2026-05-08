@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.spi.partition;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -37,10 +40,19 @@ public interface PartitionFunction extends Serializable {
   /// @return partition id for the value.
   int getPartition(String value);
 
-  /// Returns the name of the partition function.
+  /// Returns the canonical name of the partition function.
   ///
   /// @return Name of the partition function.
   String getName();
+
+  /// Returns every name (canonical + aliases) under which this partition function should be
+  /// registered with `PartitionFunctionFactory`. Defaults to a single-entry list containing
+  /// [#getName()]. Override only when you want additional aliases — e.g.
+  /// `MurmurPartitionFunction` registers under both `Murmur` and `Murmur2`.
+  @JsonIgnore
+  default List<String> getNames() {
+    return Collections.singletonList(getName());
+  }
 
   /// Returns the total number of possible partitions.
   ///

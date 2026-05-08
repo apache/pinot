@@ -20,10 +20,10 @@ package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /// Implementation of [PartitionFunction] which partitions based on configured column values.
@@ -43,7 +43,6 @@ import org.apache.pinot.spi.annotations.PartitionFunctionType;
 ///
 /// With this partition config on column "subject", `partitionId` is `1` for Maths, `2` for English and `3` for
 /// Chemistry. `partitionId` is `0` for all other values which may occur, therefore `numPartitions` is set to `4`.
-@PartitionFunctionType(names = "BoundedColumnValue")
 public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private static final int DEFAULT_PARTITION_ID = 0;
   private static final String NAME = "BoundedColumnValue";
@@ -53,9 +52,17 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private final Map<String, String> _functionConfig;
   private final String[] _values;
 
-  public BoundedColumnValuePartitionFunction(int numPartitions, Map<String, String> functionConfig) {
-    Preconditions.checkArgument(functionConfig != null && functionConfig.size() > 0,
-        "'functionConfig' should be present, specified", functionConfig);
+  public BoundedColumnValuePartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    _numPartitions = numPartitions;
+    if (functionConfig == null) {
+      // Probe-only path used by PartitionFunctionFactory startup scan; real use supplies a
+      // populated config and reaches the validation below. getPartition() will throw on a
+      // probe-built instance, which is fine because the registry never calls it.
+      _functionConfig = null;
+      _values = null;
+      return;
+    }
+    Preconditions.checkArgument(functionConfig.size() > 0, "'functionConfig' must not be empty");
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES) != null, "columnValues must be configured");
     Preconditions.checkState(functionConfig.get(COLUMN_VALUES_DELIMITER) != null,
         "'columnValuesDelimiter' must be configured");
@@ -63,11 +70,11 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
     _values = StringUtils.split(functionConfig.get(COLUMN_VALUES), functionConfig.get(COLUMN_VALUES_DELIMITER));
     Preconditions.checkState(numPartitions == _values.length + 1,
         "'numPartitions' must just be one greater than number of column values configured");
-    _numPartitions = numPartitions;
   }
 
   @Override
   public int getPartition(String value) {
+    Preconditions.checkState(_values != null, "BoundedColumnValuePartitionFunction is not configured");
     for (int i = 0; i < _numPartitions - 1; i++) {
       if (_values[i].equalsIgnoreCase(value)) {
         return i + 1;
