@@ -32,11 +32,9 @@ import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * {@link PartitionFunction} backed by a 32-bit Murmur3 hash. The configured
- * {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#MASK}) is applied to the
- * raw signed hash to derive the partition id.
- */
+/// [PartitionFunction] backed by a 32-bit Murmur3 hash. The configured
+/// [PartitionIntNormalizer] (default [PartitionIntNormalizer#MASK]) is applied to the
+/// raw signed hash to derive the partition id.
 @PartitionFunctionType(names = "Murmur3")
 public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur3";

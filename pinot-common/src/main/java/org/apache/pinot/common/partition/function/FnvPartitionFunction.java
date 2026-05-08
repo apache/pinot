@@ -32,11 +32,9 @@ import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Stateless and thread-safe {@link PartitionFunction} backed by configurable FNV variants. The
- * configured {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#MASK}) is applied
- * to the raw FNV hash to derive the partition id.
- */
+/// Stateless and thread-safe [PartitionFunction] backed by configurable FNV variants. The
+/// configured [PartitionIntNormalizer] (default [PartitionIntNormalizer#MASK]) is applied
+/// to the raw FNV hash to derive the partition id.
 @PartitionFunctionType(names = "FNV")
 public class FnvPartitionFunction implements PartitionFunction {
   private static final String NAME = "FNV";

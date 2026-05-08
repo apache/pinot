@@ -29,12 +29,10 @@ import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * {@link PartitionFunction} that hashes the input via {@link Arrays#hashCode(byte[])} of the value
- * bytes and runs the configured {@link PartitionIntNormalizer} (default
- * {@link PartitionIntNormalizer#KAFKA_ABS}, the Kafka-style {@code abs(hash) % N} that maps
- * {@code Integer.MIN_VALUE -> 0}) to derive the partition id.
- */
+/// [PartitionFunction] that hashes the input via [Arrays#hashCode(byte\[\])] of the value
+/// bytes and runs the configured [PartitionIntNormalizer] (default
+/// [PartitionIntNormalizer#KAFKA_ABS], the Kafka-style `abs(hash) % N` that maps
+/// `Integer.MIN_VALUE -> 0`) to derive the partition id.
 @PartitionFunctionType(names = "ByteArray")
 public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final String NAME = "ByteArray";

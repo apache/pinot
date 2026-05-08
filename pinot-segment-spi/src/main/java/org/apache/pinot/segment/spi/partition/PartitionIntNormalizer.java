@@ -22,16 +22,14 @@ import com.google.common.base.Preconditions;
 import java.util.Locale;
 
 
-/**
- * Maps a raw signed integer hash output to a non-negative partition id in {@code [0, numPartitions)}.
- *
- * <p>{@link PartitionFunction} implementations report which normalizer matches their internal modulo
- * semantics via {@link PartitionFunction#getPartitionIdNormalizer()}. The framework uses this label
- * for identity / staleness matching between config-side and segment-side partition metadata; legacy
- * functions perform their own modulo internally and the value is purely descriptive for them.
- */
+/// Maps a raw signed integer hash output to a non-negative partition id in `[0, numPartitions)`.
+///
+/// [PartitionFunction] implementations apply the configured normalizer in their
+/// `getPartition(...)` body and report it via [PartitionFunction#getPartitionIdNormalizer()].
+/// The framework also uses the reported value for identity / staleness matching between
+/// config-side and segment-side partition metadata.
 public enum PartitionIntNormalizer {
-  /** Compute the remainder, then shift negative remainders into the valid range with {@code + numPartitions}. */
+  /// Compute the remainder, then shift negative remainders into the valid range with `+ numPartitions`.
   POSITIVE_MODULO {
     @Override
     int toPartitionId(int value, int numPartitions) {
@@ -45,7 +43,7 @@ public enum PartitionIntNormalizer {
       return (int) (partition < 0 ? partition + numPartitions : partition);
     }
   },
-  /** Compute the remainder, then take its absolute value. */
+  /// Compute the remainder, then take its absolute value.
   ABS {
     @Override
     int toPartitionId(int value, int numPartitions) {
@@ -59,7 +57,7 @@ public enum PartitionIntNormalizer {
       return (int) (partition < 0 ? -partition : partition);
     }
   },
-  /** Mask the sign bit before applying modulo. */
+  /// Mask the sign bit before applying modulo.
   MASK {
     @Override
     int toPartitionId(int value, int numPartitions) {
@@ -71,11 +69,9 @@ public enum PartitionIntNormalizer {
       return (int) ((value & Long.MAX_VALUE) % numPartitions);
     }
   },
-  /**
-   * Kafka-style {@code abs(value) % numPartitions} that handles {@code Integer.MIN_VALUE -> 0}
-   * (and {@code Long.MIN_VALUE -> 0}) to avoid the {@code Math.abs} overflow corner. Matches the
-   * legacy semantics of {@code HashCodePartitionFunction} and {@code ByteArrayPartitionFunction}.
-   */
+  /// Kafka-style `abs(value) % numPartitions` that handles `Integer.MIN_VALUE -> 0`
+  /// (and `Long.MIN_VALUE -> 0`) to avoid the `Math.abs` overflow corner. Matches the
+  /// legacy semantics of `HashCodePartitionFunction` and `ByteArrayPartitionFunction`.
   KAFKA_ABS {
     @Override
     int toPartitionId(int value, int numPartitions) {

@@ -26,27 +26,28 @@ import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
-/**
- * Implementation of {@link PartitionFunction} which partitions based on configured column values.
- *
- * "columnPartitionMap": {
- *   "subject": {
- *     "functionName": "BoundedColumnValue",
- *     "functionConfig": {
- *       "columnValues": "Maths|English|Chemistry",
- *       "columnValuesDelimiter": "|"
- *     },
- *     "numPartitions": 4
- *   }
- * }
- * With this partition config on column "subject", partitionId would be 1 for Maths, 2 for English and 3 for Chemistry.
- * partitionId would be "0" for all other values which may occur, therefore 'numPartitions' is set to 4.
- *
- * <p>The mapping output is already in {@code [0, numPartitions)}, so the configured
- * {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#POSITIVE_MODULO}) is a
- * no-op for in-range values; it is still applied so the field is uniform across all partition
- * functions.
- */
+/// Implementation of [PartitionFunction] which partitions based on configured column values.
+///
+/// ```json
+/// "columnPartitionMap": {
+///   "subject": {
+///     "functionName": "BoundedColumnValue",
+///     "functionConfig": {
+///       "columnValues": "Maths|English|Chemistry",
+///       "columnValuesDelimiter": "|"
+///     },
+///     "numPartitions": 4
+///   }
+/// }
+/// ```
+///
+/// With this partition config on column "subject", `partitionId` is `1` for Maths, `2` for English and `3` for
+/// Chemistry. `partitionId` is `0` for all other values which may occur, therefore `numPartitions` is set to `4`.
+///
+/// The mapping output is already in `[0, numPartitions)`, so the configured
+/// [PartitionIntNormalizer] (default [PartitionIntNormalizer#POSITIVE_MODULO]) is a
+/// no-op for in-range values; it is still applied so the field is uniform across all partition
+/// functions.
 @PartitionFunctionType(names = "BoundedColumnValue")
 public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private static final int DEFAULT_PARTITION_ID = 0;
@@ -90,11 +91,9 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
     return NAME;
   }
 
-  /**
-   * Returns number of partitions configured for the column.
-   *
-   * @return Total number of partitions for the function.
-   */
+  /// Returns number of partitions configured for the column.
+  ///
+  /// @return Total number of partitions for the function.
   @Override
   public int getNumPartitions() {
     return _numPartitions;

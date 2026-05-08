@@ -34,27 +34,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Dynamic registry for {@link PartitionFunction} implementations.
- *
- * <p>Discovery is driven by classpath scanning for classes annotated with
- * {@link PartitionFunctionType}. Annotated classes must:
- * <ul>
- *   <li>be public and implement {@link PartitionFunction}</li>
- *   <li>live under a package matching the regex {@code .*\.partition\.function\..*}
- *       (e.g. {@code org.apache.pinot.common.partition.function} or any plugin package
- *       that follows the same convention)</li>
- *   <li>expose a public constructor with signature
- *       {@code (int numPartitions, Map<String, String> functionConfig)}</li>
- * </ul>
- *
- * <p>The static block scans the classpath once and builds an immutable
- * (canonicalized name → constructor) map. Instances are created on demand by
- * {@link #getPartitionFunction(String, int, Map)}.
- *
- * <p>To force eager initialization (e.g. so the scan happens before the first segment
- * is read), call {@link #init()} from broker/server/controller startup.
- */
+/// Dynamic registry for [PartitionFunction] implementations.
+///
+/// Discovery is driven by classpath scanning for classes annotated with
+/// [PartitionFunctionType]. Annotated classes must:
+///
+/// - be public and implement [PartitionFunction]
+/// - live under a package matching the regex `.*\.partition\.function\..*`
+///   (e.g. `org.apache.pinot.common.partition.function` or any plugin package
+///   that follows the same convention)
+/// - expose a public constructor with signature
+///   `(int numPartitions, Map<String, String> functionConfig)`
+///
+/// The static block scans the classpath once and builds an immutable
+/// (canonicalized name → constructor) map. Instances are created on demand by
+/// [#getPartitionFunction(String, int, Map)].
+///
+/// To force eager initialization (e.g. so the scan happens before the first segment
+/// is read), call [#init()] from broker/server/controller startup.
 public class PartitionFunctionFactory {
   private PartitionFunctionFactory() {
   }
@@ -101,21 +98,17 @@ public class PartitionFunctionFactory {
         REGISTRY.keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
-  /**
-   * No-op call that exists to force the static initializer of this class to run. Mirrors
-   * {@code FunctionRegistry.init()} so callers can eagerly trigger classpath scanning during
-   * service startup instead of paying the cost on the first partition function lookup.
-   */
+  /// No-op call that exists to force the static initializer of this class to run. Mirrors
+  /// `FunctionRegistry.init()` so callers can eagerly trigger classpath scanning during
+  /// service startup instead of paying the cost on the first partition function lookup.
   public static void init() {
   }
 
-  /**
-   * Builds an instance of the partition function registered under {@code functionName}.
-   *
-   * @param functionName matched case-insensitively (after stripping underscores)
-   * @param numPartitions positive partition count
-   * @param functionConfig optional, function-specific configuration; may be {@code null}
-   */
+  /// Builds an instance of the partition function registered under `functionName`.
+  ///
+  /// @param functionName matched case-insensitively (after stripping underscores)
+  /// @param numPartitions positive partition count
+  /// @param functionConfig optional, function-specific configuration; may be `null`
   public static PartitionFunction getPartitionFunction(String functionName, int numPartitions,
       @Nullable Map<String, String> functionConfig) {
     Constructor<? extends PartitionFunction> constructor = REGISTRY.get(canonicalize(functionName));

@@ -24,19 +24,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
 
 
-/** Shared config-parsing helpers for built-in partition functions. */
+/// Shared config-parsing helpers for built-in partition functions.
 final class PartitionFunctionConfigs {
-  /** Config key under which an explicit {@link PartitionIntNormalizer} can be selected. */
+  /// Config key under which an explicit [PartitionIntNormalizer] can be selected.
   static final String PARTITION_ID_NORMALIZER_KEY = "partitionIdNormalizer";
 
   private PartitionFunctionConfigs() {
   }
 
-  /**
-   * Reads {@link #PARTITION_ID_NORMALIZER_KEY} from the function config and resolves it to a
-   * {@link PartitionIntNormalizer}. Returns {@code defaultNormalizer} when the config is absent or
-   * the value is blank. Throws {@link IllegalArgumentException} on an unrecognized value.
-   */
+  /// Reads [#PARTITION_ID_NORMALIZER_KEY] from the function config and resolves it to a
+  /// [PartitionIntNormalizer]. Returns `defaultNormalizer` when the config is absent or
+  /// the value is blank. Throws [IllegalArgumentException] on an unrecognized value.
   static PartitionIntNormalizer normalizer(@Nullable Map<String, String> functionConfig,
       PartitionIntNormalizer defaultNormalizer) {
     if (functionConfig == null) {

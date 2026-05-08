@@ -26,11 +26,9 @@ import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
-/**
- * Modulo operation based partition function. Treats the input string as a base-10 long and runs
- * the configured {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#POSITIVE_MODULO})
- * over it.
- */
+/// Modulo operation based partition function. Treats the input string as a base-10 long and runs
+/// the configured [PartitionIntNormalizer] (default [PartitionIntNormalizer#POSITIVE_MODULO])
+/// over it.
 @PartitionFunctionType(names = "Modulo")
 public class ModuloPartitionFunction implements PartitionFunction {
   private static final String NAME = "Modulo";

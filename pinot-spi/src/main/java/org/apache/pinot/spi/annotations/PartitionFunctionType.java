@@ -24,39 +24,32 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/**
- * Marker annotation for plug-in {@code PartitionFunction} implementations.
- *
- * <p>Classes annotated with this annotation are auto-discovered at startup by
- * {@code PartitionFunctionFactory} via classpath scanning. Each annotated class must:
- * <ul>
- *   <li>Implement {@code org.apache.pinot.segment.spi.partition.PartitionFunction}</li>
- *   <li>Be public</li>
- *   <li>Live under a package matching {@code .*\.partition\.function\..*} (e.g.
- *       {@code org.apache.pinot.common.partition.function} or any plugin package
- *       that follows the same convention)</li>
- *   <li>Expose a public constructor with signature
- *       {@code (int numPartitions, java.util.Map<String, String> functionConfig)}.
- *       Implementations that ignore {@code functionConfig} should accept and discard it.</li>
- * </ul>
- *
- * <p>Multiple aliases can be declared in {@link #names()} so a single class can be
- * registered under several names (e.g. {@code Murmur} and {@code Murmur2} both map to
- * {@code MurmurPartitionFunction}). Names are matched case-insensitively.
- */
+/// Marker annotation for plug-in `PartitionFunction` implementations.
+///
+/// Classes annotated with this annotation are auto-discovered at startup by
+/// `PartitionFunctionFactory` via classpath scanning. Each annotated class must:
+///
+/// - Implement `org.apache.pinot.segment.spi.partition.PartitionFunction`
+/// - Be public
+/// - Live under a package matching `.*\.partition\.function\..*` (e.g.
+///   `org.apache.pinot.common.partition.function` or any plugin package
+///   that follows the same convention)
+/// - Expose a public constructor with signature
+///   `(int numPartitions, java.util.Map<String, String> functionConfig)`.
+///   Implementations that ignore `functionConfig` should accept and discard it.
+///
+/// Multiple aliases can be declared in [#names()] so a single class can be
+/// registered under several names (e.g. `Murmur` and `Murmur2` both map to
+/// `MurmurPartitionFunction`). Names are matched case-insensitively.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface PartitionFunctionType {
 
-  /**
-   * Canonical name(s) under which to register this partition function. Must contain at
-   * least one entry. The first entry is treated as the canonical name; remaining entries
-   * are aliases.
-   */
+  /// Canonical name(s) under which to register this partition function. Must contain at
+  /// least one entry. The first entry is treated as the canonical name; remaining entries
+  /// are aliases.
   String[] names();
 
-  /**
-   * Set to {@code false} to skip auto-registration without removing the class.
-   */
+  /// Set to `false` to skip auto-registration without removing the class.
   boolean enabled() default true;
 }

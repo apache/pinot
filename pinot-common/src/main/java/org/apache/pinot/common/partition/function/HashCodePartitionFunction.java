@@ -26,12 +26,10 @@ import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
-/**
- * {@link PartitionFunction} that hashes the input via {@link String#hashCode()} and runs the
- * configured {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#KAFKA_ABS}, the
- * Kafka-style {@code abs(hash) % N} that maps {@code Integer.MIN_VALUE -> 0}) to derive the
- * partition id.
- */
+/// [PartitionFunction] that hashes the input via [String#hashCode()] and runs the
+/// configured [PartitionIntNormalizer] (default [PartitionIntNormalizer#KAFKA_ABS], the
+/// Kafka-style `abs(hash) % N` that maps `Integer.MIN_VALUE -> 0`) to derive the
+/// partition id.
 @PartitionFunctionType(names = "HashCode")
 public class HashCodePartitionFunction implements PartitionFunction {
   private static final String NAME = "HashCode";

@@ -24,35 +24,28 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 
-/**
- * Interface for partition function.
- *
- * Implementations of this interface are assumed not to be stateful.
- * That is, two invocations of {@code PartitionFunction.getPartition(value)}
- * with the same value are expected to produce the same result. Implementations must also be safe for
- * concurrent invocation by multiple threads.
- */
+/// Interface for partition function.
+///
+/// Implementations of this interface are assumed not to be stateful. That is, two invocations of
+/// `PartitionFunction.getPartition(value)` with the same value are expected to produce the same
+/// result. Implementations must also be safe for concurrent invocation by multiple threads.
 public interface PartitionFunction extends Serializable {
 
-  /**
-   * Method to compute and return partition id for the given value.
-   * NOTE: The value is expected to be a string representation of the actual value.
-   *
-   * @param value Value for which to determine the partition id.
-   * @return partition id for the value.
-   */
+  /// Method to compute and return partition id for the given value.
+  /// NOTE: The value is expected to be a string representation of the actual value.
+  ///
+  /// @param value Value for which to determine the partition id.
+  /// @return partition id for the value.
   int getPartition(String value);
 
-  /**
-   * Returns the name of the partition function.
-   * @return Name of the partition function.
-   */
+  /// Returns the name of the partition function.
+  ///
+  /// @return Name of the partition function.
   String getName();
 
-  /**
-   * Returns the total number of possible partitions.
-   * @return Number of possible partitions.
-   */
+  /// Returns the total number of possible partitions.
+  ///
+  /// @return Number of possible partitions.
   int getNumPartitions();
 
   @Nullable
@@ -60,18 +53,16 @@ public interface PartitionFunction extends Serializable {
     return null;
   }
 
-  /**
-   * Reports the {@link PartitionIntNormalizer} that drives this partition function's int-to-id
-   * mapping. The built-in implementations now apply the named normalizer directly, so the value is
-   * authoritative — recomputing a partition via
-   * {@code PartitionIntNormalizer.valueOf(getPartitionIdNormalizer()).getPartitionId(rawHash, numPartitions)}
-   * yields the same result as {@link #getPartition(String)} for the same raw hash input.
-   *
-   * <p>Used by the framework for identity / staleness matching between config-side and segment-side
-   * partition metadata. Each implementation must declare its own value — there is intentionally no
-   * default. Plug-ins whose output is already in {@code [0, numPartitions)} should return
-   * {@link PartitionIntNormalizer#POSITIVE_MODULO} (a no-op label).
-   */
+  /// Reports the [PartitionIntNormalizer] that drives this partition function's int-to-id
+  /// mapping. The built-in implementations now apply the named normalizer directly, so the value
+  /// is authoritative — recomputing a partition via
+  /// `PartitionIntNormalizer.valueOf(getPartitionIdNormalizer()).getPartitionId(rawHash, numPartitions)`
+  /// yields the same result as [#getPartition(String)] for the same raw hash input.
+  ///
+  /// Used by the framework for identity / staleness matching between config-side and segment-side
+  /// partition metadata. Each implementation must declare its own value — there is intentionally
+  /// no default. Plug-ins whose output is already in `[0, numPartitions)` should return
+  /// [PartitionIntNormalizer#POSITIVE_MODULO] (a no-op label).
   @JsonIgnore
   String getPartitionIdNormalizer();
 }
