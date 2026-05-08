@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
@@ -92,6 +93,12 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    // Output is already a fixed mapping in [0, numPartitions); POSITIVE_MODULO is a no-op label.
+    return PartitionIntNormalizer.POSITIVE_MODULO.name();
   }
 
   @Override

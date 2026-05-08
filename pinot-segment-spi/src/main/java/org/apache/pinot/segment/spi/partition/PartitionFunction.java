@@ -67,6 +67,10 @@ public interface PartitionFunction extends Serializable {
    * matching between config-side and segment-side partition metadata; it is NOT used to drive runtime
    * normalization for legacy functions, which perform their own modulo internally.
    *
+   * <p>Each implementation must declare its own value — there is intentionally no default. Plug-ins
+   * that do not map cleanly onto any standard normalizer (e.g. a function whose output is already
+   * in {@code [0, numPartitions)}) should return {@code POSITIVE_MODULO}.
+   *
    * <p><b>Descriptive only for legacy functions:</b> classic implementations
    * ({@code Modulo}, {@code Murmur}, {@code Murmur3}, {@code Fnv}, {@code HashCode},
    * {@code ByteArray}) report the closest-matching normalizer name even though their actual
@@ -74,13 +78,7 @@ public interface PartitionFunction extends Serializable {
    * {@code Integer.MIN_VALUE -> 0} vs strict mod-then-abs in {@link PartitionIntNormalizer#ABS}).
    * Do not assume that recomputing a partition id via {@code PartitionIntNormalizer.<X>.getPartitionId(rawHash, N)}
    * will reproduce the legacy function's output bit-for-bit.
-   *
-   * <p>Implementations that do not map cleanly onto any standard normalizer (e.g.
-   * {@code BoundedColumnValue}) should still return a non-null value; {@code POSITIVE_MODULO} is a
-   * safe choice when the function's output is already in {@code [0, numPartitions)}.
    */
   @JsonIgnore
-  default String getPartitionIdNormalizer() {
-    return PartitionIntNormalizer.POSITIVE_MODULO.name();
-  }
+  String getPartitionIdNormalizer();
 }
