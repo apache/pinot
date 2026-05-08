@@ -27,31 +27,26 @@ import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /**
- * Modulo operation based partition function, where:
- * <ul>
- *   <li> partitionId = value % {@link #_numPartitions}</li>
- * </ul>
+ * Modulo operation based partition function. Treats the input string as a base-10 long and runs
+ * the configured {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#POSITIVE_MODULO})
+ * over it.
  */
 @PartitionFunctionType(names = "Modulo")
 public class ModuloPartitionFunction implements PartitionFunction {
   private static final String NAME = "Modulo";
+  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.POSITIVE_MODULO;
   private final int _numPartitions;
+  private final PartitionIntNormalizer _normalizer;
 
   public ModuloPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
-  /**
-   * Returns partition id for a given value. Assumes that the passed in object
-   * is either an Integer, or a string representation of an Integer.
-   *
-   * @param value Value for which to determine the partition id.
-   * @return Partition id for the given value.
-   */
   @Override
   public int getPartition(String value) {
-    return toNonNegative((int) (Long.parseLong(value) % _numPartitions));
+    return _normalizer.getPartitionId(Long.parseLong(value), _numPartitions);
   }
 
   @Override
@@ -66,16 +61,12 @@ public class ModuloPartitionFunction implements PartitionFunction {
 
   @Override
   public String getPartitionIdNormalizer() {
-    return PartitionIntNormalizer.POSITIVE_MODULO.name();
+    return _normalizer.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
-  }
-
-  private int toNonNegative(int partition) {
-    return partition < 0 ? partition + _numPartitions : partition;
   }
 }

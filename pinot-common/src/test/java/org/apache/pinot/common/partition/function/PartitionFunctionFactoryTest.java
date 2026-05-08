@@ -99,18 +99,53 @@ public class PartitionFunctionFactoryTest {
     assertEquals(new Murmur3PartitionFunction(4, null).getPartitionIdNormalizer(),
         PartitionIntNormalizer.MASK.name());
     assertEquals(new HashCodePartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.ABS.name());
+        PartitionIntNormalizer.KAFKA_ABS.name());
     assertEquals(new ByteArrayPartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.ABS.name());
-    // FNV defaults to MASK; ABS is reachable via config.
+        PartitionIntNormalizer.KAFKA_ABS.name());
+    // FNV defaults to MASK; any normalizer is selectable through the partitionIdNormalizer config.
     assertEquals(new FnvPartitionFunction(4, null).getPartitionIdNormalizer(),
         PartitionIntNormalizer.MASK.name());
-    assertEquals(new FnvPartitionFunction(4, Map.of("negativePartitionHandling", "abs")).getPartitionIdNormalizer(),
+    assertEquals(new FnvPartitionFunction(4, Map.of("partitionIdNormalizer", "abs")).getPartitionIdNormalizer(),
         PartitionIntNormalizer.ABS.name());
-    // BoundedColumnValue does not map onto any standard normalizer; falls back to the interface
-    // default (POSITIVE_MODULO), which is a safe label since its output is already in [0, N).
+    // BoundedColumnValue's output is already in [0, N), so POSITIVE_MODULO is a no-op default.
     PartitionFunction boundedColumnValue = new BoundedColumnValuePartitionFunction(2,
         Map.of("columnValues", "a", "columnValuesDelimiter", "|"));
     assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIntNormalizer.POSITIVE_MODULO.name());
+  }
+
+  @Test
+  public void testPartitionIdNormalizerConfigOverridesDefaultAcrossImpls() {
+    // Every impl exposes the same `partitionIdNormalizer` config key. Verify that overriding the
+    // default rewires the actual partition-id computation (not just the reported label).
+    Map<String, String> mask = Map.of("partitionIdNormalizer", "MASK");
+
+    // HashCode: configured normalizer drives the output. Pick a value whose hashCode is negative
+    // (sweep until found) so KAFKA_ABS vs MASK produces observably different partition ids.
+    String negativeHashValue = null;
+    int negativeHash = 0;
+    for (int i = 0; i < 1000 && negativeHashValue == null; i++) {
+      String candidate = "value-" + i;
+      if (candidate.hashCode() < 0) {
+        negativeHashValue = candidate;
+        negativeHash = candidate.hashCode();
+      }
+    }
+    assertTrue(negativeHashValue != null, "Failed to find a string with a negative hashCode in the search range");
+    assertEquals(new HashCodePartitionFunction(8, null).getPartition(negativeHashValue),
+        PartitionIntNormalizer.KAFKA_ABS.getPartitionId(negativeHash, 8));
+    assertEquals(new HashCodePartitionFunction(8, mask).getPartition(negativeHashValue),
+        PartitionIntNormalizer.MASK.getPartitionId(negativeHash, 8));
+
+    // Modulo: explicit MASK on a negative input differs from the default POSITIVE_MODULO output.
+    long signedValue = -10L;
+    int posMod = new ModuloPartitionFunction(7, null).getPartition(Long.toString(signedValue));
+    int maskMod = new ModuloPartitionFunction(7, mask).getPartition(Long.toString(signedValue));
+    assertEquals(posMod, PartitionIntNormalizer.POSITIVE_MODULO.getPartitionId(signedValue, 7));
+    assertEquals(maskMod, PartitionIntNormalizer.MASK.getPartitionId(signedValue, 7));
+
+    // ByteArray: KAFKA_ABS default; verify the override label round-trips on the SPI.
+    PartitionFunction byteArrayWithKafkaAbs = new ByteArrayPartitionFunction(4,
+        Map.of("partitionIdNormalizer", "KAFKA_ABS"));
+    assertEquals(byteArrayWithKafkaAbs.getPartitionIdNormalizer(), PartitionIntNormalizer.KAFKA_ABS.name());
   }
 }

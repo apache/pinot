@@ -30,27 +30,27 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Implementation of {@link PartitionFunction} which partitions on Java's
- * {@link Arrays#hashCode(byte[])} of the value bytes.
+ * {@link PartitionFunction} that hashes the input via {@link Arrays#hashCode(byte[])} of the value
+ * bytes and runs the configured {@link PartitionIntNormalizer} (default
+ * {@link PartitionIntNormalizer#KAFKA_ABS}, the Kafka-style {@code abs(hash) % N} that maps
+ * {@code Integer.MIN_VALUE -> 0}) to derive the partition id.
  */
 @PartitionFunctionType(names = "ByteArray")
 public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final String NAME = "ByteArray";
+  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.KAFKA_ABS;
   private final int _numPartitions;
+  private final PartitionIntNormalizer _normalizer;
 
-  /**
-   * Constructor for the class.
-   * @param numPartitions Number of partitions
-   * @param functionConfig unused, accepted to match the registry's standard constructor signature
-   */
   public ByteArrayPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
   public int getPartition(String value) {
-    return abs(Arrays.hashCode(value.getBytes(UTF_8))) % _numPartitions;
+    return _normalizer.getPartitionId(Arrays.hashCode(value.getBytes(UTF_8)), _numPartitions);
   }
 
   @Override
@@ -65,17 +65,12 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
 
   @Override
   public String getPartitionIdNormalizer() {
-    return PartitionIntNormalizer.ABS.name();
+    return _normalizer.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
-  }
-
-  // NOTE: This matches the Utils.abs() in Kafka
-  private static int abs(int n) {
-    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }

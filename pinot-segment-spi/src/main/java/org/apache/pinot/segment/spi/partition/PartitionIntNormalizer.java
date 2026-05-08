@@ -70,6 +70,24 @@ public enum PartitionIntNormalizer {
     int toPartitionId(long value, int numPartitions) {
       return (int) ((value & Long.MAX_VALUE) % numPartitions);
     }
+  },
+  /**
+   * Kafka-style {@code abs(value) % numPartitions} that handles {@code Integer.MIN_VALUE -> 0}
+   * (and {@code Long.MIN_VALUE -> 0}) to avoid the {@code Math.abs} overflow corner. Matches the
+   * legacy semantics of {@code HashCodePartitionFunction} and {@code ByteArrayPartitionFunction}.
+   */
+  KAFKA_ABS {
+    @Override
+    int toPartitionId(int value, int numPartitions) {
+      int abs = (value == Integer.MIN_VALUE) ? 0 : Math.abs(value);
+      return abs % numPartitions;
+    }
+
+    @Override
+    int toPartitionId(long value, int numPartitions) {
+      long abs = (value == Long.MIN_VALUE) ? 0L : Math.abs(value);
+      return (int) (abs % numPartitions);
+    }
   };
 
   public final int getPartitionId(int value, int numPartitions) {

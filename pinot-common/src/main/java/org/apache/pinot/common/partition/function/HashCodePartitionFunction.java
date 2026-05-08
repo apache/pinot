@@ -27,24 +27,27 @@ import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /**
- * Hash code partition function, where:
- * <ul>
- *   <li> partitionId = value.hashCode() % {@link #_numPartitions}</li>
- * </ul>
+ * {@link PartitionFunction} that hashes the input via {@link String#hashCode()} and runs the
+ * configured {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#KAFKA_ABS}, the
+ * Kafka-style {@code abs(hash) % N} that maps {@code Integer.MIN_VALUE -> 0}) to derive the
+ * partition id.
  */
 @PartitionFunctionType(names = "HashCode")
 public class HashCodePartitionFunction implements PartitionFunction {
   private static final String NAME = "HashCode";
+  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.KAFKA_ABS;
   private final int _numPartitions;
+  private final PartitionIntNormalizer _normalizer;
 
   public HashCodePartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
   public int getPartition(String value) {
-    return abs(value.hashCode()) % _numPartitions;
+    return _normalizer.getPartitionId(value.hashCode(), _numPartitions);
   }
 
   @Override
@@ -59,17 +62,12 @@ public class HashCodePartitionFunction implements PartitionFunction {
 
   @Override
   public String getPartitionIdNormalizer() {
-    return PartitionIntNormalizer.ABS.name();
+    return _normalizer.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
-  }
-
-  // NOTE: This matches the Utils.abs() in Kafka
-  private static int abs(int n) {
-    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }

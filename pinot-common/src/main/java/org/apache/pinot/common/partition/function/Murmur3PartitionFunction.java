@@ -33,7 +33,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Implementation of {@link PartitionFunction} which partitions based on 32 bit murmur3 hash
+ * {@link PartitionFunction} backed by a 32-bit Murmur3 hash. The configured
+ * {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#MASK}) is applied to the
+ * raw signed hash to derive the partition id.
  */
 @PartitionFunctionType(names = "Murmur3")
 public class Murmur3PartitionFunction implements PartitionFunction {
@@ -41,18 +43,16 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String SEED_KEY = "seed";
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
+  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.MASK;
+
   private final int _numPartitions;
   @Nullable
   private final Map<String, String> _functionConfig;
   private final int _seed;
   private final boolean _useX64;
   private final boolean _useRawBytes;
+  private final PartitionIntNormalizer _normalizer;
 
-  /**
-   * Constructor for the class.
-   * @param numPartitions Number of partitions.
-   * @param functionConfig to extract configurations for the partition function.
-   */
   public Murmur3PartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
@@ -80,19 +80,21 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     _seed = seed;
     _useX64 = useX64;
     _useRawBytes = useRawBytes;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
   public int getPartition(String value) {
+    int hash;
     if (_useRawBytes) {
       byte[] bytes = BytesUtils.toBytes(value);
-      int hash = _useX64 ? MurmurHashFunctions.murmurHash3X64Bit32(bytes, _seed)
+      hash = _useX64 ? MurmurHashFunctions.murmurHash3X64Bit32(bytes, _seed)
           : MurmurHashFunctions.murmurHash3X86Bit32(bytes, _seed);
-      return (hash & Integer.MAX_VALUE) % _numPartitions;
+    } else {
+      hash = _useX64 ? MurmurHashFunctions.murmurHash3X64Bit32(value, _seed)
+          : MurmurHashFunctions.murmurHash3X86Bit32(value.getBytes(UTF_8), _seed);
     }
-    int hash = _useX64 ? MurmurHashFunctions.murmurHash3X64Bit32(value, _seed)
-        : MurmurHashFunctions.murmurHash3X86Bit32(value.getBytes(UTF_8), _seed);
-    return (hash & Integer.MAX_VALUE) % _numPartitions;
+    return _normalizer.getPartitionId(hash, _numPartitions);
   }
 
   @Override
@@ -113,7 +115,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
 
   @Override
   public String getPartitionIdNormalizer() {
-    return PartitionIntNormalizer.MASK.name();
+    return _normalizer.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

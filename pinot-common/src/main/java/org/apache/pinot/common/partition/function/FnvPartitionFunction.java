@@ -33,14 +33,15 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Stateless and thread-safe {@link PartitionFunction} backed by configurable FNV variants.
+ * Stateless and thread-safe {@link PartitionFunction} backed by configurable FNV variants. The
+ * configured {@link PartitionIntNormalizer} (default {@link PartitionIntNormalizer#MASK}) is applied
+ * to the raw FNV hash to derive the partition id.
  */
 @PartitionFunctionType(names = "FNV")
 public class FnvPartitionFunction implements PartitionFunction {
   private static final String NAME = "FNV";
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
-  private static final String NEGATIVE_PARTITION_HANDLING_KEY = "negativePartitionHandling";
   private static final FnvHashFunctions.Variant DEFAULT_VARIANT = FnvHashFunctions.Variant.FNV1A_32;
   private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.MASK;
 
@@ -51,9 +52,6 @@ public class FnvPartitionFunction implements PartitionFunction {
   private final boolean _useRawBytes;
   private final PartitionIntNormalizer _normalizer;
 
-  /**
-   * Builds a new FNV partition function from the provided configuration.
-   */
   public FnvPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
@@ -61,21 +59,16 @@ public class FnvPartitionFunction implements PartitionFunction {
 
     FnvHashFunctions.Variant variant = DEFAULT_VARIANT;
     boolean useRawBytes = false;
-    PartitionIntNormalizer normalizer = DEFAULT_NORMALIZER;
     if (functionConfig != null) {
       String variantString = functionConfig.get(VARIANT_KEY);
       if (StringUtils.isNotBlank(variantString)) {
         variant = FnvHashFunctions.Variant.fromString(variantString);
       }
       useRawBytes = Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
-      String normalizerString = functionConfig.get(NEGATIVE_PARTITION_HANDLING_KEY);
-      if (StringUtils.isNotBlank(normalizerString)) {
-        normalizer = PartitionIntNormalizer.fromConfigString(normalizerString);
-      }
     }
     _variant = variant;
     _useRawBytes = useRawBytes;
-    _normalizer = normalizer;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override

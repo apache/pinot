@@ -61,23 +61,16 @@ public interface PartitionFunction extends Serializable {
   }
 
   /**
-   * Reports the int-normalizer name (a {@link PartitionIntNormalizer} value, e.g.
-   * {@code POSITIVE_MODULO}, {@code ABS}, {@code MASK}) that most closely describes this partition
-   * function's internal modulo semantics. The framework uses this label only for identity / staleness
-   * matching between config-side and segment-side partition metadata; it is NOT used to drive runtime
-   * normalization for legacy functions, which perform their own modulo internally.
+   * Reports the {@link PartitionIntNormalizer} that drives this partition function's int-to-id
+   * mapping. The built-in implementations now apply the named normalizer directly, so the value is
+   * authoritative — recomputing a partition via
+   * {@code PartitionIntNormalizer.valueOf(getPartitionIdNormalizer()).getPartitionId(rawHash, numPartitions)}
+   * yields the same result as {@link #getPartition(String)} for the same raw hash input.
    *
-   * <p>Each implementation must declare its own value — there is intentionally no default. Plug-ins
-   * that do not map cleanly onto any standard normalizer (e.g. a function whose output is already
-   * in {@code [0, numPartitions)}) should return {@code POSITIVE_MODULO}.
-   *
-   * <p><b>Descriptive only for legacy functions:</b> classic implementations
-   * ({@code Modulo}, {@code Murmur}, {@code Murmur3}, {@code Fnv}, {@code HashCode},
-   * {@code ByteArray}) report the closest-matching normalizer name even though their actual
-   * implementation may differ subtly at edge cases (notably Kafka-style abs handling
-   * {@code Integer.MIN_VALUE -> 0} vs strict mod-then-abs in {@link PartitionIntNormalizer#ABS}).
-   * Do not assume that recomputing a partition id via {@code PartitionIntNormalizer.<X>.getPartitionId(rawHash, N)}
-   * will reproduce the legacy function's output bit-for-bit.
+   * <p>Used by the framework for identity / staleness matching between config-side and segment-side
+   * partition metadata. Each implementation must declare its own value — there is intentionally no
+   * default. Plug-ins whose output is already in {@code [0, numPartitions)} should return
+   * {@link PartitionIntNormalizer#POSITIVE_MODULO} (a no-op label).
    */
   @JsonIgnore
   String getPartitionIdNormalizer();

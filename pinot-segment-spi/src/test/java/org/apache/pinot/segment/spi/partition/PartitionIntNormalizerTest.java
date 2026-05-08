@@ -58,6 +58,21 @@ public class PartitionIntNormalizerTest {
   }
 
   @Test
+  public void testKafkaAbs() {
+    PartitionIntNormalizer n = PartitionIntNormalizer.KAFKA_ABS;
+    // Plain positive / negative: matches abs(hash) % N.
+    assertEquals(n.getPartitionId(10, 7), 10 % 7);
+    assertEquals(n.getPartitionId(-10, 7), 10 % 7);
+    // The defining corner case: Math.abs(MIN_VALUE) overflows back to MIN_VALUE, so KAFKA_ABS
+    // patches that to 0 before the modulo.
+    assertEquals(n.getPartitionId(Integer.MIN_VALUE, 7), 0);
+    assertEquals(n.getPartitionId(Long.MIN_VALUE, 7), 0);
+    // For non-MIN_VALUE inputs, KAFKA_ABS and (Math.abs(value) % N) agree.
+    assertEquals(n.getPartitionId(Integer.MAX_VALUE, 1024), Integer.MAX_VALUE % 1024);
+    assertEquals(n.getPartitionId(-1234L, 17), 1234 % 17);
+  }
+
+  @Test
   public void testAllNormalizersReturnInRange() {
     int[] partitionCounts = {1, 2, 7, 1024};
     int[] hashes = {0, 1, -1, 7, -7, Integer.MIN_VALUE, Integer.MAX_VALUE, 13, -13};

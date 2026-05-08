@@ -620,7 +620,7 @@ public class PartitionFunctionTest {
     assertEquals(new FnvPartitionFunction(numPartitions, null).getPartition(value), javaCompatiblePartition);
 
     Map<String, String> functionConfig = new HashMap<>();
-    functionConfig.put("negativePartitionHandling", "abs");
+    functionConfig.put("partitionIdNormalizer", "abs");
     assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), saramaCompatPartition);
   }
 
@@ -638,14 +638,14 @@ public class PartitionFunctionTest {
     functionConfig.put("variant", "fnv1a_64");
     assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), javaCompatiblePartition);
 
-    functionConfig.put("negativePartitionHandling", "abs");
+    functionConfig.put("partitionIdNormalizer", "abs");
     assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), saramaCompatPartition);
   }
 
   @Test
   public void testFnvPartitionFunctionRejectsInvalidNegativePartitionHandling() {
     Map<String, String> functionConfig = new HashMap<>();
-    functionConfig.put("negativePartitionHandling", "saramaCompat");
+    functionConfig.put("partitionIdNormalizer", "saramaCompat");
 
     IllegalArgumentException exception =
         expectThrows(IllegalArgumentException.class, () -> new FnvPartitionFunction(4, functionConfig));
