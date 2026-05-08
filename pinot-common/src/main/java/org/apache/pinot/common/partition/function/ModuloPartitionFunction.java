@@ -16,9 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /**
@@ -26,18 +31,14 @@ import com.google.common.base.Preconditions;
  * <ul>
  *   <li> partitionId = value % {@link #_numPartitions}</li>
  * </ul>
- *
  */
+@PartitionFunctionType(names = "Modulo")
 public class ModuloPartitionFunction implements PartitionFunction {
   private static final String NAME = "Modulo";
   private final int _numPartitions;
 
-  /**
-   * Constructor for the class.
-   * @param numPartitions Number of partitions.
-   */
-  public ModuloPartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+  public ModuloPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
   }
 
@@ -61,6 +62,11 @@ public class ModuloPartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.POSITIVE_MODULO.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

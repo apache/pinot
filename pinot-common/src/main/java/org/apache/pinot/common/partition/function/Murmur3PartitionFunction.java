@@ -16,13 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
@@ -32,6 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Implementation of {@link PartitionFunction} which partitions based on 32 bit murmur3 hash
  */
+@PartitionFunctionType(names = "Murmur3")
 public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur3";
   private static final String SEED_KEY = "seed";
@@ -105,6 +109,11 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.MASK.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

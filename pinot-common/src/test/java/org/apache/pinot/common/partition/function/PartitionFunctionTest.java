@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
@@ -502,7 +504,7 @@ public class PartitionFunctionTest {
 
     // initialized {@link MurmurPartitionFunction} with 5 partitions
     int numPartitions = 5;
-    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions);
+    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions, null);
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
@@ -768,7 +770,7 @@ public class PartitionFunctionTest {
 
     // initialized {@link ByteArrayPartitionFunction} with 5 partitions
     int numPartitions = 5;
-    ByteArrayPartitionFunction byteArrayPartitionFunction = new ByteArrayPartitionFunction(numPartitions);
+    ByteArrayPartitionFunction byteArrayPartitionFunction = new ByteArrayPartitionFunction(numPartitions, null);
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results

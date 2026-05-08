@@ -16,12 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
@@ -31,6 +34,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Implementation of {@link PartitionFunction} which partitions based on 32 bit murmur hash
  */
+@PartitionFunctionType(names = {"Murmur", "Murmur2"})
 public class MurmurPartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
@@ -38,14 +42,6 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Nullable
   private final Map<String, String> _functionConfig;
   private final boolean _useRawBytes;
-
-  /**
-   * Constructor for backward compatibility.
-   * @param numPartitions Number of partitions.
-   */
-  public MurmurPartitionFunction(int numPartitions) {
-    this(numPartitions, null);
-  }
 
   /**
    * Constructor for the class.
@@ -79,6 +75,11 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public Map<String, String> getFunctionConfig() {
     return _functionConfig;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.MASK.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

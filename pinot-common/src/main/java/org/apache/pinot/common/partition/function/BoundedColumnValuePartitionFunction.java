@@ -16,11 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /**
@@ -39,6 +41,7 @@ import org.apache.commons.lang3.StringUtils;
  * With this partition config on column "subject", partitionId would be 1 for Maths, 2 for English and 3 for Chemistry.
  * partitionId would be "0" for all other values which may occur, therefore 'numPartitions' is set to 4.
  */
+@PartitionFunctionType(names = "BoundedColumnValue")
 public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private static final int DEFAULT_PARTITION_ID = 0;
   private static final String NAME = "BoundedColumnValue";

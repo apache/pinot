@@ -16,18 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /**
- * Implementation of {@link Byte array partitioner}
- *
+ * Implementation of {@link PartitionFunction} which partitions on Java's
+ * {@link Arrays#hashCode(byte[])} of the value bytes.
  */
+@PartitionFunctionType(names = "ByteArray")
 public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final String NAME = "ByteArray";
   private final int _numPartitions;
@@ -35,9 +41,10 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   /**
    * Constructor for the class.
    * @param numPartitions Number of partitions
+   * @param functionConfig unused, accepted to match the registry's standard constructor signature
    */
-  public ByteArrayPartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+  public ByteArrayPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
   }
 
@@ -54,6 +61,11 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.ABS.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead

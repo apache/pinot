@@ -16,9 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /**
@@ -27,12 +32,13 @@ import com.google.common.base.Preconditions;
  *   <li> partitionId = value.hashCode() % {@link #_numPartitions}</li>
  * </ul>
  */
+@PartitionFunctionType(names = "HashCode")
 public class HashCodePartitionFunction implements PartitionFunction {
   private static final String NAME = "HashCode";
   private final int _numPartitions;
 
-  public HashCodePartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+  public HashCodePartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
   }
 
@@ -49,6 +55,11 @@ public class HashCodePartitionFunction implements PartitionFunction {
   @Override
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  @Override
+  public String getPartitionIdNormalizer() {
+    return PartitionIntNormalizer.ABS.name();
   }
 
   // Keep it for backward-compatibility, use getName() instead
