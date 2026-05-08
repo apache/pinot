@@ -188,7 +188,11 @@ public class QueryLogger {
     return _sqlRedactionMode;
   }
 
-  private String redactQuery(String query, @Nullable QueryFingerprint queryFingerprint) {
+  public String redactQuery(String query) {
+    return redactQuery(query, null);
+  }
+
+  public String redactQuery(String query, @Nullable QueryFingerprint queryFingerprint) {
     switch (_sqlRedactionMode) {
       case FULL:
         return FULLY_REDACTED;

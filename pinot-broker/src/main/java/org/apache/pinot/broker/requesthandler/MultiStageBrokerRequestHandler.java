@@ -374,7 +374,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           requestContext.setQueryFingerprint(queryFingerprint);
         }
       } catch (Exception e) {
-        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId, query, e.getMessage());
+        LOGGER.warn("Failed to generate query fingerprint for request {}: {}. {}", requestId,
+            _queryLogger.redactQuery(query), e.getMessage());
       }
     }
 
@@ -638,14 +639,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // these requests.
       if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, timer.getRemainingTimeMs(),
           TimeUnit.MILLISECONDS)) {
-        LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
+        LOGGER.warn("Timed out waiting to execute request {}: {}", requestId,
+            _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
         requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
         return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
       }
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId, query);
+      LOGGER.warn("Interrupt received while waiting to execute request {}: {}", requestId,
+          _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       requestContext.setErrorCode(QueryErrorCode.EXECUTION_TIMEOUT);
       return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
@@ -672,7 +675,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       } catch (Throwable t) {
         QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
         String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
-        LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
+        LOGGER.error("Caught exception executing request {}: {}, {}", requestId,
+            _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()),
+            consolidatedMessage);
         requestContext.setErrorCode(queryErrorCode);
         return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
       } finally {
@@ -691,7 +696,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           for (String table : tableNames) {
             _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
           }
-          LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+          LOGGER.warn("Timed out executing request {}: {}", requestId,
+              _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
         }
         requestContext.setErrorCode(errorCode);
       } else {
@@ -796,17 +802,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return queryPlanResultFuture.get(timer.getRemainingTimeMs(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
       String errorMsg = "Timed out while planning query";
-      LOGGER.warn(errorMsg + " {}", query, e);
+      LOGGER.warn(errorMsg + " {}", _queryLogger.redactQuery(query), e);
       queryPlanResultFuture.cancel(true);
       throw QueryErrorCode.BROKER_TIMEOUT.asException(errorMsg);
     } catch (InterruptedException e) {
-      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, query);
+      LOGGER.warn("Interrupt received while planning query {}: {}", requestId, _queryLogger.redactQuery(query));
       throw QueryErrorCode.INTERNAL.asException("Interrupted while planning query");
     } catch (ExecutionException e) {
       if (e.getCause() instanceof QueryException) {
         throw (QueryException) e.getCause();
       } else {
-        LOGGER.warn("Error while planning query {}: {}", query, e.getCause());
+        LOGGER.warn("Error while planning query {}: {}", _queryLogger.redactQuery(query), e.getCause());
         throw QueryErrorCode.INTERNAL.asException("Error while planning query", e.getCause());
       }
     }
