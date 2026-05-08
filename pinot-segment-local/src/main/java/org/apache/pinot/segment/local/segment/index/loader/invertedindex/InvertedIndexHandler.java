@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -31,9 +32,9 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -44,6 +45,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/// Handler that creates inverted indexes during segment preprocessing.
+///
+/// **Handler-ordering contract:** this handler requires that the column has a dictionary on disk by the time
+/// [#updateIndices] runs. [org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor]
+/// enforces this by always running [org.apache.pinot.segment.local.segment.index.loader.ForwardIndexHandler]
+/// first and reloading segment metadata before this handler is invoked, so the new
+/// `ENABLE_DICTIONARY` → "create shared dictionary on a RAW forward column" path completes before this
+/// handler asserts `columnMetadata.hasDictionary() == true` in [#createInvertedIndexForColumn].
+///
+/// Plugins implementing custom IndexHandler scheduling must preserve this ordering or
+/// [#createInvertedIndexForColumn] will fail with an [IllegalStateException] at reload time.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class InvertedIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(InvertedIndexHandler.class);
@@ -57,7 +69,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns =
@@ -66,6 +79,12 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing inverted index from segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      if (LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
+          segmentReader.getIndexFor(column, StandardIndexes.inverted()), columnMetadata)) {
+        LOGGER.info("Need to rebuild inverted index for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -93,6 +112,14 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         LOGGER.info("Removing existing inverted index from segment: {}, column: {}", segmentName, column);
         segmentWriter.removeIndex(column, StandardIndexes.inverted());
         LOGGER.info("Removed existing inverted index from segment: {}, column: {}", segmentName, column);
+      } else {
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        if (LegacyRawValueInvertedIndexCleanup.isLegacyRawValueInvertedIndexFormat(
+            segmentWriter.getIndexFor(column, StandardIndexes.inverted()), columnMetadata)) {
+          LOGGER.info("Rebuilding existing inverted index for segment: {}, column: {}", segmentName, column);
+          segmentWriter.removeIndex(column, StandardIndexes.inverted());
+          columnsToAddIdx.add(column);
+        }
       }
     }
     for (String column : columnsToAddIdx) {
@@ -143,24 +170,42 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         .withContinueOnError(_tableConfig.getIngestionConfig() != null
             && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
+    // Raw-forward columns that require an inverted index must have a shared standalone dictionary created first by
+    // ForwardIndexHandler (which runs before this handler). If we reach this point without a dictionary, it indicates
+    // a bug in the handler pipeline — fail fast rather than leave the segment in an inconsistent state.
+    if (!columnMetadata.hasDictionary()) {
+      FileUtils.deleteQuietly(inProgress);
+      throw new IllegalStateException(
+          "Cannot create inverted index for segment: " + segmentName + ", column: " + columnName
+              + " — no dictionary present. ForwardIndexHandler must create a shared standalone dictionary before "
+              + "InvertedIndexHandler runs for columns that require a dictionary-backed inverted index.");
+    }
 
     try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
         .createIndexCreator(context, IndexConfig.ENABLED)) {
-      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-      try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
-          _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
+      try (
+          ForwardIndexReader forwardIndexReader = StandardIndexes.forward()
+              .getReaderFactory()
+              .createIndexReader(segmentWriter, _fieldIndexConfigs.get(columnName), columnMetadata);
           ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
-        if (columnMetadata.isSingleValue()) {
-          // Single-value column.
-          for (int i = 0; i < numDocs; i++) {
-            creator.add(forwardIndexReader.getDictId(i, readerContext));
+        if (forwardIndexReader.isDictionaryEncoded()) {
+          if (columnMetadata.isSingleValue()) {
+            // Single-value column.
+            for (int i = 0; i < numDocs; i++) {
+              creator.add(forwardIndexReader.getDictId(i, readerContext));
+            }
+          } else {
+            // Multi-value column.
+            int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
+            for (int i = 0; i < numDocs; i++) {
+              int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
+              creator.add(dictIds, length);
+            }
           }
         } else {
-          // Multi-value column.
-          int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
-          for (int i = 0; i < numDocs; i++) {
-            int length = forwardIndexReader.getDictIdMV(i, dictIds, readerContext);
-            creator.add(dictIds, length);
+          try (Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {
+            DictionaryBasedIndexBuilder.addRawValuesViaDictionary(creator, forwardIndexReader, readerContext,
+                dictionary, columnMetadata, numDocs);
           }
         }
         creator.seal();

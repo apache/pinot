@@ -1135,7 +1135,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   }
 
   @Nullable
-  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId,
+  @VisibleForTesting
+  SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId,
       int numPartitionGroups) {
     SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (partitionConfig == null) {
@@ -1145,18 +1146,30 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (columnPartitionMap.size() == 1) {
       Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-      if (numPartitionGroups != columnPartitionConfig.getNumPartitions()) {
-        LOGGER.warn("Number of partition groups fetched from the stream '{}' is different than "
-                + "columnPartitionConfig.numPartitions '{}' in the table config. The stream partition count is used. "
-                + "Please update the table config accordingly.", numPartitionGroups,
-            columnPartitionConfig.getNumPartitions());
-      }
       // For multi-stream tables, convert Pinot partition ID (which includes padding offset) to stream partition ID.
       // This ensures the partition metadata stored in ZK matches what the broker's partition function computes
       // during query pruning. For example, stream 1 partition 5 has Pinot partition ID 10005, but should store 5.
       int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, partitionId);
+      // If there are multiple streams, we assume the partition groups are evenly distributed across the streams, and
+      // compute the per-stream partition group count accordingly.
+      // This is needed for the partition function to correctly compute the stream partition id for pruning.
+      int numStreams = IngestionConfigUtils.getStreamConfigs(tableConfig).size();
+      if (numStreams > 1 && numPartitionGroups % numStreams != 0) {
+        LOGGER.warn("Number of partition groups '{}' is not divisible by number of streams '{}'. This might lead to "
+                + "incorrect pruning if the partition function is based on stream partition id. Please update the "
+                + "table config to ensure the partition groups are evenly distributed across the streams.",
+            numPartitionGroups, numStreams);
+        return null;
+      }
+      int perStreamNumPartitions = numStreams > 1 ? numPartitionGroups / numStreams : numPartitionGroups;
+      if (perStreamNumPartitions != columnPartitionConfig.getNumPartitions()) {
+        LOGGER.warn("Number of partitions per stream '{}' is different than "
+                + "columnPartitionConfig.numPartitions '{}' in the table config. "
+                + "The stream partition count is used. Please update the table config accordingly.",
+            perStreamNumPartitions, columnPartitionConfig.getNumPartitions());
+      }
       ColumnPartitionMetadata columnPartitionMetadata =
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
+          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), perStreamNumPartitions,
               Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {

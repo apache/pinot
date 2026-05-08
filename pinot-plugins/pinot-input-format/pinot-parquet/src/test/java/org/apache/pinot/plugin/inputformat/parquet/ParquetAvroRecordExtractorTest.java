@@ -26,6 +26,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
@@ -44,18 +45,17 @@ public class ParquetAvroRecordExtractorTest {
     // byte[12]"`. The 12-byte value is little-endian: bytes 0..7 = nanos within the day (long), bytes 8..11
     // = Julian day number (int). We pick a known instant and verify the round-trip.
     long epochMillis = 1_649_924_302_123L;
-    long millisPerDay = 86_400_000L;
-    long dayNumber = epochMillis / millisPerDay;
-    long nanosWithinDay = (epochMillis - dayNumber * millisPerDay) * 1_000_000L;
-    int julianDay = (int) (dayNumber + ParquetNativeRecordExtractor.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH);
-    byte[] int96 = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-        .putLong(nanosWithinDay).putInt(julianDay).array();
+    GenericRecord record = singleField(int96UnionSchema(), int96Fixed(epochMillis));
+    assertEquals(extract(record, null), new Timestamp(epochMillis));
+  }
 
-    Schema fixedSchema = Schema.createFixed("Int96", "INT96 represented as byte[12]", null, 12);
-    Schema fieldSchema = Schema.createUnion(List.of(Schema.create(Schema.Type.NULL), fixedSchema));
-    GenericRecord record = singleField(fieldSchema, new GenericData.Fixed(fixedSchema, int96));
-
-    assertEquals(extract(record), new Timestamp(epochMillis));
+  @Test
+  public void testInt96ExtractedAsLongEpochNanosWhenRaw() {
+    // INT96's physical encoding (nanos-of-day + Julian day) carries nanosecond precision, so nanos is the
+    // natural raw unit when `extractRawTimeValues` is set.
+    long epochMillis = 1_649_924_302_123L;
+    GenericRecord record = singleField(int96UnionSchema(), int96Fixed(epochMillis));
+    assertEquals(extract(record, rawConfig()), epochMillis * 1_000_000L);
   }
 
   @Test
@@ -68,24 +68,34 @@ public class ParquetAvroRecordExtractorTest {
   }
 
   @Test
-  public void testInt96AsBareFixedPassesThrough() {
-    // The INT96 conversion only fires when the field schema is a UNION; a bare (non-union) FIXED field, even
-    // with the INT96 doc, falls through the convert() path and surfaces as `byte[]` (which then loses the
-    // INT96 semantics — caller is responsible for declaring INT96 fields as nullable).
-    byte[] bytes = new byte[12];
+  public void testInt96AsBareFixedConvertedToTimestamp() {
+    // INT96 detection is schema-driven, not union-gated — a bare (non-union) `fixed(12)` field with the
+    // INT96 doc is also converted. This matches parquet-avro for non-nullable INT96 columns, which surface
+    // as bare `fixed(12)` rather than `union[null, fixed(12)]`.
+    long epochMillis = 1_649_924_302_123L;
     Schema fixedSchema = Schema.createFixed("Int96", "INT96 represented as byte[12]", null, 12);
-    GenericRecord record = singleField(fixedSchema, new GenericData.Fixed(fixedSchema, bytes));
-    assertEquals((byte[]) extract(record), bytes);
+    GenericRecord record = singleField(fixedSchema, int96Fixed(epochMillis));
+    assertEquals(extract(record, null), new Timestamp(epochMillis));
   }
 
   // === Helpers ===
 
-  private static Object extract(GenericRecord record) {
+  private static Object extract(GenericRecord record, AvroRecordExtractorConfig config) {
     ParquetAvroRecordExtractor extractor = new ParquetAvroRecordExtractor();
-    extractor.init(null, null);
+    extractor.init(null, config);
     GenericRow row = new GenericRow();
     extractor.extract(record, row);
     return row.getValue(COLUMN);
+  }
+
+  private static Object extract(GenericRecord record) {
+    return extract(record, null);
+  }
+
+  private static AvroRecordExtractorConfig rawConfig() {
+    AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
+    config.setExtractRawTimeValues(true);
+    return config;
   }
 
   /// Build a single-field [GenericRecord] with `value` set on `fieldSchema`.
@@ -95,5 +105,23 @@ public class ParquetAvroRecordExtractorTest {
     GenericRecord r = new GenericData.Record(record);
     r.put(COLUMN, value);
     return r;
+  }
+
+  private static Schema int96UnionSchema() {
+    Schema fixedSchema = Schema.createFixed("Int96", "INT96 represented as byte[12]", null, 12);
+    return Schema.createUnion(List.of(Schema.create(Schema.Type.NULL), fixedSchema));
+  }
+
+  /// Encode `epochMillis` as an INT96 byte[12]: bytes 0..7 = nanos-within-day (long), bytes 8..11 = Julian
+  /// day number (int).
+  private static GenericData.Fixed int96Fixed(long epochMillis) {
+    long millisPerDay = 86_400_000L;
+    long dayNumber = epochMillis / millisPerDay;
+    long nanosWithinDay = (epochMillis - dayNumber * millisPerDay) * 1_000_000L;
+    int julianDay = (int) (dayNumber + ParquetUtils.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH);
+    byte[] int96 = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+        .putLong(nanosWithinDay).putInt(julianDay).array();
+    Schema fixedSchema = Schema.createFixed("Int96", "INT96 represented as byte[12]", null, 12);
+    return new GenericData.Fixed(fixedSchema, int96);
   }
 }

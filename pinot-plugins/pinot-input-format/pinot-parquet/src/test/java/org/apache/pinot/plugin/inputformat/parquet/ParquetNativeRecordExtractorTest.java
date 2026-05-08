@@ -22,10 +22,10 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroup;
@@ -37,6 +37,7 @@ import org.apache.parquet.schema.MessageTypeParser;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Types;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -70,18 +71,11 @@ public class ParquetNativeRecordExtractorTest {
   }
 
   @Test
-  public void testInt96ConvertedToTimestamp() {
-    // INT96 is little-endian: bytes 0..7 = nanos within the day (long), bytes 8..11 = Julian day number (int).
+  public void testInt96ExtractedAsTimestamp() {
     long epochMillis = 1_649_924_302_123L;
-    long millisPerDay = 86_400_000L;
-    long dayNumber = epochMillis / millisPerDay;
-    long nanosWithinDay = (epochMillis - dayNumber * millisPerDay) * 1_000_000L;
-    int julianDay = (int) (dayNumber + ParquetNativeRecordExtractor.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH);
-    byte[] int96 = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-        .putLong(nanosWithinDay).putInt(julianDay).array();
-
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
-    assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(int96))), new Timestamp(epochMillis));
+    assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(epochMillis)))),
+        new Timestamp(epochMillis));
   }
 
   @Test
@@ -185,8 +179,9 @@ public class ParquetNativeRecordExtractorTest {
   }
 
   @Test
-  public void testTimestampMicrosExtractedAsTimestamp() {
-    // `TIMESTAMP_MICROS` (int64) → `Timestamp` preserving sub-millisecond precision via `setNanos`.
+  public void testTimestampMicrosExtractedAsTimestampPreservingSubMillis() {
+    // `TIMESTAMP_MICROS` (int64) → [Timestamp]. Sub-millisecond precision (123_987 micros) is preserved via
+    // setNanos.
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int64 col (TIMESTAMP_MICROS); }");
     Timestamp expected = new Timestamp(1_649_924_302_123L);
     expected.setNanos(123_987_000);
@@ -195,27 +190,88 @@ public class ParquetNativeRecordExtractorTest {
 
   @Test
   public void testTimestampMicrosNegativeRoundsConsistently() {
-    // Pre-epoch micros must split seconds + nanos with floor semantics so the truncating-divide vs
-    // floor-mod mismatch doesn't shift the result by a full second. -2_000_500 micros = -2.0005 seconds
-    // = (epochSecond=-3, nanoOfSecond=999_500_000).
+    // Pre-epoch micros must use floor semantics so the divide doesn't shift the result by a full second.
+    // -2_000_500 micros = -2.0005 seconds → -3 seconds + 999_500_000 nanos. Timestamp uses ms epoch (-3000)
+    // plus the leftover sub-second nanos (999_500_000).
     MessageType schema = MessageTypeParser.parseMessageType("message R { required int64 col (TIMESTAMP_MICROS); }");
-    Timestamp expected = Timestamp.from(Instant.ofEpochSecond(-3L, 999_500_000));
+    Timestamp expected = new Timestamp(-3_000L);
+    expected.setNanos(999_500_000);
     assertEquals(extract(schema, g -> g.add(0, -2_000_500L)), expected);
   }
 
   @Test
   public void testTimestampNanosNegativeRoundsConsistently() {
-    // Same floor-semantics concern for `TIMESTAMP_NANOS`. -2_000_500_000 nanos = -2.0005 seconds.
-    // `MessageTypeParser` only understands the legacy `OriginalType` set (which tops out at
-    // `TIMESTAMP_MICROS`); construct the schema via the `Types` builder to attach the modern
+    // Same floor-semantics concern for `TIMESTAMP_NANOS`. -2_000_500_000 nanos = -2.0005 seconds → -3 seconds
+    // + 999_500_000 nanos. `MessageTypeParser` only understands the legacy `OriginalType` set (which tops
+    // out at `TIMESTAMP_MICROS`); construct the schema via the `Types` builder to attach the modern
     // `TimestampLogicalTypeAnnotation` with `NANOS` precision.
     MessageType schema = Types.buildMessage()
         .required(PrimitiveTypeName.INT64)
         .as(LogicalTypeAnnotation.timestampType(/* isAdjustedToUTC = */ true, TimeUnit.NANOS))
         .named(COLUMN)
         .named("R");
-    Timestamp expected = Timestamp.from(Instant.ofEpochSecond(-3L, 999_500_000));
+    Timestamp expected = new Timestamp(-3_000L);
+    expected.setNanos(999_500_000);
     assertEquals(extract(schema, g -> g.add(0, -2_000_500_000L)), expected);
+  }
+
+  // === UUID logical type ===
+
+  @Test
+  public void testUuidExtractedAsUuid() {
+    UUID uuid = UUID.fromString("af68efc2-818a-42ac-96c3-ced5ca6585a2");
+    byte[] uuidBytes = UuidUtils.toBytes(uuid);
+    MessageType schema = Types.buildMessage()
+        .required(PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY)
+        .length(16)
+        .as(LogicalTypeAnnotation.uuidType())
+        .named(COLUMN)
+        .named("R");
+    assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(uuidBytes))), uuid);
+  }
+
+  // === extractRawTimeValues = true ===
+
+  @Test
+  public void testDateExtractedAsRawIntDaysWhenRaw() {
+    MessageType schema = MessageTypeParser.parseMessageType("message R { required int32 col (DATE); }");
+    assertEquals(extract(schema, g -> g.add(0, 19_096), rawConfig()), 19_096);
+  }
+
+  @Test
+  public void testTimeMillisExtractedAsRawIntMillisWhenRaw() {
+    MessageType schema =
+        MessageTypeParser.parseMessageType("message R { required int32 col (TIME_MILLIS); }");
+    assertEquals(extract(schema, g -> g.add(0, 31_892_123), rawConfig()), 31_892_123);
+  }
+
+  @Test
+  public void testTimeMicrosExtractedAsRawLongMicrosWhenRaw() {
+    MessageType schema =
+        MessageTypeParser.parseMessageType("message R { required int64 col (TIME_MICROS); }");
+    assertEquals(extract(schema, g -> g.add(0, 31_892_123_987L), rawConfig()), 31_892_123_987L);
+  }
+
+  @Test
+  public void testTimestampMillisExtractedAsRawLongMillisWhenRaw() {
+    MessageType schema = MessageTypeParser.parseMessageType("message R { required int64 col (TIMESTAMP_MILLIS); }");
+    assertEquals(extract(schema, g -> g.add(0, 1_649_924_302_123L), rawConfig()), 1_649_924_302_123L);
+  }
+
+  @Test
+  public void testTimestampMicrosExtractedAsRawLongMicrosWhenRaw() {
+    MessageType schema = MessageTypeParser.parseMessageType("message R { required int64 col (TIMESTAMP_MICROS); }");
+    assertEquals(extract(schema, g -> g.add(0, 1_649_924_302_123_987L), rawConfig()), 1_649_924_302_123_987L);
+  }
+
+  @Test
+  public void testInt96ExtractedAsRawLongEpochNanosWhenRaw() {
+    // INT96 has no Parquet logical-type spec, but its physical encoding (nanos-of-day + Julian day) carries
+    // nanosecond precision, so nanos is the natural raw unit.
+    long epochMillis = 1_649_924_302_123L;
+    MessageType schema = MessageTypeParser.parseMessageType("message R { required int96 col; }");
+    assertEquals(extract(schema, g -> g.add(0, Binary.fromConstantByteArray(int96Bytes(epochMillis))), rawConfig()),
+        epochMillis * 1_000_000L);
   }
 
   // === LIST — standard 3-level wrapper and legacy forms ===
@@ -244,6 +300,22 @@ public class ParquetNativeRecordExtractorTest {
       g.add(0, 20);
     });
     assertEquals(result, new Object[]{10, 20});
+  }
+
+  @Test
+  public void testLegacyRepeatedPrimitiveWithSingleElementExtractedAsArray() {
+    // Cardinality-1 case: REPEATED still surfaces as `Object[]`, never as a bare scalar.
+    MessageType schema = MessageTypeParser.parseMessageType("message R { repeated int32 col; }");
+    Object[] result = (Object[]) extract(schema, g -> g.add(0, 10));
+    assertEquals(result, new Object[]{10});
+  }
+
+  @Test
+  public void testLegacyRepeatedPrimitiveEmptyExtractedAsEmptyArray() {
+    // Cardinality-0 case: empty REPEATED is an empty `Object[]`, not `null`.
+    MessageType schema = MessageTypeParser.parseMessageType("message R { repeated int32 col; }");
+    Object[] result = (Object[]) extract(schema, g -> { });
+    assertEquals(result, new Object[]{});
   }
 
   @Test
@@ -308,6 +380,28 @@ public class ParquetNativeRecordExtractorTest {
     assertEquals(((Map<?, ?>) result).size(), 0);
   }
 
+  @Test
+  public void testMapBinaryKeyBase64Encoded() {
+    // Unannotated BINARY keys surface as `byte[]`; we base64-encode rather than letting `byte[].toString()`
+    // produce `[B@<hash>` garbage.
+    MessageType schema = MessageTypeParser.parseMessageType("message R { "
+        + "required group col (MAP) { "
+        + "  repeated group key_value { "
+        + "    required binary key; "
+        + "    required int32 value; "
+        + "  } "
+        + "} }");
+    Object result = extract(schema, g -> {
+      Group map = g.addGroup(0);
+      Group entry = map.addGroup(0);
+      entry.add(0, Binary.fromConstantByteArray(new byte[]{0, 1, 2, 3}));
+      entry.add(1, 42);
+    });
+    Map<?, ?> resultMap = (Map<?, ?>) result;
+    assertEquals(resultMap.size(), 1);
+    assertEquals(resultMap.get("AAECAw=="), 42);  // base64 of {0, 1, 2, 3}
+  }
+
   // === Struct (un-annotated group) ===
 
   @Test
@@ -336,12 +430,34 @@ public class ParquetNativeRecordExtractorTest {
   // === Helpers ===
 
   private static Object extract(MessageType schema, Consumer<SimpleGroup> populator) {
+    return extract(schema, populator, null);
+  }
+
+  private static Object extract(MessageType schema, Consumer<SimpleGroup> populator,
+      ParquetNativeRecordExtractorConfig config) {
     SimpleGroup group = new SimpleGroup(schema);
     populator.accept(group);
     ParquetNativeRecordExtractor extractor = new ParquetNativeRecordExtractor();
-    extractor.init(null, null);
+    extractor.init(null, config);
     GenericRow row = new GenericRow();
     extractor.extract(group, row);
     return row.getValue(COLUMN);
+  }
+
+  private static ParquetNativeRecordExtractorConfig rawConfig() {
+    ParquetNativeRecordExtractorConfig config = new ParquetNativeRecordExtractorConfig();
+    config.setExtractRawTimeValues(true);
+    return config;
+  }
+
+  /// Encodes `epochMillis` as an INT96 byte[12]: bytes 0..7 = nanos-within-day (long, little-endian),
+  /// bytes 8..11 = Julian day number (int, little-endian).
+  private static byte[] int96Bytes(long epochMillis) {
+    long millisPerDay = 86_400_000L;
+    long dayNumber = epochMillis / millisPerDay;
+    long nanosWithinDay = (epochMillis - dayNumber * millisPerDay) * 1_000_000L;
+    int julianDay = (int) (dayNumber + ParquetUtils.JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH);
+    return ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+        .putLong(nanosWithinDay).putInt(julianDay).array();
   }
 }

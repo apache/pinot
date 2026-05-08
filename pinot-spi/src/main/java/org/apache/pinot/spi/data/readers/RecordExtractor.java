@@ -27,42 +27,50 @@ import javax.annotation.Nullable;
 /// field is one of the following Java types — every `RecordExtractor` implementation must adhere to this contract so
 /// downstream ingestion transforms see a uniform type matrix:
 ///
-/// **Single-value** — preserved as its boxed Java type:
+/// **Primitive types** — preserved as their boxed Java type:
 /// - `Boolean`
-/// - `Integer` (sub-int integer types — `Byte`, `Short` — are widened to `Integer` so all small ints unify behind a
-///   single Pinot type)
+/// - `Integer` (`Byte` / `Short` widen to `Integer` so all small ints unify behind a single Pinot type)
 /// - `Long`
 /// - `Float`
 /// - `Double`
-/// - [java.math.BigDecimal] ([java.math.BigInteger] widens to `BigDecimal` since Pinot has no `BigInteger` type)
 /// - `String`
-/// - `byte[]` — format-native byte representations ([java.nio.ByteBuffer] for Avro, `ByteString` for ProtoBuf, ORC's
+/// - `byte[]` — format-native byte representations (`ByteBuffer` for Avro, `ByteString` for ProtoBuf, ORC's
 ///   binary `ColumnVector`, etc.) are materialized into `byte[]`
-/// - [java.time.LocalDate] — date-only logical types (Avro `date`, ORC `DATE`, Parquet `DATE`).
-///   TZ-independent — a calendar date is the same date everywhere
-/// - [java.time.LocalTime] — time-of-day logical types (Avro `time-millis` / `time-micros`, Parquet
-///   `TIME_MILLIS` / `TIME_MICROS` / `TIME_NANOS`). TZ-independent with full nanosecond precision
-/// - [java.sql.Timestamp] — full date-time logical types (Avro `timestamp-millis` / `timestamp-micros`, ORC
-///   `TIMESTAMP` / `TIMESTAMP_INSTANT`, Parquet `INT96` / `TIMESTAMP_MILLIS` / `TIMESTAMP_MICROS`, JDBC `TIMESTAMP`).
-///   The base bridges [java.time.Instant] / [java.time.OffsetDateTime] / [java.time.ZonedDateTime] losslessly,
-///   and bridges [java.time.LocalDateTime] interpreting its wall-clock as UTC
 ///
-/// **Multi-value:** [java.util.Collection] and array values (except `byte[]`) become `Object[]` with each element
+/// **Logical types** — format-specific markers (Avro logical type, Parquet logical type, ORC schema type, JDBC
+/// column type) decoded into a uniform Java type regardless of the underlying physical encoding:
+/// - `DECIMAL` → `BigDecimal`. Avro `decimal`, Parquet `DECIMAL`, JDBC `DECIMAL` / `NUMERIC`. `BigInteger` widens
+///   to `BigDecimal` since Pinot has no `BigInteger` type. Always converted — raw bytes aren't interpretable
+///   without external precision / scale
+/// - `TIMESTAMP` → `Timestamp` (sub-millisecond precision preserved via `Timestamp#getNanos`).
+///   Avro `timestamp-millis` / `timestamp-micros`, ORC `TIMESTAMP` / `TIMESTAMP_INSTANT`,
+///   Parquet `INT96` / `TIMESTAMP_MILLIS` / `TIMESTAMP_MICROS`, JDBC `TIMESTAMP`, plus native
+///   `Instant` / `OffsetDateTime` / `ZonedDateTime` / `LocalDateTime` inputs
+/// - `DATE` → `LocalDate`. Avro `date`, ORC `DATE`, Parquet `DATE`. TZ-independent — a calendar date is the same
+///   date everywhere
+/// - `TIME` → `LocalTime`. Avro `time-millis` / `time-micros`, Parquet `TIME_MILLIS` / `TIME_MICROS` / `TIME_NANOS`.
+///   TZ-independent with full nanosecond precision
+/// - `UUID` → `java.util.UUID`. Avro `uuid`, Parquet `UUID`. The downstream type transformer adapts to the Pinot
+///   column's storage type — `STRING` column gets the canonical UUID string, `BYTES` column gets the 16-byte
+///   big-endian form
+///
+/// Format-specific extractors may expose an `extractRawTimeValues` flag (Avro, Parquet) that bypasses
+/// TIMESTAMP / DATE / TIME conversion and surfaces the raw underlying integer (`Integer` for `DATE` /
+/// `TIME_MILLIS`, `Long` for the others). DECIMAL and UUID always convert.
+///
+/// **Multi-value:** `Collection` and array values (except `byte[]`) become `Object[]` with each element
 /// recursively converted under the same contract.
 ///
 /// **Map / nested complex:** map values, format-native nested records (Avro `record`, ProtoBuf nested `Message`,
-/// Thrift nested `TBase`, ORC `struct` / `map`, JSON object) become `Map<Object, Object>` (or `Map<String, Object>`
-/// for record-like inputs) with each value recursively converted.
+/// Thrift nested `TBase`, ORC `struct` / `map`, JSON object) become `Map<String, Object>` with each value
+/// recursively converted. Map keys are stringified at the extractor boundary via [BaseRecordExtractor#stringifyMapKey]
+/// — `byte[]` keys base64-encode, `Timestamp` keys serialize via `Timestamp#toInstant().toString()` (ISO-8601
+/// UTC, JVM-TZ-stable, full nanos), everything else falls back to `toString()`.
 ///
 /// **Fallback:** any other type — Avro `Utf8`, ProtoBuf `EnumValueDescriptor`, Thrift `TEnum`, etc. — falls back to
 /// `value.toString()`.
 ///
 /// **Null:** preserved as `null`.
-///
-/// The default conversion paths (single-value → [BaseRecordExtractor#convertSingleValue], multi-value →
-/// [BaseRecordExtractor#convertMultiValue], map → [BaseRecordExtractor#convertMap], nested record →
-/// [BaseRecordExtractor#convertRecord]) live in [BaseRecordExtractor]; format-specific extractors override only
-/// the parts that need format-specific handling (e.g. Avro maps `GenericFixed` → `byte[]`).
 ///
 /// The converted values feed ingestion transforms, so empty arrays, empty maps, null map entries, and other "preserve
 /// the input shape" subtleties matter. The data-type transformer (later in the ingestion pipeline) coerces these to
@@ -87,18 +95,4 @@ public interface RecordExtractor<T> extends Serializable {
   /// @param to the row to populate (re-used by the caller across calls)
   /// @return the same `to` instance, populated
   GenericRow extract(T from, GenericRow to);
-
-  /// Converts a non-null field value to the type matrix documented on [RecordExtractor] — single-value (boxed
-  /// number / boolean / `String` / `byte[]`), multi-value (`Object[]`), or `Map<Object, Object>`. Java `null`
-  /// inputs are short-circuited by callers and never reach this method.
-  ///
-  /// Conversion preserves the input *shape* — empty `Object[]`, empty `Map`, map entries whose value is `null` etc.
-  /// all round-trip unchanged so ingestion transforms can see them. The data-type transformer later in the pipeline
-  /// coerces values to the column's declared Pinot [org.apache.pinot.spi.data.FieldSpec.DataType].
-  ///
-  /// @param value the non-null field value to convert
-  /// @return the converted value. The default base implementation never returns `null`; the return is marked
-  ///         nullable so format-specific overrides retain the option to translate format-native null sentinels.
-  @Nullable
-  Object convert(Object value);
 }

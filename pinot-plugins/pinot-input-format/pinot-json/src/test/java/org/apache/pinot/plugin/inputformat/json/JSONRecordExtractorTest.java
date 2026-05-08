@@ -61,7 +61,7 @@ public class JSONRecordExtractorTest {
 
   @Test
   public void testBigIntegerWidenedToBigDecimal() {
-    // Default Jackson parses integer literals that overflow `Long` as `BigInteger`. The base widens to
+    // Default Jackson parses integer literals that overflow `Long` as `BigInteger`. The extractor widens to
     // `BigDecimal` since Pinot has no `BigInteger` type.
     BigInteger value = new BigInteger("99999999999999999999999999");
     Object result = extract(value);

@@ -18,31 +18,16 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import com.google.common.collect.Maps;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.temporal.Temporal;
-import java.util.Collection;
-import java.util.Map;
+import java.util.Base64;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.ArrayUtils;
 
 
-/// Default [RecordExtractor] implementation. Subclasses override only the bits the format needs.
+/// Default [RecordExtractor] base providing include-list resolution via [#init] and the [#stringifyMapKey] helper.
 ///
 /// @param <T> the format of the input record
-@SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
   /// Include-list resolved from [#init]'s `fields` argument: empty when [#_extractAll] is `true`, otherwise the
@@ -77,198 +62,24 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
   protected void initConfig(@Nullable RecordExtractorConfig config) {
   }
 
-  /// Whether `fieldName` should be populated in the output [GenericRow]. Returns `true` when [#_extractAll] is set
-  /// (no include list — every field is extracted) or when the explicit include list [#_fields] contains the name.
-  /// Use this in `extract` to gate per-column `putValue` calls instead of inlining
-  /// `_extractAll || _fields.contains(fieldName)`.
-  protected final boolean shouldExtract(String fieldName) {
-    return _extractAll || _fields.contains(fieldName);
-  }
-
-  /// {@inheritDoc}
-  ///
-  /// Dispatches `value` to the matching converter:
-  /// - multi-value → [#convertMultiValue]
-  /// - map → [#convertMap]
-  /// - nested record → [#convertRecord]
-  /// - everything else → [#convertSingleValue]
-  ///
-  /// The base impl never returns `null`; format-specific overrides may translate format-native null sentinels by
-  /// returning `null`.
-  @Nullable
-  @Override
-  public Object convert(Object value) {
-    Object convertedValue;
-    if (isMultiValue(value)) {
-      convertedValue = convertMultiValue(value);
-    } else if (isMap(value)) {
-      convertedValue = convertMap(value);
-    } else if (isRecord(value)) {
-      convertedValue = convertRecord(value);
-    } else {
-      convertedValue = convertSingleValue(value);
+  /// Stringifies a map key per the `RecordExtractor` `Map<String, Object>` contract. Single source of truth
+  /// for map-key stringification across every format extractor:
+  /// - `byte[]` → base64 (matches Jackson's `byte[]` value serialization, so a serialized map reads
+  ///   uniformly across keys and values).
+  /// - `Timestamp` → ISO-8601 UTC via `Timestamp#toInstant().toString()` — JVM-TZ-stable and preserves
+  ///   sub-millisecond nanos so distinct Parquet `TIMESTAMP_MICROS` / `TIMESTAMP_NANOS` / `INT96` keys
+  ///   don't collapse into colliding entries. (Diverges from the value-side `WRITE_DATES_AS_TIMESTAMPS=true`
+  ///   numeric-millis convention; matches Jackson's `WRITE_DATE_KEYS_AS_TIMESTAMPS=false` default for
+  ///   date-typed map keys.)
+  /// - Everything else (`String`, `Integer`, `Long`, `Float`, `Double`, `Boolean`, `BigDecimal`, `UUID`,
+  ///   `LocalDate`, `LocalTime`) has a stable, TZ-independent `toString()`.
+  public static String stringifyMapKey(Object key) {
+    if (key instanceof byte[]) {
+      return Base64.getEncoder().encodeToString((byte[]) key);
     }
-    return convertedValue;
-  }
-
-  /// Whether `value` is multi-value. Default: `Collection` or non-`byte[]` array.
-  protected boolean isMultiValue(Object value) {
-    return value instanceof Collection || (value.getClass().isArray() && !(value instanceof byte[]));
-  }
-
-  /// Whether `value` is a map. Default: `instanceof Map`.
-  protected boolean isMap(Object value) {
-    return value instanceof Map;
-  }
-
-  /// Whether `value` is a nested record. Default `false`; override for formats with nested record types.
-  protected boolean isRecord(Object value) {
-    return false;
-  }
-
-  /// Converts a multi-value ([Collection] / `Object[]` / primitive array) into `Object[]`, recursing on each
-  /// element via [#convert]. The base impl never returns `null`; the return is marked nullable so format-specific
-  /// overrides retain the option to translate format-native null sentinels (e.g. an empty list interpreted as
-  /// `null`).
-  @Nullable
-  protected Object[] convertMultiValue(Object value) {
-    if (value instanceof Collection) {
-      return convertCollection((Collection) value);
+    if (key instanceof Timestamp) {
+      return ((Timestamp) key).toInstant().toString();
     }
-    if (value instanceof Object[]) {
-      return convertArray((Object[]) value);
-    }
-    return convertPrimitiveArray(value);
-  }
-
-  protected Object[] convertCollection(Collection collection) {
-    int numValues = collection.size();
-    Object[] convertedValues = new Object[numValues];
-    int index = 0;
-    for (Object value : collection) {
-      Object convertedValue = value != null ? convert(value) : null;
-      convertedValues[index++] = convertedValue;
-    }
-    return convertedValues;
-  }
-
-  protected Object[] convertArray(Object[] array) {
-    int numValues = array.length;
-    Object[] convertedValues = new Object[numValues];
-    for (int i = 0; i < numValues; i++) {
-      Object value = array[i];
-      Object convertedValue = value != null ? convert(value) : null;
-      convertedValues[i] = convertedValue;
-    }
-    return convertedValues;
-  }
-
-  protected Object[] convertPrimitiveArray(Object array) {
-    if (array instanceof int[]) {
-      return ArrayUtils.toObject((int[]) array);
-    }
-    if (array instanceof long[]) {
-      return ArrayUtils.toObject((long[]) array);
-    }
-    if (array instanceof float[]) {
-      return ArrayUtils.toObject((float[]) array);
-    }
-    if (array instanceof double[]) {
-      return ArrayUtils.toObject((double[]) array);
-    }
-    throw new IllegalArgumentException("Unsupported primitive array type: " + array.getClass().getName());
-  }
-
-  /// Converts a map, recursing on each value via [#convert]. Keys go through [#convertSingleValue]; entries with a
-  /// null key — either input or post-conversion (a format-specific override may translate the key to `null` for a
-  /// format-native null sentinel) — are dropped. The base impl never returns `null`; the return is marked nullable
-  /// so format-specific overrides retain the option to translate format-native null sentinels.
-  @Nullable
-  protected Map<Object, Object> convertMap(Object value) {
-    Map<Object, Object> map = (Map) value;
-    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(map.size());
-    for (Map.Entry<Object, Object> entry : map.entrySet()) {
-      Object mapKey = entry.getKey();
-      if (mapKey == null) {
-        continue;
-      }
-      Object convertedKey = convertSingleValue(mapKey);
-      if (convertedKey == null) {
-        continue;
-      }
-      Object mapValue = entry.getValue();
-      convertedMap.put(convertedKey, mapValue != null ? convert(mapValue) : null);
-    }
-    return convertedMap;
-  }
-
-  /// Converts a nested record into a `Map<String, Object>`. Default throws — override in formats that have nested
-  /// records (Avro `GenericRecord`, Thrift `TBase`, ProtoBuf nested `Message`). Marked nullable so format-specific
-  /// overrides retain the option to translate format-native null sentinels.
-  @Nullable
-  protected Map<Object, Object> convertRecord(Object value) {
-    throw new UnsupportedOperationException(
-        getClass().getSimpleName() + " does not support nested records; override convertRecord() to enable.");
-  }
-
-  /// Converts a single value per the [RecordExtractor] contract:
-  /// - `Byte` / `Short` widen to `Integer` so all small ints unify behind a single Pinot type
-  /// - [BigInteger] widens to [BigDecimal] (Pinot has no `BigInteger` data type; downstream transforms handle
-  ///   `BigDecimal` natively)
-  /// - other `Number` (`Integer` / `Long` / `Float` / `Double` / `BigDecimal`) passes through
-  /// - `Boolean` passes through
-  /// - `byte[]` passes through
-  /// - [Timestamp] passes through
-  /// - `ByteBuffer` materializes to `byte[]` (sliced so the source buffer's position is not advanced)
-  ///
-  /// [Temporal] family (`java.time`):
-  /// - [LocalDate] / [LocalTime] pass through (TZ-independent date / time-of-day)
-  /// - [Instant] / [OffsetDateTime] / [ZonedDateTime] bridge to [Timestamp] via [Timestamp#from] — all three are
-  ///   unambiguously TZ-anchored, so the conversion is lossless (sub-second nanos preserved)
-  /// - [LocalDateTime] bridges to [Timestamp] interpreting the wall-clock as UTC
-  /// - other [Temporal] types fall through to `value.toString()`
-  ///
-  /// Everything else falls back to `value.toString()`. The base impl never returns `null`; the return is marked
-  /// nullable so format-specific overrides retain the option to translate format-native null sentinels.
-  @Nullable
-  protected Object convertSingleValue(Object value) {
-    if (value instanceof Number) {
-      if (value instanceof Byte || value instanceof Short) {
-        return ((Number) value).intValue();
-      }
-      if (value instanceof BigInteger) {
-        return new BigDecimal((BigInteger) value);
-      }
-      return value;
-    }
-    if (value instanceof Boolean || value instanceof byte[] || value instanceof Timestamp) {
-      return value;
-    }
-    if (value instanceof ByteBuffer) {
-      // ByteBuffer might be reused by the reader. Slice to avoid advancing the original buffer's position.
-      ByteBuffer slice = ((ByteBuffer) value).slice();
-      byte[] bytesValue = new byte[slice.limit()];
-      slice.get(bytesValue);
-      return bytesValue;
-    }
-    if (value instanceof Temporal) {
-      if (value instanceof LocalDate || value instanceof LocalTime) {
-        return value;
-      }
-      if (value instanceof Instant) {
-        return Timestamp.from((Instant) value);
-      }
-      if (value instanceof OffsetDateTime) {
-        return Timestamp.from(((OffsetDateTime) value).toInstant());
-      }
-      if (value instanceof ZonedDateTime) {
-        return Timestamp.from(((ZonedDateTime) value).toInstant());
-      }
-      if (value instanceof LocalDateTime) {
-        return Timestamp.from(((LocalDateTime) value).toInstant(ZoneOffset.UTC));
-      }
-      // Other Temporal types (Year, YearMonth, OffsetTime, etc.) fall through to toString.
-    }
-    return value.toString();
+    return key.toString();
   }
 }

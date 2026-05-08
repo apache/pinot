@@ -601,9 +601,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             nullValueVectorCreator.setNull(i);
           }
         } else if (outputValueType == null) {
-          Class<?> outputValueClass = outputValue.getClass();
-          outputValueType = FunctionUtils.getArgumentType(outputValueClass);
-          Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
+          outputValueType = FunctionUtils.getArgumentType(outputValue);
         }
 
         outputValues[i] = outputValue;

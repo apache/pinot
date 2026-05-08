@@ -122,11 +122,6 @@ public abstract class BaseTransformFunction implements TransformFunction {
   }
 
   @Override
-  public Dictionary getDictionary() {
-    return null;
-  }
-
-  @Override
   public int[] transformToDictIdsSV(ValueBlock valueBlock) {
     throw new UnsupportedOperationException();
   }

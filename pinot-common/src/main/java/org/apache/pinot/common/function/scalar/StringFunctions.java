@@ -20,7 +20,6 @@ package org.apache.pinot.common.function.scalar;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
@@ -34,6 +33,7 @@ import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -448,11 +448,7 @@ public class StringFunctions {
   @ScalarFunction
   public static byte[] toUUIDBytes(String input) {
     try {
-      UUID uuid = UUID.fromString(input);
-      ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
-      bb.putLong(uuid.getMostSignificantBits());
-      bb.putLong(uuid.getLeastSignificantBits());
-      return bb.array();
+      return UuidUtils.toBytes(UUID.fromString(input));
     } catch (IllegalArgumentException e) {
       return null;
     }
@@ -465,10 +461,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String fromUUIDBytes(byte[] input) {
-    ByteBuffer bb = ByteBuffer.wrap(input);
-    long firstLong = bb.getLong();
-    long secondLong = bb.getLong();
-    return new UUID(firstLong, secondLong).toString();
+    return UuidUtils.fromBytes(input).toString();
   }
 
   /**

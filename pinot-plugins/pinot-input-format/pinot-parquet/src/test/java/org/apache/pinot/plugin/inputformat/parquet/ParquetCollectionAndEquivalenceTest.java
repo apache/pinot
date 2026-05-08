@@ -28,9 +28,11 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.avro.Schema;
@@ -51,93 +53,85 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
-/**
- * Tests Parquet collection-wrapper handling end-to-end, covering:
- * <ul>
- *   <li>Specific value assertions for the standard 3-level LIST encoding, MAP encoding, nested structs, and
- *       all four Parquet LogicalTypes spec backward-compat rules for LIST element resolution (via a
- *       hand-authored {@code MessageType}).</li>
- *   <li>Specific value assertions for the checked-in {@code collection-reader-fixture.parquet} (primitives,
- *       DECIMAL/DATE/TIMESTAMP, nested structs, struct lists, map of lists, real {@code element}-named
- *       struct field).</li>
- *   <li>Regression for nested {@code LIST<LIST<STRING>>} unwrapping through the Avro reader, including the
- *       two null branches (null inner element, null inner wrapper).</li>
- *   <li>Regression for user-authored {@code array<record<UserTag, [element: string]>>} — the inner records
- *       must NOT be flattened (the Avro shape matches the parquet-avro wrapper convention but the file's
- *       Avro schema in metadata identifies the records as user data).</li>
- *   <li>Cross-reader equivalence on every existing {@code .parquet} test resource — ParquetAvroRecordReader
- *       and ParquetNativeRecordReader must produce structurally identical Pinot rows. Locks in that any
- *       encoding subtlety in the fixtures is interpreted the same way by both code paths.</li>
- * </ul>
- *
- * <p>The hand-authored schema is asserted via the native reader only; the cross-reader equivalence test
- * ensures the Avro reader produces the same rows on the same file.
- *
- * <p>This test class is stateful only through its temporary directory and is not thread-safe.
- */
+/// Tests Parquet collection-wrapper handling end-to-end:
+/// - Specific value assertions for the standard 3-level LIST encoding, MAP encoding, nested structs, and all
+///   four Parquet LogicalTypes spec backward-compat rules for LIST element resolution (via a hand-authored
+///   `MessageType`).
+/// - Specific value assertions for the checked-in `collection-reader-fixture.parquet` (primitives, DECIMAL /
+///   DATE / TIMESTAMP, nested structs, struct lists, map of lists, real `element`-named struct field).
+/// - Regression for nested `LIST<LIST<STRING>>` unwrapping through the Avro reader, including the two null
+///   branches (null inner element, null inner wrapper).
+/// - Regression for user-authored `array<record<UserTag, [element: string]>>` — the inner records must NOT
+///   be flattened (the Avro shape matches the parquet-avro wrapper convention, but the file's Avro schema in
+///   metadata identifies the records as user data).
+/// - Cross-reader equivalence on every existing `.parquet` test resource — `ParquetAvroRecordReader` and
+///   `ParquetNativeRecordReader` must produce structurally identical Pinot rows. Locks in that any encoding
+///   subtlety in the fixtures is interpreted the same way by both code paths.
+///
+/// The hand-authored schema is asserted via the native reader only; the cross-reader equivalence test
+/// ensures the Avro reader produces the same rows on the same file.
 public class ParquetCollectionAndEquivalenceTest {
-  private static final String SCHEMA = String.join("\n",
-      "message CollectionWrapperExample {",
-      "  optional group topLevelTags (LIST) {",
-      "    repeated group list {",
-      "      optional binary element (STRING);",
-      "    }",
-      "  }",
-      "  optional group topLevelProperties (MAP) {",
-      "    repeated group key_value {",
-      "      required binary key (STRING);",
-      "      optional binary value (STRING);",
-      "    }",
-      "  }",
-      "  optional group emptyProperties (MAP) {",
-      "    repeated group key_value {",
-      "      required binary key (STRING);",
-      "      optional binary value (STRING);",
-      "    }",
-      "  }",
-      "  optional group metadata {",
-      "    optional binary element (STRING);",
-      "    optional group tags (LIST) {",
-      "      repeated group list {",
-      "        optional binary element (STRING);",
-      "      }",
-      "    }",
-      "    optional group nullableTags (LIST) {",
-      "      repeated group list {",
-      "        optional binary element (STRING);",
-      "      }",
-      "    }",
-      "    optional group legacySingleFieldStructs (LIST) {",
-      "      repeated group list {",
-      "        optional binary item (STRING);",
-      "      }",
-      "    }",
-      "    optional group legacyMultiFieldStructs (LIST) {",
-      "      repeated group list {",
-      "        optional binary name (STRING);",
-      "        optional int32 score;",
-      "      }",
-      "    }",
-      "    optional group tagStructs (LIST) {",
-      "      repeated group list {",
-      "        optional group element {",
-      "          optional binary element (STRING);",
-      "        }",
-      "      }",
-      "    }",
-      "    optional group properties (MAP) {",
-      "      repeated group key_value {",
-      "        required binary key (STRING);",
-      "        optional binary value (STRING);",
-      "      }",
-      "    }",
-      "  }",
-      "}");
+  private static final String SCHEMA = """
+      message CollectionWrapperExample {
+        optional group topLevelTags (LIST) {
+          repeated group list {
+            optional binary element (STRING);
+          }
+        }
+        optional group topLevelProperties (MAP) {
+          repeated group key_value {
+            required binary key (STRING);
+            optional binary value (STRING);
+          }
+        }
+        optional group emptyProperties (MAP) {
+          repeated group key_value {
+            required binary key (STRING);
+            optional binary value (STRING);
+          }
+        }
+        optional group metadata {
+          optional binary element (STRING);
+          optional group tags (LIST) {
+            repeated group list {
+              optional binary element (STRING);
+            }
+          }
+          optional group nullableTags (LIST) {
+            repeated group list {
+              optional binary element (STRING);
+            }
+          }
+          optional group legacySingleFieldStructs (LIST) {
+            repeated group list {
+              optional binary item (STRING);
+            }
+          }
+          optional group legacyMultiFieldStructs (LIST) {
+            repeated group list {
+              optional binary name (STRING);
+              optional int32 score;
+            }
+          }
+          optional group tagStructs (LIST) {
+            repeated group list {
+              optional group element {
+                optional binary element (STRING);
+              }
+            }
+          }
+          optional group properties (MAP) {
+            repeated group key_value {
+              required binary key (STRING);
+              optional binary value (STRING);
+            }
+          }
+        }
+      }
+      """;
 
   private final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
 
@@ -168,36 +162,26 @@ public class ParquetCollectionAndEquivalenceTest {
     }
   }
 
-  /**
-   * Regression: nested LIST&lt;LIST&lt;STRING&gt;&gt; written with the standard 3-level encoding must have
-   * BOTH the outer and inner wrappers stripped by the Avro reader. Also covers null inner elements and null
-   * inner wrappers.
-   */
+  /// Regression: nested `LIST<LIST<STRING>>` written with the standard 3-level encoding must have BOTH the
+  /// outer and inner wrappers stripped by the Avro reader. Also covers null inner elements and null inner
+  /// wrappers.
   @Test
   public void testNestedListWrappersAreUnwrapped()
       throws IOException {
-    String nestedSchema = String.join("\n",
-        "message NestedListExample {",
-        "  optional group nestedTags (LIST) {",
-        "    repeated group list {",
-        "      optional group element (LIST) {",
-        "        repeated group list {",
-        "          optional binary element (STRING);",
-        "        }",
-        "      }",
-        "    }",
-        "  }",
-        "}");
-    FileUtils.forceMkdir(_tempDir);
-    File dataFile = new File(_tempDir, "nested-list-of-lists.parquet");
-    FileUtils.deleteQuietly(dataFile);
-    MessageType schema = MessageTypeParser.parseMessageType(nestedSchema);
-    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
-        .withType(schema)
-        .withCompressionCodec(CompressionCodecName.SNAPPY)
-        .build()) {
-      SimpleGroupFactory groupFactory = new SimpleGroupFactory(schema);
-      Group group = groupFactory.newGroup();
+    String nestedSchema = """
+        message NestedListExample {
+          optional group nestedTags (LIST) {
+            repeated group list {
+              optional group element (LIST) {
+                repeated group list {
+                  optional binary element (STRING);
+                }
+              }
+            }
+          }
+        }
+        """;
+    File dataFile = writeParquet("nested-list-of-lists.parquet", nestedSchema, group -> {
       Group nestedTags = group.addGroup("nestedTags");
       Group outerList0 = nestedTags.addGroup("list").addGroup("element");
       outerList0.addGroup("list").append("element", "a");
@@ -210,49 +194,47 @@ public class ParquetCollectionAndEquivalenceTest {
       outerList2.addGroup("list").append("element", "d");
       // Outer wrapper with no `element` group at all — reads back as a null inner list.
       nestedTags.addGroup("list");
-      writer.write(group);
-    }
+    });
     try (ParquetAvroRecordReader recordReader = new ParquetAvroRecordReader()) {
       recordReader.init(dataFile, null, null);
       assertTrue(recordReader.hasNext());
       GenericRow row = recordReader.next();
       Object[] outer = (Object[]) row.getValue("nestedTags");
       assertEquals(outer.length, 4);
-      assertEquals(Arrays.asList((Object[]) outer[0]), Arrays.asList("a", "b"));
-      assertEquals(Arrays.asList((Object[]) outer[1]), Arrays.asList("c"));
+      assertEquals(Arrays.asList((Object[]) outer[0]), List.of("a", "b"));
+      assertEquals(Arrays.asList((Object[]) outer[1]), List.of("c"));
       assertEquals(Arrays.asList((Object[]) outer[2]), Arrays.asList(null, "d"));
-      assertEquals(outer[3], null);
+      assertNull(outer[3]);
       assertFalse(recordReader.hasNext());
     }
   }
 
-  /**
-   * Regression: an Avro schema authored as {@code array<record<UserTag, fields=[element: string]>>} — where
-   * the inner record is real user data, NOT a parquet-avro-synthesized LIST wrapper — must NOT be flattened.
-   * The shape matches the wrapper convention but the file's Avro schema in metadata identifies the records as
-   * user data.
-   */
+  /// Regression: an Avro schema authored as `array<record<UserTag, fields=[element: string]>>` — where the
+  /// inner record is real user data, NOT a parquet-avro-synthesized LIST wrapper — must NOT be flattened.
+  /// The shape matches the wrapper convention but the file's Avro schema in metadata identifies the records
+  /// as user data.
   @Test
   public void testUserRecordWithSingleElementFieldIsPreserved()
       throws IOException {
-    Schema avroSchema = new Schema.Parser().parse(String.join("\n",
-        "{",
-        "  \"type\": \"record\",",
-        "  \"name\": \"UserOuter\",",
-        "  \"namespace\": \"com.example\",",
-        "  \"fields\": [{",
-        "    \"name\": \"tags\",",
-        "    \"type\": {",
-        "      \"type\": \"array\",",
-        "      \"items\": {",
-        "        \"type\": \"record\",",
-        "        \"name\": \"UserTag\",",
-        "        \"namespace\": \"com.example\",",
-        "        \"fields\": [{\"name\": \"element\", \"type\": \"string\"}]",
-        "      }",
-        "    }",
-        "  }]",
-        "}"));
+    Schema avroSchema = new Schema.Parser().parse("""
+        {
+          "type": "record",
+          "name": "UserOuter",
+          "namespace": "com.example",
+          "fields": [{
+            "name": "tags",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "UserTag",
+                "namespace": "com.example",
+                "fields": [{"name": "element", "type": "string"}]
+              }
+            }
+          }]
+        }
+        """);
     FileUtils.forceMkdir(_tempDir);
     File dataFile = new File(_tempDir, "user-record-with-element-field.parquet");
     FileUtils.deleteQuietly(dataFile);
@@ -262,7 +244,7 @@ public class ParquetCollectionAndEquivalenceTest {
     tag1.put("element", "user-1");
     GenericRecord tag2 = new GenericData.Record(tagSchema);
     tag2.put("element", "user-2");
-    row.put("tags", Arrays.asList(tag1, tag2));
+    row.put("tags", List.of(tag1, tag2));
     try (ParquetWriter<GenericRecord> writer = ParquetTestUtils.getParquetAvroWriter(
         new Path(dataFile.getAbsolutePath()), avroSchema)) {
       writer.write(row);
@@ -279,11 +261,70 @@ public class ParquetCollectionAndEquivalenceTest {
     }
   }
 
-  /**
-   * Cross-checks every existing Parquet test resource through both readers and asserts the two produce the
-   * same Pinot rows. Locks in that any encoding subtlety in the fixtures (LIST/MAP variants, INT96, decimals,
-   * dictionary encoding, legacy Impala/Hive output, etc.) is interpreted the same way by both code paths.
-   */
+  /// Test resources that fail both [ParquetAvroRecordReader] and [ParquetNativeRecordReader], mapped to the documented
+  /// reason. Both readers share parquet-mr's core (`ParquetFileReader.readFooter` / chunk-page reading), so a malformed
+  /// file at that layer fails both equally.
+  private static final Map<String, String> KNOWN_FAILURES_BOTH = Map.ofEntries(
+      // Malformed page boundary — parquet-mr's chunk reader runs short on bytes.
+      Map.entry("nation.dict.parquet", """
+          Parquet-mr's WorkaroundChunk.readAsBytesInput throws EOFException with 7 bytes short of the expected \
+          chunk length — malformed page boundary in this fixture"""),
+      Map.entry("nation.dict-malformed.parquet", """
+          Same EOF/malformed-page-boundary failure as nation.dict.parquet — parquet-mr's \
+          WorkaroundChunk.readAsBytesInput throws EOFException with 7 bytes short"""),
+      // Footer / column-list edge cases.
+      Map.entry("no_columns.parquet", """
+          File has no columns; parquet-mr's ParquetMetadataConverter.fromParquetMetadata indexes the empty \
+          column list and throws IndexOutOfBoundsException while reading the footer"""),
+      // Codec not available / mismatched.
+      Map.entry("non_hadoop_lz4_compressed.parquet", """
+          File uses the non-Hadoop framed LZ4 codec (LZ4_RAW); parquet-mr fails to decompress with \
+          ParquetDecodingException 'Can not read value at 0 in block -1'. Affects both readers since \
+          decompression happens in parquet-mr's column reader path""")
+  );
+
+  /// Test resources that fail [ParquetAvroRecordReader] but are read fine by [ParquetNativeRecordReader], mapped to the
+  /// documented reason. These are Avro-specific issues (schema-name validation, type incompatibility with the Avro
+  /// spec, etc.) that the schema-walking native reader sidesteps.
+  private static final Map<String, String> KNOWN_FAILURES_AVRO_ONLY = Map.ofEntries(
+      // AvroSchemaConverter rejects names that violate Avro's identifier rules.
+      Map.entry("decimals.parquet", """
+          Parquet-dotnet writes the message-type name 'parquet-dotnet-schema'; Avro forbids '-' in record names so \
+          AvroSchemaConverter rejects it before any data is read"""),
+      Map.entry("delta_encoding_required_column.parquet", """
+          Field name 'c_customer_sk:' contains a ':' character that Avro forbids in field names; \
+          AvroSchemaConverter rejects it before any data is read"""),
+      Map.entry("hadoop_lz4_compressed.parquet", """
+          The Parquet message-type name is empty; Avro requires non-empty record names so AvroSchemaConverter \
+          rejects it before any data is read"""),
+      // AvroSchemaConverter rejects Parquet shapes that have no Avro spec equivalent.
+      Map.entry("nested_maps.snappy.parquet", """
+          MAP field has a non-binary key (int32). Avro requires map keys to be strings, so AvroSchemaConverter \
+          throws 'Map key type must be binary (UTF8)' before any data is read. The native reader handles \
+          non-string map keys via stringifyMapKey."""),
+      Map.entry("repeated_no_annotation.parquet", """
+          Schema uses the legacy 'repeated <primitive>' encoding (a top-level repeated primitive without \
+          LIST/group wrapping); parquet-avro's AvroCollectionConverter calls asGroupType() on the element and \
+          throws ClassCastException for the primitive"""),
+      // parquet-java 1.17 schema/value mismatch for int32/int64 DECIMAL columns.
+      Map.entry("int32_decimal.parquet", """
+          Parquet-java 1.17 (apache/parquet-java#3306, GH-3149) added FieldDecimalIntConverter, which \
+          materializes BigDecimal for int32/int64 columns carrying a parquet-side DECIMAL annotation. But \
+          AvroSchemaConverter strips that annotation from the derived avro schema (the avro spec doesn't allow \
+          `decimal` on int/long), so the avro schema reads `[null, int]` while the runtime value is BigDecimal. \
+          AvroRecordExtractor's GenericData.resolveUnion then throws 'Unknown datum type java.math.BigDecimal'. \
+          The native reader handles the file without going through avro."""),
+      Map.entry("int64_decimal.parquet", """
+          Same parquet-java 1.17 issue as int32_decimal.parquet, but via FieldDecimalLongConverter — \
+          parquet-side DECIMAL annotation on a long column produces BigDecimal while the avro schema reads \
+          `[null, long]`""")
+  );
+
+  /// Cross-checks every existing Parquet test resource through both readers and asserts the two produce the same Pinot
+  /// rows. Locks in that any encoding subtlety in the fixtures (LIST / MAP variants, INT96, decimals, dictionary
+  /// encoding, legacy Impala / Hive output, etc.) is interpreted the same way by both code paths. Files that either
+  /// reader cannot handle must be enumerated in [#KNOWN_FAILURES_BOTH] / [#KNOWN_FAILURES_AVRO_ONLY] with a reason —
+  /// any unexplained failure (or stale allow-list entry) fails the test.
   @Test
   public void testAvroAndNativeReadersAgreeOnAllTestResources()
       throws Exception {
@@ -291,51 +332,124 @@ public class ParquetCollectionAndEquivalenceTest {
     assertTrue(parquetFiles.size() > 50, "expected to find a sizable corpus of test Parquet files, got "
         + parquetFiles.size());
 
-    List<String> failures = new ArrayList<>();
+    List<String> allowListIssues = new ArrayList<>();
+    List<String> unexpectedFailures = new ArrayList<>();
+    List<String> disagreements = new ArrayList<>();
+    Set<String> bothFailuresHit = new HashSet<>();
+    Set<String> avroOnlyFailuresHit = new HashSet<>();
     int compared = 0;
     for (File file : parquetFiles) {
       String fileName = file.getName();
+      boolean inBoth = KNOWN_FAILURES_BOTH.containsKey(fileName);
+      boolean inAvroOnly = KNOWN_FAILURES_AVRO_ONLY.containsKey(fileName);
       List<GenericRow> rowsAvro;
-      try {
-        rowsAvro = readAll(new ParquetAvroRecordReader(), file);
-      } catch (Throwable t) {
-        // Avro reader rejects some legacy schemas; only the native reader handles those. Skip rather than
-        // fail since this test verifies cross-reader agreement, not single-reader coverage.
+      try (ParquetAvroRecordReader avroReader = new ParquetAvroRecordReader()) {
+        rowsAvro = readAll(avroReader, file);
+      } catch (Throwable avroError) {
+        if (inBoth) {
+          // Verify the BOTH classification: native must also fail.
+          if (nativeReadFails(file)) {
+            bothFailuresHit.add(fileName);
+          } else {
+            allowListIssues.add(fileName
+                + ": listed in KNOWN_FAILURES_BOTH but native reader succeeded — move to KNOWN_FAILURES_AVRO_ONLY");
+          }
+        } else if (inAvroOnly) {
+          // Verify the AVRO_ONLY classification: native must succeed.
+          if (nativeReadFails(file)) {
+            allowListIssues.add(fileName
+                + ": listed in KNOWN_FAILURES_AVRO_ONLY but native reader also failed — move to KNOWN_FAILURES_BOTH");
+          } else {
+            avroOnlyFailuresHit.add(fileName);
+          }
+        } else {
+          unexpectedFailures.add(fileName + ": Avro reader failed (" + describe(avroError)
+              + ") — add to KNOWN_FAILURES_BOTH or KNOWN_FAILURES_AVRO_ONLY with a reason if this is expected");
+        }
         continue;
       }
-      // All files readable by Avro reader should also be readable by native reader
-      List<GenericRow> rowsNative = readAll(new ParquetNativeRecordReader(), file);
+      // Avro reader succeeded.
+      if (inBoth || inAvroOnly) {
+        allowListIssues.add(fileName + ": listed in "
+            + (inBoth ? "KNOWN_FAILURES_BOTH" : "KNOWN_FAILURES_AVRO_ONLY")
+            + " but the Avro reader succeeded — remove the entry");
+        continue;
+      }
+      List<GenericRow> rowsNative;
+      try (ParquetNativeRecordReader nativeReader = new ParquetNativeRecordReader()) {
+        rowsNative = readAll(nativeReader, file);
+      } catch (Throwable nativeError) {
+        unexpectedFailures.add(fileName + ": Avro reader succeeded but native reader failed ("
+            + describe(nativeError) + ")");
+        continue;
+      }
       try {
         assertReadersAgree(fileName, rowsAvro, rowsNative);
         compared++;
-      } catch (AssertionError e) {
+      } catch (AssertionError diff) {
         Map<String, Object> firstAvro = rowsAvro.isEmpty() ? Map.of() : wrapArray(rowsAvro.get(0).getFieldToValueMap());
         Map<String, Object> firstNative =
             rowsNative.isEmpty() ? Map.of() : wrapArray(rowsNative.get(0).getFieldToValueMap());
-        failures.add(fileName + ": " + e.getMessage()
-            + "\n      avro  =" + firstAvro
-            + "\n      native=" + firstNative);
+        disagreements.add(fileName + ": " + diff.getMessage()
+            + "\n        avro  =" + firstAvro
+            + "\n        native=" + firstNative);
       }
     }
-    assertTrue(compared >= 1, "expected at least one Parquet file to be readable by both readers");
-    assertEquals(failures, Collections.emptyList(),
-        "Parquet readers disagreed on " + failures.size() + " of " + compared + " files");
+    // Detect stale allow-list entries (file removed from corpus, or the reader now handles it).
+    KNOWN_FAILURES_BOTH.keySet().stream()
+        .filter(k -> !bothFailuresHit.contains(k))
+        .forEach(k -> allowListIssues.add(
+            k + ": listed in KNOWN_FAILURES_BOTH but file is not in the corpus or no longer fails — remove the entry"));
+    KNOWN_FAILURES_AVRO_ONLY.keySet().stream()
+        .filter(k -> !avroOnlyFailuresHit.contains(k))
+        .forEach(k -> allowListIssues.add(k
+            + ": listed in KNOWN_FAILURES_AVRO_ONLY but file is not in the corpus or no longer fails — remove the "
+            + "entry"));
+
+    if (!allowListIssues.isEmpty() || !unexpectedFailures.isEmpty() || !disagreements.isEmpty()) {
+      fail(buildFailureReport(compared, allowListIssues, unexpectedFailures, disagreements));
+    }
   }
 
-  // ----- writers + assertions for the hand-authored schema -----
+  private static boolean nativeReadFails(File file) {
+    try (ParquetNativeRecordReader nativeReader = new ParquetNativeRecordReader()) {
+      readAll(nativeReader, file);
+      return false;
+    } catch (Throwable t) {
+      return true;
+    }
+  }
+
+  private static String describe(Throwable t) {
+    String message = t.getMessage();
+    return t.getClass().getSimpleName() + (message == null ? "" : ": " + message);
+  }
+
+  private static String buildFailureReport(int compared, List<String> allowListIssues,
+      List<String> unexpectedFailures, List<String> disagreements) {
+    StringBuilder msg = new StringBuilder();
+    msg.append(String.format(
+        "Compared %d file(s); %d allow-list issue(s), %d unexpected reader failure(s), %d disagreement(s).%n",
+        compared, allowListIssues.size(), unexpectedFailures.size(), disagreements.size()));
+    appendSection(msg, "ALLOW-LIST ISSUES", allowListIssues);
+    appendSection(msg, "UNEXPECTED READER FAILURES", unexpectedFailures);
+    appendSection(msg, "READER DISAGREEMENTS", disagreements);
+    return msg.toString();
+  }
+
+  private static void appendSection(StringBuilder msg, String title, List<String> items) {
+    if (items.isEmpty()) {
+      return;
+    }
+    msg.append(String.format("%n[%s]%n", title));
+    items.forEach(item -> msg.append("  - ").append(item).append(System.lineSeparator()));
+  }
+
+  // === Writers and per-test row assertions ===
 
   private File writeHandAuthoredParquetFile()
       throws IOException {
-    FileUtils.forceMkdir(_tempDir);
-    File dataFile = new File(_tempDir, "hand-authored-collections.parquet");
-    FileUtils.deleteQuietly(dataFile);
-    MessageType schema = MessageTypeParser.parseMessageType(SCHEMA);
-    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
-        .withType(schema)
-        .withCompressionCodec(CompressionCodecName.SNAPPY)
-        .build()) {
-      SimpleGroupFactory groupFactory = new SimpleGroupFactory(schema);
-      Group group = groupFactory.newGroup();
+    return writeParquet("hand-authored-collections.parquet", SCHEMA, group -> {
       Group topLevelTags = group.addGroup("topLevelTags");
       topLevelTags.addGroup("list").append("element", "top-a");
       topLevelTags.addGroup("list").append("element", "top-b");
@@ -359,23 +473,43 @@ public class ParquetCollectionAndEquivalenceTest {
       Group properties = metadata.addGroup("properties");
       properties.addGroup("key_value").append("key", "key-a").append("value", "value-a");
       properties.addGroup("key_value").append("key", "key-b").append("value", "value-b");
+    });
+  }
+
+  /// Writes a single-row Parquet file at `_tempDir/fileName` with the given `schemaText`. The `populator`
+  /// runs against a fresh [Group] which is then written to the file.
+  private File writeParquet(String fileName, String schemaText, Consumer<Group> populator)
+      throws IOException {
+    FileUtils.forceMkdir(_tempDir);
+    File dataFile = new File(_tempDir, fileName);
+    FileUtils.deleteQuietly(dataFile);
+    MessageType schema = MessageTypeParser.parseMessageType(schemaText);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(dataFile.getAbsolutePath()))
+        .withType(schema)
+        .withCompressionCodec(CompressionCodecName.SNAPPY)
+        .build()) {
+      Group group = new SimpleGroupFactory(schema).newGroup();
+      populator.accept(group);
       writer.write(group);
     }
     return dataFile;
   }
 
-  @SuppressWarnings("unchecked")
   private void assertHandAuthoredCollectionValues(RecordReader recordReader)
       throws IOException {
     assertTrue(recordReader.hasNext());
     GenericRow row = recordReader.next();
-    assertEquals(Arrays.asList((Object[]) row.getValue("topLevelTags")), Arrays.asList("top-a", "top-b"));
-    assertEquals(row.getValue("topLevelProperties"), Map.of("top-key-a", "top-value-a", "top-key-b", "top-value-b"));
+    assertEquals(Arrays.asList((Object[]) row.getValue("topLevelTags")), List.of("top-a", "top-b"));
+    assertEquals(row.getValue("topLevelProperties"), Map.of(
+        "top-key-a", "top-value-a",
+        "top-key-b", "top-value-b"
+    ));
     assertEquals(row.getValue("emptyProperties"), Map.of());
 
+    //noinspection unchecked
     Map<String, Object> metadata = (Map<String, Object>) row.getValue("metadata");
     assertEquals(metadata.get("element"), "real-element-field");
-    assertEquals(Arrays.asList((Object[]) metadata.get("tags")), Arrays.asList("abc", "xyz"));
+    assertEquals(Arrays.asList((Object[]) metadata.get("tags")), List.of("abc", "xyz"));
     assertEquals(Arrays.asList((Object[]) metadata.get("nullableTags")), Arrays.asList(null, "nonnull"));
     assertEquals(metadata.get("properties"), Map.of("key-a", "value-a", "key-b", "value-b"));
 
@@ -385,23 +519,22 @@ public class ParquetCollectionAndEquivalenceTest {
     // flatten this case to the primitive value list. Preserved struct shapes require the multi-field group
     // form (see legacyMultiFieldStructs).
     Object[] legacySingleFieldStructs = (Object[]) metadata.get("legacySingleFieldStructs");
-    assertEquals(legacySingleFieldStructs.length, 2);
-    assertEquals(legacySingleFieldStructs[0], "legacy-a");
-    assertEquals(legacySingleFieldStructs[1], "legacy-b");
+    assertEquals(legacySingleFieldStructs, new Object[]{"legacy-a", "legacy-b"});
 
     Object[] legacyMultiFieldStructs = (Object[]) metadata.get("legacyMultiFieldStructs");
-    assertEquals(legacyMultiFieldStructs.length, 2);
-    assertEquals(legacyMultiFieldStructs[0], Map.of("name", "legacy-alpha", "score", 1));
-    assertEquals(legacyMultiFieldStructs[1], Map.of("name", "legacy-beta", "score", 2));
+    assertEquals(legacyMultiFieldStructs, new Object[]{
+        Map.of("name", "legacy-alpha", "score", 1),
+        Map.of("name", "legacy-beta", "score", 2)
+    });
 
     Object[] tagStructs = (Object[]) metadata.get("tagStructs");
-    assertEquals(tagStructs.length, 2);
-    assertEquals(tagStructs[0], Map.of("element", "inner-a"));
-    assertEquals(tagStructs[1], Map.of("element", "inner-b"));
+    assertEquals(tagStructs, new Object[]{
+        Map.of("element", "inner-a"),
+        Map.of("element", "inner-b")
+    });
     assertFalse(recordReader.hasNext());
   }
 
-  @SuppressWarnings("unchecked")
   private void assertFixtureValues(RecordReader recordReader)
       throws IOException {
     assertTrue(recordReader.hasNext());
@@ -417,30 +550,33 @@ public class ParquetCollectionAndEquivalenceTest {
     assertEquals(row.getValue("dateField"), LocalDate.of(2024, 1, 1));
     assertEquals(row.getValue("timestampMillisField"), new Timestamp(1700000000123L));
 
+    //noinspection unchecked
     Map<String, Object> struct = (Map<String, Object>) row.getValue("structField");
     assertEquals(struct.get("nestedString"), "nested-value");
     assertEquals(struct.get("nestedInt"), 99);
     assertEquals(struct.get("nestedElementStruct"), Map.of("element", "preserved-element"));
 
-    assertEquals(Arrays.asList((Object[]) row.getValue("stringList")), Arrays.asList("red", "blue"));
-    assertEquals(Arrays.asList((Object[]) row.getValue("intList")), Arrays.asList(7, 11));
+    assertEquals(Arrays.asList((Object[]) row.getValue("stringList")), List.of("red", "blue"));
+    assertEquals(Arrays.asList((Object[]) row.getValue("intList")), List.of(7, 11));
     assertEquals(((Object[]) row.getValue("emptyStringList")).length, 0);
 
     assertEquals(row.getValue("stringMap"), Map.of("k1", "v1", "k2", "v2"));
     assertEquals(row.getValue("emptyStringMap"), Map.of());
 
     Object[] structList = (Object[]) row.getValue("structList");
-    assertEquals(structList.length, 2);
-    assertEquals(structList[0], Map.of("name", "alpha", "score", 10));
-    assertEquals(structList[1], Map.of("name", "beta", "score", 20));
+    assertEquals(structList, new Object[]{
+        Map.of("name", "alpha", "score", 10),
+        Map.of("name", "beta", "score", 20)
+    });
 
+    //noinspection unchecked
     Map<String, Object> mapOfLists = (Map<String, Object>) row.getValue("mapOfLists");
-    assertEquals(Arrays.asList((Object[]) mapOfLists.get("letters")), Arrays.asList("a", "b"));
-    assertEquals(Arrays.asList((Object[]) mapOfLists.get("single")), Arrays.asList("z"));
+    assertEquals(Arrays.asList((Object[]) mapOfLists.get("letters")), List.of("a", "b"));
+    assertEquals(Arrays.asList((Object[]) mapOfLists.get("single")), List.of("z"));
     assertFalse(recordReader.hasNext());
   }
 
-  // ----- helpers for the cross-reader equivalence test -----
+  // === Cross-reader equivalence: helpers ===
 
   private static void assertReadersAgree(String fileName, List<GenericRow> rowsAvro, List<GenericRow> rowsNative) {
     assertEquals(rowsAvro.size(), rowsNative.size(), fileName + ": row count");
@@ -455,7 +591,7 @@ public class ParquetCollectionAndEquivalenceTest {
       throws Exception {
     URL marker = ParquetCollectionAndEquivalenceTest.class.getClassLoader()
         .getResource("collection-reader-fixture.parquet");
-    assertTrue(marker != null, "collection-reader-fixture.parquet must be on the classpath");
+    assertNotNull(marker, "collection-reader-fixture.parquet must be on the classpath");
     java.nio.file.Path root = new File(marker.toURI()).getParentFile().toPath();
     try (Stream<java.nio.file.Path> stream = Files.walk(root)) {
       return stream.filter(Files::isRegularFile)
@@ -470,20 +606,17 @@ public class ParquetCollectionAndEquivalenceTest {
       throws IOException {
     reader.init(file, null, null);
     List<GenericRow> rows = new ArrayList<>();
-    try {
-      while (reader.hasNext()) {
-        GenericRow row = new GenericRow();
-        reader.next(row);
-        rows.add(row.copy());
-      }
-    } finally {
-      reader.close();
+    while (reader.hasNext()) {
+      GenericRow row = new GenericRow();
+      reader.next(row);
+      rows.add(row.copy());
     }
     return rows;
   }
 
-  /// Wraps `byte[]` as [ByteArray] and converts `Object[]` to `List`, recursing through nested [Map] / [List] values,
-  /// so the row map can be compared via [Map#equals] without tripping on JVM array reference-equality.
+  /// Wraps `byte[]` as [ByteArray] and converts `Object[]` to `List`, recursing through nested [Map] / [List]
+  /// values, so the row map can be compared via [Map#equals] without tripping on JVM array
+  /// reference-equality.
   private static Map<String, Object> wrapArray(Map<String, Object> row) {
     Map<String, Object> out = Maps.newHashMapWithExpectedSize(row.size());
     for (Map.Entry<String, Object> e : row.entrySet()) {
@@ -492,7 +625,6 @@ public class ParquetCollectionAndEquivalenceTest {
     return out;
   }
 
-  @SuppressWarnings("unchecked")
   private static Object wrapArrayValue(Object value) {
     if (value instanceof byte[]) {
       return new ByteArray((byte[]) value);
@@ -506,6 +638,7 @@ public class ParquetCollectionAndEquivalenceTest {
       return list;
     }
     if (value instanceof List) {
+      //noinspection unchecked
       List<Object> in = (List<Object>) value;
       List<Object> out = new ArrayList<>(in.size());
       for (Object v : in) {
@@ -514,6 +647,7 @@ public class ParquetCollectionAndEquivalenceTest {
       return out;
     }
     if (value instanceof Map) {
+      //noinspection unchecked
       Map<Object, Object> in = (Map<Object, Object>) value;
       Map<Object, Object> out = Maps.newHashMapWithExpectedSize(in.size());
       for (Map.Entry<Object, Object> e : in.entrySet()) {
