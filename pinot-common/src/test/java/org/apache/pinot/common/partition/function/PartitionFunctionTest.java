@@ -445,9 +445,10 @@ public class PartitionFunctionTest {
     assertEquals(partitionFunction.getNumPartitions(), numPartitions);
 
     JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
-    assertEquals(jsonNode.size(), 3);
+    assertEquals(jsonNode.size(), 4);
     assertEquals(jsonNode.get("name").asText().toLowerCase(), functionName.toLowerCase());
     assertEquals(jsonNode.get("numPartitions").asInt(), numPartitions);
+    assertTrue(jsonNode.has("partitionIdNormalizer"));
 
     JsonNode functionConfigNode = jsonNode.get("functionConfig");
     if (functionConfig == null) {

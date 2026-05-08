@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
@@ -43,22 +43,15 @@ import org.apache.pinot.spi.annotations.PartitionFunctionType;
 ///
 /// With this partition config on column "subject", `partitionId` is `1` for Maths, `2` for English and `3` for
 /// Chemistry. `partitionId` is `0` for all other values which may occur, therefore `numPartitions` is set to `4`.
-///
-/// The mapping output is already in `[0, numPartitions)`, so the configured
-/// [PartitionIntNormalizer] (default [PartitionIntNormalizer#POSITIVE_MODULO]) is a
-/// no-op for in-range values; it is still applied so the field is uniform across all partition
-/// functions.
 @PartitionFunctionType(names = "BoundedColumnValue")
 public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   private static final int DEFAULT_PARTITION_ID = 0;
   private static final String NAME = "BoundedColumnValue";
   private static final String COLUMN_VALUES = "columnValues";
   private static final String COLUMN_VALUES_DELIMITER = "columnValuesDelimiter";
-  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.POSITIVE_MODULO;
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
   private final String[] _values;
-  private final PartitionIntNormalizer _normalizer;
 
   public BoundedColumnValuePartitionFunction(int numPartitions, Map<String, String> functionConfig) {
     Preconditions.checkArgument(functionConfig != null && functionConfig.size() > 0,
@@ -71,19 +64,16 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
     Preconditions.checkState(numPartitions == _values.length + 1,
         "'numPartitions' must just be one greater than number of column values configured");
     _numPartitions = numPartitions;
-    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
   public int getPartition(String value) {
-    int rawPartition = DEFAULT_PARTITION_ID;
     for (int i = 0; i < _numPartitions - 1; i++) {
       if (_values[i].equalsIgnoreCase(value)) {
-        rawPartition = i + 1;
-        break;
+        return i + 1;
       }
     }
-    return _normalizer.getPartitionId(rawPartition, _numPartitions);
+    return DEFAULT_PARTITION_ID;
   }
 
   @Override
@@ -105,8 +95,9 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public String getPartitionIdNormalizer() {
-    return _normalizer.name();
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    // Output is a fixed mapping in [0, numPartitions); POSITIVE_MODULO is a no-op label.
+    return PartitionIdNormalizer.POSITIVE_MODULO;
   }
 
   @Override

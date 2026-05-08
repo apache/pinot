@@ -25,65 +25,71 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
+import org.reflections.Reflections;
+import org.reflections.scanners.SubTypesScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /// Dynamic registry for [PartitionFunction] implementations.
 ///
-/// Discovery is driven by classpath scanning for classes annotated with
-/// [PartitionFunctionType]. Annotated classes must:
+/// Discovery walks every public, concrete [PartitionFunction] subtype on the classpath under the
+/// `org.apache.pinot.*` package tree, then registers each under its canonical name(s):
 ///
-/// - be public and implement [PartitionFunction]
-/// - live under a package matching the regex `.*\.partition\.function\..*`
-///   (e.g. `org.apache.pinot.common.partition.function` or any plugin package
-///   that follows the same convention)
-/// - expose a public constructor with signature
-///   `(int numPartitions, Map<String, String> functionConfig)`
+/// - If the class is annotated with [PartitionFunctionType] (and `enabled()` is true), the
+///   annotation's `names()` are used. Multiple aliases register the same constructor under each
+///   name (e.g. `Murmur` and `Murmur2` for `MurmurPartitionFunction`).
+/// - Otherwise, the registry probes [PartitionFunction#getName()] by instantiating the class with
+///   `(numPartitions=1, functionConfig=null)` and registers under the value returned. This lets
+///   existing partition functions work without adding the annotation.
 ///
-/// The static block scans the classpath once and builds an immutable
-/// (canonicalized name → constructor) map. Instances are created on demand by
-/// [#getPartitionFunction(String, int, Map)].
+/// Each registrable class must be public, concrete, and expose a public constructor with signature
+/// `(int numPartitions, Map<String, String> functionConfig)` — the constructor the registry calls
+/// when [#getPartitionFunction(String, int, Map)] is invoked.
 ///
-/// To force eager initialization (e.g. so the scan happens before the first segment
-/// is read), call [#init()] from broker/server/controller startup.
+/// The static block scans the classpath once and builds an immutable (canonicalized name →
+/// constructor) map. To force eager initialization (e.g. so the scan happens before the first
+/// segment is read), call [#init()] from broker / server / controller startup.
 public class PartitionFunctionFactory {
   private PartitionFunctionFactory() {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionFunctionFactory.class);
-  private static final String SCAN_REGEX = ".*\\.partition\\.function\\..*";
+  private static final String SCAN_PACKAGE = "org.apache.pinot";
 
   private static final Map<String, Constructor<? extends PartitionFunction>> REGISTRY;
 
   static {
     long startTimeMs = System.currentTimeMillis();
     Map<String, Constructor<? extends PartitionFunction>> registry = new HashMap<>();
-    for (Class<?> clazz : PinotReflectionUtils.getClassesThroughReflection(SCAN_REGEX, PartitionFunctionType.class)) {
-      if (!Modifier.isPublic(clazz.getModifiers()) || !PartitionFunction.class.isAssignableFrom(clazz)) {
+    Set<Class<? extends PartitionFunction>> subtypes = scanSubtypes();
+    for (Class<? extends PartitionFunction> clazz : subtypes) {
+      int mods = clazz.getModifiers();
+      if (!Modifier.isPublic(mods) || Modifier.isAbstract(mods) || clazz.isInterface()) {
         continue;
       }
       PartitionFunctionType annotation = clazz.getAnnotation(PartitionFunctionType.class);
-      if (!annotation.enabled()) {
+      if (annotation != null && !annotation.enabled()) {
         continue;
       }
-      String[] names = annotation.names();
-      Preconditions.checkState(names.length > 0,
-          "@PartitionFunctionType on %s must declare at least one name", clazz.getName());
       Constructor<? extends PartitionFunction> constructor;
       try {
-        @SuppressWarnings("unchecked")
-        Constructor<? extends PartitionFunction> ctor =
-            (Constructor<? extends PartitionFunction>) clazz.getConstructor(int.class, Map.class);
-        constructor = ctor;
+        constructor = clazz.getConstructor(int.class, Map.class);
       } catch (NoSuchMethodException e) {
-        throw new IllegalStateException("Partition function " + clazz.getName()
-            + " must declare a public constructor (int numPartitions, Map<String, String> functionConfig)", e);
+        LOGGER.warn("Skipping {}: missing public constructor (int, Map<String, String>)", clazz.getName());
+        continue;
+      }
+      String[] names = resolveNames(clazz, annotation, constructor);
+      if (names == null) {
+        continue;
       }
       for (String name : names) {
         String canonical = canonicalize(name);
@@ -98,6 +104,43 @@ public class PartitionFunctionFactory {
         REGISTRY.keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static Set<Class<? extends PartitionFunction>> scanSubtypes() {
+    final Set<?>[] result = new Set<?>[1];
+    PinotReflectionUtils.runWithLock(() ->
+        result[0] = new Reflections(new ConfigurationBuilder()
+            .setUrls(ClasspathHelper.forPackage(SCAN_PACKAGE))
+            .setScanners(new SubTypesScanner()))
+            .getSubTypesOf(PartitionFunction.class));
+    return (Set) result[0];
+  }
+
+  /// Resolves the canonical name(s) under which to register `clazz`. Returns the annotation names
+  /// when present and non-empty, or falls back to a single-element array containing the value of
+  /// `getName()` from a probe instance. Returns `null` when neither path produces a usable name.
+  @Nullable
+  private static String[] resolveNames(Class<? extends PartitionFunction> clazz,
+      @Nullable PartitionFunctionType annotation, Constructor<? extends PartitionFunction> constructor) {
+    if (annotation != null && annotation.names().length > 0) {
+      return annotation.names();
+    }
+    try {
+      PartitionFunction probe = constructor.newInstance(1, null);
+      String name = probe.getName();
+      if (name == null || name.isEmpty()) {
+        LOGGER.warn("Skipping {}: getName() returned null/empty and no @PartitionFunctionType annotation",
+            clazz.getName());
+        return null;
+      }
+      return new String[]{name};
+    } catch (ReflectiveOperationException e) {
+      LOGGER.warn(
+          "Skipping {}: no @PartitionFunctionType annotation and probing getName() with (1, null) failed: {}",
+          clazz.getName(), e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+      return null;
+    }
+  }
+
   /// No-op call that exists to force the static initializer of this class to run. Mirrors
   /// `FunctionRegistry.init()` so callers can eagerly trigger classpath scanning during
   /// service startup instead of paying the cost on the first partition function lookup.
@@ -106,7 +149,7 @@ public class PartitionFunctionFactory {
 
   /// Builds an instance of the partition function registered under `functionName`.
   ///
-  /// @param functionName matched case-insensitively (after stripping underscores)
+  /// @param functionName matched case-insensitively
   /// @param numPartitions positive partition count
   /// @param functionConfig optional, function-specific configuration; may be `null`
   public static PartitionFunction getPartitionFunction(String functionName, int numPartitions,

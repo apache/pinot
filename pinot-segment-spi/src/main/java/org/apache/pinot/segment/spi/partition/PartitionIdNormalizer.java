@@ -28,7 +28,7 @@ import java.util.Locale;
 /// `getPartition(...)` body and report it via [PartitionFunction#getPartitionIdNormalizer()].
 /// The framework also uses the reported value for identity / staleness matching between
 /// config-side and segment-side partition metadata.
-public enum PartitionIntNormalizer {
+public enum PartitionIdNormalizer {
   /// Compute the remainder, then shift negative remainders into the valid range with `+ numPartitions`.
   POSITIVE_MODULO {
     @Override
@@ -69,10 +69,10 @@ public enum PartitionIntNormalizer {
       return (int) ((value & Long.MAX_VALUE) % numPartitions);
     }
   },
-  /// Kafka-style `abs(value) % numPartitions` that handles `Integer.MIN_VALUE -> 0`
+  /// Pre-modulo abs (Kafka-style) `abs(value) % numPartitions` that handles `Integer.MIN_VALUE -> 0`
   /// (and `Long.MIN_VALUE -> 0`) to avoid the `Math.abs` overflow corner. Matches the
   /// legacy semantics of `HashCodePartitionFunction` and `ByteArrayPartitionFunction`.
-  KAFKA_ABS {
+  PRE_MODULO_ABS {
     @Override
     int toPartitionId(int value, int numPartitions) {
       int abs = (value == Integer.MIN_VALUE) ? 0 : Math.abs(value);
@@ -96,7 +96,7 @@ public enum PartitionIntNormalizer {
     return toPartitionId(value, numPartitions);
   }
 
-  public static PartitionIntNormalizer fromConfigString(String partitionIdNormalizer) {
+  public static PartitionIdNormalizer fromConfigString(String partitionIdNormalizer) {
     Preconditions.checkArgument(partitionIdNormalizer != null && !partitionIdNormalizer.trim().isEmpty(),
         "'partitionIdNormalizer' must not be blank");
     try {

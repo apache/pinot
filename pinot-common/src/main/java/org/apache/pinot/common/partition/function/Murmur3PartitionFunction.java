@@ -24,7 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
@@ -33,7 +33,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /// [PartitionFunction] backed by a 32-bit Murmur3 hash. The configured
-/// [PartitionIntNormalizer] (default [PartitionIntNormalizer#MASK]) is applied to the
+/// [PartitionIdNormalizer] (default [PartitionIdNormalizer#MASK]) is applied to the
 /// raw signed hash to derive the partition id.
 @PartitionFunctionType(names = "Murmur3")
 public class Murmur3PartitionFunction implements PartitionFunction {
@@ -41,7 +41,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private static final String SEED_KEY = "seed";
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
-  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.MASK;
+  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.MASK;
 
   private final int _numPartitions;
   @Nullable
@@ -49,7 +49,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   private final int _seed;
   private final boolean _useX64;
   private final boolean _useRawBytes;
-  private final PartitionIntNormalizer _normalizer;
+  private final PartitionIdNormalizer _normalizer;
 
   public Murmur3PartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
@@ -112,8 +112,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public String getPartitionIdNormalizer() {
-    return _normalizer.name();
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    return _normalizer;
   }
 
   // Keep it for backward-compatibility, use getName() instead

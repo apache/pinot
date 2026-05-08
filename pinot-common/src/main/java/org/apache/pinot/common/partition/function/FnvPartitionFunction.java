@@ -24,7 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
@@ -33,7 +33,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /// Stateless and thread-safe [PartitionFunction] backed by configurable FNV variants. The
-/// configured [PartitionIntNormalizer] (default [PartitionIntNormalizer#MASK]) is applied
+/// configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#MASK]) is applied
 /// to the raw FNV hash to derive the partition id.
 @PartitionFunctionType(names = "FNV")
 public class FnvPartitionFunction implements PartitionFunction {
@@ -41,14 +41,14 @@ public class FnvPartitionFunction implements PartitionFunction {
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
   private static final FnvHashFunctions.Variant DEFAULT_VARIANT = FnvHashFunctions.Variant.FNV1A_32;
-  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.MASK;
+  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.MASK;
 
   private final int _numPartitions;
   @Nullable
   private final Map<String, String> _functionConfig;
   private final FnvHashFunctions.Variant _variant;
   private final boolean _useRawBytes;
-  private final PartitionIntNormalizer _normalizer;
+  private final PartitionIdNormalizer _normalizer;
 
   public FnvPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
@@ -100,8 +100,8 @@ public class FnvPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public String getPartitionIdNormalizer() {
-    return _normalizer.name();
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    return _normalizer;
   }
 
   // Keep it for backward-compatibility, use getName() instead

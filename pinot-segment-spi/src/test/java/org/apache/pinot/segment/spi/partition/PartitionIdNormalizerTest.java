@@ -25,11 +25,11 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
-public class PartitionIntNormalizerTest {
+public class PartitionIdNormalizerTest {
 
   @Test
   public void testPositiveModulo() {
-    PartitionIntNormalizer n = PartitionIntNormalizer.POSITIVE_MODULO;
+    PartitionIdNormalizer n = PartitionIdNormalizer.POSITIVE_MODULO;
     assertEquals(n.getPartitionId(0, 7), 0);
     assertEquals(n.getPartitionId(10, 7), 3);
     assertEquals(n.getPartitionId(-1, 7), 6);
@@ -41,7 +41,7 @@ public class PartitionIntNormalizerTest {
 
   @Test
   public void testAbs() {
-    PartitionIntNormalizer n = PartitionIntNormalizer.ABS;
+    PartitionIdNormalizer n = PartitionIdNormalizer.ABS;
     assertEquals(n.getPartitionId(10, 7), 3);
     assertEquals(n.getPartitionId(-10, 7), 3);
     assertEquals(n.getPartitionId(Integer.MIN_VALUE, 7), Math.abs(Integer.MIN_VALUE % 7));
@@ -50,7 +50,7 @@ public class PartitionIntNormalizerTest {
 
   @Test
   public void testMask() {
-    PartitionIntNormalizer n = PartitionIntNormalizer.MASK;
+    PartitionIdNormalizer n = PartitionIdNormalizer.MASK;
     assertEquals(n.getPartitionId(0, 7), 0);
     assertEquals(n.getPartitionId(-1, 7), Integer.MAX_VALUE % 7);
     assertEquals(n.getPartitionId(Integer.MIN_VALUE, 7), 0);
@@ -58,16 +58,16 @@ public class PartitionIntNormalizerTest {
   }
 
   @Test
-  public void testKafkaAbs() {
-    PartitionIntNormalizer n = PartitionIntNormalizer.KAFKA_ABS;
+  public void testPreModuloAbs() {
+    PartitionIdNormalizer n = PartitionIdNormalizer.PRE_MODULO_ABS;
     // Plain positive / negative: matches abs(hash) % N.
     assertEquals(n.getPartitionId(10, 7), 10 % 7);
     assertEquals(n.getPartitionId(-10, 7), 10 % 7);
-    // The defining corner case: Math.abs(MIN_VALUE) overflows back to MIN_VALUE, so KAFKA_ABS
+    // The defining corner case: Math.abs(MIN_VALUE) overflows back to MIN_VALUE, so PRE_MODULO_ABS
     // patches that to 0 before the modulo.
     assertEquals(n.getPartitionId(Integer.MIN_VALUE, 7), 0);
     assertEquals(n.getPartitionId(Long.MIN_VALUE, 7), 0);
-    // For non-MIN_VALUE inputs, KAFKA_ABS and (Math.abs(value) % N) agree.
+    // For non-MIN_VALUE inputs, PRE_MODULO_ABS and (Math.abs(value) % N) agree.
     assertEquals(n.getPartitionId(Integer.MAX_VALUE, 1024), Integer.MAX_VALUE % 1024);
     assertEquals(n.getPartitionId(-1234L, 17), 1234 % 17);
   }
@@ -76,7 +76,7 @@ public class PartitionIntNormalizerTest {
   public void testAllNormalizersReturnInRange() {
     int[] partitionCounts = {1, 2, 7, 1024};
     int[] hashes = {0, 1, -1, 7, -7, Integer.MIN_VALUE, Integer.MAX_VALUE, 13, -13};
-    for (PartitionIntNormalizer n : PartitionIntNormalizer.values()) {
+    for (PartitionIdNormalizer n : PartitionIdNormalizer.values()) {
       for (int p : partitionCounts) {
         for (int h : hashes) {
           int pid = n.getPartitionId(h, p);
@@ -89,30 +89,30 @@ public class PartitionIntNormalizerTest {
 
   @Test
   public void testFromConfigStringRoundTrip() {
-    for (PartitionIntNormalizer n : PartitionIntNormalizer.values()) {
-      assertEquals(PartitionIntNormalizer.fromConfigString(n.name()), n);
-      assertEquals(PartitionIntNormalizer.fromConfigString(n.name().toLowerCase()), n);
-      assertEquals(PartitionIntNormalizer.fromConfigString("  " + n.name() + "  "), n);
+    for (PartitionIdNormalizer n : PartitionIdNormalizer.values()) {
+      assertEquals(PartitionIdNormalizer.fromConfigString(n.name()), n);
+      assertEquals(PartitionIdNormalizer.fromConfigString(n.name().toLowerCase()), n);
+      assertEquals(PartitionIdNormalizer.fromConfigString("  " + n.name() + "  "), n);
     }
   }
 
   @Test
   public void testFromConfigStringRejectsBlank() {
-    expectThrows(IllegalArgumentException.class, () -> PartitionIntNormalizer.fromConfigString(null));
-    expectThrows(IllegalArgumentException.class, () -> PartitionIntNormalizer.fromConfigString(""));
-    expectThrows(IllegalArgumentException.class, () -> PartitionIntNormalizer.fromConfigString("   "));
+    expectThrows(IllegalArgumentException.class, () -> PartitionIdNormalizer.fromConfigString(null));
+    expectThrows(IllegalArgumentException.class, () -> PartitionIdNormalizer.fromConfigString(""));
+    expectThrows(IllegalArgumentException.class, () -> PartitionIdNormalizer.fromConfigString("   "));
   }
 
   @Test
   public void testFromConfigStringRejectsUnknown() {
     IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
-        () -> PartitionIntNormalizer.fromConfigString("not-a-real-normalizer"));
+        () -> PartitionIdNormalizer.fromConfigString("not-a-real-normalizer"));
     assertTrue(e.getMessage().contains("not-a-real-normalizer"));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testNonPositivePartitionsRejected() {
-    PartitionIntNormalizer.POSITIVE_MODULO.getPartitionId(5, 0);
+    PartitionIdNormalizer.POSITIVE_MODULO.getPartitionId(5, 0);
   }
 
   private static int shiftedMod(long value, int numPartitions) {

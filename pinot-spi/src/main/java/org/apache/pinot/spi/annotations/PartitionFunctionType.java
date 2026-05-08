@@ -24,31 +24,32 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-/// Marker annotation for plug-in `PartitionFunction` implementations.
+/// Optional annotation declaring registration aliases for plug-in `PartitionFunction`
+/// implementations.
 ///
-/// Classes annotated with this annotation are auto-discovered at startup by
-/// `PartitionFunctionFactory` via classpath scanning. Each annotated class must:
+/// `PartitionFunctionFactory` discovers every public, concrete `PartitionFunction` subtype on the
+/// classpath under the `org.apache.pinot.*` package tree. Annotating a class with this annotation
+/// is optional and only needed when:
 ///
-/// - Implement `org.apache.pinot.segment.spi.partition.PartitionFunction`
-/// - Be public
-/// - Live under a package matching `.*\.partition\.function\..*` (e.g.
-///   `org.apache.pinot.common.partition.function` or any plugin package
-///   that follows the same convention)
-/// - Expose a public constructor with signature
-///   `(int numPartitions, java.util.Map<String, String> functionConfig)`.
-///   Implementations that ignore `functionConfig` should accept and discard it.
+/// - The class should be reachable under multiple aliases (e.g. `Murmur` and `Murmur2` for the
+///   same impl), or
+/// - The annotation-declared name should differ from `PartitionFunction.getName()`.
 ///
-/// Multiple aliases can be declared in [#names()] so a single class can be
-/// registered under several names (e.g. `Murmur` and `Murmur2` both map to
-/// `MurmurPartitionFunction`). Names are matched case-insensitively.
+/// When the annotation is absent (or [#names()] is empty), the registry instantiates the class
+/// with `(numPartitions=1, functionConfig=null)` and registers under the value returned by
+/// `PartitionFunction.getName()`.
+///
+/// Each registrable class must be public, concrete, live under the `org.apache.pinot` package
+/// tree, and expose a public constructor with signature
+/// `(int numPartitions, java.util.Map<String, String> functionConfig)`. Implementations that
+/// ignore `functionConfig` should accept and discard it.
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface PartitionFunctionType {
 
-  /// Canonical name(s) under which to register this partition function. Must contain at
-  /// least one entry. The first entry is treated as the canonical name; remaining entries
-  /// are aliases.
-  String[] names();
+  /// Canonical name(s) under which to register this partition function. When empty (the default),
+  /// the registry probes `PartitionFunction.getName()` instead.
+  String[] names() default {};
 
   /// Set to `false` to skip auto-registration without removing the class.
   boolean enabled() default true;

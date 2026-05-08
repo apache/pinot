@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.partition;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.Serializable;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -53,16 +52,13 @@ public interface PartitionFunction extends Serializable {
     return null;
   }
 
-  /// Reports the [PartitionIntNormalizer] that drives this partition function's int-to-id
-  /// mapping. The built-in implementations now apply the named normalizer directly, so the value
-  /// is authoritative — recomputing a partition via
-  /// `PartitionIntNormalizer.valueOf(getPartitionIdNormalizer()).getPartitionId(rawHash, numPartitions)`
-  /// yields the same result as [#getPartition(String)] for the same raw hash input.
+  /// Reports the [PartitionIdNormalizer] that describes this partition function's int-to-id
+  /// mapping. The framework uses this for identity / staleness matching between config-side and
+  /// segment-side partition metadata, and (for the built-in implementations) as the actual driver
+  /// of the int-to-id computation.
   ///
-  /// Used by the framework for identity / staleness matching between config-side and segment-side
-  /// partition metadata. Each implementation must declare its own value — there is intentionally
-  /// no default. Plug-ins whose output is already in `[0, numPartitions)` should return
-  /// [PartitionIntNormalizer#POSITIVE_MODULO] (a no-op label).
-  @JsonIgnore
-  String getPartitionIdNormalizer();
+  /// Each implementation must declare its own value — there is intentionally no default. Plug-ins
+  /// whose output is already in `[0, numPartitions)` (e.g. lookup-style functions) should return
+  /// [PartitionIdNormalizer#POSITIVE_MODULO] (a no-op label).
+  PartitionIdNormalizer getPartitionIdNormalizer();
 }

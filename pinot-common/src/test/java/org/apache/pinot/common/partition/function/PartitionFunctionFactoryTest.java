@@ -21,7 +21,7 @@ package org.apache.pinot.common.partition.function;
 import java.util.Map;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -93,24 +93,33 @@ public class PartitionFunctionFactoryTest {
   public void testGetPartitionIdNormalizerPerImpl() {
     // Locks the descriptive normalizer label that each built-in impl reports.
     assertEquals(new ModuloPartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.POSITIVE_MODULO.name());
+        PartitionIdNormalizer.POSITIVE_MODULO);
     assertEquals(new MurmurPartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.MASK.name());
+        PartitionIdNormalizer.MASK);
     assertEquals(new Murmur3PartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.MASK.name());
+        PartitionIdNormalizer.MASK);
     assertEquals(new HashCodePartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.KAFKA_ABS.name());
+        PartitionIdNormalizer.PRE_MODULO_ABS);
     assertEquals(new ByteArrayPartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.KAFKA_ABS.name());
+        PartitionIdNormalizer.PRE_MODULO_ABS);
     // FNV defaults to MASK; any normalizer is selectable through the partitionIdNormalizer config.
     assertEquals(new FnvPartitionFunction(4, null).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.MASK.name());
+        PartitionIdNormalizer.MASK);
     assertEquals(new FnvPartitionFunction(4, Map.of("partitionIdNormalizer", "abs")).getPartitionIdNormalizer(),
-        PartitionIntNormalizer.ABS.name());
+        PartitionIdNormalizer.ABS);
     // BoundedColumnValue's output is already in [0, N), so POSITIVE_MODULO is a no-op default.
     PartitionFunction boundedColumnValue = new BoundedColumnValuePartitionFunction(2,
         Map.of("columnValues", "a", "columnValuesDelimiter", "|"));
-    assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIntNormalizer.POSITIVE_MODULO.name());
+    assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIdNormalizer.POSITIVE_MODULO);
+  }
+
+  @Test
+  public void testUnannotatedPartitionFunctionDiscoveredViaGetName() {
+    // UnannotatedTestPartitionFunction has no @PartitionFunctionType annotation. The registry falls
+    // back to instantiating with (1, null) and calling getName() to discover its canonical name.
+    PartitionFunction fn =
+        PartitionFunctionFactory.getPartitionFunction(UnannotatedTestPartitionFunction.NAME, 8, null);
+    assertTrue(fn instanceof UnannotatedTestPartitionFunction);
   }
 
   @Test
@@ -120,7 +129,7 @@ public class PartitionFunctionFactoryTest {
     Map<String, String> mask = Map.of("partitionIdNormalizer", "MASK");
 
     // HashCode: configured normalizer drives the output. Pick a value whose hashCode is negative
-    // (sweep until found) so KAFKA_ABS vs MASK produces observably different partition ids.
+    // (sweep until found) so PRE_MODULO_ABS vs MASK produces observably different partition ids.
     String negativeHashValue = null;
     int negativeHash = 0;
     for (int i = 0; i < 1000 && negativeHashValue == null; i++) {
@@ -132,20 +141,20 @@ public class PartitionFunctionFactoryTest {
     }
     assertTrue(negativeHashValue != null, "Failed to find a string with a negative hashCode in the search range");
     assertEquals(new HashCodePartitionFunction(8, null).getPartition(negativeHashValue),
-        PartitionIntNormalizer.KAFKA_ABS.getPartitionId(negativeHash, 8));
+        PartitionIdNormalizer.PRE_MODULO_ABS.getPartitionId(negativeHash, 8));
     assertEquals(new HashCodePartitionFunction(8, mask).getPartition(negativeHashValue),
-        PartitionIntNormalizer.MASK.getPartitionId(negativeHash, 8));
+        PartitionIdNormalizer.MASK.getPartitionId(negativeHash, 8));
 
     // Modulo: explicit MASK on a negative input differs from the default POSITIVE_MODULO output.
     long signedValue = -10L;
     int posMod = new ModuloPartitionFunction(7, null).getPartition(Long.toString(signedValue));
     int maskMod = new ModuloPartitionFunction(7, mask).getPartition(Long.toString(signedValue));
-    assertEquals(posMod, PartitionIntNormalizer.POSITIVE_MODULO.getPartitionId(signedValue, 7));
-    assertEquals(maskMod, PartitionIntNormalizer.MASK.getPartitionId(signedValue, 7));
+    assertEquals(posMod, PartitionIdNormalizer.POSITIVE_MODULO.getPartitionId(signedValue, 7));
+    assertEquals(maskMod, PartitionIdNormalizer.MASK.getPartitionId(signedValue, 7));
 
-    // ByteArray: KAFKA_ABS default; verify the override label round-trips on the SPI.
+    // ByteArray: PRE_MODULO_ABS default; verify the override label round-trips on the SPI.
     PartitionFunction byteArrayWithKafkaAbs = new ByteArrayPartitionFunction(4,
-        Map.of("partitionIdNormalizer", "KAFKA_ABS"));
-    assertEquals(byteArrayWithKafkaAbs.getPartitionIdNormalizer(), PartitionIntNormalizer.KAFKA_ABS.name());
+        Map.of("partitionIdNormalizer", "PRE_MODULO_ABS"));
+    assertEquals(byteArrayWithKafkaAbs.getPartitionIdNormalizer(), PartitionIdNormalizer.PRE_MODULO_ABS);
   }
 }

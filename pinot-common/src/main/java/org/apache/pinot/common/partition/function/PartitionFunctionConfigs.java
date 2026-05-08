@@ -21,22 +21,22 @@ package org.apache.pinot.common.partition.function;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 
 /// Shared config-parsing helpers for built-in partition functions.
 final class PartitionFunctionConfigs {
-  /// Config key under which an explicit [PartitionIntNormalizer] can be selected.
+  /// Config key under which an explicit [PartitionIdNormalizer] can be selected.
   static final String PARTITION_ID_NORMALIZER_KEY = "partitionIdNormalizer";
 
   private PartitionFunctionConfigs() {
   }
 
   /// Reads [#PARTITION_ID_NORMALIZER_KEY] from the function config and resolves it to a
-  /// [PartitionIntNormalizer]. Returns `defaultNormalizer` when the config is absent or
+  /// [PartitionIdNormalizer]. Returns `defaultNormalizer` when the config is absent or
   /// the value is blank. Throws [IllegalArgumentException] on an unrecognized value.
-  static PartitionIntNormalizer normalizer(@Nullable Map<String, String> functionConfig,
-      PartitionIntNormalizer defaultNormalizer) {
+  static PartitionIdNormalizer normalizer(@Nullable Map<String, String> functionConfig,
+      PartitionIdNormalizer defaultNormalizer) {
     if (functionConfig == null) {
       return defaultNormalizer;
     }
@@ -44,6 +44,6 @@ final class PartitionFunctionConfigs {
     if (StringUtils.isBlank(raw)) {
       return defaultNormalizer;
     }
-    return PartitionIntNormalizer.fromConfigString(raw);
+    return PartitionIdNormalizer.fromConfigString(raw);
   }
 }

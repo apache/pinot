@@ -18,33 +18,25 @@
  */
 package org.apache.pinot.common.partition.function;
 
-import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
-import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
-/// Modulo operation based partition function. Treats the input string as a base-10 long and runs
-/// the configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#POSITIVE_MODULO])
-/// over it.
-@PartitionFunctionType(names = "Modulo")
-public class ModuloPartitionFunction implements PartitionFunction {
-  private static final String NAME = "Modulo";
-  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.POSITIVE_MODULO;
+/// Test fixture: a [PartitionFunction] without `@PartitionFunctionType`. Exercises the registry's
+/// fallback path where the canonical name is probed via [#getName()].
+public class UnannotatedTestPartitionFunction implements PartitionFunction {
+  public static final String NAME = "UnannotatedTestPartitionFunction-name";
   private final int _numPartitions;
-  private final PartitionIdNormalizer _normalizer;
 
-  public ModuloPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
-    _numPartitions = numPartitions;
-    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
+  public UnannotatedTestPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    _numPartitions = Math.max(numPartitions, 1);
   }
 
   @Override
   public int getPartition(String value) {
-    return _normalizer.getPartitionId(Long.parseLong(value), _numPartitions);
+    return PartitionIdNormalizer.POSITIVE_MODULO.getPartitionId(value.hashCode(), _numPartitions);
   }
 
   @Override
@@ -59,12 +51,6 @@ public class ModuloPartitionFunction implements PartitionFunction {
 
   @Override
   public PartitionIdNormalizer getPartitionIdNormalizer() {
-    return _normalizer;
-  }
-
-  // Keep it for backward-compatibility, use getName() instead
-  @Override
-  public String toString() {
-    return NAME;
+    return PartitionIdNormalizer.POSITIVE_MODULO;
   }
 }

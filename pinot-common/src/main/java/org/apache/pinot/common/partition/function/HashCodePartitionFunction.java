@@ -22,20 +22,20 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionIntNormalizer;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.annotations.PartitionFunctionType;
 
 
 /// [PartitionFunction] that hashes the input via [String#hashCode()] and runs the
-/// configured [PartitionIntNormalizer] (default [PartitionIntNormalizer#KAFKA_ABS], the
-/// Kafka-style `abs(hash) % N` that maps `Integer.MIN_VALUE -> 0`) to derive the
+/// configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#PRE_MODULO_ABS], the
+/// Pre-modulo abs (Kafka-style) `abs(hash) % N` that maps `Integer.MIN_VALUE -> 0`) to derive the
 /// partition id.
 @PartitionFunctionType(names = "HashCode")
 public class HashCodePartitionFunction implements PartitionFunction {
   private static final String NAME = "HashCode";
-  private static final PartitionIntNormalizer DEFAULT_NORMALIZER = PartitionIntNormalizer.KAFKA_ABS;
+  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.PRE_MODULO_ABS;
   private final int _numPartitions;
-  private final PartitionIntNormalizer _normalizer;
+  private final PartitionIdNormalizer _normalizer;
 
   public HashCodePartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
@@ -59,8 +59,8 @@ public class HashCodePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public String getPartitionIdNormalizer() {
-    return _normalizer.name();
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    return _normalizer;
   }
 
   // Keep it for backward-compatibility, use getName() instead
