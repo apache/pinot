@@ -73,6 +73,83 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertNotNull(dispatchableSubPlan);
   }
 
+  @Test(dataProvider = "testUnaryOperatorQueries")
+  public void testUnaryPrefixOperatorsPlanQuery(String query) {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @DataProvider(name = "testUnaryOperatorQueries")
+  public Object[][] provideUnaryOperatorQueries() {
+    return new Object[][]{
+        // INT (col3, col6)
+        {"SELECT -col3 FROM a"},
+        {"SELECT col3 FROM a ORDER BY -col3"},
+        {"SELECT col1, col3, DENSE_RANK() OVER (PARTITION BY col1 ORDER BY "
+            + "CASE WHEN col5 = true THEN -col3 ELSE col3 END) FROM a"},
+        {"SELECT col1, RANK() OVER (ORDER BY -col3) FROM a"},
+        {"SELECT +col3 FROM a"},
+        {"SELECT col3 FROM a ORDER BY +col3"},
+        {"SELECT -(col3 + col6) FROM a"},
+        {"SELECT col3 FROM a WHERE -col3 < 0"},
+        {"SELECT -col3, -col6 FROM a ORDER BY -col3"},
+        {"SELECT col3 - col6, -col3 FROM a"},
+        // LONG (col7)
+        {"SELECT -col7 FROM a"},
+        {"SELECT +col7 FROM a"},
+        {"SELECT -col7, col7 FROM a ORDER BY -col7"},
+        {"SELECT col7 FROM a WHERE -col7 < 0"},
+        {"SELECT -(col3 + col7) FROM a"},
+        // BIG_DECIMAL (col4)
+        {"SELECT -col4 FROM a"},
+        {"SELECT +col4 FROM a"},
+        {"SELECT col4 FROM a WHERE -col4 < 0"},
+        // double negation and compound
+        {"SELECT -(-col3) FROM a"},
+        {"SELECT -(-col7) FROM a"},
+        {"SELECT col3 - (-col6) FROM a"},
+        // GROUP BY with negation
+        {"SELECT -col3, COUNT(*) FROM a GROUP BY -col3"},
+        {"SELECT col1, COUNT(*) FROM a GROUP BY col1, -col3"},
+        // Aggregations with negation
+        {"SELECT SUM(-col3), MAX(-col3), MIN(-col3), AVG(-col3) FROM a"},
+        {"SELECT SUM(-col7), MAX(-col7), MIN(-col7), AVG(-col7) FROM a"},
+        {"SELECT SUM(-col4) FROM a"},
+        {"SELECT -SUM(col3), -MAX(col3), -MIN(col3), -AVG(col3) FROM a"},
+        {"SELECT -COUNT(*) FROM a"},
+        {"SELECT -COUNT(col3) FROM a"},
+        // HAVING with negation
+        {"SELECT col1, SUM(col3) FROM a GROUP BY col1 HAVING -SUM(col3) < 0"},
+        {"SELECT col1, SUM(col3) FROM a GROUP BY col1 HAVING SUM(-col3) > -100"},
+        // alias-then-orderby
+        {"SELECT -col3 AS neg FROM a ORDER BY neg"},
+        {"SELECT -col3 AS neg, col1 FROM a ORDER BY neg DESC"},
+        // CAST involving negation
+        {"SELECT CAST(-col3 AS DOUBLE) FROM a"},
+        {"SELECT CAST(-col7 AS BIGINT) FROM a"},
+        {"SELECT -CAST(col3 AS DOUBLE) FROM a"},
+        // JOIN with negation
+        {"SELECT a.col1 FROM a JOIN b ON a.col3 = -b.col3"},
+        {"SELECT a.col1, b.col1 FROM a JOIN b ON -a.col3 = b.col3"},
+        // window: PARTITION BY with negation
+        {"SELECT col1, RANK() OVER (PARTITION BY -col3 ORDER BY col6) FROM a"},
+        {"SELECT col1, ROW_NUMBER() OVER (PARTITION BY -col3 ORDER BY -col6) FROM a"},
+        // DISTINCT with negation
+        {"SELECT DISTINCT -col3 FROM a"},
+        {"SELECT COUNT(DISTINCT -col3) FROM a"},
+        // IN with negative literals
+        {"SELECT col3 FROM a WHERE col3 IN (-1, -2, -3)"},
+        {"SELECT col3 FROM a WHERE -col3 IN (-1, -2)"},
+        // negation in BETWEEN bounds
+        {"SELECT col3 FROM a WHERE col3 BETWEEN -10 AND 10"},
+        {"SELECT col3 FROM a WHERE -col3 BETWEEN -100 AND 0"},
+        // negation in subquery
+        {"SELECT col1 FROM a WHERE col3 > (SELECT AVG(-col3) FROM b)"},
+        // FLOAT (none in schema, skip) -- but verify mixed double/int negation
+        {"SELECT CAST(-col3 AS DOUBLE) + col4 FROM a"},
+    };
+  }
+
   @Test(dataProvider = "testQueryExceptionDataProvider")
   public void testQueryWithException(String query, String exceptionSnippet) {
     try {

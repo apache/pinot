@@ -511,5 +511,285 @@
         "sql": "SELECT longCol / 1e20 FROM {numTbl}"
       }
     ]
+  },
+  "unary_minus": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          [0, 0, 0.0, 0.0],
+          [1, 1, 1.5, 1.5],
+          [-1, -1, -1.5, -1.5],
+          [123, 321, 4.2, 4.2],
+          [-456, -456, -7.7, -7.7]
+        ]
+      },
+      "bigDecTbl": {
+        "schema": [
+          {"name": "bigDecCol", "type": "BIG_DECIMAL"}
+        ],
+        "inputs": [
+          ["0"],
+          ["1"],
+          ["-1"],
+          ["123456789012345678901234567890"],
+          ["-123456789012345678901234567890"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "unary minus on INT column preserves INT type",
+        "sql": "SELECT -intCol FROM {numTbl}"
+      },
+      {
+        "description": "unary minus on LONG column preserves LONG type",
+        "sql": "SELECT -longCol FROM {numTbl}"
+      },
+      {
+        "description": "unary minus on FLOAT column",
+        "sql": "SELECT -floatCol FROM {numTbl}"
+      },
+      {
+        "description": "unary minus on DOUBLE column",
+        "sql": "SELECT -doubleCol FROM {numTbl}"
+      },
+      {
+        "description": "unary minus on BIG_DECIMAL column",
+        "sql": "SELECT -bigDecCol FROM {bigDecTbl}"
+      },
+      {
+        "description": "unary minus in WHERE clause on INT",
+        "sql": "SELECT intCol FROM {numTbl} WHERE -intCol < 0"
+      },
+      {
+        "description": "unary minus in WHERE clause on DOUBLE",
+        "sql": "SELECT doubleCol FROM {numTbl} WHERE -doubleCol < 0"
+      },
+      {
+        "description": "double negation --col returns original value",
+        "sql": "SELECT -(-intCol) FROM {numTbl}"
+      },
+      {
+        "description": "double negation on LONG",
+        "sql": "SELECT -(-longCol) FROM {numTbl}"
+      },
+      {
+        "description": "unary minus on compound expression",
+        "sql": "SELECT -(intCol + longCol) FROM {numTbl}"
+      },
+      {
+        "description": "unary minus mixed with binary arithmetic",
+        "sql": "SELECT intCol - (-longCol) FROM {numTbl}"
+      },
+      {
+        "description": "unary minus on zero returns zero",
+        "sql": "SELECT -intCol FROM {numTbl} WHERE intCol = 0"
+      }
+    ]
+  },
+  "unary_plus": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          [0, 0, 0.0, 0.0],
+          [1, 1, 1.5, 1.5],
+          [-1, -1, -1.5, -1.5],
+          [123, 321, 4.2, 4.2]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "unary plus on INT is identity",
+        "sql": "SELECT +intCol FROM {numTbl}"
+      },
+      {
+        "description": "unary plus on LONG is identity",
+        "sql": "SELECT +longCol FROM {numTbl}"
+      },
+      {
+        "description": "unary plus on FLOAT is identity",
+        "sql": "SELECT +floatCol FROM {numTbl}"
+      },
+      {
+        "description": "unary plus on DOUBLE is identity",
+        "sql": "SELECT +doubleCol FROM {numTbl}"
+      },
+      {
+        "description": "unary plus combined with unary minus cancels out",
+        "sql": "SELECT +(-intCol) FROM {numTbl}"
+      },
+      {
+        "description": "unary plus in ORDER BY is identity",
+        "sql": "SELECT intCol FROM {numTbl} ORDER BY +intCol"
+      }
+    ]
+  },
+  "unary_minus_aggregations": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "groupKey", "type": "STRING"},
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          ["a", 1, 10, 1.5],
+          ["a", 2, 20, 2.5],
+          ["a", 3, 30, 3.5],
+          ["b", 4, 40, 4.5],
+          ["b", 5, 50, 5.5],
+          ["c", 6, 60, 6.5],
+          ["c", -7, -70, -7.5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "SUM(-col) equals -SUM(col)",
+        "sql": "SELECT SUM(-intCol), -SUM(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "MAX(-col) equals -MIN(col)",
+        "sql": "SELECT MAX(-intCol), -MIN(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "MIN(-col) equals -MAX(col)",
+        "sql": "SELECT MIN(-intCol), -MAX(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "AVG(-col) equals -AVG(col)",
+        "sql": "SELECT AVG(-doubleCol), -AVG(doubleCol) FROM {numTbl}"
+      },
+      {
+        "description": "COUNT is unaffected by negation of argument",
+        "sql": "SELECT COUNT(-intCol) FROM {numTbl}"
+      },
+      {
+        "description": "negation of aggregate result",
+        "sql": "SELECT -SUM(intCol), -MAX(intCol), -MIN(intCol) FROM {numTbl}"
+      },
+      {
+        "description": "aggregate of compound negation",
+        "sql": "SELECT SUM(-(intCol + longCol)) FROM {numTbl}"
+      },
+      {
+        "description": "long type aggregations with negation",
+        "sql": "SELECT SUM(-longCol), MAX(-longCol), MIN(-longCol) FROM {numTbl}"
+      },
+      {
+        "description": "double type aggregations with negation",
+        "sql": "SELECT SUM(-doubleCol), MAX(-doubleCol), MIN(-doubleCol) FROM {numTbl}"
+      }
+    ]
+  },
+  "unary_minus_group_by": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "groupKey", "type": "STRING"},
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"}
+        ],
+        "inputs": [
+          ["a", 1, 10],
+          ["a", 2, 20],
+          ["b", 3, 30],
+          ["b", 4, 40],
+          ["c", 5, 50]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "GROUP BY -col -- negation as grouping key",
+        "sql": "SELECT -intCol, COUNT(*) FROM {numTbl} GROUP BY -intCol ORDER BY -intCol"
+      },
+      {
+        "description": "GROUP BY normal key, aggregate over negation",
+        "sql": "SELECT groupKey, SUM(-intCol) FROM {numTbl} GROUP BY groupKey ORDER BY groupKey"
+      },
+      {
+        "description": "GROUP BY normal key, negation of aggregate",
+        "sql": "SELECT groupKey, -SUM(intCol) FROM {numTbl} GROUP BY groupKey ORDER BY groupKey"
+      },
+      {
+        "description": "HAVING -SUM(col) > threshold",
+        "sql": "SELECT groupKey, SUM(intCol) FROM {numTbl} GROUP BY groupKey HAVING -SUM(intCol) > -7 ORDER BY groupKey"
+      },
+      {
+        "description": "HAVING SUM(-col) < threshold",
+        "sql": "SELECT groupKey, SUM(longCol) FROM {numTbl} GROUP BY groupKey HAVING SUM(-longCol) < -20 ORDER BY groupKey"
+      },
+      {
+        "description": "DISTINCT -col",
+        "sql": "SELECT DISTINCT -intCol FROM {numTbl} ORDER BY -intCol"
+      },
+      {
+        "description": "COUNT(DISTINCT -col)",
+        "sql": "SELECT COUNT(DISTINCT -intCol) FROM {numTbl}"
+      }
+    ]
+  },
+  "unary_minus_misc": {
+    "tables": {
+      "numTbl": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "doubleCol", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          [1, 10, 1.5],
+          [2, 20, 2.5],
+          [3, 30, 3.5],
+          [4, 40, 4.5],
+          [5, 50, 5.5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "unary minus inside CAST",
+        "sql": "SELECT CAST(-intCol AS DOUBLE) FROM {numTbl}"
+      },
+      {
+        "description": "negation of CAST result",
+        "sql": "SELECT -CAST(intCol AS DOUBLE) FROM {numTbl}"
+      },
+      {
+        "description": "alias on negated column, ORDER BY alias",
+        "sql": "SELECT -intCol AS neg FROM {numTbl} ORDER BY neg"
+      },
+      {
+        "description": "IN with negative literals",
+        "sql": "SELECT intCol FROM {numTbl} WHERE intCol IN (1, 2, 3) ORDER BY intCol"
+      },
+      {
+        "description": "BETWEEN with negative bounds",
+        "sql": "SELECT intCol FROM {numTbl} WHERE intCol BETWEEN -10 AND 3 ORDER BY intCol"
+      },
+      {
+        "description": "negation in CASE expression",
+        "sql": "SELECT CASE WHEN intCol > 2 THEN -intCol ELSE intCol END FROM {numTbl} ORDER BY intCol"
+      },
+      {
+        "description": "negation of mixed-type expression preserves correct semantics",
+        "sql": "SELECT -(intCol + longCol), intCol, longCol FROM {numTbl} ORDER BY intCol"
+      }
+    ]
   }
 }
