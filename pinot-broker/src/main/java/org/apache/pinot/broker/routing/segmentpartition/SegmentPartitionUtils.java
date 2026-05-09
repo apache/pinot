@@ -25,6 +25,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -79,9 +80,15 @@ public class SegmentPartitionUtils {
       return INVALID_PARTITION_INFO;
     }
 
-    return new SegmentPartitionInfo(partitionColumn,
-        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-        columnPartitionMetadata.getPartitions());
+    try {
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionMetadata);
+      return new SegmentPartitionInfo(partitionColumn, partitionFunction, columnPartitionMetadata.getPartitions());
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while constructing partition function for column: {}, segment: {}, table: {}",
+          partitionColumn, segment, tableNameWithType, e);
+      return INVALID_PARTITION_INFO;
+    }
   }
 
   /**
@@ -123,10 +130,16 @@ public class SegmentPartitionUtils {
             segment, tableNameWithType);
         continue;
       }
-      SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
-          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-          columnPartitionMetadata.getPartitions());
-      columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
+      try {
+        PartitionFunction partitionFunction =
+            PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionMetadata);
+        SegmentPartitionInfo segmentPartitionInfo =
+            new SegmentPartitionInfo(partitionColumn, partitionFunction, columnPartitionMetadata.getPartitions());
+        columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while constructing partition function for column: {}, segment: {}, table: {}",
+            partitionColumn, segment, tableNameWithType, e);
+      }
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
       String partitionColumn = columnSegmentPartitionInfoMap.keySet().iterator().next();

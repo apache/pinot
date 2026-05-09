@@ -33,6 +33,8 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -57,6 +59,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 @SuppressWarnings({"rawtypes", "unchecked", "RedundantIfStatement"})
 public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnValueSegmentPruner.class);
+
   @Override
   protected boolean isApplicableToPredicate(Predicate predicate) {
     // Only prune columns
@@ -116,7 +120,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     if (partitionFunction != null) {
       Set<Integer> partitions = dataSourceMetadata.getPartitions();
       assert partitions != null;
-      if (!partitions.contains(partitionFunction.getPartition(cachedValue.getValue()))) {
+      if (!isPartitionMatch(partitionFunction, partitions, cachedValue.getValue(), column)) {
         return true;
       }
     }
@@ -143,10 +147,18 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     assert dataSource != null;
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     List<ValueCache.CachedValue> cachedValues = valueCache.get(inPredicate, dataSourceMetadata.getDataType());
+    PartitionFunction partitionFunction = dataSourceMetadata.getPartitionFunction();
+    Set<Integer> partitions = partitionFunction != null ? dataSourceMetadata.getPartitions() : null;
     // Check min/max value
     for (ValueCache.CachedValue value : cachedValues) {
       if (checkMinMaxRange(dataSourceMetadata, value.getComparableValue())) {
-        return false;
+        if (partitionFunction == null) {
+          return false;
+        }
+        assert partitions != null;
+        if (isPartitionMatch(partitionFunction, partitions, value.getValue(), column)) {
+          return false;
+        }
       }
     }
     return true;
@@ -244,5 +256,15 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
       }
     }
     return true;
+  }
+
+  private boolean isPartitionMatch(PartitionFunction partitionFunction, Set<Integer> partitions, String value,
+      String column) {
+    try {
+      return partitions.contains(partitionFunction.getPartition(value));
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to evaluate partition function for column: {}; skipping partition pruning", column, e);
+      return true;
+    }
   }
 }

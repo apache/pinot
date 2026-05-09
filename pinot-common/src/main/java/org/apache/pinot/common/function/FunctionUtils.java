@@ -29,6 +29,7 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.FunctionNameUtils;
 
 
 public class FunctionUtils {
@@ -105,12 +106,12 @@ public class FunctionUtils {
   /// (e.g. vendor `Timestamp` subclasses returned by JDBC drivers) are matched by their parent type.
   ///
   /// Dispatch (single-value first since it's the dominant case for function arguments):
-  /// - Single values → delegated to [PinotDataType#getSingleValueType] (covers all scalar types
-  ///   including `byte[]` → [PinotDataType#BYTES]).
-  /// - Reference arrays (`Object[]` and subtypes including `byte[][]`) → first non-null element is
+  /// - Single values -> delegated to [PinotDataType#getSingleValueType] (covers all scalar types
+  ///   including `byte[]` -> [PinotDataType#BYTES]).
+  /// - Reference arrays (`Object[]` and subtypes including `byte[][]`) -> first non-null element is
   ///   sampled and [PinotDataType#getMultiValueType] is consulted. Empty / all-null reference arrays
   ///   fall back to [PinotDataType#OBJECT_ARRAY] since the element type is undeterminable.
-  /// - Primitive arrays (`int[]` / `long[]` / `float[]` / `double[]` / `boolean[]`) → handled here, since
+  /// - Primitive arrays (`int[]` / `long[]` / `float[]` / `double[]` / `boolean[]`) -> handled here, since
   ///   they can't be element-sampled into a boxed type.
   /// - [PinotDataType#COLLECTION] for any [Collection]; otherwise falls back to [PinotDataType#OBJECT].
   public static PinotDataType getArgumentType(Object value) {
@@ -215,5 +216,12 @@ public class FunctionUtils {
     assert assertEnabled = true;
     //CHECKSTYLE:ON
     return assertEnabled;
+  }
+
+  /// Returns the canonical form of a function name: underscores stripped, lower-cased.
+  ///
+  /// @see FunctionNameUtils#canonicalize(String)
+  public static String canonicalize(String name) {
+    return FunctionNameUtils.canonicalize(name);
   }
 }

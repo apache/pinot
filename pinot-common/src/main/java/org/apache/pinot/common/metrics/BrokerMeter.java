@@ -254,6 +254,14 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "queries", false);
 
   /**
+   * Number of times a broker partition pruner caught a {@link RuntimeException} from
+   * {@code PartitionFunction.getPartition(value)} and fell back to scatter-gather (no pruning) for the query.
+   * Surfaces silently degraded routing — if non-zero for a table, the partition expression should be reviewed.
+   */
+  public static final BrokerMeter PARTITION_PRUNER_FAIL_OPEN = create("PARTITION_PRUNER_FAIL_OPEN",
+      "queries", false);
+
+  /**
    * Number of queries executed with cursors. This count includes queries that use SSE and MSE
    */
   public static final BrokerMeter CURSOR_QUERIES_GLOBAL = create("CURSOR_QUERIES_GLOBAL", "queries", true);

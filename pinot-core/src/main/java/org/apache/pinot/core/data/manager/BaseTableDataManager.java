@@ -104,6 +104,9 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -1571,6 +1574,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     String partitionColumn = null;
     ColumnPartitionConfig partitionConfig = null;
+    PartitionFunction expectedPartitionFunction = null;
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     // NOTE: Partition can only be enabled on a single column
     if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap().size() == 1) {
@@ -1578,6 +1582,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
       partitionColumn = entry.getKey();
       partitionConfig = entry.getValue();
+      expectedPartitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn, partitionConfig,
+          schema.getFieldSpecFor(partitionColumn));
     }
 
     Set<String> columnsInSegment = segmentMetadata.getAllColumns();
@@ -1792,6 +1798,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return new StaleSegment(segmentName, true, "range index changed: " + columnName);
       }
 
+      // Partition function removed: segment carries a partitionFunction but the table config no longer has any
+      // partitionColumn (or removed this column). Flag stale so the segment is rebuilt without partition metadata.
+      if (partitionColumn == null && columnMetadata.getPartitionFunction() != null) {
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function removed",
+            tableNameWithType, columnName, segmentName);
+        return new StaleSegment(segmentName, true, "partition function removed: " + columnName);
+      }
+
       // Partition changed or segment not properly partitioned
       if (columnName.equals(partitionColumn)) {
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
@@ -1800,13 +1814,43 @@ public abstract class BaseTableDataManager implements TableDataManager {
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function added: " + columnName);
         }
-        if (!partitionFunction.getName().equalsIgnoreCase(partitionConfig.getFunctionName())) {
+        if (!partitionFunction.getName().equalsIgnoreCase(expectedPartitionFunction.getName())) {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function name",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function name changed: " + columnName);
         }
-        if (partitionFunction.getNumPartitions() != partitionConfig.getNumPartitions()) {
-          LOGGER.debug("tableNameWithType: {}, columnName: {},, segmentName: {}, change: num partitions",
+        if (!Objects.equals(partitionFunction.getFunctionExpr(), expectedPartitionFunction.getFunctionExpr())) {
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function expr",
+              tableNameWithType, columnName, segmentName);
+          return new StaleSegment(segmentName, true, "partition function expr changed: " + columnName);
+        }
+        // Asymmetric null tolerance: a segment built by an older or custom-plugin partition function may return null
+        // from getPartitionIdNormalizer (older SPIs allowed it; tolerate). However, if the segment side declares a
+        // normalizer and the config side does not, the user explicitly cleared the normalizer and the segment must
+        // be rebuilt; same when the two non-null values differ.
+        PartitionIdNormalizer segmentNormalizer = partitionFunction.getPartitionIdNormalizer();
+        PartitionIdNormalizer configNormalizer = expectedPartitionFunction.getPartitionIdNormalizer();
+        if (segmentNormalizer != null && configNormalizer != segmentNormalizer) {
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition id normalizer",
+              tableNameWithType, columnName, segmentName);
+          return new StaleSegment(segmentName, true, "partition id normalizer changed: " + columnName);
+        }
+        // Detect input-type changes (STRING ↔ BYTES) for expression-mode pipelines. A field-spec edit can flip the
+        // partition column's stored type without changing functionExpr or normalizer; the recompiled pipeline would
+        // then produce different partition ids than the existing segment.
+        if (partitionFunction instanceof PartitionPipelineFunction
+            && expectedPartitionFunction instanceof PartitionPipelineFunction) {
+          boolean segmentBytes = ((PartitionPipelineFunction) partitionFunction).getPartitionPipeline().isBytesInput();
+          boolean configBytes =
+              ((PartitionPipelineFunction) expectedPartitionFunction).getPartitionPipeline().isBytesInput();
+          if (segmentBytes != configBytes) {
+            LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition input type",
+                tableNameWithType, columnName, segmentName);
+            return new StaleSegment(segmentName, true, "partition input type changed: " + columnName);
+          }
+        }
+        if (partitionFunction.getNumPartitions() != expectedPartitionFunction.getNumPartitions()) {
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: num partitions",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "num partitions changed: " + columnName);
         }

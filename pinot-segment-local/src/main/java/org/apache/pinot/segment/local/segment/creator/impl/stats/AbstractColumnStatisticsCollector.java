@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -162,6 +163,18 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   protected void updatePartition(String value) {
-    _partitions.add(_partitionFunction.getPartition(value));
+    int partitionId = _partitionFunction.getPartition(value);
+    if (partitionId != PartitionPipelineFunction.NULL_RESULT_PARTITION_ID) {
+      _partitions.add(partitionId);
+    }
+  }
+
+  /// Updates the partition set using raw bytes. Expression-mode pipelines compiled with BYTES input type will hash
+  /// the raw bytes directly; legacy partition functions fall back to hex-encoding via the default interface method.
+  protected void updatePartition(byte[] bytes) {
+    int partitionId = _partitionFunction.getPartition(bytes);
+    if (partitionId != PartitionPipelineFunction.NULL_RESULT_PARTITION_ID) {
+      _partitions.add(partitionId);
+    }
   }
 }

@@ -178,8 +178,7 @@ public class SegmentZKMetadataUtils {
       PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
       if (partitionFunction != null) {
         ColumnPartitionMetadata columnPartitionMetadata =
-            new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
-                columnMetadata.getPartitions(), partitionFunction.getFunctionConfig());
+            new ColumnPartitionMetadata(partitionFunction, columnMetadata.getPartitions());
         columnPartitionMap.put(entry.getKey(), columnPartitionMetadata);
       }
     }

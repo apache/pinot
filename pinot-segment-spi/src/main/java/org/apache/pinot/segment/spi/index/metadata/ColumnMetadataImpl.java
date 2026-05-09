@@ -38,6 +38,8 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionFunctionExprCompiler;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -338,7 +340,9 @@ public class ColumnMetadataImpl implements ColumnMetadata {
 
     // Set partition function
     String partitionFunctionName = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION), null);
-    if (partitionFunctionName != null) {
+    String partitionFunctionExpr = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION_EXPR), null);
+    String partitionIdNormalizer = config.getString(Column.getKeyFor(column, Column.PARTITION_ID_NORMALIZER), null);
+    if (partitionFunctionName != null || partitionFunctionExpr != null) {
       int numPartitions = config.getInt(Column.getKeyFor(column, Column.NUM_PARTITIONS));
       Configuration partitionFunctionConfig = config.subset(Column.getKeyFor(column, Column.PARTITION_FUNCTION_CONFIG));
       Map<String, String> partitionFunctionConfigMap;
@@ -356,9 +360,26 @@ public class ColumnMetadataImpl implements ColumnMetadata {
       } else {
         partitionFunctionConfigMap = null;
       }
-      PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
-              partitionFunctionConfigMap);
+      // For segment metadata, use the raw (non-column-bound) function: FunctionEvaluator interface is not
+      // needed here (only required by the ingestion path). Expression-mode needs the column for the pipeline.
+      PartitionFunction partitionFunction;
+      if (partitionFunctionExpr != null) {
+        // Prefer the explicitly-stored PARTITION_INPUT_TYPE if present (newer segments). Fall back to the
+        // schema-derived type for older segments that pre-date the stored input-type field.
+        String storedInputType = config.getString(Column.getKeyFor(column, Column.PARTITION_INPUT_TYPE), null);
+        PartitionValueType inputType;
+        if (storedInputType != null) {
+          inputType = PartitionValueType.valueOf(storedInputType);
+        } else {
+          inputType = storedType == DataType.BYTES ? PartitionValueType.BYTES : PartitionValueType.STRING;
+        }
+        partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction(column, inputType,
+            partitionFunctionExpr, numPartitions, partitionIdNormalizer);
+      } else {
+        partitionFunction =
+            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+                partitionFunctionConfigMap);
+      }
       builder.setPartitionFunction(partitionFunction);
       builder.setPartitions(
           ColumnPartitionMetadata.extractPartitions(config.getList(Column.getKeyFor(column, Column.PARTITION_VALUES))));

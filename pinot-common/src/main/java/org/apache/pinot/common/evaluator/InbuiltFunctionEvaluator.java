@@ -20,7 +20,6 @@ package org.apache.pinot.common.evaluator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -29,66 +28,68 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.segment.spi.function.ExecutableFunctionEvaluator;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.function.FunctionEvaluator;
 
 
-/**
- * Evaluates an expression.
- * <p>This is optimized for evaluating an expression multiple times with different inputs.
- * <p>Overall idea: parse the expression into an ExecutableNode, where an ExecutableNode can be:
- * <ul>
- *   <li>FunctionNode - executes a function</li>
- *   <li>ColumnNode - fetches the value of the column from the input GenericRow</li>
- *   <li>ConstantNode - returns the literal value</li>
- * </ul>
- */
-public class InbuiltFunctionEvaluator implements FunctionEvaluator {
-  // Root of the execution tree
-  private final ExecutableNode _rootNode;
-  private final List<String> _arguments;
-  private final String _functionExpression;
+/// Evaluates an expression backed by the Pinot [FunctionRegistry].
+///
+/// This is optimized for evaluating an expression multiple times with different inputs.
+/// The expression is compiled once into an [ExecutableFunctionEvaluator.ExecutableNode] tree
+/// whose nodes handle constants, column reads, logical operators, and function calls.
+///
+/// **Thread-safety:** Instances are safe for both concurrent invocation by multiple threads and
+/// re-entrant invocation on a single thread. Each [FunctionExecutionNode] allocates a fresh
+/// argument scratch array per `execute` call, so cross-thread sharing and recursive invocation
+/// through nested user-defined scalar functions cannot corrupt argument state.
+public class InbuiltFunctionEvaluator extends ExecutableFunctionEvaluator {
 
   public InbuiltFunctionEvaluator(String functionExpression) {
-    _functionExpression = functionExpression;
-    _arguments = new ArrayList<>();
-    _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression));
+    this(functionExpression, new ArrayList<>());
   }
 
-  private ExecutableNode planExecution(ExpressionContext expression) {
+  /// Two-phase constructor: `planExecution` is evaluated first (left-to-right argument
+  /// evaluation in Java), populating `arguments` as a side effect, so the completed list is
+  /// ready when passed to `super()`.
+  private InbuiltFunctionEvaluator(String functionExpression, List<String> arguments) {
+    super(planExecution(RequestContextUtils.getExpression(functionExpression), arguments), arguments,
+        functionExpression);
+  }
+
+  private static ExecutableNode planExecution(ExpressionContext expression, List<String> arguments) {
     switch (expression.getType()) {
       case LITERAL:
-        return new ConstantExecutionNode(expression.getLiteral().getValue());
+        return new ConstantNode(expression.getLiteral().getValue());
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
-        ColumnExecutionNode columnExecutionNode = new ColumnExecutionNode(columnName, _arguments.size());
-        _arguments.add(columnName);
-        return columnExecutionNode;
+        ColumnNode columnNode = new ColumnNode(columnName, arguments.size());
+        arguments.add(columnName);
+        return columnNode;
       case FUNCTION:
         FunctionContext function = expression.getFunction();
-        List<ExpressionContext> arguments = function.getArguments();
-        int numArguments = arguments.size();
+        List<ExpressionContext> args = function.getArguments();
+        int numArguments = args.size();
         ExecutableNode[] childNodes = new ExecutableNode[numArguments];
         for (int i = 0; i < numArguments; i++) {
-          childNodes[i] = planExecution(arguments.get(i));
+          childNodes[i] = planExecution(args.get(i), arguments);
         }
         String functionName = function.getFunctionName();
         String canonicalName = FunctionRegistry.canonicalize(functionName);
         switch (canonicalName) {
           case "and":
-            return new AndExecutionNode(childNodes);
+            return new AndNode(childNodes);
           case "or":
-            return new OrExecutionNode(childNodes);
+            return new OrNode(childNodes);
           case "not":
             Preconditions.checkState(numArguments == 1, "NOT function expects 1 argument, got: %s", numArguments);
-            return new NotExecutionNode(childNodes[0]);
+            return new NotNode(childNodes[0]);
           case "arrayvalueconstructor":
             Object[] values = new Object[numArguments];
             int i = 0;
-            for (ExpressionContext literal : arguments) {
+            for (ExpressionContext literal : args) {
               values[i++] = literal.getLiteral().getValue();
             }
-            return new ArrayConstantExecutionNode(values);
+            return new ArrayConstantNode(values);
           default:
             FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
             if (functionInfo == null) {
@@ -106,183 +107,42 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
-  @Override
-  public List<String> getArguments() {
-    return _arguments;
-  }
-
-  @Override
-  public Object evaluate(GenericRow row) {
-    return _rootNode.execute(row);
-  }
-
-  @Override
-  public Object evaluate(Object[] values) {
-    return _rootNode.execute(values);
-  }
-
-  @Override
-  public String toString() {
-    return _functionExpression;
-  }
-
-  private interface ExecutableNode {
-
-    Object execute(GenericRow row);
-
-    Object execute(Object[] values);
-  }
-
-  private static class NotExecutionNode implements ExecutableNode {
-    private final ExecutableNode _argumentNode;
-
-    NotExecutionNode(ExecutableNode argumentNode) {
-      _argumentNode = argumentNode;
-    }
-
-    @Override
-    public Object execute(GenericRow row) {
-      Boolean res = (Boolean) _argumentNode.execute(row);
-      if (res == null) {
-        return null;
-      } else {
-        return !res;
-      }
-    }
-
-    @Override
-    public Object execute(Object[] values) {
-      Boolean res = (Boolean) _argumentNode.execute(values);
-      if (res == null) {
-        return null;
-      } else {
-        return !res;
-      }
-    }
-  }
-
-  private static class OrExecutionNode implements ExecutableNode {
-    private final ExecutableNode[] _argumentNodes;
-
-    OrExecutionNode(ExecutableNode[] argumentNodes) {
-      _argumentNodes = argumentNodes;
-    }
-
-    @Override
-    public Object execute(GenericRow row) {
-      boolean hasNull = false;
-
-      for (ExecutableNode executableNode : _argumentNodes) {
-        Boolean res = (Boolean) executableNode.execute(row);
-        if (res == null) {
-          hasNull = true;
-          continue;
-        }
-        if (res) {
-          return true;
-        }
-      }
-
-      return hasNull ? null : false;
-    }
-
-    @Override
-    public Object execute(Object[] values) {
-      boolean hasNull = false;
-
-      for (ExecutableNode executableNode : _argumentNodes) {
-        Boolean res = (Boolean) executableNode.execute(values);
-        if (res == null) {
-          hasNull = true;
-          continue;
-        }
-        if (res) {
-          return true;
-        }
-      }
-
-      return hasNull ? null : false;
-    }
-  }
-
-  private static class AndExecutionNode implements ExecutableNode {
-    private final ExecutableNode[] _argumentNodes;
-
-    AndExecutionNode(ExecutableNode[] argumentNodes) {
-      _argumentNodes = argumentNodes;
-    }
-
-    @Override
-    public Object execute(GenericRow row) {
-      boolean hasNull = false;
-
-      for (ExecutableNode executableNode : _argumentNodes) {
-        Boolean res = (Boolean) executableNode.execute(row);
-        if (res == null) {
-          hasNull = true;
-          continue;
-        }
-        if (!res) {
-          return false;
-        }
-      }
-
-      return hasNull ? null : true;
-    }
-
-    @Override
-    public Object execute(Object[] values) {
-      boolean hasNull = false;
-
-      for (ExecutableNode executableNode : _argumentNodes) {
-        Boolean res = (Boolean) executableNode.execute(values);
-        if (res == null) {
-          hasNull = true;
-          continue;
-        }
-        if (!res) {
-          return false;
-        }
-      }
-
-      return hasNull ? null : true;
-    }
-  }
-
+  /// Executes a Pinot-registry function via [FunctionInvoker], with null propagation and
+  /// type conversion. Allocates a fresh argument scratch array per `execute` call, so multiple threads
+  /// and re-entrant invocations of the same node instance do not share mutable state.
   private static class FunctionExecutionNode implements ExecutableNode {
     final FunctionInvoker _functionInvoker;
     final FunctionInfo _functionInfo;
     final ExecutableNode[] _argumentNodes;
-    final Object[] _arguments;
 
     FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
       _functionInvoker = new FunctionInvoker(functionInfo);
       _functionInfo = functionInfo;
       _argumentNodes = argumentNodes;
-      _arguments = new Object[_argumentNodes.length];
     }
 
     @Override
     public Object execute(GenericRow row) {
       try {
         int numArguments = _argumentNodes.length;
+        Object[] arguments = new Object[numArguments];
         for (int i = 0; i < numArguments; i++) {
-          _arguments[i] = _argumentNodes[i].execute(row);
+          arguments[i] = _argumentNodes[i].execute(row);
         }
         if (!_functionInfo.hasNullableParameters()) {
           // Preserve null values during ingestion transformation if function is an inbuilt
           // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (Object argument : _arguments) {
+          for (Object argument : arguments) {
             if (argument == null) {
               return null;
             }
           }
         }
         if (_functionInvoker.getMethod().isVarArgs()) {
-          return _functionInvoker.invoke(new Object[]{_arguments});
+          return _functionInvoker.invoke(new Object[]{arguments});
         }
-        _functionInvoker.convertTypes(_arguments);
-        return _functionInvoker.invoke(_arguments);
+        _functionInvoker.convertTypes(arguments);
+        return _functionInvoker.invoke(arguments);
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
@@ -292,23 +152,24 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     public Object execute(Object[] values) {
       try {
         int numArguments = _argumentNodes.length;
+        Object[] arguments = new Object[numArguments];
         for (int i = 0; i < numArguments; i++) {
-          _arguments[i] = _argumentNodes[i].execute(values);
+          arguments[i] = _argumentNodes[i].execute(values);
         }
         if (!_functionInfo.hasNullableParameters()) {
           // Preserve null values during ingestion transformation if function is an inbuilt
           // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (Object argument : _arguments) {
+          for (Object argument : arguments) {
             if (argument == null) {
               return null;
             }
           }
         }
         if (_functionInvoker.getMethod().isVarArgs()) {
-          return _functionInvoker.invoke(new Object[]{_arguments});
+          return _functionInvoker.invoke(new Object[]{arguments});
         }
-        _functionInvoker.convertTypes(_arguments);
-        return _functionInvoker.invoke(_arguments);
+        _functionInvoker.convertTypes(arguments);
+        return _functionInvoker.invoke(arguments);
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
@@ -317,77 +178,6 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public String toString() {
       return _functionInvoker.getMethod().getName() + '(' + StringUtils.join(_argumentNodes, ',') + ')';
-    }
-  }
-
-  private static class ConstantExecutionNode implements ExecutableNode {
-    final Object _value;
-
-    ConstantExecutionNode(Object value) {
-      _value = value;
-    }
-
-    @Override
-    public Object execute(GenericRow row) {
-      return _value;
-    }
-
-    @Override
-    public Object execute(Object[] values) {
-      return _value;
-    }
-
-    @Override
-    public String toString() {
-      return String.format("'%s'", _value);
-    }
-  }
-
-  private static class ArrayConstantExecutionNode implements ExecutableNode {
-    final Object[] _value;
-
-    ArrayConstantExecutionNode(Object[] value) {
-      _value = value;
-    }
-
-    @Override
-    public Object[] execute(GenericRow row) {
-      return _value;
-    }
-
-    @Override
-    public Object[] execute(Object[] values) {
-      return _value;
-    }
-
-    @Override
-    public String toString() {
-      return String.format("'%s'", Arrays.toString(_value));
-    }
-  }
-
-  private static class ColumnExecutionNode implements ExecutableNode {
-    final String _column;
-    final int _id;
-
-    ColumnExecutionNode(String column, int id) {
-      _column = column;
-      _id = id;
-    }
-
-    @Override
-    public Object execute(GenericRow row) {
-      return row.getValue(_column);
-    }
-
-    @Override
-    public Object execute(Object[] values) {
-      return values[_id];
-    }
-
-    @Override
-    public String toString() {
-      return _column;
     }
   }
 }

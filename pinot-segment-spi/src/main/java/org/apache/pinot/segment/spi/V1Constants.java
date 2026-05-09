@@ -173,9 +173,26 @@ public class V1Constants {
 
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
+      public static final String PARTITION_FUNCTION_EXPR = "partitionFunctionExpr";
+      public static final String PARTITION_ID_NORMALIZER = "partitionIdNormalizer";
       public static final String NUM_PARTITIONS = "numPartitions";
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String PARTITION_FUNCTION_CONFIG = "partitionFunctionConfig";
+      /// Reserved sentinel value written into [#PARTITION_FUNCTION] for expression-mode segments. This
+      /// intentionally does not match any real `PartitionFunctionType` enum constant, so older readers loading
+      /// a new segment trip `IllegalArgumentException("No enum constant for: FunctionExpr")` and fail fast
+      /// rather than silently dropping partition pruning. New readers detect expression-mode via the presence of
+      /// [#PARTITION_FUNCTION_EXPR] and ignore this sentinel.
+      ///
+      /// Must stay in sync with `PartitionPipelineFunction.NAME`. Do **not** add an enum constant with
+      /// this name to `PartitionFunctionType` - doing so would silently break the cross-version fail-fast
+      /// contract.
+      public static final String PARTITION_FUNCTION_EXPR_SENTINEL = "FunctionExpr";
+      /// Stored input type for expression-mode partition pipelines (e.g. `"BYTES"`). Optional: when absent,
+      /// readers derive the input type from the column's stored [org.apache.pinot.spi.data.FieldSpec.DataType].
+      /// Writing it explicitly avoids any chance of segment-vs-broker disagreement on the type used to compile the
+      /// pipeline (the broker reads `inputType` from ZK metadata; the server now reads from segment metadata).
+      public static final String PARTITION_INPUT_TYPE = "partitionInputType";
 
       /// Old key maintained for backward compatibility
       // Replaced by LENGTH_OF_LONGEST_ELEMENT

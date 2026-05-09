@@ -109,6 +109,8 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
@@ -120,6 +122,8 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -1145,6 +1149,7 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Map<String, ColumnPartitionConfig> columnPartitionMap = partitionConfig.getColumnPartitionMap();
     if (columnPartitionMap.size() == 1) {
       Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
+      String columnName = entry.getKey();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
       // For multi-stream tables, convert Pinot partition ID (which includes padding offset) to stream partition ID.
       // This ensures the partition metadata stored in ZK matches what the broker's partition function computes
@@ -1168,10 +1173,18 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                 + "The stream partition count is used. Please update the table config accordingly.",
             perStreamNumPartitions, columnPartitionConfig.getNumPartitions());
       }
+      Schema schema = _helixResourceManager.getTableSchema(tableConfig.getTableName());
+      if (schema == null && columnPartitionConfig.getFunctionExpr() != null) {
+        LOGGER.warn("Unable to fetch schema for table '{}'; partition function for column '{}' will use STRING input "
+                + "type. BYTES-typed columns may produce incorrect partition metadata.",
+            tableConfig.getTableName(), columnName);
+      }
+      FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(columnName) : null;
+      PartitionFunction partitionFunction = PartitionFunctionFactory
+          .getPartitionFunction(columnName, columnPartitionConfig, perStreamNumPartitions, fieldSpec);
       ColumnPartitionMetadata columnPartitionMetadata =
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), perStreamNumPartitions,
-              Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
-      return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
+          new ColumnPartitionMetadata(partitionFunction, Collections.singleton(streamPartitionId));
+      return new SegmentPartitionMetadata(Collections.singletonMap(columnName, columnPartitionMetadata));
     } else {
       LOGGER.warn(
           "Skip persisting partition metadata because there are other than exact one partition column for table: {}",

@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -37,6 +38,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -143,6 +145,93 @@ public class ColumnValueSegmentPrunerTest {
   }
 
   @Test
+  public void testPartitionPruningWithFunctionExpr() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.STRING);
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction("column", null, 8, null, "murmur2(lower(column))");
+    int matchingPartition = partitionFunction.getPartition("Pinot");
+    String firstNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Kafka",
+        "Trino", "StarTree", "Presto", "Druid");
+    String secondNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Flink",
+        "Spark", "Hive", "Superset", "PinotDB");
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(partitionFunction);
+    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(matchingPartition));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 'Pinot'"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 'pinot'"));
+    assertTrue(runPruner(indexSegment,
+        String.format("SELECT COUNT(*) FROM testTable WHERE column = '%s'", firstNonMatchingValue)));
+    assertFalse(runPruner(indexSegment,
+        String.format("SELECT COUNT(*) FROM testTable WHERE column IN ('%s', 'Pinot')", firstNonMatchingValue)));
+    assertTrue(runPruner(indexSegment, String.format("SELECT COUNT(*) FROM testTable WHERE column IN ('%s', '%s')",
+        firstNonMatchingValue, secondNonMatchingValue)));
+  }
+
+  /// Verifies that IN-predicate pruning combining min/max and partition checks is correct:
+  ///
+  /// - A value that is within the min/max range AND maps to the segment's partition -> keep (false)
+  /// - All values within the min/max range but NONE maps to the segment's partition -> prune (true)
+  /// - All values outside the min/max range -> prune (true) regardless of partition
+  @Test
+  public void testInPredicateWithMinMaxAndPartitionPruning() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    // Segment contains values 10..20 and belongs to partition 2 of a 5-partition Modulo function
+    when(dataSourceMetadata.getMinValue()).thenReturn(10);
+    when(dataSourceMetadata.getMaxValue()).thenReturn(20);
+    PartitionFunction modulo5 = PartitionFunctionFactory.getPartitionFunction("Modulo", 5, null);
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(modulo5);
+    // partition 2 → values 2, 7, 12, 17
+    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    // value 12 is in range [10,20] AND maps to partition 2 → keep
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (12)"));
+    // value 17 is in range [10,20] AND maps to partition 2 → keep
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (17)"));
+    // value 11 is in range [10,20] but maps to partition 1 (11 % 5 = 1); value 13 maps to partition 3 → both wrong
+    // partition → prune
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (11, 13)"));
+    // value 5 is out of range; value 11 is in range but wrong partition → prune
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5, 11)"));
+    // value 5 is out of range; value 12 is in range AND right partition → keep
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (5, 12)"));
+    // all values out of range → prune
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN (1, 2, 3)"));
+  }
+
+  @Test
+  public void testPartitionPruningFailsOpenWhenPartitionFunctionThrows() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.STRING);
+    PartitionFunction partitionFunction = mock(PartitionFunction.class);
+    when(partitionFunction.getPartition(anyString())).thenThrow(new IllegalArgumentException("boom"));
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(partitionFunction);
+    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 'boom'"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column IN ('boom', 'still_boom')"));
+  }
+
+  @Test
   public void testIsApplicableTo() {
     // EQ, RANGE and IN (with small number of values) are applicable for min/max/partitionId based pruning.
     QueryContext queryContext =
@@ -194,5 +283,14 @@ public class ColumnValueSegmentPrunerTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     queryContext.setSchema(mock(Schema.class));
     return PRUNER.prune(Arrays.asList(indexSegment), queryContext).isEmpty();
+  }
+
+  private String findValueWithDifferentPartition(PartitionFunction partitionFunction, int partition, String... values) {
+    for (String value : values) {
+      if (partitionFunction.getPartition(value) != partition) {
+        return value;
+      }
+    }
+    throw new IllegalStateException("Failed to find value on a different partition");
   }
 }

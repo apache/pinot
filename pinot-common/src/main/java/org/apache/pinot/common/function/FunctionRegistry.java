@@ -24,7 +24,6 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,11 +35,10 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
+import org.apache.pinot.spi.utils.ScalarFunctionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,8 +86,7 @@ public class FunctionRegistry {
 
     // Register ScalarFunction classes
     Map<String, PinotScalarFunction> functionMap = new HashMap<>();
-    Set<Class<?>> classes =
-        PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
+    Set<Class<?>> classes = ScalarFunctionUtils.getScalarFunctionClasses();
     for (Class<?> clazz : classes) {
       if (!Modifier.isPublic(clazz.getModifiers())) {
         continue;
@@ -102,26 +99,19 @@ public class FunctionRegistry {
         } catch (Exception e) {
           throw new IllegalStateException("Failed to instantiate PinotScalarFunction with class: " + clazz);
         }
-        String[] names = scalarFunction.names();
-        if (names.length == 0) {
-          register(canonicalize(function.getName()), function, functionMap);
-        } else {
-          Set<String> canonicalNames = new HashSet<>();
-          for (String name : names) {
-            if (!canonicalNames.add(canonicalize(name))) {
-              LOGGER.warn("Duplicate names: {} in class: {}", Arrays.toString(names), clazz);
-            }
-          }
-          for (String canonicalName : canonicalNames) {
-            register(canonicalName, function, functionMap);
-          }
+        List<String> canonicalNames = ScalarFunctionUtils.getScalarFunctionNames(scalarFunction, function.getName());
+        if (scalarFunction.names().length > canonicalNames.size()) {
+          LOGGER.warn("Duplicate names: {} in class: {}", Arrays.toString(scalarFunction.names()), clazz);
+        }
+        for (String canonicalName : canonicalNames) {
+          register(canonicalName, function, functionMap);
         }
       }
     }
 
     // Register ScalarFunction methods
     Map<String, Map<Integer, FunctionInfo>> functionInfoMap = new HashMap<>();
-    Set<Method> methods = PinotReflectionUtils.getMethodsThroughReflection(".*\\.function\\..*", ScalarFunction.class);
+    Set<Method> methods = ScalarFunctionUtils.getScalarFunctionMethods();
     for (Method method : methods) {
       if (!Modifier.isPublic(method.getModifiers())) {
         continue;
@@ -132,19 +122,12 @@ public class FunctionRegistry {
             new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters(),
                 scalarFunction.isDeterministic());
         int numArguments = scalarFunction.isVarArg() ? VAR_ARG_KEY : method.getParameterCount();
-        String[] names = scalarFunction.names();
-        if (names.length == 0) {
-          register(canonicalize(method.getName()), functionInfo, numArguments, functionInfoMap);
-        } else {
-          Set<String> canonicalNames = new HashSet<>();
-          for (String name : names) {
-            if (!canonicalNames.add(canonicalize(name))) {
-              LOGGER.warn("Duplicate names: {} in method: {}", Arrays.toString(names), method);
-            }
-          }
-          for (String canonicalName : canonicalNames) {
-            register(canonicalName, functionInfo, numArguments, functionInfoMap);
-          }
+        List<String> canonicalNames = ScalarFunctionUtils.getScalarFunctionNames(scalarFunction, method.getName());
+        if (scalarFunction.names().length > canonicalNames.size()) {
+          LOGGER.warn("Duplicate names: {} in method: {}", Arrays.toString(scalarFunction.names()), method);
+        }
+        for (String canonicalName : canonicalNames) {
+          register(canonicalName, functionInfo, numArguments, functionInfoMap);
         }
       }
     }
@@ -247,7 +230,7 @@ public class FunctionRegistry {
   }
 
   public static String canonicalize(String name) {
-    return StringUtils.remove(name, '_').toLowerCase();
+    return FunctionUtils.canonicalize(name);
   }
 
   public static class ArgumentCountBasedScalarFunction implements PinotScalarFunction {

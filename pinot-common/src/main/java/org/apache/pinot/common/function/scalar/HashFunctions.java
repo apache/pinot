@@ -108,23 +108,29 @@ public class HashFunctions {
     return DigestUtils.md5Hex(input);
   }
 
+  /// Return raw MD5 digest bytes.
+  @ScalarFunction(names = {"md5_raw"})
+  public static byte[] md5Raw(byte[] input) {
+    return DigestUtils.md5(input);
+  }
+
   /**
    * Computes 32-bit MurmurHash2 of the given byte array.
    *
    * @param input the byte array to hash
    * @return 32-bit hash
    */
-  @ScalarFunction
+  // "murmurHash2" preserves the canonical name auto-derived on master before this PR introduced the "murmur2" alias.
+  // Existing user SQL queries / ingestion transforms calling murmurHash2(byte_col) must continue to resolve.
+  @ScalarFunction(names = {"murmur2", "murmurHash2"})
   public static int murmurHash2(byte[] input) {
     return MurmurHashFunctions.murmurHash2(input);
   }
 
-  /**
-   * Computes 32-bit MurmurHash2 of the given string.
-   *
-   * @param input the byte array to hash
-   * @return 32-bit hash
-   */
+  /// Computes 32-bit MurmurHash2 of the given string.
+  ///
+  /// @param input the string to hash (converted to UTF-8 bytes)
+  /// @return 32-bit hash
   @ScalarFunction
   public static int murmurHash2UTF8(String input) {
     return MurmurHashFunctions.murmurHash2(input.getBytes(StandardCharsets.UTF_8));
@@ -161,6 +167,12 @@ public class HashFunctions {
   @ScalarFunction
   public static int murmurHash3Bit32(byte[] input, int seed) {
     return Hashing.murmur3_32_fixed(seed).hashBytes(input).asInt();
+  }
+
+  /// Computes 32-bit Murmur3 hash of the given byte array with seed 0 using the partition-expression friendly name.
+  @ScalarFunction(names = {"murmur3_32"})
+  public static int murmur3Bit32Default(byte[] input) {
+    return murmurHash3Bit32(input, 0);
   }
 
   /**
@@ -224,17 +236,16 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 32-bit hash
    */
-  @ScalarFunction
+  // "fnv1Hash32" preserves the canonical name auto-derived on master before this PR introduced the "fnv1_32" alias.
+  @ScalarFunction(names = {"fnv1_32", "fnv1Hash32"})
   public static int fnv1Hash32(byte[] input) {
     return FnvHashFunctions.fnv1Hash32(input);
   }
 
-  /**
-   * Computes 32-bit FNV-1 hash of the given string using UTF-8 bytes.
-   *
-   * @param input the string to hash
-   * @return 32-bit hash
-   */
+  /// Computes 32-bit FNV-1 hash of the given string using UTF-8 bytes.
+  ///
+  /// @param input the string to hash (converted to UTF-8 bytes)
+  /// @return 32-bit hash
   @ScalarFunction
   public static int fnv1Hash32UTF8(String input) {
     return FnvHashFunctions.fnv1Hash32(input.getBytes(StandardCharsets.UTF_8));
@@ -246,7 +257,8 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 32-bit hash
    */
-  @ScalarFunction
+  // "fnv1aHash32" preserves the canonical name auto-derived on master before this PR introduced the "fnv1a_32" alias.
+  @ScalarFunction(names = {"fnv1a_32", "fnv1aHash32"})
   public static int fnv1aHash32(byte[] input) {
     return FnvHashFunctions.fnv1aHash32(input);
   }
@@ -268,7 +280,8 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 64-bit hash
    */
-  @ScalarFunction
+  // "fnv1Hash64" preserves the canonical name auto-derived on master before this PR introduced the "fnv1_64" alias.
+  @ScalarFunction(names = {"fnv1_64", "fnv1Hash64"})
   public static long fnv1Hash64(byte[] input) {
     return FnvHashFunctions.fnv1Hash64(input);
   }
@@ -290,7 +303,8 @@ public class HashFunctions {
    * @param input the byte array to hash
    * @return 64-bit hash
    */
-  @ScalarFunction
+  // "fnv1aHash64" preserves the canonical name auto-derived on master before this PR introduced the "fnv1a_64" alias.
+  @ScalarFunction(names = {"fnv1a_64", "fnv1aHash64"})
   public static long fnv1aHash64(byte[] input) {
     return FnvHashFunctions.fnv1aHash64(input);
   }

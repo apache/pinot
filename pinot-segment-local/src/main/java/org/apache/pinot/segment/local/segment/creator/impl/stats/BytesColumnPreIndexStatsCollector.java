@@ -64,7 +64,7 @@ public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       addressSorted(value);
       if (_values.add(value)) {
         if (isPartitionEnabled()) {
-          updatePartition(value.toString());
+          updatePartition(value.getBytes());
         }
         int length = value.length();
         _minLength = Math.min(_minLength, length);

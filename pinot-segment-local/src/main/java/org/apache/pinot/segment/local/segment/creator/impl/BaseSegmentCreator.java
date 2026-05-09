@@ -72,6 +72,8 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -617,8 +619,46 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED), "true");
     }
 
-    // Min/max value
-    if (fieldSpec.getFieldType() != FieldType.COMPLEX) {
+    PartitionFunction partitionFunction = columnStatistics.getPartitionFunction();
+    if (partitionFunction != null) {
+      // Always write PARTITION_FUNCTION (function name) to segment metadata. Expression-mode functions write the
+      // sentinel name "FunctionExpr" so that old readers fail fast with IllegalArgumentException
+      // ("No enum constant for: FunctionExpr") rather than silently treating the column as un-partitioned and
+      // degrading to scatter-gather.
+      properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
+      properties.setProperty(getKeyFor(column, NUM_PARTITIONS), partitionFunction.getNumPartitions());
+      if (partitionFunction.getFunctionExpr() != null) {
+        properties.setProperty(getKeyFor(column, PARTITION_FUNCTION_EXPR), partitionFunction.getFunctionExpr());
+      }
+      if (partitionFunction.getPartitionIdNormalizer() != null) {
+        properties.setProperty(getKeyFor(column, PARTITION_ID_NORMALIZER),
+            partitionFunction.getPartitionIdNormalizer());
+      }
+      // For expression-mode pipelines compiled with BYTES input, persist the input type so segment readers don't
+      // have to re-derive it from schema state (which may race with metadata loading at startup).
+      if (partitionFunction instanceof PartitionPipelineFunction
+          && ((PartitionPipelineFunction) partitionFunction).getPartitionPipeline().isBytesInput()) {
+        properties.setProperty(getKeyFor(column, PARTITION_INPUT_TYPE), PartitionValueType.BYTES.name());
+      }
+      properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnStatistics.getPartitions());
+      Map<String, String> partitionFunctionConfig = partitionFunction.getFunctionConfig();
+      if (partitionFunctionConfig != null) {
+        for (Map.Entry<String, String> entry : partitionFunctionConfig.entrySet()) {
+          properties.setProperty(getKeyFor(column, String.format("%s.%s", PARTITION_FUNCTION_CONFIG, entry.getKey())),
+              entry.getValue());
+        }
+      }
+    }
+
+    FieldType fieldType = fieldSpec.getFieldType();
+    // Datetime field
+    if (fieldType == FieldType.DATE_TIME) {
+      DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
+      properties.setProperty(getKeyFor(column, DATETIME_FORMAT), dateTimeFieldSpec.getFormat());
+      properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
+    }
+
+    if (fieldType != FieldType.COMPLEX) {
       // Regular (non-complex) field
       if (totalDocs > 0) {
         Object min = columnStatistics.getMinValue();
@@ -629,21 +669,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         // when loading the segment.
         if (min != null && max != null) {
           addColumnMinMaxValueInfo(properties, column, min, max, storedType);
-        }
-      }
-    }
-
-    // Partition function
-    PartitionFunction partitionFunction = columnStatistics.getPartitionFunction();
-    if (partitionFunction != null) {
-      properties.setProperty(getKeyFor(column, PARTITION_FUNCTION), partitionFunction.getName());
-      properties.setProperty(getKeyFor(column, NUM_PARTITIONS), partitionFunction.getNumPartitions());
-      properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnStatistics.getPartitions());
-      Map<String, String> partitionFunctionConfig = partitionFunction.getFunctionConfig();
-      if (partitionFunctionConfig != null) {
-        for (Map.Entry<String, String> entry : partitionFunctionConfig.entrySet()) {
-          properties.setProperty(getKeyFor(column, String.format("%s.%s", PARTITION_FUNCTION_CONFIG, entry.getKey())),
-              entry.getValue());
         }
       }
     }

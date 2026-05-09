@@ -407,7 +407,6 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
         String partitionColumn = entry.getKey();
         ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-        String partitionFunctionName = columnPartitionConfig.getFunctionName();
 
         // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
         //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
@@ -438,9 +437,12 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         }
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
+        // Use the stream-derived numPartitions (may differ from the table-config value if the stream has been
+        // resharded). The FieldSpec-aware 4-arg overload threads numPartitions through to expression-mode
+        // pipelines on BYTES columns, preserving the override.
         realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
-                columnPartitionConfig.getFunctionConfig()));
+            PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig, numPartitions,
+                _schema.getFieldSpecFor(partitionColumn)));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
         _logger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());

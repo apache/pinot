@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -85,7 +86,16 @@ public class StatsCollectorConfig {
     if (_segmentPartitionConfig != null) {
       ColumnPartitionConfig columnPartitionConfig = _segmentPartitionConfig.getColumnPartitionConfig(column);
       if (columnPartitionConfig != null) {
-        return PartitionFunctionFactory.getPartitionFunction(columnPartitionConfig);
+        if (columnPartitionConfig.getFunctionExpr() != null) {
+          // For expression-mode, determine input type from the column schema so BYTES columns are hashed as raw
+          // bytes rather than hex-encoded strings.
+          FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+          PartitionValueType inputType =
+              fieldSpec != null && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES
+                  ? PartitionValueType.BYTES : PartitionValueType.STRING;
+          return PartitionFunctionFactory.getPartitionFunction(column, columnPartitionConfig, inputType);
+        }
+        return PartitionFunctionFactory.getPartitionFunction(column, columnPartitionConfig);
       }
     }
     return null;
@@ -94,22 +104,36 @@ public class StatsCollectorConfig {
   @Deprecated
   @Nullable
   public String getPartitionFunctionName(String column) {
-    if (_segmentPartitionConfig == null) {
-      return null;
-    }
-
-    return _segmentPartitionConfig.getFunctionName(column);
+    ColumnPartitionConfig config = getColumnPartitionConfig(column);
+    return config != null ? config.getFunctionName() : null;
   }
 
   @Deprecated
   public int getNumPartitions(String column) {
-    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getNumPartitions(column)
-        : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
+    ColumnPartitionConfig config = getColumnPartitionConfig(column);
+    return config != null ? config.getNumPartitions() : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
   }
 
-  @Deprecated
+  @Nullable
+  public String getPartitionFunctionExpr(String column) {
+    ColumnPartitionConfig config = getColumnPartitionConfig(column);
+    return config != null ? config.getFunctionExpr() : null;
+  }
+
   @Nullable
   public Map<String, String> getPartitionFunctionConfig(String column) {
-    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getFunctionConfig(column) : null;
+    ColumnPartitionConfig config = getColumnPartitionConfig(column);
+    return config != null ? config.getFunctionConfig() : null;
+  }
+
+  @Nullable
+  public String getPartitionIdNormalizer(String column) {
+    ColumnPartitionConfig config = getColumnPartitionConfig(column);
+    return config != null ? config.getPartitionIdNormalizer() : null;
+  }
+
+  @Nullable
+  private ColumnPartitionConfig getColumnPartitionConfig(String column) {
+    return _segmentPartitionConfig != null ? _segmentPartitionConfig.getColumnPartitionConfig(column) : null;
   }
 }

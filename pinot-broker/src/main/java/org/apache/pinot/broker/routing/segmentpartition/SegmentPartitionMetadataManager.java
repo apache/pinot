@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -39,6 +40,10 @@ import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +66,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
 
   // static content, if anything changes for the following. a rebuild of routing table is needed.
   private final String _partitionColumn;
-  private final String _partitionFunctionName;
+  private final PartitionFunction _partitionFunction;
   private final int _numPartitions;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
@@ -71,12 +76,33 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private transient TablePartitionInfo _tablePartitionInfo;
   private transient TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
 
+  /// Backward-compat shim: the legacy (name-mode-only) constructor used by external broker plugins / vendor forks
+  /// that linked against the pre-expression-mode signature. Builds a synthetic [ColumnPartitionConfig] and
+  /// delegates to the new constructor. Expression-mode tables must use the [ColumnPartitionConfig] overloads.
+  /// TODO: remove after release 1.7.0 once external callers have migrated.
+  @Deprecated
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions) {
+    this(tableNameWithType, partitionColumn,
+        new ColumnPartitionConfig(partitionFunctionName, numPartitions), null);
+  }
+
+  public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn,
+      ColumnPartitionConfig columnPartitionConfig) {
+    this(tableNameWithType, partitionColumn, columnPartitionConfig, null);
+  }
+
+  /// Preferred constructor: pass the partition column's [FieldSpec] so expression-mode pipelines on BYTES
+  /// columns are compiled with BYTES input. The `FieldSpec`-less overload above always compiles with STRING
+  /// input, which silently disagrees with ingestion partition ids on BYTES columns.
+  public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn,
+      ColumnPartitionConfig columnPartitionConfig, @Nullable FieldSpec fieldSpec) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
-    _partitionFunctionName = partitionFunctionName;
-    _numPartitions = numPartitions;
+    _partitionFunction = fieldSpec != null
+        ? PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig, fieldSpec)
+        : PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig);
+    _numPartitions = _partitionFunction.getNumPartitions();
   }
 
   @Override
@@ -103,7 +129,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       return INVALID_PARTITION_ID;
     }
     PartitionFunction partitionFunction = segmentPartitionInfo.getPartitionFunction();
-    if (!_partitionFunctionName.equalsIgnoreCase(partitionFunction.getName())) {
+    if (!isMatchingPartitionFunction(partitionFunction)) {
       return INVALID_PARTITION_ID;
     }
     if (_numPartitions != partitionFunction.getNumPartitions()) {
@@ -114,6 +140,36 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       return INVALID_PARTITION_ID;
     }
     return partitions.iterator().next();
+  }
+
+  private String getPartitionFunctionDescription() {
+    String functionExpr = _partitionFunction.getFunctionExpr();
+    return functionExpr != null ? functionExpr : _partitionFunction.getName();
+  }
+
+  private boolean isMatchingPartitionFunction(PartitionFunction partitionFunction) {
+    Map<String, String> functionConfig = partitionFunction.getFunctionConfig();
+    if (functionConfig != null && !functionConfig.isEmpty()
+        && !Objects.equals(_partitionFunction.getFunctionConfig(), functionConfig)) {
+      return false;
+    }
+
+    PartitionIdNormalizer partitionIdNormalizer = partitionFunction.getPartitionIdNormalizer();
+    if (partitionIdNormalizer != null && _partitionFunction.getPartitionIdNormalizer() != partitionIdNormalizer) {
+      return false;
+    }
+
+    String functionName = partitionFunction.getName();
+    if (functionName != null) {
+      String configuredFunctionName = _partitionFunction.getName();
+      return configuredFunctionName != null && configuredFunctionName.equalsIgnoreCase(functionName);
+    }
+
+    String functionExpr = partitionFunction.getFunctionExpr();
+    if (functionExpr != null) {
+      return Objects.equals(_partitionFunction.getFunctionExpr(), functionExpr);
+    }
+    return false;
   }
 
   private static long getCreationTimeMs(@Nullable ZNRecord znRecord) {
@@ -306,7 +362,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       }
     }
     _tablePartitionReplicatedServersInfo =
-        new TablePartitionReplicatedServersInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName,
+        new TablePartitionReplicatedServersInfo(_tableNameWithType, _partitionColumn, getPartitionFunctionDescription(),
             _numPartitions, partitionInfoMap, segmentsWithInvalidPartition);
   }
 
@@ -337,7 +393,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
           _tableNameWithType);
     }
     _tablePartitionInfo =
-        new TablePartitionInfo(_tableNameWithType, _partitionColumn, _partitionFunctionName, _numPartitions,
+        new TablePartitionInfo(_tableNameWithType, _partitionColumn, getPartitionFunctionDescription(), _numPartitions,
             segmentsByPartition, segmentsWithInvalidPartition);
   }
 

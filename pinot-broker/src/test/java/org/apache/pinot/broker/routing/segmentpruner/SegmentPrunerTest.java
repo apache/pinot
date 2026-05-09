@@ -40,7 +40,10 @@ import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -382,6 +385,34 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest2, input), Set.of(segment1, segment2));
     assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest3, input), Set.of(segment0, segment1));
     assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest4, input), Set.of(segment1, segment2));
+
+    String functionExpr = "murmur2(lower(memberId))";
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN_1, null, 8, null, functionExpr);
+    int matchingPartition = partitionFunction.getPartition("Pinot");
+    String firstNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Kafka",
+        "Trino", "StarTree", "Presto", "Druid");
+    String secondNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Flink",
+        "Spark", "Hive", "Superset", "PinotDB");
+    String exprSegment = "exprSegment";
+    setSegmentZKPartitionMetadata(OFFLINE_TABLE_NAME, exprSegment, PartitionPipelineFunction.NAME, 8,
+        matchingPartition, functionExpr);
+    onlineSegments.add(exprSegment);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    input = Set.of(exprSegment);
+    BrokerRequest exprEqMatch = CalciteSqlCompiler.compileToBrokerRequest(
+        "SELECT * FROM testTable WHERE memberId = 'Pinot'");
+    BrokerRequest exprEqMiss = CalciteSqlCompiler.compileToBrokerRequest(
+        String.format("SELECT * FROM testTable WHERE memberId = '%s'", firstNonMatchingValue));
+    BrokerRequest exprInMatch = CalciteSqlCompiler.compileToBrokerRequest(
+        String.format("SELECT * FROM testTable WHERE memberId IN ('%s', 'PiNoT')", firstNonMatchingValue));
+    BrokerRequest exprInMiss = CalciteSqlCompiler.compileToBrokerRequest(
+        String.format("SELECT * FROM testTable WHERE memberId IN ('%s', '%s')", firstNonMatchingValue,
+            secondNonMatchingValue));
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(exprEqMatch, input), input);
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(exprEqMiss, input), Set.of());
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(exprInMatch, input), input);
+    assertEquals(multiPartitionColumnsSegmentPruner.prune(exprInMiss, input), Set.of());
   }
 
   @Test
@@ -680,6 +711,17 @@ public class SegmentPrunerTest extends ControllerTest {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
   }
 
+  private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment, String partitionFunction,
+      int numPartitions, int partitionId, String functionExpr) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    PartitionFunction compiledPartitionFunction =
+        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN_1, partitionFunction, numPartitions, null,
+            functionExpr);
+    segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN_1,
+        new ColumnPartitionMetadata(compiledPartitionFunction, Set.of(partitionId)))));
+    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+  }
+
   private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment,
       Map<String, ColumnPartitionMetadata> columnPartitionMap) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
@@ -700,5 +742,14 @@ public class SegmentPrunerTest extends ControllerTest {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
     segmentZKMetadata.setTotalDocs(totalDocs);
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+  }
+
+  private String findValueWithDifferentPartition(PartitionFunction partitionFunction, int partition, String... values) {
+    for (String value : values) {
+      if (partitionFunction.getPartition(value) != partition) {
+        return value;
+      }
+    }
+    throw new IllegalStateException("Failed to find value on a different partition");
   }
 }

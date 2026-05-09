@@ -19,10 +19,13 @@
 package org.apache.pinot.common.function.scalar;
 
 import java.nio.charset.StandardCharsets;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class HashFunctionsTest {
@@ -224,5 +227,33 @@ public class HashFunctionsTest {
             new byte[] {0, -44, 40, 93, -71, 96, 80, -45, -82, 111, -109, -116, 25, 32, 98, -7});
     assertEquals(HashFunctions.cityHash128(INPUT_LEN_156.getBytes()),
             new byte[] {114, 8, 23, 53, -124, 83, -28, 35, 27, -117, -59, 121, -108, -20, 59, 115});
+  }
+
+  /// Backward-compat regression: this branch added explicit `@ScalarFunction(names = {"murmur2", ...})`
+  /// aliases to byte[]-overload hash functions. The `names` array overrides the auto-derived canonical name
+  /// from the method, so without explicitly listing the original (camelCase) name, existing user SQL queries calling
+  /// `murmurHash2`/`fnv1Hash32`/`fnv1aHash32`/`fnv1Hash64`/`fnv1aHash64` on a byte[]
+  /// argument would silently stop resolving the byte[] overload after upgrade. This test locks both the new short
+  /// alias and the legacy auto-derived name so future name reshuffles cannot regress backward compatibility.
+  @Test
+  public void testLegacyAndNewHashFunctionAliasesBothResolve() {
+    // Note: lookupFunctionInfo expects canonicalized names (lowercased, underscores stripped). Both the legacy
+    // camelCase name and the new alias should canonicalize to a registered key.
+    String[][] aliasPairs = new String[][] {
+        // {legacy auto-derived name, new alias}
+        {"murmurHash2", "murmur2"},
+        {"fnv1Hash32", "fnv1_32"},
+        {"fnv1aHash32", "fnv1a_32"},
+        {"fnv1Hash64", "fnv1_64"},
+        {"fnv1aHash64", "fnv1a_64"},
+    };
+    for (String[] pair : aliasPairs) {
+      FunctionInfo legacy = FunctionRegistry.lookupFunctionInfo(FunctionRegistry.canonicalize(pair[0]), 1);
+      FunctionInfo alias = FunctionRegistry.lookupFunctionInfo(FunctionRegistry.canonicalize(pair[1]), 1);
+      assertNotNull(legacy, "Legacy alias must still resolve: " + pair[0]);
+      assertNotNull(alias, "New alias must resolve: " + pair[1]);
+      assertEquals(legacy.getMethod(), alias.getMethod(),
+          "Legacy and new aliases must resolve to the same method: " + pair[0] + " vs " + pair[1]);
+    }
   }
 }

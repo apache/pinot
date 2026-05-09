@@ -20,10 +20,17 @@ package org.apache.pinot.common.partition.function;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
@@ -32,6 +39,7 @@ import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -435,6 +443,43 @@ public class PartitionFunctionTest {
     assertEquals(partitionFunction.getPartition("Physics"), 0);
   }
 
+  @Test
+  public void testLegacyPartitionFunctionFactoryAcceptsMatchingPartitionIdNormalizer() {
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction("id", "Murmur2", 8, null, null, "MASK");
+
+    assertEquals(partitionFunction.getName(), "Murmur");
+    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.MASK);
+  }
+
+  @Test
+  public void testLegacyPartitionFunctionFactoryRejectsMismatchedPartitionIdNormalizer() {
+    IllegalArgumentException exception = expectThrows(IllegalArgumentException.class,
+        () -> PartitionFunctionFactory.getPartitionFunction("id", "Murmur2", 8, null, null, "ABS"));
+
+    assertTrue(exception.getMessage().contains("incompatible with legacy partition function 'Murmur2'"));
+  }
+
+  @Test
+  public void testLegacyPartitionFunctionImplementsFunctionEvaluatorWhenBoundToColumn() {
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction("id", "Murmur2", 8, null, null, "MASK");
+    assertTrue(partitionFunction instanceof FunctionEvaluator);
+    FunctionEvaluator evaluator = (FunctionEvaluator) partitionFunction;
+    GenericRow row = new GenericRow();
+    row.putValue("id", "Pinot");
+
+    assertEquals(evaluator.getArguments(), java.util.List.of("id"));
+    assertEquals(evaluator.evaluate(row), partitionFunction.getPartition("Pinot"));
+    assertEquals(evaluator.evaluate(new Object[]{"Pinot"}), partitionFunction.getPartition("Pinot"));
+  }
+
+  @Test
+  public void testUnboundLegacyPartitionFunctionDoesNotImplementFunctionEvaluator() {
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction("Murmur2", 8, null);
+    assertFalse(partitionFunction instanceof FunctionEvaluator);
+  }
+
   private void testBasicProperties(PartitionFunction partitionFunction, String functionName, int numPartitions) {
     testBasicProperties(partitionFunction, functionName, numPartitions, null);
   }
@@ -831,5 +876,37 @@ public class PartitionFunctionTest {
 
   private int getMaskPartition(long hash, int numPartitions) {
     return (int) ((hash & Long.MAX_VALUE) % numPartitions);
+  }
+
+  /// Cross-version contract regression: the segment-metadata sentinel "FunctionExpr" written for expression-mode
+  /// segments MUST never resolve to a real legacy partition function in the registry. Old readers rely on the
+  /// factory lookup throwing IllegalArgumentException to fail fast and skip partition pruning, instead of silently
+  /// treating the column as un-partitioned. If anyone registers a "FunctionExpr" entry with the dynamic registry,
+  /// this test guards against the silent regression in the cross-version fail-fast contract.
+  @Test
+  public void testFunctionExprSentinelIsNotARealPartitionFunctionType() {
+    expectThrows(IllegalArgumentException.class,
+        () -> PartitionFunctionFactory.getPartitionFunction(
+            V1Constants.MetadataKeys.Column.PARTITION_FUNCTION_EXPR_SENTINEL, 1, null));
+  }
+
+  /// Drift regression: `ColumnPartitionConfig.PARTITION_ID_NORMALIZER_*` string constants live in pinot-spi
+  /// (which cannot reference [PartitionIdNormalizer] due to the module dependency direction). This test asserts
+  /// each user-configurable constant resolves to a real enum value so adding a new constant without updating the
+  /// enum trips a test failure rather than a silent runtime rejection. The enum may declare values that are NOT
+  /// user-configurable (e.g. `PRE_MODULO_ABS`, `NO_OP`), so the relationship is constants ⊆ enum values.
+  @Test
+  public void testPartitionIdNormalizerConstantsMatchEnumValues() {
+    Set<String> enumNames = new HashSet<>();
+    for (PartitionIdNormalizer normalizer : PartitionIdNormalizer.values()) {
+      enumNames.add(normalizer.name());
+    }
+    Set<String> configConstants = new HashSet<>();
+    configConstants.add(ColumnPartitionConfig.PARTITION_ID_NORMALIZER_POSITIVE_MODULO);
+    configConstants.add(ColumnPartitionConfig.PARTITION_ID_NORMALIZER_ABS);
+    configConstants.add(ColumnPartitionConfig.PARTITION_ID_NORMALIZER_MASK);
+    assertTrue(enumNames.containsAll(configConstants),
+        "ColumnPartitionConfig.PARTITION_ID_NORMALIZER_* string constants must all resolve to real "
+            + "PartitionIdNormalizer enum values. If a new constant is added, also add the matching enum value.");
   }
 }

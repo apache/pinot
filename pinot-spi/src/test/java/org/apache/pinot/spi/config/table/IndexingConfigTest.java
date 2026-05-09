@@ -28,8 +28,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class IndexingConfigTest {
@@ -90,6 +92,62 @@ public class IndexingConfigTest {
     IndexingConfig actualIndexingConfig =
         JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
     assertEquals(actualIndexingConfig.getSegmentPartitionConfig(), expectedPartitionConfig);
+  }
+
+  @Test
+  public void testSegmentPartitionConfigWithFunctionExpr()
+      throws IOException {
+    SegmentPartitionConfig expectedPartitionConfig = new SegmentPartitionConfig(
+        Map.of("raw_key",
+            ColumnPartitionConfig.forFunctionExpr("fnv1a_32(md5(raw_key))", 64, "MASK")));
+    IndexingConfig expectedIndexingConfig = new IndexingConfig();
+    expectedIndexingConfig.setSegmentPartitionConfig(expectedPartitionConfig);
+
+    IndexingConfig actualIndexingConfig =
+        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
+
+    SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
+    assertEquals(actualPartitionConfig.getNumPartitions("raw_key"), 64);
+    ColumnPartitionConfig actualColumnPartitionConfig = actualPartitionConfig.getColumnPartitionConfig("raw_key");
+    assertNotNull(actualColumnPartitionConfig);
+    assertEquals(actualColumnPartitionConfig.getFunctionExpr(), "fnv1a_32(md5(raw_key))");
+    assertEquals(actualColumnPartitionConfig.getPartitionIdNormalizer(), "MASK");
+    assertNull(actualPartitionConfig.getFunctionName("raw_key"));
+  }
+
+  @Test
+  public void testSegmentPartitionConfigWithFunctionExprAbsNormalizer()
+      throws IOException {
+    SegmentPartitionConfig expectedPartitionConfig = new SegmentPartitionConfig(
+        Map.of("raw_key",
+            ColumnPartitionConfig.forFunctionExpr("murmur2(raw_key)", 64, "ABS")));
+    IndexingConfig expectedIndexingConfig = new IndexingConfig();
+    expectedIndexingConfig.setSegmentPartitionConfig(expectedPartitionConfig);
+
+    IndexingConfig actualIndexingConfig =
+        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
+
+    SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
+    assertEquals(actualPartitionConfig.getNumPartitions("raw_key"), 64);
+    ColumnPartitionConfig actualColumnPartitionConfig = actualPartitionConfig.getColumnPartitionConfig("raw_key");
+    assertNotNull(actualColumnPartitionConfig);
+    assertEquals(actualColumnPartitionConfig.getFunctionExpr(), "murmur2(raw_key)");
+    assertEquals(actualColumnPartitionConfig.getPartitionIdNormalizer(), "ABS");
+    assertNull(actualPartitionConfig.getFunctionName("raw_key"));
+  }
+
+  @Test
+  public void testColumnPartitionConfigRejectsInvalidModeCombinations() {
+    expectThrows(IllegalArgumentException.class,
+        () -> new ColumnPartitionConfig(null, 8, null, null, null));
+    expectThrows(IllegalArgumentException.class,
+        () -> new ColumnPartitionConfig("Murmur", 8, null, "murmur2(raw_key)", null));
+    expectThrows(IllegalArgumentException.class,
+        () -> new ColumnPartitionConfig(null, 8, Map.of("seed", "1"), "murmur3_32(raw_key)", null));
+    expectThrows(IllegalArgumentException.class,
+        () -> new ColumnPartitionConfig("Murmur", 8, null, null, "MASK"));
+    expectThrows(IllegalArgumentException.class,
+        () -> new ColumnPartitionConfig(null, 8, null, "murmur2(raw_key)", "unknown"));
   }
 
   @Test

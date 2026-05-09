@@ -384,8 +384,10 @@ public class BaseTableDataManagerNeedRefreshTest {
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "partition function added: partitionedColumn");
 
-    // when segment has partitions AND tableConfig has no partitions, then needRefresh = false
-    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentWithPartition).isStale());
+    // when segment has partitions AND tableConfig has no partitions, then needRefresh = true
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(INDEX_LOADING_CONFIG, segmentWithPartition);
+    assertTrue(response.isStale());
+    assertEquals(response.getReason(), "partition function removed: partitionedColumn");
 
     // when # of partitions is different, then needRefresh = true
     TableConfig partitionedTableConfig40 = getTableConfigBuilder().setSegmentPartitionConfig(new SegmentPartitionConfig(

@@ -58,6 +58,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -953,6 +954,102 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       assertEquals(col1Meta.getPartitionFunction().getNumPartitions(), 5);
       assertEquals(col1Meta.getPartitionFunction().getFunctionConfig(), functionConfig,
           "Murmur3 function config (seed, variant) should be preserved in converted segment metadata");
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
+  }
+
+  @Test
+  public void testPartitionFunctionExprPreservedInConvertedSegment()
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    String functionExpr = "fnv1a_32(md5(" + STRING_COLUMN1 + "))";
+    String partitionIdNormalizer = "MASK";
+
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
+        Map.of(STRING_COLUMN1, ColumnPartitionConfig.forFunctionExpr(functionExpr, 8, partitionIdNormalizer)));
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testTable")
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setSegmentPartitionConfig(segmentPartitionConfig)
+        .setColumnMajorSegmentBuilderEnabled(false)
+        .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension(STRING_COLUMN1, DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN2, DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN3, DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN4, DataType.STRING)
+        .addSingleValueDimension(LONG_COLUMN1, DataType.LONG)
+        .addSingleValueDimension(LONG_COLUMN2, DataType.LONG)
+        .addSingleValueDimension(LONG_COLUMN3, DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, DataType.INT)
+        .addMetric(LONG_COLUMN4, DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    PartitionFunction partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction(STRING_COLUMN1,
+            segmentPartitionConfig.getColumnPartitionMap().get(STRING_COLUMN1));
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder()
+        .setTableNameWithType(tableNameWithType)
+        .setSegmentName(segmentName)
+        .setStreamName(tableNameWithType)
+        .setSchema(schema)
+        .setTimeColumnName(DATE_TIME_COLUMN)
+        .setCapacity(1000)
+        .setAvgNumMultiValues(3)
+        .setPartitionColumn(STRING_COLUMN1)
+        .setPartitionFunction(partitionFunction)
+        .setPartitionId(0)
+        .setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
+        .setOffHeap(true)
+        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setStatsHistory(RealtimeSegmentStatsHistory.deserializeFrom(new File(tmpDir, "stats")))
+        .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath())
+        .build();
+
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfig, null);
+    try {
+      List<GenericRow> rows = generateTestData();
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      SegmentPartitionConfig mutablePartitionConfig = mutableSegmentImpl.getSegmentPartitionConfig();
+      assertNotNull(mutablePartitionConfig);
+      ColumnPartitionConfig columnPartitionConfig =
+          mutablePartitionConfig.getColumnPartitionMap().get(STRING_COLUMN1);
+      assertNotNull(columnPartitionConfig);
+      assertNull(columnPartitionConfig.getFunctionName());
+      assertEquals(columnPartitionConfig.getFunctionExpr(), functionExpr);
+      assertEquals(columnPartitionConfig.getPartitionIdNormalizer(), partitionIdNormalizer);
+      assertEquals(columnPartitionConfig.getNumPartitions(), 8);
+      assertNull(columnPartitionConfig.getFunctionConfig());
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+
+      ColumnMetadata col1Meta = segmentMetadata.getColumnMetadataFor(STRING_COLUMN1);
+      assertNotNull(col1Meta.getPartitionFunction(), "Partition function should be present in converted segment");
+      assertEquals(col1Meta.getPartitionFunction().getName(), PartitionPipelineFunction.NAME);
+      assertEquals(col1Meta.getPartitionFunction().getNumPartitions(), 8);
+      assertEquals(col1Meta.getPartitionFunction().getFunctionExpr(), functionExpr);
+      assertEquals(col1Meta.getPartitionFunction().getPartitionIdNormalizer(), partitionIdNormalizer);
+      assertNull(col1Meta.getPartitionFunction().getFunctionConfig());
     } finally {
       mutableSegmentImpl.destroy();
     }

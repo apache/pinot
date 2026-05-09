@@ -29,7 +29,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionFunctionExprCompiler;
+import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
@@ -54,6 +59,11 @@ import org.slf4j.LoggerFactory;
 /// The static block scans the classpath once and builds an immutable (canonicalized name →
 /// constructor) map. To force eager initialization (e.g. so the scan happens before the first
 /// segment is read), call [#init()] from broker / server / controller startup.
+///
+/// **Expression-mode functions** (i.e. configs whose `functionExpr` is non-null) are not part of
+/// this registry — they are compiled by [PartitionFunctionExprCompiler] from the function
+/// expression text. The column-name aware overloads on this factory dispatch to the compiler when
+/// `functionExpr` is set and otherwise look up the legacy registry by `functionName`.
 public class PartitionFunctionFactory {
   private PartitionFunctionFactory() {
   }
@@ -140,7 +150,7 @@ public class PartitionFunctionFactory {
   public static void init() {
   }
 
-  /// Builds an instance of the partition function registered under `functionName`.
+  /// Builds an instance of the legacy (name-mode) partition function registered under `functionName`.
   ///
   /// @param functionName matched case-insensitively
   /// @param numPartitions positive partition count
@@ -162,15 +172,211 @@ public class PartitionFunctionFactory {
     }
   }
 
+  /// Returns the legacy (name-mode) partition function for the given config.
+  ///
+  /// @deprecated Expression-mode configs require a column name to compile the pipeline. This overload throws on
+  ///     expression-mode configs; prefer the column-name aware overloads which support both modes.
+  ///     TODO: remove after release 1.7.0.
+  /// @throws IllegalArgumentException if `config.getFunctionExpr()` is non-null.
+  @Deprecated
   public static PartitionFunction getPartitionFunction(ColumnPartitionConfig config) {
+    Preconditions.checkNotNull(config, "Column partition config must be configured");
+    Preconditions.checkArgument(config.getFunctionExpr() == null,
+        "Expression-mode config requires a column name; use getPartitionFunction(String, ColumnPartitionConfig)");
     return getPartitionFunction(config.getFunctionName(), config.getNumPartitions(), config.getFunctionConfig());
   }
 
+  /// Returns the legacy (name-mode) partition function for the given segment metadata.
+  ///
+  /// @deprecated Expression-mode metadata requires a column name to compile the pipeline. This overload throws on
+  ///     expression-mode metadata; prefer the column-name aware overloads.
+  ///     TODO: remove after release 1.7.0.
+  /// @throws IllegalArgumentException if `metadata.getFunctionExpr()` is non-null.
+  @Deprecated
   public static PartitionFunction getPartitionFunction(ColumnPartitionMetadata metadata) {
+    Preconditions.checkNotNull(metadata, "Column partition metadata must be configured");
+    Preconditions.checkArgument(metadata.getFunctionExpr() == null,
+        "Expression-mode metadata requires a column name; use getPartitionFunction(String, ColumnPartitionMetadata)");
     return getPartitionFunction(metadata.getFunctionName(), metadata.getNumPartitions(), metadata.getFunctionConfig());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionMetadata metadata) {
+    Preconditions.checkNotNull(metadata, "Column partition metadata must be configured");
+    if (metadata.getFunctionExpr() != null && metadata.getInputType() != null) {
+      PartitionValueType inputType = PartitionValueType.valueOf(metadata.getInputType());
+      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, inputType, metadata.getFunctionExpr(),
+          metadata.getNumPartitions(), metadata.getPartitionIdNormalizer());
+    }
+    return getPartitionFunction(columnName, metadata.getFunctionName(), metadata.getNumPartitions(),
+        metadata.getFunctionConfig(), metadata.getFunctionExpr(), metadata.getPartitionIdNormalizer());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig) {
+    return getPartitionFunction(columnName, columnPartitionConfig, columnPartitionConfig.getNumPartitions());
+  }
+
+  /// Builds a partition function for the given column with an explicit numPartitions override.
+  ///
+  /// @deprecated For BYTES-typed partition columns this overload always compiles the expression pipeline with STRING
+  /// input, producing partition ids that disagree with ingestion. Prefer the FieldSpec-aware overload.
+  /// TODO: remove after release 1.7.0.
+  @Deprecated
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig,
+      int numPartitions) {
+    Preconditions.checkNotNull(columnPartitionConfig, "Column partition config must be configured");
+    return getPartitionFunction(columnName, columnPartitionConfig.getFunctionName(), numPartitions,
+        columnPartitionConfig.getFunctionConfig(), columnPartitionConfig.getFunctionExpr(),
+        columnPartitionConfig.getPartitionIdNormalizer());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
+      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
+    return getPartitionFunction(columnName, functionName, numPartitions, functionConfig, functionExpr, null);
+  }
+
+  /// Builds a partition function for expression mode using an explicit input type.
+  ///
+  /// Use [PartitionValueType#BYTES] when the partition column stores raw byte arrays so that functions in the
+  /// expression receive the original bytes directly rather than a hex-encoded string representation.
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
+      PartitionValueType inputType) {
+    Preconditions.checkNotNull(config, "Column partition config must be configured");
+    Preconditions.checkArgument(config.getFunctionExpr() != null,
+        "inputType overload is only valid for expression-mode configs (functionExpr must be set)");
+    return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, inputType, config.getFunctionExpr(),
+        config.getNumPartitions(), config.getPartitionIdNormalizer());
+  }
+
+  /// Builds a partition function using the schema field spec to determine the correct input type for expression-mode
+  /// partition functions on BYTES-typed columns.
+  ///
+  /// When `fieldSpec` is non-null and the stored type is [FieldSpec.DataType#BYTES], the expression is
+  /// compiled with [PartitionValueType#BYTES] input so that scalar functions receive raw byte arrays rather than
+  /// hex-encoded strings.  For all other cases the default STRING input type is used.
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
+      @Nullable FieldSpec fieldSpec) {
+    return getPartitionFunction(columnName, config, config.getNumPartitions(), fieldSpec);
+  }
+
+  /// Builds a partition function with an explicit `numPartitions` override and uses `fieldSpec` to
+  /// determine the correct input type for expression-mode partition functions on BYTES-typed columns.
+  ///
+  /// Use this overload when the live partition count (e.g. the stream partition count) may differ from the value
+  /// stored in the table config, so that the built function uses the authoritative count while still receiving the
+  /// correct input type for BYTES columns.
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
+      int numPartitions, @Nullable FieldSpec fieldSpec) {
+    if (config.getFunctionExpr() != null && fieldSpec != null
+        && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
+      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, PartitionValueType.BYTES,
+          config.getFunctionExpr(), numPartitions, config.getPartitionIdNormalizer());
+    }
+    return getPartitionFunction(columnName, config.getFunctionName(), numPartitions, config.getFunctionConfig(),
+        config.getFunctionExpr(), config.getPartitionIdNormalizer());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
+      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr,
+      @Nullable String partitionIdNormalizer) {
+    if (functionExpr != null) {
+      return PartitionFunctionExprCompiler
+          .compilePartitionFunction(columnName, functionExpr, numPartitions, partitionIdNormalizer);
+    }
+    Preconditions.checkArgument(functionName != null, "Partition function name must be configured");
+    PartitionFunction partitionFunction = getPartitionFunction(functionName, numPartitions, functionConfig);
+    if (partitionIdNormalizer != null) {
+      PartitionIdNormalizer effective = partitionFunction.getPartitionIdNormalizer();
+      Preconditions.checkArgument(effective != null
+              && effective.name().equalsIgnoreCase(partitionIdNormalizer),
+          "'partitionIdNormalizer'=%s is incompatible with legacy partition function '%s'; expected '%s'",
+          partitionIdNormalizer, functionName, effective == null ? null : effective.name());
+    }
+    return new ColumnBoundPartitionFunction(columnName, partitionFunction);
   }
 
   private static String canonicalize(String name) {
     return name.toLowerCase(Locale.ROOT);
+  }
+
+  // PartitionFunction extends Serializable for historical reasons; partition functions are never
+  // Java-serialized in Pinot's runtime. Suppress the warning to avoid noise.
+  @SuppressWarnings("serial")
+  private static final class ColumnBoundPartitionFunction implements PartitionFunction, FunctionEvaluator {
+    private final String _columnName;
+    private final PartitionFunction _delegate;
+
+    private ColumnBoundPartitionFunction(String columnName, PartitionFunction delegate) {
+      _columnName = Preconditions.checkNotNull(columnName, "Partition column must be configured");
+      _delegate = Preconditions.checkNotNull(delegate, "Delegate partition function must be configured");
+    }
+
+    @Override
+    public int getPartition(String value) {
+      return _delegate.getPartition(value);
+    }
+
+    @Override
+    public int getPartition(byte[] bytes) {
+      return _delegate.getPartition(bytes);
+    }
+
+    @Override
+    public String getName() {
+      return _delegate.getName();
+    }
+
+    @Override
+    public List<String> getNames() {
+      return _delegate.getNames();
+    }
+
+    @Override
+    public int getNumPartitions() {
+      return _delegate.getNumPartitions();
+    }
+
+    @Override
+    public Map<String, String> getFunctionConfig() {
+      return _delegate.getFunctionConfig();
+    }
+
+    @Override
+    public String getPartitionColumn() {
+      return _columnName;
+    }
+
+    @Override
+    public String getFunctionExpr() {
+      return _delegate.getFunctionExpr();
+    }
+
+    @Override
+    public PartitionIdNormalizer getPartitionIdNormalizer() {
+      return _delegate.getPartitionIdNormalizer();
+    }
+
+    @Override
+    public List<String> getArguments() {
+      return Collections.singletonList(_columnName);
+    }
+
+    @Override
+    public Object evaluate(GenericRow genericRow) {
+      Object value = genericRow.getValue(_columnName);
+      return value != null ? getPartition(FieldSpec.getStringValue(value)) : null;
+    }
+
+    @Override
+    public Object evaluate(Object[] values) {
+      Preconditions.checkArgument(values.length == 1,
+          "Partition function for column '%s' expects exactly 1 positional argument, got: %s", _columnName,
+          values.length);
+      return values[0] != null ? getPartition(FieldSpec.getStringValue(values[0])) : null;
+    }
+
+    @Override
+    public String toString() {
+      return _delegate.toString();
+    }
   }
 }
