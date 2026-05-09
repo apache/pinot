@@ -102,7 +102,71 @@ public class UuidConversionFunctionsTest {
     assertNull(UuidConversionFunctions.uuidToBytes(null));
     assertNull(UuidConversionFunctions.bytesToUuid(null));
     assertNull(UuidConversionFunctions.uuidToString(null));
+    assertNull(UuidConversionFunctions.uuidVersion(null));
+    assertNull(UuidConversionFunctions.uuidTimestamp(null));
     assertFalse(IsUuidScalarFunction.isUuid((String) null));
     assertFalse(IsUuidScalarFunction.isUuid((byte[]) null));
+  }
+
+  @Test
+  public void testUuidV4ProducesValidVersion4Uuid() {
+    UUID uuid = UuidConversionFunctions.uuidV4();
+    assertEquals(uuid.version(), 4, "uuidV4 must produce version 4");
+    assertEquals(UuidConversionFunctions.uuidVersion(uuid).intValue(), 4);
+
+    // Two successive calls should not return the same value (probability of collision is ~0).
+    UUID other = UuidConversionFunctions.uuidV4();
+    assertFalse(uuid.equals(other), "Successive uuidV4 calls collided");
+  }
+
+  @Test
+  public void testUuidV7EncodesCurrentUnixMillisAndIsKSortable() {
+    long before = System.currentTimeMillis();
+    UUID first = UuidConversionFunctions.uuidV7();
+    UUID second = UuidConversionFunctions.uuidV7();
+    long after = System.currentTimeMillis();
+
+    assertEquals(first.version(), 7, "uuidV7 must produce version 7");
+    assertEquals(UuidConversionFunctions.uuidVersion(first).intValue(), 7);
+
+    long firstTs = UuidConversionFunctions.uuidTimestamp(first);
+    long secondTs = UuidConversionFunctions.uuidTimestamp(second);
+
+    assertTrue(firstTs >= before && firstTs <= after,
+        "uuidV7 timestamp " + firstTs + " not within [" + before + ", " + after + "]");
+    assertTrue(secondTs >= firstTs, "uuidV7 timestamps must be monotonically non-decreasing across calls");
+
+    // Variant must be RFC 4122 (top two bits of LSB = 10).
+    assertEquals(first.variant(), 2, "uuidV7 must use RFC 4122 variant");
+  }
+
+  @Test
+  public void testUuidVersionForKnownVersions() {
+    // Version 4 — random.
+    assertEquals(UuidConversionFunctions.uuidVersion(UUID.fromString("550e8400-e29b-41d4-a716-446655440000"))
+        .intValue(), 4);
+    // Version 1 — Gregorian time-based.
+    assertEquals(UuidConversionFunctions.uuidVersion(UUID.fromString("c232ab00-9414-11ec-b3c8-9e6bdeced846"))
+        .intValue(), 1);
+    // Version 7 — Unix-time-based.
+    assertEquals(UuidConversionFunctions.uuidVersion(UUID.fromString("017f22e2-79b0-7cc3-98c4-dc0c0c07398f"))
+        .intValue(), 7);
+  }
+
+  @Test
+  public void testUuidTimestampRejectsNonTimeBasedVersions() {
+    UUID v4 = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+    Assert.expectThrows(IllegalArgumentException.class, () -> UuidConversionFunctions.uuidTimestamp(v4));
+  }
+
+  @Test
+  public void testUuidTimestampDecodesV7FixedSample() {
+    // Construct a v7 UUID with known unix ms = 0x017F22E279B0L = 1645557742000 (2022-02-22T19:22:22Z).
+    long unixMs = 0x017F22E279B0L;
+    long msb = (unixMs << 16) | 0x7000L | 0x0CC3L;
+    long lsb = 0x8000000000000000L | 0x18C4DC0C0C07398FL;
+    UUID v7 = new UUID(msb, lsb);
+    assertEquals(UuidConversionFunctions.uuidTimestamp(v7).longValue(), unixMs);
+    assertEquals(UuidConversionFunctions.uuidVersion(v7).intValue(), 7);
   }
 }
