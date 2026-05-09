@@ -21,9 +21,6 @@ package org.apache.pinot.segment.spi.partition.pipeline;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
-import java.util.function.ToIntFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
@@ -34,38 +31,32 @@ import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
+/// The compiler does not normalize the expression output; the test expressions wrap the hash with `mod(...)` (or use
+/// `bucket(...)` which already wraps) so that the integral output is in `[0, numPartitions)` as required by the
+/// pipeline contract.
 public class PartitionFunctionExprCompilerTest {
   @Test
   public void testCompilePartitionFunctionForMd5Fnv() {
-    PartitionPipelineFunction partitionFunction =
-        PartitionFunctionExprCompiler.compilePartitionFunction("raw_key", "fnv1a_32(md5(raw_key))", 64);
+    PartitionPipelineFunction partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction("raw_key",
+        "positiveModulo(fnv1a_32(md5(raw_key)), 64)", 64);
 
     String digestHex = BytesUtils.toHexString(md5("Pinot".getBytes(UTF_8)));
     int expectedHash = FnvHashFunctions.fnv1aHash32(digestHex.getBytes(UTF_8));
     int expectedPartition = positiveModulo(expectedHash, 64);
     assertEquals(partitionFunction.getPartition("Pinot"), expectedPartition);
-    assertEquals(partitionFunction.getFunctionExpr(), "fnv1a_32(md5(raw_key))");
-    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.POSITIVE_MODULO);
-  }
-
-  @Test
-  public void testCompilePartitionFunctionForMd5FnvWithExactUuidUsingMaskNormalizer() {
-    PartitionPipelineFunction partitionFunction =
-        PartitionFunctionExprCompiler.compilePartitionFunction("id", "fnv1a_32(md5(id))", 128, "MASK");
-
-    assertEquals(partitionFunction.getPartition("000016be-9d72-466c-9632-cfa680dc8fa3"), 104);
-    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.MASK);
+    assertEquals(partitionFunction.getFunctionExpr(), "positivemodulo(fnv1a_32(md5(raw_key)), 64)");
+    // Expression-mode pipelines pass the integral output through unchanged.
+    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.NO_OP);
   }
 
   @Test
   public void testCompilePartitionFunctionForLowerMurmur2() {
-    PartitionPipelineFunction partitionFunction =
-        PartitionFunctionExprCompiler.compilePartitionFunction("raw_key", "murmur2(lower(raw_key))", 32);
+    PartitionPipelineFunction partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction("raw_key",
+        "positiveModulo(murmur2(lower(raw_key)), 32)", 32);
 
     int expectedHash = MurmurHashFunctions.murmurHash2("hello".getBytes(UTF_8));
     assertEquals(partitionFunction.getPartition("HeLLo"), positiveModulo(expectedHash, 32));
@@ -84,11 +75,11 @@ public class PartitionFunctionExprCompilerTest {
   public void testCanonicalizationPreservesQuotedLiteralPayload() {
     PartitionPipelineFunction partitionFunction =
         PartitionFunctionExprCompiler.compilePartitionFunction("raw_key",
-            "MURMUR2( CONCAT( raw_key , 'SALT Value' ) )", 64);
+            "POSITIVEMODULO( MURMUR2( CONCAT( raw_key , 'SALT Value' ) ), 64 )", 64);
 
     int expectedHash = MurmurHashFunctions.murmurHash2("PinotSALT Value".getBytes(UTF_8));
     assertEquals(partitionFunction.getPartition("Pinot"), positiveModulo(expectedHash, 64));
-    assertEquals(partitionFunction.getFunctionExpr(), "murmur2(concat(raw_key, 'SALT Value'))");
+    assertEquals(partitionFunction.getFunctionExpr(), "positivemodulo(murmur2(concat(raw_key, 'SALT Value')), 64)");
   }
 
   @Test
@@ -114,52 +105,6 @@ public class PartitionFunctionExprCompilerTest {
   }
 
   @Test
-  public void testIntegralExpressionDefaultsToPositiveModulo() {
-    int numPartitions = 13;
-    PartitionPipeline pipeline = PartitionFunctionExprCompiler.compile("raw_key", "murmur2(raw_key)");
-    PartitionPipelineFunction partitionFunction =
-        PartitionFunctionExprCompiler.compilePartitionFunction("raw_key", "murmur2(raw_key)", numPartitions);
-    PartitionFunction legacyPartitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("Murmur2", numPartitions, null);
-    String value = findValueWithNegativeHash(input -> MurmurHashFunctions.murmurHash2(input.getBytes(UTF_8)));
-    int hash = MurmurHashFunctions.murmurHash2(value.getBytes(UTF_8));
-
-    assertTrue(hash < 0);
-    assertNotEquals(positiveModulo(hash, numPartitions), legacyPartitionFunction.getPartition(value));
-    assertEquals(pipeline.getIntNormalizer(), null);
-    assertEquals(partitionFunction.getPartition(value), positiveModulo(hash, numPartitions));
-    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.POSITIVE_MODULO);
-  }
-
-  @Test
-  public void testExplicitMaskNormalizerMatchesLegacyMurmur2Partitioning() {
-    int numPartitions = 13;
-    PartitionPipelineFunction partitionFunction =
-        PartitionFunctionExprCompiler.compilePartitionFunction("raw_key", "identity(murmur2(raw_key))",
-            numPartitions, "MASK");
-    PartitionFunction legacyPartitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("Murmur2", numPartitions, null);
-    String value = findValueWithNegativeHash(input -> MurmurHashFunctions.murmurHash2(input.getBytes(UTF_8)));
-
-    assertEquals(partitionFunction.getPartition(value), legacyPartitionFunction.getPartition(value));
-    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.MASK);
-  }
-
-  @Test
-  public void testExplicitAbsNormalizerUsesAbsoluteRemainder() {
-    int numPartitions = 13;
-    String value = findValueWithNegativeHash(input -> MurmurHashFunctions.murmurHash2(input.getBytes(UTF_8)));
-    int hash = MurmurHashFunctions.murmurHash2(value.getBytes(UTF_8));
-    PartitionPipelineFunction partitionFunction =
-        PartitionFunctionExprCompiler.compilePartitionFunction("raw_key", "identity(murmur2(raw_key))",
-            numPartitions, "ABS");
-
-    assertTrue(hash < 0);
-    assertEquals(partitionFunction.getPartition(value), absoluteModulo(hash, numPartitions));
-    assertEquals(partitionFunction.getPartitionIdNormalizer(), PartitionIdNormalizer.ABS);
-  }
-
-  @Test
   public void testRejectsWrongColumnReference() {
     IllegalArgumentException error = expectThrows(IllegalArgumentException.class,
         () -> PartitionFunctionExprCompiler.compile("raw_key", "md5(other_key)"));
@@ -169,7 +114,7 @@ public class PartitionFunctionExprCompilerTest {
 
   @Test
   public void testRejectsNonIntPartitionFunctionOutput() {
-    // md5 returns a String; the error is thrown at evaluation time when normalizeResult() checks the return type
+    // md5 returns a String; the error is thrown at evaluation time when the pipeline output is checked.
     PartitionPipelineFunction partitionFunction =
         PartitionFunctionExprCompiler.compilePartitionFunction("raw_key", "md5(raw_key)", 16);
     IllegalStateException error = expectThrows(IllegalStateException.class,
@@ -205,20 +150,5 @@ public class PartitionFunctionExprCompilerTest {
   private static int positiveModulo(int value, int modulus) {
     int partition = value % modulus;
     return partition < 0 ? partition + modulus : partition;
-  }
-
-  private static int absoluteModulo(int value, int modulus) {
-    int partition = value % modulus;
-    return partition < 0 ? -partition : partition;
-  }
-
-  private static String findValueWithNegativeHash(ToIntFunction<String> hashFunction) {
-    for (int i = 0; i < 10_000; i++) {
-      String value = "value_" + i;
-      if (hashFunction.applyAsInt(value) < 0) {
-        return value;
-      }
-    }
-    throw new IllegalStateException("Failed to find a value with a negative hash");
   }
 }

@@ -3470,14 +3470,14 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testValidateSegmentPartitionFunctionExprWithExplicitMaskNormalizer() {
+  public void testValidateSegmentPartitionFunctionExprWithExplicitModulo() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.STRING)
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(Collections.singletonMap(
-        PARTITION_COLUMN, ColumnPartitionConfig.forFunctionExpr("fnv1a_32(md5(" + PARTITION_COLUMN + "))", 128,
-            "MASK")));
+        PARTITION_COLUMN,
+        ColumnPartitionConfig.forFunctionExpr("positiveModulo(fnv1a_32(md5(" + PARTITION_COLUMN + ")), 128)", 128)));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setStreamConfigs(getStreamConfigs())

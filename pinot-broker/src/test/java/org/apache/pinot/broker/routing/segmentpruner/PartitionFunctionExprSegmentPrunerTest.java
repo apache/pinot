@@ -81,10 +81,10 @@ public class PartitionFunctionExprSegmentPrunerTest {
       throws Exception {
     SinglePartitionColumnSegmentPruner pruner =
         new SinglePartitionColumnSegmentPruner(TABLE_NAME_WITH_TYPE, UUID_PARTITION_COLUMN);
-    String functionExpr = "fnv1a_32(md5(id))";
+    String functionExpr = "positiveModulo(fnv1a_32(md5(id)), 128)";
     String matchingValue = "000016be-9d72-466c-9632-cfa680dc8fa3";
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(UUID_PARTITION_COLUMN, null, 128, null, functionExpr, "MASK");
+        PartitionFunctionFactory.getPartitionFunction(UUID_PARTITION_COLUMN, null, 128, null, functionExpr);
     int matchingPartition = partitionFunction.getPartition(matchingValue);
     String nonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition,
         "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002",
@@ -99,7 +99,6 @@ public class PartitionFunctionExprSegmentPrunerTest {
     BrokerRequest eqMiss = CalciteSqlCompiler.compileToBrokerRequest(
         String.format("SELECT * FROM testTable WHERE id = '%s'", nonMatchingValue));
 
-    assertEquals(matchingPartition, 104);
     assertEquals(pruner.prune(eqMatch, input), input);
     assertEquals(pruner.prune(eqMiss, input), Set.of());
   }
@@ -135,7 +134,7 @@ public class PartitionFunctionExprSegmentPrunerTest {
         new SinglePartitionColumnSegmentPruner(TABLE_NAME_WITH_TYPE, PARTITION_COLUMN);
     pruner.refreshSegment(segment,
         createRawPartitionMetadataRecord(segment, PARTITION_COLUMN, PartitionPipelineFunction.NAME, 8, Set.of(1),
-            "sha256(memberId)", null));
+            "sha256(memberId)"));
 
     Set<String> input = Set.of(segment);
     BrokerRequest brokerRequest =
@@ -155,7 +154,7 @@ public class PartitionFunctionExprSegmentPrunerTest {
   }
 
   private ZNRecord createRawPartitionMetadataRecord(String segmentName, String partitionColumn, String functionName,
-      int numPartitions, Set<Integer> partitions, String functionExpr, String partitionIdNormalizer)
+      int numPartitions, Set<Integer> partitions, String functionExpr)
       throws IOException {
     ZNRecord znRecord = new ZNRecord(segmentName);
     Map<String, Object> columnPartitionMetadata = new HashMap<>();
@@ -163,9 +162,6 @@ public class PartitionFunctionExprSegmentPrunerTest {
     columnPartitionMetadata.put("numPartitions", numPartitions);
     columnPartitionMetadata.put("partitions", partitions);
     columnPartitionMetadata.put("functionExpr", functionExpr);
-    if (partitionIdNormalizer != null) {
-      columnPartitionMetadata.put("partitionIdNormalizer", partitionIdNormalizer);
-    }
     znRecord.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, JsonUtils.objectToString(
         Map.of("columnPartitionMap", Map.of(partitionColumn, columnPartitionMetadata))));
     return znRecord;

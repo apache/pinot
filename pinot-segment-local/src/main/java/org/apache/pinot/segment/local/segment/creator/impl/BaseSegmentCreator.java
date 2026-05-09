@@ -630,10 +630,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       if (partitionFunction.getFunctionExpr() != null) {
         properties.setProperty(getKeyFor(column, PARTITION_FUNCTION_EXPR), partitionFunction.getFunctionExpr());
       }
-      if (partitionFunction.getPartitionIdNormalizer() != null) {
-        properties.setProperty(getKeyFor(column, PARTITION_ID_NORMALIZER),
-            partitionFunction.getPartitionIdNormalizer());
-      }
       // For expression-mode pipelines compiled with BYTES input, persist the input type so segment readers don't
       // have to re-derive it from schema state (which may race with metadata loading at startup).
       if (partitionFunction instanceof PartitionPipelineFunction

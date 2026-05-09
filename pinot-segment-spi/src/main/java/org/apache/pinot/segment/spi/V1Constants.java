@@ -174,7 +174,6 @@ public class V1Constants {
       /// Partition function, all optional
       public static final String PARTITION_FUNCTION = "partitionFunction";
       public static final String PARTITION_FUNCTION_EXPR = "partitionFunctionExpr";
-      public static final String PARTITION_ID_NORMALIZER = "partitionIdNormalizer";
       public static final String NUM_PARTITIONS = "numPartitions";
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String PARTITION_FUNCTION_CONFIG = "partitionFunctionConfig";

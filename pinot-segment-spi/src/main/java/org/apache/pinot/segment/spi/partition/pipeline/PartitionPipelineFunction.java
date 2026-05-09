@@ -38,8 +38,12 @@ import org.slf4j.LoggerFactory;
 
 /// [PartitionFunction] adapter for expression-mode partition pipelines.
 ///
-/// **Note on `Serializable`:** [PartitionFunction] extends [java.io.Serializable] for
-/// historical reasons, but partition functions are never Java-serialized in Pinot's runtime.
+/// The user's `functionExpr` is expected to produce an integral value already in `[0, numPartitions)`. This wrapper
+/// does no normalization — it narrows long output to int and returns it directly. Out-of-range output is the user's
+/// responsibility (e.g. wrap your hash expression with `mod(..., numPartitions)` if it does not already wrap).
+///
+/// **Note on `Serializable`:** [PartitionFunction] extends [java.io.Serializable] for historical reasons, but
+/// partition functions are never Java-serialized in Pinot's runtime.
 @SuppressWarnings("serial")
 public class PartitionPipelineFunction implements PartitionFunction, FunctionEvaluator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionPipelineFunction.class);
@@ -56,22 +60,12 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
 
   private final PartitionPipeline _pipeline;
   private final int _numPartitions;
-  // Cache the IntNormalizer so the per-row hot path skips the @Nullable getter lookup + Preconditions.checkState.
-  // The constructor enforces non-null below; this is then a class invariant for the wrapper.
-  private final PartitionIdNormalizer _intNormalizer;
 
   public PartitionPipelineFunction(PartitionPipeline pipeline, int numPartitions) {
     Preconditions.checkNotNull(pipeline, "Partition pipeline must be configured");
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
-    // PartitionPipeline._intNormalizer is @Nullable for compile-time flexibility; this wrapper requires it because
-    // normalizeResult depends on the normalizer to map raw integer outputs into [0, numPartitions). Surface the
-    // contract violation at construction time rather than crashing on the first row.
-    Preconditions.checkArgument(pipeline.getIntNormalizer() != null,
-        "Partition pipeline for column '%s' must have an INT normalizer when wrapped as a PartitionPipelineFunction",
-        pipeline.getRawColumn());
     _pipeline = pipeline;
     _numPartitions = numPartitions;
-    _intNormalizer = pipeline.getIntNormalizer();
   }
 
   public PartitionPipeline getPartitionPipeline() {
@@ -112,7 +106,7 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
             "Partition pipeline must produce INT or LONG output, got: " + javaClassToTypeName(probe.getClass()));
       }
       try {
-        normalizeResult(probe);
+        toPartitionId(probe);
       } catch (IllegalStateException e) {
         throw new IllegalArgumentException(
             "Partition pipeline must produce INT or LONG output: " + e.getMessage(), e);
@@ -158,7 +152,7 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
     if (_pipeline.isBytesInput()) {
       return getPartition(BytesUtils.toBytes(value));
     }
-    return normalizeResult(_pipeline.evaluate(new Object[]{value}));
+    return toPartitionId(_pipeline.evaluate(new Object[]{value}));
   }
 
   /// Overrides the default bytes partition to pass raw bytes directly through the pipeline when this pipeline was
@@ -168,10 +162,13 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
     if (!_pipeline.isBytesInput()) {
       return getPartition(BytesUtils.toHexString(bytes));
     }
-    return normalizeResult(_pipeline.evaluate(new Object[]{bytes}));
+    return toPartitionId(_pipeline.evaluate(new Object[]{bytes}));
   }
 
-  private int normalizeResult(Object result) {
+  /// Converts the integral numeric output from the user's expression into a partition id. The expression is expected
+  /// to already produce a value in `[0, numPartitions)`; out-of-range output is the user's responsibility (the value
+  /// is returned unchanged after narrowing long → int).
+  private int toPartitionId(Object result) {
     if (result == null) {
       LOGGER.debug("Partition expression for column '{}' returned null; skipping partition assignment for this value",
           _pipeline.getRawColumn());
@@ -194,15 +191,14 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
               + "(|x| < 2^53), got: %s (%s); cast the expression result to LONG explicitly to avoid this",
           _pipeline.getRawColumn(), result, result.getClass().getSimpleName());
     }
-    // _intNormalizer is non-null by class invariant (enforced in the constructor).
     // BigInteger and BigDecimal get dedicated paths so Number.longValue()/intValue() cannot silently truncate
     // fractional values or values outside the LONG range.
     if (num instanceof BigInteger) {
-      return normalizeBigIntegerResult((BigInteger) num, result);
+      return narrowToInt((BigInteger) num, result);
     }
     if (num instanceof BigDecimal) {
       try {
-        return normalizeBigIntegerResult(((BigDecimal) num).toBigIntegerExact(), result);
+        return narrowToInt(((BigDecimal) num).toBigIntegerExact(), result);
       } catch (ArithmeticException e) {
         throw new IllegalStateException(
             "Partition expression for column '" + _pipeline.getRawColumn()
@@ -210,19 +206,19 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
       }
     }
     if (num instanceof Long || num instanceof Float || num instanceof Double) {
-      return _intNormalizer.getPartitionId(num.longValue(), _numPartitions);
+      return (int) num.longValue();
     }
     if (num instanceof Integer || num instanceof Short || num instanceof Byte) {
-      return _intNormalizer.getPartitionId(num.intValue(), _numPartitions);
+      return num.intValue();
     }
     throw new IllegalStateException(
         "Partition expression for column '" + _pipeline.getRawColumn()
             + "' must return INT or LONG-compatible output, got: " + javaClassToTypeName(result.getClass()));
   }
 
-  private int normalizeBigIntegerResult(BigInteger value, Object originalResult) {
+  private int narrowToInt(BigInteger value, Object originalResult) {
     try {
-      return _intNormalizer.getPartitionId(value.longValueExact(), _numPartitions);
+      return (int) value.longValueExact();
     } catch (ArithmeticException e) {
       throw new IllegalStateException(
           "Partition expression for column '" + _pipeline.getRawColumn()
@@ -253,10 +249,12 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
     return _pipeline.getCanonicalFunctionExpr();
   }
 
+  /// Expression-mode pipelines pass the integral expression output through unchanged (the framework's `NO_OP`
+  /// normalizer label). The user's expression is responsible for producing a value already in `[0, numPartitions)`.
   @Override
-  @JsonProperty("partitionIdNormalizer")
+  @JsonIgnore
   public PartitionIdNormalizer getPartitionIdNormalizer() {
-    return _intNormalizer;
+    return PartitionIdNormalizer.NO_OP;
   }
 
   // FunctionEvaluator implementation
@@ -272,7 +270,7 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
     // dispatch, and the null-input early return. Avoids duplicating that logic here and saves one Object[]
     // allocation per row vs the getPartition(...) path.
     Object rawResult = _pipeline.evaluate(genericRow);
-    int partitionId = normalizeResult(rawResult);
+    int partitionId = toPartitionId(rawResult);
     return partitionId == NULL_RESULT_PARTITION_ID ? null : partitionId;
   }
 

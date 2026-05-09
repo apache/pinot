@@ -341,7 +341,6 @@ public class ColumnMetadataImpl implements ColumnMetadata {
     // Set partition function
     String partitionFunctionName = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION), null);
     String partitionFunctionExpr = config.getString(Column.getKeyFor(column, Column.PARTITION_FUNCTION_EXPR), null);
-    String partitionIdNormalizer = config.getString(Column.getKeyFor(column, Column.PARTITION_ID_NORMALIZER), null);
     if (partitionFunctionName != null || partitionFunctionExpr != null) {
       int numPartitions = config.getInt(Column.getKeyFor(column, Column.NUM_PARTITIONS));
       Configuration partitionFunctionConfig = config.subset(Column.getKeyFor(column, Column.PARTITION_FUNCTION_CONFIG));
@@ -374,7 +373,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
           inputType = storedType == DataType.BYTES ? PartitionValueType.BYTES : PartitionValueType.STRING;
         }
         partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction(column, inputType,
-            partitionFunctionExpr, numPartitions, partitionIdNormalizer);
+            partitionFunctionExpr, numPartitions);
       } else {
         partitionFunction =
             PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,

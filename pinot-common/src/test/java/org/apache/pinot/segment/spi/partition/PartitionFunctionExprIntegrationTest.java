@@ -37,27 +37,28 @@ public class PartitionFunctionExprIntegrationTest {
   @Test
   public void testFunctionExprPartitionFunctionImplementsFunctionEvaluator() {
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "fnv1a_32(md5(id))", "MASK");
+        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "positiveModulo(fnv1a_32(md5(id)), 128)");
     assertTrue(partitionFunction instanceof FunctionEvaluator);
     FunctionEvaluator evaluator = (FunctionEvaluator) partitionFunction;
     GenericRow row = new GenericRow();
     row.putValue("id", "000016be-9d72-466c-9632-cfa680dc8fa3");
 
     assertEquals(evaluator.getArguments(), List.of("id"));
-    assertEquals(evaluator.evaluate(row), 104);
-    assertEquals(evaluator.evaluate(new Object[]{"000016be-9d72-466c-9632-cfa680dc8fa3"}), 104);
+    int directPartition = partitionFunction.getPartition("000016be-9d72-466c-9632-cfa680dc8fa3");
+    assertTrue(directPartition >= 0 && directPartition < 128, "partition id must be in [0, 128)");
+    assertEquals(evaluator.evaluate(row), directPartition);
+    assertEquals(evaluator.evaluate(new Object[]{"000016be-9d72-466c-9632-cfa680dc8fa3"}), directPartition);
   }
 
   @Test
   public void testFunctionExprPartitionFunctionSerialization() {
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "fnv1a_32(md5(id))", "MASK");
+        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "positiveModulo(fnv1a_32(md5(id)), 128)");
 
     JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
     assertEquals(partitionFunction.getName(), PartitionPipelineFunction.NAME);
     assertEquals(jsonNode.get("name").asText(), PartitionPipelineFunction.NAME);
     assertEquals(jsonNode.get("numPartitions").asInt(), 128);
-    assertEquals(jsonNode.get("functionExpr").asText(), "fnv1a_32(md5(id))");
-    assertEquals(jsonNode.get("partitionIdNormalizer").asText(), "MASK");
+    assertEquals(jsonNode.get("functionExpr").asText(), "positivemodulo(fnv1a_32(md5(id)), 128)");
   }
 }

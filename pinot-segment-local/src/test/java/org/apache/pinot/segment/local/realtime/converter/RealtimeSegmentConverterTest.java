@@ -963,11 +963,10 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
   public void testPartitionFunctionExprPreservedInConvertedSegment()
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
-    String functionExpr = "fnv1a_32(md5(" + STRING_COLUMN1 + "))";
-    String partitionIdNormalizer = "MASK";
+    String functionExpr = "positivemodulo(fnv1a_32(md5(" + STRING_COLUMN1 + ")), 8)";
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(
-        Map.of(STRING_COLUMN1, ColumnPartitionConfig.forFunctionExpr(functionExpr, 8, partitionIdNormalizer)));
+        Map.of(STRING_COLUMN1, ColumnPartitionConfig.forFunctionExpr(functionExpr, 8)));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName("testTable")
@@ -1027,7 +1026,6 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       assertNotNull(columnPartitionConfig);
       assertNull(columnPartitionConfig.getFunctionName());
       assertEquals(columnPartitionConfig.getFunctionExpr(), functionExpr);
-      assertEquals(columnPartitionConfig.getPartitionIdNormalizer(), partitionIdNormalizer);
       assertEquals(columnPartitionConfig.getNumPartitions(), 8);
       assertNull(columnPartitionConfig.getFunctionConfig());
 
@@ -1048,7 +1046,6 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
       assertEquals(col1Meta.getPartitionFunction().getName(), PartitionPipelineFunction.NAME);
       assertEquals(col1Meta.getPartitionFunction().getNumPartitions(), 8);
       assertEquals(col1Meta.getPartitionFunction().getFunctionExpr(), functionExpr);
-      assertEquals(col1Meta.getPartitionFunction().getPartitionIdNormalizer(), partitionIdNormalizer);
       assertNull(col1Meta.getPartitionFunction().getFunctionConfig());
     } finally {
       mutableSegmentImpl.destroy();

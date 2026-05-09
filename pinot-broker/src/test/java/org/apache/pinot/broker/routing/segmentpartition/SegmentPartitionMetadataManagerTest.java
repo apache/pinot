@@ -295,12 +295,13 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>();
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
-    String functionExpr = "fnv1a_32(md5(" + PARTITION_COLUMN + "))";
+    String functionExpr = "positiveModulo(fnv1a_32(md5(" + PARTITION_COLUMN + ")), 8)";
+    String differentExpr = "positiveModulo(murmur2(" + PARTITION_COLUMN + "), 8)";
     String segment = "exprSegment";
 
     SegmentPartitionMetadataManager partitionMetadataManager =
         new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN,
-            ColumnPartitionConfig.forFunctionExpr(functionExpr, 8, "MASK"));
+            ColumnPartitionConfig.forFunctionExpr(functionExpr, 8));
     SegmentZkMetadataFetcher segmentZkMetadataFetcher =
         new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
     segmentZkMetadataFetcher.register(partitionMetadataManager);
@@ -308,7 +309,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
 
     onlineSegments.add(segment);
     segmentAssignment.put(segment, Collections.singletonMap(SERVER_0, ONLINE));
-    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, functionExpr, "MASK", 0L);
+    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, functionExpr, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
 
     TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
@@ -317,41 +318,13 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
         Collections.singleton(segment));
     assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
-    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, functionExpr, "POSITIVE_MODULO", 0L);
+    // Segment whose functionExpr differs from the table-config expression must be flagged invalid.
+    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, differentExpr, 0L);
     segmentZkMetadataFetcher.refreshSegment(segment);
 
     tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
     assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition(),
         Collections.singletonList(segment));
-  }
-
-  @Test
-  public void testPartitionMetadataManagerProcessingWithFunctionExprAbsNormalizer() {
-    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
-    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
-    Set<String> onlineSegments = new HashSet<>();
-    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
-    String functionExpr = "murmur2(" + PARTITION_COLUMN + ")";
-    String segment = "exprAbsSegment";
-
-    SegmentPartitionMetadataManager partitionMetadataManager =
-        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN,
-            ColumnPartitionConfig.forFunctionExpr(functionExpr, 8, "ABS"));
-    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
-        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
-    segmentZkMetadataFetcher.register(partitionMetadataManager);
-    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
-
-    onlineSegments.add(segment);
-    segmentAssignment.put(segment, Collections.singletonMap(SERVER_0, ONLINE));
-    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, functionExpr, "ABS", 0L);
-    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-
-    TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
-        partitionMetadataManager.getTablePartitionReplicatedServersInfo();
-    assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap()[1]._segments,
-        Collections.singleton(segment));
-    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
   }
 
   @Test
@@ -374,7 +347,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
 
     onlineSegments.add(segment);
     segmentAssignment.put(segment, Collections.singletonMap(SERVER_0, ONLINE));
-    setSegmentZKMetadata(segment, partitionFunction, 8, 1, functionConfig, null, null, 0L);
+    setSegmentZKMetadata(segment, partitionFunction, 8, 1, functionConfig, null, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
 
     TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
@@ -383,7 +356,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
         Collections.singleton(segment));
     assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
-    setSegmentZKMetadata(segment, partitionFunction, 8, 1, Map.of("seed", "13"), null, null, 0L);
+    setSegmentZKMetadata(segment, partitionFunction, 8, 1, Map.of("seed", "13"), null, 0L);
     segmentZkMetadataFetcher.refreshSegment(segment);
 
     tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
@@ -401,13 +374,13 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
     Set<String> onlineSegments = new HashSet<>();
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
-    String configExpr = "fnv1a_32(md5(" + PARTITION_COLUMN + "))";
-    String mixedCaseSegmentExpr = "FNV1A_32(MD5(" + PARTITION_COLUMN + "))";
+    String configExpr = "positiveModulo(fnv1a_32(md5(" + PARTITION_COLUMN + ")), 8)";
+    String mixedCaseSegmentExpr = "MOD(FNV1A_32(MD5(" + PARTITION_COLUMN + ")), 8)";
     String segment = "mixedCaseSegment";
 
     SegmentPartitionMetadataManager partitionMetadataManager =
         new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN,
-            ColumnPartitionConfig.forFunctionExpr(configExpr, 8, "MASK"));
+            ColumnPartitionConfig.forFunctionExpr(configExpr, 8));
     SegmentZkMetadataFetcher segmentZkMetadataFetcher =
         new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
     segmentZkMetadataFetcher.register(partitionMetadataManager);
@@ -415,7 +388,7 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
 
     onlineSegments.add(segment);
     segmentAssignment.put(segment, Collections.singletonMap(SERVER_0, ONLINE));
-    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, mixedCaseSegmentExpr, "MASK", 0L);
+    setSegmentZKMetadata(segment, PartitionPipelineFunction.NAME, 8, 1, mixedCaseSegmentExpr, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
 
     TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
@@ -429,27 +402,20 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
       long creationTimeMs) {
-    setSegmentZKMetadata(segment, partitionFunction, numPartitions, partitionId, null, null, creationTimeMs);
+    setSegmentZKMetadata(segment, partitionFunction, numPartitions, partitionId, null, creationTimeMs);
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
       @Nullable String functionExpr, long creationTimeMs) {
-    setSegmentZKMetadata(segment, partitionFunction, numPartitions, partitionId, functionExpr, null, creationTimeMs);
+    setSegmentZKMetadata(segment, partitionFunction, numPartitions, partitionId, null, functionExpr, creationTimeMs);
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
-      @Nullable String functionExpr, @Nullable String partitionIdNormalizer, long creationTimeMs) {
-    setSegmentZKMetadata(segment, partitionFunction, numPartitions, partitionId, null, functionExpr,
-        partitionIdNormalizer, creationTimeMs);
-  }
-
-  private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
-      @Nullable Map<String, String> functionConfig, @Nullable String functionExpr,
-      @Nullable String partitionIdNormalizer, long creationTimeMs) {
+      @Nullable Map<String, String> functionConfig, @Nullable String functionExpr, long creationTimeMs) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
     PartitionFunction effectivePartitionFunction =
         PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN, partitionFunction, numPartitions,
-            functionConfig, functionExpr, partitionIdNormalizer);
+            functionConfig, functionExpr);
     segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
         new ColumnPartitionMetadata(effectivePartitionFunction, Collections.singleton(partitionId)))));
     segmentZKMetadata.setCreationTime(creationTimeMs);

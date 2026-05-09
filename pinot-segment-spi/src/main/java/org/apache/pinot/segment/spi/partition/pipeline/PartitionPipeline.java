@@ -21,8 +21,6 @@ package org.apache.pinot.segment.spi.partition.pipeline;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
@@ -39,20 +37,16 @@ public final class PartitionPipeline implements FunctionEvaluator {
   private final String _rawColumn;
   private final boolean _isBytesInput;
   private final String _canonicalFunctionExpr;
-  @Nullable
-  private final PartitionIdNormalizer _intNormalizer;
   private final FunctionEvaluator _evaluator;
   private final List<String> _arguments;
 
-  PartitionPipeline(String rawColumn, boolean isBytesInput, String canonicalFunctionExpr,
-      @Nullable PartitionIdNormalizer intNormalizer, FunctionEvaluator evaluator) {
+  PartitionPipeline(String rawColumn, boolean isBytesInput, String canonicalFunctionExpr, FunctionEvaluator evaluator) {
     Preconditions.checkNotNull(rawColumn, "Raw column must be configured");
     Preconditions.checkNotNull(canonicalFunctionExpr, "Canonical function expression must be configured");
     Preconditions.checkNotNull(evaluator, "Function evaluator must be configured");
     _rawColumn = rawColumn;
     _isBytesInput = isBytesInput;
     _canonicalFunctionExpr = canonicalFunctionExpr;
-    _intNormalizer = intNormalizer;
     _evaluator = evaluator;
     _arguments = Collections.singletonList(rawColumn);
   }
@@ -67,11 +61,6 @@ public final class PartitionPipeline implements FunctionEvaluator {
 
   public String getCanonicalFunctionExpr() {
     return _canonicalFunctionExpr;
-  }
-
-  @Nullable
-  public PartitionIdNormalizer getIntNormalizer() {
-    return _intNormalizer;
   }
 
   @Override

@@ -41,7 +41,6 @@ import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -151,11 +150,6 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     Map<String, String> functionConfig = partitionFunction.getFunctionConfig();
     if (functionConfig != null && !functionConfig.isEmpty()
         && !Objects.equals(_partitionFunction.getFunctionConfig(), functionConfig)) {
-      return false;
-    }
-
-    PartitionIdNormalizer partitionIdNormalizer = partitionFunction.getPartitionIdNormalizer();
-    if (partitionIdNormalizer != null && _partitionFunction.getPartitionIdNormalizer() != partitionIdNormalizer) {
       return false;
     }
 

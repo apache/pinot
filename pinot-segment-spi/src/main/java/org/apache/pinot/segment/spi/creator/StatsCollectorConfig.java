@@ -127,12 +127,6 @@ public class StatsCollectorConfig {
   }
 
   @Nullable
-  public String getPartitionIdNormalizer(String column) {
-    ColumnPartitionConfig config = getColumnPartitionConfig(column);
-    return config != null ? config.getPartitionIdNormalizer() : null;
-  }
-
-  @Nullable
   private ColumnPartitionConfig getColumnPartitionConfig(String column) {
     return _segmentPartitionConfig != null ? _segmentPartitionConfig.getColumnPartitionConfig(column) : null;
   }

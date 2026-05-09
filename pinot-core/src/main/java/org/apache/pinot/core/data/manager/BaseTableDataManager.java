@@ -105,7 +105,6 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -1823,17 +1822,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function expr",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function expr changed: " + columnName);
-        }
-        // Asymmetric null tolerance: a segment built by an older or custom-plugin partition function may return null
-        // from getPartitionIdNormalizer (older SPIs allowed it; tolerate). However, if the segment side declares a
-        // normalizer and the config side does not, the user explicitly cleared the normalizer and the segment must
-        // be rebuilt; same when the two non-null values differ.
-        PartitionIdNormalizer segmentNormalizer = partitionFunction.getPartitionIdNormalizer();
-        PartitionIdNormalizer configNormalizer = expectedPartitionFunction.getPartitionIdNormalizer();
-        if (segmentNormalizer != null && configNormalizer != segmentNormalizer) {
-          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition id normalizer",
-              tableNameWithType, columnName, segmentName);
-          return new StaleSegment(segmentName, true, "partition id normalizer changed: " + columnName);
         }
         // Detect input-type changes (STRING ↔ BYTES) for expression-mode pipelines. A field-spec edit can flip the
         // partition column's stored type without changing functionExpr or normalizer; the recompiled pipeline would

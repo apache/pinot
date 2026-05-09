@@ -205,10 +205,10 @@ public class PartitionFunctionFactory {
     if (metadata.getFunctionExpr() != null && metadata.getInputType() != null) {
       PartitionValueType inputType = PartitionValueType.valueOf(metadata.getInputType());
       return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, inputType, metadata.getFunctionExpr(),
-          metadata.getNumPartitions(), metadata.getPartitionIdNormalizer());
+          metadata.getNumPartitions());
     }
     return getPartitionFunction(columnName, metadata.getFunctionName(), metadata.getNumPartitions(),
-        metadata.getFunctionConfig(), metadata.getFunctionExpr(), metadata.getPartitionIdNormalizer());
+        metadata.getFunctionConfig(), metadata.getFunctionExpr());
   }
 
   public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig) {
@@ -225,13 +225,7 @@ public class PartitionFunctionFactory {
       int numPartitions) {
     Preconditions.checkNotNull(columnPartitionConfig, "Column partition config must be configured");
     return getPartitionFunction(columnName, columnPartitionConfig.getFunctionName(), numPartitions,
-        columnPartitionConfig.getFunctionConfig(), columnPartitionConfig.getFunctionExpr(),
-        columnPartitionConfig.getPartitionIdNormalizer());
-  }
-
-  public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
-      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
-    return getPartitionFunction(columnName, functionName, numPartitions, functionConfig, functionExpr, null);
+        columnPartitionConfig.getFunctionConfig(), columnPartitionConfig.getFunctionExpr());
   }
 
   /// Builds a partition function for expression mode using an explicit input type.
@@ -244,7 +238,7 @@ public class PartitionFunctionFactory {
     Preconditions.checkArgument(config.getFunctionExpr() != null,
         "inputType overload is only valid for expression-mode configs (functionExpr must be set)");
     return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, inputType, config.getFunctionExpr(),
-        config.getNumPartitions(), config.getPartitionIdNormalizer());
+        config.getNumPartitions());
   }
 
   /// Builds a partition function using the schema field spec to determine the correct input type for expression-mode
@@ -269,28 +263,19 @@ public class PartitionFunctionFactory {
     if (config.getFunctionExpr() != null && fieldSpec != null
         && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
       return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, PartitionValueType.BYTES,
-          config.getFunctionExpr(), numPartitions, config.getPartitionIdNormalizer());
+          config.getFunctionExpr(), numPartitions);
     }
     return getPartitionFunction(columnName, config.getFunctionName(), numPartitions, config.getFunctionConfig(),
-        config.getFunctionExpr(), config.getPartitionIdNormalizer());
+        config.getFunctionExpr());
   }
 
   public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
-      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr,
-      @Nullable String partitionIdNormalizer) {
+      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
     if (functionExpr != null) {
-      return PartitionFunctionExprCompiler
-          .compilePartitionFunction(columnName, functionExpr, numPartitions, partitionIdNormalizer);
+      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, functionExpr, numPartitions);
     }
     Preconditions.checkArgument(functionName != null, "Partition function name must be configured");
     PartitionFunction partitionFunction = getPartitionFunction(functionName, numPartitions, functionConfig);
-    if (partitionIdNormalizer != null) {
-      PartitionIdNormalizer effective = partitionFunction.getPartitionIdNormalizer();
-      Preconditions.checkArgument(effective != null
-              && effective.name().equalsIgnoreCase(partitionIdNormalizer),
-          "'partitionIdNormalizer'=%s is incompatible with legacy partition function '%s'; expected '%s'",
-          partitionIdNormalizer, functionName, effective == null ? null : effective.name());
-    }
     return new ColumnBoundPartitionFunction(columnName, partitionFunction);
   }
 

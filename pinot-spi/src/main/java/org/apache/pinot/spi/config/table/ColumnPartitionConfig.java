@@ -21,7 +21,6 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -31,63 +30,48 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 ///
 /// There are two mutually exclusive modes:
 ///
-/// - **Name mode** (legacy): configure `functionName` (and optionally `functionConfig`).
-///   Old and new nodes can all deserialize this format.
-/// - **Expression mode** (new): configure `functionExpr` (and optionally `partitionIdNormalizer`). This mode produces
-///   JSON that omits `functionName`. **Known limitation:** expression-mode configs must only be written after *all*
-///   broker/server/controller nodes have been upgraded to a version that supports this feature. A node pre-dating
-///   expression mode will fail to deserialize such a config and will exclude the affected table from partition-aware
-///   routing. No mixed-version safety gate is enforced at the controller write path; operators are responsible for
-///   ensuring the cluster is fully upgraded before enabling expression-mode partitioning.
+/// - **Name mode** (legacy, production-recommended): configure `functionName` (and optionally `functionConfig`).
+///   Old and new nodes can all deserialize this format. The named partition functions
+///   (`Murmur`, `Modulo`, `HashCode`, ...) are the production-ready path.
+/// - **Expression mode** (new, flexibility escape hatch): configure `functionExpr` to compute the partition with
+///   a chained scalar expression (e.g. `fnv1a_32(md5(col))`). This trades runtime overhead for the ability to
+///   express arbitrary partition logic without writing a custom partition function. The pipeline always normalizes
+///   the integral expression output with `POSITIVE_MODULO` over `numPartitions`. **Known limitation:** expression-mode
+///   configs must only be written after *all* broker/server/controller nodes have been upgraded to a version that
+///   supports this feature. A node pre-dating expression mode will fail to deserialize such a config and will exclude
+///   the affected table from partition-aware routing. No mixed-version safety gate is enforced at the controller
+///   write path; operators are responsible for ensuring the cluster is fully upgraded before enabling expression-mode
+///   partitioning.
 public class ColumnPartitionConfig extends BaseJsonConfig {
-  public static final String PARTITION_ID_NORMALIZER_POSITIVE_MODULO = "POSITIVE_MODULO";
-  public static final String PARTITION_ID_NORMALIZER_ABS = "ABS";
-  public static final String PARTITION_ID_NORMALIZER_MASK = "MASK";
-
   private final String _functionName;
   private final String _functionExpr;
-  private final String _partitionIdNormalizer;
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
 
   public ColumnPartitionConfig(String functionName, int numPartitions) {
-    this(functionName, numPartitions, null, null, null);
+    this(functionName, numPartitions, null, null);
   }
 
   public static ColumnPartitionConfig forFunctionExpr(String functionExpr, int numPartitions) {
-    return forFunctionExpr(functionExpr, numPartitions, null);
-  }
-
-  public static ColumnPartitionConfig forFunctionExpr(String functionExpr, int numPartitions,
-      @Nullable String partitionIdNormalizer) {
-    return new ColumnPartitionConfig(null, numPartitions, null, functionExpr, partitionIdNormalizer);
+    return new ColumnPartitionConfig(null, numPartitions, null, functionExpr);
   }
 
   public ColumnPartitionConfig(String functionName, int numPartitions, @Nullable Map<String, String> functionConfig) {
-    this(functionName, numPartitions, functionConfig, null, null);
+    this(functionName, numPartitions, functionConfig, null);
   }
 
   @JsonCreator
   public ColumnPartitionConfig(@JsonProperty("functionName") @Nullable String functionName,
       @JsonProperty(value = "numPartitions", required = true) int numPartitions,
       @JsonProperty("functionConfig") @Nullable Map<String, String> functionConfig,
-      @JsonProperty("functionExpr") @Nullable String functionExpr,
-      @JsonProperty("partitionIdNormalizer") @Nullable String partitionIdNormalizer) {
+      @JsonProperty("functionExpr") @Nullable String functionExpr) {
     Preconditions.checkArgument(hasText(functionName) ^ hasText(functionExpr),
         "Exactly one of 'functionName' or 'functionExpr' must be configured");
     Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     Preconditions.checkArgument(!hasText(functionExpr) || functionConfig == null,
         "'functionConfig' cannot be configured together with 'functionExpr'");
-    Preconditions.checkArgument(!hasText(partitionIdNormalizer) || hasText(functionExpr),
-        "'partitionIdNormalizer' can only be configured together with 'functionExpr'");
-    Preconditions.checkArgument(isValidPartitionIdNormalizer(partitionIdNormalizer),
-        "Unsupported partitionIdNormalizer: %s", partitionIdNormalizer);
     _functionName = functionName;
     _functionExpr = functionExpr;
-    // Canonicalize to uppercase at construction so downstream comparisons (case-sensitive on the wire format,
-    // case-insensitive in older code paths) cannot disagree on case alone.
-    _partitionIdNormalizer = hasText(partitionIdNormalizer)
-        ? partitionIdNormalizer.trim().toUpperCase(Locale.ROOT) : null;
     _numPartitions = numPartitions;
     _functionConfig = functionConfig;
   }
@@ -106,12 +90,6 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
   @Nullable
   public String getFunctionExpr() {
     return _functionExpr;
-  }
-
-  /// Returns the partition-id normalizer for expression-mode partitioning.
-  @Nullable
-  public String getPartitionIdNormalizer() {
-    return _partitionIdNormalizer;
   }
 
   /**
@@ -135,14 +113,5 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
 
   private static boolean hasText(@Nullable String value) {
     return value != null && !value.trim().isEmpty();
-  }
-
-  private static boolean isValidPartitionIdNormalizer(@Nullable String partitionIdNormalizer) {
-    if (!hasText(partitionIdNormalizer)) {
-      return true;
-    }
-    return PARTITION_ID_NORMALIZER_POSITIVE_MODULO.equalsIgnoreCase(partitionIdNormalizer)
-        || PARTITION_ID_NORMALIZER_ABS.equalsIgnoreCase(partitionIdNormalizer)
-        || PARTITION_ID_NORMALIZER_MASK.equalsIgnoreCase(partitionIdNormalizer);
   }
 }

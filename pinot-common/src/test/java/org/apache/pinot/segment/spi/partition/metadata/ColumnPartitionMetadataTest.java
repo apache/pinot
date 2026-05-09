@@ -46,14 +46,14 @@ public class ColumnPartitionMetadataTest {
     assertEquals(roundTripped.getNumPartitions(), metadata.getNumPartitions());
     assertEquals(roundTripped.getPartitions(), metadata.getPartitions());
     assertNull(roundTripped.getFunctionExpr());
-    assertNull(roundTripped.getPartitionIdNormalizer());
     assertEquals(roundTripped, metadata);
   }
 
   @Test
   public void testConstructorFromPartitionFunctionPreservesExpressionFields() {
     ColumnPartitionMetadata metadata = new ColumnPartitionMetadata(
-        PartitionFunctionExprCompiler.compilePartitionFunction("id", "fnv1a_32(md5(id))", 128, "MASK"), Set.of(104));
+        PartitionFunctionExprCompiler.compilePartitionFunction("id", "positiveModulo(fnv1a_32(md5(id)), 128)", 128),
+        Set.of(104));
 
     // Expression-mode: functionName is the stable "FunctionExpr" sentinel for backward compatibility.
     // Old brokers that call jsonMetadata.get("functionName").asText() without a null guard will receive
@@ -61,8 +61,7 @@ public class ColumnPartitionMetadataTest {
     assertEquals(metadata.getFunctionName(), PartitionPipelineFunction.NAME);
     assertEquals(metadata.getNumPartitions(), 128);
     assertEquals(metadata.getPartitions(), Set.of(104));
-    assertEquals(metadata.getFunctionExpr(), "fnv1a_32(md5(id))");
-    assertEquals(metadata.getPartitionIdNormalizer(), "MASK");
+    assertEquals(metadata.getFunctionExpr(), "positivemodulo(fnv1a_32(md5(id)), 128)");
     assertNull(metadata.getInputType()); // STRING is the default, not stored
   }
 
@@ -70,7 +69,7 @@ public class ColumnPartitionMetadataTest {
   public void testExpressionModeRoundTripPreservesAllFields()
       throws Exception {
     ColumnPartitionMetadata metadata = new ColumnPartitionMetadata(
-        PartitionFunctionExprCompiler.compilePartitionFunction("id", "fnv1a_32(md5(id))", 64, "POSITIVE_MODULO"),
+        PartitionFunctionExprCompiler.compilePartitionFunction("id", "positiveModulo(fnv1a_32(md5(id)), 64)", 64),
         Set.of(7, 15));
 
     String json = JsonUtils.objectToString(metadata);
@@ -83,8 +82,7 @@ public class ColumnPartitionMetadataTest {
     ColumnPartitionMetadata roundTripped = JsonUtils.stringToObject(json, ColumnPartitionMetadata.class);
 
     assertEquals(roundTripped.getFunctionName(), PartitionPipelineFunction.NAME);
-    assertEquals(roundTripped.getFunctionExpr(), "fnv1a_32(md5(id))");
-    assertEquals(roundTripped.getPartitionIdNormalizer(), "POSITIVE_MODULO");
+    assertEquals(roundTripped.getFunctionExpr(), "positivemodulo(fnv1a_32(md5(id)), 64)");
     assertEquals(roundTripped.getNumPartitions(), 64);
     assertEquals(roundTripped.getPartitions(), Set.of(7, 15));
     assertNull(roundTripped.getInputType());
@@ -96,7 +94,7 @@ public class ColumnPartitionMetadataTest {
       throws Exception {
     byte[] value = new byte[]{1, 2, 3};
     PartitionPipelineFunction partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction(
-        "id", PartitionValueType.BYTES, "murmur2(id)", 16, "MASK");
+        "id", PartitionValueType.BYTES, "positiveModulo(murmur2(id), 16)", 16);
     ColumnPartitionMetadata metadata =
         new ColumnPartitionMetadata(partitionFunction, Set.of(partitionFunction.getPartition(value)));
 
