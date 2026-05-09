@@ -24,6 +24,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
@@ -32,6 +34,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -57,18 +60,32 @@ public final class SegmentProcessorAvroUtils {
    */
   public static GenericData.Record convertGenericRowToAvroRecord(GenericRow genericRow,
       GenericData.Record reusableRecord, Set<String> fields) {
+    Schema avroSchema = reusableRecord.getSchema();
     for (String field : fields) {
       Object value = genericRow.getValue(field);
       if (value instanceof Object[]) {
         reusableRecord.put(field, Arrays.asList((Object[]) value));
       } else {
         if (value instanceof byte[]) {
-          value = ByteBuffer.wrap((byte[]) value);
+          // UUID columns are emitted with an Avro string{logicalType:uuid} schema (Avro 1.x only allows the
+          // uuid logical type on string), so the 16-byte canonical form must be rendered as a canonical
+          // UUID string here. Plain BYTES columns continue to be wrapped as ByteBuffer.
+          Schema.Field avroField = avroSchema.getField(field);
+          if (avroField != null && isUuidLogicalType(avroField.schema())) {
+            value = UuidUtils.toString((byte[]) value);
+          } else {
+            value = ByteBuffer.wrap((byte[]) value);
+          }
         }
         reusableRecord.put(field, value);
       }
     }
     return reusableRecord;
+  }
+
+  private static boolean isUuidLogicalType(Schema schema) {
+    LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
+    return logicalType != null && "uuid".equals(logicalType.getName());
   }
 
   /**
