@@ -368,11 +368,11 @@ public class ColumnMinMaxValueGenerator {
             for (int docId = 0; docId < numDocs; docId++) {
               byte[] value = rawIndexReader.getBytes(docId, readerContext);
               if (min == null || (useUuidComparison ? UuidUtils.compare(value, min) : ByteArray.compare(value, min))
-                  > 0) {
+                  < 0) {
                 min = value;
               }
               if (max == null || (useUuidComparison ? UuidUtils.compare(value, max) : ByteArray.compare(value, max))
-                  < 0) {
+                  > 0) {
                 max = value;
               }
             }
@@ -381,11 +381,11 @@ public class ColumnMinMaxValueGenerator {
               byte[][] values = rawIndexReader.getBytesMV(docId, readerContext);
               for (byte[] value : values) {
                 if (min == null || (useUuidComparison ? UuidUtils.compare(value, min)
-                    : ByteArray.compare(value, min)) > 0) {
+                    : ByteArray.compare(value, min)) < 0) {
                   min = value;
                 }
                 if (max == null || (useUuidComparison ? UuidUtils.compare(value, max)
-                    : ByteArray.compare(value, max)) < 0) {
+                    : ByteArray.compare(value, max)) > 0) {
                   max = value;
                 }
               }
