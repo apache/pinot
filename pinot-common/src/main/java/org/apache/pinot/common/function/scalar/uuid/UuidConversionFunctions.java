@@ -46,4 +46,40 @@ public final class UuidConversionFunctions {
   public static String uuidToString(UUID uuid) {
     return uuid != null ? UuidUtils.toString(uuid) : null;
   }
+
+  /**
+   * Generates a fresh random RFC 4122 version-4 UUID. Each invocation produces a new value, so this function
+   * is non-deterministic.
+   */
+  @ScalarFunction(names = {"UUID_V4"})
+  public static UUID uuidV4() {
+    return UuidUtils.randomV4();
+  }
+
+  /**
+   * Generates a fresh RFC 9562 version-7 (Unix-time-based) UUID. The leading 48 bits encode the current Unix
+   * time in milliseconds, making v7 UUIDs k-sortable and well-suited to time-ordered primary keys. Each
+   * invocation produces a new value, so this function is non-deterministic.
+   */
+  @ScalarFunction(names = {"UUID_V7"})
+  public static UUID uuidV7() {
+    return UuidUtils.randomV7();
+  }
+
+  /**
+   * Returns the 4-bit version field (0-15) of the given UUID. Common values: 1, 3, 4, 5, 6, 7, 8.
+   */
+  @ScalarFunction(names = {"UUID_VERSION"}, nullableParameters = true)
+  public static Integer uuidVersion(UUID uuid) {
+    return uuid != null ? UuidUtils.getVersion(uuid) : null;
+  }
+
+  /**
+   * Returns the embedded Unix-millisecond timestamp from a time-based UUID (version 1, 6, or 7). Throws
+   * for non-time-based versions.
+   */
+  @ScalarFunction(names = {"UUID_TIMESTAMP"}, nullableParameters = true)
+  public static Long uuidTimestamp(UUID uuid) {
+    return uuid != null ? UuidUtils.getTimestampMillis(uuid) : null;
+  }
 }
