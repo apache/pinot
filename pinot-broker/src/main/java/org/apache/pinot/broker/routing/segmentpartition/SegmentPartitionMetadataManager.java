@@ -159,15 +159,20 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
       return false;
     }
 
+    // Expression-mode partition functions report a stable sentinel name ("FunctionExpr") via getName(), so two
+    // expression-mode segments with different functionExpr values would falsely match if compared by name only.
+    // Compare functionExpr first when either side is expression-mode; fall through to name comparison only when
+    // both sides are legacy (functionExpr == null).
+    String configuredFunctionExpr = _partitionFunction.getFunctionExpr();
+    String segmentFunctionExpr = partitionFunction.getFunctionExpr();
+    if (configuredFunctionExpr != null || segmentFunctionExpr != null) {
+      return Objects.equals(configuredFunctionExpr, segmentFunctionExpr);
+    }
+
     String functionName = partitionFunction.getName();
     if (functionName != null) {
       String configuredFunctionName = _partitionFunction.getName();
       return configuredFunctionName != null && configuredFunctionName.equalsIgnoreCase(functionName);
-    }
-
-    String functionExpr = partitionFunction.getFunctionExpr();
-    if (functionExpr != null) {
-      return Objects.equals(_partitionFunction.getFunctionExpr(), functionExpr);
     }
     return false;
   }
