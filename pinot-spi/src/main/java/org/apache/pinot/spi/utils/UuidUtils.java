@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 
 /**
@@ -31,6 +32,10 @@ import java.util.UUID;
 public final class UuidUtils {
   public static final int UUID_NUM_BYTES = 16;
   private static final byte[] NULL_UUID_BYTES = new byte[UUID_NUM_BYTES];
+
+  // Gregorian-to-Unix offset in 100-nanosecond units. Matches RFC 4122 / RFC 9562.
+  // This is the count of 100-ns intervals between 1582-10-15T00:00:00Z and 1970-01-01T00:00:00Z.
+  private static final long GREGORIAN_TO_UNIX_OFFSET_100NS = 0x01b21dd213814000L;
 
   private UuidUtils() {
   }
@@ -389,6 +394,87 @@ public final class UuidUtils {
       return isUuid(value.toString());
     }
     return false;
+  }
+
+  /**
+   * Returns a random RFC 4122 version-4 UUID. Equivalent to {@link UUID#randomUUID()} and uses the same
+   * cryptographically-strong source of randomness.
+   */
+  public static UUID randomV4() {
+    return UUID.randomUUID();
+  }
+
+  /**
+   * Returns a random RFC 9562 version-7 UUID. The leading 48 bits encode the current Unix time in milliseconds
+   * (big-endian), making v7 UUIDs k-sortable and friendly to time-ordered storage. Within a single millisecond,
+   * 74 bits of randomness disambiguate concurrent generations; this implementation does not guarantee strict
+   * monotonic ordering within the same millisecond.
+   */
+  public static UUID randomV7() {
+    long unixMillis = System.currentTimeMillis() & 0xFFFFFFFFFFFFL;
+    ThreadLocalRandom random = ThreadLocalRandom.current();
+    // MSB layout: [unix_ts_ms (48)] [ver=0b0111 (4)] [rand_a (12)]
+    long msb = (unixMillis << 16) | 0x7000L | (random.nextLong() & 0x0FFFL);
+    // LSB layout: [var=0b10 (2)] [rand_b (62)]
+    long lsb = 0x8000000000000000L | (random.nextLong() & 0x3FFFFFFFFFFFFFFFL);
+    return new UUID(msb, lsb);
+  }
+
+  /**
+   * Returns the 4-bit version field of the UUID (0-15). Common values: 1 (Gregorian time-based), 3 (MD5
+   * name-based), 4 (random), 5 (SHA-1 name-based), 6 (reordered Gregorian time-based), 7 (Unix time-based),
+   * 8 (custom). The nil UUID returns 0.
+   */
+  public static int getVersion(UUID uuid) {
+    validateNotNull(uuid, "UUID");
+    return (int) ((uuid.getMostSignificantBits() >>> 12) & 0xFL);
+  }
+
+  public static int getVersion(byte[] uuidBytes) {
+    validateNotNull(uuidBytes, "UUID");
+    validateLength(uuidBytes);
+    return (int) ((getMostSignificantBitsInternal(uuidBytes) >>> 12) & 0xFL);
+  }
+
+  /**
+   * Extracts the embedded timestamp from a time-based UUID (versions 1, 6, or 7) and returns it as Unix epoch
+   * milliseconds.
+   *
+   * @throws IllegalArgumentException if the UUID is not time-based (version 1, 6, or 7).
+   */
+  public static long getTimestampMillis(UUID uuid) {
+    validateNotNull(uuid, "UUID");
+    return getTimestampMillisInternal(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
+  }
+
+  public static long getTimestampMillis(byte[] uuidBytes) {
+    validateNotNull(uuidBytes, "UUID");
+    validateLength(uuidBytes);
+    return getTimestampMillisInternal(getMostSignificantBitsInternal(uuidBytes),
+        getLeastSignificantBitsInternal(uuidBytes));
+  }
+
+  private static long getTimestampMillisInternal(long msb, long lsb) {
+    int version = (int) ((msb >>> 12) & 0xFL);
+    switch (version) {
+      case 7:
+        // Upper 48 bits of MSB are the Unix milliseconds, big-endian.
+        return msb >>> 16;
+      case 6: {
+        // RFC 9562 v6 layout: [time_high (32) | time_mid (16) | ver (4) | time_low (12)] in MSB.
+        long gregorian100Ns = ((msb >>> 32) << 28) | (((msb >>> 16) & 0xFFFFL) << 12) | (msb & 0x0FFFL);
+        return (gregorian100Ns - GREGORIAN_TO_UNIX_OFFSET_100NS) / 10_000L;
+      }
+      case 1: {
+        // RFC 4122 v1 layout: [time_low (32) | time_mid (16) | ver+time_high (16)] in MSB.
+        long gregorian100Ns =
+            (msb >>> 32) | (((msb >>> 16) & 0xFFFFL) << 32) | ((msb & 0x0FFFL) << 48);
+        return (gregorian100Ns - GREGORIAN_TO_UNIX_OFFSET_100NS) / 10_000L;
+      }
+      default:
+        throw new IllegalArgumentException("UUID version " + version + " is not time-based; only versions 1, 6, "
+            + "and 7 carry an embedded timestamp");
+    }
   }
 
   private static void validateLength(byte[] uuidBytes) {
