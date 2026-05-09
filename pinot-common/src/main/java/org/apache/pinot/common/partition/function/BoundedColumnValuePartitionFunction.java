@@ -103,8 +103,8 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
 
   @Override
   public PartitionIdNormalizer getPartitionIdNormalizer() {
-    // Output is a fixed mapping in [0, numPartitions); POSITIVE_MODULO is a no-op label.
-    return PartitionIdNormalizer.POSITIVE_MODULO;
+    // Output is a fixed mapping in [0, numPartitions); no normalization is applied.
+    return PartitionIdNormalizer.NO_OP;
   }
 
   @Override

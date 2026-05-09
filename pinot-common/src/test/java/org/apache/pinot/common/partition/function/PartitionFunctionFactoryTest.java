@@ -125,10 +125,10 @@ public class PartitionFunctionFactoryTest {
         PartitionIdNormalizer.MASK);
     assertEquals(new FnvPartitionFunction(4, Map.of("partitionIdNormalizer", "abs")).getPartitionIdNormalizer(),
         PartitionIdNormalizer.ABS);
-    // BoundedColumnValue's output is already in [0, N), so POSITIVE_MODULO is a no-op default.
+    // BoundedColumnValue's output is already in [0, N); reports NO_OP (identity).
     PartitionFunction boundedColumnValue = new BoundedColumnValuePartitionFunction(2,
         Map.of("columnValues", "a", "columnValuesDelimiter", "|"));
-    assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIdNormalizer.POSITIVE_MODULO);
+    assertEquals(boundedColumnValue.getPartitionIdNormalizer(), PartitionIdNormalizer.NO_OP);
   }
 
   @Test

@@ -73,10 +73,30 @@ public class PartitionIdNormalizerTest {
   }
 
   @Test
-  public void testAllNormalizersReturnInRange() {
+  public void testNoOpIsIdentity() {
+    PartitionIdNormalizer n = PartitionIdNormalizer.NO_OP;
+    // Identity for every input — the caller is asserting the value is already in [0, N).
+    assertEquals(n.getPartitionId(0, 7), 0);
+    assertEquals(n.getPartitionId(3, 7), 3);
+    // The framework does NOT validate the input is in range; passing out-of-range is the
+    // caller's responsibility.
+    assertEquals(n.getPartitionId(-5, 7), -5);
+    assertEquals(n.getPartitionId(99, 7), 99);
+    // long overload narrows to int.
+    assertEquals(n.getPartitionId(42L, 7), 42);
+    assertEquals(n.getPartitionId((long) Integer.MAX_VALUE, 1024), Integer.MAX_VALUE);
+  }
+
+  @Test
+  public void testRangeFoldingNormalizersReturnInRange() {
     int[] partitionCounts = {1, 2, 7, 1024};
     int[] hashes = {0, 1, -1, 7, -7, Integer.MIN_VALUE, Integer.MAX_VALUE, 13, -13};
+    // NO_OP is excluded — it's identity and only safe when the caller already produced an
+    // in-range value. The other four normalizers fold every signed input into [0, N).
     for (PartitionIdNormalizer n : PartitionIdNormalizer.values()) {
+      if (n == PartitionIdNormalizer.NO_OP) {
+        continue;
+      }
       for (int p : partitionCounts) {
         for (int h : hashes) {
           int pid = n.getPartitionId(h, p);

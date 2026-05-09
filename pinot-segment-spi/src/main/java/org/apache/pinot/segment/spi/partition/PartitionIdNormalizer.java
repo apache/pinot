@@ -84,6 +84,22 @@ public enum PartitionIdNormalizer {
       long abs = (value == Long.MIN_VALUE) ? 0L : Math.abs(value);
       return (int) (abs % numPartitions);
     }
+  },
+  /// Identity. Returns the input unchanged (narrowed to `int` for the long overload). Use only
+  /// when the upstream `PartitionFunction#getPartition` value is already guaranteed to be in
+  /// `[0, numPartitions)` — e.g. lookup-style functions like `BoundedColumnValuePartitionFunction`.
+  /// The framework does NOT validate that the input is in range; passing an out-of-range value
+  /// yields an out-of-range partition id.
+  NO_OP {
+    @Override
+    int toPartitionId(int value, int numPartitions) {
+      return value;
+    }
+
+    @Override
+    int toPartitionId(long value, int numPartitions) {
+      return (int) value;
+    }
   };
 
   public final int getPartitionId(int value, int numPartitions) {
