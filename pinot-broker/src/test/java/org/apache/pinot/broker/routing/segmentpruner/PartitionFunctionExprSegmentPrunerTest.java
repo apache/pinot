@@ -29,6 +29,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -48,8 +49,8 @@ public class PartitionFunctionExprSegmentPrunerTest {
     SinglePartitionColumnSegmentPruner pruner =
         new SinglePartitionColumnSegmentPruner(TABLE_NAME_WITH_TYPE, PARTITION_COLUMN);
     String functionExpr = "murmur2(lower(memberId))";
-    PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN, null, 8, null, functionExpr);
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN,
+        ColumnPartitionConfig.forFunctionExpr(functionExpr, 8));
     int matchingPartition = partitionFunction.getPartition("Pinot");
     String firstNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Kafka",
         "Trino", "StarTree", "Presto", "Druid");
@@ -83,8 +84,8 @@ public class PartitionFunctionExprSegmentPrunerTest {
         new SinglePartitionColumnSegmentPruner(TABLE_NAME_WITH_TYPE, UUID_PARTITION_COLUMN);
     String functionExpr = "positiveModulo(fnv1a_32(md5(id)), 128)";
     String matchingValue = "000016be-9d72-466c-9632-cfa680dc8fa3";
-    PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(UUID_PARTITION_COLUMN, null, 128, null, functionExpr);
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(UUID_PARTITION_COLUMN,
+        ColumnPartitionConfig.forFunctionExpr(functionExpr, 128));
     int matchingPartition = partitionFunction.getPartition(matchingValue);
     String nonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition,
         "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002",
@@ -110,9 +111,8 @@ public class PartitionFunctionExprSegmentPrunerTest {
     String segment = "segmentInvalidLiteralExpr";
     SinglePartitionColumnSegmentPruner pruner =
         new SinglePartitionColumnSegmentPruner(TABLE_NAME_WITH_TYPE, partitionColumn);
-    PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(partitionColumn, null, 128, null,
-            "intDiv(eventTimeMillis, 1000)");
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn,
+        ColumnPartitionConfig.forFunctionExpr("intDiv(eventTimeMillis, 1000)", 128));
     pruner.refreshSegment(segment, createPartitionMetadataRecord(segment, partitionColumn,
         new ColumnPartitionMetadata(partitionFunction, Set.of(54))));
 

@@ -72,8 +72,6 @@ import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -629,12 +627,6 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       properties.setProperty(getKeyFor(column, NUM_PARTITIONS), partitionFunction.getNumPartitions());
       if (partitionFunction.getFunctionExpr() != null) {
         properties.setProperty(getKeyFor(column, PARTITION_FUNCTION_EXPR), partitionFunction.getFunctionExpr());
-      }
-      // For expression-mode pipelines compiled with BYTES input, persist the input type so segment readers don't
-      // have to re-derive it from schema state (which may race with metadata loading at startup).
-      if (partitionFunction instanceof PartitionPipelineFunction
-          && ((PartitionPipelineFunction) partitionFunction).getPartitionPipeline().isBytesInput()) {
-        properties.setProperty(getKeyFor(column, PARTITION_INPUT_TYPE), PartitionValueType.BYTES.name());
       }
       properties.setProperty(getKeyFor(column, PARTITION_VALUES), columnStatistics.getPartitions());
       Map<String, String> partitionFunctionConfig = partitionFunction.getFunctionConfig();

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.partition;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -37,7 +38,8 @@ public class PartitionFunctionExprIntegrationTest {
   @Test
   public void testFunctionExprPartitionFunctionImplementsFunctionEvaluator() {
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "positiveModulo(fnv1a_32(md5(id)), 128)");
+        PartitionFunctionFactory.getPartitionFunction("id",
+            ColumnPartitionConfig.forFunctionExpr("positiveModulo(fnv1a_32(md5(id)), 128)", 128));
     assertTrue(partitionFunction instanceof FunctionEvaluator);
     FunctionEvaluator evaluator = (FunctionEvaluator) partitionFunction;
     GenericRow row = new GenericRow();
@@ -53,7 +55,8 @@ public class PartitionFunctionExprIntegrationTest {
   @Test
   public void testFunctionExprPartitionFunctionSerialization() {
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("id", null, 128, null, "positiveModulo(fnv1a_32(md5(id)), 128)");
+        PartitionFunctionFactory.getPartitionFunction("id",
+            ColumnPartitionConfig.forFunctionExpr("positiveModulo(fnv1a_32(md5(id)), 128)", 128));
 
     JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
     assertEquals(partitionFunction.getName(), PartitionPipelineFunction.NAME);

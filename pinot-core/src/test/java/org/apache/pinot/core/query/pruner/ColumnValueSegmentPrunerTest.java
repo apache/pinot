@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -153,8 +154,8 @@ public class ColumnValueSegmentPrunerTest {
 
     DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
     when(dataSourceMetadata.getDataType()).thenReturn(DataType.STRING);
-    PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("column", null, 8, null, "murmur2(lower(column))");
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction("column",
+        ColumnPartitionConfig.forFunctionExpr("murmur2(lower(column))", 8));
     int matchingPartition = partitionFunction.getPartition("Pinot");
     String firstNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Kafka",
         "Trino", "StarTree", "Presto", "Druid");

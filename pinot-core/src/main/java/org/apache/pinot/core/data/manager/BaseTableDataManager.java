@@ -105,7 +105,6 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -1581,8 +1580,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
       partitionColumn = entry.getKey();
       partitionConfig = entry.getValue();
-      expectedPartitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn, partitionConfig,
-          schema.getFieldSpecFor(partitionColumn));
+      expectedPartitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn, partitionConfig);
     }
 
     Set<String> columnsInSegment = segmentMetadata.getAllColumns();
@@ -1822,20 +1820,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function expr",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function expr changed: " + columnName);
-        }
-        // Detect input-type changes (STRING ↔ BYTES) for expression-mode pipelines. A field-spec edit can flip the
-        // partition column's stored type without changing functionExpr or normalizer; the recompiled pipeline would
-        // then produce different partition ids than the existing segment.
-        if (partitionFunction instanceof PartitionPipelineFunction
-            && expectedPartitionFunction instanceof PartitionPipelineFunction) {
-          boolean segmentBytes = ((PartitionPipelineFunction) partitionFunction).getPartitionPipeline().isBytesInput();
-          boolean configBytes =
-              ((PartitionPipelineFunction) expectedPartitionFunction).getPartitionPipeline().isBytesInput();
-          if (segmentBytes != configBytes) {
-            LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition input type",
-                tableNameWithType, columnName, segmentName);
-            return new StaleSegment(segmentName, true, "partition input type changed: " + columnName);
-          }
         }
         if (partitionFunction.getNumPartitions() != expectedPartitionFunction.getNumPartitions()) {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: num partitions",

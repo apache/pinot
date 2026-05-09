@@ -31,7 +31,6 @@ import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,18 +72,16 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
   }
 
   /// Validates that the compiled expression produces an integral numeric output by probing it with several sample
-  /// values that cover common input shapes (numeric strings, alpha strings, raw bytes). Throws
-  /// [IllegalArgumentException] if at least one probe completes and the output is non-numeric (e.g. STRING from
-  /// `md5(col)`), or if every probe throws (cannot determine output type - likely a misconfigured pipeline).
+  /// values that cover common input shapes (numeric strings, alpha strings). Throws [IllegalArgumentException] if
+  /// at least one probe completes and the output is non-numeric (e.g. STRING from `md5(col)`), or if every probe
+  /// throws (cannot determine output type — likely a misconfigured pipeline).
   public void validateOutputType() {
-    // Probe set covers numeric strings, alpha strings, raw bytes (for BYTES input), and null. The null sample
-    // mirrors the runtime ingestion path that already handles nulls, so the validation also exercises that the
-    // pipeline does not blow up on null input. Non-null samples are checked for non-numeric output types.
-    // Track non-null-probe success separately: a pipeline that only succeeds on null (e.g. "case when col is null
-    // then 0 else fail() end") would otherwise pass validation and crash on the first real row.
-    Object[] samples = _pipeline.isBytesInput()
-        ? new Object[]{new byte[]{0}, new byte[]{1, 2, 3}, new byte[0], null}
-        : new Object[]{"1", "0", "abc", null};
+    // Probe set covers numeric strings, alpha strings, and null. The null sample mirrors the runtime ingestion path
+    // that already handles nulls, so the validation also exercises that the pipeline does not blow up on null input.
+    // Non-null samples are checked for non-numeric output types. Track non-null-probe success separately: a pipeline
+    // that only succeeds on null (e.g. "case when col is null then 0 else fail() end") would otherwise pass
+    // validation and crash on the first real row.
+    Object[] samples = new Object[]{"1", "0", "abc", null};
     boolean anyNonNullProbeSucceeded = false;
     RuntimeException lastFailure = null;
     for (Object sample : samples) {
@@ -147,22 +144,7 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
 
   @Override
   public int getPartition(String value) {
-    // BYTES-input pipelines expect raw bytes. When the caller provides a string (e.g. a hex-encoded predicate value
-    // from broker routing), convert the hex string back to raw bytes so the partition computation matches ingestion.
-    if (_pipeline.isBytesInput()) {
-      return getPartition(BytesUtils.toBytes(value));
-    }
     return toPartitionId(_pipeline.evaluate(new Object[]{value}));
-  }
-
-  /// Overrides the default bytes partition to pass raw bytes directly through the pipeline when this pipeline was
-  /// compiled with [PartitionValueType#BYTES] input type, avoiding the hex-encoding round-trip.
-  @Override
-  public int getPartition(byte[] bytes) {
-    if (!_pipeline.isBytesInput()) {
-      return getPartition(BytesUtils.toHexString(bytes));
-    }
-    return toPartitionId(_pipeline.evaluate(new Object[]{bytes}));
   }
 
   /// Converts the integral numeric output from the user's expression into a partition id. The expression is expected
@@ -260,9 +242,8 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
 
   @Override
   public Object evaluate(GenericRow genericRow) {
-    // Delegate to the underlying pipeline directly: it already handles the column lookup, the BYTES-vs-STRING
-    // dispatch, and the null-input early return. Avoids duplicating that logic here and saves one Object[]
-    // allocation per row vs the getPartition(...) path.
+    // Delegate to the underlying pipeline directly: it already handles the column lookup and the null-input
+    // early return. Saves one Object[] allocation per row vs the getPartition(...) path.
     Object rawResult = _pipeline.evaluate(genericRow);
     int partitionId = toPartitionId(rawResult);
     return partitionId == NULL_RESULT_PARTITION_ID ? null : partitionId;
@@ -277,9 +258,7 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
     if (inputValue == null) {
       return null;
     }
-    int partitionId = (inputValue instanceof byte[] && _pipeline.isBytesInput())
-        ? getPartition((byte[]) inputValue)
-        : getPartition(FieldSpec.getStringValue(inputValue));
+    int partitionId = getPartition(FieldSpec.getStringValue(inputValue));
     return partitionId == NULL_RESULT_PARTITION_ID ? null : partitionId;
   }
 

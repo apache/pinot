@@ -25,6 +25,7 @@ import java.util.Random;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -442,7 +443,7 @@ public class PartitionFunctionTest {
   @Test
   public void testLegacyPartitionFunctionImplementsFunctionEvaluatorWhenBoundToColumn() {
     PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction("id", "Murmur2", 8, null, null);
+        PartitionFunctionFactory.getPartitionFunction("id", new ColumnPartitionConfig("Murmur2", 8));
     assertTrue(partitionFunction instanceof FunctionEvaluator);
     FunctionEvaluator evaluator = (FunctionEvaluator) partitionFunction;
     GenericRow row = new GenericRow();

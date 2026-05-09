@@ -30,7 +30,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionFunctionExprCompiler;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -52,18 +51,12 @@ import org.slf4j.LoggerFactory;
 /// `MurmurPartitionFunction` registers under both `Murmur` and `Murmur2`).
 ///
 /// Each registrable class must be public, concrete, and expose a public constructor with signature
-/// `(int numPartitions, Map<String, String> functionConfig)` — the constructor used both for the
-/// startup `getNames()` probe (called with `(1, null)`) and for [#getPartitionFunction(String, int,
-/// Map)] at lookup time.
+/// `(int numPartitions, Map<String, String> functionConfig)`.
 ///
-/// The static block scans the classpath once and builds an immutable (canonicalized name →
-/// constructor) map. To force eager initialization (e.g. so the scan happens before the first
-/// segment is read), call [#init()] from broker / server / controller startup.
-///
-/// **Expression-mode functions** (i.e. configs whose `functionExpr` is non-null) are not part of
-/// this registry — they are compiled by [PartitionFunctionExprCompiler] from the function
-/// expression text. The column-name aware overloads on this factory dispatch to the compiler when
-/// `functionExpr` is set and otherwise look up the legacy registry by `functionName`.
+/// **Expression-mode functions** (`functionExpr` is non-null) are not part of this registry — they are compiled
+/// by [PartitionFunctionExprCompiler] from the expression text. The factory dispatches to the compiler when
+/// `functionExpr` is set and otherwise looks up the legacy registry by `functionName`. When both are configured the
+/// factory **prefers `functionExpr`** and uses `functionName` only as a documentation hint for older readers.
 public class PartitionFunctionFactory {
   private PartitionFunctionFactory() {
   }
@@ -121,11 +114,10 @@ public class PartitionFunctionFactory {
     return (Set) result[0];
   }
 
-  /// Instantiates `clazz` with `(numPartitions = 1, functionConfig = null)` and returns the
-  /// names list reported by [PartitionFunction#getNames()]. Returns `null` (with a warning log)
-  /// when the probe construction fails — typically a function whose ctor requires non-null config
-  /// (e.g. `BoundedColumnValuePartitionFunction`); such functions need to either supply a usable
-  /// default config or skip auto-registration.
+  /// Instantiates `clazz` with `(numPartitions = 1, functionConfig = null)` and returns the names list reported by
+  /// [PartitionFunction#getNames()]. Returns `null` (with a warning log) when the probe construction fails — typically
+  /// a function whose ctor requires non-null config (e.g. `BoundedColumnValuePartitionFunction`); such functions need
+  /// to either supply a usable default config or skip auto-registration.
   @Nullable
   private static List<String> probeNames(Class<? extends PartitionFunction> clazz,
       Constructor<? extends PartitionFunction> constructor) {
@@ -144,9 +136,9 @@ public class PartitionFunctionFactory {
     }
   }
 
-  /// No-op call that exists to force the static initializer of this class to run. Mirrors
-  /// `FunctionRegistry.init()` so callers can eagerly trigger classpath scanning during
-  /// service startup instead of paying the cost on the first partition function lookup.
+  /// No-op call that exists to force the static initializer of this class to run. Mirrors `FunctionRegistry.init()`
+  /// so callers can eagerly trigger classpath scanning during service startup instead of paying the cost on the first
+  /// partition function lookup.
   public static void init() {
   }
 
@@ -172,111 +164,41 @@ public class PartitionFunctionFactory {
     }
   }
 
-  /// Returns the legacy (name-mode) partition function for the given config.
-  ///
-  /// @deprecated Expression-mode configs require a column name to compile the pipeline. This overload throws on
-  ///     expression-mode configs; prefer the column-name aware overloads which support both modes.
-  ///     TODO: remove after release 1.7.0.
-  /// @throws IllegalArgumentException if `config.getFunctionExpr()` is non-null.
-  @Deprecated
-  public static PartitionFunction getPartitionFunction(ColumnPartitionConfig config) {
+  /// Builds a partition function from a column-partition config. Prefers `functionExpr` when set; otherwise looks
+  /// up the legacy registry by `functionName`.
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config) {
+    return getPartitionFunction(columnName, config, config.getNumPartitions());
+  }
+
+  /// Builds a partition function from a column-partition config with an explicit `numPartitions` override (e.g. when
+  /// the live stream partition count differs from the value stored in the table config).
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
+      int numPartitions) {
     Preconditions.checkNotNull(config, "Column partition config must be configured");
-    Preconditions.checkArgument(config.getFunctionExpr() == null,
-        "Expression-mode config requires a column name; use getPartitionFunction(String, ColumnPartitionConfig)");
-    return getPartitionFunction(config.getFunctionName(), config.getNumPartitions(), config.getFunctionConfig());
+    if (config.getFunctionExpr() != null) {
+      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, config.getFunctionExpr(),
+          numPartitions);
+    }
+    String functionName = config.getFunctionName();
+    Preconditions.checkArgument(functionName != null,
+        "At least one of 'functionName' or 'functionExpr' must be configured for column: %s", columnName);
+    return new ColumnBoundPartitionFunction(columnName,
+        getPartitionFunction(functionName, numPartitions, config.getFunctionConfig()));
   }
 
-  /// Returns the legacy (name-mode) partition function for the given segment metadata.
-  ///
-  /// @deprecated Expression-mode metadata requires a column name to compile the pipeline. This overload throws on
-  ///     expression-mode metadata; prefer the column-name aware overloads.
-  ///     TODO: remove after release 1.7.0.
-  /// @throws IllegalArgumentException if `metadata.getFunctionExpr()` is non-null.
-  @Deprecated
-  public static PartitionFunction getPartitionFunction(ColumnPartitionMetadata metadata) {
-    Preconditions.checkNotNull(metadata, "Column partition metadata must be configured");
-    Preconditions.checkArgument(metadata.getFunctionExpr() == null,
-        "Expression-mode metadata requires a column name; use getPartitionFunction(String, ColumnPartitionMetadata)");
-    return getPartitionFunction(metadata.getFunctionName(), metadata.getNumPartitions(), metadata.getFunctionConfig());
-  }
-
+  /// Builds a partition function from segment-side metadata. Prefers `functionExpr` when set; otherwise looks up the
+  /// legacy registry by `functionName`.
   public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionMetadata metadata) {
     Preconditions.checkNotNull(metadata, "Column partition metadata must be configured");
-    if (metadata.getFunctionExpr() != null && metadata.getInputType() != null) {
-      PartitionValueType inputType = PartitionValueType.valueOf(metadata.getInputType());
-      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, inputType, metadata.getFunctionExpr(),
+    if (metadata.getFunctionExpr() != null) {
+      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, metadata.getFunctionExpr(),
           metadata.getNumPartitions());
     }
-    return getPartitionFunction(columnName, metadata.getFunctionName(), metadata.getNumPartitions(),
-        metadata.getFunctionConfig(), metadata.getFunctionExpr());
-  }
-
-  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig) {
-    return getPartitionFunction(columnName, columnPartitionConfig, columnPartitionConfig.getNumPartitions());
-  }
-
-  /// Builds a partition function for the given column with an explicit numPartitions override.
-  ///
-  /// @deprecated For BYTES-typed partition columns this overload always compiles the expression pipeline with STRING
-  /// input, producing partition ids that disagree with ingestion. Prefer the FieldSpec-aware overload.
-  /// TODO: remove after release 1.7.0.
-  @Deprecated
-  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig columnPartitionConfig,
-      int numPartitions) {
-    Preconditions.checkNotNull(columnPartitionConfig, "Column partition config must be configured");
-    return getPartitionFunction(columnName, columnPartitionConfig.getFunctionName(), numPartitions,
-        columnPartitionConfig.getFunctionConfig(), columnPartitionConfig.getFunctionExpr());
-  }
-
-  /// Builds a partition function for expression mode using an explicit input type.
-  ///
-  /// Use [PartitionValueType#BYTES] when the partition column stores raw byte arrays so that functions in the
-  /// expression receive the original bytes directly rather than a hex-encoded string representation.
-  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
-      PartitionValueType inputType) {
-    Preconditions.checkNotNull(config, "Column partition config must be configured");
-    Preconditions.checkArgument(config.getFunctionExpr() != null,
-        "inputType overload is only valid for expression-mode configs (functionExpr must be set)");
-    return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, inputType, config.getFunctionExpr(),
-        config.getNumPartitions());
-  }
-
-  /// Builds a partition function using the schema field spec to determine the correct input type for expression-mode
-  /// partition functions on BYTES-typed columns.
-  ///
-  /// When `fieldSpec` is non-null and the stored type is [FieldSpec.DataType#BYTES], the expression is
-  /// compiled with [PartitionValueType#BYTES] input so that scalar functions receive raw byte arrays rather than
-  /// hex-encoded strings.  For all other cases the default STRING input type is used.
-  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
-      @Nullable FieldSpec fieldSpec) {
-    return getPartitionFunction(columnName, config, config.getNumPartitions(), fieldSpec);
-  }
-
-  /// Builds a partition function with an explicit `numPartitions` override and uses `fieldSpec` to
-  /// determine the correct input type for expression-mode partition functions on BYTES-typed columns.
-  ///
-  /// Use this overload when the live partition count (e.g. the stream partition count) may differ from the value
-  /// stored in the table config, so that the built function uses the authoritative count while still receiving the
-  /// correct input type for BYTES columns.
-  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config,
-      int numPartitions, @Nullable FieldSpec fieldSpec) {
-    if (config.getFunctionExpr() != null && fieldSpec != null
-        && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES) {
-      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, PartitionValueType.BYTES,
-          config.getFunctionExpr(), numPartitions);
-    }
-    return getPartitionFunction(columnName, config.getFunctionName(), numPartitions, config.getFunctionConfig(),
-        config.getFunctionExpr());
-  }
-
-  public static PartitionFunction getPartitionFunction(String columnName, @Nullable String functionName,
-      int numPartitions, @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
-    if (functionExpr != null) {
-      return PartitionFunctionExprCompiler.compilePartitionFunction(columnName, functionExpr, numPartitions);
-    }
-    Preconditions.checkArgument(functionName != null, "Partition function name must be configured");
-    PartitionFunction partitionFunction = getPartitionFunction(functionName, numPartitions, functionConfig);
-    return new ColumnBoundPartitionFunction(columnName, partitionFunction);
+    String functionName = metadata.getFunctionName();
+    Preconditions.checkArgument(functionName != null,
+        "At least one of 'functionName' or 'functionExpr' must be configured for column: %s", columnName);
+    return new ColumnBoundPartitionFunction(columnName,
+        getPartitionFunction(functionName, metadata.getNumPartitions(), metadata.getFunctionConfig()));
   }
 
   private static String canonicalize(String name) {

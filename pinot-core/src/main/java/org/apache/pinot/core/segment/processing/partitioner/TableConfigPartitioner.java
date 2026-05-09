@@ -24,7 +24,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -38,20 +37,10 @@ public class TableConfigPartitioner implements Partitioner {
 
   private final String _column;
   private final PartitionFunction _partitionFunction;
-  /// True when the partition function was compiled with BYTES input; raw byte[] values are passed directly.
-  private final boolean _isBytesMode;
 
   public TableConfigPartitioner(String columnName, ColumnPartitionConfig columnPartitionConfig) {
-    this(columnName, columnPartitionConfig, null);
-  }
-
-  public TableConfigPartitioner(String columnName, ColumnPartitionConfig columnPartitionConfig,
-      @Nullable Schema schema) {
     _column = columnName;
-    FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(columnName) : null;
-    _isBytesMode = columnPartitionConfig.getFunctionExpr() != null && fieldSpec != null
-        && fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.BYTES;
-    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(columnName, columnPartitionConfig, fieldSpec);
+    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(columnName, columnPartitionConfig);
   }
 
   @Override
@@ -80,7 +69,7 @@ public class TableConfigPartitioner implements Partitioner {
     if (value == null) {
       return NULL_PARTITION;
     }
-    int partitionId = (_isBytesMode && value instanceof byte[])
+    int partitionId = (value instanceof byte[])
         ? _partitionFunction.getPartition((byte[]) value)
         : _partitionFunction.getPartition(FieldSpec.getStringValue(value));
     if (partitionId == PartitionPipelineFunction.NULL_RESULT_PARTITION_ID) {

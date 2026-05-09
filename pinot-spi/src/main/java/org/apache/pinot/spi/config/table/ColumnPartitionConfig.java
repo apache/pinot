@@ -28,15 +28,17 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /// Partition configuration for a single column.
 ///
-/// There are two mutually exclusive modes:
+/// At least one of `functionName` or `functionExpr` must be configured. Both may be configured together; in that case
+/// the framework prefers `functionExpr` and uses `functionName` only as a documentation hint or for older readers
+/// that pre-date expression mode.
 ///
 /// - **Name mode** (legacy, production-recommended): configure `functionName` (and optionally `functionConfig`).
 ///   Old and new nodes can all deserialize this format. The named partition functions
 ///   (`Murmur`, `Modulo`, `HashCode`, ...) are the production-ready path.
 /// - **Expression mode** (new, flexibility escape hatch): configure `functionExpr` to compute the partition with
-///   a chained scalar expression (e.g. `fnv1a_32(md5(col))`). This trades runtime overhead for the ability to
-///   express arbitrary partition logic without writing a custom partition function. The pipeline always normalizes
-///   the integral expression output with `POSITIVE_MODULO` over `numPartitions`. **Known limitation:** expression-mode
+///   a chained scalar expression (e.g. `positiveModulo(fnv1a_32(md5(col)), numPartitions)`). This trades runtime
+///   overhead for the ability to express arbitrary partition logic without writing a custom partition function. The
+///   expression must produce an integral value already in `[0, numPartitions)`. **Known limitation:** expression-mode
 ///   configs must only be written after *all* broker/server/controller nodes have been upgraded to a version that
 ///   supports this feature. A node pre-dating expression mode will fail to deserialize such a config and will exclude
 ///   the affected table from partition-aware routing. No mixed-version safety gate is enforced at the controller
@@ -65,11 +67,9 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
       @JsonProperty(value = "numPartitions", required = true) int numPartitions,
       @JsonProperty("functionConfig") @Nullable Map<String, String> functionConfig,
       @JsonProperty("functionExpr") @Nullable String functionExpr) {
-    Preconditions.checkArgument(hasText(functionName) ^ hasText(functionExpr),
-        "Exactly one of 'functionName' or 'functionExpr' must be configured");
+    Preconditions.checkArgument(hasText(functionName) || hasText(functionExpr),
+        "At least one of 'functionName' or 'functionExpr' must be configured");
     Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
-    Preconditions.checkArgument(!hasText(functionExpr) || functionConfig == null,
-        "'functionConfig' cannot be configured together with 'functionExpr'");
     _functionName = functionName;
     _functionExpr = functionExpr;
     _numPartitions = numPartitions;

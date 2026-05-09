@@ -413,9 +413,11 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
       @Nullable Map<String, String> functionConfig, @Nullable String functionExpr, long creationTimeMs) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    ColumnPartitionConfig config = functionExpr != null
+        ? ColumnPartitionConfig.forFunctionExpr(functionExpr, numPartitions)
+        : new ColumnPartitionConfig(partitionFunction, numPartitions, functionConfig);
     PartitionFunction effectivePartitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN, partitionFunction, numPartitions,
-            functionConfig, functionExpr);
+        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN, config);
     segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Collections.singletonMap(PARTITION_COLUMN,
         new ColumnPartitionMetadata(effectivePartitionFunction, Collections.singleton(partitionId)))));
     segmentZKMetadata.setCreationTime(creationTimeMs);

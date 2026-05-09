@@ -24,28 +24,24 @@ import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /// Immutable compiled pipeline for one raw partition column, backed by a [FunctionEvaluator].
 ///
-/// The underlying [FunctionEvaluator] is responsible for correct type coercion. For partition expressions,
-/// the evaluator uses UTF-8 encoding when converting `String` values to `byte[]` parameters, ensuring
-/// that hash functions (`md5`, `murmur2`, `fnv1a_32`, etc.) operate on raw string bytes rather
-/// than a hex-decoded representation.
+/// The pipeline always treats the input as a string. For BYTES-typed partition columns the value is hex-encoded at
+/// every call site (ingestion, broker pruner) so the partition expression sees a consistent string representation —
+/// the user's expression operates on the hex string, not the raw bytes.
 public final class PartitionPipeline implements FunctionEvaluator {
   private final String _rawColumn;
-  private final boolean _isBytesInput;
   private final String _canonicalFunctionExpr;
   private final FunctionEvaluator _evaluator;
   private final List<String> _arguments;
 
-  PartitionPipeline(String rawColumn, boolean isBytesInput, String canonicalFunctionExpr, FunctionEvaluator evaluator) {
+  PartitionPipeline(String rawColumn, String canonicalFunctionExpr, FunctionEvaluator evaluator) {
     Preconditions.checkNotNull(rawColumn, "Raw column must be configured");
     Preconditions.checkNotNull(canonicalFunctionExpr, "Canonical function expression must be configured");
     Preconditions.checkNotNull(evaluator, "Function evaluator must be configured");
     _rawColumn = rawColumn;
-    _isBytesInput = isBytesInput;
     _canonicalFunctionExpr = canonicalFunctionExpr;
     _evaluator = evaluator;
     _arguments = Collections.singletonList(rawColumn);
@@ -53,10 +49,6 @@ public final class PartitionPipeline implements FunctionEvaluator {
 
   public String getRawColumn() {
     return _rawColumn;
-  }
-
-  public boolean isBytesInput() {
-    return _isBytesInput;
   }
 
   public String getCanonicalFunctionExpr() {
@@ -74,17 +66,6 @@ public final class PartitionPipeline implements FunctionEvaluator {
     if (inputValue == null) {
       return null;
     }
-    if (_isBytesInput) {
-      // For BYTES-input pipelines pass raw byte[] directly; String values are hex-encoded representations.
-      if (inputValue instanceof byte[]) {
-        return _evaluator.evaluate(new Object[]{inputValue});
-      }
-      // Hex-encoded string representation of bytes (e.g. from broker routing) — decode before passing.
-      return _evaluator.evaluate(new Object[]{BytesUtils.toBytes(
-          FieldSpec.getStringValue(inputValue))});
-    }
-    // For STRING-input pipelines pass the string value as-is. The underlying PartitionFunctionEvaluator converts
-    // String to byte[] using UTF-8 encoding when a function parameter requires byte[].
     return _evaluator.evaluate(new Object[]{FieldSpec.getStringValue(inputValue)});
   }
 
@@ -96,13 +77,6 @@ public final class PartitionPipeline implements FunctionEvaluator {
     Object inputValue = values[0];
     if (inputValue == null) {
       return null;
-    }
-    if (_isBytesInput) {
-      if (inputValue instanceof byte[]) {
-        return _evaluator.evaluate(new Object[]{inputValue});
-      }
-      return _evaluator.evaluate(new Object[]{BytesUtils.toBytes(
-          FieldSpec.getStringValue(inputValue))});
     }
     return _evaluator.evaluate(new Object[]{FieldSpec.getStringValue(inputValue)});
   }

@@ -387,8 +387,8 @@ public class SegmentPrunerTest extends ControllerTest {
     assertEquals(multiPartitionColumnsSegmentPruner.prune(brokerRequest4, input), Set.of(segment1, segment2));
 
     String functionExpr = "murmur2(lower(memberId))";
-    PartitionFunction partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN_1, null, 8, null, functionExpr);
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN_1,
+        ColumnPartitionConfig.forFunctionExpr(functionExpr, 8));
     int matchingPartition = partitionFunction.getPartition("Pinot");
     String firstNonMatchingValue = findValueWithDifferentPartition(partitionFunction, matchingPartition, "Kafka",
         "Trino", "StarTree", "Presto", "Druid");
@@ -714,9 +714,11 @@ public class SegmentPrunerTest extends ControllerTest {
   private void setSegmentZKPartitionMetadata(String tableNameWithType, String segment, String partitionFunction,
       int numPartitions, int partitionId, String functionExpr) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segment);
+    ColumnPartitionConfig config = functionExpr != null
+        ? ColumnPartitionConfig.forFunctionExpr(functionExpr, numPartitions)
+        : new ColumnPartitionConfig(partitionFunction, numPartitions);
     PartitionFunction compiledPartitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN_1, partitionFunction, numPartitions, null,
-            functionExpr);
+        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN_1, config);
     segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(Map.of(PARTITION_COLUMN_1,
         new ColumnPartitionMetadata(compiledPartitionFunction, Set.of(partitionId)))));
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);

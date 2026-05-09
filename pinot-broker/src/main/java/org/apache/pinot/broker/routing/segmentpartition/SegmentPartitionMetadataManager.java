@@ -42,7 +42,6 @@ import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.Partiti
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,30 +76,19 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
 
   /// Backward-compat shim: the legacy (name-mode-only) constructor used by external broker plugins / vendor forks
   /// that linked against the pre-expression-mode signature. Builds a synthetic [ColumnPartitionConfig] and
-  /// delegates to the new constructor. Expression-mode tables must use the [ColumnPartitionConfig] overloads.
+  /// delegates to the new constructor. Expression-mode tables must use the [ColumnPartitionConfig] overload.
   /// TODO: remove after release 1.7.0 once external callers have migrated.
   @Deprecated
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions) {
-    this(tableNameWithType, partitionColumn,
-        new ColumnPartitionConfig(partitionFunctionName, numPartitions), null);
+    this(tableNameWithType, partitionColumn, new ColumnPartitionConfig(partitionFunctionName, numPartitions));
   }
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn,
       ColumnPartitionConfig columnPartitionConfig) {
-    this(tableNameWithType, partitionColumn, columnPartitionConfig, null);
-  }
-
-  /// Preferred constructor: pass the partition column's [FieldSpec] so expression-mode pipelines on BYTES
-  /// columns are compiled with BYTES input. The `FieldSpec`-less overload above always compiles with STRING
-  /// input, which silently disagrees with ingestion partition ids on BYTES columns.
-  public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn,
-      ColumnPartitionConfig columnPartitionConfig, @Nullable FieldSpec fieldSpec) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
-    _partitionFunction = fieldSpec != null
-        ? PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig, fieldSpec)
-        : PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig);
+    _partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionConfig);
     _numPartitions = _partitionFunction.getNumPartitions();
   }
 

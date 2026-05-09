@@ -37,13 +37,13 @@ import org.slf4j.LoggerFactory;
 /// Compiles a partition-function expression into a [PartitionPipeline] backed by a
 /// [org.apache.pinot.spi.function.FunctionEvaluator] provided by [PartitionEvaluatorFactory].
 ///
-/// The compiled expression is expected to produce an integral output already in `[0, numPartitions)`.
-/// No normalization is applied — the caller's expression is responsible for producing a valid partition id
-/// (e.g. `mod(murmur2(col), 8)` or `bucket(timestampMillis, 1000)` when bucket already wraps at numPartitions).
+/// The compiled expression is expected to produce an integral output already in `[0, numPartitions)`. No
+/// normalization is applied — the caller's expression is responsible for producing a valid partition id (e.g.
+/// `positiveModulo(murmur2(col), 8)` or `bucket(timestampMillis, 1000)` when bucket already wraps at numPartitions).
 public final class PartitionFunctionExprCompiler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionFunctionExprCompiler.class);
   // Cap on user-supplied expression length, sized to fit comfortably within ZK / segment metadata size budgets while
-  // allowing realistic chained expressions (e.g. fnv1a_32(md5(lower(trim(col))))).
+  // allowing realistic chained expressions (e.g. positiveModulo(fnv1a_32(md5(lower(trim(col)))), 8)).
   private static final int MAX_EXPRESSION_LENGTH = 256;
 
   // Cache compiled pipelines so a broker/server with thousands of segments sharing the same partition expression
@@ -105,28 +105,18 @@ public final class PartitionFunctionExprCompiler {
   }
 
   public static PartitionPipeline compile(String rawColumn, String functionExpr) {
-    return compile(rawColumn, PartitionValueType.STRING, functionExpr);
-  }
-
-  /// Compiles a partition pipeline with an explicit input type.
-  ///
-  /// Use [PartitionValueType#BYTES] when the partition column stores raw byte arrays so that functions in the
-  /// expression receive the original bytes directly rather than a hex-encoded string representation.
-  public static PartitionPipeline compile(String rawColumn, PartitionValueType inputType, String functionExpr) {
     Preconditions.checkArgument(rawColumn != null && !rawColumn.trim().isEmpty(), "Raw column must be configured");
-    Preconditions.checkArgument(inputType != null, "Input type must be configured");
     Preconditions.checkArgument(functionExpr != null && !functionExpr.trim().isEmpty(),
         "'functionExpr' must be configured");
     Preconditions.checkArgument(functionExpr.length() <= MAX_EXPRESSION_LENGTH,
         "'functionExpr' must be <= %s characters", MAX_EXPRESSION_LENGTH);
 
     String canonicalExpr = canonicalize(functionExpr);
-    boolean isBytesInput = inputType == PartitionValueType.BYTES;
-    PipelineCacheKey cacheKey = new PipelineCacheKey(rawColumn, isBytesInput, canonicalExpr);
+    PipelineCacheKey cacheKey = new PipelineCacheKey(rawColumn, canonicalExpr);
     try {
       return PIPELINE_CACHE.get(cacheKey, () -> {
         FunctionEvaluator evaluator = EvaluatorFactoryHolder.INSTANCE.compile(rawColumn, canonicalExpr);
-        return new PartitionPipeline(rawColumn, isBytesInput, canonicalExpr, evaluator);
+        return new PartitionPipeline(rawColumn, canonicalExpr, evaluator);
       });
     } catch (UncheckedExecutionException e) {
       // Loader threw a RuntimeException (e.g. invalid expression). Unwrap so callers see the original failure.
@@ -147,17 +137,7 @@ public final class PartitionFunctionExprCompiler {
 
   public static PartitionPipelineFunction compilePartitionFunction(String rawColumn, String functionExpr,
       int numPartitions) {
-    return compilePartitionFunction(rawColumn, PartitionValueType.STRING, functionExpr, numPartitions);
-  }
-
-  /// Compiles a partition pipeline function with an explicit input type.
-  ///
-  /// Use [PartitionValueType#BYTES] when the partition column stores raw byte arrays so that functions in the
-  /// expression receive the original bytes directly rather than a hex-encoded string representation.
-  public static PartitionPipelineFunction compilePartitionFunction(String rawColumn, PartitionValueType inputType,
-      String functionExpr, int numPartitions) {
-    PartitionPipeline pipeline = compile(rawColumn, inputType, functionExpr);
-    return new PartitionPipelineFunction(pipeline, numPartitions);
+    return new PartitionPipelineFunction(compile(rawColumn, functionExpr), numPartitions);
   }
 
   /// Returns a canonical form of the expression: trimmed, lowercased, with spaces removed around
@@ -234,12 +214,10 @@ public final class PartitionFunctionExprCompiler {
 
   private static final class PipelineCacheKey {
     private final String _rawColumn;
-    private final boolean _isBytesInput;
     private final String _canonicalExpr;
 
-    PipelineCacheKey(String rawColumn, boolean isBytesInput, String canonicalExpr) {
+    PipelineCacheKey(String rawColumn, String canonicalExpr) {
       _rawColumn = rawColumn;
-      _isBytesInput = isBytesInput;
       _canonicalExpr = canonicalExpr;
     }
 
@@ -252,14 +230,12 @@ public final class PartitionFunctionExprCompiler {
         return false;
       }
       PipelineCacheKey other = (PipelineCacheKey) obj;
-      return _isBytesInput == other._isBytesInput
-          && _rawColumn.equals(other._rawColumn)
-          && _canonicalExpr.equals(other._canonicalExpr);
+      return _rawColumn.equals(other._rawColumn) && _canonicalExpr.equals(other._canonicalExpr);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(_rawColumn, _isBytesInput, _canonicalExpr);
+      return Objects.hash(_rawColumn, _canonicalExpr);
     }
   }
 }

@@ -57,9 +57,7 @@ public interface PartitionFunction extends Serializable {
   /// Returns the partition id for a raw byte array value.
   ///
   /// The default implementation converts the bytes to a hex string and delegates to [#getPartition(String)],
-  /// matching the historical behaviour for BYTES columns. Expression-mode pipelines that were compiled with
-  /// [org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType#BYTES] input type override this method
-  /// to hash the raw bytes directly without the hex-encoding round-trip.
+  /// matching the historical behaviour for BYTES columns.
   ///
   /// @param bytes Raw byte array value.
   /// @return partition id for the value.

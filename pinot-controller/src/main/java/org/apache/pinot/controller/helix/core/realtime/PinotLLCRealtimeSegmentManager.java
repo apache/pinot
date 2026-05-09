@@ -122,7 +122,6 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -1179,9 +1178,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
                 + "type. BYTES-typed columns may produce incorrect partition metadata.",
             tableConfig.getTableName(), columnName);
       }
-      FieldSpec fieldSpec = schema != null ? schema.getFieldSpecFor(columnName) : null;
       PartitionFunction partitionFunction = PartitionFunctionFactory
-          .getPartitionFunction(columnName, columnPartitionConfig, perStreamNumPartitions, fieldSpec);
+          .getPartitionFunction(columnName, columnPartitionConfig, perStreamNumPartitions);
       ColumnPartitionMetadata columnPartitionMetadata =
           new ColumnPartitionMetadata(partitionFunction, Collections.singleton(streamPartitionId));
       return new SegmentPartitionMetadata(Collections.singletonMap(columnName, columnPartitionMetadata));

@@ -20,8 +20,6 @@ package org.apache.pinot.core.segment.processing.partitioner;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -55,12 +53,6 @@ public final class PartitionerFactory {
    * Construct a Partitioner using the PartitioningConfig
    */
   public static Partitioner getPartitioner(PartitionerConfig config) {
-    return getPartitioner(config, null);
-  }
-
-  /// Construct a Partitioner using the PartitioningConfig. The optional schema is used to determine the correct
-  /// input type for expression-mode partition functions on BYTES-typed columns.
-  public static Partitioner getPartitioner(PartitionerConfig config, @Nullable Schema schema) {
     Partitioner partitioner = null;
     switch (config.getPartitionerType()) {
       case NO_OP:
@@ -86,7 +78,7 @@ public final class PartitionerFactory {
             "Must provide columnName for TABLE_PARTITION_CONFIG Partitioner");
         Preconditions.checkState(config.getColumnPartitionConfig() != null,
             "Must provide columnPartitionConfig for TABLE_PARTITION_CONFIG Partitioner");
-        partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig(), schema);
+        partitioner = new TableConfigPartitioner(config.getColumnName(), config.getColumnPartitionConfig());
         break;
       default:
         break;
@@ -100,18 +92,10 @@ public final class PartitionerFactory {
    * @return Array of partitioners
    */
   public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs) {
-    return getPartitioners(partitionerConfigs, null);
-  }
-
-  /// Create partitioner array from configuration. The optional schema is used to determine the correct
-  /// input type for expression-mode partition functions on BYTES-typed columns.
-  ///
-  /// @return Array of partitioners
-  public static Partitioner[] getPartitioners(List<PartitionerConfig> partitionerConfigs, @Nullable Schema schema) {
     int numPartitioners = partitionerConfigs.size();
     Partitioner[] partitioners = new Partitioner[numPartitioners];
     for (int i = 0; i < numPartitioners; i++) {
-      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i), schema);
+      partitioners[i] = PartitionerFactory.getPartitioner(partitionerConfigs.get(i));
     }
     return partitioners;
   }

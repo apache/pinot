@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.partition.metadata;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -37,7 +36,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -54,11 +52,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class ColumnPartitionMetadata {
   private final String _functionName;
   private final String _functionExpr;
-  /// Pipeline input type for expression-mode partition functions. `null` means STRING (the default and legacy
-  /// behavior). Currently only `"BYTES"` is stored for BYTES-typed partition columns so that the broker can
-  /// compile the same BYTES-input pipeline and produce consistent partition assignments with ingestion.
-  @Nullable
-  private final String _inputType;
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
   private final Set<Integer> _partitions;
@@ -77,17 +70,15 @@ public class ColumnPartitionMetadata {
       @Nullable Map<String, String> functionConfig) {
     _functionName = functionName;
     _functionExpr = null;
-    _inputType = null;
     _numPartitions = numPartitions;
     _partitions = partitions;
     _functionConfig = functionConfig;
   }
 
   private ColumnPartitionMetadata(@Nullable String functionName, int numPartitions, Set<Integer> partitions,
-      @Nullable Map<String, String> functionConfig, @Nullable String functionExpr, @Nullable String inputType) {
+      @Nullable Map<String, String> functionConfig, @Nullable String functionExpr) {
     _functionName = functionName;
     _functionExpr = normalizeOptionalText(functionExpr);
-    _inputType = normalizeOptionalText(inputType);
     _numPartitions = numPartitions;
     _partitions = partitions;
     _functionConfig = functionConfig;
@@ -103,26 +94,12 @@ public class ColumnPartitionMetadata {
         partitionFunction.getFunctionExpr() != null ? PartitionPipelineFunction.NAME
             : partitionFunction.getName(),
         partitionFunction.getNumPartitions(), partitions, partitionFunction.getFunctionConfig(),
-        partitionFunction.getFunctionExpr(),
-        // Store the pipeline input type only when it is non-default (BYTES) to avoid bloating the metadata.
-        partitionFunction instanceof PartitionPipelineFunction
-            && ((PartitionPipelineFunction) partitionFunction).getPartitionPipeline().isBytesInput()
-            ? PartitionValueType.BYTES.name() : null);
+        partitionFunction.getFunctionExpr());
   }
 
   @Nullable
   public String getFunctionName() {
     return _functionName;
-  }
-
-  /// Returns the pipeline input type for expression-mode partition functions, or `null` if the default
-  /// ([PartitionValueType#STRING]) input type applies. The `@JsonProperty` value matches
-  /// [org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column#PARTITION_INPUT_TYPE] so the same key
-  /// names the field on both wire formats (ZK JSON and segment `.properties`).
-  @Nullable
-  @JsonProperty("partitionInputType")
-  public String getInputType() {
-    return _inputType;
   }
 
   public int getNumPartitions() {
@@ -151,14 +128,14 @@ public class ColumnPartitionMetadata {
       ColumnPartitionMetadata that = (ColumnPartitionMetadata) obj;
       return Objects.equals(_functionName, that._functionName) && _numPartitions == that._numPartitions
           && _partitions.equals(that._partitions) && Objects.equals(_functionConfig, that._functionConfig)
-          && Objects.equals(_functionExpr, that._functionExpr) && Objects.equals(_inputType, that._inputType);
+          && Objects.equals(_functionExpr, that._functionExpr);
     }
     return false;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_functionName, _numPartitions, _partitions, _functionConfig, _functionExpr, _inputType);
+    return Objects.hash(_functionName, _numPartitions, _partitions, _functionConfig, _functionExpr);
   }
 
   /**
@@ -213,9 +190,6 @@ public class ColumnPartitionMetadata {
     private static final String NUM_PARTITIONS_KEY = "numPartitions";
     private static final String FUNCTION_CONFIG_KEY = "functionConfig";
     private static final String FUNCTION_EXPR_KEY = "functionExpr";
-    // Matches V1Constants.MetadataKeys.Column.PARTITION_INPUT_TYPE so the same key names the field on both
-    // wire formats (ZK JSON and segment .properties).
-    private static final String INPUT_TYPE_KEY = "partitionInputType";
     private static final String PARTITIONS_KEY = "partitions";
 
     // DO NOT CHANGE: for backward-compatibility
@@ -250,7 +224,6 @@ public class ColumnPartitionMetadata {
 
       JsonNode functionNameNode = jsonMetadata.get(FUNCTION_NAME_KEY);
       JsonNode functionExprNode = jsonMetadata.get(FUNCTION_EXPR_KEY);
-      JsonNode inputTypeNode = jsonMetadata.get(INPUT_TYPE_KEY);
       // numPartitions is mandatory in segment partition metadata. Surface a clear error if absent rather than
       // letting the caller's catch handler log an opaque NPE.
       JsonNode numPartitionsNode = jsonMetadata.get(NUM_PARTITIONS_KEY);
@@ -259,8 +232,7 @@ public class ColumnPartitionMetadata {
             "'" + NUM_PARTITIONS_KEY + "' is required in segment partition metadata");
       }
       return new ColumnPartitionMetadata(readOptionalText(functionNameNode),
-          numPartitionsNode.asInt(), partitions, functionConfig,
-          readOptionalText(functionExprNode), readOptionalText(inputTypeNode));
+          numPartitionsNode.asInt(), partitions, functionConfig, readOptionalText(functionExprNode));
     }
 
     @Nullable

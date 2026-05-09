@@ -1572,7 +1572,7 @@ public final class TableConfigUtils {
           Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot partition on multi-value column: %s",
               column);
           PartitionFunction partitionFunction =
-              PartitionFunctionFactory.getPartitionFunction(column, columnPartitionMap.get(column), fieldSpec);
+              PartitionFunctionFactory.getPartitionFunction(column, columnPartitionMap.get(column));
           if (partitionFunction instanceof PartitionPipelineFunction) {
             ((PartitionPipelineFunction) partitionFunction).validateOutputType();
           }

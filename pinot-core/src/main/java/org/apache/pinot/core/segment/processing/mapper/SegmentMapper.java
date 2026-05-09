@@ -117,7 +117,7 @@ public class SegmentMapper {
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
-    _partitioners = PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs(), schema);
+    _partitioners = PartitionerFactory.getPartitioners(processorConfig.getPartitionerConfigs());
     // Time partition + partition from partitioners
     _partitionsBuffer = new String[_partitioners.length + 1];
     _throttledLogger = new ThrottledLogger(LOGGER, tableConfig.getIngestionConfig());

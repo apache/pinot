@@ -23,7 +23,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionFunctionExprCompiler;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionPipelineFunction;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -62,7 +61,6 @@ public class ColumnPartitionMetadataTest {
     assertEquals(metadata.getNumPartitions(), 128);
     assertEquals(metadata.getPartitions(), Set.of(104));
     assertEquals(metadata.getFunctionExpr(), "positivemodulo(fnv1a_32(md5(id)), 128)");
-    assertNull(metadata.getInputType()); // STRING is the default, not stored
   }
 
   @Test
@@ -85,26 +83,31 @@ public class ColumnPartitionMetadataTest {
     assertEquals(roundTripped.getFunctionExpr(), "positivemodulo(fnv1a_32(md5(id)), 64)");
     assertEquals(roundTripped.getNumPartitions(), 64);
     assertEquals(roundTripped.getPartitions(), Set.of(7, 15));
-    assertNull(roundTripped.getInputType());
     assertEquals(roundTripped, metadata);
   }
 
   @Test
-  public void testBytesInputTypeRoundTripRebuildsMatchingPartitionFunction()
+  public void testBytesColumnRoundTripRebuildsMatchingPartitionFunction()
       throws Exception {
     byte[] value = new byte[]{1, 2, 3};
     PartitionPipelineFunction partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction(
-        "id", PartitionValueType.BYTES, "positiveModulo(murmur2(id), 16)", 16);
-    ColumnPartitionMetadata metadata =
-        new ColumnPartitionMetadata(partitionFunction, Set.of(partitionFunction.getPartition(value)));
+        "id", "positiveModulo(murmur2(id), 16)", 16);
+    int viaHexString = partitionFunction.getPartition(BytesUtils.toHexString(value));
+    ColumnPartitionMetadata metadata = new ColumnPartitionMetadata(partitionFunction, Set.of(viaHexString));
 
-    String json = JsonUtils.objectToString(metadata);
-    assertTrue(json.contains("\"partitionInputType\""), "JSON must include non-default BYTES input type");
-
-    ColumnPartitionMetadata roundTripped = JsonUtils.stringToObject(json, ColumnPartitionMetadata.class);
+    ColumnPartitionMetadata roundTripped = JsonUtils.stringToObject(JsonUtils.objectToString(metadata),
+        ColumnPartitionMetadata.class);
     PartitionFunction rebuilt = PartitionFunctionFactory.getPartitionFunction("id", roundTripped);
 
-    assertEquals(roundTripped.getInputType(), PartitionValueType.BYTES.name());
-    assertEquals(rebuilt.getPartition(BytesUtils.toHexString(value)), partitionFunction.getPartition(value));
+    // The pipeline always treats the input as a string. For BYTES columns the call site (ingestion / broker pruner)
+    // hex-encodes the value, so getPartition(hexString) and getPartition(byte[]) (which delegates to hex) agree.
+    assertTrue(json(metadata).contains("\"functionExpr\""), "JSON must include functionExpr");
+    assertEquals(rebuilt.getPartition(BytesUtils.toHexString(value)), viaHexString);
+    assertEquals(rebuilt.getPartition(value), viaHexString);
+  }
+
+  private static String json(ColumnPartitionMetadata metadata)
+      throws Exception {
+    return JsonUtils.objectToString(metadata);
   }
 }

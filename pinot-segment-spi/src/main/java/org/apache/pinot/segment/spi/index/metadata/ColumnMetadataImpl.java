@@ -39,7 +39,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.segment.spi.partition.pipeline.PartitionFunctionExprCompiler;
-import org.apache.pinot.segment.spi.partition.pipeline.PartitionValueType;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -363,17 +362,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
       // needed here (only required by the ingestion path). Expression-mode needs the column for the pipeline.
       PartitionFunction partitionFunction;
       if (partitionFunctionExpr != null) {
-        // Prefer the explicitly-stored PARTITION_INPUT_TYPE if present (newer segments). Fall back to the
-        // schema-derived type for older segments that pre-date the stored input-type field.
-        String storedInputType = config.getString(Column.getKeyFor(column, Column.PARTITION_INPUT_TYPE), null);
-        PartitionValueType inputType;
-        if (storedInputType != null) {
-          inputType = PartitionValueType.valueOf(storedInputType);
-        } else {
-          inputType = storedType == DataType.BYTES ? PartitionValueType.BYTES : PartitionValueType.STRING;
-        }
-        partitionFunction = PartitionFunctionExprCompiler.compilePartitionFunction(column, inputType,
-            partitionFunctionExpr, numPartitions);
+        partitionFunction =
+            PartitionFunctionExprCompiler.compilePartitionFunction(column, partitionFunctionExpr, numPartitions);
       } else {
         partitionFunction =
             PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
