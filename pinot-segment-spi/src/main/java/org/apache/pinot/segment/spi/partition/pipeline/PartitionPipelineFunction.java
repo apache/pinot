@@ -237,12 +237,6 @@ public class PartitionPipelineFunction implements PartitionFunction, FunctionEva
   }
 
   @Override
-  @JsonIgnore
-  public String getPartitionColumn() {
-    return _pipeline.getRawColumn();
-  }
-
-  @Override
   @JsonIgnore(false)  // Override @JsonIgnore on PartitionFunction#getFunctionExpr to expose this in serialization.
   @JsonProperty("functionExpr")
   public String getFunctionExpr() {

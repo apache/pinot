@@ -34,12 +34,10 @@ import org.apache.pinot.spi.utils.BytesUtils;
 /// result. Implementations must also be safe for concurrent invocation by multiple threads.
 ///
 /// **Expression-mode partition functions:** When [#getFunctionExpr()] returns non-null, the implementation
-/// is operating in expression mode (e.g. `PartitionPipelineFunction`). In that case
-/// [#getPartitionColumn()] also typically returns non-null. Existing legacy partition functions
-/// (`Murmur`, `Modulo`, `HashCode`, etc.) return `null` from these accessors and continue to operate
-/// as before. Framework callers (segment writers, broker pruners, staleness checks) use the
-/// non-null/null distinction on `getFunctionExpr` to dispatch between the two modes — plugins that
-/// want to be treated as expression-mode must override the relevant accessors.
+/// is operating in expression mode (e.g. `PartitionPipelineFunction`). Existing legacy partition functions
+/// (`Murmur`, `Modulo`, `HashCode`, etc.) return `null` from `getFunctionExpr` and continue to operate as
+/// before. Framework callers (segment writers, broker pruners, staleness checks) use the non-null/null
+/// distinction on `getFunctionExpr` to dispatch between the two modes.
 public interface PartitionFunction extends Serializable {
 
   /// Method to compute and return partition id for the given value.
@@ -90,14 +88,6 @@ public interface PartitionFunction extends Serializable {
 
   @Nullable
   default Map<String, String> getFunctionConfig() {
-    return null;
-  }
-
-  /// Returns the partition column name for expression-mode partition functions, or `null` for
-  /// legacy/single-column functions. Used by routing/staleness paths to identify the input column.
-  @JsonIgnore
-  @Nullable
-  default String getPartitionColumn() {
     return null;
   }
 

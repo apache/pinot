@@ -326,11 +326,6 @@ public class PartitionFunctionFactory {
     }
 
     @Override
-    public String getPartitionColumn() {
-      return _columnName;
-    }
-
-    @Override
     public String getFunctionExpr() {
       return _delegate.getFunctionExpr();
     }
