@@ -778,6 +778,62 @@ public class PartitionFunctionTest {
     testPartitionFunction(byteArrayPartitionFunction, expectedPartitions);
   }
 
+  /**
+   * Unit test for {@link UuidPartitionFunction}.
+   * <ul>
+   *   <li> Verifies factory registration. </li>
+   *   <li> Verifies partition values are deterministic and in [0, numPartitions). </li>
+   *   <li> Verifies the function hashes the 16-byte UUID form (canonical-string format does not affect the hash). </li>
+   *   <li> Verifies an invalid UUID string throws. </li>
+   * </ul>
+   */
+  @Test
+  public void testUuidPartitioner() {
+    int numPartitions = 64;
+
+    // Factory registration (case-insensitive name lookup) should produce a UuidPartitionFunction.
+    PartitionFunction viaFactory = PartitionFunctionFactory.getPartitionFunction("uUiD", numPartitions, null);
+    assertEquals(viaFactory.getName(), "Uuid");
+    assertEquals(viaFactory.getNumPartitions(), numPartitions);
+    assertTrue(viaFactory instanceof UuidPartitionFunction);
+
+    UuidPartitionFunction direct = new UuidPartitionFunction(numPartitions, null);
+    testBasicProperties(direct, "Uuid", numPartitions);
+
+    // Determinism + range.
+    String[] uuids = new String[]{
+        "00000000-0000-0000-0000-000000000000",
+        "ffffffff-ffff-ffff-ffff-ffffffffffff",
+        "12345678-1234-1234-1234-1234567890ab",
+        "9c5e1f24-0b8e-4c9d-87f1-0aa64a3b9d12",
+        "550e8400-e29b-41d4-a716-446655440000"
+    };
+    for (String uuid : uuids) {
+      int partition = direct.getPartition(uuid);
+      assertTrue(partition >= 0 && partition < numPartitions, "partition " + partition + " out of range");
+      assertEquals(direct.getPartition(uuid), partition, "non-deterministic partition for " + uuid);
+
+      // Hash matches the documented contract: murmurHash2 of the 16-byte canonical form, masked, modulo numPartitions.
+      byte[] uuidBytes = org.apache.pinot.spi.utils.UuidUtils.toBytes(uuid);
+      int expected = (MurmurHashFunctions.murmurHash2(uuidBytes) & Integer.MAX_VALUE) % numPartitions;
+      assertEquals(partition, expected);
+    }
+
+    // Different UUIDs should not all collapse to the same partition (basic spread sanity check).
+    int firstPartition = direct.getPartition(uuids[0]);
+    boolean spread = false;
+    for (int i = 1; i < uuids.length; i++) {
+      if (direct.getPartition(uuids[i]) != firstPartition) {
+        spread = true;
+        break;
+      }
+    }
+    assertTrue(spread, "UuidPartitionFunction collapsed all sample UUIDs to the same partition");
+
+    // Invalid UUID must surface as an exception (not a silent zero partition).
+    expectThrows(IllegalArgumentException.class, () -> direct.getPartition("not-a-uuid"));
+  }
+
   private void testPartitionInExpectedRange(PartitionFunction partitionFunction, Object value, int numPartitions) {
     int partition = partitionFunction.getPartition(value.toString());
     assertTrue(partition >= 0 && partition < numPartitions);
