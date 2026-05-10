@@ -368,13 +368,10 @@ public class GcsPinotFS extends BasePinotFS {
         _storage.create(blobInfo, new byte[0]);
         return true;
       }
-      OffsetDateTime offsetUpdateTime = blob.getUpdateTimeOffsetDateTime();
-      long updateTime = offsetUpdateTime != null ? offsetUpdateTime.toInstant().toEpochMilli() : 0L;
+      // Any successful GCS objects.patch call advances the blob's updateTime server-side,
+      // so returning true on success (and propagating StorageException on failure) is correct.
       _storage.update(blob.toBuilder().setMetadata(blob.getMetadata()).build());
-      Blob updatedBlob = getBlob(gcsUri);
-      OffsetDateTime newOffsetUpdateTime = updatedBlob != null ? updatedBlob.getUpdateTimeOffsetDateTime() : null;
-      long newUpdateTime = newOffsetUpdateTime != null ? newOffsetUpdateTime.toInstant().toEpochMilli() : 0L;
-      return newUpdateTime > updateTime;
+      return true;
     } catch (StorageException e) {
       throw new IOException(e);
     }
