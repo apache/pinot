@@ -342,7 +342,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
     C config = fieldIndexConfigs.getConfig(index);
-    if (config.isEnabled()) {
+    if (config.isEnabled() && index.shouldCreateIndex(context, config)) {
+      //noinspection resource
       creatorsByIndex.put(index, index.createIndexCreator(context, config));
     }
   }
