@@ -24,6 +24,7 @@ import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCr
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -48,111 +49,107 @@ public final class DictionaryBasedIndexBuilder {
   /// the current SPI; eliminating either one would require a length-aware `addXxxMV(values, dictIds, length)` SPI
   /// method.
   ///
-  /// @throws IllegalStateException if the column data type is unsupported, or if the column is multi-value with a
-  ///     data type that does not support MV (e.g. BIG_DECIMAL).
-  @SuppressWarnings("rawtypes")
+  /// @throws IllegalStateException if the column data type is unsupported.
+  @SuppressWarnings({"rawtypes", "unchecked"})
   public static void addRawValuesViaDictionary(DictionaryBasedInvertedIndexCreator creator,
       ForwardIndexReader forwardIndexReader, ForwardIndexReaderContext readerContext, Dictionary dictionary,
       ColumnMetadata columnMetadata, int numDocs) {
-    String columnName = columnMetadata.getColumnName();
-    boolean singleValue = columnMetadata.isSingleValue();
-    switch (columnMetadata.getDataType().getStoredType()) {
-      case INT:
-        if (singleValue) {
+    DataType dataType = columnMetadata.getDataType();
+    DataType storedType = dataType.getStoredType();
+    if (columnMetadata.isSingleValue()) {
+      switch (storedType) {
+        case INT:
           for (int i = 0; i < numDocs; i++) {
             int value = forwardIndexReader.getInt(i, readerContext);
             creator.addInt(value, dictionary.indexOf(value));
           }
-        } else {
-          for (int i = 0; i < numDocs; i++) {
-            int[] values = forwardIndexReader.getIntMV(i, readerContext);
-            creator.addIntMV(values, lookupDictIds(dictionary, values));
-          }
-        }
-        return;
-      case LONG:
-        if (singleValue) {
+          break;
+        case LONG:
           for (int i = 0; i < numDocs; i++) {
             long value = forwardIndexReader.getLong(i, readerContext);
             creator.addLong(value, dictionary.indexOf(value));
           }
-        } else {
-          for (int i = 0; i < numDocs; i++) {
-            long[] values = forwardIndexReader.getLongMV(i, readerContext);
-            creator.addLongMV(values, lookupDictIds(dictionary, values));
-          }
-        }
-        return;
-      case FLOAT:
-        if (singleValue) {
+          break;
+        case FLOAT:
           for (int i = 0; i < numDocs; i++) {
             float value = forwardIndexReader.getFloat(i, readerContext);
             creator.addFloat(value, dictionary.indexOf(value));
           }
-        } else {
-          for (int i = 0; i < numDocs; i++) {
-            float[] values = forwardIndexReader.getFloatMV(i, readerContext);
-            creator.addFloatMV(values, lookupDictIds(dictionary, values));
-          }
-        }
-        return;
-      case DOUBLE:
-        if (singleValue) {
+          break;
+        case DOUBLE:
           for (int i = 0; i < numDocs; i++) {
             double value = forwardIndexReader.getDouble(i, readerContext);
             creator.addDouble(value, dictionary.indexOf(value));
           }
-        } else {
+          break;
+        case BIG_DECIMAL:
           for (int i = 0; i < numDocs; i++) {
-            double[] values = forwardIndexReader.getDoubleMV(i, readerContext);
-            creator.addDoubleMV(values, lookupDictIds(dictionary, values));
+            BigDecimal value = forwardIndexReader.getBigDecimal(i, readerContext);
+            creator.addBigDecimal(value, dictionary.indexOf(value));
           }
-        }
-        return;
-      case BIG_DECIMAL:
-        if (!singleValue) {
-          throw new IllegalStateException(
-              "Dictionary-based index over raw values not supported for multi-value BIG_DECIMAL column: " + columnName);
-        }
-        for (int i = 0; i < numDocs; i++) {
-          BigDecimal value = forwardIndexReader.getBigDecimal(i, readerContext);
-          creator.add(value, dictionary.indexOf(value));
-        }
-        return;
-      case STRING:
-        if (singleValue) {
+          break;
+        case STRING:
           for (int i = 0; i < numDocs; i++) {
             String value = forwardIndexReader.getString(i, readerContext);
             creator.addString(value, dictionary.indexOf(value));
           }
-        } else {
-          for (int i = 0; i < numDocs; i++) {
-            String[] values = forwardIndexReader.getStringMV(i, readerContext);
-            creator.addStringMV(values, lookupDictIds(dictionary, values));
-          }
-        }
-        return;
-      case BYTES:
-        if (singleValue) {
+          break;
+        case BYTES:
           for (int i = 0; i < numDocs; i++) {
             byte[] value = forwardIndexReader.getBytes(i, readerContext);
             creator.addBytes(value, dictionary.indexOf(new ByteArray(value)));
           }
-        } else {
+          break;
+        default:
+          throw new IllegalStateException("Unsupported SV data type: " + dataType);
+      }
+    } else {
+      switch (storedType) {
+        case INT:
+          for (int i = 0; i < numDocs; i++) {
+            int[] values = forwardIndexReader.getIntMV(i, readerContext);
+            creator.addIntMV(values, lookupDictIds(dictionary, values));
+          }
+          break;
+        case LONG:
+          for (int i = 0; i < numDocs; i++) {
+            long[] values = forwardIndexReader.getLongMV(i, readerContext);
+            creator.addLongMV(values, lookupDictIds(dictionary, values));
+          }
+          break;
+        case FLOAT:
+          for (int i = 0; i < numDocs; i++) {
+            float[] values = forwardIndexReader.getFloatMV(i, readerContext);
+            creator.addFloatMV(values, lookupDictIds(dictionary, values));
+          }
+          break;
+        case DOUBLE:
+          for (int i = 0; i < numDocs; i++) {
+            double[] values = forwardIndexReader.getDoubleMV(i, readerContext);
+            creator.addDoubleMV(values, lookupDictIds(dictionary, values));
+          }
+          break;
+        case BIG_DECIMAL:
+          for (int i = 0; i < numDocs; i++) {
+            BigDecimal[] values = forwardIndexReader.getBigDecimalMV(i, readerContext);
+            creator.addBigDecimalMV(values, lookupDictIds(dictionary, values));
+          }
+          break;
+        case STRING:
+          for (int i = 0; i < numDocs; i++) {
+            String[] values = forwardIndexReader.getStringMV(i, readerContext);
+            creator.addStringMV(values, lookupDictIds(dictionary, values));
+          }
+          break;
+        case BYTES:
           for (int i = 0; i < numDocs; i++) {
             byte[][] values = forwardIndexReader.getBytesMV(i, readerContext);
-            int[] dictIds = new int[values.length];
-            for (int j = 0; j < values.length; j++) {
-              dictIds[j] = dictionary.indexOf(new ByteArray(values[j]));
-            }
-            creator.addBytesMV(values, dictIds);
+            creator.addBytesMV(values, lookupDictIds(dictionary, values));
           }
-        }
-        return;
-      default:
-        throw new IllegalStateException(
-            "Unsupported data type for dictionary-based index over raw values: " + columnMetadata.getDataType()
-                + " (column: " + columnName + ")");
+          break;
+        default:
+          throw new IllegalStateException("Unsupported MV data type: " + dataType);
+      }
     }
   }
 
@@ -188,10 +185,26 @@ public final class DictionaryBasedIndexBuilder {
     return dictIds;
   }
 
+  private static int[] lookupDictIds(Dictionary dictionary, BigDecimal[] values) {
+    int[] dictIds = new int[values.length];
+    for (int j = 0; j < values.length; j++) {
+      dictIds[j] = dictionary.indexOf(values[j]);
+    }
+    return dictIds;
+  }
+
   private static int[] lookupDictIds(Dictionary dictionary, String[] values) {
     int[] dictIds = new int[values.length];
     for (int j = 0; j < values.length; j++) {
       dictIds[j] = dictionary.indexOf(values[j]);
+    }
+    return dictIds;
+  }
+
+  private static int[] lookupDictIds(Dictionary dictionary, byte[][] values) {
+    int[] dictIds = new int[values.length];
+    for (int j = 0; j < values.length; j++) {
+      dictIds[j] = dictionary.indexOf(new ByteArray(values[j]));
     }
     return dictIds;
   }
