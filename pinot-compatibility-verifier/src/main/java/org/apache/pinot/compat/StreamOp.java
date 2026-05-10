@@ -277,8 +277,12 @@ public class StreamOp extends BaseOp {
       String errorMsg =
           String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query, response.toPrettyString());
       JsonNode exceptions = response.get(EXCEPTIONS);
-      JsonNode errorCode = exceptions.get(ERROR_CODE);
-      if (QueryErrorCode.BROKER_INSTANCE_MISSING.getId() == errorCode.asInt()) {
+      // exceptions is a JSON array; iterate to find any transient error code before failing
+      JsonNode firstException = exceptions.get(0);
+      JsonNode errorCode = firstException != null ? firstException.get(ERROR_CODE) : null;
+      int code = errorCode != null ? errorCode.asInt() : -1;
+      if (QueryErrorCode.BROKER_INSTANCE_MISSING.getId() == code
+          || QueryErrorCode.BROKER_SEGMENT_UNAVAILABLE.getId() == code) {
         LOGGER.warn("{}.Trying again", errorMsg);
         return 0;
       }
