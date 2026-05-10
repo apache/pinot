@@ -1113,6 +1113,10 @@ mapvalue:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.MapValueTransformFunction"
   udf: null
+mask:
+  scalar: "org.apache.pinot.common.function.scalar.bitwise.MaskScalarFunction"
+  transform: null
+  udf: null
 max:
   scalar: null
   transform: null

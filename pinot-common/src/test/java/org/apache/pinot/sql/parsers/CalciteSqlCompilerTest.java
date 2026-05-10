@@ -1089,7 +1089,8 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testPolymorphicArithmeticScalarFunctionsCompile() {
     PinotQuery pinotQuery = compileToPinotQuery("SELECT least(col1, col2), greatest(col3, col4), negate(col5), "
-        + "positiveModulo(col6, col7), moduloOrZero(col8, col9) FROM myTable WHERE least(col1, col2) = 1 "
+        + "positiveModulo(col6, col7), moduloOrZero(col8, col9) "
+        + "FROM myTable WHERE least(col1, col2) = 1 "
         + "AND greatest(col3, col4) = 2 AND negate(col5) = -1 AND positiveModulo(col6, col7) = 0 "
         + "AND moduloOrZero(col8, col9) = 0");
 
@@ -1099,6 +1100,16 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(selectList.get(2).getFunctionCall().getOperator(), "negate");
     Assert.assertEquals(selectList.get(3).getFunctionCall().getOperator(), "positivemodulo");
     Assert.assertEquals(selectList.get(4).getFunctionCall().getOperator(), "moduloorzero");
+  }
+
+  @Test
+  public void testPolymorphicBitwiseScalarFunctionsCompile() {
+    PinotQuery pinotQuery =
+        compileToPinotQuery("SELECT mask(col1) FROM myTable WHERE mask(col1) = 0");
+
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "mask");
+    Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall()
+        .getOperator(), "mask");
   }
 
   @Test

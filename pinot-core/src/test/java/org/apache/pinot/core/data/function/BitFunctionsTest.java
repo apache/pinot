@@ -71,6 +71,14 @@ public class BitFunctionsTest {
     inputs.add(new Object[]{"bitNot(value)", Lists.newArrayList("value"), unaryRow, -7L});
     inputs.add(new Object[]{"bitMask(value)", Lists.newArrayList("value"), unaryRow, 64L});
 
+    GenericRow signMaskRow = new GenericRow();
+    signMaskRow.putValue("value", -10);
+    inputs.add(new Object[]{"mask(value)", Lists.newArrayList("value"), signMaskRow, Long.MAX_VALUE - 9L});
+
+    GenericRow minValueMaskRow = new GenericRow();
+    minValueMaskRow.putValue("value", Long.MIN_VALUE);
+    inputs.add(new Object[]{"mask(value)", Lists.newArrayList("value"), minValueMaskRow, 0L});
+
     GenericRow highBitMaskRow = new GenericRow();
     highBitMaskRow.putValue("value", 40);
     inputs.add(new Object[]{"bitMask(value)", Lists.newArrayList("value"), highBitMaskRow, 1L << 40});

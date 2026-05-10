@@ -73,6 +73,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertNotNull(dispatchableSubPlan);
   }
 
+  @Test
+  public void testPolymorphicBitwiseScalarFunctionsPlanQuery() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT mask(col3) FROM a WHERE mask(col3) = 0");
+    assertNotNull(dispatchableSubPlan);
+  }
+
   @Test(dataProvider = "testQueryExceptionDataProvider")
   public void testQueryWithException(String query, String exceptionSnippet) {
     try {
