@@ -49,10 +49,20 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
     if (tierConfigs == null || tierConfigs.isEmpty()) {
       return Set.of();
     }
-    // Fetch tier instance partitions from ZK to positively identify tier servers. If ZK is unavailable, the
-    // fetch will throw and propagate up; this is intentional — silently falling back to an empty set would
-    // re-introduce the cold-tier assignment bug during ZK flakiness. Reads are typically served from the local
-    // HelixPropertyStore cache, so the cost per call is small.
+    // Fetch tier instance partitions from ZK to positively identify tier servers. Behavior breakdown:
+    //   1. Purpose: build the set of all servers belonging to non-consuming tiers, so getExistingAssignment
+    //      can skip segments that live entirely on those servers and avoid placing new CONSUMING segments
+    //      on a non-consuming tier.
+    //   2. Path missing in ZK: the fetch returns null and that tier contributes nothing to the filter. This
+    //      is correct because no segment can be on a tier whose instance partitions have not been created
+    //      yet (for example, a tier configured but not yet rebalanced).
+    //   3. ZK unreachable and value not in local cache: the fetch throws and the exception propagates up
+    //      through assignSegment. The exception is caught by the retry policy in IdealStateGroupCommit and
+    //      the call is retried with exponential backoff. If the outage outlives the inline retry,
+    //      RealtimeSegmentValidationManager's periodic repair takes over once ZK is reachable again.
+    //   4. We never silently swallow a ZK failure and fall back to an empty tier set, because that would
+    //      re-introduce the cold-tier assignment bug during ZK flakiness.
+    // Reads are typically served from the local HelixPropertyStore cache, so the cost per call is small.
     Set<String> tierInstances = new HashSet<>();
     for (TierConfig tierConfig : tierConfigs) {
       String instancePartitionsName =

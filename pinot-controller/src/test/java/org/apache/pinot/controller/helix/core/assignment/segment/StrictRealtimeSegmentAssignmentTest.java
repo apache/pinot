@@ -391,49 +391,11 @@ public class StrictRealtimeSegmentAssignmentTest {
   }
 
   @Test
-  public void testAssignSegmentIgnoresColdTierSegments() {
-    // Reproduces the bug where getExistingAssignment() returns cold-tier servers for a partition, causing new
-    // CONSUMING segments to be assigned to cold-tier servers instead of hot-tier (CONSUMING) servers.
-    // Only dedup tables support multi-tier assignment (MultiTierStrictRealtimeSegmentAssignment).
-    SegmentAssignment segmentAssignment = createSegmentAssignmentWithTiers("dedup");
-    Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
-        Map.of(InstancePartitionsType.CONSUMING, _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
-    int numInstancesPerReplicaGroup = NUM_CONSUMING_INSTANCES / NUM_REPLICAS;
-    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
-
-    // Assign segments 0-3 (one per partition) to CONSUMING instances normally
-    for (int segmentId = 0; segmentId < NUM_PARTITIONS; segmentId++) {
-      String segmentName = _segments.get(segmentId);
-      List<String> instancesAssigned =
-          segmentAssignment.assignSegment(segmentName, currentAssignment, onlyConsumingInstancePartitionMap);
-      addToAssignment(currentAssignment, segmentId, instancesAssigned);
-    }
-
-    // Simulate a tier move: replace the assignment for partition 0's segment (segment 0) with cold-tier servers.
-    // This mimics what happens when a completed segment is moved to a cold tier during rebalance.
-    currentAssignment.put(_segments.get(0), buildColdTierStateMap());
-
-    // Now assign a new segment for partition 0 (segment 4). With the bug, getExistingAssignment() would find
-    // the cold-tier segment first (TreeMap alphabetical order) and return cold-tier servers, causing the new
-    // CONSUMING segment to be assigned to cold-tier servers. With the fix, the cold-tier segment is skipped
-    // because its servers are positively identified as belonging to a known tier via ZK.
-    // Segment 4 is partition 0, same as segment 0.
-    int newSegmentId = 4;
-    String newSegmentName = _segments.get(newSegmentId);
-    List<String> instancesAssigned =
-        segmentAssignment.assignSegment(newSegmentName, currentAssignment, onlyConsumingInstancePartitionMap);
-    assertEquals(instancesAssigned.size(), NUM_REPLICAS);
-    // Should be assigned to CONSUMING instances, not cold-tier servers
-    for (int replicaGroupId = 0; replicaGroupId < NUM_REPLICAS; replicaGroupId++) {
-      int expectedAssignedInstanceId = replicaGroupId * numInstancesPerReplicaGroup;
-      assertEquals(instancesAssigned.get(replicaGroupId), CONSUMING_INSTANCES.get(expectedAssignedInstanceId));
-    }
-  }
-
-  @Test
-  public void testAssignSegmentAllColdTierFallsBackToComputed() {
-    // When ALL segments for a partition are on cold tier, getExistingAssignment() should return null,
-    // causing the assignment to fall back to the computed assignment from instance partitions.
+  public void testOnlyColdTierSegmentForPartitionFallsBackToComputed() {
+    // When the only segment for a partition is on cold tier, getExistingAssignment() returns null after the
+    // tier filter skips it, and the assignment falls back to the computed assignment from instance partitions.
+    // This covers the case where the bug previously placed a single existing segment on cold tier (or the
+    // legitimate case where a partition's only completed segment has aged out to cold).
     // Only dedup tables support multi-tier assignment (MultiTierStrictRealtimeSegmentAssignment).
     SegmentAssignment segmentAssignment = createSegmentAssignmentWithTiers("dedup");
     Map<InstancePartitionsType, InstancePartitions> onlyConsumingInstancePartitionMap =
@@ -448,12 +410,12 @@ public class StrictRealtimeSegmentAssignmentTest {
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
 
-    // Move ALL segments for partition 0 to cold tier
+    // Replace partition 0's only segment with a cold-tier placement
     currentAssignment.put(_segments.get(0), buildColdTierStateMap());
 
-    // Assign new segment for partition 0 using NEW instance partitions. Since all existing segments for
-    // partition 0 are on cold tier, getExistingAssignment returns null, so the assignment falls back to
-    // the computed assignment from the new instance partitions.
+    // Assign a new segment for partition 0 using NEW instance partitions. With the cold-tier segment skipped
+    // by the tier filter, getExistingAssignment returns null and the assignment falls back to the computed
+    // (new) instance partitions.
     Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
         Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
     int newSegmentId = 4;
@@ -461,7 +423,6 @@ public class StrictRealtimeSegmentAssignmentTest {
     List<String> instancesAssigned =
         segmentAssignment.assignSegment(newSegmentName, currentAssignment, newConsumingInstancePartitionMap);
     assertEquals(instancesAssigned.size(), NUM_REPLICAS);
-    // Should be assigned to NEW consuming instances since no valid existing assignment exists
     assertEquals(instancesAssigned,
         Arrays.asList("new_consumingInstance_0", "new_consumingInstance_3", "new_consumingInstance_6"));
   }

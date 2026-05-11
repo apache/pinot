@@ -104,8 +104,16 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
   }
 
   /**
-   * Returns the existing assignment for the given partition id, or {@code null} if there is no existing segment for the
-   * partition. We try to derive the partition id from segment name to avoid ZK reads.
+   * Returns the existing assignment for the given partition id, or {@code null} if there is no existing segment
+   * for the partition. We try to derive the partition id from segment name to avoid ZK reads.
+   *
+   * <p>Segments are skipped during the lookup in two cases:
+   * <ul>
+   *   <li>OFFLINE segments — their idealState assignment may be stale.</li>
+   *   <li>Segments whose servers are entirely on a known non-consuming tier (e.g. cold tier), as returned by
+   *       {@link #getTierInstances()}. These segments were moved by rebalance and must not influence the
+   *       placement of new CONSUMING segments.</li>
+   * </ul>
    */
   @Nullable
   private Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
