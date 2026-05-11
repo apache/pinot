@@ -18,14 +18,20 @@
  */
 package org.apache.pinot.common.response;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class LazyToEagerBrokerResponseAdaptorTest {
@@ -51,6 +57,62 @@ public class LazyToEagerBrokerResponseAdaptorTest {
     assertEquals(resultTable.getRows().get(0)[1], "one");
     assertEquals(resultTable.getRows().get(1)[0], 2);
     assertEquals(resultTable.getRows().get(1)[1], "two");
+  }
+
+  @Test
+  public void testGetResultTableNullWhenNullSchema()
+      throws IOException {
+    // Early validation errors produce a response with no data schema.
+    StreamingBrokerResponse streaming = StreamingBrokerResponse.error(
+        QueryErrorCode.QUERY_VALIDATION, "mismatched row sizes");
+    BrokerResponse eager = LazyToEagerBrokerResponseAdaptor.of(streaming);
+
+    assertNull(eager.getResultTable(), "resultTable must be null for error responses with no schema");
+
+    JsonNode json = JsonUtils.stringToJsonNode(eager.toJsonString());
+    assertNull(json.get("resultTable"), "resultTable must be absent from JSON for error responses");
+  }
+
+  @Test
+  public void testGetResultTableNullWhenExceptionAndNoRows()
+      throws IOException {
+    // Execution errors (e.g. NUM_GROUPS_LIMIT with error_on=true) produce a response with a schema
+    // but no rows and at least one exception.
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"i", "j", "cnt"},
+        new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.LONG
+        }
+    );
+    List<QueryProcessingException> exceptions =
+        List.of(new QueryProcessingException(507, "NUM_GROUPS_LIMIT has been reached"));
+    StreamingBrokerResponse streaming = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, new StreamingBrokerResponse.Metainfo.Error(exceptions), List.of());
+
+    BrokerResponse eager = LazyToEagerBrokerResponseAdaptor.of(streaming);
+
+    assertNull(eager.getResultTable(), "resultTable must be null when schema set but execution raised an exception");
+
+    JsonNode json = JsonUtils.stringToJsonNode(eager.toJsonString());
+    assertNull(json.get("resultTable"), "resultTable must be absent from JSON");
+    assertNotNull(json.get("exceptions"), "exceptions must be present in JSON");
+  }
+
+  @Test
+  public void testGetResultTableNonNullWhenEmptyRowsNoException() {
+    // A valid query that matches no rows should still return an empty ResultTable (not null).
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"id"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}
+    );
+    StreamingBrokerResponse streaming = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, new StreamingBrokerResponse.Metainfo.Error(List.of()), List.of());
+
+    BrokerResponse eager = LazyToEagerBrokerResponseAdaptor.of(streaming);
+
+    ResultTable resultTable = eager.getResultTable();
+    assertNotNull(resultTable, "resultTable must be non-null for a valid empty result set");
+    assertEquals(resultTable.getRows().size(), 0);
   }
 
   @Test
