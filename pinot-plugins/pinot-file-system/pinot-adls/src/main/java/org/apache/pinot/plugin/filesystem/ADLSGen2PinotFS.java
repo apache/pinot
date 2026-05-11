@@ -659,16 +659,18 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     try {
       DataLakeFileClient fileClient =
           _fileSystemClient.getFileClient(AzurePinotFSUtil.convertUriToAzureStylePath(uri));
+      PathProperties pathProperties;
       try {
-        PathProperties pathProperties = fileClient.getProperties();
-        fileClient.setHttpHeaders(getPathHttpHeaders(pathProperties));
+        pathProperties = fileClient.getProperties();
       } catch (DataLakeStorageException e) {
-        if (e.getStatusCode() != NOT_FOUND_STATUS_CODE) {
-          throw e;
+        if (e.getStatusCode() == NOT_FOUND_STATUS_CODE) {
+          // File does not exist — create an empty file to satisfy the PinotFS touch() contract
+          _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToAzureStylePath(uri));
+          return true;
         }
-        // File does not exist — create an empty file to satisfy the PinotFS touch() contract
-        _fileSystemClient.createFile(AzurePinotFSUtil.convertUriToAzureStylePath(uri));
+        throw new IOException(e);
       }
+      fileClient.setHttpHeaders(getPathHttpHeaders(pathProperties));
       return true;
     } catch (DataLakeStorageException e) {
       throw new IOException(e);
