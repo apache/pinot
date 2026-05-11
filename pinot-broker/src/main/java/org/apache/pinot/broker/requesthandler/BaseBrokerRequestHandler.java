@@ -48,6 +48,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.StreamingBrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -160,7 +161,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     SqlNodeAndOptions actualSqlNodeAndOptions =
         extractSqlNodeAndOptions(query, request, sqlNodeAndOptions, requestContext);
 
-    checkApplication(actualSqlNodeAndOptions, requestContext, requestId, query);
+    try {
+      checkApplication(actualSqlNodeAndOptions, requestContext, requestId, query);
+    } catch (QueryException e) {
+      return StreamingBrokerResponse.error(e.getErrorCode(), e.getMessage());
+    }
 
     @SuppressWarnings("resource")
     StreamingBrokerResponse streamingBrokerResponse = handleStreamingRequest(
@@ -191,7 +196,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     SqlNodeAndOptions actualSqlNodeAndOptions =
         extractSqlNodeAndOptions(query, request, sqlNodeAndOptions, requestContext);
 
-    checkApplication(actualSqlNodeAndOptions, requestContext, requestId, query);
+    try {
+      checkApplication(actualSqlNodeAndOptions, requestContext, requestId, query);
+    } catch (QueryException e) {
+      return new BrokerResponseNative(e.getErrorCode(), e.getMessage());
+    }
 
     BrokerResponse brokerResponse = handleRequest(
         requestId, query, actualSqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
