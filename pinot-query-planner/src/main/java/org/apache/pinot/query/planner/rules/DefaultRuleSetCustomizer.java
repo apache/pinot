@@ -267,7 +267,7 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
       PinotTableScanConverterRule.INSTANCE
   );
 
-  public static final List<RelOptRule> POST_LOGICAL_V2_RULES = List.of(
+  public static final List<RelOptRule> POST_LOGICAL_PHYSICAL_RULES = List.of(
       PinotTableScanConverterRule.INSTANCE,
       PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
       PinotLogicalAggregateRule.SortAggregate.INSTANCE,
@@ -300,8 +300,8 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
       case POST_LOGICAL:
         rules.addAll(POST_LOGICAL_RULES);
         return;
-      case POST_LOGICAL_V2:
-        rules.addAll(POST_LOGICAL_V2_RULES);
+      case POST_LOGICAL_PHYSICAL:
+        rules.addAll(POST_LOGICAL_PHYSICAL_RULES);
         return;
       case POST_LOGICAL_ENRICHED_JOIN:
         rules.addAll(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);

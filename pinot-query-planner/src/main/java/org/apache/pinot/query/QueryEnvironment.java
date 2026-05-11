@@ -662,7 +662,7 @@ public class QueryEnvironment {
         hepProgramBuilder.addRuleCollection(ruleSet.rulesFor(Phase.POST_LOGICAL_ENRICHED_JOIN));
       }
     } else {
-      for (RelOptRule relOptRule : ruleSet.rulesFor(Phase.POST_LOGICAL_V2)) {
+      for (RelOptRule relOptRule : ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL)) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }

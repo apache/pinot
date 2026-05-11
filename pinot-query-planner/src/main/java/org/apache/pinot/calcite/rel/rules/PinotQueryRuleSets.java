@@ -49,7 +49,7 @@ public final class PinotQueryRuleSets {
   public static final List<RelOptRule> PRUNE_RULES = DefaultRuleSetCustomizer.PRUNE_RULES;
 
   @Deprecated
-  public static final List<RelOptRule> PINOT_POST_RULES_V2 = DefaultRuleSetCustomizer.POST_LOGICAL_V2_RULES;
+  public static final List<RelOptRule> PINOT_POST_RULES_V2 = DefaultRuleSetCustomizer.POST_LOGICAL_PHYSICAL_RULES;
 
   /// Returns the default POST_LOGICAL rule list.
   ///

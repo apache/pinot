@@ -54,8 +54,8 @@ public enum Phase {
   POST_LOGICAL,
 
   /// Post-logical rules used when the physical optimizer **is** enabled.
-  /// OSS defaults: `DefaultRuleSetCustomizer.POST_LOGICAL_V2_RULES`.
-  POST_LOGICAL_V2,
+  /// OSS defaults: `DefaultRuleSetCustomizer.POST_LOGICAL_PHYSICAL_RULES`.
+  POST_LOGICAL_PHYSICAL,
 
   /// Conditional enriched-join rules applied after the post-logical phase
   /// when the `JOIN_TO_ENRICHED_JOIN` rule is not skipped.
