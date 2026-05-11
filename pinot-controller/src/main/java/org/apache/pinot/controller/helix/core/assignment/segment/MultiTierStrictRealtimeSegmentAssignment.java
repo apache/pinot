@@ -19,15 +19,19 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -38,6 +42,32 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * the CONSUMING servers.
  */
 public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtimeSegmentAssignment {
+
+  @Override
+  protected Set<String> getTierInstances() {
+    List<TierConfig> tierConfigs = _tableConfig.getTierConfigsList();
+    if (tierConfigs == null || tierConfigs.isEmpty()) {
+      return Set.of();
+    }
+    // Fetch tier instance partitions from ZK to positively identify tier servers. If ZK is unavailable, the
+    // fetch will throw and propagate up; this is intentional — silently falling back to an empty set would
+    // re-introduce the cold-tier assignment bug during ZK flakiness. Reads are typically served from the local
+    // HelixPropertyStore cache, so the cost per call is small.
+    Set<String> tierInstances = new HashSet<>();
+    for (TierConfig tierConfig : tierConfigs) {
+      String instancePartitionsName =
+          InstancePartitionsUtils.getInstancePartitionsNameForTier(_tableNameWithType, tierConfig.getName());
+      InstancePartitions tierInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+          _helixManager.getHelixPropertyStore(), instancePartitionsName);
+      if (tierInstancePartitions != null) {
+        for (List<String> instances : tierInstancePartitions.getPartitionToInstancesMap().values()) {
+          tierInstances.addAll(instances);
+        }
+      }
+    }
+    return tierInstances;
+  }
+
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,

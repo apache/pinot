@@ -47,10 +47,15 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  *     breaking the key assumption for queries to be correct for the table using upsert/dedup.
  *   </li>
  *   <li>
- *     There is no need to handle COMPLETED segments for tables using upsert/dedup, because their completed
- *     segments should not be relocated to servers tagged to host COMPLETED segments. Basically, upsert/dedup-enabled
- *     tables can only use servers tagged for CONSUMING segments to host both consuming and completed segments from a
- *     table partition.
+ *     For tables using {@link SingleTierStrictRealtimeSegmentAssignment} (upsert), all segments for a partition stay
+ *     on CONSUMING-tagged servers — completed segments are NOT relocated to other tiers, because upsert correctness
+ *     requires keeping validDocIds bitmaps co-located with the CONSUMING segment of the partition.
+ *   </li>
+ *   <li>
+ *     For tables using {@link MultiTierStrictRealtimeSegmentAssignment} (dedup), completed segments past their TTL
+ *     CAN be relocated to non-consuming tiers (e.g. cold tier). When looking up the existing assignment to enforce
+ *     the same-server invariant for new CONSUMING segments, such tier-resident segments must be skipped so the new
+ *     CONSUMING segment lands on hot-tier (consuming) servers. The skip is implemented via {@link #getTierInstances()}.
  *   </li>
  * </ul>
  *
@@ -104,10 +109,16 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
    */
   @Nullable
   private Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
+    Set<String> tierInstances = getTierInstances();
     List<String> uploadedSegments = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       // Skip OFFLINE segments as they are not rebalanced, so their assignment in idealState can be stale.
       if (isOfflineSegment(entry.getValue())) {
+        continue;
+      }
+      // Skip segments whose servers are all on a known tier (e.g. cold tier). These segments were moved by
+      // rebalance and should not influence the placement of new CONSUMING segments.
+      if (!tierInstances.isEmpty() && tierInstances.containsAll(entry.getValue().keySet())) {
         continue;
       }
       LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
@@ -126,6 +137,16 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
       }
     }
     return null;
+  }
+
+  /**
+   * Returns the set of all server instances belonging to non-consuming tiers (e.g. cold tier). Segments assigned
+   * exclusively to these instances are skipped when looking for existing assignments, since they were moved by
+   * rebalance and must not influence the placement of new CONSUMING segments. The default returns an empty set
+   * (no tier filtering); subclasses that support tiering should override.
+   */
+  protected Set<String> getTierInstances() {
+    return Set.of();
   }
 
   /**
