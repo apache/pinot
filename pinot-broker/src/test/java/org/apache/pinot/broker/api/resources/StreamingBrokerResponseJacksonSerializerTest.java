@@ -514,6 +514,76 @@ public class StreamingBrokerResponseJacksonSerializerTest {
   }
 
   @Test
+  public void testExceptionWithNoRowsOmitsResultTable() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"col1", "col2"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}
+    );
+    List<QueryProcessingException> exceptions =
+        List.of(new QueryProcessingException(507, "NUM_GROUPS_LIMIT has been reached"));
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(exceptions);
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, Collections.emptyList());
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+
+    assertFalse(json.has("resultTable"), "resultTable must be absent when exceptions present with no rows");
+    assertTrue(json.has("exceptions"));
+    assertEquals(json.get("exceptions").size(), 1);
+    assertEquals(json.get("exceptions").get(0).get("message").asText(), "NUM_GROUPS_LIMIT has been reached");
+  }
+
+  @Test
+  public void testExceptionWithRowsIncludesResultTable() throws Exception {
+    // Partial results: exceptions exist but some rows were produced — resultTable must still be present.
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"col1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}
+    );
+    List<QueryProcessingException> exceptions =
+        List.of(new QueryProcessingException(QueryErrorCode.SERVER_SEGMENT_MISSING.getId(), "Segment not found"));
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(exceptions);
+    List<Object[]> data = List.<Object[]>of(new Object[]{42});
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, data);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+
+    assertTrue(json.has("resultTable"), "resultTable must be present when rows exist even with exceptions");
+    JsonNode rows = json.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0).get(0).asInt(), 42);
+    assertTrue(json.has("exceptions"));
+    assertEquals(json.get("exceptions").size(), 1);
+  }
+
+  @Test
+  public void testErrorMessageFormatIncludesErrorCodePrefix() throws Exception {
+    // error(QueryErrorCode, String) must prepend errorCode.getDefaultMessage() + ": " to match BrokerResponseNative.
+    String detail = "some validation error detail";
+    StreamingBrokerResponse response = StreamingBrokerResponse.error(QueryErrorCode.QUERY_VALIDATION, detail);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+
+    String expected = QueryErrorCode.QUERY_VALIDATION.getDefaultMessage() + ": " + detail;
+    assertEquals(json.get("exceptions").get(0).get("message").asText(), expected);
+  }
+
+  @Test
+  public void testMetainfoErrorConstructorIncludesErrorCodePrefix() throws Exception {
+    // Metainfo.Error(QueryErrorCode, String) must also prepend the prefix — it's used in BaseBrokerRequestHandler.
+    String detail = "some query validation detail";
+    StreamingBrokerResponse.Metainfo.Error error =
+        new StreamingBrokerResponse.Metainfo.Error(QueryErrorCode.QUERY_VALIDATION, detail);
+    StreamingBrokerResponse response = new StreamingBrokerResponse.EarlyResponse(error);
+
+    JsonNode json = serializeToJsonNode(response, Comparator.naturalOrder());
+
+    String expected = QueryErrorCode.QUERY_VALIDATION.getDefaultMessage() + ": " + detail;
+    assertEquals(json.get("exceptions").get(0).get("message").asText(), expected);
+  }
+
+  @Test
   public void testModuleRegistration() throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     StreamingBrokerResponseJacksonSerializer.registerModule(mapper, Comparator.naturalOrder());

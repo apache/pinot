@@ -98,7 +98,9 @@ public interface StreamingBrokerResponse extends AutoCloseable {
   }
 
   static StreamingBrokerResponse error(QueryErrorCode errorCode, @Nullable String errorMessage) {
-    String actualErrorMessage = errorMessage != null ? errorMessage : errorCode.getDefaultMessage();
+    String actualErrorMessage = errorMessage != null
+        ? errorCode.getDefaultMessage() + ": " + errorMessage
+        : errorCode.getDefaultMessage();
     QueryProcessingException processingException = new QueryProcessingException(errorCode.getId(), actualErrorMessage);
 
     return new EarlyResponse(new Metainfo.Error(List.of(processingException)));
@@ -147,7 +149,8 @@ public interface StreamingBrokerResponse extends AutoCloseable {
       private final List<QueryProcessingException> _processingExceptions;
 
       public Error(QueryErrorCode errorCode, String errorMessage) {
-        this(List.of(new QueryProcessingException(errorCode.getId(), errorMessage)));
+        this(List.of(new QueryProcessingException(errorCode.getId(),
+            errorCode.getDefaultMessage() + ": " + errorMessage)));
       }
 
       public Error(List<QueryProcessingException> processingExceptions) {

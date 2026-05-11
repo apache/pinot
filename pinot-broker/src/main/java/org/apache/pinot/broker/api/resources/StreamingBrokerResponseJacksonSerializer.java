@@ -70,7 +70,9 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
 
   /// Writes all the data from the StreamingBrokerResponse into the "resultTable" field.
   ///
-  /// This method consumes the data blocks from the response.
+  /// This method consumes the data blocks from the response using lazy-commit: the "resultTable" JSON field is
+  /// opened only when the first row arrives. This avoids full buffering while still allowing resultTable to be
+  /// suppressed when 0 rows are produced with exceptions (e.g. errorOnNumGroupsLimit=true).
   private static ResultTableWriteResult writeResultTable(StreamingBrokerResponse value, JsonGenerator gen,
       SerializerProvider provider)
       throws IOException, InterruptedException {
@@ -83,19 +85,67 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
       }), -1);
     }
 
-    gen.writeFieldName("resultTable");
-    gen.writeStartObject();
-
-    // write the data schema
-    gen.writeFieldName("dataSchema");
-    provider.defaultSerializeValue(dataSchema, gen);
-
-    try {
-      RowsWriteResult rowsWriteResult = writeRowsIfAny(value, gen, provider, dataSchema);
-      return new ResultTableWriteResult(rowsWriteResult._metainfo, rowsWriteResult._rowCount);
-    } finally {
-      gen.writeEndObject(); // end of resultTable
+    int width = dataSchema.size();
+    // Fast path: cache one serializer per type-stable column (INT, LONG, STRING, arrays, etc.).
+    @SuppressWarnings("unchecked")
+    JsonSerializer<Object>[] serializers = new JsonSerializer[width];
+    // Runtime type can vary per row (OBJECT columns, or rows already converted/formatted by eager paths), so cache
+    // serializers by runtime class for fallback.
+    @SuppressWarnings("unchecked")
+    Map<Class<?>, JsonSerializer<Object>>[] runtimeColumnSerializers = new Map[width];
+    DataSchema.ColumnDataType[] columnTypes = dataSchema.getColumnDataTypes();
+    for (int colIdx = 0; colIdx < columnTypes.length; colIdx++) {
+      DataSchema.ColumnDataType columnType = columnTypes[colIdx];
+      if (columnType != DataSchema.ColumnDataType.OBJECT) {
+        serializers[colIdx] = provider.findTypedValueSerializer(columnType.getExternalClass(), false, null);
+      }
     }
+
+    // The lazy-open callback writes the resultTable header (field name, schema, rows array start) on first row.
+    // If consumeData produces 0 rows it is never called, so the field is never committed to the JSON stream.
+    DataBlockContentWriter writer =
+        new DataBlockContentWriter(gen, provider, columnTypes, serializers, runtimeColumnSerializers, width);
+    writer.setBeforeFirstRow(() -> {
+      try {
+        gen.writeFieldName("resultTable");
+        gen.writeStartObject();
+        gen.writeFieldName("dataSchema");
+        provider.defaultSerializeValue(dataSchema, gen);
+        gen.writeFieldName("rows");
+        gen.writeStartArray();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+
+    StreamingBrokerResponse.Metainfo metainfo;
+    try {
+      metainfo = value.consumeData(writer::writeDataBlockContent);
+    } catch (UncheckedIOException e) {
+      throw (IOException) e.getCause();
+    }
+
+    if (writer.getRowCount() == 0) {
+      // The lazy-open callback was never invoked — resultTable was not started.
+      if (!metainfo.getExceptions().isEmpty()) {
+        return new ResultTableWriteResult(metainfo, -1); // suppress resultTable
+      }
+      // Empty result set with no exceptions: write a complete empty resultTable.
+      gen.writeFieldName("resultTable");
+      gen.writeStartObject();
+      gen.writeFieldName("dataSchema");
+      provider.defaultSerializeValue(dataSchema, gen);
+      gen.writeFieldName("rows");
+      gen.writeStartArray();
+      gen.writeEndArray();
+      gen.writeEndObject();
+      return new ResultTableWriteResult(metainfo, 0);
+    }
+
+    // Close the JSON structures opened lazily before the first row.
+    gen.writeEndArray(); // rows
+    gen.writeEndObject(); // resultTable
+    return new ResultTableWriteResult(metainfo, writer.getRowCount());
   }
 
   /// Consumes the full row stream without writing `resultTable` JSON (for `dropResults` on streaming responses).
@@ -115,42 +165,6 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
     return new ResultTableWriteResult(metainfo, rowCountHolder[0]);
   }
 
-  /// Serializes the rows from the StreamingBrokerResponse.
-  ///
-  /// This method consumes the data blocks from the response.
-  private static RowsWriteResult writeRowsIfAny(StreamingBrokerResponse value, JsonGenerator gen,
-      SerializerProvider provider,
-      DataSchema dataSchema
-  ) throws IOException, InterruptedException {
-    gen.writeFieldName("rows");
-    // write all the rows as an array of arrays
-    gen.writeStartArray();
-
-    try {
-      int width = dataSchema.size();
-      // Fast path: cache one serializer per type-stable column (INT, LONG, STRING, arrays, etc.).
-      @SuppressWarnings("unchecked")
-      JsonSerializer<Object>[] serializers = new JsonSerializer[width];
-      // Runtime type can vary per row (OBJECT columns, or rows already converted/formatted by eager paths), so cache
-      // serializers by runtime class for fallback.
-      @SuppressWarnings("unchecked")
-      Map<Class<?>, JsonSerializer<Object>>[] runtimeColumnSerializers = new Map[width];
-      DataSchema.ColumnDataType[] columnTypes = dataSchema.getColumnDataTypes();
-      for (int colIdx = 0; colIdx < columnTypes.length; colIdx++) {
-        DataSchema.ColumnDataType columnType = columnTypes[colIdx];
-        if (columnType != DataSchema.ColumnDataType.OBJECT) {
-          serializers[colIdx] = provider.findTypedValueSerializer(columnType.getExternalClass(), false, null);
-        }
-      }
-      DataBlockContentWriter writer =
-          new DataBlockContentWriter(gen, provider, columnTypes, serializers, runtimeColumnSerializers, width);
-      StreamingBrokerResponse.Metainfo metainfo = value.consumeData(writer::writeDataBlockContent);
-      return new RowsWriteResult(metainfo, writer.getRowCount());
-    } finally {
-      gen.writeEndArray();
-    }
-  }
-
   private static final class DataBlockContentWriter {
     private final JsonGenerator _gen;
     private final SerializerProvider _provider;
@@ -159,6 +173,7 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
     private final Map<Class<?>, JsonSerializer<Object>>[] _runtimeColumnSerializers;
     private final int _width;
     private int _rowCount;
+    private Runnable _beforeFirstRow; // called lazily before the first row is written; null after first invocation
 
     private DataBlockContentWriter(JsonGenerator gen, SerializerProvider provider,
         DataSchema.ColumnDataType[] columnTypes, JsonSerializer<Object>[] serializers,
@@ -171,12 +186,21 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
       _width = width;
     }
 
+    private void setBeforeFirstRow(Runnable beforeFirstRow) {
+      _beforeFirstRow = beforeFirstRow;
+    }
+
     private int getRowCount() {
       return _rowCount;
     }
 
     private void writeDataBlockContent(StreamingBrokerResponse.Data dataBlock) {
       while (dataBlock.next()) {
+        if (_beforeFirstRow != null) {
+          Runnable callback = _beforeFirstRow;
+          _beforeFirstRow = null;
+          callback.run(); // throws UncheckedIOException on JSON write failure
+        }
         // Make sure every row array is closed even if one value fails to serialize.
         boolean rowStarted = false;
         try {
@@ -320,16 +344,6 @@ public class StreamingBrokerResponseJacksonSerializer extends StdSerializer<Stre
     private ResultTableWriteResult(StreamingBrokerResponse.Metainfo metainfo, int numRowsResultSet) {
       _metainfo = metainfo;
       _numRowsResultSet = numRowsResultSet;
-    }
-  }
-
-  private static final class RowsWriteResult {
-    private final StreamingBrokerResponse.Metainfo _metainfo;
-    private final int _rowCount;
-
-    private RowsWriteResult(StreamingBrokerResponse.Metainfo metainfo, int rowCount) {
-      _metainfo = metainfo;
-      _rowCount = rowCount;
     }
   }
 
