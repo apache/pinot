@@ -35,21 +35,6 @@ import org.apache.calcite.plan.RelOptRule;
 /// before [PinotRuleSet#defaultInstance()] is first called; the singleton is
 /// initialized once and not refreshed.
 ///
-/// ### Plugin classloader configuration
-///
-/// Pinot plugins are loaded in isolated classloaders. The plugin classloader
-/// imports `org.apache.pinot.spi.*` from the broker realm by default. Because
-/// this interface is in `org.apache.pinot.query.planner.rules` (not under
-/// `org.apache.pinot.spi`), the plugin classloader cannot link
-/// `RuleSetCustomizer` or `RelOptRule` unless the plugin's
-/// `pinot-plugin.properties` explicitly imports them:
-///
-/// ```properties
-/// importFrom.pinot=org.apache.pinot.query.planner.rules,org.apache.calcite.plan
-/// ```
-///
-/// The `importFrom.<realmId>` property lists package prefixes to delegate to
-/// the named realm before the plugin's own classloader.
 ///
 /// [PinotRuleSet] invokes every discovered customizer once per [Phase] at
 /// broker startup. The customizer receives the mutable per-phase rule list

@@ -302,7 +302,14 @@ public class PluginManager {
 
         // All packages to look up in pinot realm BEFORE itself.
         // Acts like a prefix so all classes in (and below) the listed package are accessible.
-        Stream.of("org.apache.pinot.spi").forEach(p -> pluginRealm.importFrom(pinotRealm, p));
+        // pinot-query-planner-spi packages are exported so plugins can implement broker SPIs
+        // (RuleSetCustomizer, Phase) without bundling or shading those classes.
+        // org.apache.calcite.plan is exported for RelOptRule used in RuleSetCustomizer.customize.
+        Stream.of(
+            "org.apache.pinot.spi",
+            "org.apache.pinot.query.planner.rules",
+            "org.apache.calcite.plan"
+        ).forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
         // Additional importForm as specified by the plugin configuration
         config.getImportsFromPerRealm().forEach((r, ifs) -> {

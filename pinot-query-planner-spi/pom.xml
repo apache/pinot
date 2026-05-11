@@ -27,8 +27,8 @@
     <groupId>org.apache.pinot</groupId>
     <version>1.6.0-SNAPSHOT</version>
   </parent>
-  <artifactId>pinot-query-planner</artifactId>
-  <name>Pinot Query Planner</name>
+  <artifactId>pinot-query-planner-spi</artifactId>
+  <name>Pinot Query Planner SPI</name>
   <url>https://pinot.apache.org/</url>
 
   <properties>
@@ -37,41 +37,8 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-query-planner-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.janino</groupId>
-      <artifactId>janino</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.janino</groupId>
-      <artifactId>commons-compiler</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.immutables</groupId>
-      <artifactId>value-annotations</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-core</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-    </dependency>
-    <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
+      <groupId>org.apache.calcite</groupId>
+      <artifactId>calcite-core</artifactId>
     </dependency>
   </dependencies>
 </project>

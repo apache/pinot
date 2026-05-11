@@ -57,6 +57,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-query-planner-spi</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
@@ -634,6 +635,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-planner-spi</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
