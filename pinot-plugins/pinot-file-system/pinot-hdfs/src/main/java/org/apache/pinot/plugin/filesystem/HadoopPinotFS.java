@@ -184,7 +184,7 @@ public class HadoopPinotFS extends BasePinotFS {
     // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
     FileStatus[] files = _hadoopFS.listStatus(path);
     if (files == null) {
-      return;
+      throw new IOException("FileSystem.listStatus() returned null for path: " + path);
     }
     for (FileStatus file : files) {
       visitor.accept(file);
