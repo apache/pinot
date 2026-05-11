@@ -57,7 +57,11 @@ public class UrlAuthProvider implements AuthProvider {
     try {
       _header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
       _prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Bearer");
-      _url = new URL(authConfig.getProperties().get(URL).toString());
+      Object urlValue = authConfig.getProperties().get(URL);
+      if (urlValue == null) {
+        throw new IllegalArgumentException("Missing required auth config property: " + URL);
+      }
+      _url = new URL(urlValue.toString());
     } catch (MalformedURLException e) {
       throw new IllegalArgumentException(e);
     }
