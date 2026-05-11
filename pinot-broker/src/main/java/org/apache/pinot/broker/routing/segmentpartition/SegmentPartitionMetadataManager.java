@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +56,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionMetadataManager.class);
+  private static final String CUSTOM_PARTITION_FUNCTION_NAME = "Custom";
   private static final int INVALID_PARTITION_ID = -1;
   private static final long INVALID_CREATION_TIME_MS = -1L;
 
@@ -63,6 +66,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final String _partitionColumn;
   private final String _partitionFunctionName;
   private final int _numPartitions;
+  private final PartitionFunction _partitionFunction;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
@@ -73,10 +77,18 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
       int numPartitions) {
+    this(tableNameWithType, partitionColumn, partitionFunctionName, numPartitions, null);
+  }
+
+  public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
+      int numPartitions, @Nullable Map<String, String> functionConfig) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
+    _partitionFunction =
+        PartitionFunctionFactory.getPartitionFunction(partitionColumn, partitionFunctionName, numPartitions,
+            functionConfig);
   }
 
   @Override
@@ -109,11 +121,19 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     if (_numPartitions != partitionFunction.getNumPartitions()) {
       return INVALID_PARTITION_ID;
     }
+    if (isCustomPartitionFunction(partitionFunction) && !Objects.equals(_partitionFunction.getFunctionConfig(),
+        partitionFunction.getFunctionConfig())) {
+      return INVALID_PARTITION_ID;
+    }
     Set<Integer> partitions = segmentPartitionInfo.getPartitions();
     if (partitions.size() != 1) {
       return INVALID_PARTITION_ID;
     }
     return partitions.iterator().next();
+  }
+
+  private static boolean isCustomPartitionFunction(PartitionFunction partitionFunction) {
+    return CUSTOM_PARTITION_FUNCTION_NAME.equalsIgnoreCase(partitionFunction.getName());
   }
 
   private static long getCreationTimeMs(@Nullable ZNRecord znRecord) {

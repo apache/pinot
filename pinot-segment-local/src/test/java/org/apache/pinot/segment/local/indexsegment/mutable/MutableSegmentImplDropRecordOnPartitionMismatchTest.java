@@ -19,7 +19,10 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.IOException;
+import java.util.Map;
+import org.apache.pinot.common.partition.function.CustomPartitionFunction;
 import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -40,6 +43,10 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.INT)
+      .addSingleValueDimension(VALUE_COLUMN, FieldSpec.DataType.INT)
+      .build();
+  private static final Schema STRING_PARTITION_SCHEMA = new Schema.SchemaBuilder()
+      .addSingleValueDimension(PARTITION_COLUMN, FieldSpec.DataType.STRING)
       .addSingleValueDimension(VALUE_COLUMN, FieldSpec.DataType.INT)
       .build();
 
@@ -109,6 +116,33 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
     assertEquals(_segment.getNumDocsIndexed(), 4);
   }
 
+  @Test
+  public void testInvalidCustomPartitionIdDoesNotDropRecord()
+      throws IOException {
+    _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(STRING_PARTITION_SCHEMA, PARTITION_COLUMN,
+        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN, CustomPartitionFunction.NAME, NUM_PARTITIONS,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(memberId,0)")),
+        MAIN_PARTITION_ID, true);
+
+    indexRow(_segment, "not-a-number", 200);
+
+    assertEquals(_segment.getNumDocsIndexed(), 1);
+  }
+
+  @Test
+  public void testOutOfRangeCustomPartitionIdDoesNotDropRecord()
+      throws IOException {
+    _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, PARTITION_COLUMN,
+        PartitionFunctionFactory.getPartitionFunction(PARTITION_COLUMN, CustomPartitionFunction.NAME, NUM_PARTITIONS,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(memberId,0)", "partitionIdNormalizer",
+                "NO_OP")),
+        MAIN_PARTITION_ID, true);
+
+    indexRow(_segment, 99, 300);
+
+    assertEquals(_segment.getNumDocsIndexed(), 1);
+  }
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testNullPartitionColumnValueThrowsException()
       throws IOException {
@@ -121,7 +155,7 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
     _segment.index(row, null);
   }
 
-  private void indexRow(MutableSegmentImpl segment, int partitionColumnValue, int valueColumnValue)
+  private void indexRow(MutableSegmentImpl segment, Object partitionColumnValue, int valueColumnValue)
       throws IOException {
     GenericRow row = new GenericRow();
     row.putValue(PARTITION_COLUMN, partitionColumnValue);

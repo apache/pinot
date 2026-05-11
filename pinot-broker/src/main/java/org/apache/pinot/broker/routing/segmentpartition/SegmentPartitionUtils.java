@@ -41,13 +41,11 @@ public class SegmentPartitionUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPartitionUtils.class);
 
-  /**
-   * Returns the partition info for a given segment with single partition column.
-   *
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_PARTITION_INFO} when the segment does not have valid partition metadata in its ZK metadata,
-   *       in which case we won't retry later.
-   */
+  /// Returns the partition info for a given segment with single partition column.
+  ///
+  /// NOTE: Returns `null` when the ZNRecord is missing (could be transient Helix issue). Returns
+  /// [SegmentPartitionUtils#INVALID_PARTITION_INFO] when the segment does not have valid partition metadata in its ZK
+  /// metadata, in which case we won't retry later.
   @Nullable
   public static SegmentPartitionInfo extractPartitionInfo(String tableNameWithType, String partitionColumn,
       String segment, @Nullable ZNRecord znRecord) {
@@ -79,18 +77,16 @@ public class SegmentPartitionUtils {
       return INVALID_PARTITION_INFO;
     }
 
-    return new SegmentPartitionInfo(partitionColumn,
-        PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-        columnPartitionMetadata.getPartitions());
+    SegmentPartitionInfo segmentPartitionInfo =
+        getSegmentPartitionInfo(tableNameWithType, segment, partitionColumn, columnPartitionMetadata);
+    return segmentPartitionInfo != null ? segmentPartitionInfo : INVALID_PARTITION_INFO;
   }
 
-  /**
-   * Returns a map from partition column name to partition info for a given segment with multiple partition columns.
-   *
-   * NOTE: Returns {@code null} when the ZNRecord is missing (could be transient Helix issue). Returns
-   *       {@link #INVALID_COLUMN_PARTITION_INFO_MAP} when the segment does not have valid partition metadata in its ZK
-   *       metadata, in which case we won't retry later.
-   */
+  /// Returns a map from partition column name to partition info for a given segment with multiple partition columns.
+  ///
+  /// NOTE: Returns `null` when the ZNRecord is missing (could be transient Helix issue). Returns
+  /// [SegmentPartitionUtils#INVALID_COLUMN_PARTITION_INFO_MAP] when the segment does not have valid partition metadata
+  /// in its ZK metadata, in which case we won't retry later.
   @Nullable
   public static Map<String, SegmentPartitionInfo> extractPartitionInfoMap(String tableNameWithType,
       Set<String> partitionColumns, String segment, @Nullable ZNRecord znRecord) {
@@ -123,15 +119,44 @@ public class SegmentPartitionUtils {
             segment, tableNameWithType);
         continue;
       }
-      SegmentPartitionInfo segmentPartitionInfo = new SegmentPartitionInfo(partitionColumn,
-          PartitionFunctionFactory.getPartitionFunction(columnPartitionMetadata),
-          columnPartitionMetadata.getPartitions());
-      columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
+      SegmentPartitionInfo segmentPartitionInfo =
+          getSegmentPartitionInfo(tableNameWithType, segment, partitionColumn, columnPartitionMetadata);
+      if (segmentPartitionInfo != null) {
+        columnSegmentPartitionInfoMap.put(partitionColumn, segmentPartitionInfo);
+      }
     }
     if (columnSegmentPartitionInfoMap.size() == 1) {
       String partitionColumn = columnSegmentPartitionInfoMap.keySet().iterator().next();
       return Collections.singletonMap(partitionColumn, columnSegmentPartitionInfoMap.get(partitionColumn));
     }
     return columnSegmentPartitionInfoMap.isEmpty() ? INVALID_COLUMN_PARTITION_INFO_MAP : columnSegmentPartitionInfoMap;
+  }
+
+  @Nullable
+  private static SegmentPartitionInfo getSegmentPartitionInfo(String tableNameWithType, String segment,
+      String partitionColumn, ColumnPartitionMetadata columnPartitionMetadata) {
+    try {
+      return new SegmentPartitionInfo(partitionColumn,
+          PartitionFunctionFactory.getPartitionFunction(partitionColumn, columnPartitionMetadata),
+          validPartitions(columnPartitionMetadata) ? columnPartitionMetadata.getPartitions() : Collections.emptySet());
+    } catch (RuntimeException e) {
+      LOGGER.warn("Caught exception while extracting partition info for column: {}, segment: {}, table: {}",
+          partitionColumn, segment, tableNameWithType, e);
+      return null;
+    }
+  }
+
+  private static boolean validPartitions(ColumnPartitionMetadata columnPartitionMetadata) {
+    Set<Integer> partitions = columnPartitionMetadata.getPartitions();
+    if (partitions == null || partitions.isEmpty()) {
+      return false;
+    }
+    int numPartitions = columnPartitionMetadata.getNumPartitions();
+    for (int partition : partitions) {
+      if (partition < 0 || partition >= numPartitions) {
+        return false;
+      }
+    }
+    return true;
   }
 }

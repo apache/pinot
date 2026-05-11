@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.partition.function.CustomPartitionFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -140,6 +141,62 @@ public class ColumnValueSegmentPrunerTest {
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 2"));
     assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column < 10"));
     assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0 OR column = 10"));
+  }
+
+  @Test
+  public void testPartitionPruningWithCustomPartitionFunction() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(
+        PartitionFunctionFactory.getPartitionFunction("column", CustomPartitionFunction.NAME, 5,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(column,0)")));
+    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    assertTrue(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 0"));
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 7"));
+  }
+
+  @Test
+  public void testPartitionPruningWithInvalidCustomPartitionId() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.STRING);
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(
+        PartitionFunctionFactory.getPartitionFunction("column", CustomPartitionFunction.NAME, 5,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(column,0)")));
+    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 'not-a-number'"));
+  }
+
+  @Test
+  public void testPartitionPruningWithOutOfRangeCustomPartitionId() {
+    IndexSegment indexSegment = mockIndexSegment();
+
+    DataSource dataSource = mock(DataSource.class);
+    when(indexSegment.getDataSource(eq("column"), any(Schema.class))).thenReturn(dataSource);
+
+    DataSourceMetadata dataSourceMetadata = mock(DataSourceMetadata.class);
+    when(dataSourceMetadata.getDataType()).thenReturn(DataType.INT);
+    when(dataSourceMetadata.getPartitionFunction()).thenReturn(
+        PartitionFunctionFactory.getPartitionFunction("column", CustomPartitionFunction.NAME, 5,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(column,0)", "partitionIdNormalizer",
+                "NO_OP")));
+    when(dataSourceMetadata.getPartitions()).thenReturn(Collections.singleton(2));
+    when(dataSource.getDataSourceMetadata()).thenReturn(dataSourceMetadata);
+
+    assertFalse(runPruner(indexSegment, "SELECT COUNT(*) FROM testTable WHERE column = 99"));
   }
 
   @Test

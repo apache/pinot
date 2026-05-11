@@ -58,6 +58,7 @@ import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -1563,11 +1564,17 @@ public final class TableConfigUtils {
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       if (MapUtils.isNotEmpty(columnPartitionMap)) {
-        for (String column : columnPartitionMap.keySet()) {
+        for (Map.Entry<String, ColumnPartitionConfig> entry : columnPartitionMap.entrySet()) {
+          String column = entry.getKey();
           FieldSpec fieldSpec = schema.getFieldSpecFor(column);
           Preconditions.checkState(fieldSpec != null, "Failed to find partition column: %s in schema", column);
           Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot partition on multi-value column: %s",
               column);
+          try {
+            PartitionFunctionFactory.getPartitionFunction(column, entry.getValue());
+          } catch (RuntimeException e) {
+            throw new IllegalStateException("Invalid partition config for column: " + column, e);
+          }
         }
       }
     }

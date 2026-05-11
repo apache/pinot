@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.sql.FilterKind;
 
 
@@ -140,8 +141,8 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
         Identifier identifier = operands.get(0).getIdentifier();
         if (identifier != null) {
           SegmentPartitionInfo partitionInfo = columnPartitionInfoMap.get(identifier.getName());
-          return partitionInfo == null || partitionInfo.getPartitions().contains(
-              partitionInfo.getPartitionFunction().getPartition(RequestContextUtils.getStringValue(operands.get(1))));
+          return partitionInfo == null || isPartitionMatch(partitionInfo,
+              RequestContextUtils.getStringValue(operands.get(1)));
         } else {
           return true;
         }
@@ -155,8 +156,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
           }
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
-            if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-                .getPartition(RequestContextUtils.getStringValue(operands.get(i))))) {
+            if (isPartitionMatch(partitionInfo, RequestContextUtils.getStringValue(operands.get(i)))) {
               return true;
             }
           }
@@ -168,5 +168,15 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
       default:
         return true;
     }
+  }
+
+  private static boolean isPartitionMatch(SegmentPartitionInfo partitionInfo, String value) {
+    Set<Integer> partitions = partitionInfo.getPartitions();
+    if (partitions.isEmpty()) {
+      return true;
+    }
+    PartitionFunction partitionFunction = partitionInfo.getPartitionFunction();
+    int partitionId = partitionFunction.getPartition(value);
+    return partitionId < 0 || partitionId >= partitionFunction.getNumPartitions() || partitions.contains(partitionId);
   }
 }

@@ -439,7 +439,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
         realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+            PartitionFunctionFactory.getPartitionFunction(partitionColumn, partitionFunctionName, numPartitions,
                 columnPartitionConfig.getFunctionConfig()));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.partition.function.CustomPartitionFunction;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -1807,6 +1808,53 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+
+    partitionConfigMap = Map.of("intCol",
+        new ColumnPartitionConfig(CustomPartitionFunction.NAME, 4,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(intCol,0)")));
+    partitionConfig = new SegmentPartitionConfig(partitionConfigMap);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(partitionConfig)
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    partitionConfigMap = Map.of("myCol",
+        new ColumnPartitionConfig(CustomPartitionFunction.NAME, 4,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(otherCol,0)")));
+    partitionConfig = new SegmentPartitionConfig(partitionConfigMap);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(partitionConfig)
+        .build();
+    TableConfig invalidReferenceTableConfig = tableConfig;
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(invalidReferenceTableConfig, schema));
+
+    partitionConfigMap = Map.of("myCol", new ColumnPartitionConfig(CustomPartitionFunction.NAME, 4, Map.of()));
+    partitionConfig = new SegmentPartitionConfig(partitionConfigMap);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(partitionConfig)
+        .build();
+    TableConfig missingExpressionTableConfig = tableConfig;
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(missingExpressionTableConfig, schema));
+
+    partitionConfigMap = Map.of("myCol",
+        new ColumnPartitionConfig(CustomPartitionFunction.NAME, 4,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "md5(myCol)")));
+    partitionConfig = new SegmentPartitionConfig(partitionConfigMap);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(partitionConfig)
+        .build();
+    TableConfig nonNumericExpressionTableConfig = tableConfig;
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(nonNumericExpressionTableConfig, schema));
+
+    partitionConfigMap = Map.of("myCol",
+        new ColumnPartitionConfig(CustomPartitionFunction.NAME, 4,
+            Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "myCol")));
+    partitionConfig = new SegmentPartitionConfig(partitionConfigMap);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setSegmentPartitionConfig(partitionConfig)
+        .build();
+    TableConfig bareColumnExpressionTableConfig = tableConfig;
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validate(bareColumnExpressionTableConfig, schema));
 
     // Although this config makes no sense, it should pass the validation phase
     StarTreeIndexConfig starTreeIndexConfig =

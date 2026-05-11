@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.partition.function.CustomPartitionFunction;
 import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -37,6 +38,8 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -70,6 +73,8 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
 
   private static final int NUM_ROWS = 1001;
   private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
+  private static final String CUSTOM_PARTITIONED_COLUMN_NAME = "customPartitionedColumn";
+  private static final String CUSTOM_PARTITION_EXPRESSION = "plus(" + CUSTOM_PARTITIONED_COLUMN_NAME + ",0)";
 
   private static final String NON_PARTITIONED_COLUMN_NAME = "nonPartitionedColumn";
   private static final int NUM_PARTITIONS = 20; // For modulo function
@@ -77,6 +82,7 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
   private static final String PARTITION_FUNCTION_NAME = "MoDuLo";
 
   private final Set<Integer> _expectedPartitions = new HashSet<>();
+  private final Set<Integer> _expectedCustomPartitions = new HashSet<>();
   private IndexSegment _segment;
 
   @BeforeClass
@@ -115,6 +121,20 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
     columnMetadata = segmentMetadata.getColumnMetadataFor(NON_PARTITIONED_COLUMN_NAME);
     Assert.assertNull(columnMetadata.getPartitionFunction());
     Assert.assertNull(columnMetadata.getPartitions());
+  }
+
+  @Test
+  public void testPartitionExpressionMetadataAfterPersist()
+      throws Exception {
+    SegmentMetadata persistedSegmentMetadata = new SegmentMetadataImpl(new File(SEGMENT_PATH));
+    ColumnMetadata columnMetadata = persistedSegmentMetadata.getColumnMetadataFor(CUSTOM_PARTITIONED_COLUMN_NAME);
+
+    PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
+    Assert.assertTrue(partitionFunction instanceof CustomPartitionFunction);
+    Assert.assertEquals(partitionFunction.getFunctionConfig(),
+        Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, CUSTOM_PARTITION_EXPRESSION));
+    Assert.assertEquals(columnMetadata.getPartitions(), _expectedCustomPartitions);
+    Assert.assertEquals(partitionFunction.getPartition(Integer.toString(NUM_PARTITIONS + 3)), 3);
   }
 
   /**
@@ -174,6 +194,7 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
       throws Exception {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
+    schema.addField(new DimensionFieldSpec(CUSTOM_PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
     schema.addField(new DimensionFieldSpec(NON_PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
 
@@ -182,6 +203,8 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
 
     partitionFunctionMap.put(PARTITIONED_COLUMN_NAME,
         new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
+    partitionFunctionMap.put(CUSTOM_PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(CustomPartitionFunction.NAME,
+        NUM_PARTITIONS, Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, CUSTOM_PARTITION_EXPRESSION)));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -197,7 +220,9 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
       int partition = random.nextInt(PARTITION_DIVISOR);
       int validPartitionedValue = random.nextInt(100) * 20 + partition;
       _expectedPartitions.add(partition);
+      _expectedCustomPartitions.add(partition);
       row.putValue(PARTITIONED_COLUMN_NAME, validPartitionedValue);
+      row.putValue(CUSTOM_PARTITIONED_COLUMN_NAME, validPartitionedValue);
       row.putValue(NON_PARTITIONED_COLUMN_NAME, validPartitionedValue);
       rows.add(row);
     }

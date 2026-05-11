@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
 import java.util.HashMap;
@@ -60,6 +61,9 @@ public class PartitionFunctionFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionFunctionFactory.class);
   private static final String SCAN_PACKAGE = "org.apache.pinot";
+  private static final String CUSTOM_PARTITION_FUNCTION_NAME = "Custom";
+  private static final String CUSTOM_PARTITION_FUNCTION_CLASS_NAME =
+      "org.apache.pinot.common.partition.function.CustomPartitionFunction";
 
   private static final Map<String, Constructor<? extends PartitionFunction>> REGISTRY;
 
@@ -76,6 +80,9 @@ public class PartitionFunctionFactory {
       try {
         constructor = clazz.getConstructor(int.class, Map.class);
       } catch (NoSuchMethodException e) {
+        if (CUSTOM_PARTITION_FUNCTION_CLASS_NAME.equals(clazz.getName())) {
+          continue;
+        }
         LOGGER.warn("Skipping {}: missing public constructor (int, Map<String, String>)", clazz.getName());
         continue;
       }
@@ -147,6 +154,14 @@ public class PartitionFunctionFactory {
   /// @param functionConfig optional, function-specific configuration; may be `null`
   public static PartitionFunction getPartitionFunction(String functionName, int numPartitions,
       @Nullable Map<String, String> functionConfig) {
+    return getPartitionFunction(null, functionName, numPartitions, functionConfig);
+  }
+
+  public static PartitionFunction getPartitionFunction(@Nullable String columnName, String functionName,
+      int numPartitions, @Nullable Map<String, String> functionConfig) {
+    if (CUSTOM_PARTITION_FUNCTION_NAME.equalsIgnoreCase(functionName)) {
+      return getCustomPartitionFunction(columnName, numPartitions, functionConfig);
+    }
     Constructor<? extends PartitionFunction> constructor = REGISTRY.get(canonicalize(functionName));
     Preconditions.checkArgument(constructor != null, "No partition function registered for name: %s", functionName);
     try {
@@ -162,12 +177,49 @@ public class PartitionFunctionFactory {
     }
   }
 
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionConfig config) {
+    return getPartitionFunction(columnName, config.getFunctionName(), config.getNumPartitions(),
+        config.getFunctionConfig());
+  }
+
+  public static PartitionFunction getPartitionFunction(String columnName, ColumnPartitionMetadata metadata) {
+    return getPartitionFunction(columnName, metadata.getFunctionName(), metadata.getNumPartitions(),
+        metadata.getFunctionConfig());
+  }
+
+  /// Compatibility shim for callers that do not need column-aware validation.
+  ///
+  /// @deprecated use [#getPartitionFunction(String, ColumnPartitionConfig)].
+  @Deprecated
   public static PartitionFunction getPartitionFunction(ColumnPartitionConfig config) {
     return getPartitionFunction(config.getFunctionName(), config.getNumPartitions(), config.getFunctionConfig());
   }
 
+  /// Compatibility shim for callers that do not need column-aware validation.
+  ///
+  /// @deprecated use [#getPartitionFunction(String, ColumnPartitionMetadata)].
+  @Deprecated
   public static PartitionFunction getPartitionFunction(ColumnPartitionMetadata metadata) {
     return getPartitionFunction(metadata.getFunctionName(), metadata.getNumPartitions(), metadata.getFunctionConfig());
+  }
+
+  private static PartitionFunction getCustomPartitionFunction(@Nullable String columnName, int numPartitions,
+      @Nullable Map<String, String> functionConfig) {
+    try {
+      Class<?> clazz = Class.forName(CUSTOM_PARTITION_FUNCTION_CLASS_NAME);
+      Constructor<?> constructor = clazz.getConstructor(String.class, int.class, Map.class);
+      return (PartitionFunction) constructor.newInstance(columnName, numPartitions, functionConfig);
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException("Custom partition function is not available on the classpath", e);
+    } catch (NoSuchMethodException | IllegalAccessException | InstantiationException e) {
+      throw new IllegalStateException("Failed to instantiate custom partition function", e);
+    } catch (InvocationTargetException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      throw new IllegalStateException("Failed to instantiate custom partition function", cause);
+    }
   }
 
   private static String canonicalize(String name) {

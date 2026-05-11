@@ -104,6 +104,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -1794,21 +1795,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Partition changed or segment not properly partitioned
       if (columnName.equals(partitionColumn)) {
+        assert partitionConfig != null;
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
         if (partitionFunction == null) {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function",
               tableNameWithType, columnName, segmentName);
           return new StaleSegment(segmentName, true, "partition function added: " + columnName);
         }
-        if (!partitionFunction.getName().equalsIgnoreCase(partitionConfig.getFunctionName())) {
+        PartitionFunction configuredPartitionFunction =
+            PartitionFunctionFactory.getPartitionFunction(columnName, partitionConfig);
+        if (!isPartitionFunctionCompatible(partitionFunction, configuredPartitionFunction)) {
           LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function name",
               tableNameWithType, columnName, segmentName);
-          return new StaleSegment(segmentName, true, "partition function name changed: " + columnName);
-        }
-        if (partitionFunction.getNumPartitions() != partitionConfig.getNumPartitions()) {
-          LOGGER.debug("tableNameWithType: {}, columnName: {},, segmentName: {}, change: num partitions",
-              tableNameWithType, columnName, segmentName);
-          return new StaleSegment(segmentName, true, "num partitions changed: " + columnName);
+          return new StaleSegment(segmentName, true, "partition function changed: " + columnName);
         }
         Set<Integer> partitions = columnMetadata.getPartitions();
         if (partitions == null || partitions.size() != 1) {
@@ -1820,6 +1819,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
 
     return new StaleSegment(segmentName, false, null);
+  }
+
+  private static boolean isPartitionFunctionCompatible(PartitionFunction segmentPartitionFunction,
+      PartitionFunction configuredPartitionFunction) {
+    return segmentPartitionFunction.getName().equalsIgnoreCase(configuredPartitionFunction.getName())
+        && segmentPartitionFunction.getNumPartitions() == configuredPartitionFunction.getNumPartitions()
+        && Objects.equals(segmentPartitionFunction.getFunctionConfig(),
+            configuredPartitionFunction.getFunctionConfig());
   }
 
   protected SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

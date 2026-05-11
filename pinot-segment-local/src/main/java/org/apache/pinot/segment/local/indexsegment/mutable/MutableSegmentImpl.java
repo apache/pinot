@@ -642,7 +642,7 @@ public class MutableSegmentImpl implements MutableSegment {
       IndexContainer indexContainer = _indexContainerMap.get(_partitionColumn);
       String stringValue = indexContainer._fieldSpec.getDataType().toString(value);
       int partition = _partitionFunction.getPartition(stringValue);
-      if (partition != _mainPartitionId) {
+      if (partition >= 0 && partition < _partitionFunction.getNumPartitions() && partition != _mainPartitionId) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
         }

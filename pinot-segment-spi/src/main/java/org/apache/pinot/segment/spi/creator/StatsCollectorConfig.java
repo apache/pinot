@@ -85,7 +85,7 @@ public class StatsCollectorConfig {
     if (_segmentPartitionConfig != null) {
       ColumnPartitionConfig columnPartitionConfig = _segmentPartitionConfig.getColumnPartitionConfig(column);
       if (columnPartitionConfig != null) {
-        return PartitionFunctionFactory.getPartitionFunction(columnPartitionConfig);
+        return PartitionFunctionFactory.getPartitionFunction(column, columnPartitionConfig);
       }
     }
     return null;

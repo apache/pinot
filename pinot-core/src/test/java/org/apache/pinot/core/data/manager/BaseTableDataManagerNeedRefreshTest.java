@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.partition.function.CustomPartitionFunction;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -174,6 +175,14 @@ public class BaseTableDataManagerNeedRefreshTest {
     row2.putValue(CARRIER_COLUMN_NAME, "c0");
 
     return List.of(row0, row2, row1);
+  }
+
+  protected static List<GenericRow> generateRowsInSinglePartition() {
+    List<GenericRow> rows = generateRows();
+    for (GenericRow row : rows) {
+      row.putValue(PARTITIONED_COLUMN_NAME, 0);
+    }
+    return rows;
   }
 
   private static File createSegment(IndexLoadingConfig indexLoadingConfig, String segmentName, List<GenericRow> rows)
@@ -393,7 +402,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(partitionedTableConfig40, SCHEMA),
         segmentWithPartition);
     assertTrue(response.isStale());
-    assertEquals(response.getReason(), "num partitions changed: partitionedColumn");
+    assertEquals(response.getReason(), "partition function changed: partitionedColumn");
 
     // when partition function is different, then needRefresh = true
     TableConfig partitionedTableConfigMurmur = getTableConfigBuilder().setSegmentPartitionConfig(
@@ -402,7 +411,37 @@ public class BaseTableDataManagerNeedRefreshTest {
     response = BASE_TABLE_DATA_MANAGER.isSegmentStale(new IndexLoadingConfig(partitionedTableConfigMurmur, SCHEMA),
         segmentWithPartition);
     assertTrue(response.isStale());
-    assertEquals(response.getReason(), "partition function name changed: partitionedColumn");
+    assertEquals(response.getReason(), "partition function changed: partitionedColumn");
+
+    Map<String, String> customFunctionConfig =
+        Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(partitionedColumn,0)",
+            "partitionIdNormalizer", "POSITIVE_MODULO");
+    TableConfig partitionedTableConfigWithCustomFunction = getTableConfigBuilder().setSegmentPartitionConfig(
+        new SegmentPartitionConfig(
+            Map.of(PARTITIONED_COLUMN_NAME,
+                new ColumnPartitionConfig(CustomPartitionFunction.NAME, NUM_PARTITIONS, customFunctionConfig))))
+        .build();
+    IndexLoadingConfig indexLoadingConfigWithCustomFunction =
+        new IndexLoadingConfig(partitionedTableConfigWithCustomFunction, SCHEMA);
+    ImmutableSegmentDataManager segmentWithCustomPartition =
+        createImmutableSegmentDataManager(indexLoadingConfigWithCustomFunction, "partitionWithCustomFunction",
+            generateRowsInSinglePartition());
+
+    // when partition function config matches, then needRefresh = false
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(indexLoadingConfigWithCustomFunction,
+        segmentWithCustomPartition).isStale());
+
+    // when partition function config is different, then needRefresh = true
+    TableConfig partitionedTableConfigWithChangedCustomFunction = getTableConfigBuilder().setSegmentPartitionConfig(
+        new SegmentPartitionConfig(
+            Map.of(PARTITIONED_COLUMN_NAME,
+                new ColumnPartitionConfig(CustomPartitionFunction.NAME, NUM_PARTITIONS,
+                    Map.of(CustomPartitionFunction.PARTITION_EXPRESSION_CONFIG_KEY, "plus(partitionedColumn,1)",
+                        "partitionIdNormalizer", "POSITIVE_MODULO"))))).build();
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(
+        new IndexLoadingConfig(partitionedTableConfigWithChangedCustomFunction, SCHEMA), segmentWithCustomPartition);
+    assertTrue(response.isStale());
+    assertEquals(response.getReason(), "partition function changed: partitionedColumn");
   }
 
   @Test

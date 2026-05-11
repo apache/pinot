@@ -162,6 +162,9 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   protected void updatePartition(String value) {
-    _partitions.add(_partitionFunction.getPartition(value));
+    int partitionId = _partitionFunction.getPartition(value);
+    if (partitionId >= 0 && partitionId < _partitionFunction.getNumPartitions()) {
+      _partitions.add(partitionId);
+    }
   }
 }

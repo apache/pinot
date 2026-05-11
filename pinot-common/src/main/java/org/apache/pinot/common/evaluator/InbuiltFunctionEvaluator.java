@@ -48,6 +48,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
   private final String _functionExpression;
+  private boolean _deterministic = true;
 
   public InbuiltFunctionEvaluator(String functionExpression) {
     _functionExpression = functionExpression;
@@ -99,6 +100,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
                 throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
               }
             }
+            if (!functionInfo.isDeterministic()) {
+              _deterministic = false;
+            }
             return new FunctionExecutionNode(functionInfo, childNodes);
         }
       default:
@@ -109,6 +113,14 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   @Override
   public List<String> getArguments() {
     return _arguments;
+  }
+
+  public boolean isDeterministic() {
+    return _deterministic;
+  }
+
+  public Class<?> getResultClass() {
+    return _rootNode.getResultClass();
   }
 
   @Override
@@ -131,6 +143,8 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     Object execute(GenericRow row);
 
     Object execute(Object[] values);
+
+    Class<?> getResultClass();
   }
 
   private static class NotExecutionNode implements ExecutableNode {
@@ -158,6 +172,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       } else {
         return !res;
       }
+    }
+
+    @Override
+    public Class<?> getResultClass() {
+      return Boolean.class;
     }
   }
 
@@ -203,6 +222,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
       return hasNull ? null : false;
     }
+
+    @Override
+    public Class<?> getResultClass() {
+      return Boolean.class;
+    }
   }
 
   private static class AndExecutionNode implements ExecutableNode {
@@ -247,6 +271,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
       return hasNull ? null : true;
     }
+
+    @Override
+    public Class<?> getResultClass() {
+      return Boolean.class;
+    }
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
@@ -269,20 +298,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
         }
-        if (!_functionInfo.hasNullableParameters()) {
-          // Preserve null values during ingestion transformation if function is an inbuilt
-          // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (Object argument : _arguments) {
-            if (argument == null) {
-              return null;
-            }
-          }
-        }
-        if (_functionInvoker.getMethod().isVarArgs()) {
-          return _functionInvoker.invoke(new Object[]{_arguments});
-        }
-        _functionInvoker.convertTypes(_arguments);
-        return _functionInvoker.invoke(_arguments);
+        return invoke();
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
@@ -295,23 +311,32 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(values);
         }
-        if (!_functionInfo.hasNullableParameters()) {
-          // Preserve null values during ingestion transformation if function is an inbuilt
-          // scalar function that cannot handle nulls, and invoked with null parameter(s).
-          for (Object argument : _arguments) {
-            if (argument == null) {
-              return null;
-            }
-          }
-        }
-        if (_functionInvoker.getMethod().isVarArgs()) {
-          return _functionInvoker.invoke(new Object[]{_arguments});
-        }
-        _functionInvoker.convertTypes(_arguments);
-        return _functionInvoker.invoke(_arguments);
+        return invoke();
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
+    }
+
+    private Object invoke() {
+      if (!_functionInfo.hasNullableParameters()) {
+        // Preserve null values during ingestion transformation if function is an inbuilt
+        // scalar function that cannot handle nulls, and invoked with null parameter(s).
+        for (Object argument : _arguments) {
+          if (argument == null) {
+            return null;
+          }
+        }
+      }
+      if (_functionInvoker.getMethod().isVarArgs()) {
+        return _functionInvoker.invoke(new Object[]{_arguments});
+      }
+      _functionInvoker.convertTypes(_arguments);
+      return _functionInvoker.invoke(_arguments);
+    }
+
+    @Override
+    public Class<?> getResultClass() {
+      return _functionInvoker.getResultClass();
     }
 
     @Override
@@ -338,6 +363,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     }
 
     @Override
+    public Class<?> getResultClass() {
+      return _value != null ? _value.getClass() : Object.class;
+    }
+
+    @Override
     public String toString() {
       return String.format("'%s'", _value);
     }
@@ -358,6 +388,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object[] execute(Object[] values) {
       return _value;
+    }
+
+    @Override
+    public Class<?> getResultClass() {
+      return Object[].class;
     }
 
     @Override
@@ -383,6 +418,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     @Override
     public Object execute(Object[] values) {
       return values[_id];
+    }
+
+    @Override
+    public Class<?> getResultClass() {
+      return Object.class;
     }
 
     @Override

@@ -357,7 +357,7 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         partitionFunctionConfigMap = null;
       }
       PartitionFunction partitionFunction =
-          PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+          PartitionFunctionFactory.getPartitionFunction(column, partitionFunctionName, numPartitions,
               partitionFunctionConfigMap);
       builder.setPartitionFunction(partitionFunction);
       builder.setPartitions(
