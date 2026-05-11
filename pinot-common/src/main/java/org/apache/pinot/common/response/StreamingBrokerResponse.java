@@ -340,11 +340,6 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     }
 
     @Override
-    public BrokerResponse asEagerBrokerResponse() {
-      return _delegate.asEagerBrokerResponse();
-    }
-
-    @Override
     public void close() {
       _delegate.close();
     }
@@ -436,6 +431,12 @@ public interface StreamingBrokerResponse extends AutoCloseable {
     public Metainfo consumeData(DataConsumer consumer)
         throws InterruptedException {
       Metainfo metainfo = _delegate.consumeData(consumer);
+      return new Metainfo.PostDecorator(metainfo, this::decorateMetainfoJson);
+    }
+
+    @Override
+    public Metainfo getMetaInfo() {
+      Metainfo metainfo = _delegate.getMetaInfo();
       return new Metainfo.PostDecorator(metainfo, this::decorateMetainfoJson);
     }
   }

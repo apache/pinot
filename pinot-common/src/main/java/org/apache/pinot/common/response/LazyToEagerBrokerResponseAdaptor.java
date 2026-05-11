@@ -156,7 +156,7 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
 
   @Override
   public void setRequestId(String requestId) {
-    throw new UnsupportedOperationException("Cannot set request ID on early broker response");
+    _json.put("requestId", requestId);
   }
 
   @Override

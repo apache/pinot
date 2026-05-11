@@ -457,7 +457,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer).toStreamingResponse();
       } else {
         StreamingBrokerResponse plainResponse = query(compiledQuery, requestId, requesterIdentity, requestContext,
-            httpHeaders, queryTimer, queryWasLogged);
+            httpHeaders, queryTimer, queryWasLogged, executionContext);
         if (rlsFiltersApplied.get()) {
           return plainResponse.withDecoratedMetainfo(stats -> stats.put("rlsFiltersApplied", true));
         } else {
@@ -938,7 +938,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private StreamingBrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean queryWasLogged)
+      boolean queryWasLogged, QueryExecutionContext executionContext)
       throws QueryException, WebApplicationException {
     InternalQueryResponseContext context = prepareQueryPlan(requestId, query.getTextQuery(), requesterIdentity,
         requestContext, httpHeaders, timer, query, queryWasLogged);
@@ -966,7 +966,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       QueryDispatcher.DispatcherStreamingBrokerResponse dispatcherResponse = _queryDispatcher.submit(
           requestContext, context._dispatchableSubPlan, timer.getRemainingTimeMs(), context._queryOptions);
-      return new MseHandlerStreamingBrokerResponse(dispatcherResponse, context, estimatedNumQueryThreads);
+      return new MseHandlerStreamingBrokerResponse(dispatcherResponse, context, estimatedNumQueryThreads,
+          executionContext);
     } catch (QueryException e) {
       _stagesFinishedMeter.mark(countStages(context.dispatchableSubPlan));
       _opchainsCompletedMeter.mark(countOpChain(context.dispatchableSubPlan));
@@ -1000,12 +1001,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private class MseHandlerStreamingBrokerResponse extends StreamingBrokerResponse.Delegator {
     private final InternalQueryResponseContext _context;
     private final int _estimatedNumQueryThreads;
+    private final QueryExecutionContext _executionContext;
 
     public MseHandlerStreamingBrokerResponse(QueryDispatcher.DispatcherStreamingBrokerResponse delegate,
-        InternalQueryResponseContext context, int estimatedNumQueryThreads) {
+        InternalQueryResponseContext context, int estimatedNumQueryThreads, QueryExecutionContext executionContext) {
       super(delegate);
       _context = context;
       _estimatedNumQueryThreads = estimatedNumQueryThreads;
+      _executionContext = executionContext;
     }
 
     @Override
@@ -1013,7 +1016,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         throws InterruptedException {
 
       EagerToLazyBrokerResponseAdaptor.EagerBrokerResponseToMetainfo metainfo;
-      try {
+      // Stage 0 (broker reduce) always has stage 1 as its sole upstream.
+      QueryThreadContext.MseWorkerInfo mseWorkerInfo =
+          new QueryThreadContext.MseWorkerInfo(0, 0, Set.of(1), Set.of());
+      try (QueryThreadContext ignore = QueryThreadContext.open(_executionContext, mseWorkerInfo, _threadAccountant)) {
         QueryDispatcher.DispatcherStreamingBrokerResponse delegate =
             (QueryDispatcher.DispatcherStreamingBrokerResponse) _delegate;
 
@@ -1054,6 +1060,26 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     private void postExecution(BrokerResponseNativeV2 brokerResponse) {
       _stagesFinishedMeter.mark(countStages(_context._dispatchableSubPlan));
       _opchainsCompletedMeter.mark(countOpChain(_context._dispatchableSubPlan));
+
+      long executionStartTimeNs = System.nanoTime();
+
+      for (QueryProcessingException processingException : brokerResponse.getExceptions()) {
+        QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(processingException.getErrorCode());
+        if (errorCode == QueryErrorCode.EXECUTION_TIMEOUT) {
+          for (String table : _context._tableNames) {
+            _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+          }
+          LOGGER.warn("Timed out executing request {}: {}", _context._requestId, _context._compiledQuery);
+        }
+        _context._requestContext.setErrorCode(errorCode);
+      }
+      if (brokerResponse.getExceptions().isEmpty()) {
+        brokerResponse.setResultTable(brokerResponse.getResultTable());
+        long executionEndTimeNs = System.nanoTime();
+        updatePhaseTimingForTables(_context._tableNames, BrokerQueryPhase.QUERY_EXECUTION,
+            executionEndTimeNs - executionStartTimeNs);
+      }
+
       postProcessBrokerResponse(brokerResponse, _context);
     }
   }
