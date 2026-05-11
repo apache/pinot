@@ -331,10 +331,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         false}
     );
 
-    // Scalar function that doesn't have a valid use should throw an exception on the leaf stage
-    //   - predicate only functions:
+    // Scalar function that doesn't have a valid use should throw an exception
+    //   - predicate only functions that fail at leaf stage (registered in Calcite, rejected at execution):
     testCases.add(new Object[]{"SELECT * FROM a WHERE textMatch(col1, 'f')", "without text index", false});
     testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index", false});
+    //   - predicate only functions that fail at Calcite plan time (not registered in the MSE planner):
     testCases.add(new Object[]{
         "SELECT * FROM a WHERE textContains(col1, 'f')",
         "No match found for function signature textContains",
