@@ -19,7 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 
-public class CpuBasedBrokerQueryKillingLazyBrokerIntegrationTest extends CpuBasedBrokerQueryKillingIntegrationTest {
+public class CpuBasedBrokerQueryKillingLazyBrokerIntegrationTest extends QueryKillingIntegrationTest {
   @Override
   protected boolean useStreamingBrokerResponse() {
     return true;
