@@ -21,10 +21,13 @@ package org.apache.pinot.query.planner.rules;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 /// Owns the multi-stage planner's per-phase Calcite rule lists. Constructed
@@ -70,10 +73,32 @@ public final class PinotRuleSet {
   /// Discovers every [RuleSetCustomizer] via [ServiceLoader] and builds a
   /// rule set from them. Used by [#defaultInstance()] and by callers that
   /// don't have an externally-managed customizer list.
+  ///
+  /// Discovery order:
+  /// 1. Application-classpath customizers (context classloader) — picks up
+  ///    [DefaultRuleSetCustomizer] and any customizer bundled with the broker.
+  /// 2. Plugin classloaders enumerated by [PluginManager#getPluginClassLoaders()] —
+  ///    picks up customizers registered in plugin JARs via
+  ///    `META-INF/services/org.apache.pinot.query.planner.rules.RuleSetCustomizer`.
+  ///
+  /// Call after all plugins have been loaded via [PluginManager]; plugins loaded
+  /// after this method returns will not be included.
   public static PinotRuleSet loadFromServiceLoader() {
     List<RuleSetCustomizer> customizers = new ArrayList<>();
+    // Dedup by class name: the context classloader and a plugin classloader may both see the same
+    // META-INF/services file if their classpaths overlap (e.g. fat-jar + plugin realm).
+    Set<String> seen = new LinkedHashSet<>();
     for (RuleSetCustomizer customizer : ServiceLoader.load(RuleSetCustomizer.class)) {
-      customizers.add(customizer);
+      if (seen.add(customizer.getClass().getName())) {
+        customizers.add(customizer);
+      }
+    }
+    for (ClassLoader pluginClassLoader : PluginManager.get().getPluginClassLoaders()) {
+      for (RuleSetCustomizer customizer : ServiceLoader.load(RuleSetCustomizer.class, pluginClassLoader)) {
+        if (seen.add(customizer.getClass().getName())) {
+          customizers.add(customizer);
+        }
+      }
     }
     return new PinotRuleSet(customizers);
   }

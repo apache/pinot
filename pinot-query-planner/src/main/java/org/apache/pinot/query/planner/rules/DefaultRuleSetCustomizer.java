@@ -80,7 +80,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
 
   //@formatter:off
-  static final List<RelOptRule> BASIC_RULES = List.of(
+  public static final List<RelOptRule> BASIC_RULES = List.of(
       // push a filter into a join
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
@@ -180,7 +180,7 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
   // single HepInstruction.
-  static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
+  public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
       PinotFilterIntoJoinRule
           .instanceWithDescription(PlannerRuleNames.FILTER_INTO_JOIN),
       FilterAggregateTransposeRule.Config.DEFAULT
@@ -193,7 +193,7 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
 
   // Project pushdown rules run using a RuleCollection since we want to push down a project as much as possible in a
   // single HepInstruction.
-  static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
+  public static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
       ProjectFilterTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_FILTER_TRANSPOSE).toRule(),
       PinotProjectJoinTransposeRule
@@ -203,7 +203,7 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
   );
 
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
-  static final List<RelOptRule> PRUNE_RULES = List.of(
+  public static final List<RelOptRule> PRUNE_RULES = List.of(
       AggregateProjectMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_PROJECT_MERGE).toRule(),
       ProjectMergeRule.Config.DEFAULT
@@ -241,7 +241,7 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
   /// the rule's hard-coded default fetch limit). `QueryEnvironment` swaps the
   /// rule on a per-query copy of this list when the per-query
   /// `sortExchangeCopyLimit` differs from that default.
-  static final List<RelOptRule> POST_LOGICAL_RULES = List.of(
+  public static final List<RelOptRule> POST_LOGICAL_RULES = List.of(
       // TODO: Merge the following 2 rules into a single rule
       // add an extra exchange for sort
       PinotSortExchangeNodeInsertRule.INSTANCE,
@@ -267,7 +267,7 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
       PinotTableScanConverterRule.INSTANCE
   );
 
-  static final List<RelOptRule> POST_LOGICAL_V2_RULES = List.of(
+  public static final List<RelOptRule> POST_LOGICAL_V2_RULES = List.of(
       PinotTableScanConverterRule.INSTANCE,
       PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
       PinotLogicalAggregateRule.SortAggregate.INSTANCE,

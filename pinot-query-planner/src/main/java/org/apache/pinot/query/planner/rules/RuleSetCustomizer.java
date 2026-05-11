@@ -24,10 +24,32 @@ import org.apache.calcite.plan.RelOptRule;
 
 /// Plugin SPI for customizing the multi-stage planner's Calcite rule sets.
 ///
-/// Implementations are discovered via [java.util.ServiceLoader]: a plugin
-/// declares its customizer in
-/// `META-INF/services/org.apache.pinot.query.planner.rules.RuleSetCustomizer`.
-/// Implementations must therefore have a public no-arg constructor.
+/// Implementations are discovered via [java.util.ServiceLoader]. Declare your
+/// customizer in
+/// `META-INF/services/org.apache.pinot.query.planner.rules.RuleSetCustomizer`
+/// inside the plugin JAR. Implementations must have a public no-arg constructor.
+///
+/// [PinotRuleSet#loadFromServiceLoader()] first discovers application-classpath
+/// customizers, then iterates every plugin classloader registered with
+/// [org.apache.pinot.spi.plugin.PluginManager]. Plugin JARs must be loaded
+/// before [PinotRuleSet#defaultInstance()] is first called; the singleton is
+/// initialized once and not refreshed.
+///
+/// ### Plugin classloader configuration
+///
+/// Pinot plugins are loaded in isolated classloaders. The plugin classloader
+/// imports `org.apache.pinot.spi.*` from the broker realm by default. Because
+/// this interface is in `org.apache.pinot.query.planner.rules` (not under
+/// `org.apache.pinot.spi`), the plugin classloader cannot link
+/// `RuleSetCustomizer` or `RelOptRule` unless the plugin's
+/// `pinot-plugin.properties` explicitly imports them:
+///
+/// ```properties
+/// importFrom.pinot=org.apache.pinot.query.planner.rules,org.apache.calcite.plan
+/// ```
+///
+/// The `importFrom.<realmId>` property lists package prefixes to delegate to
+/// the named realm before the plugin's own classloader.
 ///
 /// [PinotRuleSet] invokes every discovered customizer once per [Phase] at
 /// broker startup. The customizer receives the mutable per-phase rule list
