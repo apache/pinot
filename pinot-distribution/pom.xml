@@ -263,6 +263,21 @@
   </dependencies>
   <build>
     <plugins>
+      <!-- Override the root pom's inherited shade execution (which resolves phase=none from the
+           root default) with a hard-coded package phase. pinot-distribution must shade all its
+           runtime deps into a fat jar for lib/pinot-all-*.jar. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>net.nicoulaj.maven.plugins</groupId>
         <artifactId>checksum-maven-plugin</artifactId>

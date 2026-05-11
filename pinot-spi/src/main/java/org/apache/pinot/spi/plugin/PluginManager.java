@@ -532,6 +532,11 @@ public class PluginManager {
           additionalHitLoaders.add(cl);
         }
       } catch (ClassNotFoundException ignored) {
+      } catch (NoClassDefFoundError e) {
+        // The class bytecode was found on this classloader but a dependency class could not be
+        // resolved (e.g. the plugin jar is on the system classpath but its native deps are not).
+        // Continue walking — a later classloader (e.g. the plugin's own realm) may have all deps.
+        LOGGER.debug("Skipping classloader {} for class {}: {}", cl, name, e.toString());
       }
     }
     if (firstHit == null) {

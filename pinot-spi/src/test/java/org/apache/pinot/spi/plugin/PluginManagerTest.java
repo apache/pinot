@@ -21,6 +21,9 @@ package org.apache.pinot.spi.plugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
@@ -425,6 +428,37 @@ public class PluginManagerTest {
     List<Runnable> services = PluginManager.get().loadServices(Runnable.class);
     Assert.assertNotNull(services);
     Assert.assertTrue(services.isEmpty());
+  }
+
+  /// Regression test: a classloader in the realm walk that throws {@link NoClassDefFoundError}
+  /// (class bytecode found but transitive dep missing) must not propagate the error to the
+  /// caller. The walk must continue past it and ultimately surface {@link ClassNotFoundException}.
+  @Test
+  public void testRealmWalkContinuesPastNoClassDefFoundError() throws Exception {
+    PluginManager pm = new PluginManager();
+
+    PluginClassLoader badCl = new PluginClassLoader(new URL[0], null) {
+      @Override
+      protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        throw new NoClassDefFoundError("Simulated missing transitive dep for " + name);
+      }
+    };
+    Field registryField = PluginManager.class.getDeclaredField("_registry");
+    registryField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<Plugin, PluginClassLoader> registry = (Map<Plugin, PluginClassLoader>) registryField.get(pm);
+    registry.put(new Plugin("bad-plugin"), badCl);
+
+    Method method = PluginManager.class.getDeclaredMethod("loadClassFromAnyPlugin", String.class);
+    method.setAccessible(true);
+    try {
+      method.invoke(pm, "com.example.DoesNotExist");
+      Assert.fail("Expected ClassNotFoundException");
+    } catch (InvocationTargetException ite) {
+      Throwable cause = ite.getCause();
+      Assert.assertTrue(cause instanceof ClassNotFoundException,
+          "Expected ClassNotFoundException but got " + cause.getClass().getName() + ": " + cause.getMessage());
+    }
   }
 
   @AfterClass
