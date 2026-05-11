@@ -32,6 +32,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
+    <plugin.type>pinot-segment-uploader</plugin.type>
   </properties>
 
   <dependencies>

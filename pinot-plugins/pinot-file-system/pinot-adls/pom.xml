@@ -31,7 +31,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
+    <plugin.type>pinot-file-system</plugin.type>
   </properties>
   <dependencies>
     <dependency>

@@ -32,7 +32,7 @@
   <url>https://pinot.apache.org/</url>
 
   <properties>
-    <shade.phase.prop>package</shade.phase.prop>
+    <plugin.type>pinot-stream-ingestion</plugin.type>
     <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
 

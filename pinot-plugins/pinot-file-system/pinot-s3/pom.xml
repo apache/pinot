@@ -32,6 +32,7 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
+    <plugin.type>pinot-file-system</plugin.type>
   </properties>
 
   <dependencies>
@@ -60,18 +61,6 @@
   </dependencies>
 
   <profiles>
-    <profile>
-      <id>build-shaded-jar</id>
-      <activation>
-        <property>
-          <name>skipShade</name>
-          <value>!true</value>
-        </property>
-      </activation>
-      <properties>
-        <shade.phase.prop>package</shade.phase.prop>
-      </properties>
-    </profile>
     <profile>
       <id>pinot-fastdev</id>
       <properties>

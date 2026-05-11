@@ -29,6 +29,7 @@
 
   <properties>
     <maven.compiler.release>@maven.compiler.release@</maven.compiler.release>
+    <plugin.type>test-plugin-type</plugin.type>
   </properties>
 
   <build>
