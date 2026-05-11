@@ -1,0 +1,155 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.local.recordtransformer;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.ThrottledLogger;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Shared per-row application of {@link FunctionEvaluator}s during ingestion. A single entry point,
+ * {@link #applyFunctionEvaluations}, iterates evaluators; {@link Policy} selects semantics for each pipeline:
+ * <ul>
+ *   <li>{@link Policy#enricher()} &mdash; used by
+ *   {@link org.apache.pinot.segment.local.recordtransformer.enricher.function.CustomFunctionEnricher}: always
+ *   {@code putValue(column, evaluate(record))} in map order (exceptions propagate).</li>
+ *   <li>{@link Policy#expressionTransformation} &mdash; used by {@link ExpressionTransformer}: null / overwrite /
+ *   implicit MAP rules and {@code continueOnError} as in table/schema-driven transforms.</li>
+ * </ul>
+ */
+public final class IngestionFunctionEvaluation {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IngestionFunctionEvaluation.class);
+
+  private IngestionFunctionEvaluation() {
+  }
+
+  /**
+   * How each {@code (column, evaluator)} pair is applied to the row. Only one policy is active per call.
+   */
+  public static final class Policy {
+    private final boolean _enricherOverwrite;
+    private final boolean _continueOnError;
+    private final boolean _overwriteExistingValues;
+    private final Set<String> _implicitMapTransformColumns;
+    private final ThrottledLogger _throttledLogger;
+
+    private Policy(boolean enricherOverwrite, boolean continueOnError, boolean overwriteExistingValues,
+        Set<String> implicitMapTransformColumns, ThrottledLogger throttledLogger) {
+      _enricherOverwrite = enricherOverwrite;
+      _continueOnError = continueOnError;
+      _overwriteExistingValues = overwriteExistingValues;
+      _implicitMapTransformColumns = implicitMapTransformColumns;
+      _throttledLogger = throttledLogger;
+    }
+
+    /**
+     * JSON {@code fieldToFunctionMap} enricher: every field is overwritten with {@code evaluate(record)}.
+     */
+    public static Policy enricher() {
+      return new Policy(true, false, false, Set.of(), null);
+    }
+
+    /**
+     * Table/schema-driven {@link ExpressionTransformer} transforms (including post-upsert overrides).
+     */
+    public static Policy expressionTransformation(boolean continueOnError, boolean overwriteExistingValues,
+        Set<String> implicitMapTransformColumns, ThrottledLogger throttledLogger) {
+      return new Policy(false, continueOnError, overwriteExistingValues, implicitMapTransformColumns,
+          Objects.requireNonNull(throttledLogger, "throttledLogger"));
+    }
+  }
+
+  /**
+   * Single loop over {@code evaluators}: behavior is determined by {@code policy} (enricher vs. expression transform).
+   */
+  public static void applyFunctionEvaluations(GenericRow record, Map<String, FunctionEvaluator> evaluators,
+      Policy policy) {
+    for (Map.Entry<String, FunctionEvaluator> entry : evaluators.entrySet()) {
+      String column = entry.getKey();
+      FunctionEvaluator transformFunctionEvaluator = entry.getValue();
+
+      if (policy._enricherOverwrite) {
+        record.putValue(column, transformFunctionEvaluator.evaluate(record));
+        continue;
+      }
+
+      Object existingValue = record.getValue(column);
+      boolean shouldApplyTransform =
+          policy._overwriteExistingValues || existingValue == null || record.isNullValue(column);
+      if (shouldApplyTransform) {
+        try {
+          Object transformedValue = transformFunctionEvaluator.evaluate(record);
+          applyTransformedValue(record, column, transformedValue);
+        } catch (Exception e) {
+          if (!policy._continueOnError) {
+            throw new RuntimeException("Caught exception while evaluation transform function for column: " + column, e);
+          }
+          policy._throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
+          record.markIncomplete();
+        }
+      } else if (existingValue.getClass().isArray() || existingValue instanceof Collection
+          || existingValue instanceof Map) {
+        try {
+          Object transformedValue = transformFunctionEvaluator.evaluate(record);
+          if (transformedValue == null && policy._implicitMapTransformColumns.contains(column)) {
+            continue;
+          }
+          if (!isTypeCompatible(existingValue, transformedValue)) {
+            applyTransformedValue(record, column, transformedValue);
+          }
+        } catch (Exception e) {
+          LOGGER.debug("Caught exception while evaluation transform function for column: {}", column, e);
+        }
+      }
+    }
+  }
+
+  private static void applyTransformedValue(GenericRow record, String column, @Nullable Object transformedValue) {
+    if (transformedValue != null) {
+      record.removeNullValueField(column);
+      record.putValue(column, transformedValue);
+    } else {
+      record.removeValue(column);
+      record.addNullValueField(column);
+    }
+  }
+
+  private static boolean isTypeCompatible(Object existingValue, @Nullable Object transformedValue) {
+    if (transformedValue == null || existingValue == null) {
+      return transformedValue == existingValue;
+    }
+    if (transformedValue.getClass() == existingValue.getClass()) {
+      return true;
+    }
+    if (transformedValue instanceof Collection && existingValue instanceof Collection) {
+      return true;
+    }
+    if (transformedValue instanceof Map && existingValue instanceof Map) {
+      return true;
+    }
+    return transformedValue.getClass().isArray() && existingValue.getClass().isArray();
+  }
+}

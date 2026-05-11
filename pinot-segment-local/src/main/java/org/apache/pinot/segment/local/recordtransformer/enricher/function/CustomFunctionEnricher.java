@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordtransformer.IngestionFunctionEvaluation;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.function.FunctionEvaluator;
 import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
@@ -33,8 +34,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
- * Enriches the record with custom functions.
- * TODO: Merge this and ExpressionTransformer
+ * {@link RecordEnricher} that applies a JSON {@code fieldToFunctionMap} of transform expressions. Evaluation is
+ * delegated to {@link IngestionFunctionEvaluation#applyFunctionEvaluations} with
+ * {@link IngestionFunctionEvaluation.Policy#enricher()}; for table/schema-driven transforms and
+ * dependency ordering, see {@link org.apache.pinot.segment.local.recordtransformer.ExpressionTransformer}.
  */
 public class CustomFunctionEnricher implements RecordEnricher {
   private final LinkedHashMap<String, FunctionEvaluator> _fieldToFunctionEvaluator;
@@ -61,8 +64,7 @@ public class CustomFunctionEnricher implements RecordEnricher {
 
   @Override
   public void enrich(GenericRow record) {
-    _fieldToFunctionEvaluator.forEach((field, evaluator) -> {
-      record.putValue(field, evaluator.evaluate(record));
-    });
+    IngestionFunctionEvaluation.applyFunctionEvaluations(record, _fieldToFunctionEvaluator,
+        IngestionFunctionEvaluation.Policy.enricher());
   }
 }
