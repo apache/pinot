@@ -3145,20 +3145,6 @@
               </excludes>
             </filter>
           </filters>
-          <relocations>
-            <relocation>
-              <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.scala-lang</pattern>
-              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
-            </relocation>
-          </relocations>
         </configuration>
       </plugin>
       <!-- Include apache LICENSE, NOTICE files for jar resource bundle -->
