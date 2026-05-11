@@ -1706,6 +1706,141 @@ public class CommonConstants {
     public static final String DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER = "false";
   }
 
+  /**
+   * Materializes pre-aggregated data into an OFFLINE table based on a user-defined SQL query.
+   * The generator computes a time window and appends it to the SQL; the executor queries the
+   * base table via the broker, builds segments from the results, and uploads them to the MV
+   * table.
+   *
+   * <p>Supports three task modes: {@code APPEND} (new time windows), {@code OVERWRITE}
+   * (re-materialize stale partitions), and {@code DELETE} (remove expired partitions).
+   *
+   * <p>User-facing config keys: {@code definedSQL}, {@code bucketTimePeriod},
+   * {@code bufferTimePeriod} (optional), {@code maxNumRecordsPerSegment} (optional, default
+   * {@link #DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT}).
+   */
+  public static class MaterializedViewTask {
+    public static final String TASK_TYPE = "MaterializedViewTask";
+
+    /**
+     * Prefix for the gRPC client config the minion uses to query the broker when materializing
+     * the MV.  Set keys under this prefix (e.g. {@code pinot.minion.materializedview.broker.grpc.
+     * usePlainText=false}, {@code .tls.keystore.path=...}) to enable TLS, raise the max inbound
+     * message size, or tune keepalive.  Without these, the gRPC client connects in plaintext with
+     * defaults — fine for local quickstarts but wrong for any TLS-enabled production cluster.
+     *
+     * <p>Note: per-request auth metadata (Bearer tokens, etc.) is unaffected by this prefix; it
+     * is sourced per task from the task's {@code AuthProvider} and forwarded as gRPC metadata.
+     */
+    public static final String MINION_BROKER_GRPC_CONFIG_PREFIX = "pinot.minion.materializedview.broker.grpc";
+
+    public static final String DEFINED_SQL_KEY = "definedSQL";
+    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    public static final String WINDOW_START_MS_KEY = "windowStartMs";
+    public static final String WINDOW_END_MS_KEY = "windowEndMs";
+    public static final String SOURCE_TABLE_NAME_KEY = "sourceTableName";
+    public static final String PARTITION_FINGERPRINTS_KEY = "partitionFingerprints";
+
+    /**
+     * Generator-populated copy of the user's declared {@code LIMIT} value from {@code definedSQL}.
+     * Passed through to the executor so it can detect result-set truncation (when the query
+     * actually returned {@code LIMIT}-many rows, the window is almost certainly incomplete and
+     * must not be marked VALID / advance the runtime watermark).
+     */
+    public static final String EFFECTIVE_LIMIT_KEY = "effectiveLimit";
+
+    public static final String TASK_MODE_KEY = "taskMode";
+    public static final String TASK_MODE_APPEND = "APPEND";
+    public static final String TASK_MODE_OVERWRITE = "OVERWRITE";
+    public static final String TASK_MODE_DELETE = "DELETE";
+
+    public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+
+    /**
+     * Maximum number of APPEND task windows to schedule in a single generator cycle.
+     * Increase this to back-fill historical data faster. Default 4 lets a typical onboarding
+     * back-fill complete in roughly {@code N/4} scheduling cycles instead of {@code N} for a
+     * single-task-per-cycle setup, while keeping minion-pool contention bounded.
+     */
+    public static final String MAX_TASKS_PER_BATCH_KEY = "maxTasksPerBatch";
+    public static final int DEFAULT_MAX_TASKS_PER_BATCH = 4;
+
+    /**
+     * Per-MV staleness SLO.  Broker excludes the MV from rewrite when
+     * {@code (now - watermarkMs) > stalenessThresholdMs}, falling back to the base table.
+     * Operators set this to bound the maximum age of MV-served data.  Default {@code 0} means
+     * "no SLO check" (broker uses any MV with a non-zero watermark).
+     */
+    public static final String STALENESS_THRESHOLD_MS_KEY = "stalenessThresholdMs";
+    public static final long DEFAULT_STALENESS_THRESHOLD_MS = 0L;
+
+    /**
+     * Hard upper bound on the user-facing {@code maxTasksPerBatch} config - values above this
+     * are rejected at table-create time. Distinct from the internal scheduler-loop iteration
+     * cap (which can be larger because it covers historical-VALID skip work, not just slot
+     * count).
+     */
+    public static final int MAX_TASKS_PER_BATCH_USER_CAP = 1_000;
+
+    /**
+     * Auto-injected {@code LIMIT} value used when {@code definedSQL} omits an explicit LIMIT.
+     *
+     * <p>Without this, the broker would silently apply its cluster-wide default query limit
+     * (see {@code pinot.broker.default.query.limit}, default 10) to MV-generation queries and
+     * truncate every window to that many rows - the executor's saturation gate cannot detect
+     * such truncation because it never sees the broker's silent override.
+     */
+    public static final int DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT = 1_000_000;
+
+    /**
+     * Hard upper bound on any user-declared LIMIT in {@code definedSQL}. Capped at
+     * {@code 100_000_000} so a single window cannot OOM the executor - the executor must
+     * accumulate all returned rows in memory before the saturation gate can detect truncation.
+     * Operators with legitimately larger windows must split via narrower {@code bucketTimePeriod}
+     * or filters in {@code definedSQL}.
+     */
+    public static final int MAX_MATERIALIZED_VIEW_QUERY_LIMIT = 100_000_000;
+
+    // -------------------------------------------------------------------------
+    //  Cluster-config keys that override the compile-time defaults above.
+    //
+    //  All keys are read live from Helix CLUSTER scope on each consumer-site
+    //  call — no controller / minion restart is required for a value change
+    //  to take effect.  When a key is unset, malformed, or non-positive, the
+    //  compile-time default applies.
+    //
+    //  Use `pinot-admin.sh ClusterConfig` or the controller REST endpoint
+    //  /cluster/configs to set / update / unset these.
+    // -------------------------------------------------------------------------
+
+    /// Cluster-config key. Overrides {@link #DEFAULT_MATERIALIZED_VIEW_QUERY_LIMIT}.
+    public static final String CLUSTER_CONFIG_KEY_DEFAULT_QUERY_LIMIT =
+        "pinot.materialized.view.query.default.limit";
+
+    /// Cluster-config key. Overrides {@link #MAX_MATERIALIZED_VIEW_QUERY_LIMIT}.
+    public static final String CLUSTER_CONFIG_KEY_MAX_QUERY_LIMIT =
+        "pinot.materialized.view.query.max.limit";
+
+    /// Cluster-config key. Overrides {@link #MAX_TASKS_PER_BATCH_USER_CAP}.
+    public static final String CLUSTER_CONFIG_KEY_MAX_TASKS_PER_BATCH_CAP =
+        "pinot.materialized.view.scheduler.max.tasks.per.batch.cap";
+
+    /// Cluster-config key. Overrides the scheduler's internal batch-loop iteration cap.
+    public static final String CLUSTER_CONFIG_KEY_MAX_BATCH_LOOP_ITERATIONS =
+        "pinot.materialized.view.scheduler.max.batch.loop.iterations";
+
+    /// Cluster-config key. Overrides the executor's runtime-znode CAS retry budget.
+    public static final String CLUSTER_CONFIG_KEY_MAX_RUNTIME_UPDATE_ATTEMPTS =
+        "pinot.materialized.view.executor.runtime.update.max.attempts";
+
+    /// Cluster-config key. Overrides the consistency manager's debounce window (ms).
+    public static final String CLUSTER_CONFIG_KEY_CONSISTENCY_DEBOUNCE_MS =
+        "pinot.materialized.view.consistency.debounce.ms";
+  }
+
   public static class ControllerJob {
     /**
      * Controller job ZK props
