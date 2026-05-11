@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -56,9 +55,9 @@ public class StageStatsTreeNode {
   public StageStatsTreeNode(MultiStageOperator.Type type, List<Integer> planNodeIds, StatMap<?> statMap,
       List<StageStatsTreeNode> children) {
     _type = type;
-    _planNodeIds = ImmutableList.copyOf(planNodeIds);
+    _planNodeIds = List.copyOf(planNodeIds);
     _statMap = statMap;
-    _children = ImmutableList.copyOf(children);
+    _children = List.copyOf(children);
   }
 
   public MultiStageOperator.Type getType() {

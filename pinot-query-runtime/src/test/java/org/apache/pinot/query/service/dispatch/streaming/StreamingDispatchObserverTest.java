@@ -189,5 +189,4 @@ public class StreamingDispatchObserverTest {
       return ByteString.copyFrom(baos.toByteArray());
     }
   }
-
 }

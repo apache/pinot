@@ -148,8 +148,9 @@ class DispatchClient {
    * @param expectedOpChainsForThisServer  number of opchains this server is expected to report; used to drain the
    *                              session latch correctly when the stream errors before all opchains have responded
    * @param ackCallback           receives the submit-ack response or a failure throwable
-   * @return the observer, also exposed as {@link org.apache.pinot.query.service.dispatch.streaming.StreamingServerHandle}
-   *         on the session for cancel fan-out
+   * @return the observer, also exposed as
+   *         {@link org.apache.pinot.query.service.dispatch.streaming.StreamingServerHandle} on the session for
+   *         cancel fan-out
    */
   public StreamingDispatchObserver submitWithStream(Worker.QueryRequest request, QueryServerInstance virtualServer,
       Deadline deadline, StreamingQuerySession session, int expectedOpChainsForThisServer,
