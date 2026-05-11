@@ -235,6 +235,8 @@ public class PinotHelixResourceManager {
   private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
+  @Nullable
+  private final ControllerConf _controllerConf;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -257,13 +259,15 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager,
+      @Nullable ControllerConf controllerConf) {
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
+    _controllerConf = controllerConf;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<>() {
@@ -286,7 +290,7 @@ public class PinotHelixResourceManager {
     this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf), controllerConf);
   }
 
   /**
@@ -2111,6 +2115,11 @@ public class PinotHelixResourceManager {
    * rollback (the subtype identifies the cause: {@code BadVersionException}, {@code NoNodeException},
    * {@code NodeExistsException}, ...). Connectivity / session failures propagate as the original
    * {@link org.apache.helix.zookeeper.zkclient.exception.ZkException}.
+   * <p>The dedicated underlying {@link ZkClient} honors the controller's
+   * {@value CommonConstants.Helix.ZkClient#ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG} and
+   * {@value CommonConstants.Helix.ZkClient#ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG} overrides; JVM-level
+   * ZooKeeper system properties (e.g. {@code jute.maxbuffer}) are picked up automatically by the
+   * ZooKeeper client library itself.
    */
   public ZkMultiWriteBuilder multiWriteZK() {
     return new ZkMultiWriteBuilder(getOrBuildMultiWriteZkClient(),
@@ -2127,8 +2136,14 @@ public class PinotHelixResourceManager {
         Preconditions.checkState(_helixZkManager != null,
             "multiWriteZK unavailable: PinotHelixResourceManager has not been started");
         String zkAddress = _helixZkManager.getMetadataStoreConnectionString();
-        int sessionTimeoutMs = CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS;
-        int connectTimeoutMs = CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS;
+        int sessionTimeoutMs = _controllerConf != null
+            ? _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
+                CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS)
+            : CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS;
+        int connectTimeoutMs = _controllerConf != null
+            ? _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG,
+                CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS)
+            : CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS;
         LOGGER.info("Building dedicated multiWriteZK ZkClient at {} (session={}ms, connect={}ms)",
             zkAddress, sessionTimeoutMs, connectTimeoutMs);
         ZkClient built = new ZkClient.Builder()
