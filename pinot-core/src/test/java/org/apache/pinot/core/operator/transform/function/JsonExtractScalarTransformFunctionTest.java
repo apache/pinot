@@ -653,4 +653,318 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         // TODO: Change the framework to do not duplicate segments when only one segment is used
         .thenResultIs(expectedRow, expectedRow); // 2 rows because of segment duplication
   }
+
+  // === Per-stored-type coercion tests for the value-handling helpers. Tests are grouped first by SV
+  //     vs MV result type, then ordered within each group by canonical Pinot type order
+  //     (INT/LONG/FLOAT/DOUBLE → BIG_DECIMAL → BOOLEAN → TIMESTAMP → STRING). ===
+
+  // -- Single-value (SV) tests --
+
+  /// Runs `SELECT jsonExtractScalar(json, '$.v', resultsType) FROM testTable` against a single-row table
+  /// containing the given JSON document, and asserts the result for the (always-duplicated) two
+  /// expected rows.
+  private void assertJsonExtractScalar(String json, String resultsType, Object expectedValue) {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    Object[] expectedRow = new Object[]{expectedValue};
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(new Object[]{json})
+        .whenQuery("SELECT jsonExtractScalar(json, '$.v', '" + resultsType + "') FROM testTable")
+        .thenResultIs(expectedRow, expectedRow);
+  }
+
+  @Test
+  public void testExtractBooleanAsNumeric() {
+    // JSON true / false coerces to 1 / 0 across all numeric result types — matches PinotDataType's
+    // BOOLEAN.toInt / toLong / toFloat / toDouble / toBigDecimal convention.
+    assertJsonExtractScalar("{\"v\": true}", "INT", 1);
+    assertJsonExtractScalar("{\"v\": false}", "INT", 0);
+    assertJsonExtractScalar("{\"v\": true}", "LONG", 1L);
+    assertJsonExtractScalar("{\"v\": false}", "LONG", 0L);
+    assertJsonExtractScalar("{\"v\": true}", "FLOAT", 1f);
+    assertJsonExtractScalar("{\"v\": false}", "FLOAT", 0f);
+    assertJsonExtractScalar("{\"v\": true}", "DOUBLE", 1d);
+    assertJsonExtractScalar("{\"v\": false}", "DOUBLE", 0d);
+    // BIG_DECIMAL formatted as String via toPlainString.
+    assertJsonExtractScalar("{\"v\": true}", "BIG_DECIMAL", "1");
+    assertJsonExtractScalar("{\"v\": false}", "BIG_DECIMAL", "0");
+  }
+
+  @Test
+  public void testExtractBigDecimalPreservesPrecision() {
+    // The BIG_DECIMAL parser preserves full numeric precision — beyond what Double can represent.
+    // Broker formats BIG_DECIMAL as String via BigDecimal.toPlainString().
+    assertJsonExtractScalar("{\"v\": 12345678901234567890.123456789}", "BIG_DECIMAL",
+        "12345678901234567890.123456789");
+  }
+
+  @DataProvider(name = "booleanCoercion")
+  public Object[][] booleanCoercion() {
+    return new Object[][]{
+        // JSON boolean — direct map.
+        {"true", 1},
+        {"false", 0},
+        // JSON number — Pinot's numeric BOOLEAN convention: any non-zero → 1.
+        {"1", 1},
+        {"0", 0},
+        {"5", 1},
+        {"-1", 1},
+        {"0.5", 1},
+        {"0.0", 0},
+        // JSON string — only "true" / "TRUE" / "1" → 1; anything else (including "yes", "TRUE ") → 0.
+        {"\"true\"", 1},
+        {"\"TRUE\"", 1},
+        {"\"True\"", 1},
+        {"\"1\"", 1},
+        {"\"false\"", 0},
+        {"\"0\"", 0},
+        {"\"yes\"", 0},
+        {"\"\"", 0}
+    };
+  }
+
+  @Test(dataProvider = "booleanCoercion")
+  public void testExtractBoolean(String jsonValueLiteral, int expected) {
+    // The SELECT projection for a BOOLEAN result surfaces as Boolean true / false in the broker rows.
+    Object expectedBoolean = expected == 1;
+    assertJsonExtractScalar("{\"v\": " + jsonValueLiteral + "}", "BOOLEAN", expectedBoolean);
+  }
+
+  @DataProvider(name = "timestampCoercion")
+  public Object[][] timestampCoercion() {
+    long epochMillis = 1700000000000L;
+    return new Object[][]{
+        // Numeric epoch millis — straight longValue path.
+        {String.valueOf(epochMillis), epochMillis},
+        // Numeric epoch millis as string — TimestampUtils accepts numeric strings.
+        {"\"" + epochMillis + "\"", epochMillis},
+        // ISO-8601 string — TimestampUtils parses to epoch millis.
+        {"\"2023-11-14T22:13:20Z\"", epochMillis},
+        {"\"2023-11-14 22:13:20\"", epochMillis - java.util.TimeZone.getDefault().getOffset(epochMillis)}
+    };
+  }
+
+  @Test(dataProvider = "timestampCoercion")
+  public void testExtractTimestamp(String jsonValueLiteral, long expectedMillis) {
+    // Broker formats TIMESTAMP via Timestamp.toString() (local-TZ wall-clock representation).
+    assertJsonExtractScalar("{\"v\": " + jsonValueLiteral + "}", "TIMESTAMP",
+        new java.sql.Timestamp(expectedMillis).toString());
+  }
+
+  @Test
+  public void testExtractTimestampRejectsBoolean() {
+    // TIMESTAMP doesn't accept Boolean — Boolean → epoch millis is semantically nonsensical, matching
+    // PinotDataType.TIMESTAMP.toBoolean throwing UnsupportedOperationException. JSON true is routed
+    // through TimestampUtils.toMillisSinceEpoch("true") which throws IllegalArgumentException; the
+    // broker surfaces the failure as a query error.
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    try {
+      FluentQueryTest.withBaseDir(_baseDir)
+          .withNullHandling(false)
+          .givenTable(schema, tableConfig)
+          .onFirstInstance(new Object[]{"{\"v\": true}"})
+          .whenQuery("SELECT jsonExtractScalar(json, '$.v', 'TIMESTAMP') FROM testTable")
+          .thenResultIs(new Object[]{"unused"});
+      Assert.fail("Expected query to fail when extracting JSON boolean as TIMESTAMP");
+    } catch (AssertionError e) {
+      // Expected — broker surfaces the parse failure as a query error.
+    }
+  }
+
+  @Test
+  public void testExtractStringFromNonStringJson() {
+    // A String JSON value passes through as-is.
+    assertJsonExtractScalar("{\"v\": \"hello\"}", "STRING", "hello");
+    // Numbers, booleans, arrays, and objects are JSON-serialized via JsonUtils.objectToString.
+    assertJsonExtractScalar("{\"v\": 42}", "STRING", "42");
+    assertJsonExtractScalar("{\"v\": 3.14}", "STRING", "3.14");
+    assertJsonExtractScalar("{\"v\": true}", "STRING", "true");
+    assertJsonExtractScalar("{\"v\": [1,2,3]}", "STRING", "[1,2,3]");
+    assertJsonExtractScalar("{\"v\": {\"a\":1}}", "STRING", "{\"a\":1}");
+  }
+
+  @Test
+  public void testExtractStringPreservesNumericPrecision() {
+    // STRING uses JSON_PARSER_CONTEXT_WITH_BIG_DECIMAL so floats that exceed Double precision survive
+    // the JSON → Java → JSON round-trip without truncation. Symmetric with BIG_DECIMAL precision.
+    assertJsonExtractScalar(
+        "{\"v\": 12345678901234567890.123456789}", "STRING",
+        "12345678901234567890.123456789");
+  }
+
+  // -- Multi-value (MV) tests --
+
+  /// Asserts that `SELECT jsonExtractScalar(json, '$.v', resultsType)` over a single-row table with the
+  /// given JSON document produces the given primitive-array result.
+  private void assertJsonExtractMv(String json, String resultsType, Object expectedArray) {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    Object[] expectedRow = new Object[]{expectedArray};
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(new Object[]{json})
+        .whenQuery("SELECT jsonExtractScalar(json, '$.v', '" + resultsType + "') FROM testTable")
+        .thenResultIs(expectedRow, expectedRow);
+  }
+
+  @Test
+  public void testIntArrayFromHeterogeneousJsonElements() {
+    // JSON numbers — direct intValue path.
+    assertJsonExtractMv("{\"v\": [1, 2, 3]}", "INT_ARRAY", new int[]{1, 2, 3});
+    // JSON string-form numbers — Integer.parseInt(toString()) fallback.
+    assertJsonExtractMv("{\"v\": [\"1\", \"2\", \"3\"]}", "INT_ARRAY", new int[]{1, 2, 3});
+    // Mixed numeric and string-numeric — both forms coerce.
+    assertJsonExtractMv("{\"v\": [1, \"2\", 3]}", "INT_ARRAY", new int[]{1, 2, 3});
+  }
+
+  @Test
+  public void testNumericArrayWithBooleanElements() {
+    // JSON true / false elements coerce to 1 / 0 in numeric MV paths.
+    assertJsonExtractMv("{\"v\": [true, false, true]}", "INT_ARRAY", new int[]{1, 0, 1});
+    assertJsonExtractMv("{\"v\": [true, false]}", "LONG_ARRAY", new long[]{1L, 0L});
+    assertJsonExtractMv("{\"v\": [true, false]}", "FLOAT_ARRAY", new float[]{1f, 0f});
+    assertJsonExtractMv("{\"v\": [true, false]}", "DOUBLE_ARRAY", new double[]{1d, 0d});
+    assertJsonExtractMv("{\"v\": [true, false]}", "BIG_DECIMAL_ARRAY", new String[]{"1", "0"});
+    // Mixed numeric / boolean elements — Boolean coerces to 1/0, Number values pass through.
+    assertJsonExtractMv("{\"v\": [1, true, 3, false]}", "INT_ARRAY", new int[]{1, 1, 3, 0});
+  }
+
+  @Test
+  public void testBigDecimalArrayPreservesPrecision() {
+    // Broker formats BIG_DECIMAL_ARRAY as String[] via per-element BigDecimal.toPlainString().
+    String[] expected = {
+        "12345678901234567890.123456789",
+        "0.0000000000000001",
+        "3.14"
+    };
+    assertJsonExtractMv(
+        "{\"v\": [12345678901234567890.123456789, 0.0000000000000001, 3.14]}",
+        "BIG_DECIMAL_ARRAY", expected);
+  }
+
+  @Test
+  public void testBooleanArrayResultType() {
+    // BOOLEAN_ARRAY uses storedType INT and the BOOLEAN per-element convention (non-zero Number → 1),
+    // distinct from INT_ARRAY which uses intValue() directly. JSON [1, 5, 0, 2.5] therefore yields
+    // [true, true, false, true] for BOOLEAN_ARRAY but [1, 5, 0, 2] for INT_ARRAY.
+    assertJsonExtractMv("{\"v\": [1, 5, 0, 2.5]}", "BOOLEAN_ARRAY",
+        new boolean[]{true, true, false, true});
+    // Mixed Boolean / Number / String — each element coerced via PinotDataType BOOLEAN convention.
+    assertJsonExtractMv("{\"v\": [true, 0, \"true\", false]}", "BOOLEAN_ARRAY",
+        new boolean[]{true, false, true, false});
+  }
+
+  @Test
+  public void testTimestampArrayResultType() {
+    // TIMESTAMP_ARRAY: storedType LONG, transformToLongValuesMV with isTimestamp=true. JSON numeric
+    // millis pass through Number.longValue(); JSON ISO strings parse via TimestampUtils.
+    long epochMillis = 1700000000000L;
+    String tsString = new java.sql.Timestamp(epochMillis).toString();
+    // Broker formats TIMESTAMP_ARRAY as String[] (per-element Timestamp.toString()).
+    assertJsonExtractMv(
+        "{\"v\": [" + epochMillis + ", \"2023-11-14T22:13:20Z\"]}",
+        "TIMESTAMP_ARRAY",
+        new String[]{tsString, tsString});
+  }
+
+  @Test
+  public void testStringArrayFromNonStringJsonElements() {
+    // JSON strings pass through.
+    assertJsonExtractMv("{\"v\": [\"a\", \"b\"]}", "STRING_ARRAY", new String[]{"a", "b"});
+    // JSON numbers, booleans, and nested structures get JSON-serialized.
+    assertJsonExtractMv("{\"v\": [1, 2, 3]}", "STRING_ARRAY", new String[]{"1", "2", "3"});
+    assertJsonExtractMv("{\"v\": [true, false]}", "STRING_ARRAY", new String[]{"true", "false"});
+    assertJsonExtractMv("{\"v\": [[1, 2], [3, 4]]}", "STRING_ARRAY", new String[]{"[1,2]", "[3,4]"});
+  }
+
+  // -- Default values for newly-handled result types --
+
+  @Test
+  public void testDefaultValueForBoolean() {
+    // BOOLEAN default literal stored as Integer 0/1 in init() to match INT storedType. When the JSON
+    // path doesn't resolve, the default surfaces correctly through transformToIntValuesSV.
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(new Object[]{"{\"other\": 1}"})
+        .whenQuery("SELECT jsonExtractScalar(json, '$.missing', 'BOOLEAN', true) FROM testTable")
+        .thenResultIs(new Object[]{true}, new Object[]{true});
+  }
+
+  @Test
+  public void testDefaultValueForTimestamp() {
+    // TIMESTAMP default literal stored as Long in init() to match LONG storedType. When the JSON path
+    // doesn't resolve, the default surfaces through transformToLongValuesSV.
+    long defaultMillis = 1234567890000L;
+    String expected = new java.sql.Timestamp(defaultMillis).toString();
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(new Object[]{"{\"other\": 1}"})
+        .whenQuery("SELECT jsonExtractScalar(json, '$.missing', 'TIMESTAMP', " + defaultMillis + ") "
+            + "FROM testTable")
+        .thenResultIs(new Object[]{expected}, new Object[]{expected});
+  }
+
+  // -- Cross-type guard: requesting a type other than the function's declared result type should
+  //    route through the base class's cross-type conversion path. --
+
+  @Test
+  public void testCrossTypeConversionFromStringResult() {
+    // The function's declared result type is STRING, but the caller requests INT — base class should
+    // handle the STRING→INT conversion via parsing.
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(new Object[]{"{\"v\": \"42\"}"})
+        // Cast STRING-result to LONG triggers the base-class cross-type path: STRING → parseLong.
+        .whenQuery("SELECT CAST(jsonExtractScalar(json, '$.v', 'STRING') AS LONG) FROM testTable")
+        .thenResultIs(new Object[]{42L}, new Object[]{42L});
+  }
 }

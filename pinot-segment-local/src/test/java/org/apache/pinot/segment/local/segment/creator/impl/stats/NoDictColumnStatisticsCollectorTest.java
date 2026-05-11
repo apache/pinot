@@ -445,15 +445,13 @@ public class NoDictColumnStatisticsCollectorTest {
   }
 
   private void runRandomizedTest(Random random, int iteration) {
-    // Randomly select data type (excluding BIG_DECIMAL for MV as it's unsupported)
     DataType[] supportedTypes = {
         DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE, DataType.BIG_DECIMAL, DataType.STRING,
         DataType.BYTES
     };
     DataType dataType = supportedTypes[random.nextInt(supportedTypes.length)];
 
-    // Randomly choose single vs multi-value (skip MV for BIG_DECIMAL)
-    boolean isSingleValue = dataType == DataType.BIG_DECIMAL || random.nextBoolean();
+    boolean isSingleValue = random.nextBoolean();
 
     // Randomly choose cardinality level
     CardinalityLevel cardinalityLevel = CardinalityLevel.values()[random.nextInt(CardinalityLevel.values().length)];

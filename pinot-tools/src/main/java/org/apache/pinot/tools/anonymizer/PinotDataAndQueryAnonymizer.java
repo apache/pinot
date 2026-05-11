@@ -512,7 +512,7 @@ public class PinotDataAndQueryAnonymizer {
           // derived value will be the same
           return val;
         } else {
-          return RandomStringUtils.randomAlphanumeric(val.length());
+          return RandomStringUtils.secure().nextAlphanumeric(val.length());
         }
       case BYTES:
         byte[] value = (byte[]) origValue;

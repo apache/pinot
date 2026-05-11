@@ -318,8 +318,4 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
       }
     }
   }
-
-  public File getInvertedIndexFile() {
-    return _invertedIndexFile;
-  }
 }

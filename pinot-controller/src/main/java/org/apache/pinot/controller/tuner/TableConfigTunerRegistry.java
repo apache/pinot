@@ -66,7 +66,7 @@ public class TableConfigTunerRegistry {
           String tunerName = tunerAnnotation.name();
           TableConfigTuner tuner;
           try {
-            tuner = (TableConfigTuner) tunerClass.newInstance();
+            tuner = (TableConfigTuner) tunerClass.getDeclaredConstructor().newInstance();
             CONFIG_TUNER_MAP.putIfAbsent(tunerName, tuner);
           } catch (Exception e) {
             LOGGER.error(String.format("Unable to register tuner %s . Cannot instantiate.", tunerName), e);

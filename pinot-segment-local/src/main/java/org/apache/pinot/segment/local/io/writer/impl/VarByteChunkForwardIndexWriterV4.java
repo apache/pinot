@@ -172,6 +172,11 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   }
 
   @Override
+  public void putBigDecimalMV(BigDecimal[] values) {
+    putBytes(ArraySerDeUtils.serializeBigDecimalArray(values));
+  }
+
+  @Override
   public void putStringMV(String[] values) {
     putBytes(ArraySerDeUtils.serializeStringArray(values));
   }

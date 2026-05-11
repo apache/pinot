@@ -217,7 +217,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
         tempIntRows[i] = 1001;
         tempLongRows[i] = 1001L;
       } else {
-        tempStringRows[i] = RandomStringUtils.random(random.nextInt(100), true, true);
+        tempStringRows[i] = RandomStringUtils.secure().next(random.nextInt(100), true, true);
         tempIntRows[i] = random.nextInt(rowLength);
         tempLongRows[i] = (long) random.nextInt(rowLength);
       }

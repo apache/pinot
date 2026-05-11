@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
@@ -40,6 +42,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -48,8 +51,10 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -111,8 +116,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(emptyTableSchema);
-    when(tableCache.getTableConfig("emptyTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("emptyTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -123,9 +127,209 @@ public class WorkerManagerTest {
     String query = "SET useLeafServerForIntermediateStage=true; SELECT * FROM emptyTable LIMIT 10";
 
     // This should not throw "bound must be positive" error anymore
-    @SuppressWarnings("deprecation")
-    DispatchableSubPlan dispatchableSubPlan = queryEnvironment.planQuery(query);
-    assertNotNull(dispatchableSubPlan);
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningUsesFilteredRoutingQueryOnThisPath() {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable", "testTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+    assertNotNull(filterExpression);
+    assertEquals(filterExpression.getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(filterExpression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    assertEquals(brokerRequest.getPinotQuery().getSelectList().size(), 1);
+    assertEquals(brokerRequest.getPinotQuery().getSelectList().get(0).getIdentifier().getName(), "col2");
+  }
+
+  @Test
+  public void testBrokerPruningRoutesFilterToBothHybridTableTypesOnThisPath() {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    ServerInstance server2 = getServerInstance("localhost", 2);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(
+        server1.getInstanceId(), server1, server2.getInstanceId(), server2);
+    RoutingTable offlineRoutingTable = new RoutingTable(
+        Map.of(server1, new SegmentsToQuery(List.of("offline_seg1"), List.of())), List.of(), 0);
+    RoutingTable realtimeRoutingTable = new RoutingTable(
+        Map.of(server2, new SegmentsToQuery(List.of("realtime_seg1"), List.of())), List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", offlineRoutingTable, "testTable_REALTIME", realtimeRoutingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable_REALTIME", "testTable_REALTIME");
+    tableNameMap.put("testTable", "testTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+    when(tableCache.getTableConfig("testTable_REALTIME")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    // Verify both table types received the filter from the query
+    for (String tableType : List.of("testTable_OFFLINE", "testTable_REALTIME")) {
+      BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest(tableType);
+      assertNotNull(brokerRequest, "Missing routing request for " + tableType);
+      assertEquals(brokerRequest.getPinotQuery().getDataSource().getTableName(), tableType);
+      Expression filterExpression = brokerRequest.getPinotQuery().getFilterExpression();
+      assertNotNull(filterExpression, "Missing filter for " + tableType);
+      assertEquals(filterExpression.getFunctionCall().getOperator(), "EQUALS");
+      assertEquals(filterExpression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    }
+  }
+
+  @Test
+  public void testBrokerPruningCountPropagatedToDispatchableSubPlan() {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    // RoutingTable with 42 pruned segments
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 42);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable", "testTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      // Pruned count should propagate from RoutingTable through DispatchablePlanContext to DispatchableSubPlan
+      assertEquals(dispatchableSubPlan.getNumSegmentsPrunedByBroker(), 42);
+    }
+  }
+
+  @Test
+  public void testBrokerPruningDefaultsToUnfilteredRoutingOnThisPath() {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable", "testTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    // Without SET useBrokerPruning=true, this path should fall back to unfiltered SELECT * routing.
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    // No filter should be present — the routing query is a plain SELECT * used for segment lookup only.
+    assertNull(brokerRequest.getPinotQuery().getFilterExpression());
+  }
+
+  @Test
+  public void testBrokerPruningPreservesQueryOptionsOnRoutingRequest() {
+    Schema schema = getSchemaBuilder("testTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    RoutingTable routingTable = new RoutingTable(Map.of(server, new SegmentsToQuery(List.of("segment1"), List.of())),
+        List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", routingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable", "testTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(
+        "SET useBrokerPruning=true; SET useLeafServerForIntermediateStage=true;"
+            + " SELECT col2 FROM testTable WHERE col1 = 'foo'")) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+    }
+
+    BrokerRequest brokerRequest = routingManager.getCapturedRoutingRequest("testTable_OFFLINE");
+    assertNotNull(brokerRequest);
+    // Query options must be preserved on the broker-pruning routing path so that
+    // routing-affecting options are visible to the routing manager.
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    assertNotNull(queryOptions);
+    assertEquals(queryOptions.get("useLeafServerForIntermediateStage"), "true");
   }
 
   /**
@@ -175,8 +379,7 @@ public class WorkerManagerTest {
     when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
     when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
     when(tableCache.getSchema(anyString())).thenReturn(tableSchema);
-    when(tableCache.getTableConfig("testTable_OFFLINE"))
-        .thenReturn(mock(org.apache.pinot.spi.config.table.TableConfig.class));
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
 
     WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 5, routingManager);
     QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
@@ -338,6 +541,81 @@ public class WorkerManagerTest {
     @Override
     public boolean routingExists(String tableNameWithType) {
       return true;
+    }
+
+    @Nullable
+    @Override
+    public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
+      return null;
+    }
+
+    @Override
+    public Set<String> getServingInstances(String tableNameWithType) {
+      return new HashSet<>(_serverInstanceMap.keySet());
+    }
+
+    @Override
+    public boolean isTableDisabled(String tableNameWithType) {
+      return false;
+    }
+  }
+
+  private static class CapturingRoutingManager implements RoutingManager {
+    private final Map<String, ServerInstance> _serverInstanceMap;
+    private final Map<String, RoutingTable> _routingTableByName;
+    private final Map<String, BrokerRequest> _capturedRoutingRequests = new LinkedHashMap<>();
+
+    CapturingRoutingManager(Map<String, ServerInstance> serverInstanceMap,
+        Map<String, RoutingTable> routingTableByName) {
+      _serverInstanceMap = serverInstanceMap;
+      _routingTableByName = routingTableByName;
+    }
+
+    @Nullable
+    BrokerRequest getCapturedRoutingRequest(String tableNameWithType) {
+      return _capturedRoutingRequests.get(tableNameWithType);
+    }
+
+    @Override
+    public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+      return _serverInstanceMap;
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
+      String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+      _capturedRoutingRequests.put(tableNameWithType, brokerRequest);
+      return _routingTableByName.get(tableNameWithType);
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+      return getRoutingTable(brokerRequest, requestId);
+    }
+
+    @Nullable
+    @Override
+    public List<String> getSegments(BrokerRequest brokerRequest) {
+      return List.of();
+    }
+
+    @Override
+    public boolean routingExists(String tableNameWithType) {
+      return _routingTableByName.containsKey(tableNameWithType);
     }
 
     @Nullable

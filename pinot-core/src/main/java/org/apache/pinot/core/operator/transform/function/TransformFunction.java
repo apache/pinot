@@ -77,7 +77,9 @@ public interface TransformFunction {
    * Returns the dictionary for the transform result if the result is dictionary-encoded, or {@code null} if not.
    */
   @Nullable
-  Dictionary getDictionary();
+  default Dictionary getDictionary() {
+    return null;
+  }
 
   /**
    * Transforms the data from the given value block to single-valued dictionary ids.
@@ -151,6 +153,11 @@ public interface TransformFunction {
    * Transforms the data from the given value block to multi-valued double values.
    */
   double[][] transformToDoubleValuesMV(ValueBlock valueBlock);
+
+  /**
+   * Transforms the data from the given value block to multi-valued BigDecimal values.
+   */
+  BigDecimal[][] transformToBigDecimalValuesMV(ValueBlock valueBlock);
 
   /**
    * Transforms the data from the given value block to multi-valued string values.

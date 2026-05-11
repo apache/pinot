@@ -160,22 +160,15 @@ public class MessageCodeGen {
     }
 
     for (Descriptors.FieldDescriptor desc : descriptorsToDerive) {
-      Descriptors.FieldDescriptor.Type type = desc.getType();
+      Descriptors.FieldDescriptor.JavaType javaType = desc.getJavaType();
       String fieldNameInCode = ProtobufInternalUtils.underScoreToCamelCase(desc.getName(), true);
-      switch (type) {
-        case STRING:
-        case INT32:
-        case INT64:
-        case UINT64:
-        case FIXED64:
-        case FIXED32:
-        case UINT32:
-        case SFIXED32:
-        case SFIXED64:
-        case SINT32:
-        case SINT64:
-        case DOUBLE:
+      switch (javaType) {
+        case BOOLEAN:
+        case INT:
+        case LONG:
         case FLOAT:
+        case DOUBLE:
+        case STRING:
           /* Generate code for scalar field extraction
            Example: If field has presence
             if (msg.hasEmail()) {
@@ -190,33 +183,7 @@ public class MessageCodeGen {
           */
           code.append(codeForScalarFieldExtraction(desc, fieldNameInCode, indent));
           break;
-        case BOOL:
-          /* Generate code for boolean field extraction
-           Example: If field has presence
-             if (msg.hasIsRegistered()) {
-               msgMap.put("is_registered", String.valueOf(msg.getIsRegistered()));
-             }
-           OR if no presence:
-             msgMap.put("is_registered", String.valueOf(msg.getIsRegistered()));
-           OR if repeated:
-             List<Object> list1 = new ArrayList<>();
-             for (String row: msg.getIsRegisteredList()) {
-               list3.add(String.valueOf(row));
-             }
-             if (!list1.isEmpty()) {
-                msgMap.put("is_registered", list1.toArray());
-             }
-          */
-          code.append(codeForComplexFieldExtraction(
-              desc,
-              fieldNameInCode,
-              "String",
-              indent,
-              ++varNum,
-              "String.valueOf",
-              ""));
-          break;
-        case BYTES:
+        case BYTE_STRING:
           /* Generate code for bytes field extraction
             Example: If field has presence
               if (msg.hasEmail()) {
@@ -273,7 +240,7 @@ public class MessageCodeGen {
           if (desc.isMapField()) {
             // Generated code for Map extraction. The key for the map is always a scalar object in Protobuf.
             Descriptors.FieldDescriptor valueDescriptor = desc.getMessageType().findFieldByName("value");
-            if (valueDescriptor.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {
+            if (valueDescriptor.getJavaType() == Descriptors.FieldDescriptor.JavaType.MESSAGE) {
               /* Generate code for map field extraction if the value type is a message
               Example: If field has presence
                 if (msg.hasComplexMap()) {
@@ -315,8 +282,8 @@ public class MessageCodeGen {
           }
           break;
         default:
-          LOGGER.error(String.format("Protobuf type %s is not supported by pinot yet. Skipping this field %s",
-              type, desc.getName()));
+          LOGGER.error("Protobuf JavaType {} is not supported by pinot yet. Skipping this field {}", javaType,
+              desc.getName());
           break;
       }
     }

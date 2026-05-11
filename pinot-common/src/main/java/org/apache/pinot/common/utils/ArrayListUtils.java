@@ -23,6 +23,8 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import java.math.BigDecimal;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -112,6 +114,21 @@ public class ArrayListUtils {
   }
 
   /**
+   * Convert the given {@link ObjectArrayList} to a BigDecimal array. Mirrors {@link #toStringArray}: returns the
+   * backing array reference when possible, otherwise copies elements into a new array.
+   */
+  public static BigDecimal[] toBigDecimalArray(ObjectArrayList<BigDecimal> bigDecimalArrayList) {
+    Object elements = bigDecimalArrayList.elements();
+    if (elements instanceof BigDecimal[]) {
+      BigDecimal[] bigDecimalArrayListElements = (BigDecimal[]) elements;
+      if (bigDecimalArrayListElements.length == bigDecimalArrayList.size()) {
+        return bigDecimalArrayListElements;
+      }
+    }
+    return bigDecimalArrayList.toArray(new BigDecimal[0]);
+  }
+
+  /**
    * Convert the given {@link ObjectArrayList} to a string array.
    * The method {@link ObjectArrayList#elements()} could return either Object[] or String[]. The casting to String[]
    * is not guaranteed to work, and it may throw {@link ClassCastException} if the internal object is not a String
@@ -135,5 +152,20 @@ public class ArrayListUtils {
       }
     }
     return stringArrayList.toArray(new String[0]);
+  }
+
+  /**
+   * Convert the given {@link ObjectArrayList} to a ByteArray array. Mirrors {@link #toStringArray}: returns the
+   * backing array reference when possible, otherwise copies elements into a new array.
+   */
+  public static ByteArray[] toBytesArray(ObjectArrayList<ByteArray> bytesArrayList) {
+    Object elements = bytesArrayList.elements();
+    if (elements instanceof ByteArray[]) {
+      ByteArray[] bytesArrayListElements = (ByteArray[]) elements;
+      if (bytesArrayListElements.length == bytesArrayList.size()) {
+        return bytesArrayListElements;
+      }
+    }
+    return bytesArrayList.toArray(new ByteArray[0]);
   }
 }

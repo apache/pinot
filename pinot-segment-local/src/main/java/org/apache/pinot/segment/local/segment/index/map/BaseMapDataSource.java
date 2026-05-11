@@ -72,7 +72,7 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
     if (_keyDataSources.containsKey(key)) {
       return _keyDataSources.get(key);
     }
-    Map<IndexType, IndexReader> indexes = getMapIndexReader().getKeyIndexes(key);
+    Map<IndexType, IndexReader> indexes = getMapIndexReader().getIndexes(key);
 
     if (indexes == null) {
       // The key does not exist in the map
@@ -80,7 +80,7 @@ public abstract class BaseMapDataSource extends BaseDataSource implements MapDat
     }
 
     try (ColumnIndexContainer indexContainer = new ColumnIndexContainer.FromMap(indexes)) {
-      ColumnMetadata keyMeta = getMapIndexReader().getKeyMetadata(key);
+      ColumnMetadata keyMeta = getMapIndexReader().getColumnMetadata(key);
       ImmutableDataSource dataSource = new ImmutableDataSource(keyMeta, indexContainer);
       _keyDataSources.put(key, dataSource);
       return dataSource;

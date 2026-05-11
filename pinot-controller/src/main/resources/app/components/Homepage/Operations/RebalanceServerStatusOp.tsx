@@ -181,12 +181,19 @@ export const RebalanceServerStatusOp = (
                             }}
                             data={{
                                 records: rebalanceServerJobs.map(rebalanceServerJob => {
-                                    const progressStats = JSON.parse(rebalanceServerJob.REBALANCE_PROGRESS_STATS);
+                                    const progressStats = JSON.parse(rebalanceServerJob.REBALANCE_PROGRESS_STATS || '{}');
+                                    // Prefer the rebalance-reported start time; fall back to the job submission time.
+                                    const startTimeMs = progressStats.startTimeMs || +rebalanceServerJob.submissionTimeMs;
+                                    // timeToFinishInSeconds is only populated once the rebalance completes.
+                                    const timeToFinishInSeconds = progressStats.timeToFinishInSeconds || 0;
                                     return [
                                         rebalanceServerJob.jobId,
                                         rebalanceServerJob.tableName,
                                         progressStats.status,
-                                        formatTimeInTimezone(+rebalanceServerJob.submissionTimeMs + (JSON.parse(rebalanceServerJob?.REBALANCE_PROGRESS_STATS || '{}').timeToFinishInSeconds * 1000))
+                                        formatTimeInTimezone(startTimeMs),
+                                        timeToFinishInSeconds > 0
+                                            ? formatTimeInTimezone(startTimeMs + timeToFinishInSeconds * 1000)
+                                            : '-'
                                     ];
                                 }),
                                 columns: ['Job id', 'Table name', 'Status', 'Started at', 'Finished at']

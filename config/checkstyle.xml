@@ -182,6 +182,10 @@
     <module name="IllegalImport">
       <property name="illegalClasses" value="com.google.common.collect.ImmutableList"/>
     </module>
+    <!-- Disallow importing Guava Files (use java.nio.file.Files instead) -->
+    <module name="IllegalImport">
+      <property name="illegalClasses" value="com.google.common.io.Files"/>
+    </module>
     <!-- Use org.testng.Assert in tests -->
     <module name="IllegalImport">
       <property name="regexp" value="true"/>
@@ -322,5 +326,20 @@
   <module name="RegexpMultiline">
     <property name="format" value="\n\n\s*\}" />
     <property name="message" value="Blank line before closing brace" />
+  </module>
+
+  <!-- Deprecated API guards: prevent reintroduction of deprecated APIs that have been cleaned up.
+       Suppress false positives with CHECKSTYLE:OFF/ON comments (e.g. StringUtils.remove(str, char) is not deprecated). -->
+  <module name="RegexpSingleline">
+    <property name="format" value="RandomStringUtils\.random[A-Z(]"/>
+    <property name="message" value="RandomStringUtils.random*() is deprecated. Use RandomStringUtils.secure().next*() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="StringUtils\.compare\("/>
+    <property name="message" value="StringUtils.compare() is deprecated. Use Strings.CS.compare() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="StringUtils\.replace\("/>
+    <property name="message" value="StringUtils.replace() is deprecated. Use Strings.CS.replace() instead."/>
   </module>
 </module>

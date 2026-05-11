@@ -215,7 +215,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
   @Test
   public void testStringPredicateEvaluators() {
-    String stringValue = RandomStringUtils.random(MAX_STRING_LENGTH);
+    String stringValue = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
     PredicateEvaluator eqPredicateEvaluator =
@@ -236,7 +236,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
     Assert.assertFalse(neqPredicateEvaluator.applyMV(randomStrings, NUM_MULTI_VALUES));
 
     for (int i = 0; i < 100; i++) {
-      String random = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String random = RandomStringUtils.secure().next(MAX_STRING_LENGTH);
       Assert.assertEquals(eqPredicateEvaluator.applySV(random), (random.equals(stringValue)));
       Assert.assertEquals(neqPredicateEvaluator.applySV(random), (!random.equals(stringValue)));
 
@@ -252,8 +252,8 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
   public void testJsonPredicateEvaluators() {
     String jsonStringTemplate = "{\"id\": %s, \"name\": %s}";
     String jsonString = String.format(jsonStringTemplate,
-        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-        RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+        RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+        RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, jsonString);
     PredicateEvaluator eqPredicateEvaluator =
@@ -275,8 +275,8 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
     for (int i = 0; i < 100; i++) {
       String randomJson = String.format(jsonStringTemplate,
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH),
-          RandomStringUtils.randomAlphanumeric(MAX_STRING_LENGTH));
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH),
+          RandomStringUtils.secure().nextAlphanumeric(MAX_STRING_LENGTH));
       Assert.assertEquals(eqPredicateEvaluator.applySV(randomJson), (randomJson.equals(jsonString)));
       Assert.assertEquals(neqPredicateEvaluator.applySV(randomJson), (!randomJson.equals(jsonString)));
 
@@ -290,7 +290,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
 
   @Test
   public void testBytesPredicateEvaluators() {
-    byte[] bytesValue = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+    byte[] bytesValue = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
     String stringValue = BytesUtils.toHexString(bytesValue);
 
     EqPredicate eqPredicate = new EqPredicate(COLUMN_EXPRESSION, stringValue);
@@ -312,7 +312,7 @@ public class NoDictionaryEqualsPredicateEvaluatorsTest {
     Assert.assertFalse(neqPredicateEvaluator.applyMV(randomBytesArray, NUM_MULTI_VALUES));
 
     for (int i = 0; i < 100; i++) {
-      byte[] randomBytes = RandomStringUtils.random(MAX_STRING_LENGTH).getBytes();
+      byte[] randomBytes = RandomStringUtils.secure().next(MAX_STRING_LENGTH).getBytes();
       String randomString = BytesUtils.toHexString(randomBytes);
       Assert.assertEquals(eqPredicateEvaluator.applySV(randomBytes), (randomString.equals(stringValue)));
       Assert.assertEquals(neqPredicateEvaluator.applySV(randomBytes), (!randomString.equals(stringValue)));

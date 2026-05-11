@@ -24,17 +24,27 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.query.mailbox.channel.ChannelManager;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.TerminationException;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -43,6 +53,23 @@ import static org.testng.Assert.assertTrue;
 
 
 public class GrpcSendingMailboxTest {
+
+  @Test
+  public void sendDataThrowsWhenQueryTerminated() {
+    ChannelManager channelManager = Mockito.mock(ChannelManager.class);
+    GrpcSendingMailbox mailbox = new GrpcSendingMailbox("test-mailbox", channelManager, "localhost", 0, Long.MAX_VALUE,
+        new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024);
+    RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
+        new DataSchema(new String[]{"foo"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
+
+    try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
+      ctx.getExecutionContext().terminate(QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED, "test");
+
+      // Termination check at the top of send(MseBlock.Data) fires before the gRPC channel is touched.
+      Assert.assertThrows(TerminationException.class, () -> mailbox.send(block));
+      Mockito.verifyNoInteractions(channelManager);
+    }
+  }
 
   @Test(dataProvider = "byteBuffersDataProvider")
   public void testByteBuffersToByteStrings(int[] byteBufferSizes, int maxByteStringSize) {

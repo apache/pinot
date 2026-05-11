@@ -19,15 +19,15 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -37,7 +37,6 @@ import static org.testng.Assert.assertTrue;
 
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
-
   private static final String DEFAULT_TABLE_NAME = "ArrayTest";
   private static final String BOOLEAN_COLUMN = "boolCol";
   private static final String BOOLEAN_FROM_INT_COLUMN = "boolColFromInt";
@@ -54,7 +53,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String BOOLEAN_FROM_STRING_ARRAY_COLUMN = "booleanArrayColFromStringArray";
   private static final String LONG_ARRAY_COLUMN = "longArrayCol";
   private static final String DOUBLE_ARRAY_COLUMN = "doubleArrayCol";
+  private static final String BIG_DECIMAL_ARRAY_COLUMN = "bigDecimalArrayCol";
   private static final String STRING_ARRAY_COLUMN = "stringArrayCol";
+  private static final String BYTES_ARRAY_COLUMN = "bytesArrayCol";
 
   @Override
   protected long getCountStarResult() {
@@ -728,6 +729,38 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asLong(), getCountStarResult());
   }
 
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayLengthBigDecimalAndBytes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Each row's bigDecimalArrayCol and bytesArrayCol contains 4 elements.
+    String queryBigDecimal = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(%s) = 4",
+        getTableName(), BIG_DECIMAL_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBigDecimal).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+
+    String queryBytes = String.format("SELECT COUNT(*) FROM %s WHERE arrayLength(%s) = 4",
+        getTableName(), BYTES_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBytes).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraysOverlapBigDecimalAndBytes(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryBigDecimal = String.format("SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)",
+        getTableName(), BIG_DECIMAL_ARRAY_COLUMN, BIG_DECIMAL_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBigDecimal).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+
+    String queryBytes = String.format("SELECT COUNT(*) FROM %s WHERE ARRAYS_OVERLAP(%s, %s)",
+        getTableName(), BYTES_ARRAY_COLUMN, BYTES_ARRAY_COLUMN);
+    assertEquals(postQuery(queryBytes).get("resultTable").get("rows").get(0).get(0).asLong(),
+        getCountStarResult());
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testFilterMvLongArrayFilterValues(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -1253,8 +1286,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public Schema createSchema() {
-    return new Schema.SchemaBuilder().setSchemaName(getTableName())
+  public org.apache.pinot.spi.data.Schema createSchema() {
+    return new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName(getTableName())
         .addSingleValueDimension(BOOLEAN_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(BOOLEAN_FROM_INT_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addSingleValueDimension(BOOLEAN_FROM_STRING_COLUMN, FieldSpec.DataType.BOOLEAN)
@@ -1270,7 +1304,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addMultiValueDimension(BOOLEAN_FROM_STRING_ARRAY_COLUMN, FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension(LONG_ARRAY_COLUMN, FieldSpec.DataType.LONG)
         .addMultiValueDimension(DOUBLE_ARRAY_COLUMN, FieldSpec.DataType.DOUBLE)
+        .addMultiValueDimension(BIG_DECIMAL_ARRAY_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension(STRING_ARRAY_COLUMN, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(BYTES_ARRAY_COLUMN, FieldSpec.DataType.BYTES)
         .build();
   }
 
@@ -1278,86 +1314,70 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
-    org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
+    Schema avroSchema = Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(List.of(
-        new org.apache.avro.Schema.Field(BOOLEAN_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_INT_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_STRING_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
-            null, null),
-        new org.apache.avro.Schema.Field(INT_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT),
-            null, null),
-        new org.apache.avro.Schema.Field(LONG_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
-            null, null),
-        new org.apache.avro.Schema.Field(FLOAT_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.FLOAT),
-            null, null),
-        new org.apache.avro.Schema.Field(DOUBLE_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE),
-            null, null),
-        new org.apache.avro.Schema.Field(STRING_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
-            null, null),
-        new org.apache.avro.Schema.Field(TIMESTAMP_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
-            null, null),
-        new org.apache.avro.Schema.Field(GROUP_BY_COLUMN,
-            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN)),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_INT_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT)),
-            null, null),
-        new org.apache.avro.Schema.Field(BOOLEAN_FROM_STRING_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING)),
-            null, null),
-        new org.apache.avro.Schema.Field(LONG_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG)),
-            null, null),
-        new org.apache.avro.Schema.Field(DOUBLE_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.DOUBLE)),
-            null, null),
-        new org.apache.avro.Schema.Field(STRING_ARRAY_COLUMN,
-            org.apache.avro.Schema.createArray(org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING)),
-            null, null)
-    ));
+        new Schema.Field(BOOLEAN_COLUMN, Schema.create(Schema.Type.BOOLEAN), null, null),
+        new Schema.Field(BOOLEAN_FROM_INT_COLUMN, Schema.create(Schema.Type.INT), null, null),
+        new Schema.Field(BOOLEAN_FROM_STRING_COLUMN, Schema.create(Schema.Type.STRING), null, null),
+        new Schema.Field(INT_COLUMN, Schema.create(Schema.Type.INT), null, null),
+        new Schema.Field(LONG_COLUMN, Schema.create(Schema.Type.LONG), null, null),
+        new Schema.Field(FLOAT_COLUMN, Schema.create(Schema.Type.FLOAT), null, null),
+        new Schema.Field(DOUBLE_COLUMN, Schema.create(Schema.Type.DOUBLE), null, null),
+        new Schema.Field(STRING_COLUMN, Schema.create(Schema.Type.STRING), null, null),
+        new Schema.Field(TIMESTAMP_COLUMN, Schema.create(Schema.Type.LONG), null, null),
+        new Schema.Field(GROUP_BY_COLUMN, Schema.create(Schema.Type.STRING), null, null),
+        new Schema.Field(BOOLEAN_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.BOOLEAN)), null, null),
+        new Schema.Field(BOOLEAN_FROM_INT_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.INT)), null, null),
+        new Schema.Field(BOOLEAN_FROM_STRING_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.STRING)), null,
+            null),
+        new Schema.Field(LONG_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.LONG)), null, null),
+        new Schema.Field(DOUBLE_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.DOUBLE)), null, null),
+        new Schema.Field(BIG_DECIMAL_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.STRING)), null, null),
+        new Schema.Field(STRING_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.STRING)), null, null),
+        new Schema.Field(BYTES_ARRAY_COLUMN, Schema.createArray(Schema.create(Schema.Type.BYTES)), null, null))
+    );
 
-    Cache<Integer, GenericData.Record> recordCache = CacheBuilder.newBuilder().build();
+    int numRecords = (int) getCountStarResult();
+    int numUniqueRecords = numRecords / 10;
+    List<GenericData.Record> uniqueRecords = new ArrayList<>(numUniqueRecords);
+    for (int i = 0; i < numUniqueRecords; i++) {
+      uniqueRecords.add(createAvroRecord(avroSchema, i));
+    }
     try (AvroFilesAndWriters avroFilesAndWriters = createAvroFilesAndWriters(avroSchema)) {
       List<DataFileWriter<GenericData.Record>> writers = avroFilesAndWriters.getWriters();
-      for (int i = 0; i < getCountStarResult(); i++) {
-        // add avro record to file
-        int finalI = i;
-        writers.get(i % getNumAvroFiles())
-            .append(recordCache.get((int) (i % (getCountStarResult() / 10)), () -> {
-                  // create avro record
-                  GenericData.Record record = new GenericData.Record(avroSchema);
-                  record.put(BOOLEAN_COLUMN, finalI % 4 == 0 || finalI % 4 == 1);
-                  record.put(BOOLEAN_FROM_INT_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? 1 : 0);
-                  record.put(BOOLEAN_FROM_STRING_COLUMN, finalI % 4 == 0 || finalI % 4 == 1 ? "true" : "false");
-                  record.put(INT_COLUMN, finalI);
-                  record.put(LONG_COLUMN, finalI);
-                  record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
-                  record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
-                  record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
-                  record.put(TIMESTAMP_COLUMN, finalI);
-                  record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
-                  record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
-                  record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
-                  record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
-                  record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
-                  record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
-                  record.put(STRING_ARRAY_COLUMN, List.of("/api/v1", "/home", "/api/v2", "/metrics"));
-                  return record;
-                }
-            ));
+      int numAvroFiles = getNumAvroFiles();
+      for (int i = 0; i < numRecords; i++) {
+        writers.get(i % numAvroFiles).append(uniqueRecords.get(i % numUniqueRecords));
       }
       return avroFilesAndWriters.getAvroFiles();
     }
+  }
+
+  private GenericData.Record createAvroRecord(Schema schema, int i) {
+    GenericData.Record record = new GenericData.Record(schema);
+    record.put(BOOLEAN_COLUMN, i % 4 == 0 || i % 4 == 1);
+    record.put(BOOLEAN_FROM_INT_COLUMN, i % 4 == 0 || i % 4 == 1 ? 1 : 0);
+    record.put(BOOLEAN_FROM_STRING_COLUMN, i % 4 == 0 || i % 4 == 1 ? "true" : "false");
+    record.put(INT_COLUMN, i);
+    record.put(LONG_COLUMN, i);
+    record.put(FLOAT_COLUMN, i + RANDOM.nextFloat());
+    record.put(DOUBLE_COLUMN, i + RANDOM.nextDouble());
+    record.put(STRING_COLUMN, RandomStringUtils.secure().next(i));
+    record.put(TIMESTAMP_COLUMN, i);
+    record.put(GROUP_BY_COLUMN, String.valueOf(i % 10));
+    record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
+    record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
+    record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
+    record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
+    record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
+    record.put(BIG_DECIMAL_ARRAY_COLUMN, List.of("0.0", "0.1", "0.2", "0.3"));
+    record.put(STRING_ARRAY_COLUMN, List.of("/api/v1", "/home", "/api/v2", "/metrics"));
+    record.put(BYTES_ARRAY_COLUMN, List.of(
+        ByteBuffer.wrap(new byte[]{0x00}),
+        ByteBuffer.wrap(new byte[]{0x01}),
+        ByteBuffer.wrap(new byte[]{0x02}),
+        ByteBuffer.wrap(new byte[]{0x03})
+    ));
+    return record;
   }
 }

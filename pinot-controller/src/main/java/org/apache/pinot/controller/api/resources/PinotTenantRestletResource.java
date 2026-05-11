@@ -471,12 +471,12 @@ public class PinotTenantRestletResource {
 
     if (StateType.DISABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
     if (StateType.ENABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
       }
     }
     return new SuccessResponse("Changed state of tenant " + tenantName + " to " + stateStr + " successfully.");

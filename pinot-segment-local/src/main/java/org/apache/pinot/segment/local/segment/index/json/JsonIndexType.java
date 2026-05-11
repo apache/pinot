@@ -141,6 +141,18 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
+  @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, JsonIndexConfig indexConfig) {
+    // JSON index is built directly from the raw JSON column values; it does not depend on a dictionary.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, JsonIndexConfig indexConfig) {
+    // JSON index payload is derived from raw JSON values, independent of dictionary representation.
+    return false;
+  }
+
   private static class ReaderFactory extends IndexReaderFactory.Default<JsonIndexConfig, JsonIndexReader> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
 

@@ -60,7 +60,8 @@ public class EventObserverFactoryRegistry {
       EventObserverFactory annotation = clazz.getAnnotation(EventObserverFactory.class);
       if (annotation.enabled()) {
         try {
-          MinionEventObserverFactory eventObserverFactory = (MinionEventObserverFactory) clazz.newInstance();
+          MinionEventObserverFactory eventObserverFactory =
+              (MinionEventObserverFactory) clazz.getDeclaredConstructor().newInstance();
           eventObserverFactory.init(zkMetadataManager, taskProgressManager);
           registerEventObserverFactory(eventObserverFactory);
         } catch (Exception e) {

@@ -182,8 +182,8 @@ public class ProtoBufCodeGenMessageDecoderTest {
         new Object[] {BYTES_FIELD, ByteString.copyFrom(new byte[] {0, 1, 2, 3}), new byte[] {0, 1, 2, 3}},
         new Object[] {NULLABLE_BYTES_FIELD, ByteString.copyFrom(new byte[] {0, 1, 2, 3}), new byte[] {0, 1, 2, 3}},
 
-        new Object[] {BOOL_FIELD, true, "true"},
-        new Object[] {NULLABLE_BOOL_FIELD, true, "true"}
+        new Object[] {BOOL_FIELD, true, true},
+        new Object[] {NULLABLE_BOOL_FIELD, true, true}
     };
   }
 
@@ -237,8 +237,8 @@ public class ProtoBufCodeGenMessageDecoderTest {
         new Object[] {BYTES_FIELD, ByteString.EMPTY, new byte[] {}},
         new Object[] {NULLABLE_BYTES_FIELD, ByteString.EMPTY, new byte[] {}},
 
-        new Object[] {BOOL_FIELD, false, "false"},
-        new Object[] {NULLABLE_BOOL_FIELD, false, "false"}
+        new Object[] {BOOL_FIELD, false, false},
+        new Object[] {NULLABLE_BOOL_FIELD, false, false}
     };
   }
 
@@ -280,7 +280,7 @@ public class ProtoBufCodeGenMessageDecoderTest {
         new Object[] {BYTES_FIELD, new byte[] {}},
         new Object[] {NULLABLE_BYTES_FIELD, null},
 
-        new Object[] {BOOL_FIELD, "false"},
+        new Object[] {BOOL_FIELD, false},
         new Object[] {NULLABLE_BOOL_FIELD, null}
     };
   }
@@ -320,7 +320,7 @@ public class ProtoBufCodeGenMessageDecoderTest {
         new Object[] {BYTES_FIELD, new byte[] {}},
         new Object[] {NULLABLE_BYTES_FIELD, null},
 
-        new Object[] {BOOL_FIELD, "false"},
+        new Object[] {BOOL_FIELD, false},
         new Object[] {NULLABLE_BOOL_FIELD, null}
     };
   }

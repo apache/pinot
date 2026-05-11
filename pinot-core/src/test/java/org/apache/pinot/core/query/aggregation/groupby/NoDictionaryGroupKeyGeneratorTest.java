@@ -121,7 +121,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
       double doubleValue = RANDOM.nextDouble();
       record.putValue(DOUBLE_COLUMN, doubleValue);
       values[3] = Double.toString(doubleValue);
-      String stringValue = RandomStringUtils.randomAlphabetic(10);
+      String stringValue = RandomStringUtils.secure().nextAlphabetic(10);
       record.putValue(STRING_COLUMN, stringValue);
       values[4] = stringValue;
       // NOTE: Create fixed-length bytes so that dictionary can be generated.

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1347,7 +1348,7 @@ public class ControllerTest {
 
   public static String sendGetRequestRaw(String urlString)
       throws IOException {
-    return IOUtils.toString(new URL(urlString).openStream());
+    return IOUtils.toString(new URL(urlString).openStream(), StandardCharsets.UTF_8);
   }
 
   /**

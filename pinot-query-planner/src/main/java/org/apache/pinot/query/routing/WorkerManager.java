@@ -40,6 +40,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
@@ -501,7 +502,7 @@ public class WorkerManager {
     if (metadata.getLogicalTableRouteInfo() != null) {
       assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
     } else {
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      assignWorkersToNonPartitionedLeafFragment(fragment, metadata, context);
     }
     addLeafServersToContext(metadata, context);
   }
@@ -517,11 +518,15 @@ public class WorkerManager {
   // --------------------------------------------------------------------------
   // Non-partitioned leaf stage assignment
   // --------------------------------------------------------------------------
-  private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+  private void assignWorkersToNonPartitionedLeafFragment(PlanFragment fragment, DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    Map<String, RoutingTable> routingTableMap =
-        getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
+    PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
+    // When broker pruning is enabled, routingPinotQuery carries the leaf stage filter so that segment pruners can
+    // eliminate segments. When disabled (null), fall back to an unfiltered SELECT * routing request.
+    Map<String, RoutingTable> routingTableMap = routingPinotQuery != null
+        ? getRoutingTable(routingPinotQuery, context.getRequestId())
+        : getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 
     // acquire time boundary info if it is a hybrid table.
@@ -555,6 +560,9 @@ public class WorkerManager {
       if (!routingTable.getUnavailableSegments().isEmpty()) {
         metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
       }
+      if (routingPinotQuery != null) {
+        context.addNumSegmentsPrunedByBroker(routingTable.getNumPrunedSegments());
+      }
     }
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
@@ -583,7 +591,8 @@ public class WorkerManager {
   }
 
   /**
-   * Acquire routing table for items listed in {@link TableScanNode}.
+   * Acquire routing table for items listed in {@link TableScanNode}. Creates a bare {@code SELECT *} broker request
+   * with no filter, so no broker-side segment pruning occurs.
    *
    * @param tableName table name with or without type suffix.
    * @return keyed-map from table type(s) to routing table(s).
@@ -616,6 +625,61 @@ public class WorkerManager {
     }
   }
 
+  /**
+   * Acquire routing table using a pre-built {@link PinotQuery} that carries filter expressions for segment pruning.
+   * Unlike {@link #getRoutingTable(String, long)} which creates a bare {@code SELECT *} broker request,
+   * this overload forwards the filter to the routing manager so broker-side segment pruners can eliminate
+   * segments before dispatching to servers.
+   *
+   * @param pinotQuery the routing query with filter expressions for pruning. Table name may be raw or typed.
+   * @return keyed-map from table type(s) to routing table(s).
+   */
+  private Map<String, RoutingTable> getRoutingTable(PinotQuery pinotQuery, long requestId) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(pinotQuery.getDataSource().getTableName());
+    if (tableType == null) {
+      Map<String, RoutingTable> routingTableMap = new HashMap<>(4);
+      RoutingTable offlineRoutingTable = getRoutingTableHelper(pinotQuery, requestId, TableType.OFFLINE);
+      if (offlineRoutingTable != null) {
+        routingTableMap.put(TableType.OFFLINE.name(), offlineRoutingTable);
+      }
+      RoutingTable realtimeRoutingTable = getRoutingTableHelper(pinotQuery, requestId, TableType.REALTIME);
+      if (realtimeRoutingTable != null) {
+        routingTableMap.put(TableType.REALTIME.name(), realtimeRoutingTable);
+      }
+      return routingTableMap;
+    } else {
+      RoutingTable routingTable = getRoutingTableHelper(pinotQuery, requestId);
+      return routingTable != null ? Map.of(tableType.name(), routingTable) : Map.of();
+    }
+  }
+
+  /**
+   * Builds a {@link PinotQuery} from the leaf stage tree for broker-side segment pruning on the logical planner path.
+   * Returns {@code null} if broker pruning is disabled or the leaf stage shape is unsupported.
+   */
+  @Nullable
+  private PinotQuery extractRoutingQuery(PlanNode leafStageRoot, String tableName, DispatchablePlanContext context) {
+    boolean defaultLogicalPlannerUseBrokerPruning =
+        context.getPlannerContext().getEnvConfig().defaultLogicalPlannerUseBrokerPruning();
+    boolean useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(
+        context.getPlannerContext().getOptions(), defaultLogicalPlannerUseBrokerPruning);
+    if (!useBrokerPruning) {
+      return null;
+    }
+    try {
+      PinotQuery pinotQuery = PlanNodeRoutingQueryBuilder.createPinotQueryForRouting(tableName, leafStageRoot, false);
+      Map<String, String> queryOptions = context.getPlannerContext().getOptions();
+      if (MapUtils.isNotEmpty(queryOptions)) {
+        pinotQuery.setQueryOptions(new HashMap<>(queryOptions));
+      }
+      return pinotQuery;
+    } catch (RuntimeException e) {
+      LOGGER.warn("Broker pruning skipped for table {} due to unsupported leaf stage shape: {}",
+          tableName, e.getMessage());
+      return null;
+    }
+  }
+
   @Nullable
   private RoutingTable getRoutingTableHelper(String tableNameWithType, long requestId,
       Map<String, String> queryOptions) {
@@ -626,6 +690,19 @@ public class WorkerManager {
       brokerRequest.getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
     }
     return _routingManager.getRoutingTable(brokerRequest, requestId);
+  }
+
+  @Nullable
+  private RoutingTable getRoutingTableHelper(PinotQuery pinotQuery, long requestId) {
+    return _routingManager.getRoutingTable(CalciteSqlCompiler.convertToBrokerRequest(pinotQuery), requestId);
+  }
+
+  @Nullable
+  private RoutingTable getRoutingTableHelper(PinotQuery pinotQuery, long requestId, TableType tableType) {
+    PinotQuery copy = pinotQuery.deepCopy();
+    copy.getDataSource().setTableName(TableNameBuilder.forType(tableType).tableNameWithType(
+        TableNameBuilder.extractRawTableName(pinotQuery.getDataSource().getTableName())));
+    return getRoutingTableHelper(copy, requestId);
   }
 
   // --------------------------------------------------------------------------

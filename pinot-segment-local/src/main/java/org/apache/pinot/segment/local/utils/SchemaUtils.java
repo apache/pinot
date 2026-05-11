@@ -174,8 +174,6 @@ public class SchemaUtils {
   private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
     Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
         "JSON columns cannot be of multi-value type");
-    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.BIG_DECIMAL),
-        "BIG_DECIMAL columns cannot be of multi-value type");
   }
 
   /**

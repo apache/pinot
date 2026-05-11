@@ -21,7 +21,6 @@ package org.apache.pinot.server.api;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -35,8 +34,8 @@ public class TableSizeResourceTest extends BaseResourceTest {
 
   @Test
   public void testTableSizeDetailed() {
-    verifyTableSizeDetailedImpl(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0));
-    verifyTableSizeDetailedImpl(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0));
+    verifyTableSizeDetailedImpl(REALTIME_TABLE_NAME, _realtimeIndexSegments.get(0));
+    verifyTableSizeDetailedImpl(OFFLINE_TABLE_NAME, _offlineIndexSegments.get(0));
   }
 
   private void verifyTableSizeDetailedImpl(String expectedTableName, ImmutableSegment segment) {
@@ -53,9 +52,8 @@ public class TableSizeResourceTest extends BaseResourceTest {
 
   @Test
   public void testTableSizeNoDetails() {
-    verifyTableSizeNoDetailsImpl(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        _realtimeIndexSegments.get(0));
-    verifyTableSizeNoDetailsImpl(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0));
+    verifyTableSizeNoDetailsImpl(REALTIME_TABLE_NAME, _realtimeIndexSegments.get(0));
+    verifyTableSizeNoDetailsImpl(OFFLINE_TABLE_NAME, _offlineIndexSegments.get(0));
   }
 
   private void verifyTableSizeNoDetailsImpl(String expectedTableName, ImmutableSegment segment) {
@@ -70,8 +68,8 @@ public class TableSizeResourceTest extends BaseResourceTest {
 
   @Test
   public void testTableSizeOld() {
-    verifyTableSizeOldImpl(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), _realtimeIndexSegments.get(0));
-    verifyTableSizeOldImpl(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), _offlineIndexSegments.get(0));
+    verifyTableSizeOldImpl(REALTIME_TABLE_NAME, _realtimeIndexSegments.get(0));
+    verifyTableSizeOldImpl(OFFLINE_TABLE_NAME, _offlineIndexSegments.get(0));
   }
 
   private void verifyTableSizeOldImpl(String expectedTableName, ImmutableSegment segment) {

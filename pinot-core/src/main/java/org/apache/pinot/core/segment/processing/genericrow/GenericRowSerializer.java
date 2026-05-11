@@ -31,8 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.MapUtils;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 /**
@@ -105,7 +104,7 @@ public class GenericRowSerializer {
             _objectBytes[i] = bigDecimalBytes;
             break;
           case STRING:
-            byte[] stringBytes = ((String) value).getBytes(UTF_8);
+            byte[] stringBytes = Utf8Utils.encode((String) value);
             numBytes += Integer.BYTES + stringBytes.length;
             _objectBytes[i] = stringBytes;
             break;
@@ -113,8 +112,8 @@ public class GenericRowSerializer {
             numBytes += Integer.BYTES + ((byte[]) value).length;
             break;
           case MAP:
-            Map<String, Object> map = (Map<String, Object>) value;
-            byte[] mapBytes = MapUtils.serializeMap(map);
+            //noinspection unchecked
+            byte[] mapBytes = MapUtils.serializeMap((Map<String, Object>) value, false);
             numBytes += Integer.BYTES + mapBytes.length;
             _objectBytes[i] = mapBytes;
             break;
@@ -143,7 +142,7 @@ public class GenericRowSerializer {
             numBytes += Integer.BYTES * numValues;
             byte[][] stringBytesArray = new byte[numValues][];
             for (int j = 0; j < numValues; j++) {
-              byte[] stringBytes = ((String) multiValue[j]).getBytes(UTF_8);
+              byte[] stringBytes = Utf8Utils.encode((String) multiValue[j]);
               numBytes += stringBytes.length;
               stringBytesArray[j] = stringBytes;
             }

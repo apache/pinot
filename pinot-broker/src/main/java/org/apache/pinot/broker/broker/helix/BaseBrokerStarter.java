@@ -101,6 +101,7 @@ import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -279,6 +280,37 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         serverRoutingStatsManager, failureDetector, threadAccountant, multiClusterRoutingContext);
   }
 
+  /**
+   * Override to supply a custom {@link GrpcBrokerRequestHandler} subclass.
+   * The default implementation returns a plain {@link GrpcBrokerRequestHandler}.
+   */
+  protected GrpcBrokerRequestHandler createGrpcBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, FailureDetector failureDetector,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
+    return new GrpcBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, failureDetector, threadAccountant,
+        multiClusterRoutingContext);
+  }
+
+  /**
+   * Override to supply a custom {@link MultiStageBrokerRequestHandler} subclass (e.g. one that
+   * overrides {@code onQueryCompletion(RequestContext, BrokerResponse)} for async query logging).
+   * The default implementation returns a plain {@link MultiStageBrokerRequestHandler}.
+   */
+  protected MultiStageBrokerRequestHandler createMultiStageBrokerRequestHandler(
+      PinotConfiguration config, String brokerId, BrokerRequestIdGenerator requestIdGenerator,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      MultiStageQueryThrottler multiStageQueryThrottler, FailureDetector failureDetector,
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager) {
+    return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
+        accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
+        threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
+  }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
@@ -396,8 +428,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     QueryRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES));
     LOGGER.info("Initializing ResultRewriterFactory");
     ResultRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES));
-    // Initialize FunctionRegistry before starting the broker request handler
+    // Initialize FunctionRegistry and PartitionFunctionFactory before starting the broker request handler
     FunctionRegistry.init();
+    PartitionFunctionFactory.init();
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
@@ -445,7 +478,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createGrpcBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _failureDetector, _threadAccountant,
               multiClusterRoutingContext);
     } else {
@@ -493,7 +526,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         multiClusterWorkerManager = workerManager;
       }
       multiStageBrokerRequestHandler =
-          new MultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
+          createMultiStageBrokerRequestHandler(_brokerConf, brokerId, requestIdGenerator, _routingManager,
               _accessControlFactory, _queryQuotaManager, _tableCache, _multiStageQueryThrottler, _failureDetector,
               _threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager);
       MultiStageBrokerRequestHandler finalHandler = multiStageBrokerRequestHandler;

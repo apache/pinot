@@ -244,7 +244,7 @@ public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
       case BIG_DECIMAL:
         return BigDecimal.valueOf(RANDOM.nextDouble());
       case STRING:
-        return RandomStringUtils.randomAscii(RANDOM.nextInt(1024));
+        return RandomStringUtils.secure().nextAscii(RANDOM.nextInt(1024));
       case BYTES:
         byte[] bytes = new byte[RANDOM.nextInt(100) + 1];
         RANDOM.nextBytes(bytes);

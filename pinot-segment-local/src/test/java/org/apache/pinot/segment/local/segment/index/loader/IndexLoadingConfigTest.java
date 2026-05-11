@@ -181,6 +181,7 @@ public class IndexLoadingConfigTest {
     assertNotNull(indexConfigs);
     ForwardIndexConfig forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
     assertTrue(forwardIndexConfig.isEnabled());
+    assertEquals(forwardIndexConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
     assertNull(forwardIndexConfig.getCompressionCodec());
     assertFalse(forwardIndexConfig.isDeriveNumDocsPerChunk());
     assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion());
@@ -214,6 +215,7 @@ public class IndexLoadingConfigTest {
     assertNotNull(indexConfigs);
     forwardIndexConfig = indexConfigs.getConfig(StandardIndexes.forward());
     assertTrue(forwardIndexConfig.isEnabled());
+    assertEquals(forwardIndexConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
     assertEquals(forwardIndexConfig.getCompressionCodec(), FieldConfig.CompressionCodec.SNAPPY);
     assertTrue(forwardIndexConfig.isDeriveNumDocsPerChunk());
     assertEquals(forwardIndexConfig.getRawIndexWriterVersion(), 4);
