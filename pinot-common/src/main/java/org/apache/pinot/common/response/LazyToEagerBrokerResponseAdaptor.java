@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
@@ -84,9 +85,16 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
     return new LazyToEagerBrokerResponseAdaptor(dataSchema, metainfo, rows);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   @Override
   public ResultTable getResultTable() {
+    // Return null (omit from JSON) when the response represents an error: either the schema was never established
+    // (early validation error) or the schema was established but execution produced no rows due to an exception.
+    // This matches BrokerResponseNative behavior, where setResultTable is never called on error responses.
+    if (_dataSchema == null || (_rows.isEmpty() && !_metainfo.getExceptions().isEmpty())) {
+      return null;
+    }
     return new ResultTable(_dataSchema, _rows);
   }
 
