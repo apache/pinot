@@ -234,10 +234,11 @@ public class StreamingQuerySession {
   }
 
   /**
-   * Sends {@code BrokerToServer.cancel} on every other open server stream. Called once on the first peer error
-   * observed. Failures are swallowed — cancel is best-effort.
+   * Sends {@code BrokerToServer.cancel} on every open server stream. Used on the first peer error observed and when
+   * the broker's data mailbox reports a processing exception. Failures are swallowed — cancel is best-effort.
+   * Idempotent w.r.t. concurrent calls.
    */
-  private void fanOutCancel() {
+  public void fanOutCancel() {
     Set<StreamingServerHandle> snapshot;
     _lock.lock();
     try {

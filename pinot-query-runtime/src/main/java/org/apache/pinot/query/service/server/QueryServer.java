@@ -20,12 +20,10 @@ package org.apache.pinot.query.service.server;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
-import java.io.DataOutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
-import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -715,26 +712,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   public void cancel(Worker.CancelRequest request, StreamObserver<Worker.CancelResponse> responseObserver) {
     long requestId = request.getRequestId();
     try {
-      Map<Integer, MultiStageQueryStats.StageStats.Closed> stats = _queryRunner.cancel(requestId);
-
-      Worker.CancelResponse.Builder cancelBuilder = Worker.CancelResponse.newBuilder();
-      for (Map.Entry<Integer, MultiStageQueryStats.StageStats.Closed> statEntry : stats.entrySet()) {
-        // even we are using output streams here, these calls are non-blocking because we use in memory output streams
-        try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream.Builder().get();
-            DataOutputStream daos = new DataOutputStream(baos)) {
-          statEntry.getValue().serialize(daos);
-
-          daos.flush();
-          byte[] byteArray = baos.toByteArray();
-          ByteString bytes = UnsafeByteOperations.unsafeWrap(byteArray);
-          cancelBuilder.putStatsByStage(statEntry.getKey(), bytes);
-        }
-      }
-      responseObserver.onNext(cancelBuilder.build());
+      _queryRunner.cancel(requestId);
     } catch (Throwable t) {
       LOGGER.error("Caught exception while cancelling opChain for request: {}", requestId, t);
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
+    responseObserver.onNext(Worker.CancelResponse.getDefaultInstance());
     responseObserver.onCompleted();
   }
 

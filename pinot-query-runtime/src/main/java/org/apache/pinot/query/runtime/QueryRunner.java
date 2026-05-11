@@ -57,7 +57,6 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
@@ -552,8 +551,8 @@ public class QueryRunner {
     return _mailboxService;
   }
 
-  public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
-    return _opChainScheduler.cancel(requestId);
+  public void cancel(long requestId) {
+    _opChainScheduler.cancel(requestId);
   }
 
   /**

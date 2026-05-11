@@ -26,8 +26,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
-import java.io.DataInputStream;
-import java.io.InputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,7 +50,6 @@ import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -81,7 +78,6 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
-import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -205,13 +201,15 @@ public class QueryDispatcher {
   /// most of the budget, the per-stage stats may end up partial (visible via the per-stage {@code mergeFailed} /
   /// {@code missing} counts the session exposes).
   ///
+  /// Cancel is handled via {@link StreamingQuerySession#fanOutCancel()} — no unary Cancel RPCs are issued for this
+  /// query path. On any error, fan-out cancel is broadcast over the open streams, then the broker waits for remaining
+  /// stats before building the final result.
+  ///
   /// <b>Mixed-version policy.</b> No automatic fallback to the unary {@link #submit} path. Enabling
   /// {@link CommonConstants.Broker.Request.QueryOptionKey#USE_STREAM_STATS_REPORTING} requires every server in the
   /// cluster to implement {@code SubmitWithStream}; if any server returns {@code UNIMPLEMENTED} or any other
   /// transport error during dispatch, {@link #submitWithStream} surfaces the throwable through the ack queue,
-  /// {@link #processResults} throws, this method's {@code catch} cancels every other server via {@link #tryRecover}
-  /// and propagates the failure to the caller. Mixed-version safety is the operator's responsibility — only enable
-  /// this option once the whole fleet has been upgraded.
+  /// {@link #processResults} throws, and this method fans out cancel via the session before propagating the failure.
   private QueryResult submitAndReduceWithStream(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
       long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
@@ -249,13 +247,13 @@ public class QueryDispatcher {
       }
 
       if (brokerResult.getProcessingException() != null) {
-        cancel(requestId);
+        session.fanOutCancel();
       }
       return mergeSessionStatsIntoResult(brokerResult, session, expectedByStage);
     } catch (Exception ex) {
-      return tryRecover(requestId, servers, ex);
+      return tryRecoverWithStream(session, expectedByStage, deadlineMs, ex);
     } catch (Throwable e) {
-      cancel(requestId);
+      session.fanOutCancel();
       throw e;
     } finally {
       if (isQueryCancellationEnabled()) {
@@ -309,7 +307,7 @@ public class QueryDispatcher {
 
     processResults(requestId, serversOut.size(), (response, server) -> {
       if (response.containsMetadata(ServerResponseStatus.STATUS_ERROR)) {
-        cancel(requestId, serversOut);
+        session.fanOutCancel();
         throw new RuntimeException(
             String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId, server,
                 response.getMetadataOrDefault(ServerResponseStatus.STATUS_ERROR, "null")));
@@ -372,10 +370,10 @@ public class QueryDispatcher {
         brokerResult.getBrokerReduceTimeMs(), stageCoverage);
   }
 
-  /// Tries to recover from an exception thrown during query dispatching.
+  /// Tries to recover from an exception thrown during legacy (non-streaming) query dispatching.
   ///
-  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and stats,
-  /// while other exceptions are not known, so they are directly rethrown.
+  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and empty
+  /// stats, while other exceptions are directly rethrown. Stats are not collected on the legacy cancel path.
   private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
       throws Exception {
     if (servers.isEmpty()) {
@@ -390,19 +388,48 @@ public class QueryDispatcher {
     } else if (ex instanceof QueryException) {
       errorCode = ((QueryException) ex).getErrorCode();
     } else {
-      // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
       cancel(requestId, servers);
       throw ex;
     }
-    // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
-    // that include the stats.
-    LOGGER.warn("Query failed with a known exception. Trying to cancel the other opchains");
-    MultiStageQueryStats stats = cancelWithStats(requestId, servers);
-    if (stats == null) {
+    LOGGER.warn("Query failed with a known exception. Cancelling remaining opchains.");
+    cancel(requestId, servers);
+    QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
+    return new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+  }
+
+  /// Tries to recover from an exception thrown during stream-mode ({@code SubmitWithStream}) query dispatching.
+  ///
+  /// Fans out cancel over the open streams, waits briefly for any remaining {@code OpChainComplete} messages (up to
+  /// the query deadline), and builds a {@link QueryResult} that includes whatever stats arrived before the deadline.
+  /// Stats from before the error are available because servers push {@code OpChainComplete} even on failure.
+  ///
+  /// Unknown exceptions (not {@link TimeoutException} or {@link QueryException}) are re-thrown after cancel fan-out.
+  private QueryResult tryRecoverWithStream(StreamingQuerySession session, Map<Integer, Integer> expectedByStage,
+      long deadlineMs, Exception ex)
+      throws Exception {
+    if (ex instanceof ExecutionException && ex.getCause() instanceof Exception) {
+      ex = (Exception) ex.getCause();
+    }
+    QueryErrorCode errorCode;
+    if (ex instanceof TimeoutException) {
+      errorCode = QueryErrorCode.EXECUTION_TIMEOUT;
+    } else if (ex instanceof QueryException) {
+      errorCode = ((QueryException) ex).getErrorCode();
+    } else {
+      session.fanOutCancel();
       throw ex;
     }
+    LOGGER.warn("Stream-mode query failed with a known exception. Fanning out cancel and waiting for stats.");
+    session.fanOutCancel();
+    long remainingMs = Math.max(0, deadlineMs - System.currentTimeMillis());
+    try {
+      session.awaitCompletion(remainingMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+    }
     QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
-    return new QueryResult(processingException, stats, 0L);
+    QueryResult errorResult = new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+    return mergeSessionStatsIntoResult(errorResult, session, expectedByStage);
   }
 
   public List<PlanNode> explain(RequestContext context, DispatchablePlanFragment fragment, long timeoutMs,
@@ -681,41 +708,6 @@ public class QueryDispatcher {
       _serversByQuery.remove(requestId);
     }
     return true;
-  }
-
-  @Nullable
-  private MultiStageQueryStats cancelWithStats(long requestId, @Nullable Set<QueryServerInstance> servers) {
-    if (servers == null) {
-      return null;
-    }
-
-    Deadline deadline = Deadline.after(_cancelTimeout.toMillis(), TimeUnit.MILLISECONDS);
-    SendRequest<Long, Worker.CancelResponse> sendRequest = DispatchClient::cancel;
-    BlockingQueue<AsyncResponse<Worker.CancelResponse>> dispatchCallbacks =
-        dispatch(sendRequest, servers, deadline, serverInstance -> requestId);
-
-    MultiStageQueryStats stats = MultiStageQueryStats.emptyStats(0);
-    StatMap<BaseMailboxReceiveOperator.StatKey> rootStats = new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
-    stats.getCurrentStats().addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE, rootStats);
-    try {
-      processResults(requestId, servers.size(), (response, server) -> {
-        Map<Integer, ByteString> statsByStage = response.getStatsByStageMap();
-        for (Map.Entry<Integer, ByteString> entry : statsByStage.entrySet()) {
-          try (InputStream is = entry.getValue().newInput(); DataInputStream dis = new DataInputStream(is)) {
-            MultiStageQueryStats.StageStats.Closed closed = MultiStageQueryStats.StageStats.Closed.deserialize(dis);
-            stats.mergeUpstream(entry.getKey(), closed);
-          } catch (Exception e) {
-            LOGGER.debug("Caught exception while deserializing stats on server: {}", server, e);
-          }
-        }
-      }, deadline, dispatchCallbacks);
-      return stats;
-    } catch (InterruptedException e) {
-      throw QueryErrorCode.INTERNAL.asException("Interrupted while waiting for cancel response", e);
-    } catch (TimeoutException e) {
-      LOGGER.debug("Timed out waiting for cancel response", e);
-      return stats;
-    }
   }
 
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {

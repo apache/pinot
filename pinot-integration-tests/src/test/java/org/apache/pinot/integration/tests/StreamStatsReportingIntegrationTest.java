@@ -155,7 +155,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     @Language("sql")
     String sql = "SELECT a.AirlineID, COUNT(*) "
         + "FROM mytable a JOIN mytable b ON a.AirlineID = b.AirlineID "
-        + "WHERE a.DaysSinceEpoch > 16000 "
+        + "WHERE a.DaysSinceEpoch = 16101 AND b.DaysSinceEpoch = 16101 "
         + "GROUP BY a.AirlineID "
         + "LIMIT 5";
     JsonNode response = postWithStreamStats(sql);

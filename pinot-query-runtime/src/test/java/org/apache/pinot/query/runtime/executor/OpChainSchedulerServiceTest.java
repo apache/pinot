@@ -84,12 +84,16 @@ public class OpChainSchedulerServiceTest {
   }
 
   private OpChain getChain(MultiStageOperator operator) {
+    return getChain(operator, 0);
+  }
+
+  private OpChain getChain(MultiStageOperator operator, int stageId) {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
     WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     OpChainExecutionContext context = OpChainExecutionContext.fromQueryContext(mailboxService, Map.of(),
-        new StageMetadata(0, List.of(workerMetadata), Map.of()), workerMetadata, null, true, true);
+        new StageMetadata(stageId, List.of(workerMetadata), Map.of()), workerMetadata, null, true, true);
     return new OpChain(context, operator);
   }
 
@@ -190,6 +194,10 @@ public class OpChainSchedulerServiceTest {
 
     // now cancel the request.
     schedulerService.cancel(123L);
+    // The eviction inside cancel() happens under the write lock (before context.terminate()), so the context
+    // map must be empty as soon as cancel() returns — no need to wait for the opchain to finish.
+    assertEquals(schedulerService.activeRequestCount(), 0,
+        "context map should be empty immediately after cancel() returns");
 
     assertTrue(cancelLatch.await(10, TimeUnit.SECONDS), "expected OpChain to be cancelled");
     Mockito.verify(_operatorA, Mockito.times(1)).cancel(Mockito.any());
@@ -308,6 +316,43 @@ public class OpChainSchedulerServiceTest {
         assertTrue(message.contains("being scheduled"));
       }
     }
+  }
+
+  /**
+   * Registers two opchains for the same request, waits for both to complete, and verifies that the per-request
+   * context map entry is removed once the last opchain finishes. Regression coverage for the TOCTOU race in
+   * decrementActiveOpChains that could leave a stale entry in _executionContextByRequest.
+   */
+  @Test
+  public void shouldCleanUpContextAfterAllOpChainsComplete()
+      throws InterruptedException {
+    CountDownLatch allClosed = new CountDownLatch(2);
+    MultiStageOperator operatorB = Mockito.mock(MultiStageOperator.class);
+    Mockito.when(operatorB.copyStatMaps()).thenAnswer(inv -> new StatMap<>(MailboxSendOperator.StatKey.class));
+
+    Mockito.when(_operatorA.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.doAnswer(inv -> MultiStageQueryStats.emptyStats(0)).when(_operatorA).calculateStats();
+    Mockito.doAnswer(inv -> {
+      allClosed.countDown();
+      return null;
+    }).when(_operatorA).close();
+
+    Mockito.when(operatorB.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.doAnswer(inv -> MultiStageQueryStats.emptyStats(1)).when(operatorB).calculateStats();
+    Mockito.doAnswer(inv -> {
+      allClosed.countDown();
+      return null;
+    }).when(operatorB).close();
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      schedulerService.register(getChain(_operatorA, 0));
+      schedulerService.register(getChain(operatorB, 1));
+    }
+
+    assertTrue(allClosed.await(10, TimeUnit.SECONDS), "expected both opchains to complete within 10 s");
+    assertEquals(schedulerService.activeRequestCount(), 0,
+        "context map should be empty after all opchains for a request complete");
   }
 
   @Test

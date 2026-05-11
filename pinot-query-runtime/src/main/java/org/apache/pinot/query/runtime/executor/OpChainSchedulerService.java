@@ -26,12 +26,11 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -77,6 +76,21 @@ public class OpChainSchedulerService {
   /// before the broker submits the query and fires once for every opchain that runs on this server for that request.
   /// Listeners are responsible for unregistering themselves once they've consumed all expected events.
   private final ConcurrentMap<Long, OpChainCompletionListener> _completionListeners = new ConcurrentHashMap<>();
+  /// Maps requestId → QueryExecutionContext for O(1) cancel. An entry is added when the first opchain for a request
+  /// registers and removed when cancel() fires or when the last opchain for that request completes. The counter map
+  /// below tracks how many opchains are still active per request so we know when to clean up.
+  ///
+  /// Consistency invariant: all mutations of BOTH maps for the same requestId must occur inside
+  /// `_activeOpChainsByRequest.compute(requestId, …)`. The compute() bin-lock for the requestId key serializes
+  /// all register and decrement operations, keeping the two maps coherent. cancel() acquires the query write lock
+  /// BEFORE calling compute() so that register()'s read lock cannot overlap with the eviction window.
+  ///
+  /// NOTE: `_opChainCache.put()` in registerInternal must stay inside the read lock. cancel()'s cache-invalidation
+  /// forEach runs OUTSIDE the write lock (after the cancelled-query cache is written). It relies on the read lock
+  /// exclusion to guarantee that no register() call is mid-flight between the cache.put and the counter increment
+  /// when the forEach observes the cache entry.
+  private final ConcurrentMap<Long, QueryExecutionContext> _executionContextByRequest = new ConcurrentHashMap<>();
+  private final ConcurrentMap<Long, AtomicInteger> _activeOpChainsByRequest = new ConcurrentHashMap<>();
 
   public OpChainSchedulerService(String instanceId, ExecutorService executorService, PinotConfiguration config) {
     this(instanceId, executorService, config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
@@ -158,8 +172,21 @@ public class OpChainSchedulerService {
 
   private void registerInternal(OpChain operatorChain, QueryExecutionContext executionContext) {
     OpChainId opChainId = operatorChain.getId();
+    long requestId = opChainId.getRequestId();
     MultiStageOperator rootOperator = operatorChain.getRoot();
     _opChainCache.put(opChainId, Pair.of(rootOperator, executionContext));
+    // Track the context for O(1) cancel and increment the per-request active opchain count.
+    // Both operations are performed inside a single compute() call so that a concurrent decrementActiveOpChains()
+    // that observes count==0 and removes the context entry cannot race with a new putIfAbsent arriving between the
+    // counter update and the context-map update.
+    _activeOpChainsByRequest.compute(requestId, (k, v) -> {
+      _executionContextByRequest.putIfAbsent(requestId, executionContext);
+      if (v == null) {
+        return new AtomicInteger(1);
+      }
+      v.incrementAndGet();
+      return v;
+    });
     // Captured by the runJob and read by the FutureCallback so we can hand the calculated stats to the per-request
     // completion listener (stream-mode stats reporting). On error we may not have stats; the FutureCallback handles
     // that by passing null.
@@ -193,6 +220,7 @@ public class OpChainSchedulerService {
       @Override
       public void onSuccess(Void result) {
         _metrics.onOpChainFinished(rootOperator);
+        decrementActiveOpChains(requestId);
         notifyCompletionListener(opChainId, operatorChain, statsRef.get(), null);
         operatorChain.close();
       }
@@ -214,6 +242,7 @@ public class OpChainSchedulerService {
         } else {
           LOGGER.error(logMsg, t);
         }
+        decrementActiveOpChains(requestId);
         notifyCompletionListener(opChainId, operatorChain, statsRef.get(), t);
         operatorChain.cancel(t);
         operatorChain.close();
@@ -221,6 +250,27 @@ public class OpChainSchedulerService {
     }, MoreExecutors.directExecutor());
 
     _executorService.submit(listenableFutureTask);
+  }
+
+  private void decrementActiveOpChains(long requestId) {
+    // Use compute() so the "decrement-to-zero → remove" step is atomic with a concurrent registerInternal()
+    // that would otherwise interleave a putIfAbsent + increment between our remove() calls.
+    _activeOpChainsByRequest.compute(requestId, (k, counter) -> {
+      if (counter == null) {
+        return null;
+      }
+      if (counter.decrementAndGet() <= 0) {
+        _executionContextByRequest.remove(requestId);
+        return null;
+      }
+      return counter;
+    });
+  }
+
+  /** Returns the number of requestIds with at least one active opchain. Exposed for tests only. */
+  @VisibleForTesting
+  int activeRequestCount() {
+    return _executionContextByRequest.size();
   }
 
   private void notifyCompletionListener(OpChainId opChainId, OpChain operatorChain,
@@ -256,45 +306,54 @@ public class OpChainSchedulerService {
     return _completionListeners.remove(requestId);
   }
 
-  public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
-    QueryExecutionContext cancelledExecutionContext = null;
-    Map<OpChainId, MultiStageOperator> cancelledOperators = new HashMap<>();
-    for (Map.Entry<OpChainId, Pair<MultiStageOperator, QueryExecutionContext>> entry : _opChainCache.asMap()
-        .entrySet()) {
-      if (entry.getKey().getRequestId() == requestId) {
-        Pair<MultiStageOperator, QueryExecutionContext> pair = entry.getValue();
-        cancelledOperators.put(entry.getKey(), pair.getLeft());
-        cancelledExecutionContext = pair.getRight();
-      }
+  /**
+   * Cancels all opchains registered for {@code requestId} by terminating the shared
+   * {@link QueryExecutionContext} for that request. The cancel is O(1) via a direct context look-up; no
+   * per-opchain scan is needed.
+   *
+   * <p>Stats for cancelled opchains are NOT returned synchronously. In stream mode, each cancelled opchain
+   * delivers its (partial) stats asynchronously via {@link OpChainCompletionListener#onOpChainComplete} once the
+   * opchain finishes after being interrupted. In legacy mode, cancel-path stats are not collected.
+   *
+   * <p>If no opchains are currently registered (pre-registration cancel race), the requestId is marked in the
+   * cancelled-query cache so that any future registrations for that requestId are immediately rejected.
+   */
+  public void cancel(long requestId) {
+    // Acquire the write lock BEFORE eviction so that register()'s readLock cannot overlap with the window
+    // between the context eviction and the cancelled-query cache write. Without the write lock first, a
+    // concurrent register() could pass the cache check (cache not yet written) after the context was already
+    // evicted, slipping through and starting an opchain that should have been rejected.
+    AtomicReference<QueryExecutionContext> ctxRef = new AtomicReference<>();
+    Lock writeLock = getQueryLock(requestId).writeLock();
+    writeLock.lock();
+    try {
+      // Atomically evict the counter and the shared QueryExecutionContext inside one compute() so this cannot
+      // race with a concurrent registerInternal() that holds the same compute()-bin lock while calling
+      // putIfAbsent() on _executionContextByRequest.
+      _activeOpChainsByRequest.compute(requestId, (k, counter) -> {
+        ctxRef.set(_executionContextByRequest.remove(requestId));
+        return null; // unconditionally evict the counter on cancel
+      });
+      _cancelledQueryCache.put(requestId, Boolean.TRUE);
+    } finally {
+      writeLock.unlock();
     }
-
-    if (cancelledExecutionContext != null) {
-      cancelledExecutionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled on: " + _instanceId);
-      _opChainCache.invalidateAll(cancelledOperators.keySet());
-      Map<Integer, MultiStageQueryStats.StageStats.Closed> statsMap = new HashMap<>();
-      for (Map.Entry<OpChainId, MultiStageOperator> entry : cancelledOperators.entrySet()) {
-        int stageId = entry.getKey().getStageId();
-        MultiStageQueryStats.StageStats.Closed stats = entry.getValue().calculateStats().getCurrentStats().close();
-        statsMap.merge(stageId, stats, (s1, s2) -> {
-          s1.merge(s2);
-          return s1;
-        });
+    // Promptly release memory held by cancelled opchain entries; without explicit invalidation they would linger
+    // in the cache until TTL expiry. Running this forEach outside the write lock is safe: by the time the write
+    // lock was released, the cancelledQueryCache entry was already written, so no new register() calls for this
+    // requestId can add entries. Any register() that was already holding the read lock when cancel() began must
+    // have completed (it released the read lock for cancel() to acquire the write lock), so its _opChainCache
+    // entry is already visible to this iterator. Double-invalidation of an already-evicted entry is a no-op.
+    _opChainCache.asMap().forEach((id, pair) -> {
+      if (id.getRequestId() == requestId) {
+        _opChainCache.invalidate(id);
       }
-      return statsMap;
-    } else {
-      // When no query execution context is found, it means there is no actively running operator chain (registered but
-      // not done). To prevent future registration for a cancelled query, add the query to the cancelled query cache.
-
-      // Acquire write lock for the query to ensure that the query is not cancelled while scheduling the operator chain.
-      Lock writeLock = getQueryLock(requestId).writeLock();
-      writeLock.lock();
-      try {
-        _cancelledQueryCache.put(requestId, Boolean.TRUE);
-      } finally {
-        writeLock.unlock();
-      }
-
-      return Map.of();
+    });
+    QueryExecutionContext context = ctxRef.get();
+    if (context != null) {
+      // terminate() interrupts all registered tasks (via addTask) and sets the termination flag so that
+      // checkTermination() blocks any subsequent registrations for the same requestId.
+      context.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled on: " + _instanceId);
     }
   }
 
