@@ -27,42 +27,42 @@
     <version>1.6.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>pinot-parquet</artifactId>
-  <name>Pinot Parquet</name>
+  <artifactId>pinot-parquet-base</artifactId>
+  <name>Pinot Parquet Base</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <dependencies>
-    <!--
-      ParquetUtils lives in pinot-parquet-base so that pinot-tools can depend on it as a library
-      without pulling ParquetRecordReader (the plugin class) into pinot-all.jar.
-    -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-parquet-base</artifactId>
+      <artifactId>pinot-avro-base</artifactId>
     </dependency>
-
-    <!-- Used for Parquet Writer in tests -->
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-avro</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-mapreduce-client-core</artifactId>
+      <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-local</artifactId>
-      <scope>test</scope>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client-runtime</artifactId>
+      <scope>${hadoop.dependencies.scope}</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.woodstox</groupId>
+      <artifactId>stax2-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
   </dependencies>
-
-  <profiles>
-    <profile>
-      <id>pinot-fastdev</id>
-      <properties>
-        <shade.phase.prop>none</shade.phase.prop>
-      </properties>
-    </profile>
-  </profiles>
 </project>

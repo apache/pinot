@@ -1,0 +1,58 @@
+{
+  "schemaName": "testSampleData",
+  "dimensionFieldSpecs": [
+    {
+      "name": "column1",
+      "dataType": "LONG"
+    },
+    {
+      "name": "column2",
+      "dataType": "INT"
+    },
+    {
+      "name": "column3",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column4",
+      "dataType": "INT"
+    },
+    {
+      "name": "column5",
+      "dataType": "INT"
+    },
+    {
+      "name": "column7",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column8",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column9",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column10",
+      "dataType": "STRING"
+    },
+    {
+      "name": "column13",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "met_impressionCount",
+      "dataType": "LONG"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "INT",
+      "name": "time_day"
+    }
+  }
+}

@@ -34,6 +34,17 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
+  <dependencies>
+    <!--
+      JSONRecordReader and JSONRecordExtractor live in pinot-json-base so that pinot-tools can
+      depend on them as a library without pulling the full plugin into pinot-all.jar. The plugin
+      classes (JSONMessageDecoder) depend on pinot-json-base transitively.
+    -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-json-base</artifactId>
+    </dependency>
+  </dependencies>
 
   <profiles>
     <profile>

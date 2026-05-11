@@ -51,17 +51,13 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-minion-builtin-tasks</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-batch-ingestion-common</artifactId>
     </dependency>
     <!--
-      Depend on pinot-avro-base (the shared library) rather than pinot-avro (the plugin), so
-      pinot-tools' Java code can use AvroUtils/AvroRecordReader without pulling the runtime
-      AvroMessageDecoder plugin classes into pinot-all.jar. The decoder classes live in
-      pinot-avro and are loaded at runtime from the plugins/ directory.
+      Depend on *-base (the shared library) rather than the full plugin, so pinot-tools' Java
+      code can use the utility classes without pulling the plugin implementation classes into
+      pinot-all.jar. The plugin classes live exclusively in plugins/ and are realm-loaded at
+      runtime.
     -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -69,31 +65,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-confluent-avro</artifactId>
+      <artifactId>pinot-json-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-csv</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-protobuf</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-json</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-orc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-parquet</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-thrift</artifactId>
+      <artifactId>pinot-parquet-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -132,6 +108,12 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-compound-metrics</artifactId>
+    </dependency>
+
+    <!-- QuickStartBase.createKafkaAdminClient() uses AdminClient directly -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
     </dependency>
 
     <dependency>

@@ -45,7 +45,9 @@
     <module>pinot-confluent-json</module>
     <module>pinot-confluent-protobuf</module>
     <module>pinot-orc</module>
+    <module>pinot-json-base</module>
     <module>pinot-json</module>
+    <module>pinot-parquet-base</module>
     <module>pinot-parquet</module>
     <module>pinot-csv</module>
     <module>pinot-thrift</module>
