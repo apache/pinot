@@ -32,7 +32,6 @@
   <url>https://pinot.apache.org/</url>
 
   <properties>
-    <plugin.type>pinot-stream-ingestion</plugin.type>
     <pinot.root>${basedir}/../../..</pinot.root>
   </properties>
 

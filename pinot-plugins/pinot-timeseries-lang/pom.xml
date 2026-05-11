@@ -33,7 +33,6 @@
 
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-timeseries-lang</plugin.type>
   </properties>
 
   <modules>

@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-input-format</plugin.type>
   </properties>
 
   <modules>
