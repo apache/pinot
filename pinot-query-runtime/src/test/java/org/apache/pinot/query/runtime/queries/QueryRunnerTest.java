@@ -337,11 +337,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     testCases.add(new Object[]{"SELECT * FROM a WHERE text_match(col1, 'f')", "without text index", false});
     testCases.add(new Object[]{
         "SELECT * FROM a WHERE textContains(col1, 'f')",
-        "supported only on native text index",
+        "No match found for function signature textContains",
         false});
     testCases.add(new Object[]{
         "SELECT * FROM a WHERE text_contains(col1, 'f')",
-        "supported only on native text index",
+        "No match found for function signature text_contains",
         false}
     );
 
