@@ -585,11 +585,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (ForwardIndexReader<?> reader = readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(column),
         columnMetadata)) {
-      IndexCreationContext.Builder builder =
-          IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
-              .withTableNameWithType(_tableConfig.getTableName())
-              .withContinueOnError(_tableConfig.getIngestionConfig() != null
-                  && _tableConfig.getIngestionConfig().isContinueOnError());
+      IndexCreationContext.Builder builder = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata);
       // Encoding flows through ForwardIndexConfig; for compression-change rewrite the encoding does not change so
       // the config in _fieldIndexConfigs already carries the correct encoding.
       // Set entry length info for raw index creators. No need to set this when changing dictionary id compression type.
@@ -600,7 +596,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           lengthOfLongestEntry = getMaxRowLength(columnMetadata, reader, null);
         }
         if (columnMetadata.isSingleValue()) {
-          builder.withLengthOfLongestEntry(lengthOfLongestEntry);
+          builder.withLengthOfLongestElement(lengthOfLongestEntry);
         } else {
           // For VarByte MV columns like String and Bytes, the storage representation of each row contains the following
           // components:
@@ -984,16 +980,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       LOGGER.info("Built dictionary. Rewriting dictionary enabled forward index for segment={} and column={}",
           segmentName, column);
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      IndexCreationContext context = IndexCreationContext.builder()
-          .withIndexDir(indexDir)
-          .withFieldSpec(fieldSpec)
-          .withColumnStatistics(statsCollector)
-          .withTotalDocs(numDocs)
-          .withDictionary(true)
-          .withTableNameWithType(_tableConfig.getTableName())
-          .withContinueOnError(
-              _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError())
-          .build();
+      IndexCreationContext context =
+          new IndexCreationContext.Builder(indexDir, _tableConfig, statsCollector, true).build();
       try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
         forwardIndexRewriteHelper(column, existingColMetadata, reader, creator, numDocs, dictionaryCreator, null);
       }
@@ -1212,24 +1200,15 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         columnMetadata)) {
       Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata);
       IndexCreationContext.Builder builder =
-          IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
-              .withTableNameWithType(_tableConfig.getTableName())
-              .withContinueOnError(_tableConfig.getIngestionConfig() != null
-                  && _tableConfig.getIngestionConfig().isContinueOnError());
-      builder.withDictionary(false);
-      // Encoding flows through ForwardIndexConfig set below.
-      if (!columnMetadata.getDataType().getStoredType().isFixedWidth()) {
-        if (columnMetadata.isSingleValue()) {
-          // lengthOfLongestEntry is available for dict columns from metadata.
-          builder.withLengthOfLongestEntry(columnMetadata.getLengthOfLongestElement());
-        } else {
-          // maxRowLength can only be determined by scanning the column.
-          builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, reader, dictionary));
-        }
+          new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).withDictionary(false);
+      // Encoding flows through ForwardIndexConfig set below. The row length is derived from persisted metadata via
+      // the Builder constructor; only fall back to scanning when metadata returns UNAVAILABLE (var-width MV columns
+      // with varying element lengths).
+      if (columnMetadata.getMaxRowLengthInBytes() == ColumnMetadata.UNAVAILABLE) {
+        builder.withMaxRowLengthInBytes(getMaxRowLength(columnMetadata, reader, dictionary));
       }
       ForwardIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
-      IndexCreationContext context = builder.build();
-      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(context, config)) {
+      try (ForwardIndexCreator creator = StandardIndexes.forward().createIndexCreator(builder.build(), config)) {
         forwardIndexRewriteHelper(column, columnMetadata, reader, creator, columnMetadata.getTotalDocs(), null,
             dictionary);
       }

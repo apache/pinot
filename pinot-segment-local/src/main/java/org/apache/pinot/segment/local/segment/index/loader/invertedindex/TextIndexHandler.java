@@ -228,14 +228,8 @@ public class TextIndexHandler extends BaseIndexHandler {
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
-
-    IndexCreationContext context = IndexCreationContext.builder()
-        .withColumnMetadata(columnMetadata)
-        .withIndexDir(segmentDirectory)
+    IndexCreationContext context = new IndexCreationContext.Builder(segmentDirectory, _tableConfig, columnMetadata)
         .withTextCommitOnClose(true)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
 
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();

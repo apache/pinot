@@ -242,8 +242,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(segmentMetadata.getTotalDocs(), 30);
     ColumnMetadata columnMetadataForT = segmentMetadata.getColumnMetadataFor(T);
     assertEquals(columnMetadataForT.getCardinality(), 3);
-    assertTrue((long) columnMetadataForT.getMinValue() >= 1600473600000L);
-    assertTrue((long) columnMetadataForT.getMaxValue() < 1600560000000L);
+    assertTrue((Long) columnMetadataForT.getMinValue() >= 1600473600000L);
+    assertTrue((Long) columnMetadataForT.getMaxValue() < 1600560000000L);
   }
 
   @Test
@@ -271,8 +271,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     ColumnMetadata columnMetadataForT = segmentMetadata.getColumnMetadataFor(T);
     assertEquals(columnMetadataForT.getCardinality(), 3);
-    assertTrue((long) columnMetadataForT.getMinValue() >= 1600473600000L);
-    assertTrue((long) columnMetadataForT.getMaxValue() < 1600560000000L);
+    assertTrue((Long) columnMetadataForT.getMinValue() >= 1600473600000L);
+    assertTrue((Long) columnMetadataForT.getMaxValue() < 1600560000000L);
   }
 
   @Test
@@ -301,7 +301,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     ColumnMetadata columnMetadataForT = segmentMetadata.getColumnMetadataFor(T);
     assertEquals(columnMetadataForT.getCardinality(), 1);
-    assertEquals((long) columnMetadataForT.getMinValue(), 1600473600000L);
+    assertEquals(columnMetadataForT.getMinValue(), 1600473600000L);
   }
 
   @Test
@@ -332,11 +332,11 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(segmentMetadata.getTotalDocs(), 2);
     ColumnMetadata columnMetadataForT = segmentMetadata.getColumnMetadataFor(T);
     assertEquals(columnMetadataForT.getCardinality(), 1);
-    assertEquals((long) columnMetadataForT.getMinValue(), 1600473600000L);
+    assertEquals(columnMetadataForT.getMinValue(), 1600473600000L);
     ColumnMetadata columnMetadataForM1 = segmentMetadata.getColumnMetadataFor(M1);
     assertEquals(columnMetadataForM1.getCardinality(), 2);
-    assertEquals((int) columnMetadataForM1.getMinValue(), 1);
-    assertEquals((int) columnMetadataForM1.getMaxValue(), 3);
+    assertEquals(columnMetadataForM1.getMinValue(), 1);
+    assertEquals(columnMetadataForM1.getMaxValue(), 3);
   }
 
   @Test
@@ -426,8 +426,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     ColumnMetadata columnMetadataForT = segmentMetadata.getColumnMetadataFor(T_TRX);
     assertEquals(columnMetadataForT.getCardinality(), 3);
-    assertTrue((int) columnMetadataForT.getMinValue() >= 444576);
-    assertTrue((int) columnMetadataForT.getMaxValue() < 444600);
+    assertTrue((Integer) columnMetadataForT.getMinValue() >= 444576);
+    assertTrue((Integer) columnMetadataForT.getMaxValue() < 444600);
   }
 
   @Test
@@ -456,8 +456,8 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertEquals(segmentMetadata.getTotalDocs(), 3);
     ColumnMetadata columnMetadataForT = segmentMetadata.getColumnMetadataFor(T_TRX);
     assertEquals(columnMetadataForT.getCardinality(), 3);
-    assertTrue((int) columnMetadataForT.getMinValue() >= 2020091900);
-    assertTrue((int) columnMetadataForT.getMaxValue() < 2020092000);
+    assertTrue((Integer) columnMetadataForT.getMinValue() >= 2020091900);
+    assertTrue((Integer) columnMetadataForT.getMaxValue() < 2020092000);
   }
 
   @AfterClass

@@ -116,10 +116,8 @@ public abstract class BaseIndexHandler implements IndexHandler {
     boolean dictionaryBasedForwardIndex = forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY;
 
     InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
-        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            dictionaryBasedForwardIndex, forwardIndexConfig, segmentWriter, isTemporaryForwardIndex,
-            _tableConfig.getTableName(),
-            _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError());
+        new InvertedIndexAndDictionaryBasedForwardIndexCreator(_segmentDirectory, segmentWriter, _tableConfig,
+            columnName, dictionaryEnabled, dictionaryBasedForwardIndex, forwardIndexConfig, isTemporaryForwardIndex);
     creator.regenerateForwardIndex();
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, StandardIndexes.forward())) {

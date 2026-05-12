@@ -64,9 +64,9 @@ public class DefaultColumnStatisticsTest {
 
     // Assertions follow ColumnStatistics API order
 
-    // getFieldSpec, getValueType, isSingleValue
+    // getFieldSpec, getStoredType, isSingleValue
     assertEquals(stats.getFieldSpec(), fieldSpec);
-    assertEquals(stats.getValueType(), storedType);
+    assertEquals(stats.getStoredType(), storedType);
     assertTrue(stats.isSingleValue());
 
     // getMinValue, getMaxValue — single default value: min == max
@@ -125,9 +125,9 @@ public class DefaultColumnStatisticsTest {
 
     // Assertions follow ColumnStatistics API order
 
-    // getFieldSpec, getValueType, isSingleValue
+    // getFieldSpec, getStoredType, isSingleValue
     assertEquals(stats.getFieldSpec(), fieldSpec);
-    assertEquals(stats.getValueType(), storedType);
+    assertEquals(stats.getStoredType(), storedType);
     assertFalse(stats.isSingleValue());
 
     // getMinValue, getMaxValue — single default value: min == max

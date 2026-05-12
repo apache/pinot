@@ -97,11 +97,11 @@ public class ForwardIndexCreatorFactory {
       int targetDocsPerChunk = indexConfig.getTargetDocsPerChunk();
       if (fieldSpec.isSingleValueField()) {
         return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
+            context.getLengthOfLongestElement(), deriveNumDocsPerChunk, writerVersion, targetMaxChunkSize,
             targetDocsPerChunk);
       } else {
         return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
+            context.getMaxNumberOfMultiValues(), deriveNumDocsPerChunk, writerVersion,
             context.getMaxRowLengthInBytes(), targetMaxChunkSize, targetDocsPerChunk);
       }
     }

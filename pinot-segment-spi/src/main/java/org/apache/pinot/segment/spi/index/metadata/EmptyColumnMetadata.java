@@ -16,41 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.map;
+package org.apache.pinot.segment.spi.index.metadata;
 
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.EmptyColumnShape;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-// TODO: THIS IS A HACK with all stats UNAVAILABLE. Revisit to fill the actual stats for the column.
-@SuppressWarnings("rawtypes")
-public class SimpleColumnMetadata implements ColumnMetadata {
-  private final FieldSpec _fieldSpec;
-  private final int _totalDocs;
+/// [ColumnMetadata] for an empty column (zero rows).
+public class EmptyColumnMetadata extends EmptyColumnShape implements ColumnMetadata {
 
-  public SimpleColumnMetadata(FieldSpec fieldSpec, int totalDocs) {
-    _fieldSpec = fieldSpec;
-    _totalDocs = totalDocs;
+  public EmptyColumnMetadata(FieldSpec fieldSpec, @Nullable PartitionFunction partitionFunction,
+      @Nullable Set<Integer> partitions) {
+    super(fieldSpec, partitionFunction, partitions);
   }
 
-  @Override
-  public FieldSpec getFieldSpec() {
-    return _fieldSpec;
-  }
-
-  @Override
-  public int getTotalDocs() {
-    return _totalDocs;
-  }
-
-  @Override
-  public int getCardinality() {
-    return UNAVAILABLE;
+  /// Constructs an [EmptyColumnMetadata] for `column` by reading the field spec and partition info from `config`.
+  public static EmptyColumnMetadata fromPropertiesConfiguration(PropertiesConfiguration config, String column) {
+    FieldSpec fieldSpec = ColumnMetadataImpl.extractFieldSpec(column, config);
+    PartitionFunction partitionFunction = ColumnMetadataImpl.extractPartitionFunction(column, config);
+    Set<Integer> partitions =
+        partitionFunction != null ? ColumnMetadataImpl.extractPartitions(column, config) : null;
+    return new EmptyColumnMetadata(fieldSpec, partitionFunction, partitions);
   }
 
   @Override
@@ -64,67 +58,13 @@ public class SimpleColumnMetadata implements ColumnMetadata {
   }
 
   @Override
-  public boolean isSorted() {
-    return false;
-  }
-
-  @Nullable
-  @Override
-  public Comparable<?> getMinValue() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public Comparable<?> getMaxValue() {
-    return null;
-  }
-
-  @Override
   public boolean isMinMaxValueInvalid() {
     return true;
   }
 
   @Override
-  public int getLengthOfShortestElement() {
-    return UNAVAILABLE;
-  }
-
-  @Override
-  public int getLengthOfLongestElement() {
-    return UNAVAILABLE;
-  }
-
-  @Override
-  public int getTotalNumberOfEntries() {
-    return UNAVAILABLE;
-  }
-
-  @Override
-  public int getMaxNumberOfMultiValues() {
-    return UNAVAILABLE;
-  }
-
-  @Override
-  public int getMaxRowLengthInBytes() {
-    return UNAVAILABLE;
-  }
-
-  @Override
   public int getBitsPerElement() {
     return UNAVAILABLE;
-  }
-
-  @Nullable
-  @Override
-  public PartitionFunction getPartitionFunction() {
-    return null;
-  }
-
-  @Nullable
-  @Override
-  public Set<Integer> getPartitions() {
-    return null;
   }
 
   @Override
@@ -139,16 +79,23 @@ public class SimpleColumnMetadata implements ColumnMetadata {
 
   @Override
   public short getIndexType(int position) {
-    throw new UnsupportedOperationException();
+    throw new IndexOutOfBoundsException(position);
   }
 
   @Override
   public long getIndexSize(int position) {
-    throw new UnsupportedOperationException();
+    throw new IndexOutOfBoundsException(position);
   }
 
   @Override
   public long getIndexSizeFor(IndexType type) {
     return UNAVAILABLE;
+  }
+
+  // NOTE: This method is only meant to retain compatibility of serialization for endpoint:
+  //       `/tables/{tableName}/segments/{segmentName}/metadata`
+  @SuppressWarnings("unused")
+  public Map<IndexType<?, ?, ?>, Long> getIndexSizeMap() {
+    return Map.of();
   }
 }

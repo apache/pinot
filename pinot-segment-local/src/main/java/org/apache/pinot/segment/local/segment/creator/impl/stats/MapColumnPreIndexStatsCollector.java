@@ -89,6 +89,7 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
 
     if (entry instanceof Map) {
       //noinspection unchecked

@@ -65,7 +65,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
   private static final List<String> COLUMNS_TO_COMPARE =
       List.of("name", "game", "score", "timestampInEpoch", "deleted");
-  private String _kafkaTopicName;
 
   @BeforeClass
   public void setUp()

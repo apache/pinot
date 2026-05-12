@@ -57,6 +57,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
         updatePartition(Long.toString(value));
       }
     }
+    _totalDocs++;
     _totalNumberOfEntries++;
   }
 
@@ -71,6 +72,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
       _values.add(valueGetter.apply(i));
     }
     _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
     updateTotalNumberOfEntries(length);
   }
 
