@@ -21,6 +21,8 @@ package org.apache.pinot.integration.tests.multicluster;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
@@ -129,6 +131,40 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
         "Multi-cluster routing should include physical table from cluster 1: " + multiRouting);
     assertTrue(multiJson.has(phys2OfflineKey),
         "Multi-cluster routing should include physical table from cluster 2: " + multiRouting);
+    assertTrue(multiJson.get(phys1OfflineKey).size() >= 1,
+        "Cluster 1 physical table should have at least one server");
+    assertTrue(multiJson.get(phys2OfflineKey).size() >= 1,
+        "Cluster 2 physical table should have at least one server");
+  }
+
+  @Test(groups = "query")
+  public void testMultiClusterSqlRoutingTableDebugEndpoint() throws Exception {
+    String logicalTable = getLogicalTableName();
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+
+    // SQL-based local routing (no multi-cluster flag): result is keyed by the table name from the SQL
+    String physicalTable = getPhysicalTable1InCluster1();
+    String localSql = URLEncoder.encode("SELECT * FROM " + physicalTable + "_OFFLINE", StandardCharsets.UTF_8);
+    String localRouting = ControllerTest.sendGetRequest(brokerBase + "/debug/routingTable/sql?query=" + localSql);
+    JsonMapper mapper = JsonMapper.builder().build();
+    JsonNode localJson = mapper.readTree(localRouting);
+    String physicalOfflineKey = physicalTable + "_OFFLINE";
+    assertTrue(localJson.has(physicalOfflineKey),
+        "Local SQL routing should include physical offline table: " + localRouting);
+
+    // SQL-based multi-cluster routing for a logical table: expands to physical tables
+    String multiSql =
+        URLEncoder.encode("SELECT * FROM " + logicalTable + "_OFFLINE", StandardCharsets.UTF_8);
+    String multiRouting = ControllerTest.sendGetRequest(
+        brokerBase + "/debug/routingTable/sql?query=" + multiSql + "&useMultiClusterRouting=true");
+    JsonNode multiJson = mapper.readTree(multiRouting);
+
+    String phys1OfflineKey = getPhysicalTable1InCluster1() + "_OFFLINE";
+    String phys2OfflineKey = getPhysicalTable1InCluster2() + "_OFFLINE";
+    assertTrue(multiJson.has(phys1OfflineKey),
+        "Multi-cluster SQL routing should include physical table from cluster 1: " + multiRouting);
+    assertTrue(multiJson.has(phys2OfflineKey),
+        "Multi-cluster SQL routing should include physical table from cluster 2: " + multiRouting);
     assertTrue(multiJson.get(phys1OfflineKey).size() >= 1,
         "Cluster 1 physical table should have at least one server");
     assertTrue(multiJson.get(phys2OfflineKey).size() >= 1,

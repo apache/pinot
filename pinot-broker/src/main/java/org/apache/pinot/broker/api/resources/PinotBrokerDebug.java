@@ -159,13 +159,8 @@ public class PinotBrokerDebug {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     RoutingManager routingManager = resolveRoutingManager(useMultiClusterRouting, tableName);
     Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
-    if (useMultiClusterRouting) {
-      getPhysicalRoutingTablesForLogical(routingManager, tableName, (tableNameWithType, routingTable) -> result.put(
-          tableNameWithType, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
-    } else {
-      getRoutingTable(routingManager, tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
-          removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
-    }
+    collectRoutingTables(routingManager, useMultiClusterRouting, tableName, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
     if (!result.isEmpty()) {
       return result;
     } else {
@@ -192,18 +187,22 @@ public class PinotBrokerDebug {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     RoutingManager routingManager = resolveRoutingManager(useMultiClusterRouting, tableName);
     Map<String, Map<ServerInstance, SegmentsToQuery>> result = new TreeMap<>();
-    if (useMultiClusterRouting) {
-      getPhysicalRoutingTablesForLogical(routingManager, tableName,
-          (tableNameWithType, routingTable) -> result.put(tableNameWithType,
-              routingTable.getServerInstanceToSegmentsMap()));
-    } else {
-      getRoutingTable(routingManager, tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
-          routingTable.getServerInstanceToSegmentsMap()));
-    }
+    collectRoutingTables(routingManager, useMultiClusterRouting, tableName, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, routingTable.getServerInstanceToSegmentsMap()));
     if (!result.isEmpty()) {
       return result;
     } else {
       throw new WebApplicationException("Cannot find routing for table: " + tableName, Response.Status.NOT_FOUND);
+    }
+  }
+
+  /** Dispatches to {@link #getPhysicalRoutingTablesForLogical} or {@link #lookupLocalRoutingTable} based on flag. */
+  private void collectRoutingTables(RoutingManager routingManager, boolean useMultiClusterRouting,
+      String tableName, BiConsumer<String, RoutingTable> consumer) {
+    if (useMultiClusterRouting) {
+      getPhysicalRoutingTablesForLogical(routingManager, tableName, consumer);
+    } else {
+      lookupLocalRoutingTable(routingManager, tableName, consumer);
     }
   }
 
@@ -233,7 +232,7 @@ public class PinotBrokerDebug {
     }
   }
 
-  private void getRoutingTable(RoutingManager routingManager, String tableName,
+  private void lookupLocalRoutingTable(RoutingManager routingManager, String tableName,
       BiConsumer<String, RoutingTable> consumer) {
     // Use a single requestId for both OFFLINE and REALTIME routing so that replica-group selection rotates properly
     // for raw table names (no suffix) and stays consistent for hybrid tables.
@@ -299,17 +298,31 @@ public class PinotBrokerDebug {
   @ApiOperation(value = "Get the routing table for a query")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request"),
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, List<String>> getRoutingTableForQuery(
+  public Map<String, Map<ServerInstance, List<String>>> getRoutingTableForQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
+      @ApiParam(value = "Use multi-cluster routing manager instead of local")
+      @QueryParam("useMultiClusterRouting") boolean useMultiClusterRouting,
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     checkAccessControl(brokerRequest, httpHeaders);
-    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
-    if (routingTable != null) {
-      return removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap());
+    String tableName = brokerRequest.getQuerySource().getTableName();
+    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    if (useMultiClusterRouting) {
+      RoutingManager routingManager = resolveRoutingManager(true, tableName);
+      getPhysicalRoutingTablesForLogical(routingManager, tableName, (tableNameWithType, routingTable) ->
+          result.put(tableNameWithType, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
+    } else {
+      RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
+      if (routingTable != null) {
+        result.put(tableName, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap()));
+      }
+    }
+    if (!result.isEmpty()) {
+      return result;
     } else {
       throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
     }
@@ -322,17 +335,31 @@ public class PinotBrokerDebug {
   @ApiOperation(value = "Get the routing table for a query, including optional segments")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request"),
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, SegmentsToQuery> getRoutingTableForQueryWithOptionalSegments(
+  public Map<String, Map<ServerInstance, SegmentsToQuery>> getRoutingTableForQueryWithOptionalSegments(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
+      @ApiParam(value = "Use multi-cluster routing manager instead of local")
+      @QueryParam("useMultiClusterRouting") boolean useMultiClusterRouting,
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     checkAccessControl(brokerRequest, httpHeaders);
-    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
-    if (routingTable != null) {
-      return routingTable.getServerInstanceToSegmentsMap();
+    String tableName = brokerRequest.getQuerySource().getTableName();
+    Map<String, Map<ServerInstance, SegmentsToQuery>> result = new TreeMap<>();
+    if (useMultiClusterRouting) {
+      RoutingManager routingManager = resolveRoutingManager(true, tableName);
+      getPhysicalRoutingTablesForLogical(routingManager, tableName, (tableNameWithType, routingTable) ->
+          result.put(tableNameWithType, routingTable.getServerInstanceToSegmentsMap()));
+    } else {
+      RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
+      if (routingTable != null) {
+        result.put(tableName, routingTable.getServerInstanceToSegmentsMap());
+      }
+    }
+    if (!result.isEmpty()) {
+      return result;
     } else {
       throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
     }

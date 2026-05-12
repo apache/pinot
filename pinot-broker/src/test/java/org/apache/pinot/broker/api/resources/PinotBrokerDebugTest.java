@@ -24,12 +24,15 @@ import java.util.List;
 import java.util.Map;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.MultiClusterRoutingContextProvider;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.mockito.ArgumentCaptor;
@@ -42,10 +45,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 
+/**
+ * Unit tests for {@link PinotBrokerDebug} covering request-ID consistency, multi-cluster routing dispatch,
+ * and the SQL-based routing endpoints (single-table and logical-table expansion).
+ */
 public class PinotBrokerDebugTest {
 
   private PinotBrokerDebug createBrokerDebug(BrokerRoutingManager routingManager)
@@ -121,8 +129,8 @@ public class PinotBrokerDebugTest {
       }
     }
 
-    assertTrue(firstRealtimeRequestId != null);
-    assertTrue(secondRealtimeRequestId != null);
+    assertNotNull(firstRealtimeRequestId);
+    assertNotNull(secondRealtimeRequestId);
     assertEquals((long) secondRealtimeRequestId, firstRealtimeRequestId + 1);
   }
 
@@ -194,5 +202,77 @@ public class PinotBrokerDebugTest {
     // One call per physical table in the config; the local routingManager is never touched
     verify(multiClusterManager, times(2)).getRoutingTable(any(BrokerRequest.class), anyLong());
     verify(routingManager, times(0)).getRoutingTable(any(BrokerRequest.class), anyLong());
+  }
+
+  /** Creates a PinotBrokerDebug with a permissive access control factory for SQL endpoint tests. */
+  private PinotBrokerDebug createBrokerDebugWithAccessControl(BrokerRoutingManager routingManager,
+      MultiClusterRoutingContext multiClusterContext, TableCache tableCache)
+      throws Exception {
+    AccessControl accessControl = mock(AccessControl.class);
+    when(accessControl.hasAccess(any(), any(), any(), any())).thenReturn(true);
+    AccessControlFactory accessControlFactory = mock(AccessControlFactory.class);
+    when(accessControlFactory.create()).thenReturn(accessControl);
+
+    PinotBrokerDebug brokerDebug = new PinotBrokerDebug();
+    setField(brokerDebug, "_routingManager", routingManager);
+    setField(brokerDebug, "_multiClusterRoutingContextProvider",
+        new MultiClusterRoutingContextProvider(multiClusterContext));
+    setField(brokerDebug, "_tableCache", tableCache);
+    setField(brokerDebug, "_accessControlFactory", accessControlFactory);
+    return brokerDebug;
+  }
+
+  @Test
+  public void testSqlEndpointNonMultiClusterWrapsResultInMap()
+      throws Exception {
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+        .thenReturn(new RoutingTable(Collections.emptyMap(), Collections.emptyList(), 0));
+
+    PinotBrokerDebug brokerDebug =
+        createBrokerDebugWithAccessControl(routingManager, null, mock(TableCache.class));
+
+    Map<String, Map<ServerInstance, List<String>>> result =
+        brokerDebug.getRoutingTableForQuery("SELECT * FROM myTable_OFFLINE", false, (HttpHeaders) null);
+
+    // Non-multi-cluster: single entry keyed by the table name from the SQL
+    assertEquals(result.size(), 1);
+    assertTrue(result.containsKey("myTable_OFFLINE"));
+  }
+
+  @Test
+  public void testSqlMultiClusterRoutingSucceedsForLogicalTable()
+      throws Exception {
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    BrokerRoutingManager multiClusterManager = mock(BrokerRoutingManager.class);
+    when(multiClusterManager.getRoutingTable(any(BrokerRequest.class), anyLong()))
+        .thenReturn(new RoutingTable(Collections.emptyMap(), Collections.emptyList(), 0));
+
+    MultiClusterRoutingContext context =
+        new MultiClusterRoutingContext(Collections.emptyMap(), routingManager, multiClusterManager,
+            Collections.emptySet());
+
+    LogicalTableConfig logicalTableConfig = new LogicalTableConfig();
+    logicalTableConfig.setTableName("logicalTable");
+    logicalTableConfig.setPhysicalTableConfigMap(Map.of(
+        "physicalTable1_OFFLINE", new PhysicalTableConfig(false),
+        "physicalTable2_OFFLINE", new PhysicalTableConfig(true)));
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.isLogicalTable("logicalTable")).thenReturn(true);
+    when(tableCache.getLogicalTableConfig("logicalTable")).thenReturn(logicalTableConfig);
+
+    PinotBrokerDebug brokerDebug = createBrokerDebugWithAccessControl(routingManager, context, tableCache);
+
+    Map<String, Map<ServerInstance, List<String>>> result =
+        brokerDebug.getRoutingTableForQuery("SELECT * FROM logicalTable_OFFLINE", true, (HttpHeaders) null);
+
+    // Multi-cluster: one entry per physical table in the logical table config
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("physicalTable1_OFFLINE"));
+    assertTrue(result.containsKey("physicalTable2_OFFLINE"));
+    // The local routing manager is never touched for the multi-cluster SQL case
+    verify(routingManager, times(0)).getRoutingTable(any(BrokerRequest.class), anyLong());
+    verify(multiClusterManager, times(2)).getRoutingTable(any(BrokerRequest.class), anyLong());
   }
 }
