@@ -761,6 +761,25 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
+  @Test
+  public void testGetTableMetadataCompressionStatsDisabled()
+      throws Exception {
+    String tableMetadataPath = "/tables/" + OFFLINE_TABLE_NAME + "/metadata";
+
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(tableMetadataPath)
+        .queryParam("columns", "column1")
+        .queryParam("columns", "column2")
+        .request()
+        .get(String.class));
+    TableMetadataInfo metadataInfo = JsonUtils.jsonNodeToObject(jsonResponse, TableMetadataInfo.class);
+
+    Assert.assertNotNull(metadataInfo);
+    Assert.assertNull(metadataInfo.getColumnCompressionStats(),
+        "columnCompressionStats should be null when compressionStatsEnabled is false");
+    Assert.assertNull(metadataInfo.getCompressionStats(),
+        "compressionStats should be null when compressionStatsEnabled is false");
+  }
+
   // Override to use data with delete records
   @Override
   protected String getAvroFileName() {
