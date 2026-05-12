@@ -65,6 +65,10 @@ public class MultistageAggregationExecutor {
       _mergeResultHolder = null;
     } else {
       _mergeResultHolder = new Object[numFunctions];
+      for (int i = 0; i < numFunctions; i++) {
+        _mergeResultHolder[i] = aggFunctions[i].extractAggregationResult(
+            aggFunctions[i].createAggregationResultHolder());
+      }
       _aggregateResultHolder = null;
     }
   }

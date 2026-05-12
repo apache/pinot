@@ -49,6 +49,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.BOOLEAN;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG;
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.STRING;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -360,6 +361,81 @@ public class AggregateOperatorTest {
     return new AggregateOperator(context, _input,
         new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT, false,
             collations, limit));
+  }
+
+  // ---- Merge-mode identity value tests ----
+  // The merge result holder is pre-initialized with identity values so that when no input blocks arrive
+  // (e.g., all segments pruned by broker), the correct result is returned. This affects both FINAL and
+  // INTERMEDIATE modes since both use the merge path (isInputIntermediateFormat=true).
+
+  // FINAL-mode tests: identity values are converted to final form via extractFinalResult.
+
+  @Test
+  public void testFinalCountWithNoInputReturnsZero() {
+    assertMergeAggIdentityValue("COUNT", LONG, AggType.FINAL, 0L);
+  }
+
+  @Test
+  public void testFinalSumWithNoInputReturnsNull() {
+    assertMergeAggIdentityValue("SUM", DOUBLE, AggType.FINAL, null);
+  }
+
+  @Test
+  public void testFinalMinWithNoInputReturnsNull() {
+    assertMergeAggIdentityValue("MIN", DOUBLE, AggType.FINAL, null);
+  }
+
+  @Test
+  public void testFinalMaxWithNoInputReturnsNull() {
+    assertMergeAggIdentityValue("MAX", DOUBLE, AggType.FINAL, null);
+  }
+
+  @Test
+  public void testFinalDistinctCountWithNoInputReturnsZero() {
+    assertMergeAggIdentityValue("DISTINCTCOUNT", INT, AggType.FINAL, 0);
+  }
+
+  @Test
+  public void testFinalAvgWithNoInputReturnsNull() {
+    assertMergeAggIdentityValue("AVG", DOUBLE, AggType.FINAL, null);
+  }
+
+  @Test
+  public void testFinalDistinctCountHllWithNoInputReturnsZero() {
+    assertMergeAggIdentityValue("DISTINCTCOUNTHLL", LONG, AggType.FINAL, 0L);
+  }
+
+  // INTERMEDIATE-mode tests: identity values are returned as-is (intermediate form).
+
+  @Test
+  public void testIntermediateCountWithNoInputReturnsZero() {
+    assertMergeAggIdentityValue("COUNT", LONG, AggType.INTERMEDIATE, 0L);
+  }
+
+  @Test
+  public void testIntermediateSumWithNoInputReturnsNull() {
+    // INTERMEDIATE returns the raw intermediate value, not converted to final form
+    assertMergeAggIdentityValue("SUM", DOUBLE, AggType.INTERMEDIATE, null);
+  }
+
+  private void assertMergeAggIdentityValue(String functionName, ColumnDataType resultType, AggType aggType,
+      Object expectedValue) {
+    MseBlock block = runMergeAggWithNoInput(functionName, resultType, aggType);
+    assertTrue(block.isData(), "Expected a data block for " + functionName + " " + aggType);
+    List<Object[]> rows = ((MseBlock.Data) block).asRowHeap().getRows();
+    assertEquals(rows.size(), 1, functionName + " should produce exactly 1 row");
+    assertEquals(rows.get(0)[0], expectedValue, functionName + " " + aggType + " identity value mismatch");
+  }
+
+  private MseBlock runMergeAggWithNoInput(String functionName, ColumnDataType resultType, AggType aggType) {
+    RexExpression.FunctionCall aggCall =
+        new RexExpression.FunctionCall(resultType, functionName, List.of(new RexExpression.InputRef(0)));
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    DataSchema resultSchema = new DataSchema(new String[]{"result"}, new ColumnDataType[]{resultType});
+    AggregateOperator operator = new AggregateOperator(OperatorTestUtil.getContext(Map.of()), _input,
+        new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), List.of(aggCall), List.of(-1),
+            List.of(), aggType, false, null, 0));
+    return operator.nextBlock();
   }
 
   @Test
