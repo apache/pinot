@@ -21,8 +21,9 @@ package org.apache.pinot.common.function;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.PinotDataType;
+
 
 /// Like [FunctionInvoker], but designed to be called from query engines.
 ///
