@@ -38,7 +38,8 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
+import org.apache.pinot.query.runtime.operator.OperatorTypeRegistry;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
@@ -406,7 +407,7 @@ public class MultiStageQueryStats {
      * <p>
      * This list contains no null values.
      */
-    protected final List<MultiStageOperator.Type> _operatorTypes;
+    protected final List<OperatorTypeDescriptor> _operatorTypes;
     /**
      * The stats associated with the given operator index.
      * <p>
@@ -421,7 +422,7 @@ public class MultiStageQueryStats {
       this(new ArrayList<>(), new ArrayList<>());
     }
 
-    private StageStats(List<MultiStageOperator.Type> operatorTypes, List<StatMap<?>> operatorStats) {
+    private StageStats(List<OperatorTypeDescriptor> operatorTypes, List<StatMap<?>> operatorStats) {
       Preconditions.checkArgument(operatorTypes.size() == operatorStats.size(),
           "Operator types and stats must have the same size (%s != %s)",
           operatorTypes.size(), operatorStats.size());
@@ -466,7 +467,7 @@ public class MultiStageQueryStats {
       return _operatorStats.get(operatorIdx);
     }
 
-    public MultiStageOperator.Type getOperatorType(int index) {
+    public OperatorTypeDescriptor getOperatorType(int index) {
       return _operatorTypes.get(index);
     }
 
@@ -482,8 +483,8 @@ public class MultiStageQueryStats {
       return _operatorTypes.isEmpty();
     }
 
-    public void forEach(BiConsumer<MultiStageOperator.Type, StatMap<?>> consumer) {
-      Iterator<MultiStageOperator.Type> typeIterator = _operatorTypes.iterator();
+    public void forEach(BiConsumer<OperatorTypeDescriptor, StatMap<?>> consumer) {
+      Iterator<OperatorTypeDescriptor> typeIterator = _operatorTypes.iterator();
       Iterator<StatMap<?>> statIterator = _operatorStats.iterator();
       while (typeIterator.hasNext()) {
         consumer.accept(typeIterator.next(), statIterator.next());
@@ -551,7 +552,7 @@ public class MultiStageQueryStats {
      * never add entries for itself in upstream stats.
      */
     public static class Closed extends StageStats {
-      public Closed(List<MultiStageOperator.Type> operatorTypes, List<StatMap<?>> operatorStats) {
+      public Closed(List<OperatorTypeDescriptor> operatorTypes, List<StatMap<?>> operatorStats) {
         super(operatorTypes, operatorStats);
       }
 
@@ -619,13 +620,13 @@ public class MultiStageQueryStats {
 
     public static Closed deserialize(DataInput input, int numOperators)
         throws IOException {
-      List<MultiStageOperator.Type> operatorTypes = new ArrayList<>(numOperators);
+      List<OperatorTypeDescriptor> operatorTypes = new ArrayList<>(numOperators);
       List<StatMap<?>> operatorStats = new ArrayList<>(numOperators);
 
       try {
         for (int i = 0; i < numOperators; i++) {
           int typeId = input.readByte();
-          MultiStageOperator.Type type = MultiStageOperator.Type.fromId(typeId);
+          OperatorTypeDescriptor type = OperatorTypeRegistry.fromId(typeId);
           if (type == null) {
             throw new IllegalStateException(
                 "Invalid operator type id " + typeId + " at index " + i + ". " + "Deserialized so far: "
@@ -662,7 +663,7 @@ public class MultiStageQueryStats {
       ///
       /// @param statMap The stats for the operator to add. The ownership of this map will be transferred to this
       ///  object, so the caller should not modify it after calling this method.
-      public Open addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
+      public Open addLastOperator(OperatorTypeDescriptor type, StatMap<?> statMap) {
         Preconditions.checkArgument(statMap.getKeyClass().equals(type.getStatKeyClass()),
             "Expected stats of class %s for type %s but found class %s",
             type.getStatKeyClass(), type, statMap.getKeyClass());

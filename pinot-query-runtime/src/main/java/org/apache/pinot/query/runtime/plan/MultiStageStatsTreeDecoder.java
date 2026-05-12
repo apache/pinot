@@ -27,7 +27,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
+import org.apache.pinot.query.runtime.operator.OperatorTypeRegistry;
 
 
 /**
@@ -60,7 +61,7 @@ public final class MultiStageStatsTreeDecoder {
    */
   public static StageStatsTreeNode decodeNode(Worker.StageStatsNode node)
       throws DecodeFailedException {
-    MultiStageOperator.Type type = MultiStageOperator.Type.fromId(node.getOperatorTypeId());
+    OperatorTypeDescriptor type = OperatorTypeRegistry.fromId(node.getOperatorTypeId());
     if (type == null) {
       throw new DecodeFailedException("Unknown operator type id: " + node.getOperatorTypeId());
     }
@@ -68,7 +69,7 @@ public final class MultiStageStatsTreeDecoder {
     try {
       statMap = deserializeStatMap(node.getStatMap(), type);
     } catch (IOException e) {
-      throw new DecodeFailedException("Failed to deserialize StatMap for operator type " + type, e);
+      throw new DecodeFailedException("Failed to deserialize StatMap for operator type " + type.name(), e);
     }
     List<StageStatsTreeNode> children = new ArrayList<>(node.getChildrenCount());
     for (Worker.StageStatsNode child : node.getChildrenList()) {
@@ -124,7 +125,7 @@ public final class MultiStageStatsTreeDecoder {
   // The Type -> StatKey class relationship is preserved by MultiStageOperator.Type, but Java's type system can't
   // express the dependent type, so we suppress the resulting unchecked warning here.
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private static StatMap<?> deserializeStatMap(ByteString bytes, MultiStageOperator.Type type)
+  private static StatMap<?> deserializeStatMap(ByteString bytes, OperatorTypeDescriptor type)
       throws IOException {
     try (DataInputStream input = new DataInputStream(bytes.newInput())) {
       return StatMap.deserialize(input, (Class) type.getStatKeyClass());

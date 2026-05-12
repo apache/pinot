@@ -28,6 +28,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 
 
 /**
@@ -98,7 +99,7 @@ public final class MultiStageStatsTreeEncoder {
       builder.addChildren(encodeNode(child, openStats, cursor, planNodeIdResolver));
     }
     int idx = cursor[0]++;
-    MultiStageOperator.Type type = openStats.getOperatorType(idx);
+    OperatorTypeDescriptor type = openStats.getOperatorType(idx);
     StatMap<?> statMap = openStats.getOperatorStats(idx);
     builder.setOperatorTypeId(type.getId());
     builder.setStatMap(serializeStatMap(statMap));

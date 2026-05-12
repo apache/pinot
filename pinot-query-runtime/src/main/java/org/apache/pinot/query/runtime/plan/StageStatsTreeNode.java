@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
 
 
 /**
@@ -47,12 +47,12 @@ public class StageStatsTreeNode {
     }
   }
 
-  private final MultiStageOperator.Type _type;
+  private final OperatorTypeDescriptor _type;
   private final List<Integer> _planNodeIds;
   private final StatMap<?> _statMap;
   private final List<StageStatsTreeNode> _children;
 
-  public StageStatsTreeNode(MultiStageOperator.Type type, List<Integer> planNodeIds, StatMap<?> statMap,
+  public StageStatsTreeNode(OperatorTypeDescriptor type, List<Integer> planNodeIds, StatMap<?> statMap,
       List<StageStatsTreeNode> children) {
     _type = type;
     _planNodeIds = List.copyOf(planNodeIds);
@@ -60,7 +60,7 @@ public class StageStatsTreeNode {
     _children = List.copyOf(children);
   }
 
-  public MultiStageOperator.Type getType() {
+  public OperatorTypeDescriptor getType() {
     return _type;
   }
 
@@ -86,8 +86,8 @@ public class StageStatsTreeNode {
   @SuppressWarnings({"unchecked", "rawtypes"})
   public void merge(StageStatsTreeNode other)
       throws ShapeMismatchException {
-    if (_type != other._type) {
-      throw new ShapeMismatchException("Operator type mismatch: " + _type + " vs " + other._type);
+    if (_type.getId() != other._type.getId()) {
+      throw new ShapeMismatchException("Operator type mismatch: " + _type.name() + " vs " + other._type.name());
     }
     if (_children.size() != other._children.size()) {
       throw new ShapeMismatchException("Children count mismatch for " + _type + ": " + _children.size() + " vs "
@@ -110,13 +110,13 @@ public class StageStatsTreeNode {
    * tree shape should use this {@link StageStatsTreeNode} directly.
    */
   public MultiStageQueryStats.StageStats.Closed flattenInorder() {
-    List<MultiStageOperator.Type> types = new ArrayList<>();
+    List<OperatorTypeDescriptor> types = new ArrayList<>();
     List<StatMap<?>> stats = new ArrayList<>();
     flattenInto(types, stats);
     return new MultiStageQueryStats.StageStats.Closed(types, stats);
   }
 
-  private void flattenInto(List<MultiStageOperator.Type> types, List<StatMap<?>> stats) {
+  private void flattenInto(List<OperatorTypeDescriptor> types, List<StatMap<?>> stats) {
     for (StageStatsTreeNode child : _children) {
       child.flattenInto(types, stats);
     }
@@ -133,7 +133,7 @@ public class StageStatsTreeNode {
       return false;
     }
     StageStatsTreeNode that = (StageStatsTreeNode) o;
-    return _type == that._type
+    return _type.getId() == that._type.getId()
         && Objects.equals(_planNodeIds, that._planNodeIds)
         && Objects.equals(_statMap, that._statMap)
         && Objects.equals(_children, that._children);
