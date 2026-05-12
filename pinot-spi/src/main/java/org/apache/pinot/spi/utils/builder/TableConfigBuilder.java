@@ -55,6 +55,8 @@ import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 
 public class TableConfigBuilder {
+  private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
+  private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
   private static final String MMAP_LOAD_MODE = "MMAP";
@@ -75,6 +77,12 @@ public class TableConfigBuilder {
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
   private String _replacedSegmentsRetentionPeriod;
   private String _lineageEntryCleanupRetentionPeriod;
+  @Deprecated
+  private String _segmentPushFrequency;
+  // Written to validationConfig for backward compat: IngestionConfigUtils still falls back to this field.
+  // Remove once the IngestionConfigUtils fallback is removed.
+  @Deprecated
+  private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
   @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
@@ -212,6 +220,28 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
     _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
+    return this;
+  }
+
+  /**
+   * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
+   */
+  @Deprecated
+  public TableConfigBuilder setSegmentPushType(String segmentPushType) {
+    if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
+      _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
+    } else {
+      _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
+    }
+    return this;
+  }
+
+  /**
+   * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
+   */
+  @Deprecated
+  public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
+    _segmentPushFrequency = segmentPushFrequency;
     return this;
   }
 
@@ -485,6 +515,8 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @SuppressWarnings("deprecation") // intentionally calls deprecated setters on SegmentsValidationAndRetentionConfig
+  // and IndexingConfig; those calls are required to keep the IngestionConfigUtils legacy fallback working.
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -495,6 +527,8 @@ public class TableConfigBuilder {
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
     validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
     validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);
+    validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
+    validationConfig.setSegmentPushType(_segmentPushType);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
     validationConfig.setReplication(_numReplicas);
