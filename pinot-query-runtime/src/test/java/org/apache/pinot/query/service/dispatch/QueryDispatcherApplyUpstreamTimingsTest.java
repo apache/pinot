@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -34,7 +32,7 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.physical.FragmentType;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
@@ -109,10 +107,6 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     return new QueryDispatcher.QueryResult(EMPTY_RESULT, mqStats, 0L);
   }
 
-  /**
-   * Builds a leaf {@link DispatchablePlanFragment} mock: has a non-null table name (leaf stage)
-   * and a plan root that advertises {@code receiverStageId} as its receiver.
-   */
   private static DispatchablePlanFragment leafFragment(int receiverStageId, QueryServerInstance... servers) {
     return leafFragmentWithStageId(0, receiverStageId, servers);
   }
@@ -125,29 +119,40 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
       entries[i] = Map.entry(servers[i], List.of(i));
     }
     when(fragment.getServerInstanceToWorkerIdMap()).thenReturn(Map.ofEntries(entries));
-    when(fragment.getTableName()).thenReturn("testTable");
+    when(fragment.getFragmentType()).thenReturn(FragmentType.LEAF);
 
     MailboxSendNode sendNode = mock(MailboxSendNode.class);
-    when(sendNode.getStageId()).thenReturn(stageId);
     when(sendNode.getReceiverStageIds()).thenReturn(List.of(receiverStageId));
     PlanFragment planFragment = mock(PlanFragment.class);
+    when(planFragment.getFragmentId()).thenReturn(stageId);
     when(planFragment.getFragmentRoot()).thenReturn(sendNode);
     when(fragment.getPlanFragment()).thenReturn(planFragment);
     return fragment;
   }
 
-  /**
-   * Builds a non-leaf {@link DispatchablePlanFragment} mock: has a null table name (intermediate stage).
-   * Used to populate the senderKey -> instanceId lookup without contributing leaf-stage receiver info.
-   */
   private static DispatchablePlanFragment nonLeafFragment(QueryServerInstance... servers) {
+    return nonLeafFragmentWithReceivers(List.of(), servers);
+  }
+
+  private static DispatchablePlanFragment nonLeafFragmentWithReceivers(List<Integer> receiverStageIds,
+      QueryServerInstance... servers) {
     DispatchablePlanFragment fragment = mock(DispatchablePlanFragment.class);
     Map.Entry<QueryServerInstance, List<Integer>>[] entries = new Map.Entry[servers.length];
     for (int i = 0; i < servers.length; i++) {
       entries[i] = Map.entry(servers[i], List.of(i));
     }
     when(fragment.getServerInstanceToWorkerIdMap()).thenReturn(Map.ofEntries(entries));
-    when(fragment.getTableName()).thenReturn(null);
+    when(fragment.getFragmentType()).thenReturn(FragmentType.INTERMEDIATE);
+
+    if (!receiverStageIds.isEmpty()) {
+      MailboxSendNode sendNode = mock(MailboxSendNode.class);
+      when(sendNode.getReceiverStageIds()).thenReturn(receiverStageIds);
+      PlanFragment planFragment = mock(PlanFragment.class);
+      when(planFragment.getFragmentRoot()).thenReturn(sendNode);
+      when(fragment.getPlanFragment()).thenReturn(planFragment);
+    } else {
+      when(fragment.getPlanFragment()).thenReturn(null);
+    }
     return fragment;
   }
 
@@ -322,44 +327,26 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 300L);
   }
 
-  /**
-   * Builds a "mixed" leaf fragment: {@code getTableName()} is non-null (scans a dim table), but the plan
-   * subtree also contains a {@link MailboxReceiveNode} with the given {@code receiveDistribution}. This
-   * mirrors the lookup-join pattern where a stage both receives all upstream data via a SINGLETON exchange
-   * and scans an inline dimension table.
-   *
-   * @param leafStageId  the stage ID of this leaf fragment itself (used as the SINGLETON leaf stage ID
-   *                     when {@code receiveDistribution} is SINGLETON)
-   * @param receiverStageId  the stage ID that this leaf sends its output to
-   */
-  private static DispatchablePlanFragment mixedLeafFragment(int leafStageId, int receiverStageId,
-      RelDistribution.Type receiveDistribution, QueryServerInstance... servers) {
-    return mixedLeafFragment(leafStageId, receiverStageId, receiveDistribution, 98, servers);
+  private static DispatchablePlanFragment singletonLeafFragment(int leafStageId, boolean timingTrusted,
+      QueryServerInstance... servers) {
+    return singletonLeafFragment(leafStageId, timingTrusted, List.of(), servers);
   }
 
-  private static DispatchablePlanFragment mixedLeafFragment(int leafStageId, int receiverStageId,
-      RelDistribution.Type receiveDistribution, int senderStageId, QueryServerInstance... servers) {
+  private static DispatchablePlanFragment singletonLeafFragment(int leafStageId, boolean timingTrusted,
+      List<Integer> receiverStageIds, QueryServerInstance... servers) {
     DispatchablePlanFragment fragment = mock(DispatchablePlanFragment.class);
     Map.Entry<QueryServerInstance, List<Integer>>[] entries = new Map.Entry[servers.length];
     for (int i = 0; i < servers.length; i++) {
       entries[i] = Map.entry(servers[i], List.of(i));
     }
     when(fragment.getServerInstanceToWorkerIdMap()).thenReturn(Map.ofEntries(entries));
-    when(fragment.getTableName()).thenReturn("dimTable");
+    when(fragment.getFragmentType()).thenReturn(
+        timingTrusted ? FragmentType.SINGLETON_LEAF : FragmentType.INTERMEDIATE);
 
-    // A real MailboxReceiveNode with the given distribution type, representing the upstream receive.
-    MailboxReceiveNode receiveNode = new MailboxReceiveNode(
-        /*stageId=*/99, new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}),
-        senderStageId, PinotRelExchangeType.getDefaultExchangeType(),
-        receiveDistribution, null, null, false, false, null);
-
-    // A mock MailboxSendNode whose subtree contains the receive node.
     MailboxSendNode sendNode = mock(MailboxSendNode.class);
-    when(sendNode.getStageId()).thenReturn(leafStageId);
-    when(sendNode.getReceiverStageIds()).thenReturn(List.of(receiverStageId));
-    when(sendNode.getInputs()).thenReturn(List.of(receiveNode));
-
+    when(sendNode.getReceiverStageIds()).thenReturn(receiverStageIds);
     PlanFragment planFragment = mock(PlanFragment.class);
+    when(planFragment.getFragmentId()).thenReturn(leafStageId);
     when(planFragment.getFragmentRoot()).thenReturn(sendNode);
     when(fragment.getPlanFragment()).thenReturn(planFragment);
     return fragment;
@@ -367,28 +354,23 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
 
   @Test
   public void testMixedLeafWithSingletonReceiveIsSkipped() {
-    // A fragment that has getTableName() != null (dim table scan) AND a SINGLETON MailboxReceiveNode
-    // (lookup-join pattern). Stage 1 is not consulted (the 800ms timing is never recorded).
-    // The SINGLETON stage's server is NOT in _trackedServers, so the caller's finally block records
-    // it at -1 (not at wall-clock) to avoid cascade contamination.
+    // A SINGLETON leaf fragment (dim table lookup-join). Its receiver stage 1 is NOT trusted
+    // (SINGLETON receivers are contaminated). Its servers are NOT tracked.
     QueryServerInstance server = new QueryServerInstance("instance-a", "host-a", 9000, MAILBOX_PORT);
     String encoded = AdaptiveRoutingUpstreamTimings.senderKey("host-a", MAILBOX_PORT) + "=800";
 
     ServerRoutingStatsManager stats = mock(ServerRoutingStatsManager.class);
     Set<String> recorded = new HashSet<>();
 
-    // Stage 1 has timing, but the only "leaf" fragment is a mixed stage (leafStageId=2) with
-    // SINGLETON receive that sends to stage 1.
+    // SINGLETON leaf (stageId=2), not timing-trusted (sender is not a leaf in this test).
     AdaptiveRoutingStageClassification classification = applyUpstreamTimingsFromStats(
         resultWithStage1Timing(encoded),
-        planWith(mixedLeafFragment(2, 1, RelDistribution.Type.SINGLETON, server)),
+        planWith(singletonLeafFragment(2, false, server)),
         stats, REQUEST_ID, recorded);
 
     // Stage 1 (receiver) is not consulted — the inflated 800ms timing is never recorded.
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 800L);
-    // No -1 pre-recording inside applyUpstreamTimingsFromStats — that's the caller's job.
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", -1L);
-    // But the server is NOT in trackedServers, so the caller's fallback will record -1.
     Assert.assertFalse(classification._trackedServers.contains("instance-a"),
         "instance-a must NOT be in trackedServers so the finally block records -1");
   }
@@ -396,12 +378,12 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
 
   @Test
   public void testPureLeavesStillRecordedWhenMixedLeafAlsoPresent() {
-    // When a query has both a pure leaf (fact table) and a mixed leaf (inline dim with SINGLETON receive),
-    // the pure leaf timing is still recorded correctly. The mixed leaf is silently skipped.
+    // When a query has both a pure leaf (fact table) and a SINGLETON leaf (dim lookup),
+    // the pure leaf timing is still recorded correctly. The SINGLETON leaf is silently skipped.
     QueryServerInstance server = new QueryServerInstance("instance-a", "host-a", 9000, MAILBOX_PORT);
 
-    // Stage 1 receives from the pure leaf (will be in stagesReceivingFromLeaves).
-    // Stage 2 receives from the mixed leaf (must be excluded).
+    // Stage 1 receives from the pure leaf (trusted receiver).
+    // Stage 2 receives from the SINGLETON leaf (not trusted).
     StatMap<BaseMailboxReceiveOperator.StatKey> stage1Stats =
         new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
     stage1Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
@@ -422,30 +404,22 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     ServerRoutingStatsManager stats = mock(ServerRoutingStatsManager.class);
     Set<String> recorded = new HashSet<>();
 
+    // Pure leaf sends to stage 1 (trusted). SINGLETON leaf (stage 3) has no trusted receivers.
     applyUpstreamTimingsFromStats(result,
-        planWith(leafFragment(1, server), mixedLeafFragment(3, 2, RelDistribution.Type.SINGLETON, server)),
+        planWith(leafFragment(1, server), singletonLeafFragment(3, false, server)),
         stats, REQUEST_ID, recorded);
 
-    // Pure leaf timing (90ms) recorded, NOT the inflated mixed-leaf timing (950ms).
+    // Pure leaf timing (90ms) recorded, NOT the inflated SINGLETON timing (950ms).
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 90L);
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 950L);
   }
 
-  /**
-   * Models the 10-stage canary case where all leaf stages are "mixed" SINGLETON lookup-join stages,
-   * so {@code stagesReceivingFromLeaves} is empty. The slow server is identified by its slow network
-   * sends: stage-4 SINGLETON workers at remote servers record the slow server's stage-5 data as
-   * arriving late. Stage 4 (the SINGLETON leaf stage itself) is in {@code singletonLeafStageIds}
-   * and is directly consulted, giving clean per-server upstream-send timings.
-   */
   @Test
   public void testSingletonLeafStageItselfIsConsultedWhenSenderIsLeaf() {
     QueryServerInstance impacted = new QueryServerInstance("impacted", "host-impacted", 9000, MAILBOX_PORT);
     QueryServerInstance normal = new QueryServerInstance("normal", "host-normal", 9000, MAILBOX_PORT);
 
     // Stage 4 (the SINGLETON leaf stage) receives from stage 5 (a pure leaf scan stage).
-    // It records stage-5 leaf senders' timings: the impacted server's data took 911ms to arrive;
-    // the normal server's data arrived in 2ms.
     StatMap<BaseMailboxReceiveOperator.StatKey> stage4Stats =
         new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
     stage4Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
@@ -457,11 +431,9 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
         List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(stage4Stats)));
     QueryDispatcher.QueryResult result = new QueryDispatcher.QueryResult(EMPTY_RESULT, mqStats, 0L);
 
-    // SINGLETON mixed leaf at stageId=4, sends to receiver stage 3, receives from stage 5 (a leaf).
-    // singletonLeafStageIds = {4}; stagesReceivingFromLeaves = {}.
-    // Stage 5 is a pure leaf (fact table scan) running on the same servers.
-    DispatchablePlanFragment mixedLeaf =
-        mixedLeafFragment(4, 3, RelDistribution.Type.SINGLETON, /*senderStageId=*/5, impacted, normal);
+    // SINGLETON leaf at stageId=4, marked TIMING_TRUSTED (sender stage 5 is a leaf).
+    // Stage 5 is a pure leaf running on the same servers.
+    DispatchablePlanFragment singletonLeaf = singletonLeafFragment(4, true, impacted, normal);
     DispatchablePlanFragment senderLeaf = leafFragmentWithStageId(5, 4, impacted, normal);
     DispatchablePlanFragment intermediate = nonLeafFragment(impacted, normal);
 
@@ -469,10 +441,9 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     Set<String> recorded = new HashSet<>();
 
     applyUpstreamTimingsFromStats(
-        result, planWith(mixedLeaf, senderLeaf, intermediate), stats, REQUEST_ID, recorded);
+        result, planWith(singletonLeaf, senderLeaf, intermediate), stats, REQUEST_ID, recorded);
 
-    // Stage 4 is in singletonLeafStageIds (sender stage 5 is a leaf) -> consulted.
-    // Correct per-server send timings recorded.
+    // Stage 4 is TIMING_TRUSTED -> its stats are consulted.
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "impacted", 911L);
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "normal", 2L);
     Assert.assertTrue(recorded.containsAll(List.of("impacted", "normal")));
@@ -517,21 +488,12 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
         "relay-instance must NOT be in trackedServers so the finally block records -1");
   }
 
-  /**
-   * Verifies that a SINGLETON leaf stage whose sender is an intermediate (non-leaf) stage is NOT
-   * consulted. This prevents cascade-contaminated timings from being attributed to intermediate
-   * servers. Example: stage 2 is a SINGLETON leaf (dim join) that receives from stage 3 (an
-   * intermediate hash-distribution stage running on multiple servers). If stage 3 servers wait for
-   * a slow upstream, their delivery to stage 2 is delayed. Reading stage 2's timing would wrongly
-   * attribute that cascade delay to those intermediate servers.
-   */
   @Test
   public void testSingletonLeafReceivingFromIntermediateNotConsulted() {
     QueryServerInstance serverA = new QueryServerInstance("server-a", "host-a", 9000, MAILBOX_PORT);
     QueryServerInstance serverB = new QueryServerInstance("server-b", "host-b", 9000, MAILBOX_PORT);
 
-    // Stage 2 (SINGLETON leaf) records timing for its stage-3 upstream senders. These timings
-    // are cascade-contaminated: serverA took 600ms because it waited for a slow upstream.
+    // Stage 2 (SINGLETON leaf) records timing for its stage-3 upstream senders.
     StatMap<BaseMailboxReceiveOperator.StatKey> stage2Stats =
         new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
     stage2Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
@@ -543,10 +505,8 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
         List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(stage2Stats)));
     QueryDispatcher.QueryResult result = new QueryDispatcher.QueryResult(EMPTY_RESULT, mqStats, 0L);
 
-    // Stage 2 is a SINGLETON leaf that receives from stage 3, but stage 3 is NOT a leaf
-    // (it's an intermediate stage). So stage 2 must NOT be consulted.
-    DispatchablePlanFragment singletonLeaf =
-        mixedLeafFragment(2, 1, RelDistribution.Type.SINGLETON, /*senderStageId=*/3, serverA, serverB);
+    // Stage 2 is a SINGLETON leaf. NOT timing-trusted (sender stage 3 is intermediate, not a leaf).
+    DispatchablePlanFragment singletonLeaf = singletonLeafFragment(2, false, serverA, serverB);
     DispatchablePlanFragment intermediate = nonLeafFragment(serverA, serverB);
 
     ServerRoutingStatsManager stats = mock(ServerRoutingStatsManager.class);
@@ -555,13 +515,11 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     AdaptiveRoutingStageClassification classification = applyUpstreamTimingsFromStats(
         result, planWith(singletonLeaf, intermediate), stats, REQUEST_ID, recorded);
 
-    // Stage 2 is NOT consulted (sender stage 3 is not a leaf) -> contaminated timings never recorded.
+    // Stage 2 is NOT consulted (not timing-trusted) -> contaminated timings never recorded.
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "server-a", 600L);
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "server-b", 10L);
-    // No -1 pre-recording inside applyUpstreamTimingsFromStats. Caller handles via trackedServers check.
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "server-a", -1L);
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "server-b", -1L);
-    // Neither server is in trackedServers, so the caller's fallback will suppress them.
     Assert.assertFalse(classification._trackedServers.contains("server-a"));
     Assert.assertFalse(classification._trackedServers.contains("server-b"));
   }

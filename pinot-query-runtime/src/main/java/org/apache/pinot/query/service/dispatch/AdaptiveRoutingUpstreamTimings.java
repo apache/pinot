@@ -20,7 +20,6 @@ package org.apache.pinot.query.service.dispatch;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +43,8 @@ public class AdaptiveRoutingUpstreamTimings {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveRoutingUpstreamTimings.class);
 
+  public static final String COLLECT_UPSTREAM_TIMING_KEY = "collectUpstreamTiming";
+
   static final char ENTRY_SEPARATOR = ';';
   static final char KV_SEPARATOR = '=';
 
@@ -59,8 +60,7 @@ public class AdaptiveRoutingUpstreamTimings {
   }
 
   /**
-   * Encode a map of senderKey -> elapsedMs into a string. Entries are sorted by key so the
-   * output is deterministic and easy to diff.
+   * Encode a map of senderKey -> elapsedMs into a string.
    *
    * @return encoded string, or {@code null} if the map is empty (null = absent in StatMap)
    */
@@ -70,7 +70,7 @@ public class AdaptiveRoutingUpstreamTimings {
       return null;
     }
     StringBuilder sb = new StringBuilder();
-    for (Map.Entry<String, Long> entry : new TreeMap<>(timings).entrySet()) {
+    for (Map.Entry<String, Long> entry : timings.entrySet()) {
       if (sb.length() > 0) {
         sb.append(ENTRY_SEPARATOR);
       }
@@ -87,18 +87,24 @@ public class AdaptiveRoutingUpstreamTimings {
     if (encoded == null || encoded.isEmpty()) {
       return result;
     }
-    String[] entries = encoded.split(String.valueOf(ENTRY_SEPARATOR));
-    for (String entry : entries) {
-      int eq = entry.indexOf(KV_SEPARATOR);
-      if (eq > 0) {
-        String key = entry.substring(0, eq);
+    int start = 0;
+    int len = encoded.length();
+    while (start < len) {
+      int end = encoded.indexOf(ENTRY_SEPARATOR, start);
+      if (end < 0) {
+        end = len;
+      }
+      int eq = encoded.indexOf(KV_SEPARATOR, start);
+      if (eq > start && eq < end) {
+        String key = encoded.substring(start, eq);
         try {
-          long value = Long.parseLong(entry.substring(eq + 1));
+          long value = Long.parseLong(encoded.substring(eq + 1, end));
           result.put(key, value);
         } catch (NumberFormatException e) {
-          LOGGER.warn("Skipping malformed timing entry '{}': {}", entry, e.getMessage());
+          LOGGER.warn("Skipping malformed timing entry '{}': {}", encoded.substring(start, end), e.getMessage());
         }
       }
+      start = end + 1;
     }
     return result;
   }

@@ -18,18 +18,14 @@
  */
 package org.apache.pinot.query.service.dispatch;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.physical.FragmentType;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
@@ -70,18 +66,17 @@ final class AdaptiveRoutingStageClassification {
   }
 
   /**
-   * Classification of plan fragments into consulted stages and tracked servers.
+   * Derives trusted stages and tracked servers from pre-computed roles set at planning time.
+   *
+   * <p>For pure leaves: their receivers are trusted (unless also receiving from a non-leaf).
+   * For SINGLETON leaf trusted: the stage itself is trusted.
+   * Contamination filter: any stage that receives from a non-leaf is excluded from trusted.
    */
   static AdaptiveRoutingStageClassification classify(DispatchableSubPlan plan) {
     Map<String, String> senderKeyToInstanceId = new HashMap<>();
-    Set<Integer> leafStageIds = new HashSet<>();
     Set<Integer> trustedStageIds = new HashSet<>();
     Set<String> trackedServers = new HashSet<>();
-    // Stages that receive from any non-leaf stage. Their timing is unreliable: the non-leaf sender
-    // may have waited for a slow upstream (cascade), inflating per-sender timings at the receiver.
     Set<Integer> stagesReceivingFromNonLeaf = new HashSet<>();
-    // Deferred: SINGLETON leaf stages pending "is sender also a leaf?" resolution.
-    List<int[]> pendingSingletonLeaves = new ArrayList<>();
 
     for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
       Set<QueryServerInstance> fragmentServers = fragment.getServerInstanceToWorkerIdMap().keySet();
@@ -90,81 +85,50 @@ final class AdaptiveRoutingStageClassification {
         senderKeyToInstanceId.putIfAbsent(key, server.getInstanceId());
       }
 
+      FragmentType role = fragment.getFragmentType();
       PlanFragment planFragment = fragment.getPlanFragment();
       PlanNode fragmentRoot = planFragment != null ? planFragment.getFragmentRoot() : null;
+      MailboxSendNode sendNode = fragmentRoot instanceof MailboxSendNode ? (MailboxSendNode) fragmentRoot : null;
 
-      if (fragment.getTableName() == null) {
-        // Non-leaf intermediate stage — mark its receivers as contaminated.
-        if (fragmentRoot instanceof MailboxSendNode) {
-          for (int receiverStageId : ((MailboxSendNode) fragmentRoot).getReceiverStageIds()) {
-            stagesReceivingFromNonLeaf.add(receiverStageId);
+      if (role == FragmentType.LEAF) {
+        // Leaf: receivers are trusted, servers are tracked.
+        if (sendNode != null) {
+          for (int receiverStageId : sendNode.getReceiverStageIds()) {
+            trustedStageIds.add(receiverStageId);
           }
-        }
-        continue;
-      }
-
-      if (!(fragmentRoot instanceof MailboxSendNode)) {
-        continue;
-      }
-      MailboxSendNode sendNode = (MailboxSendNode) fragmentRoot;
-      leafStageIds.add(sendNode.getStageId());
-
-      int singletonSenderStageId = getSingletonReceiveSenderStageId(fragmentRoot);
-      if (singletonSenderStageId >= 0) {
-        // SINGLETON leaf: mark its receivers as contaminated, defer consultation decision
-        // until we know whether the sender is also a leaf.
-        for (int receiverStageId : sendNode.getReceiverStageIds()) {
-          stagesReceivingFromNonLeaf.add(receiverStageId);
-        }
-        pendingSingletonLeaves.add(new int[]{sendNode.getStageId(), singletonSenderStageId});
-      } else {
-        // Pure leaf: its receivers are consulted and its servers are tracked for EMA updates.
-        for (int receiverStageId : sendNode.getReceiverStageIds()) {
-          trustedStageIds.add(receiverStageId);
         }
         for (QueryServerInstance server : fragmentServers) {
           trackedServers.add(server.getInstanceId());
         }
+      } else if (role == FragmentType.SINGLETON_LEAF) {
+        // SINGLETON leaf with leaf sender: this stage's own stats are trusted.
+        trustedStageIds.add(planFragment.getFragmentId());
+        // Its receivers are contaminated (SINGLETON cascade).
+        if (sendNode != null) {
+          for (int receiverStageId : sendNode.getReceiverStageIds()) {
+            stagesReceivingFromNonLeaf.add(receiverStageId);
+          }
+        }
+      } else if (role == FragmentType.INTERMEDIATE && sendNode != null) {
+        // Intermediate stage: its receivers are contaminated by cascade delays.
+        for (int receiverStageId : sendNode.getReceiverStageIds()) {
+          stagesReceivingFromNonLeaf.add(receiverStageId);
+        }
+      } else if (role == null && sendNode != null) {
+        LOGGER.debug("Stage {} has null FragmentType; treating as INTERMEDIATE",
+            planFragment != null ? planFragment.getFragmentId() : "unknown");
+        for (int receiverStageId : sendNode.getReceiverStageIds()) {
+          stagesReceivingFromNonLeaf.add(receiverStageId);
+        }
       }
     }
 
-    // Resolve deferred SINGLETON leaves: only consult if their sender is also a leaf.
-    for (int[] pair : pendingSingletonLeaves) {
-      if (leafStageIds.contains(pair[1])) {
-        trustedStageIds.add(pair[0]);
-      }
-    }
-
-    // Exclude stages that receive from any non-leaf stage. Non-leaf senders may carry cascade
-    // delay from slow upstream servers, inflating per-sender timings at the receiver.
+    // Exclude stages contaminated by non-leaf/SINGLETON senders.
     trustedStageIds.removeAll(stagesReceivingFromNonLeaf);
 
-    LOGGER.debug("==[UPSTREAM_TIMING]== classifyStages: leafStageIds={} trustedStageIds={} "
-        + "trackedServers={} senderKeyToInstanceId.size={}", leafStageIds, trustedStageIds,
-        trackedServers.size(), senderKeyToInstanceId.size());
+    LOGGER.debug("==[UPSTREAM_TIMING]== classifyStages: trustedStageIds={} trackedServers={} "
+        + "senderKeyToInstanceId.size={}", trustedStageIds, trackedServers.size(), senderKeyToInstanceId.size());
 
     return new AdaptiveRoutingStageClassification(senderKeyToInstanceId, trustedStageIds, trackedServers);
-  }
-
-  /**
-   * Returns the sender stage ID of the first {@link MailboxReceiveNode} with
-   * {@link RelDistribution.Type#SINGLETON} distribution found in the plan subtree rooted at {@code node},
-   * or {@code -1} if none is found.
-   */
-  @VisibleForTesting
-  static int getSingletonReceiveSenderStageId(PlanNode node) {
-    if (node instanceof MailboxReceiveNode) {
-      MailboxReceiveNode receiveNode = (MailboxReceiveNode) node;
-      if (receiveNode.getDistributionType() == RelDistribution.Type.SINGLETON) {
-        return receiveNode.getSenderStageId();
-      }
-    }
-    for (PlanNode input : node.getInputs()) {
-      int result = getSingletonReceiveSenderStageId(input);
-      if (result >= 0) {
-        return result;
-      }
-    }
-    return -1;
   }
 }

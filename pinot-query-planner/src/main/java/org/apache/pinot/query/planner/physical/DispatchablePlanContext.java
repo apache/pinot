@@ -207,9 +207,18 @@ public class DispatchablePlanContext {
       if (dispatchablePlanMetadata.getTimeBoundaryInfo() != null) {
         dispatchablePlanFragment.setTimeBoundaryInfo(dispatchablePlanMetadata.getTimeBoundaryInfo());
       }
+
+      PlanFragment planFrag = dispatchablePlanFragment.getPlanFragment();
+      PlanNode root = planFrag != null ? planFrag.getFragmentRoot() : null;
+      FragmentType fragmentType = FragmentType.classify(root,
+          !dispatchablePlanMetadata.getScannedTables().isEmpty(), _dispatchablePlanMetadataMap);
+      if (fragmentType != null) {
+        dispatchablePlanFragment.setFragmentType(fragmentType);
+      }
     }
     return dispatchablePlanFragmentMap;
   }
+
 
   private Map<Integer, DispatchablePlanFragment> createDispatchablePlanFragmentMap(PlanFragment planFragmentRoot) {
     HashMap<Integer, DispatchablePlanFragment> result =

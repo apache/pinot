@@ -230,6 +230,18 @@ public class QueryDispatcher {
     long submitTimeMs = _clock.getAsLong();
     QueryResult result = null;
 
+    AdaptiveRoutingStageClassification classification = null;
+    if (statsManager != null) {
+      classification = AdaptiveRoutingStageClassification.classify(dispatchableSubPlan);
+      for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStagesWithoutRoot()) {
+        int stageId = fragment.getPlanFragment().getFragmentId();
+        if (classification._trustedStageIds.contains(stageId)) {
+          // Safe to mutate: plan is fresh per request (not cached) and this runs before submit() serializes.
+          fragment.getCustomProperties().put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
+        }
+      }
+    }
+
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
       // The SSE engine increments before `submit`, but here we increment after because `submit` populates
@@ -256,11 +268,8 @@ public class QueryDispatcher {
     } finally {
       if (statsManager != null) {
         Set<String> trackedServers = Set.of();
-        if (result != null && !incrementedServers.isEmpty()) {
+        if (result != null && !incrementedServers.isEmpty() && !classification._trustedStageIds.isEmpty()) {
           try {
-            // Gather all the timings we fully received.
-            AdaptiveRoutingStageClassification classification =
-                AdaptiveRoutingStageClassification.classify(dispatchableSubPlan);
             Map<String, Long> maxTimings = extractMaxTimingsPerInstance(result, classification, requestId);
             for (Map.Entry<String, Long> entry : maxTimings.entrySet()) {
               String instanceId = entry.getKey();
@@ -668,6 +677,7 @@ public class QueryDispatcher {
   private boolean isQueryCancellationEnabled() {
     return _serversByQuery != null;
   }
+
 
   /**
    * Extracts the maximum observed latency per instance from consulted stages' stats.

@@ -395,6 +395,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     protected void onMailboxSuccess(ReceivingMailbox.MseBlockWithStats element,
         AsyncStream<ReceivingMailbox.MseBlockWithStats> completedStream) {
       mergeStats(element);
+      if (_streamIdToSenderKey.isEmpty()) {
+        return;
+      }
       String senderKey = _streamIdToSenderKey.get(completedStream.getId());
       if (senderKey == null) {
         LOGGER.warn("==[UPSTREAM_TIMING]== stage {} stream {} has no senderKey mapping, skipping timing",
