@@ -1135,7 +1135,7 @@ public class CommonConstants {
       public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
       public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
       public static final String CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR =
-          CONFIG_PREFIX + ".hybrid.score.queue.size.offset";
+          CONFIG_PREFIX + ".hybrid.score.queue.size.floor";
       public static final int DEFAULT_HYBRID_SCORE_QUEUE_FLOOR = 0;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
