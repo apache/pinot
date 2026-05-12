@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.RealtimeConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -110,6 +111,12 @@ public class TableConfigSerDeUtils {
     String queryConfigString = simpleFields.get(TableConfig.QUERY_CONFIG_KEY);
     if (queryConfigString != null) {
       queryConfig = JsonUtils.stringToObject(queryConfigString, QueryConfig.class);
+    }
+
+    RealtimeConfig realtimeConfig = null;
+    String realtimeConfigString = simpleFields.get(TableConfig.REALTIME_CONFIG_KEY);
+    if (realtimeConfigString != null) {
+      realtimeConfig = JsonUtils.stringToObject(realtimeConfigString, RealtimeConfig.class);
     }
 
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = null;
@@ -198,7 +205,7 @@ public class TableConfigSerDeUtils {
         new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
             quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
             upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
-            tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
+            tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs, realtimeConfig);
     tableConfig.setDescription(description);
     tableConfig.setTags(tags);
     return tableConfig;
@@ -233,6 +240,10 @@ public class TableConfigSerDeUtils {
     QueryConfig queryConfig = tableConfig.getQueryConfig();
     if (queryConfig != null) {
       simpleFields.put(TableConfig.QUERY_CONFIG_KEY, queryConfig.toJsonString());
+    }
+    RealtimeConfig realtimeConfig = tableConfig.getRealtimeConfig();
+    if (realtimeConfig != null) {
+      simpleFields.put(TableConfig.REALTIME_CONFIG_KEY, realtimeConfig.toJsonString());
     }
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
     if (instanceAssignmentConfigMap != null) {

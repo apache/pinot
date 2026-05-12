@@ -102,6 +102,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
   SEGMENT_BUILD_FAILURE("segments", false),
+  /// Counts consuming-segment-build events where `realtimeConfig.consumingSegmentIndexConfig` could not be applied
+  /// and the server fell back to the persisted segment shape. Emitted per table.
+  CONSUMING_SEGMENT_INDEX_PROFILE_FALLBACK("events", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.

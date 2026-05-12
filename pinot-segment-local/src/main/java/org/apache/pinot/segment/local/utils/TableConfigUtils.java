@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -48,7 +49,9 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -59,6 +62,8 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.ConsumingSegmentFieldConfig;
+import org.apache.pinot.spi.config.table.ConsumingSegmentIndexConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
@@ -66,6 +71,7 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.RealtimeConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -187,6 +193,7 @@ public final class TableConfigUtils {
     }
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfigAndFieldConfigList(tableConfig, schema);
+    validateConsumingSegmentIndexConfig(tableConfig, schema);
     validateInstancePartitionsTypeMapConfig(tableConfig);
     validatePartitionedReplicaGroupInstance(tableConfig);
     validateInstanceAssignmentConfigs(tableConfig);
@@ -2123,6 +2130,323 @@ public final class TableConfigUtils {
   private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
     for (Map.Entry<String, JsonNode> cfgEntry : newCfg.properties()) {
       ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
+    }
+  }
+
+  // Top-level legacy tableIndexConfig lists that conflict with the first supported consuming profile index.
+  private static final Set<String> CONSUMING_SEGMENT_PROFILE_TOP_LEVEL_INDEX_LIST_KEYS = Set.of("invertedIndexColumns");
+  private static final String NO_DICTIONARY_CONFIG_KEY = "noDictionaryConfig";
+  private static final String NO_DICTIONARY_COLUMNS_KEY = "noDictionaryColumns";
+  private static final String INVERTED_INDEX_KEY = "inverted";
+  private static final Set<String> SUPPORTED_CONSUMING_SEGMENT_PROFILE_INDEXES = Set.of(INVERTED_INDEX_KEY);
+
+  /// Returns `true` when the table has a consuming segment index profile.
+  public static boolean hasConsumingSegmentIndexConfig(TableConfig tableConfig) {
+    return getConsumingSegmentIndexConfig(tableConfig) != null;
+  }
+
+  @Nullable
+  private static ConsumingSegmentIndexConfig getConsumingSegmentIndexConfig(TableConfig tableConfig) {
+    RealtimeConfig realtimeConfig = tableConfig.getRealtimeConfig();
+    return realtimeConfig == null ? null : realtimeConfig.getConsumingSegmentIndexConfig();
+  }
+
+  /// Returns a [TableConfig] with `realtimeConfig.consumingSegmentIndexConfig` applied to the base table config.
+  /// The returned config is intended only for building realtime mutable consuming segments. Committed segments and
+  /// immutable loads must continue to use the persisted table config, plus normal storage-tier overwrites if a real
+  /// segment tier exists.
+  ///
+  /// Merge semantics are intentionally narrow:
+  /// - `encodingType` replaces the field config encoding when present.
+  /// - `indexes` replaces the field config `indexes` tree when present; only `inverted` is supported in this first
+  ///   version.
+  /// - legacy `invertedIndexColumns` and no-dictionary config entries are scrubbed only when they contradict the
+  ///   specific consuming profile override.
+  ///
+  /// @param tableConfig original table config; not mutated
+  /// @return a new table config with the consuming profile applied, or the original config when no profile exists
+  public static TableConfig applyConsumingSegmentIndexConfig(TableConfig tableConfig) {
+    return applyConsumingSegmentIndexConfig(tableConfig, null);
+  }
+
+  private static TableConfig applyConsumingSegmentIndexConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    ConsumingSegmentIndexConfig consumingSegmentIndexConfig = getConsumingSegmentIndexConfig(tableConfig);
+    if (consumingSegmentIndexConfig == null) {
+      return tableConfig;
+    }
+    enforceConsumingSegmentIndexConfigInvariants(tableConfig, schema);
+    Set<String> indexOverrideColumns = new HashSet<>();
+    Set<String> dictionaryOverrideColumns = new HashSet<>();
+    for (ConsumingSegmentFieldConfig profileFieldConfig : consumingSegmentIndexConfig.getFieldConfigList()) {
+      String column = profileFieldConfig.getName();
+      if (profileFieldConfig.hasConfiguredIndexes()) {
+        indexOverrideColumns.add(column);
+      }
+      if (profileFieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+        dictionaryOverrideColumns.add(column);
+      }
+    }
+    try {
+      JsonNode tblCfgJson = tableConfig.toJsonNode().deepCopy();
+      Preconditions.checkState(tblCfgJson.isObject(), "Table config JSON must be an object for table: %s",
+          tableConfig.getTableName());
+      ObjectNode tblCfgObj = (ObjectNode) tblCfgJson;
+      ArrayNode fieldCfgListJson;
+      JsonNode fieldCfgListNode = tblCfgObj.get(TableConfig.FIELD_CONFIG_LIST_KEY);
+      if (fieldCfgListNode == null || fieldCfgListNode.isNull()) {
+        fieldCfgListJson = JsonUtils.newArrayNode();
+        tblCfgObj.set(TableConfig.FIELD_CONFIG_LIST_KEY, fieldCfgListJson);
+      } else {
+        Preconditions.checkState(fieldCfgListNode.isArray(),
+            "fieldConfigList must be an array in table config JSON for table: %s", tableConfig.getTableName());
+        fieldCfgListJson = (ArrayNode) fieldCfgListNode;
+      }
+
+      Map<String, ObjectNode> fieldConfigByColumn = new java.util.LinkedHashMap<>();
+      Iterator<JsonNode> fieldCfgItr = fieldCfgListJson.elements();
+      while (fieldCfgItr.hasNext()) {
+        JsonNode fieldCfgJson = fieldCfgItr.next();
+        if (!fieldCfgJson.isObject()) {
+          continue;
+        }
+        JsonNode nameNode = fieldCfgJson.get(ConsumingSegmentFieldConfig.NAME_KEY);
+        if (nameNode != null && nameNode.isTextual()) {
+          fieldConfigByColumn.put(nameNode.asText(), (ObjectNode) fieldCfgJson);
+        }
+      }
+
+      for (ConsumingSegmentFieldConfig profileFieldConfig : consumingSegmentIndexConfig.getFieldConfigList()) {
+        String column = profileFieldConfig.getName();
+        ObjectNode fieldCfgObj = fieldConfigByColumn.get(column);
+        if (fieldCfgObj == null) {
+          fieldCfgObj = JsonUtils.newObjectNode();
+          fieldCfgObj.put(ConsumingSegmentFieldConfig.NAME_KEY, column);
+          fieldCfgListJson.add(fieldCfgObj);
+          fieldConfigByColumn.put(column, fieldCfgObj);
+        }
+        FieldConfig.EncodingType encodingType = profileFieldConfig.getEncodingType();
+        if (encodingType != null) {
+          fieldCfgObj.put(ConsumingSegmentFieldConfig.ENCODING_TYPE_KEY, encodingType.name());
+        }
+        if (profileFieldConfig.hasConfiguredIndexes()) {
+          fieldCfgObj.set(ConsumingSegmentFieldConfig.INDEXES_KEY, profileFieldConfig.getIndexes().deepCopy());
+          fieldCfgObj.remove("indexType");
+          fieldCfgObj.remove("indexTypes");
+        }
+      }
+
+      JsonNode tblIdxCfgJson = tblCfgObj.get(TableConfig.INDEXING_CONFIG_KEY);
+      if (tblIdxCfgJson != null && tblIdxCfgJson.isObject()) {
+        scrubConsumingSegmentOverridesFromTableIndexConfig((ObjectNode) tblIdxCfgJson, indexOverrideColumns,
+            dictionaryOverrideColumns);
+      }
+      tblCfgObj.remove(TableConfig.REALTIME_CONFIG_KEY);
+      return JsonUtils.jsonNodeToObject(tblCfgObj, TableConfig.class);
+    } catch (IOException e) {
+      throw new IllegalStateException(
+          "Failed to apply consuming segment index config for table: " + tableConfig.getTableName(), e);
+    }
+  }
+
+  private static void scrubConsumingSegmentOverridesFromTableIndexConfig(ObjectNode tblIdxCfgObj,
+      Set<String> indexOverrideColumns, Set<String> dictionaryOverrideColumns) {
+    Iterator<Map.Entry<String, JsonNode>> entries = tblIdxCfgObj.properties().iterator();
+    while (entries.hasNext()) {
+      Map.Entry<String, JsonNode> entry = entries.next();
+      String key = entry.getKey();
+      JsonNode value = entry.getValue();
+      if (NO_DICTIONARY_CONFIG_KEY.equals(key) && value != null && value.isObject()) {
+        for (String dictionaryOverrideColumn : dictionaryOverrideColumns) {
+          ((ObjectNode) value).remove(dictionaryOverrideColumn);
+        }
+        continue;
+      }
+      Set<String> columnsToScrub;
+      if (NO_DICTIONARY_COLUMNS_KEY.equals(key)) {
+        columnsToScrub = dictionaryOverrideColumns;
+      } else if (CONSUMING_SEGMENT_PROFILE_TOP_LEVEL_INDEX_LIST_KEYS.contains(key)) {
+        columnsToScrub = indexOverrideColumns;
+      } else {
+        continue;
+      }
+      if (columnsToScrub.isEmpty()) {
+        continue;
+      }
+      if (value == null || !value.isArray() || value.isEmpty()) {
+        continue;
+      }
+      ArrayNode arr = (ArrayNode) value;
+      for (JsonNode element : arr) {
+        if (!element.isTextual()) {
+          arr = null;
+          break;
+        }
+      }
+      if (arr == null) {
+        continue;
+      }
+      List<JsonNode> kept = new ArrayList<>(arr.size());
+      for (JsonNode element : arr) {
+        if (!columnsToScrub.contains(element.asText())) {
+          kept.add(element);
+        }
+      }
+      if (kept.size() != arr.size()) {
+        ArrayNode replacement = JsonUtils.newArrayNode();
+        for (JsonNode element : kept) {
+          replacement.add(element);
+        }
+        tblIdxCfgObj.set(key, replacement);
+      }
+    }
+  }
+
+  /// Builds the [RealtimeSegmentConfig.Builder] for a mutable consuming segment, applying
+  /// `realtimeConfig.consumingSegmentIndexConfig` when present. Storage-tier overwrites are intentionally not applied
+  /// on the profile path: tier overwrites describe immutable segment storage placement/load behavior, while this
+  /// profile describes only the mutable consuming lifecycle.
+  public static RealtimeSegmentConfig.Builder buildConsumingSegmentConfigBuilder(TableConfig tableConfig,
+      Schema schema, IndexLoadingConfig indexLoadingConfig, Logger logger, @Nullable Runnable onFallback) {
+    if (hasConsumingSegmentIndexConfig(tableConfig)) {
+      try {
+        TableConfig consumingTableConfig = applyConsumingSegmentIndexConfig(tableConfig, schema);
+        Schema schemaCopy;
+        try {
+          schemaCopy = JsonUtils.jsonNodeToObject(schema.toJsonObject(), Schema.class);
+        } catch (IOException e) {
+          throw new IllegalStateException(
+              "Failed to clone schema for consuming segment index config on table: " + tableConfig.getTableName(), e);
+        }
+        IndexLoadingConfig consumingIndexLoadingConfig =
+            new IndexLoadingConfig(indexLoadingConfig.getInstanceDataManagerConfig(), consumingTableConfig, schemaCopy);
+        return new RealtimeSegmentConfig.Builder(consumingIndexLoadingConfig);
+      } catch (RuntimeException e) {
+        logger.error("Failed to apply consuming segment index config for table: {} (profile: {}); falling back to "
+                + "persisted shape for this consuming segment", tableConfig.getTableName(),
+            summarizeConsumingSegmentIndexConfig(tableConfig), e);
+        if (onFallback != null) {
+          onFallback.run();
+        }
+      }
+    }
+    return new RealtimeSegmentConfig.Builder(indexLoadingConfig);
+  }
+
+  private static String summarizeConsumingSegmentIndexConfig(TableConfig tableConfig) {
+    ConsumingSegmentIndexConfig config = getConsumingSegmentIndexConfig(tableConfig);
+    return config == null ? "{}" : config.toJsonString();
+  }
+
+  private static void validateConsumingSegmentIndexConfig(TableConfig tableConfig, Schema schema) {
+    RealtimeConfig realtimeConfig = tableConfig.getRealtimeConfig();
+    if (realtimeConfig == null) {
+      return;
+    }
+    Preconditions.checkArgument(realtimeConfig.getUnknownProperties().isEmpty(),
+        "Unknown realtimeConfig keys: %s; allowed keys: [%s]", realtimeConfig.getUnknownProperties().keySet(),
+        RealtimeConfig.CONSUMING_SEGMENT_INDEX_CONFIG_KEY);
+    ConsumingSegmentIndexConfig consumingSegmentIndexConfig = realtimeConfig.getConsumingSegmentIndexConfig();
+    if (consumingSegmentIndexConfig == null) {
+      return;
+    }
+    Set<String> profiledColumns = enforceConsumingSegmentIndexConfigInvariants(tableConfig, schema);
+    TableConfig merged = applyConsumingSegmentIndexConfig(tableConfig, schema);
+    if (merged != tableConfig) {
+      Schema schemaCopy;
+      try {
+        schemaCopy = JsonUtils.jsonNodeToObject(schema.toJsonObject(), Schema.class);
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed to clone schema while validating consuming segment index config for "
+            + "table: " + tableConfig.getTableName(), e);
+      }
+      try {
+        validateIndexingConfigAndFieldConfigList(merged, schemaCopy);
+      } catch (RuntimeException e) {
+        throw new IllegalStateException(
+            "realtimeConfig.consumingSegmentIndexConfig for columns " + profiledColumns
+                + " produces an invalid mutable consuming shape: " + e.getMessage(), e);
+      }
+    }
+  }
+
+  private static Set<String> enforceConsumingSegmentIndexConfigInvariants(TableConfig tableConfig,
+      @Nullable Schema schema) {
+    ConsumingSegmentIndexConfig consumingSegmentIndexConfig = getConsumingSegmentIndexConfig(tableConfig);
+    Preconditions.checkState(consumingSegmentIndexConfig != null,
+        "Missing consuming segment index config for table: %s", tableConfig.getTableName());
+    Preconditions.checkArgument(tableConfig.getTableType() == TableType.REALTIME,
+        "realtimeConfig.consumingSegmentIndexConfig is only supported on REALTIME tables; table %s is %s",
+        tableConfig.getTableName(), tableConfig.getTableType());
+    Preconditions.checkArgument(consumingSegmentIndexConfig.getUnknownProperties().isEmpty(),
+        "Unknown realtimeConfig.consumingSegmentIndexConfig keys: %s; allowed keys: [%s]",
+        consumingSegmentIndexConfig.getUnknownProperties().keySet(),
+        ConsumingSegmentIndexConfig.FIELD_CONFIG_LIST_KEY);
+    List<ConsumingSegmentFieldConfig> fieldConfigList = consumingSegmentIndexConfig.getFieldConfigList();
+    Preconditions.checkArgument(CollectionUtils.isNotEmpty(fieldConfigList),
+        "realtimeConfig.consumingSegmentIndexConfig.fieldConfigList must be non-empty");
+
+    Set<String> profiledColumns = new HashSet<>();
+    for (ConsumingSegmentFieldConfig fieldConfig : fieldConfigList) {
+      String column = fieldConfig.getName();
+      Preconditions.checkArgument(StringUtils.isNotBlank(column),
+          "Each consuming segment field config must provide a non-blank name");
+      Preconditions.checkArgument(profiledColumns.add(column),
+          "Duplicate consuming segment field config for column: %s", column);
+      if (schema != null) {
+        Preconditions.checkArgument(schema.getFieldSpecFor(column) != null,
+            "Consuming segment field config references unknown column: %s", column);
+      }
+      Preconditions.checkArgument(fieldConfig.getUnknownProperties().isEmpty(),
+          "Unknown consuming segment field config keys on column %s: %s; allowed keys: [%s, %s, %s]",
+          column, fieldConfig.getUnknownProperties().keySet(), ConsumingSegmentFieldConfig.NAME_KEY,
+          ConsumingSegmentFieldConfig.ENCODING_TYPE_KEY, ConsumingSegmentFieldConfig.INDEXES_KEY);
+      Preconditions.checkArgument(fieldConfig.getEncodingType() != null || fieldConfig.hasConfiguredIndexes(),
+          "Consuming segment field config for column %s must configure at least one of encodingType or indexes",
+          column);
+      if (fieldConfig.hasConfiguredIndexes()) {
+        validateConsumingSegmentProfileIndexes(column, fieldConfig.getIndexes());
+      }
+    }
+    enforceConsumingSegmentIndexConfigStructuralInvariants(tableConfig, profiledColumns);
+    return profiledColumns;
+  }
+
+  private static void validateConsumingSegmentProfileIndexes(String column, JsonNode indexes) {
+    Preconditions.checkArgument(indexes.isObject(),
+        "Consuming segment field config indexes must be a JSON object on column %s; got: %s",
+        column, indexes.getNodeType());
+    Iterator<String> indexNames = indexes.fieldNames();
+    while (indexNames.hasNext()) {
+      String indexName = indexNames.next();
+      Preconditions.checkArgument(SUPPORTED_CONSUMING_SEGMENT_PROFILE_INDEXES.contains(indexName),
+          "Unsupported consuming segment index '%s' on column %s; supported indexes: %s",
+          indexName, column, SUPPORTED_CONSUMING_SEGMENT_PROFILE_INDEXES);
+      JsonNode indexConfig = indexes.get(indexName);
+      Preconditions.checkArgument(indexConfig == null || indexConfig.isObject(),
+          "Consuming segment index '%s' on column %s must be a JSON object; got: %s",
+          indexName, column, indexConfig == null ? "null" : indexConfig.getNodeType());
+    }
+  }
+
+  private static void enforceConsumingSegmentIndexConfigStructuralInvariants(TableConfig tableConfig,
+      Set<String> profiledColumns) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null || profiledColumns.isEmpty()) {
+      return;
+    }
+    List<String> sortedColumns = indexingConfig.getSortedColumn();
+    if (sortedColumns != null) {
+      for (String sortedColumn : sortedColumns) {
+        Preconditions.checkState(!profiledColumns.contains(sortedColumn),
+            "Consuming segment index profile is not allowed on sorted column: %s", sortedColumn);
+      }
+    }
+    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null) {
+      for (String partitionColumn : segmentPartitionConfig.getColumnPartitionMap().keySet()) {
+        Preconditions.checkState(!profiledColumns.contains(partitionColumn),
+            "Consuming segment index profile is not allowed on partition column: %s", partitionColumn);
+      }
     }
   }
 

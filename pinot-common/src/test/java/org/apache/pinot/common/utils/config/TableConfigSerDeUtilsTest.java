@@ -28,11 +28,14 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
+import org.apache.pinot.spi.config.table.ConsumingSegmentFieldConfig;
+import org.apache.pinot.spi.config.table.ConsumingSegmentIndexConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
+import org.apache.pinot.spi.config.table.RealtimeConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -213,6 +216,28 @@ public class TableConfigSerDeUtilsTest {
       tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkQueryConfig(tableConfigToCompare);
+    }
+    {
+      // With realtime config
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      indexes.set("inverted", JsonUtils.newObjectNode().put("enabled", true));
+      RealtimeConfig realtimeConfig = new RealtimeConfig(new ConsumingSegmentIndexConfig(List.of(
+          new ConsumingSegmentFieldConfig("column1", FieldConfig.EncodingType.DICTIONARY, indexes))));
+      TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME)
+          .setTableName("testRealtimeTable")
+          .setRealtimeConfig(realtimeConfig)
+          .build();
+
+      checkRealtimeConfig(tableConfig);
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkRealtimeConfig(tableConfigToCompare);
+
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
+      assertEquals(tableConfigToCompare, tableConfig);
+      checkRealtimeConfig(tableConfigToCompare);
     }
     {
       // With instance assignment config
@@ -410,6 +435,7 @@ public class TableConfigSerDeUtilsTest {
     assertFalse(tableConfigJson.has(TableConfig.TASK_CONFIG_KEY));
     assertFalse(tableConfigJson.has(TableConfig.ROUTING_CONFIG_KEY));
     assertFalse(tableConfigJson.has(TableConfig.QUERY_CONFIG_KEY));
+    assertFalse(tableConfigJson.has(TableConfig.REALTIME_CONFIG_KEY));
     assertFalse(tableConfigJson.has(TableConfig.INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY));
     assertFalse(tableConfigJson.has(TableConfig.SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY));
     assertFalse(tableConfigJson.has(TableConfig.FIELD_CONFIG_LIST_KEY));
@@ -428,6 +454,23 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(tenantConfig.getServer(), "aServerTenant");
     assertEquals(tenantConfig.getBroker(), "aBrokerTenant");
     assertNull(tenantConfig.getTagOverrideConfig());
+  }
+
+  private void checkRealtimeConfig(TableConfig tableConfig) {
+    RealtimeConfig realtimeConfig = tableConfig.getRealtimeConfig();
+    assertNotNull(realtimeConfig);
+    ConsumingSegmentIndexConfig consumingSegmentIndexConfig = realtimeConfig.getConsumingSegmentIndexConfig();
+    assertNotNull(consumingSegmentIndexConfig);
+    List<ConsumingSegmentFieldConfig> fieldConfigList = consumingSegmentIndexConfig.getFieldConfigList();
+    assertNotNull(fieldConfigList);
+    assertEquals(fieldConfigList.size(), 1);
+    ConsumingSegmentFieldConfig fieldConfig = fieldConfigList.get(0);
+    assertEquals(fieldConfig.getName(), "column1");
+    assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
+    assertTrue(fieldConfig.getIndexes().has("inverted"));
+
+    ObjectNode tableConfigJson = (ObjectNode) tableConfig.toJsonNode();
+    assertTrue(tableConfigJson.has(TableConfig.REALTIME_CONFIG_KEY));
   }
 
   private void checkTenantConfigWithTagOverride(TableConfig tableConfig) {
