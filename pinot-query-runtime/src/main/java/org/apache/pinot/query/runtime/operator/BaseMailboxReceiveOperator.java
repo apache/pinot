@@ -88,7 +88,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         asyncStreams.add(asyncStream);
         _receivingStats.add(asyncStream._mailbox.getStatMap());
       }
-      Map<Object, String> streamIdToSenderKey = buildStreamIdToSenderKey(mailboxInfos, asyncStreams);
+      boolean collectTiming = "true".equals(
+          context.getOpChainMetadata().get(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY));
+      Map<Object, String> streamIdToSenderKey = collectTiming
+          ? buildStreamIdToSenderKey(mailboxInfos, asyncStreams)
+          : Map.of();
       _multiConsumer = new BlockingMultiStreamConsumer.OfMseBlock(
           context, asyncStreams, _senderStageId, streamIdToSenderKey);
     } else {
