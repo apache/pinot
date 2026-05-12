@@ -528,11 +528,10 @@ public class CommonConstants {
     /// Cluster-level default for stream-mode stats reporting. When {@code true} the broker opens a
     /// {@code SubmitWithStream} bidi RPC for every multi-stage query instead of the legacy unary Submit, enabling
     /// reliable per-operator stats delivery even on the error path. Individual queries may override this default
-    /// via the {@link Request.QueryOptionKey#USE_STREAM_STATS_REPORTING} query option. Requires all servers to
+    /// via the {@link Request.QueryOptionKey#STREAM_STATS} query option. Requires all servers to
     /// implement the {@code SubmitWithStream} RPC; enabling it on a mixed-version cluster will cause query failures.
-    public static final String CONFIG_OF_USE_STREAM_STATS_REPORTING =
-        "pinot.broker.mse.use.stream.stats.reporting";
-    public static final boolean DEFAULT_USE_STREAM_STATS_REPORTING = false;
+    public static final String CONFIG_OF_STREAM_STATS = "pinot.broker.mse.stream.stats";
+    public static final boolean DEFAULT_STREAM_STATS = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -753,7 +752,7 @@ public class CommonConstants {
          * other transport error) during dispatch, the broker cancels the query and surfaces the error to the
          * client.
          */
-        public static final String USE_STREAM_STATS_REPORTING = "useStreamStatsReporting";
+        public static final String STREAM_STATS = "streamStats";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *

@@ -42,18 +42,18 @@ import static org.testng.Assert.assertTrue;
  * Integration tests for the {@code SubmitWithStream} stats-reporting path. Verifies that:
  * <ol>
  *   <li>Queries run to completion with correct results when stream stats are enabled per-query via the
- *   {@code useStreamStatsReporting} query option.</li>
+ *   {@code streamStats} query option.</li>
  *   <li>The broker response contains a non-null {@code streamStatsCoverage} array indexed by stage id with
  *   {@code responded} &gt; 0 and {@code missing} = {@code mergeFailed} = 0 on the success path.</li>
  *   <li>An N-ary set operation (three-way UNION) produces a correct tree-shaped stats payload — regression coverage
  *   for the known loss in the legacy flat-binary / inorder format when a set op has more than two inputs.</li>
- *   <li>The cluster-level config ({@code pinot.broker.multistage.use.stream.stats.reporting}) activates stream mode
+ *   <li>The cluster-level config ({@code pinot.broker.mse.stream.stats}) activates stream mode
  *   for all queries without a per-query option.</li>
  * </ol>
  */
 public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationTestSet {
 
-  private static final String STREAM_OPTION = "useStreamStatsReporting=true";
+  private static final String STREAM_OPTION = "streamStats=true";
 
   @BeforeClass
   public void setUp()
@@ -95,7 +95,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
   // ─── helpers ──────────────────────────────────────────────────────────────────
 
   /**
-   * Posts a multi-stage query with the {@code useStreamStatsReporting=true} option.
+   * Posts a multi-stage query with the {@code streamStats=true} option.
    */
   private JsonNode postWithStreamStats(@Language("sql") String sql)
       throws Exception {
@@ -197,7 +197,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
   }
 
   /**
-   * Verifies that the cluster-level config {@code pinot.broker.multistage.use.stream.stats.reporting=true}
+   * Verifies that the cluster-level config {@code pinot.broker.mse.stream.stats=true}
    * activates stream mode for queries that do not carry the per-query option. The broker is restarted with the config
    * set for this test class via {@link #overrideBrokerConf}.
    */
@@ -205,7 +205,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
   public void testClusterLevelConfigActivatesStreamMode()
       throws Exception {
     // Post WITHOUT the per-query option — stream mode should still be active because the broker was started
-    // with CONFIG_OF_USE_STREAM_STATS_REPORTING=true in overrideBrokerConf.
+    // with CONFIG_OF_STREAM_STATS=true in overrideBrokerConf.
     @Language("sql")
     String sql = "SELECT COUNT(*) FROM mytable LIMIT 1";
     JsonNode response = postQuery(sql);
@@ -218,7 +218,7 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     // Enable stream-mode cluster-wide so testClusterLevelConfigActivatesStreamMode can run without a per-query option.
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_USE_STREAM_STATS_REPORTING, true);
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_STREAM_STATS, true);
     super.overrideBrokerConf(brokerConf);
   }
 

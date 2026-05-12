@@ -189,6 +189,93 @@ public class StreamingQuerySessionTest {
     Assert.assertEquals(merged.getLong(AggregateOperator.StatKey.EMITTED_ROWS), n);
   }
 
+  /**
+   * An opchain whose stats tree contains an operator type id absent from {@link
+   * org.apache.pinot.query.runtime.operator.OperatorTypeRegistry} (simulating a newer server carrying a plugin
+   * the broker has not installed) must not abort the query. The session marks the stage merge-failed and drains
+   * the completion latch so the query result is returned normally.
+   */
+  @Test
+  public void testDecodeFailedUnknownTypeIdDoesNotAbortQuery()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+
+    session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
+    // Type id 9999 is not in the registry — decode throws DecodeFailedException.
+    session.recordOpChainComplete(buildOpChainCompleteWithTypeId(0, 1, 9999, ByteString.EMPTY));
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+        "query should complete despite unknown operator type id");
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
+        "only the successfully decoded opchain should be counted as responded");
+    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
+        "the unknown-type opchain should be counted as merge-failed");
+    Assert.assertNotNull(coverage.getStageAccumulator().get(0),
+        "first worker's valid stats should remain in the accumulator");
+  }
+
+  /**
+   * When two workers report the same stage with incompatible tree shapes (different operator types), the second
+   * merge throws {@link StageStatsTreeNode.ShapeMismatchException}. The first worker's stats are preserved in the
+   * accumulator, the stage is marked merge-failed, and the query still completes.
+   *
+   * <p>Note: the second worker still counts toward {@code respondedByStage} because its payload decoded
+   * successfully — the failure occurred at merge time, not decode time.
+   */
+  @Test
+  public void testShapeMismatchDoesNotAbortQuery()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+
+    // Worker 0 reports AGGREGATE at stage 0; populates the accumulator.
+    session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
+
+    // Worker 1 reports HASH_JOIN at stage 0 with an empty-but-valid stat map.
+    // The type id mismatch triggers ShapeMismatchException inside merge().
+    session.recordOpChainComplete(
+        buildOpChainCompleteWithTypeId(0, 1, MultiStageOperator.Type.HASH_JOIN.getId(), emptyStatBytes()));
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+        "query should complete despite shape mismatch");
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    // Both workers decoded successfully, so both count as responded.
+    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 2,
+        "both workers decoded successfully so both count as responded");
+    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
+        "second worker's shape-mismatched opchain should be counted as merge-failed");
+    Assert.assertNotNull(coverage.getStageAccumulator().get(0),
+        "first worker's stats should remain in the accumulator after the failed merge");
+  }
+
+  /**
+   * When a stat-map payload is unreadable (truncated bytes — not enough data for even the count header), the
+   * decoder wraps the resulting {@link java.io.EOFException} as a
+   * {@link org.apache.pinot.query.runtime.plan.MultiStageStatsTreeDecoder.DecodeFailedException}. The session
+   * absorbs the failure, marks the stage merge-failed, and drains the latch. The query result is unaffected.
+   */
+  @Test
+  public void testCorruptedStatBytesDoesNotAbortQuery()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+
+    session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
+    // ByteString.EMPTY has 0 bytes; StatMap.deserialize() tries to readByte() for the count and throws
+    // EOFException, which the decoder re-throws as DecodeFailedException.
+    session.recordOpChainComplete(
+        buildOpChainCompleteWithTypeId(0, 1, MultiStageOperator.Type.AGGREGATE.getId(), ByteString.EMPTY));
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+        "query should complete despite corrupted stat bytes");
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
+        "only the successfully decoded opchain should be counted as responded");
+    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
+        "the opchain with corrupted stat bytes should be counted as merge-failed");
+    Assert.assertNotNull(coverage.getStageAccumulator().get(0),
+        "first worker's valid stats should remain in the accumulator");
+  }
+
   // ---- helpers ----
 
   private static Worker.OpChainComplete buildOpChainComplete(int stageId, int workerId, int planNodeId, long emitted)
@@ -218,6 +305,29 @@ public class StreamingQuerySessionTest {
         .setSuccess(false)
         .setErrorMsg(errorMsg)
         .build();
+  }
+
+  private static Worker.OpChainComplete buildOpChainCompleteWithTypeId(
+      int stageId, int workerId, int typeId, ByteString statBytes) {
+    Worker.StageStatsNode rootNode = Worker.StageStatsNode.newBuilder()
+        .setOperatorTypeId(typeId)
+        .setStatMap(statBytes)
+        .build();
+    return Worker.OpChainComplete.newBuilder()
+        .setStageId(stageId)
+        .setWorkerId(workerId)
+        .setSuccess(true)
+        .setStats(Worker.MultiStageStatsTree.newBuilder()
+            .setCurrentStageId(stageId)
+            .setCurrentStage(rootNode)
+            .build())
+        .build();
+  }
+
+  /** Serialised empty {@link StatMap} — one zero byte representing zero entries. */
+  private static ByteString emptyStatBytes()
+      throws IOException {
+    return serialize(new StatMap<>(AggregateOperator.StatKey.class));
   }
 
   private static ByteString serialize(StatMap<?> statMap)

@@ -166,7 +166,7 @@ public class QueryDispatcher {
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
-    if (QueryOptionsUtils.isUseStreamStatsReporting(queryOptions, false)) {
+    if (QueryOptionsUtils.isStreamStats(queryOptions, false)) {
       return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions);
     }
     long requestId = context.getRequestId();
@@ -206,7 +206,7 @@ public class QueryDispatcher {
   /// stats before building the final result.
   ///
   /// <b>Mixed-version policy.</b> No automatic fallback to the unary {@link #submit} path. Enabling
-  /// {@link CommonConstants.Broker.Request.QueryOptionKey#USE_STREAM_STATS_REPORTING} requires every server in the
+  /// {@link CommonConstants.Broker.Request.QueryOptionKey#STREAM_STATS} requires every server in the
   /// cluster to implement {@code SubmitWithStream}; if any server returns {@code UNIMPLEMENTED} or any other
   /// transport error during dispatch, {@link #submitWithStream} surfaces the throwable through the ack queue,
   /// {@link #processResults} throws, and this method fans out cancel via the session before propagating the failure.

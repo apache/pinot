@@ -140,7 +140,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
-  private final boolean _useStreamStatsReporting;
+  private final boolean _streamStats;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -206,9 +206,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _enableQueryFingerprinting = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
-    _useStreamStatsReporting = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_USE_STREAM_STATS_REPORTING,
-        CommonConstants.Broker.DEFAULT_USE_STREAM_STATS_REPORTING);
+    _streamStats = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
+        CommonConstants.Broker.DEFAULT_STREAM_STATS);
   }
 
   @Override
@@ -658,10 +658,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // Inject the cluster-default stream-stats mode unless the query already overrides it.
       Map<String, String> effectiveOptions = query.getOptions();
-      if (_useStreamStatsReporting && !effectiveOptions.containsKey(
-          CommonConstants.Broker.Request.QueryOptionKey.USE_STREAM_STATS_REPORTING)) {
+      if (_streamStats && !effectiveOptions.containsKey(
+          CommonConstants.Broker.Request.QueryOptionKey.STREAM_STATS)) {
         effectiveOptions = new HashMap<>(effectiveOptions);
-        effectiveOptions.put(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAM_STATS_REPORTING, "true");
+        effectiveOptions.put(CommonConstants.Broker.Request.QueryOptionKey.STREAM_STATS, "true");
       }
 
       QueryDispatcher.QueryResult queryResults;

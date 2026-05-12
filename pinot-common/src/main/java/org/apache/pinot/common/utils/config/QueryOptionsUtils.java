@@ -529,11 +529,11 @@ public class QueryOptionsUtils {
   }
 
   /**
-   * Reads the {@code useStreamStatsReporting} query option that opts a single query into the {@code SubmitWithStream}
-   * dispatch path. See {@link QueryOptionKey#USE_STREAM_STATS_REPORTING}.
+   * Reads the {@code streamStats} query option that opts a single query into the {@code SubmitWithStream}
+   * dispatch path. See {@link QueryOptionKey#STREAM_STATS}.
    */
-  public static boolean isUseStreamStatsReporting(Map<String, String> queryOptions, boolean defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.USE_STREAM_STATS_REPORTING);
+  public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.STREAM_STATS);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
