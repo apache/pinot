@@ -142,7 +142,7 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
    * and refreshes the killing strategy if scan-killing-related keys changed.
    */
   @Override
-  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+  public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     QueryMonitorConfig updated = new QueryMonitorConfig(_configRef.get(), changedConfigs, clusterConfigs);
     _configRef.set(updated);
     rebuildStrategy();
@@ -154,8 +154,15 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
    */
   public void checkAndKillIfNeeded(QueryExecutionContext executionContext, QueryScanCostContext scanCostContext) {
     Object cached = executionContext.getCachedKillingStrategy();
-    QueryKillingStrategy cachedStrategy =
-        (cached instanceof QueryKillingStrategy) ? (QueryKillingStrategy) cached : null;
+    QueryKillingStrategy cachedStrategy;
+    if (cached instanceof QueryKillingStrategy) {
+      cachedStrategy = (QueryKillingStrategy) cached;
+    } else {
+      if (cached != null) {
+        LOGGER.warn("Unexpected cached killing strategy type: {}", cached.getClass().getName());
+      }
+      cachedStrategy = null;
+    }
     checkAndKillIfNeeded(executionContext, scanCostContext, cachedStrategy,
         executionContext.getQueryId(), executionContext.getTableName());
   }
@@ -213,7 +220,8 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
 
   private void checkAndKillIfNeeded(QueryExecutionContext executionContext, QueryScanCostContext scanCostContext,
       @Nullable QueryKillingStrategy cachedStrategy, @Nullable String queryId, @Nullable String tableName) {
-    QueryKillingStrategy strategy = cachedStrategy != null ? cachedStrategy : _strategy;
+    QueryKillingStrategy currentStrategy = _strategy;
+    QueryKillingStrategy strategy = cachedStrategy != null ? cachedStrategy : currentStrategy;
     if (strategy == null) {
       return;
     }
@@ -226,7 +234,7 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     }
     String resolvedQueryId = queryId != null ? queryId : "unknown";
     String resolvedTableName = tableName != null ? tableName : "unknown";
-    String configSource = (cachedStrategy != null && cachedStrategy != _strategy) ? "table:" + resolvedTableName
+    String configSource = (cachedStrategy != null && cachedStrategy != currentStrategy) ? "table:" + resolvedTableName
         : "cluster";
     try {
       checkAndKillWithStrategy(executionContext, scanCostContext, strategy, configSource, resolvedQueryId,

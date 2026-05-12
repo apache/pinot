@@ -65,15 +65,18 @@ public class QueryExecutionContext {
 
   private volatile TerminationException _terminateException;
 
-  // Scan-based query killing (set per-query when killing is enabled)
+  /// Per-query scan cost accumulators for scan-based killing, tracking cumulative scan cost across all segments.
   @Nullable
-  private QueryScanCostContext _queryScanCostContext;
+  private volatile QueryScanCostContext _queryScanCostContext;
+
   @Nullable
-  private Object _cachedKillingStrategy;
+  private volatile Object _cachedKillingStrategy;
+
   @Nullable
-  private String _tableName;
+  private volatile String _tableName;
+
   @Nullable
-  private String _queryId;
+  private volatile String _queryId;
 
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {

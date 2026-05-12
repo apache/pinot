@@ -53,7 +53,6 @@ import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.query.QueryScanCostContext;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -377,11 +376,5 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);
-  }
-
-  @javax.annotation.Nullable
-  private static QueryScanCostContext getScanCostContext() {
-    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
-    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

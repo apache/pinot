@@ -98,12 +98,6 @@ public class DocIdSetOperator extends BaseDocIdSetOperator {
     }
   }
 
-  @javax.annotation.Nullable
-  private static QueryScanCostContext getScanCostContext() {
-    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
-    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
-  }
-
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;

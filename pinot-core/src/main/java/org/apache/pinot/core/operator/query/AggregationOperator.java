@@ -36,7 +36,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 import org.apache.pinot.spi.query.QueryScanCostContext;
-import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -126,11 +125,5 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
     attributeBuilder.putStringList("aggregations", aggregations);
-  }
-
-  @javax.annotation.Nullable
-  private static QueryScanCostContext getScanCostContext() {
-    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
-    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }
