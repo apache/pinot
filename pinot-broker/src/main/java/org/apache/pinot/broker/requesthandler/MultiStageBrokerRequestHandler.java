@@ -588,6 +588,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 
+    // TODO: Short-circuit here if all segments are pruned like SSE does. Currently fully-pruned queries still
+    // dispatch intermediate stages to servers.
+
     // Optionally set ignoreMissingSegments query option based on broker config if not already set.
     if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
         CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
