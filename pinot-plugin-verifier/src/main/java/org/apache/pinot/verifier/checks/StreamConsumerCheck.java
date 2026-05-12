@@ -35,6 +35,7 @@ public final class StreamConsumerCheck implements Check {
   /// {@code plugins/pinot-stream-ingestion/<name>}.
   private static final Map<String, String> CONSUMERS = new LinkedHashMap<>() {{
     put("pinot-kafka-3.0", "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
+    put("pinot-kafka-4.0", "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");
     put("pinot-kinesis", "org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory");
     put("pinot-pulsar", "org.apache.pinot.plugin.stream.pulsar.PulsarConsumerFactory");
   }};

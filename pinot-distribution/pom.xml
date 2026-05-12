@@ -54,6 +54,14 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kafka-4.0</artifactId>
+      <version>${project.version}</version>
+      <classifier>plugin</classifier>
+      <type>zip</type>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-kinesis</artifactId>
       <version>${project.version}</version>
       <classifier>plugin</classifier>

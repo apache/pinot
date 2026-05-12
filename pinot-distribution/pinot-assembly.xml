@@ -87,6 +87,7 @@
       <scope>provided</scope>
       <includes>
         <include>org.apache.pinot:pinot-kafka-3.0:zip:plugin</include>
+        <include>org.apache.pinot:pinot-kafka-4.0:zip:plugin</include>
         <include>org.apache.pinot:pinot-kinesis:zip:plugin</include>
         <include>org.apache.pinot:pinot-pulsar:zip:plugin</include>
         <include>org.apache.pinot:pinot-batch-ingestion-standalone:zip:plugin</include>
