@@ -54,13 +54,13 @@ public class UrlAuthProvider implements AuthProvider {
   }
 
   public UrlAuthProvider(AuthConfig authConfig) {
+    _header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
+    _prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Bearer");
+    Object urlValue = authConfig.getProperties().get(URL);
+    if (urlValue == null) {
+      throw new IllegalArgumentException("Missing required auth config property: " + URL);
+    }
     try {
-      _header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
-      _prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Bearer");
-      Object urlValue = authConfig.getProperties().get(URL);
-      if (urlValue == null) {
-        throw new IllegalArgumentException("Missing required auth config property: " + URL);
-      }
       _url = new URL(urlValue.toString());
     } catch (MalformedURLException e) {
       throw new IllegalArgumentException(e);
