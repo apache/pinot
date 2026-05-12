@@ -1027,41 +1027,36 @@ public abstract class BaseTableDataManager implements TableDataManager {
       boolean forceDownload)
       throws Exception {
     String segmentName = segmentDataManager.getSegmentName();
-    _segmentReloadSemaphore.acquire(segmentName, _logger);
-    try {
-      if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-        // Use force commit to reload consuming segment
-        if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
-          // Force-committing consuming segments is restricted only for tables with inconsistent state configs
-          // (partial-upsert or dropOutOfOrderRecord=true with replication > 1).
-          // For these tables, winner selection could incorrectly favor replicas with fewer consumed rows,
-          // triggering unnecessary reconsumption and resulting in inconsistent upsert state.
-          // To enable force commit for such tables, change the cluster config
-          // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload.
-          TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-          ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
-          boolean isTableTypeInconsistentDuringConsumption =
-              TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
-          // Allow force commit if:
-          // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
-          // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
-          if (tableConfig == null || (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed())) {
-            _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
-                + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
-          } else {
-            _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-            ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-          }
+    if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+      // Use force commit to reload consuming segment
+      if (_instanceDataManagerConfig.shouldReloadConsumingSegment()) {
+        // Force-committing consuming segments is restricted only for tables with inconsistent state configs
+        // (partial-upsert or dropOutOfOrderRecord=true with replication > 1).
+        // For these tables, winner selection could incorrectly favor replicas with fewer consumed rows,
+        // triggering unnecessary reconsumption and resulting in inconsistent upsert state.
+        // To enable force commit for such tables, change the cluster config
+        // `pinot.server.consuming.segment.consistency.mode` to PROTECTED for safer reload.
+        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+        ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
+        boolean isTableTypeInconsistentDuringConsumption =
+            TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
+        // Allow force commit if:
+        // 1. Table doesn't have inconsistent configs (non-upsert or standard upsert tables), OR
+        // 2. Consistency mode is PROTECTED or UNSAFE (isForceCommitAllowed = true)
+        if (tableConfig == null || (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed())) {
+          _logger.warn("Skipping reload (force commit) on consuming segment: {} due to inconsistent state config. "
+              + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
         } else {
-          _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
+          _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
         }
       } else {
-        SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
-        SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-        reloadSegment(segmentName, indexLoadingConfig, zkMetadata, localMetadata, forceDownload);
+        _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
       }
-    } finally {
-      _segmentReloadSemaphore.release();
+    } else {
+      SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
+      SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
+      reloadSegment(segmentName, indexLoadingConfig, zkMetadata, localMetadata, forceDownload);
     }
   }
 
@@ -1076,68 +1071,74 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
-      /*
-      Determines if a segment should be downloaded from deep storage based on:
-      1. A forced download flag.
-      2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
-         between ZK metadata and local metadata CRC.
-         - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
-           and the segment is available in deep storage or with a peer before discarding
-           the local copy.
+      _segmentReloadSemaphore.acquire(segmentName, _logger);
+      try {
+        /*
+        Determines if a segment should be downloaded from deep storage based on:
+        1. A forced download flag.
+        2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
+           between ZK metadata and local metadata CRC.
+           - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
+             and the segment is available in deep storage or with a peer before discarding
+             the local copy.
 
-      Otherwise:
-      - Copy the backup directory back to the original index directory.
-      - Continue loading the segment from the index directory.
-      */
-      boolean shouldDownload =
-          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
-              && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
-      if (shouldDownload) {
-        // Create backup directory to handle failure of segment reloading.
-        createBackup(indexDir);
-        if (forceDownload) {
-          _logger.info("Force downloading segment: {}", segmentName);
+        Otherwise:
+        - Copy the backup directory back to the original index directory.
+        - Continue loading the segment from the index directory.
+        */
+        boolean shouldDownload =
+            forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
+                && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
+        if (shouldDownload) {
+          // Create backup directory to handle failure of segment reloading.
+          createBackup(indexDir);
+          if (forceDownload) {
+            _logger.info("Force downloading segment: {}", segmentName);
+          } else {
+            _logger.info("Downloading segment: {} because its CRC has changed from: {} to: {}", segmentName,
+                localMetadata.getCrc(), zkMetadata.getCrc());
+          }
+          indexDir = downloadSegment(zkMetadata);
         } else {
-          _logger.info("Downloading segment: {} because its CRC has changed from: {} to: {}", segmentName,
-              localMetadata.getCrc(), zkMetadata.getCrc());
+          _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
+              TierConfigUtils.normalizeTierName(segmentTier));
+          SegmentDirectory segmentDirectory =
+              initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+          // We should first try to reuse existing segment directory
+          if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
+            _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed",
+                segmentName);
+            // No reprocessing needed, reuse the same segment
+            ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
+            addSegment(segment, zkMetadata);
+            return;
+          }
+          // Create backup directory to handle failure of segment reloading.
+          createBackup(indexDir);
+          // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
+          // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
+          // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
+          try {
+            segmentDirectory.copyTo(indexDir);
+          } finally {
+            segmentDirectory.close();
+          }
         }
-        indexDir = downloadSegment(zkMetadata);
-      } else {
-        _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
-            TierConfigUtils.normalizeTierName(segmentTier));
-        SegmentDirectory segmentDirectory =
-            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
-        // We should first try to reuse existing segment directory
-        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
-          _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
-          // No reprocessing needed, reuse the same segment
-          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
-          addSegment(segment, zkMetadata);
-          return;
-        }
-        // Create backup directory to handle failure of segment reloading.
-        createBackup(indexDir);
-        // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
-        // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
-        // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
-        try {
-          segmentDirectory.copyTo(indexDir);
-        } finally {
-          segmentDirectory.close();
-        }
+
+        // Load from indexDir and replace the old segment in memory. What's inside indexDir
+        // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
+        indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+        _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
+            TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
+        ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
+            _segmentOperationsThrottlerSet, zkMetadata);
+        addSegment(segment, zkMetadata);
+
+        // Remove backup directory to mark the completion of segment reloading.
+        removeBackup(indexDir);
+      } finally {
+        _segmentReloadSemaphore.release();
       }
-
-      // Load from indexDir and replace the old segment in memory. What's inside indexDir
-      // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
-      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-      _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
-          TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
-          _segmentOperationsThrottlerSet, zkMetadata);
-      addSegment(segment, zkMetadata);
-
-      // Remove backup directory to mark the completion of segment reloading.
-      removeBackup(indexDir);
     } catch (Exception reloadFailureException) {
       try {
         LoaderUtils.reloadFailureRecovery(indexDir);
@@ -1923,7 +1924,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   // CRC check can be performed on both segment CRC and data CRC (if available) based on the ZK property value of
   // useDataCRC.
-  protected static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
+  public static boolean hasSameCRC(SegmentZKMetadata zkMetadata, SegmentMetadata localMetadata) {
     if (zkMetadata.getCrc() == Long.parseLong(localMetadata.getCrc())) {
       return true;
     }
