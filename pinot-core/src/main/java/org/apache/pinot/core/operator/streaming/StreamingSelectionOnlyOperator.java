@@ -37,7 +37,6 @@ import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.query.QueryScanCostContext;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -167,11 +166,5 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
         numTotalDocs);
-  }
-
-  @javax.annotation.Nullable
-  private static QueryScanCostContext getScanCostContext() {
-    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
-    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

@@ -19,7 +19,9 @@
 package org.apache.pinot.core.query.killing;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.accounting.QueryMonitorConfig;
@@ -293,6 +295,126 @@ public class QueryKillingManagerTest {
     configRef.set(config2);
     manager.rebuildStrategy();
     assertNotNull(manager.getActiveStrategy(), "After config update, strategy should be built");
+  }
+
+  // --- onChange (dynamic config reload) ---
+
+  @Test
+  public void testOnChangeRebuildsStrategy() {
+    // Start with killing disabled
+    QueryMonitorConfig disabledConfig = buildConfig("disabled", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(disabledConfig);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+    assertNull(manager.getActiveStrategy(), "Strategy should be null when disabled");
+
+    // Simulate cluster config change enabling killing with enforce mode + threshold
+    Set<String> changedKeys = new HashSet<>();
+    changedKeys.add(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
+    changedKeys.add(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
+    clusterConfigs.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "500");
+
+    manager.onChange(changedKeys, clusterConfigs);
+    assertNotNull(manager.getActiveStrategy(),
+        "Strategy should be rebuilt after onChange enables killing");
+  }
+
+  @Test
+  public void testOnChangeDisablesStrategy() {
+    // Start with killing enabled
+    QueryMonitorConfig enabledConfig = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(enabledConfig);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+    assertNotNull(manager.getActiveStrategy(), "Strategy should be active when enabled");
+
+    // Simulate cluster config change to disable killing
+    Set<String> changedKeys = new HashSet<>();
+    changedKeys.add(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "disabled");
+
+    manager.onChange(changedKeys, clusterConfigs);
+    assertNull(manager.getActiveStrategy(),
+        "Strategy should be null after onChange disables killing");
+  }
+
+  // --- Convenience overload (2-arg checkAndKillIfNeeded) ---
+
+  @Test
+  public void testConvenienceOverloadKillsViaCachedStrategy() {
+    // Create a manager with killing enabled, threshold = 50 for entries scanned
+    QueryMonitorConfig config = buildConfig("enforce", 50L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    // Resolve the per-query strategy and cache it on the execution context
+    QueryKillingStrategy resolvedStrategy = manager.resolveQueryStrategy(null);
+    assertNotNull(resolvedStrategy);
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    execCtx.setTableName("testTable_OFFLINE");
+    execCtx.setQueryId("conv-q1");
+    execCtx.setCachedKillingStrategy(resolvedStrategy);
+
+    // Create scan cost exceeding the threshold
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(100L); // Above threshold of 50
+
+    // Use the 2-arg convenience overload
+    manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    assertNotNull(execCtx.getTerminateException(),
+        "Query should be terminated via cached strategy when threshold is exceeded");
+  }
+
+  @Test
+  public void testConvenienceOverloadNullScanCostContextNoOp() {
+    // When the manager's strategy is null (disabled), calling with null scanCostContext is a no-op.
+    // In production, BaseOperator guards against null scanCostContext before calling the manager.
+    // Here we verify the manager's early-return when disabled.
+    QueryMonitorConfig config = buildConfig("disabled", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    // No queryScanCostContext set on execCtx — mirrors the real scenario where
+    // scan-based killing is not initialized for this query.
+
+    // The 2-arg overload with null scanCostContext is safe when strategy is null (disabled)
+    manager.checkAndKillIfNeeded(execCtx, null);
+    assertNull(execCtx.getTerminateException(),
+        "No exception should be set when killing is disabled and scanCostContext is null");
+  }
+
+  // --- resolveQueryStrategy ---
+
+  @Test
+  public void testResolveQueryStrategyReturnsNullWhenDisabled() {
+    QueryMonitorConfig config = buildConfig("disabled", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryKillingStrategy resolved = manager.resolveQueryStrategy(null);
+    assertNull(resolved, "resolveQueryStrategy should return null when killing is disabled");
+  }
+
+  @Test
+  public void testResolveQueryStrategyReturnsStrategyWhenEnabled() {
+    QueryMonitorConfig config = buildConfig("enforce", 200L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryKillingStrategy resolved = manager.resolveQueryStrategy(null);
+    assertNotNull(resolved, "resolveQueryStrategy should return a strategy when killing is enabled");
+    assertTrue(resolved instanceof ScanEntriesThresholdStrategy);
   }
 
   // --- Test fixtures for pluggable strategy ---

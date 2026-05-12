@@ -59,7 +59,15 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
 
   protected void checkTermination() {
     QueryThreadContext.checkTermination(this::getExplainName);
-    // Scan-based query killing check
+    checkScanBasedKilling();
+  }
+
+  protected void checkTerminationAndSampleUsage() {
+    QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName);
+    checkScanBasedKilling();
+  }
+
+  private void checkScanBasedKilling() {
     QueryKillingManager killingManager = QueryKillingManager.getInstance();
     if (killingManager != null) {
       QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
@@ -77,8 +85,10 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     }
   }
 
-  protected void checkTerminationAndSampleUsage() {
-    QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName);
+  @javax.annotation.Nullable
+  protected static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 
   protected List<ExplainInfo> getChildrenExplainInfo() {
