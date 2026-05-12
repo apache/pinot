@@ -19,6 +19,7 @@
 package org.apache.pinot.server.api;
 
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.testng.Assert;
@@ -82,5 +83,24 @@ public class TableSizeResourceTest extends BaseResourceTest {
     Assert.assertEquals(tableSizeInfo.getSegments().get(0).getSegmentName(), segment.getSegmentName());
     Assert.assertEquals(tableSizeInfo.getSegments().get(0).getDiskSizeInBytes(), segment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.getDiskSizeInBytes(), segment.getSegmentSizeBytes());
+  }
+
+  @Test
+  public void testTableSizeDetailedCompressionStatsDisabled() {
+    String path = "/tables/" + OFFLINE_TABLE_NAME + "/size";
+    TableSizeInfo tableSizeInfo =
+        _webTarget.path(path).queryParam("detailed", "true").request().get(TableSizeInfo.class);
+
+    Assert.assertNotNull(tableSizeInfo);
+    Assert.assertTrue(tableSizeInfo.getDiskSizeInBytes() > 0,
+        "Table disk size should be greater than 0");
+
+    Assert.assertNotNull(tableSizeInfo.getSegments(), "Segments list should not be null");
+    for (SegmentSizeInfo segmentSizeInfo : tableSizeInfo.getSegments()) {
+      Assert.assertNull(segmentSizeInfo.getColumnCompressionStats(),
+          "columnCompressionStats should be null when compressionStatsEnabled is false");
+      // tier should always be tracked regardless of the compression stats flag
+      Assert.assertNotNull(segmentSizeInfo.getSegmentName(), "Segment name should not be null");
+    }
   }
 }
