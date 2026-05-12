@@ -47,6 +47,7 @@ public enum QueryErrorCode {
   SERVER_SEGMENT_MISSING(235, "ServerSegmentMissing", Response.Status.NOT_FOUND),
   QUERY_SCHEDULING_TIMEOUT(240, "QuerySchedulingTimeoutError", Response.Status.REQUEST_TIMEOUT),
   SERVER_RESOURCE_LIMIT_EXCEEDED(245, "ServerResourceLimitExceededError", Response.Status.SERVICE_UNAVAILABLE),
+  QUERY_SCAN_LIMIT_EXCEEDED(246, "QueryScanLimitExceededError", Response.Status.BAD_REQUEST),
   EXECUTION_TIMEOUT(250, "ExecutionTimeoutError", Response.Status.REQUEST_TIMEOUT),
   BROKER_SEGMENT_UNAVAILABLE(305, "", Response.Status.SERVICE_UNAVAILABLE),
   BROKER_TIMEOUT(400, "BrokerTimeoutError", Response.Status.REQUEST_TIMEOUT),

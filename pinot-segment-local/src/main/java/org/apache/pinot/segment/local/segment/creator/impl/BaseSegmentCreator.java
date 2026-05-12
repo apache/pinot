@@ -342,7 +342,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
     C config = fieldIndexConfigs.getConfig(index);
-    if (config.isEnabled()) {
+    if (config.isEnabled() && index.shouldCreateIndex(context, config)) {
+      //noinspection resource
       creatorsByIndex.put(index, index.createIndexCreator(context, config));
     }
   }
@@ -370,6 +371,19 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    // If any enabled index requires a dictionary for this column, create one regardless of the user's
+    // explicit dictionary setting or the optimizeDictionary heuristics — the alternative is segment
+    // creation failure (e.g., inverted index can't be built without a dict) or silent index loss
+    // (FST/IFST expect a dictionary).
+    boolean dictionaryRequired = DictionaryIndexConfig.requiresDictionary(spec, fieldIndexConfigs);
+    if (dictionaryRequired) {
+      if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+        LOGGER.warn("Column: {} has dictionary disabled but required by indexes: {}; creating dictionary anyway",
+            column, DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(spec, fieldIndexConfigs));
+      }
+      return true;
+    }
+
     if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
       return false;
     }

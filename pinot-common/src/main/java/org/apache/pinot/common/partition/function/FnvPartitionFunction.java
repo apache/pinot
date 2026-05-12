@@ -16,76 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Stateless and thread-safe {@link PartitionFunction} backed by configurable FNV variants.
- */
+/// Stateless and thread-safe [PartitionFunction] backed by configurable FNV variants. The
+/// configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#MASK]) is applied
+/// to the raw FNV hash to derive the partition id.
 public class FnvPartitionFunction implements PartitionFunction {
   private static final String NAME = "FNV";
   private static final String VARIANT_KEY = "variant";
   private static final String USE_RAW_BYTES_KEY = "useRawBytes";
-  private static final String NEGATIVE_PARTITION_HANDLING_KEY = "negativePartitionHandling";
   private static final FnvHashFunctions.Variant DEFAULT_VARIANT = FnvHashFunctions.Variant.FNV1A_32;
-  private static final NegativePartitionHandling DEFAULT_NEGATIVE_PARTITION_HANDLING =
-      NegativePartitionHandling.MASK;
+  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.MASK;
 
   private final int _numPartitions;
   @Nullable
   private final Map<String, String> _functionConfig;
   private final FnvHashFunctions.Variant _variant;
   private final boolean _useRawBytes;
-  private final NegativePartitionHandling _negativePartitionHandling;
+  private final PartitionIdNormalizer _normalizer;
 
-  private enum NegativePartitionHandling {
-    MASK,
-    ABS;
-
-    private static final String ALLOWED_HANDLINGS = "mask or abs";
-
-    public static NegativePartitionHandling fromString(String value) {
-      if (value == null) {
-        throw invalidHandlingException(null);
-      }
-      try {
-        return valueOf(value.trim().toUpperCase(Locale.ROOT));
-      } catch (IllegalArgumentException e) {
-        throw invalidHandlingException(value);
-      }
-    }
-
-    public int getPartition(int hash, int numPartitions) {
-      if (this == MASK) {
-        return (hash & Integer.MAX_VALUE) % numPartitions;
-      }
-      int partition = hash % numPartitions;
-      return partition < 0 ? -partition : partition;
-    }
-
-    public int getPartition(long hash, int numPartitions) {
-      if (this == MASK) {
-        return (int) ((hash & Long.MAX_VALUE) % numPartitions);
-      }
-      long partition = hash % numPartitions;
-      return (int) (partition < 0 ? -partition : partition);
-    }
-  }
-
-  /**
-   * Builds a new FNV partition function from the provided configuration.
-   */
   public FnvPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
@@ -93,21 +55,16 @@ public class FnvPartitionFunction implements PartitionFunction {
 
     FnvHashFunctions.Variant variant = DEFAULT_VARIANT;
     boolean useRawBytes = false;
-    NegativePartitionHandling negativePartitionHandling = DEFAULT_NEGATIVE_PARTITION_HANDLING;
     if (functionConfig != null) {
       String variantString = functionConfig.get(VARIANT_KEY);
       if (StringUtils.isNotBlank(variantString)) {
         variant = FnvHashFunctions.Variant.fromString(variantString);
       }
       useRawBytes = Boolean.parseBoolean(functionConfig.get(USE_RAW_BYTES_KEY));
-      String negativePartitionHandlingString = functionConfig.get(NEGATIVE_PARTITION_HANDLING_KEY);
-      if (StringUtils.isNotBlank(negativePartitionHandlingString)) {
-        negativePartitionHandling = NegativePartitionHandling.fromString(negativePartitionHandlingString);
-      }
     }
     _variant = variant;
     _useRawBytes = useRawBytes;
-    _negativePartitionHandling = negativePartitionHandling;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
@@ -116,12 +73,12 @@ public class FnvPartitionFunction implements PartitionFunction {
     if (_variant.is64Bit()) {
       long hash = _variant == FnvHashFunctions.Variant.FNV1_64 ? FnvHashFunctions.fnv1Hash64(bytes)
           : FnvHashFunctions.fnv1aHash64(bytes);
-      return _negativePartitionHandling.getPartition(hash, _numPartitions);
+      return _normalizer.getPartitionId(hash, _numPartitions);
     }
 
     int hash = _variant == FnvHashFunctions.Variant.FNV1_32 ? FnvHashFunctions.fnv1Hash32(bytes)
         : FnvHashFunctions.fnv1aHash32(bytes);
-    return _negativePartitionHandling.getPartition(hash, _numPartitions);
+    return _normalizer.getPartitionId(hash, _numPartitions);
   }
 
   @Override
@@ -140,19 +97,14 @@ public class FnvPartitionFunction implements PartitionFunction {
     return _functionConfig;
   }
 
+  @Override
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    return _normalizer;
+  }
+
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
-  }
-
-  private static IllegalArgumentException invalidHandlingException(@Nullable String value) {
-    return new IllegalArgumentException(
-        "FNV negative partition handling must be " + NegativePartitionHandling.ALLOWED_HANDLINGS + ", but was: "
-            + formatValue(value));
-  }
-
-  private static String formatValue(@Nullable String value) {
-    return value == null ? "null" : "'" + value + "'";
   }
 }

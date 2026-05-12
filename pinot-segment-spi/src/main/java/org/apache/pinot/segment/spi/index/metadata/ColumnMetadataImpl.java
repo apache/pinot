@@ -571,7 +571,11 @@ public class ColumnMetadataImpl implements ColumnMetadata {
         _lengthOfShortestElement = size;
         _lengthOfLongestElement = size;
       } else {
-        if (_lengthOfLongestElement < 0 && _dictionaryElementSize > 0) {
+        // Pre-1.6.0 segments don't write LENGTH_OF_LONGEST_ELEMENT; fall back to DICTIONARY_ELEMENT_SIZE,
+        // which has been written for dictionary-encoded columns since well before 1.6.0 (including the
+        // zero-length case where every entry is an empty string). Leaving the field at the UNAVAILABLE
+        // sentinel would propagate as `numBytesPerValue = -1` into BaseImmutableDictionary.getBuffer().
+        if (_lengthOfLongestElement < 0 && _hasDictionary) {
           _lengthOfLongestElement = _dictionaryElementSize;
         }
       }

@@ -1874,6 +1874,57 @@ public class CommonConstants {
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
+
+    // Scan-based query killing
+    public enum ScanKillingMode {
+      DISABLED("disabled"),
+      LOG_ONLY("logOnly"),
+      ENFORCE("enforce");
+
+      private final String _configValue;
+
+      ScanKillingMode(String configValue) {
+        _configValue = configValue;
+      }
+
+      public String getConfigValue() {
+        return _configValue;
+      }
+
+      /**
+       * Parses a config string into a {@link ScanKillingMode}. Case-insensitive.
+       * Returns {@code null} if the value is not recognized.
+       */
+      public static ScanKillingMode fromConfigValue(String value) {
+        if (value == null) {
+          return null;
+        }
+        for (ScanKillingMode mode : values()) {
+          if (mode._configValue.equalsIgnoreCase(value)) {
+            return mode;
+          }
+        }
+        return null;
+      }
+    }
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MODE = "accounting.scan.based.killing.mode";
+    public static final ScanKillingMode DEFAULT_SCAN_BASED_KILLING_MODE = ScanKillingMode.DISABLED;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME =
+        "accounting.scan.based.killing.strategy.factory.class.name";
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.in.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED =
+        "accounting.scan.based.killing.max.docs.scanned";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.post.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER = Long.MAX_VALUE;
   }
 
   public static class ExecutorService {

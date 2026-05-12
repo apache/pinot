@@ -25,7 +25,9 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -40,7 +42,13 @@ public class IdentifierTransformFunction implements TransformFunction {
 
   public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
     _columnName = columnName;
-    _dictionary = columnContext.getDictionary();
+    DataSource dataSource = columnContext.getDataSource();
+    assert dataSource != null;
+    // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
+    // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
+    // BlockValueSet.getDictionaryIdsSV requires a dict-encoded forward index.
+    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+    _dictionary = forwardIndex != null && forwardIndex.isDictionaryEncoded() ? dataSource.getDictionary() : null;
     _resultMetadata =
         new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
   }

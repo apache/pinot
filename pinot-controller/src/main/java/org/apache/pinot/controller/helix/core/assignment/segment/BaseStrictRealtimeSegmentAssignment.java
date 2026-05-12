@@ -103,7 +103,7 @@ public abstract class BaseStrictRealtimeSegmentAssignment extends RealtimeSegmen
    * partition. We try to derive the partition id from segment name to avoid ZK reads.
    */
   @Nullable
-  private Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
+  protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
     List<String> uploadedSegments = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       // Skip OFFLINE segments as they are not rebalanced, so their assignment in idealState can be stale.

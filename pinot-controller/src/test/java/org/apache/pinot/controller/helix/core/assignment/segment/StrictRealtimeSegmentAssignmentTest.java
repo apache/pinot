@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
@@ -133,6 +134,10 @@ public class StrictRealtimeSegmentAssignmentTest {
   }
 
   private static SegmentAssignment createSegmentAssignment(String tableType) {
+    return createSegmentAssignment(tableType, createHelixManager());
+  }
+
+  private static SegmentAssignment createSegmentAssignment(String tableType, HelixManager helixManager) {
     TableConfigBuilder builder = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setNumReplicas(NUM_REPLICAS)
         .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
@@ -146,7 +151,7 @@ public class StrictRealtimeSegmentAssignmentTest {
       tableConfig = builder.setDedupConfig(new DedupConfig()).build();
     }
     SegmentAssignment segmentAssignment =
-        SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
+        SegmentAssignmentFactory.getSegmentAssignment(helixManager, tableConfig, null);
     assertSegmentAssignmentType(segmentAssignment, tableType);
     return segmentAssignment;
   }
@@ -387,6 +392,76 @@ public class StrictRealtimeSegmentAssignmentTest {
     }
   }
 
+  /**
+   * Verifies the MultiTierStrictRealtimeSegmentAssignment override picks the LATEST LLC segment (highest sequence
+   * number) for the partition rather than the first one encountered, so a new CONSUMING segment is aligned with the
+   * current location of the partition after a rebalance.
+   */
+  @Test
+  public void testMultiTierAssignSegmentUsesLatestExistingAssignment() {
+    SegmentAssignment segmentAssignment = createSegmentAssignment("dedup");
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+
+    // Pre-seed currentAssignment for partition 0 with two segments:
+    //   - older sequence (seq 0) on the OLD CONSUMING instances (ONLINE),
+    //   - newer sequence (seq 1) on the NEW CONSUMING instances (CONSUMING).
+    // Picking the FIRST entry would return the old instances and cause the new CONSUMING segment to land on stale
+    // instances; picking the LATEST returns the new instances, which matches what new instancePartitions decides.
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    String olderSegment = _segments.get(0); // partition 0, sequence 0
+    String latestSegment = _segments.get(4); // partition 0, sequence 1
+    List<String> oldInstances = Arrays.asList(CONSUMING_INSTANCES.get(0), CONSUMING_INSTANCES.get(3),
+        CONSUMING_INSTANCES.get(6));
+    List<String> newInstances = Arrays.asList(NEW_CONSUMING_INSTANCES.get(0), NEW_CONSUMING_INSTANCES.get(3),
+        NEW_CONSUMING_INSTANCES.get(6));
+    currentAssignment.put(olderSegment, SegmentAssignmentUtils.getInstanceStateMap(oldInstances,
+        SegmentStateModel.ONLINE));
+    currentAssignment.put(latestSegment, SegmentAssignmentUtils.getInstanceStateMap(newInstances,
+        SegmentStateModel.CONSUMING));
+
+    // Now assign the next CONSUMING segment for partition 0 (sequence 2). With the override picking the latest
+    // existing segment, idealAssignment matches the candidate decided by new instancePartitions, so we end up on
+    // the new instances.
+    String nextSegment = _segments.get(8); // partition 0, sequence 2
+    List<String> instancesAssigned =
+        segmentAssignment.assignSegment(nextSegment, currentAssignment, newConsumingInstancePartitionMap);
+    assertEquals(instancesAssigned, newInstances);
+  }
+
+  /**
+   * Verifies the MultiTierStrictRealtimeSegmentAssignment override returns null when the latest LLC segment for the
+   * partition has been moved to a tier (ZK metadata getTier() != null). In that case the existing assignment must not
+   * be reused because tiered segments live on a different instance pool than CONSUMING segments.
+   */
+  @Test
+  public void testMultiTierAssignSegmentSkipsExistingWhenLatestOnTier() {
+    String olderSegment = _segments.get(0); // partition 0, sequence 0
+    String tieredSegment = _segments.get(4); // partition 0, sequence 1 — marked as tiered
+    HelixManager helixManager = createHelixManager(Collections.singleton(tieredSegment));
+    SegmentAssignment segmentAssignment = createSegmentAssignment("dedup", helixManager);
+
+    Map<InstancePartitionsType, InstancePartitions> newConsumingInstancePartitionMap =
+        Map.of(InstancePartitionsType.CONSUMING, _newConsumingInstancePartitions);
+
+    Map<String, Map<String, String>> currentAssignment = new TreeMap<>();
+    // Older segment still on the original consuming instances.
+    currentAssignment.put(olderSegment, SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList(CONSUMING_INSTANCES.get(0), CONSUMING_INSTANCES.get(3), CONSUMING_INSTANCES.get(6)),
+        SegmentStateModel.ONLINE));
+    // Latest segment has been moved to a cold tier (lives on different instances that we don't even reuse here).
+    currentAssignment.put(tieredSegment, SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList("coldTier_server_0", "coldTier_server_1", "coldTier_server_2"),
+        SegmentStateModel.ONLINE));
+
+    String nextSegment = _segments.get(8); // partition 0, sequence 2
+    List<String> instancesAssigned =
+        segmentAssignment.assignSegment(nextSegment, currentAssignment, newConsumingInstancePartitionMap);
+    // Override returned null -> assignSegment falls back to the assignment decided by new instancePartitions.
+    assertEquals(instancesAssigned, Arrays.asList(NEW_CONSUMING_INSTANCES.get(0), NEW_CONSUMING_INSTANCES.get(3),
+        NEW_CONSUMING_INSTANCES.get(6)));
+  }
+
   private void addToAssignment(Map<String, Map<String, String>> currentAssignment, int segmentId,
       List<String> instancesAssigned) {
     // Change the state of the last segment in the same partition from CONSUMING to ONLINE if exists
@@ -404,12 +479,20 @@ public class StrictRealtimeSegmentAssignmentTest {
   }
 
   private static HelixManager createHelixManager() {
+    return createHelixManager(Set.of());
+  }
+
+  private static HelixManager createHelixManager(Set<String> tieredSegments) {
     HelixManager helixManager = mock(HelixManager.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(propertyStore.get(anyString(), eq(null), eq(AccessOption.PERSISTENT))).thenAnswer(invocation -> {
       String path = invocation.getArgument(0, String.class);
       String segmentName = path.substring(path.lastIndexOf('/') + 1);
-      return new ZNRecord(segmentName);
+      ZNRecord record = new ZNRecord(segmentName);
+      if (tieredSegments.contains(segmentName)) {
+        record.setSimpleField(Segment.TIER, "coldTier");
+      }
+      return record;
     });
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     return helixManager;

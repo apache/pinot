@@ -16,29 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 
-/**
- * Hash code partition function, where:
- * <ul>
- *   <li> partitionId = value.hashCode() % {@link #_numPartitions}</li>
- * </ul>
- */
-public class HashCodePartitionFunction implements PartitionFunction {
-  private static final String NAME = "HashCode";
+/// Modulo operation based partition function. Treats the input string as a base-10 long and runs
+/// the configured [PartitionIdNormalizer] (default [PartitionIdNormalizer#POSITIVE_MODULO])
+/// over it.
+public class ModuloPartitionFunction implements PartitionFunction {
+  private static final String NAME = "Modulo";
+  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.POSITIVE_MODULO;
   private final int _numPartitions;
+  private final PartitionIdNormalizer _normalizer;
 
-  public HashCodePartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+  public ModuloPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
   public int getPartition(String value) {
-    return abs(value.hashCode()) % _numPartitions;
+    return _normalizer.getPartitionId(Long.parseLong(value), _numPartitions);
   }
 
   @Override
@@ -51,14 +55,14 @@ public class HashCodePartitionFunction implements PartitionFunction {
     return _numPartitions;
   }
 
+  @Override
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    return _normalizer;
+  }
+
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
-  }
-
-  // NOTE: This matches the Utils.abs() in Kafka
-  private static int abs(int n) {
-    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }

@@ -62,8 +62,9 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
     return to;
   }
 
+  @Nullable
   private Object convert(@Nullable String value) {
-    if (value == null || StringUtils.isEmpty(value)) {
+    if (StringUtils.isEmpty(value)) {
       return null;
       // NOTE about CSV behavior for empty string e.g. foo,bar,,zoo or foo,bar,"",zoo. These both are equivalent to a
       // CSVParser

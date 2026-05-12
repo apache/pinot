@@ -780,8 +780,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * If no specific tables are targeted (i.e., "schedule for every table"), the check iterates the full
    * table list so that per-table opt-outs are still honored.
    */
-  @VisibleForTesting
-  boolean shouldUseConcurrentPath(TaskSchedulingContext context) {
+  protected boolean shouldUseConcurrentPath(TaskSchedulingContext context) {
     Set<String> targetTables = context.getTablesToSchedule();
     Set<String> targetDatabases = context.getDatabasesToSchedule();
     Set<String> consolidatedTables = new HashSet<>();
@@ -814,8 +813,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Resolves the effective concurrent-scheduling flag for a single table: table-level override if
    * set, otherwise the cluster-level default.
    */
-  @VisibleForTesting
-  boolean resolveConcurrentScheduling(TableConfig tableConfig) {
+  protected boolean resolveConcurrentScheduling(TableConfig tableConfig) {
     TableTaskConfig taskConfig = tableConfig.getTaskConfig();
     if (taskConfig != null) {
       Boolean tableFlag = taskConfig.getConcurrentSchedulingEnabled();

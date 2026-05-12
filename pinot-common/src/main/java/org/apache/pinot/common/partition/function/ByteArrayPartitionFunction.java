@@ -16,34 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionIdNormalizer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-/**
- * Implementation of {@link Byte array partitioner}
- *
- */
+/// [PartitionFunction] that hashes the input via [Arrays#hashCode(byte\[\])] of the value
+/// bytes and runs the configured [PartitionIdNormalizer] (default
+/// [PartitionIdNormalizer#PRE_MODULO_ABS], the Pre-modulo abs (Kafka-style) `abs(hash) % N` that maps
+/// `Integer.MIN_VALUE -> 0`) to derive the partition id.
 public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final String NAME = "ByteArray";
+  private static final PartitionIdNormalizer DEFAULT_NORMALIZER = PartitionIdNormalizer.PRE_MODULO_ABS;
   private final int _numPartitions;
+  private final PartitionIdNormalizer _normalizer;
 
-  /**
-   * Constructor for the class.
-   * @param numPartitions Number of partitions
-   */
-  public ByteArrayPartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+  public ByteArrayPartitionFunction(int numPartitions, @Nullable Map<String, String> functionConfig) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, was: %s", numPartitions);
     _numPartitions = numPartitions;
+    _normalizer = PartitionFunctionConfigs.normalizer(functionConfig, DEFAULT_NORMALIZER);
   }
 
   @Override
   public int getPartition(String value) {
-    return abs(Arrays.hashCode(value.getBytes(UTF_8))) % _numPartitions;
+    return _normalizer.getPartitionId(Arrays.hashCode(value.getBytes(UTF_8)), _numPartitions);
   }
 
   @Override
@@ -56,14 +59,14 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
     return _numPartitions;
   }
 
+  @Override
+  public PartitionIdNormalizer getPartitionIdNormalizer() {
+    return _normalizer;
+  }
+
   // Keep it for backward-compatibility, use getName() instead
   @Override
   public String toString() {
     return NAME;
-  }
-
-  // NOTE: This matches the Utils.abs() in Kafka
-  private static int abs(int n) {
-    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }

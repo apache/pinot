@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
@@ -112,10 +113,12 @@ public abstract class BaseIndexHandler implements IndexHandler {
     FieldIndexConfigs fieldIndexConfig = _fieldIndexConfigs.get(columnName);
     boolean dictionaryEnabled = fieldIndexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
     ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
+    boolean dictionaryBasedForwardIndex = forwardIndexConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY;
 
     InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex, _tableConfig.getTableName(),
+            dictionaryBasedForwardIndex, forwardIndexConfig, segmentWriter, isTemporaryForwardIndex,
+            _tableConfig.getTableName(),
             _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError());
     creator.regenerateForwardIndex();
     // Validate that the forward index is created.

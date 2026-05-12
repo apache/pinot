@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.partition;
+package org.apache.pinot.common.partition.function;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.hash.FnvHashFunctions;
@@ -443,9 +445,10 @@ public class PartitionFunctionTest {
     assertEquals(partitionFunction.getNumPartitions(), numPartitions);
 
     JsonNode jsonNode = JsonUtils.objectToJsonNode(partitionFunction);
-    assertEquals(jsonNode.size(), 3);
+    assertEquals(jsonNode.size(), 4);
     assertEquals(jsonNode.get("name").asText().toLowerCase(), functionName.toLowerCase());
     assertEquals(jsonNode.get("numPartitions").asInt(), numPartitions);
+    assertTrue(jsonNode.has("partitionIdNormalizer"));
 
     JsonNode functionConfigNode = jsonNode.get("functionConfig");
     if (functionConfig == null) {
@@ -502,7 +505,7 @@ public class PartitionFunctionTest {
 
     // initialized {@link MurmurPartitionFunction} with 5 partitions
     int numPartitions = 5;
-    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions);
+    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions, null);
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
@@ -618,7 +621,7 @@ public class PartitionFunctionTest {
     assertEquals(new FnvPartitionFunction(numPartitions, null).getPartition(value), javaCompatiblePartition);
 
     Map<String, String> functionConfig = new HashMap<>();
-    functionConfig.put("negativePartitionHandling", "abs");
+    functionConfig.put("partitionIdNormalizer", "abs");
     assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), saramaCompatPartition);
   }
 
@@ -636,19 +639,19 @@ public class PartitionFunctionTest {
     functionConfig.put("variant", "fnv1a_64");
     assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), javaCompatiblePartition);
 
-    functionConfig.put("negativePartitionHandling", "abs");
+    functionConfig.put("partitionIdNormalizer", "abs");
     assertEquals(new FnvPartitionFunction(numPartitions, functionConfig).getPartition(value), saramaCompatPartition);
   }
 
   @Test
   public void testFnvPartitionFunctionRejectsInvalidNegativePartitionHandling() {
     Map<String, String> functionConfig = new HashMap<>();
-    functionConfig.put("negativePartitionHandling", "saramaCompat");
+    functionConfig.put("partitionIdNormalizer", "saramaCompat");
 
     IllegalArgumentException exception =
         expectThrows(IllegalArgumentException.class, () -> new FnvPartitionFunction(4, functionConfig));
-    assertEquals(exception.getMessage(),
-        "FNV negative partition handling must be mask or abs, but was: 'saramaCompat'");
+    assertTrue(exception.getMessage().contains("saramaCompat"),
+        "Expected error to mention the offending value, was: " + exception.getMessage());
   }
 
   @Test
@@ -768,7 +771,7 @@ public class PartitionFunctionTest {
 
     // initialized {@link ByteArrayPartitionFunction} with 5 partitions
     int numPartitions = 5;
-    ByteArrayPartitionFunction byteArrayPartitionFunction = new ByteArrayPartitionFunction(numPartitions);
+    ByteArrayPartitionFunction byteArrayPartitionFunction = new ByteArrayPartitionFunction(numPartitions, null);
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import java.math.BigDecimal;
+
+
 /**
  * Support for RoaringBitmap inverted index:
  * <pre>
@@ -92,6 +95,11 @@ public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreato
   }
 
   @Override
+  default void addBigDecimal(BigDecimal value, int dictId) {
+    add(dictId);
+  }
+
+  @Override
   default void addString(String value, int dictId) {
     add(dictId);
   }
@@ -118,6 +126,11 @@ public interface DictionaryBasedInvertedIndexCreator extends InvertedIndexCreato
 
   @Override
   default void addDoubleMV(double[] values, int[] dictIds) {
+    add(dictIds, dictIds.length);
+  }
+
+  @Override
+  default void addBigDecimalMV(BigDecimal[] values, int[] dictIds) {
     add(dictIds, dictIds.length);
   }
 

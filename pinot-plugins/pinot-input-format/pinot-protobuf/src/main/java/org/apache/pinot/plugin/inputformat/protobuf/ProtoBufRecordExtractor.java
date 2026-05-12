@@ -31,22 +31,20 @@ import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/// Extracts Pinot [GenericRow] from a ProtoBuf [Message]. Conversion is dispatched directly off the field's
-/// [Descriptors.FieldDescriptor] (`isMapField` / `isRepeated` / `getJavaType`) — no [BaseRecordExtractor#convert]
-/// pipeline, no per-value wrapper allocation.
+/// Extracts Pinot [GenericRow] from a ProtoBuf [Message].
 ///
 /// **Proto source type → Java input → Java output type:**
-/// - proto `bool` → `Boolean` → `Boolean`
-/// - proto `int32` / `sint32` / `sfixed32` / `uint32` / `fixed32` → `Integer` → `Integer`
-/// - proto `int64` / `sint64` / `sfixed64` / `uint64` / `fixed64` → `Long` → `Long`
-/// - proto `float` → `Float` → `Float`
-/// - proto `double` → `Double` → `Double`
-/// - proto `string` → `String` → `String`
-/// - proto `bytes` → [ByteString] → `byte[]` (via [ByteString#toByteArray])
-/// - proto `enum` → [Descriptors.EnumValueDescriptor] → enum constant name `String`
-/// - proto nested `message` → [Message] → `Map<String, Object>` (recursive over the message's set fields)
-/// - proto `repeated X` → `List<X>` → `Object[]` (each element recursively converted)
-/// - proto `map<K, V>` → `Map<K, V>` → `Map<String, Object>` (keys stringified via
+/// - `bool` → `Boolean` → `Boolean`
+/// - `int32` / `sint32` / `sfixed32` / `uint32` / `fixed32` → `Integer` → `Integer`
+/// - `int64` / `sint64` / `sfixed64` / `uint64` / `fixed64` → `Long` → `Long`
+/// - `float` → `Float` → `Float`
+/// - `double` → `Double` → `Double`
+/// - `string` → `String` → `String`
+/// - `bytes` → [ByteString] → `byte[]` (via [ByteString#toByteArray])
+/// - `enum` → [Descriptors.EnumValueDescriptor] → enum constant name `String`
+/// - `message` → [Message] → `Map<String, Object>` (recursive over the message's set fields)
+/// - `repeated X` → `List<X>` → `Object[]` (each element recursively converted)
+/// - `map<K, V>` → `Map<K, V>` → `Map<String, Object>` (keys stringified via
 ///   [BaseRecordExtractor#stringifyMapKey], values recursively converted)
 /// - proto3 `optional` field that is unset / cleared → `null`
 public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
