@@ -267,14 +267,14 @@ public class ForwardIndexHandlerCompressionStatsTest {
     assertTrue(dictIntMeta.hasDictionary());
     assertNull(dictIntMeta.getCompressionCodec(),
         "Dictionary column should not have compression codec in metadata");
-    assertEquals(dictIntMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(dictIntMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Dictionary column should not have uncompressed forward index size");
 
     ColumnMetadata dictStringMeta = metadata.getColumnMetadataFor(DICT_STRING_COL);
     assertTrue(dictStringMeta.hasDictionary());
     assertNull(dictStringMeta.getCompressionCodec(),
         "Dictionary string column should not have compression codec");
-    assertEquals(dictStringMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(dictStringMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Dictionary string column should not have uncompressed forward index size");
   }
 
@@ -384,7 +384,7 @@ public class ForwardIndexHandlerCompressionStatsTest {
     assertTrue(dictMeta.hasDictionary(), "Column should now have dictionary");
     assertNull(dictMeta.getCompressionCodec(),
         "Compression codec should be cleared after raw-to-dict conversion");
-    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Uncompressed forward index size should be cleared after raw-to-dict conversion");
   }
 }
