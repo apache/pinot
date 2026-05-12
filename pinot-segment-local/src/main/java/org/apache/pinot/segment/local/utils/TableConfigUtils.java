@@ -48,7 +48,9 @@ import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -134,6 +136,12 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
+  private static final String CONSUMING_SEGMENT_TIER = "consuming";
+  private static final Set<String> CONSUMING_SEGMENT_TIER_INDEXING_CONFIG_KEYS = ImmutableSet.of(
+      "invertedIndexColumns", "rangeIndexColumns", "rangeIndexVersion", "jsonIndexColumns", "jsonIndexConfigs",
+      "sortedColumn", "bloomFilterColumns", "bloomFilterConfigs", "noDictionaryColumns", "noDictionaryConfig",
+      "onHeapDictionaryColumns", "varLengthDictionaryColumns", "optimizeDictionary", "optimizeDictionaryForMetrics",
+      "optimizeDictionaryType", "noDictionarySizeRatioThreshold", "noDictionaryCardinalityRatioThreshold");
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -187,6 +195,7 @@ public final class TableConfigUtils {
     }
     validateTierConfigList(tableConfig.getTierConfigsList());
     validateIndexingConfigAndFieldConfigList(tableConfig, schema);
+    validateConsumingTierOverwrites(tableConfig, schema);
     validateInstancePartitionsTypeMapConfig(tableConfig);
     validatePartitionedReplicaGroupInstance(tableConfig);
     validateInstanceAssignmentConfigs(tableConfig);
@@ -2124,6 +2133,121 @@ public final class TableConfigUtils {
     for (Map.Entry<String, JsonNode> cfgEntry : newCfg.properties()) {
       ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
     }
+  }
+
+  public static boolean isConsumingSegmentTier(@Nullable String tier) {
+    return CONSUMING_SEGMENT_TIER.equals(tier);
+  }
+
+  public static boolean isSyntheticConsumingSegmentTier(@Nullable TableConfig tableConfig, @Nullable String tier) {
+    return isConsumingSegmentTier(tier) && !hasTierConfig(tableConfig, tier);
+  }
+
+  private static void validateConsumingTierOverwrites(TableConfig tableConfig, Schema schema) {
+    if (tableConfig.getTableType() != TableType.REALTIME
+        || !hasTierOverwritesForTier(tableConfig, CONSUMING_SEGMENT_TIER)
+        || hasTierConfig(tableConfig, CONSUMING_SEGMENT_TIER)) {
+      return;
+    }
+    validateConsumingTierOverwriteScope(tableConfig);
+    TableConfig consumingTableConfig = overwriteTableConfigForTier(tableConfig, CONSUMING_SEGMENT_TIER);
+    Preconditions.checkState(consumingTableConfig != tableConfig,
+        "Failed to apply tierOverwrites.%s for table: %s", CONSUMING_SEGMENT_TIER, tableConfig.getTableName());
+    try {
+      validateIndexingConfigAndFieldConfigList(consumingTableConfig, schema);
+    } catch (RuntimeException e) {
+      throw new IllegalStateException(
+          "tierOverwrites." + CONSUMING_SEGMENT_TIER + " produces an invalid mutable consuming segment config: "
+              + e.getMessage(), e);
+    }
+  }
+
+  private static void validateConsumingTierOverwriteScope(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig == null) {
+      return;
+    }
+    JsonNode consumingIndexingOverwrite = getTierOverwrite(indexingConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+    if (consumingIndexingOverwrite == null) {
+      return;
+    }
+    Preconditions.checkState(consumingIndexingOverwrite.isObject(),
+        "tableIndexConfig.tierOverwrites.%s must be a JSON object", CONSUMING_SEGMENT_TIER);
+    Iterator<String> keys = consumingIndexingOverwrite.fieldNames();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      Preconditions.checkState(CONSUMING_SEGMENT_TIER_INDEXING_CONFIG_KEYS.contains(key),
+          "Unsupported tableIndexConfig.tierOverwrites.%s key: %s; supported keys: %s", CONSUMING_SEGMENT_TIER,
+          key, CONSUMING_SEGMENT_TIER_INDEXING_CONFIG_KEYS);
+    }
+  }
+
+  /// Builds the [RealtimeSegmentConfig.Builder] for a mutable consuming segment. If the table config contains
+  /// `tierOverwrites.consuming` under `tableIndexConfig` or a `fieldConfigList` entry, the builder is created from the
+  /// existing tier-overwrite view for that synthetic tier. Only index-loading settings are supported for
+  /// `tableIndexConfig.tierOverwrites.consuming`; settings that control row shape or ingestion behavior must stay on
+  /// the persisted table config. If `consuming` is already configured as a real storage tier, storage-tier semantics
+  /// take precedence for backward compatibility. The original [IndexLoadingConfig] is left untouched so the commit path
+  /// and immutable segment load path continue to use the persisted table config and real segment tier.
+  public static RealtimeSegmentConfig.Builder buildConsumingSegmentConfigBuilder(TableConfig tableConfig, Schema schema,
+      IndexLoadingConfig indexLoadingConfig) {
+    if (!hasTierOverwritesForTier(tableConfig, CONSUMING_SEGMENT_TIER)
+        || hasTierConfig(tableConfig, CONSUMING_SEGMENT_TIER)) {
+      return new RealtimeSegmentConfig.Builder(indexLoadingConfig);
+    }
+    TableConfig consumingTableConfig = overwriteTableConfigForTier(tableConfig, CONSUMING_SEGMENT_TIER);
+    if (consumingTableConfig == tableConfig) {
+      return new RealtimeSegmentConfig.Builder(indexLoadingConfig);
+    }
+    Schema schemaCopy;
+    try {
+      schemaCopy = JsonUtils.jsonNodeToObject(schema.toJsonObject(), Schema.class);
+    } catch (IOException e) {
+      throw new IllegalStateException(
+          "Failed to clone schema while applying consuming tier overrides for table: " + tableConfig.getTableName(), e);
+    }
+    IndexLoadingConfig consumingIndexLoadingConfig =
+        new IndexLoadingConfig(indexLoadingConfig.getInstanceDataManagerConfig(), consumingTableConfig, schemaCopy);
+    return new RealtimeSegmentConfig.Builder(consumingIndexLoadingConfig);
+  }
+
+  private static boolean hasTierOverwritesForTier(TableConfig tableConfig, String tier) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null && hasTierOverwrite(indexingConfig.getTierOverwrites(), tier)) {
+      return true;
+    }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList == null) {
+      return false;
+    }
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      if (hasTierOverwrite(fieldConfig.getTierOverwrites(), tier)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasTierConfig(@Nullable TableConfig tableConfig, String tier) {
+    if (tableConfig == null || tableConfig.getTierConfigsList() == null) {
+      return false;
+    }
+    for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+      if (tier.equals(tierConfig.getName())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasTierOverwrite(@Nullable JsonNode tierOverwrites, String tier) {
+    JsonNode tierOverwrite = getTierOverwrite(tierOverwrites, tier);
+    return tierOverwrite != null && !tierOverwrite.isNull();
+  }
+
+  @Nullable
+  private static JsonNode getTierOverwrite(@Nullable JsonNode tierOverwrites, String tier) {
+    return tierOverwrites != null && tierOverwrites.isObject() ? tierOverwrites.get(tier) : null;
   }
 
   /**

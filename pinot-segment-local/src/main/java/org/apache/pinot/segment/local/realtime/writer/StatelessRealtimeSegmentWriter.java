@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -180,9 +181,11 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     File statsHistoryFile = new File(tableDataDir, SEGMENT_STATS_FILE_NAME);
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsHistoryFile);
 
-    // Initialize mutable segment with configurations
+    // Initialize mutable segment with configurations.
     IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        TableConfigUtils.buildConsumingSegmentConfigBuilder(_tableConfig, _schema, indexLoadingConfig);
+    realtimeSegmentConfigBuilder
         .setTableNameWithType(_tableNameWithType)
         .setSegmentName(_segmentName)
         .setStreamName(_streamConfig.getTopicName())

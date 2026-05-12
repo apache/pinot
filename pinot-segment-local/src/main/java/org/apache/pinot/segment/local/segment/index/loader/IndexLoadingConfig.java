@@ -221,7 +221,9 @@ public class IndexLoadingConfig {
   }
 
   private TableConfig getTableConfigWithTierOverwrites() {
-    return (_segmentTier == null || _tableConfig == null) ? _tableConfig
+    return (_segmentTier == null || _tableConfig == null
+        || TableConfigUtils.isSyntheticConsumingSegmentTier(_tableConfig, _segmentTier))
+        ? _tableConfig
         : TableConfigUtils.overwriteTableConfigForTier(_tableConfig, _segmentTier);
   }
 

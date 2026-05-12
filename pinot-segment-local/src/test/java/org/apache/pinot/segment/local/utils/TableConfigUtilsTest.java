@@ -1104,6 +1104,16 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    // `consuming` remains valid as a real storage tier name for backward compatibility
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setStreamConfigs(getStreamConfigs())
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("consuming", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "consuming_tag_REALTIME", null, null)))
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
     // fixedSegmentSelector
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setTierConfigList(Lists.newArrayList(

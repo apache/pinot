@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -32,6 +33,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -155,6 +157,72 @@ public class IndexLoadingConfigTest {
     assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.bloomFilter()).isEnabled());
     assertFalse(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
+  }
+
+  @Test
+  public void testSyntheticConsumingTierIsNotAppliedAsStorageTier()
+      throws IOException {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+            .build();
+    FieldConfig col1Cfg = JsonUtils.stringToObject("{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"RAW\","
+        + "  \"tierOverwrites\": {"
+        + "    \"consuming\": {"
+        + "      \"encodingType\": \"DICTIONARY\","
+        + "      \"indexes\": {"
+        + "        \"inverted\": {\"enabled\": \"true\"}"
+        + "      }"
+        + "    }"
+        + "  }"
+        + "}", FieldConfig.class);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(List.of("col1"))
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"consuming\": {\"noDictionaryColumns\": []}}"))
+        .setFieldConfigList(List.of(col1Cfg))
+        .build();
+
+    IndexLoadingConfig ilc = new IndexLoadingConfig(tableConfig, schema);
+    ilc.setSegmentTier("consuming");
+
+    FieldIndexConfigs fieldCfgs = ilc.getFieldIndexConfig("col1");
+    assertFalse(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
+    assertFalse(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
+  }
+
+  @Test
+  public void testRealConsumingStorageTierIsAppliedAsStorageTier()
+      throws IOException {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+            .build();
+    FieldConfig col1Cfg = JsonUtils.stringToObject("{"
+        + "  \"name\": \"col1\","
+        + "  \"encodingType\": \"RAW\","
+        + "  \"tierOverwrites\": {"
+        + "    \"consuming\": {"
+        + "      \"encodingType\": \"DICTIONARY\","
+        + "      \"indexes\": {"
+        + "        \"inverted\": {\"enabled\": \"true\"}"
+        + "      }"
+        + "    }"
+        + "  }"
+        + "}", FieldConfig.class);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(List.of("col1"))
+        .setTierOverwrites(JsonUtils.stringToJsonNode("{\"consuming\": {\"noDictionaryColumns\": []}}"))
+        .setFieldConfigList(List.of(col1Cfg))
+        .setTierConfigList(List.of(new TierConfig("consuming", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "consuming_tag_REALTIME", null, null)))
+        .build();
+
+    IndexLoadingConfig ilc = new IndexLoadingConfig(tableConfig, schema);
+    ilc.setSegmentTier("consuming");
+
+    FieldIndexConfigs fieldCfgs = ilc.getFieldIndexConfig("col1");
+    assertTrue(fieldCfgs.getConfig(StandardIndexes.dictionary()).isEnabled());
+    assertTrue(fieldCfgs.getConfig(StandardIndexes.inverted()).isEnabled());
   }
 
   @Test
