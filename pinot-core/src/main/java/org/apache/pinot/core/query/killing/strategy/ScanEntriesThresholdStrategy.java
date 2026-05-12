@@ -65,7 +65,7 @@ public class ScanEntriesThresholdStrategy implements QueryKillingStrategy {
 
   @Override
   public QueryKillReport buildKillReport(QueryScanCostContext ctx,
-      String queryId, String tableName, String configSource) {
+      long requestId, String queryId, String tableName, String configSource) {
     String triggeringMetric;
     long actualValue;
     long thresholdValue;
@@ -79,7 +79,7 @@ public class ScanEntriesThresholdStrategy implements QueryKillingStrategy {
       actualValue = ctx.getNumDocsScanned();
       thresholdValue = _maxDocsScanned;
     }
-    return new QueryKillReport(queryId, tableName, STRATEGY_NAME,
+    return new QueryKillReport(requestId, queryId, tableName, STRATEGY_NAME,
         triggeringMetric, actualValue, thresholdValue, configSource, ctx);
   }
 

@@ -28,6 +28,8 @@ import org.apache.pinot.core.operator.DocIdOrderedOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -70,6 +72,10 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
       IntFunction<Object[]> rowFetcher = fetchBlock(valueBlock, blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+      }
       for (int i = 0; i < numDocsFetched; i++) {
         if (listBuilder.add(rowFetcher.apply(i))) {
           return listBuilder.build();
@@ -87,5 +93,11 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
   @Override
   protected String getUpperCaseExplainName() {
     return EXPLAIN_NAME;
+  }
+
+  @javax.annotation.Nullable
+  private static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

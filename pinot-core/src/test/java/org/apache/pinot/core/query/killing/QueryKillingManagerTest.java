@@ -308,8 +308,8 @@ public class QueryKillingManagerTest {
 
     @Override
     public QueryKillReport buildKillReport(QueryScanCostContext context,
-        String queryId, String tableName, String configSource) {
-      return new QueryKillReport(queryId, tableName, "AlwaysKillStrategy",
+        long requestId, String queryId, String tableName, String configSource) {
+      return new QueryKillReport(requestId, queryId, tableName, "AlwaysKillStrategy",
           "always", 0, 0, configSource, context);
     }
   }

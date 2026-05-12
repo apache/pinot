@@ -81,7 +81,7 @@ public class ScanEntriesThresholdStrategyTest {
     QueryScanCostContext ctx = new QueryScanCostContext();
     ctx.addEntriesScannedInFilter(150_000_000);
 
-    QueryKillReport report = strategy.buildKillReport(ctx, "q1", "myTable", "cluster");
+    QueryKillReport report = strategy.buildKillReport(ctx, 1L, "q1", "myTable", "cluster");
     assertEquals(report.getTriggeringMetric(), "numEntriesScannedInFilter");
     assertEquals(report.getActualValue(), 150_000_000L);
     assertEquals(report.getThresholdValue(), 100_000_000L);
@@ -93,7 +93,7 @@ public class ScanEntriesThresholdStrategyTest {
     QueryScanCostContext ctx = new QueryScanCostContext();
     ctx.addDocsScanned(15_000_000);
 
-    QueryKillReport report = strategy.buildKillReport(ctx, "q2", "myTable", "table:myTable");
+    QueryKillReport report = strategy.buildKillReport(ctx, 2L, "q2", "myTable", "table:myTable");
     assertEquals(report.getTriggeringMetric(), "numDocsScanned");
     assertEquals(report.getActualValue(), 15_000_000L);
     assertEquals(report.getThresholdValue(), 10_000_000L);

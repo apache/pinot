@@ -38,6 +38,7 @@ public class QueryKillReportTest {
     context.addEntriesScannedPostFilter(200L);
 
     QueryKillReport report = new QueryKillReport(
+        101L,
         "queryId-1",
         "myTable_OFFLINE",
         "EntriesScannedInFilterStrategy",
@@ -66,6 +67,7 @@ public class QueryKillReportTest {
     context.addEntriesScannedPostFilter(50L);
 
     QueryKillReport report = new QueryKillReport(
+        202L,
         "queryId-abc",
         "salesTable_REALTIME",
         "EntriesScannedInFilterStrategy",
@@ -83,6 +85,7 @@ public class QueryKillReportTest {
     assertTrue(msg.contains("1,234,567"), "Should contain actual value with commas");
     assertTrue(msg.contains("1,000,000"), "Should contain threshold with commas");
     assertTrue(msg.contains("CLUSTER_CONFIG"), "Should contain config source");
+    assertTrue(msg.contains("requestId=202"), "Should contain requestId");
     assertTrue(msg.contains("missing index") || msg.contains("index"),
         "Should include advice about missing indexes");
   }
@@ -95,6 +98,7 @@ public class QueryKillReportTest {
     context.addEntriesScannedPostFilter(150L);
 
     QueryKillReport report = new QueryKillReport(
+        303L,
         "queryId-xyz",
         "ordersTable_OFFLINE",
         "DocsScannedStrategy",
@@ -108,6 +112,7 @@ public class QueryKillReportTest {
     String msg = report.toInternalLogMessage();
 
     assertTrue(msg.startsWith("QUERY_KILLED"), "Should start with QUERY_KILLED prefix");
+    assertTrue(msg.contains("requestId=303"), "Should have requestId key=value");
     assertTrue(msg.contains("queryId=queryId-xyz"), "Should have queryId key=value");
     assertTrue(msg.contains("table=ordersTable_OFFLINE"), "Should have table key=value");
     assertTrue(msg.contains("metric=numDocsScanned"), "Should have metric key=value");
@@ -124,6 +129,7 @@ public class QueryKillReportTest {
     context.addEntriesScannedPostFilter(25L);
 
     QueryKillReport report = new QueryKillReport(
+        404L,
         "queryId-getters",
         "testTable_OFFLINE",
         "TestStrategy",
@@ -134,6 +140,7 @@ public class QueryKillReportTest {
         context
     );
 
+    assertEquals(report.getRequestId(), 404L);
     assertEquals(report.getQueryId(), "queryId-getters");
     assertEquals(report.getTableName(), "testTable_OFFLINE");
     assertEquals(report.getStrategyName(), "TestStrategy");
