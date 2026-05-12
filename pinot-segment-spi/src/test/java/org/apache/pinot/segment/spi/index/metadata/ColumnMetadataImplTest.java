@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.metadata;
 
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -28,6 +29,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -130,6 +132,33 @@ public class ColumnMetadataImplTest {
 
     assertEquals(metadata.getParentColumn(), "metrics");
     assertTrue(metadata.isMaterializedChild());
+  }
+
+  @Test
+  public void compressionStatsPersistedAndLoaded() {
+    PropertiesConfiguration config = baseConfig("rawCol");
+    config.setProperty(Column.getKeyFor("rawCol", Column.HAS_DICTIONARY), false);
+    config.setProperty(Column.getKeyFor("rawCol", Column.FORWARD_INDEX_UNCOMPRESSED_SIZE), 4096L);
+    config.setProperty(Column.getKeyFor("rawCol", Column.FORWARD_INDEX_COMPRESSION_CODEC), "LZ4");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "rawCol");
+
+    assertEquals(metadata.getUncompressedForwardIndexSizeBytes(), 4096L);
+    assertEquals(metadata.getCompressionCodec(), "LZ4");
+  }
+
+  @Test
+  public void compressionStatsDefaultToUnavailableOnOldSegment() {
+    PropertiesConfiguration config = baseConfig("col");
+    config.setProperty(Column.getKeyFor("col", Column.HAS_DICTIONARY), false);
+    // Neither FORWARD_INDEX_UNCOMPRESSED_SIZE nor FORWARD_INDEX_COMPRESSION_CODEC set
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "col");
+
+    assertEquals(metadata.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
+        "Old segments without compression stats should return UNAVAILABLE");
+    assertNull(metadata.getCompressionCodec(),
+        "Old segments without compression codec should return null");
   }
 
   private static PropertiesConfiguration baseConfig(String column) {
