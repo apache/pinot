@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.rules;
 
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,12 +35,12 @@ public class PinotRuleSetTest {
   public void defaultsSeedEveryPhaseFromDefaultRuleSetCustomizer() {
     PinotRuleSet ruleSet = new PinotRuleSet(List.of(new DefaultRuleSetCustomizer()));
 
-    assertEquals(ruleSet.rulesFor(Phase.BASIC), DefaultRuleSetCustomizer.BASIC_RULES);
-    assertEquals(ruleSet.rulesFor(Phase.FILTER_PUSHDOWN), DefaultRuleSetCustomizer.FILTER_PUSHDOWN_RULES);
-    assertEquals(ruleSet.rulesFor(Phase.PROJECT_PUSHDOWN), DefaultRuleSetCustomizer.PROJECT_PUSHDOWN_RULES);
-    assertEquals(ruleSet.rulesFor(Phase.PRUNE), DefaultRuleSetCustomizer.PRUNE_RULES);
-    assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL), DefaultRuleSetCustomizer.POST_LOGICAL_RULES);
-    assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL), DefaultRuleSetCustomizer.POST_LOGICAL_PHYSICAL_RULES);
+    assertEquals(ruleSet.rulesFor(Phase.BASIC), PinotQueryRuleSets.BASIC_RULES);
+    assertEquals(ruleSet.rulesFor(Phase.FILTER_PUSHDOWN), PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+    assertEquals(ruleSet.rulesFor(Phase.PROJECT_PUSHDOWN), PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES);
+    assertEquals(ruleSet.rulesFor(Phase.PRUNE), PinotQueryRuleSets.PRUNE_RULES);
+    assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL), PinotQueryRuleSets.POST_LOGICAL_RULES);
+    assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL), PinotQueryRuleSets.PINOT_POST_RULES_V2);
     assertTrue(ruleSet.rulesFor(Phase.POST_LOGICAL_ENRICHED_JOIN).size() > 0,
         "POST_LOGICAL_ENRICHED_JOIN should be populated by PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES");
   }
@@ -55,8 +56,8 @@ public class PinotRuleSetTest {
 
   @Test
   public void customizerCanAppendRule() {
-    RelOptRule extraRule = DefaultRuleSetCustomizer.BASIC_RULES.get(0);
-    int defaultSize = DefaultRuleSetCustomizer.BASIC_RULES.size();
+    RelOptRule extraRule = PinotQueryRuleSets.BASIC_RULES.get(0);
+    int defaultSize = PinotQueryRuleSets.BASIC_RULES.size();
 
     RuleSetCustomizer plugin = (phase, rules) -> {
       if (phase == Phase.BASIC) {
@@ -71,8 +72,8 @@ public class PinotRuleSetTest {
 
   @Test
   public void customizerCanRemoveOssRuleByName() {
-    String firstRuleName = DefaultRuleSetCustomizer.BASIC_RULES.get(0).toString();
-    int defaultSize = DefaultRuleSetCustomizer.BASIC_RULES.size();
+    String firstRuleName = PinotQueryRuleSets.BASIC_RULES.get(0).toString();
+    int defaultSize = PinotQueryRuleSets.BASIC_RULES.size();
 
     RuleSetCustomizer plugin = (phase, rules) -> {
       if (phase == Phase.BASIC) {
