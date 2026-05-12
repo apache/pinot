@@ -29,7 +29,8 @@ public class OperatorTypeRegistryTest {
     for (MultiStageOperator.Type builtIn : MultiStageOperator.Type.values()) {
       OperatorTypeDescriptor descriptor = OperatorTypeRegistry.fromId(builtIn.getId());
       Assert.assertNotNull(descriptor, "Built-in type " + builtIn + " (id=" + builtIn.getId() + ") not in registry");
-      Assert.assertSame(descriptor, builtIn, "Registry entry for id=" + builtIn.getId() + " should be the enum constant");
+      Assert.assertSame(descriptor, builtIn,
+          "Registry entry for id=" + builtIn.getId() + " should be the enum constant");
     }
   }
 
