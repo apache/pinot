@@ -92,8 +92,8 @@ public class ServerRoutingStatsManager {
         AdaptiveServerSelector.DEFAULT_AVG_INITIALIZATION_VAL);
     _hybridScoreExponent = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT,
         AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_EXPONENT);
-    _hybridScoreQueueSizeOffset = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR,
-        AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_QUEUE_FLOOR);
+    _hybridScoreQueueSizeOffset = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET,
+        AdaptiveServerSelector.DEFAULT_HYBRID_SCORE_QUEUE_SIZE_OFFSET);
 
     int threadPoolSize = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
         AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);

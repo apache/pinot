@@ -403,7 +403,7 @@ public class ServerRoutingStatsManagerTest {
 
     // offset=0 (default): after 1 submit + 1 response at latency=10,
     // numInFlight=0, inFlightEMA=1, latencyEMA=10 -> (0+1)^3 * 10 = 10.
-    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET, 0);
     ServerRoutingStatsManager managerNoOffset =
         new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
     managerNoOffset.init();
@@ -415,7 +415,7 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(managerNoOffset.fetchHybridScoreForServer("offsetServer"), 10.0);
 
     // offset=1: same sequence -> (1+0+1)^3 * 10 = 80.
-    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR, 1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET, 1);
     ServerRoutingStatsManager managerWithOffset =
         new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
     managerWithOffset.init();
@@ -433,7 +433,7 @@ public class ServerRoutingStatsManagerTest {
     // When autodecay is enabled, inFlightEMA eventually decays to 0 during idle periods; at that
     // point offset=0 collapses all scores to (0+0+0)^3 * latency = 0, destroying latency ordering,
     // while offset=1 keeps score = 1^3 * latency = latency and preserves the ranking.
-    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR, 1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET, 1);
     ServerRoutingStatsManager managerMultiServer =
         new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
     managerMultiServer.init();

@@ -1134,9 +1134,9 @@ public class CommonConstants {
       // Parameters related to Hybrid score.
       public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
       public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
-      public static final String CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR =
+      public static final String CONFIG_OF_HYBRID_SCORE_QUEUE_SIZE_OFFSET =
           CONFIG_PREFIX + ".hybrid.score.queue.size.offset";
-      public static final int DEFAULT_HYBRID_SCORE_QUEUE_FLOOR = 0;
+      public static final int DEFAULT_HYBRID_SCORE_QUEUE_SIZE_OFFSET = 0;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
       // stats for servers upon query submission and response arrival.
