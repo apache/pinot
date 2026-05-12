@@ -23,6 +23,10 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggBigDecimalFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggBytesFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctBigDecimalFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctBytesFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctFloatFunction;
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctIntFunction;
@@ -323,8 +327,12 @@ public class AggregationFunctionFactory {
                   return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
                 case DOUBLE:
                   return new ArrayAggDistinctDoubleFunction(firstArgument, nullHandlingEnabled);
+                case BIG_DECIMAL:
+                  return new ArrayAggDistinctBigDecimalFunction(firstArgument, nullHandlingEnabled);
                 case STRING:
                   return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
+                case BYTES:
+                  return new ArrayAggDistinctBytesFunction(firstArgument, nullHandlingEnabled);
                 default:
                   throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
               }
@@ -340,8 +348,12 @@ public class AggregationFunctionFactory {
                 return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
               case DOUBLE:
                 return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
+              case BIG_DECIMAL:
+                return new ArrayAggBigDecimalFunction(firstArgument, nullHandlingEnabled);
               case STRING:
                 return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
+              case BYTES:
+                return new ArrayAggBytesFunction(firstArgument, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
             }

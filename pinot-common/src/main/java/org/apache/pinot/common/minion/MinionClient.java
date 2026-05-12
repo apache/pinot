@@ -21,6 +21,7 @@ package org.apache.pinot.common.minion;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
@@ -89,7 +90,7 @@ public class MinionClient {
     HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
     try (CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet)) {
       int statusCode = response.getCode();
-      final String responseString = IOUtils.toString(response.getEntity().getContent());
+      final String responseString = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
       if (statusCode >= 400) {
         throw new HttpException(
             String.format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode,

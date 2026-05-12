@@ -72,33 +72,38 @@ public class ExprMinMaxTest extends BaseQueriesTest {
   private static final String LONG_COLUMN = "longColumn";
   private static final String FLOAT_COLUMN = "floatColumn";
   private static final String DOUBLE_COLUMN = "doubleColumn";
-  private static final String MV_DOUBLE_COLUMN = "mvDoubleColumn";
-  private static final String MV_INT_COLUMN = "mvIntColumn";
-  private static final String MV_BYTES_COLUMN = "mvBytesColumn";
-  private static final String MV_STRING_COLUMN = "mvStringColumn";
+  private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
+  private static final String BOOLEAN_COLUMN = "booleanColumn";
+  private static final String TIMESTAMP_COLUMN = "timestampColumn";
   private static final String STRING_COLUMN = "stringColumn";
+  private static final String JSON_COLUMN = "jsonColumn";
+  private static final String BYTES_COLUMN = "bytesColumn";
+  private static final String MV_INT_COLUMN = "mvIntColumn";
+  private static final String MV_DOUBLE_COLUMN = "mvDoubleColumn";
+  private static final String MV_STRING_COLUMN = "mvStringColumn";
+  private static final String MV_BYTES_COLUMN = "mvBytesColumn";
   private static final String GROUP_BY_INT_COLUMN = "groupByIntColumn";
   private static final String GROUP_BY_MV_INT_COLUMN = "groupByMVIntColumn";
   private static final String GROUP_BY_INT_COLUMN2 = "groupByIntColumn2";
-  private static final String BIG_DECIMAL_COLUMN = "bigDecimalColumn";
-  private static final String TIMESTAMP_COLUMN = "timestampColumn";
-  private static final String BOOLEAN_COLUMN = "booleanColumn";
-  private static final String JSON_COLUMN = "jsonColumn";
 
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, DataType.INT)
-      .addSingleValueDimension(LONG_COLUMN, DataType.LONG).addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
-      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE).addMultiValueDimension(MV_INT_COLUMN, DataType.INT)
-      .addMultiValueDimension(MV_BYTES_COLUMN, DataType.BYTES)
-      .addMultiValueDimension(MV_STRING_COLUMN, DataType.STRING)
+  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(LONG_COLUMN, DataType.LONG)
+      .addSingleValueDimension(FLOAT_COLUMN, DataType.FLOAT)
+      .addSingleValueDimension(DOUBLE_COLUMN, DataType.DOUBLE)
+      .addSingleValueDimension(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
+      .addSingleValueDimension(BOOLEAN_COLUMN, DataType.BOOLEAN)
+      .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
       .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
+      .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+      .addMultiValueDimension(MV_INT_COLUMN, DataType.INT)
+      .addMultiValueDimension(MV_DOUBLE_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(MV_STRING_COLUMN, DataType.STRING)
+      .addMultiValueDimension(MV_BYTES_COLUMN, DataType.BYTES)
       .addSingleValueDimension(GROUP_BY_INT_COLUMN, DataType.INT)
       .addMultiValueDimension(GROUP_BY_MV_INT_COLUMN, DataType.INT)
       .addSingleValueDimension(GROUP_BY_INT_COLUMN2, DataType.INT)
-      .addSingleValueDimension(BIG_DECIMAL_COLUMN, DataType.BIG_DECIMAL)
-      .addSingleValueDimension(TIMESTAMP_COLUMN, DataType.TIMESTAMP)
-      .addSingleValueDimension(BOOLEAN_COLUMN, DataType.BOOLEAN)
-      .addMultiValueDimension(MV_DOUBLE_COLUMN, DataType.DOUBLE)
-      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
       .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
@@ -135,26 +140,27 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       record.putValue(LONG_COLUMN, (long) i - NUM_RECORDS / 2);
       record.putValue(FLOAT_COLUMN, (float) i * 0.5);
       record.putValue(DOUBLE_COLUMN, (double) i);
-      record.putValue(MV_INT_COLUMN, Arrays.asList(i, i + 1, i + 2));
-      record.putValue(MV_BYTES_COLUMN, Arrays.asList(String.valueOf(i).getBytes(), String.valueOf(i + 1).getBytes(),
-          String.valueOf(i + 2).getBytes()));
-      record.putValue(MV_STRING_COLUMN, Arrays.asList("a" + i, "a" + i + 1, "a" + i + 2));
+      record.putValue(BIG_DECIMAL_COLUMN, new BigDecimal(-i * i + 1200 * i));
+      record.putValue(BOOLEAN_COLUMN, i % 2);
+      record.putValue(TIMESTAMP_COLUMN, 1683138373879L - i);
       if (i < 20) {
         record.putValue(STRING_COLUMN, stringSVVals[i % stringSVVals.length]);
       } else {
         record.putValue(STRING_COLUMN, "a33");
       }
+      record.putValue(JSON_COLUMN, "{\"name\":\"John\", \"age\":" + i + ", \"car\":null}");
+      record.putValue(BYTES_COLUMN, String.valueOf(i).getBytes());
+      record.putValue(MV_INT_COLUMN, Arrays.asList(i, i + 1, i + 2));
+      record.putValue(MV_DOUBLE_COLUMN, Arrays.asList((double) i, (double) i * i, (double) i * i * i));
+      record.putValue(MV_STRING_COLUMN, Arrays.asList("a" + i, "a" + i + 1, "a" + i + 2));
+      record.putValue(MV_BYTES_COLUMN, Arrays.asList(String.valueOf(i).getBytes(), String.valueOf(i + 1).getBytes(),
+          String.valueOf(i + 2).getBytes()));
       record.putValue(GROUP_BY_INT_COLUMN, i % 5);
       record.putValue(GROUP_BY_MV_INT_COLUMN, Arrays.asList(i % 10, (i + 1) % 10));
       if (i == j) {
         j *= 2;
       }
       record.putValue(GROUP_BY_INT_COLUMN2, j);
-      record.putValue(BIG_DECIMAL_COLUMN, new BigDecimal(-i * i + 1200 * i));
-      record.putValue(TIMESTAMP_COLUMN, 1683138373879L - i);
-      record.putValue(BOOLEAN_COLUMN, i % 2);
-      record.putValue(MV_DOUBLE_COLUMN, Arrays.asList((double) i, (double) i * i, (double) i * i * i));
-      record.putValue(JSON_COLUMN, "{\"name\":\"John\", \"age\":" + i + ", \"car\":null}");
       records.add(record);
     }
 
@@ -199,12 +205,6 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     BrokerResponse brokerResponse = getBrokerResponse(query);
     Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
         "ExprMinMax only supports single-valued measuring columns"
-    ));
-
-    query = "SELECT expr_max(mvDoubleColumn, jsonColumn) FROM testTable";
-    brokerResponse = getBrokerResponse(query);
-    Assert.assertTrue(brokerResponse.getExceptions().get(0).getMessage().contains(
-        "Cannot compute exprminMax measuring on non-comparable type: JSON"
     ));
   }
 
@@ -359,16 +359,26 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       assertEquals(rows.get(i)[1], "a");
     }
 
-    // TODO: The following query throws an exception,
-    //       requires fix for multi-value bytes column serialization in DataBlock
-    query = "SELECT expr_min(mvBytesColumn, intColumn) FROM testTable";
+    // SV BYTES projection: expr_min picks the row with min(intColumn) = 0 (i.e. i=0), returning
+    // bytesColumn at that row = bytes("0"). Formatted as hex by DataSchema.
+    query = "SELECT expr_min(bytesColumn, intColumn) FROM testTable";
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0)[0], "30");
+    assertEquals(rows.get(1)[0], "30");
 
-    try {
-      getBrokerResponse(query);
-      fail("remove this test case, now mvBytesColumn works correctly in serialization");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Unsupported stored type: BYTES_ARRAY"));
-    }
+    // MV BYTES projection: expr_min picks the row with min(intColumn) = 0 (i.e. i=0), returning
+    // mvBytesColumn at that row = [bytes("0"), bytes("1"), bytes("2")]. Formatted as hex by DataSchema.
+    query = "SELECT expr_min(mvBytesColumn, intColumn) FROM testTable";
+    brokerResponse = getBrokerResponse(query);
+    resultTable = brokerResponse.getResultTable();
+    rows = resultTable.getRows();
+    assertEquals(rows.size(), 2);
+    String[] expectedMvBytes = {"30", "31", "32"};
+    assertEquals(rows.get(0)[0], expectedMvBytes);
+    assertEquals(rows.get(1)[0], expectedMvBytes);
   }
 
   @Test

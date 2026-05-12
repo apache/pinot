@@ -20,8 +20,8 @@ package org.apache.pinot.spi.utils;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -574,11 +574,20 @@ public class CommonConstants {
     public static final boolean DEFAULT_RUN_IN_BROKER = true;
 
     /**
-     * Whether to use broker pruning by default.
+     * Whether to use broker pruning by default on the physical optimizer path.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option
      */
     public static final String CONFIG_OF_USE_BROKER_PRUNING = "pinot.broker.multistage.use.broker.pruning";
     public static final boolean DEFAULT_USE_BROKER_PRUNING = true;
+
+    /**
+     * Whether to use broker pruning by default on the logical planner (non-physical-optimizer) path.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option.
+     * Separated from {@link #CONFIG_OF_USE_BROKER_PRUNING} so the two paths can be rolled out independently.
+     */
+    public static final String CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING =
+        "pinot.broker.multistage.logical.planner.use.broker.pruning";
+    public static final boolean DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING = false;
 
     /**
      * Default server stage limit for lite mode queries.
@@ -884,10 +893,9 @@ public class CommonConstants {
         // Server stage limit for lite mode queries.
         public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
         public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
-        // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
-        // new MSE query optimizer.
-        // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
-        //   a table config to enable broker pruning (it is disabled by default).
+        // Used by the MSE engine to enable broker-side segment pruning during routing. The physical optimizer
+        // path defaults to DEFAULT_USE_BROKER_PRUNING (true); the logical planner path defaults to
+        // DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING (false). Both can be overridden per-query.
         public static final String USE_BROKER_PRUNING = "useBrokerPruning";
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
@@ -1132,6 +1140,16 @@ public class CommonConstants {
       public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
+
+      // Determines whether routing stats are exported as broker metrics (gauges) on a periodic basis.
+      public static final String CONFIG_OF_ENABLE_STATS_METRIC_EXPORT =
+          CONFIG_PREFIX + ".enable.stats.metric.export";
+      public static final boolean DEFAULT_ENABLE_STATS_METRIC_EXPORT = false;
+
+      // Interval in milliseconds at which routing stats are exported as broker metrics.
+      public static final String CONFIG_OF_STATS_METRIC_EXPORT_INTERVAL_MS =
+          CONFIG_PREFIX + ".stats.metric.export.interval.ms";
+      public static final long DEFAULT_STATS_METRIC_EXPORT_INTERVAL_MS = 10 * 1000;
     }
 
     public static class Grpc {
@@ -1856,6 +1874,57 @@ public class CommonConstants {
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
+
+    // Scan-based query killing
+    public enum ScanKillingMode {
+      DISABLED("disabled"),
+      LOG_ONLY("logOnly"),
+      ENFORCE("enforce");
+
+      private final String _configValue;
+
+      ScanKillingMode(String configValue) {
+        _configValue = configValue;
+      }
+
+      public String getConfigValue() {
+        return _configValue;
+      }
+
+      /**
+       * Parses a config string into a {@link ScanKillingMode}. Case-insensitive.
+       * Returns {@code null} if the value is not recognized.
+       */
+      public static ScanKillingMode fromConfigValue(String value) {
+        if (value == null) {
+          return null;
+        }
+        for (ScanKillingMode mode : values()) {
+          if (mode._configValue.equalsIgnoreCase(value)) {
+            return mode;
+          }
+        }
+        return null;
+      }
+    }
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MODE = "accounting.scan.based.killing.mode";
+    public static final ScanKillingMode DEFAULT_SCAN_BASED_KILLING_MODE = ScanKillingMode.DISABLED;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME =
+        "accounting.scan.based.killing.strategy.factory.class.name";
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.in.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED =
+        "accounting.scan.based.killing.max.docs.scanned";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.post.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER = Long.MAX_VALUE;
   }
 
   public static class ExecutorService {
@@ -1954,7 +2023,9 @@ public class CommonConstants {
 
     public static class AssignmentStrategy {
       public static final String BALANCE_NUM_SEGMENT_ASSIGNMENT_STRATEGY = "balanced";
+      public static final String ROUND_ROBIN_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobin";
       public static final String REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "replicagroup";
+      public static final String ROUND_ROBIN_REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY = "roundrobinreplicagroup";
       public static final String DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY = "allservers";
     }
 
@@ -2203,6 +2274,51 @@ public class CommonConstants {
     /// TODO: This is used by the broker. Consider renaming it.
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
     public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
+
+    /// gRPC keep-alive time for broker dispatch channels, in milliseconds. Values &gt; 0 enable keep-alive pings so
+    /// that a silently unreachable server (e.g. kernel-dead node, one-way network partition) transitions the dispatch
+    /// channel out of `READY`, which in turn lets the broker's FailureDetector exclude it from routing.
+    ///
+    /// Defaults are chosen to be safe against Netty's default gRPC server enforcement
+    /// (`permitKeepAliveTime` = 5 minutes, `permitKeepAliveWithoutCalls` = false); operators may tune these down for
+    /// faster silent-peer detection once the server side has been configured to permit a higher ping rate.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.time.ms";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// gRPC keep-alive timeout for broker dispatch channels, in milliseconds. Only applies when keep-alive is enabled.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.timeout.ms";
+    public static final int DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS = 30_000;
+
+    /// Whether to send gRPC keep-alive pings on dispatch channels even when there are no active calls. Default is
+    /// `false` because Netty's default gRPC server rejects pings-without-calls with `GOAWAY (ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.multistage.dispatch.channel.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS = false;
+
+    /// Minimum interval, in milliseconds, between client gRPC keep-alive pings that the MSE
+    /// [org.apache.pinot.query.service.server.QueryServer] will accept. Pings arriving more frequently than this are
+    /// counted as "bad pings"; once the server's internal threshold is exceeded it sends `GOAWAY(ENHANCE_YOUR_CALM)`
+    /// with `too_many_pings` debug data and closes the connection.
+    ///
+    /// Defaults to 5 minutes to match Netty's gRPC server default. Operators tuning down the broker dispatch
+    /// `keepAliveTime` (see [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS]) for faster silent-peer detection MUST set
+    /// this to a value less than or equal to the configured client keep-alive time, otherwise the server will tear
+    /// down the dispatch channel. A non-positive value leaves Netty's gRPC server default (currently 5 minutes) in
+    /// place.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS =
+        "pinot.query.multistage.query.server.permit.keep.alive.time.ms";
+    public static final int DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS = 300_000;
+
+    /// Whether the MSE [org.apache.pinot.query.service.server.QueryServer] permits client gRPC keep-alive pings when
+    /// there are no active RPCs on the connection. Defaults to `false` to match Netty's gRPC server default. Must be
+    /// set to `true` if brokers configure
+    /// [#KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS] to `true`, otherwise the server will close idle channels
+    /// with `GOAWAY(ENHANCE_YOUR_CALM)`.
+    public static final String KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS =
+        "pinot.query.multistage.query.server.permit.keep.alive.without.calls";
+    public static final boolean DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS = false;
   }
 
   public static class NullValuePlaceHolder {
@@ -2218,9 +2334,11 @@ public class CommonConstants {
     public static final long[] LONG_ARRAY = new long[0];
     public static final float[] FLOAT_ARRAY = new float[0];
     public static final double[] DOUBLE_ARRAY = new double[0];
+    public static final BigDecimal[] BIG_DECIMAL_ARRAY = new BigDecimal[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
-    public static final Object MAP = Collections.emptyMap();
+    public static final ByteArray[] INTERNAL_BYTES_ARRAY = new ByteArray[0];
+    public static final Object MAP = Map.of();
   }
 
   public static class CursorConfigs {
@@ -2233,11 +2351,12 @@ public class CommonConstants {
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".expiration";
 
+    // Read once at broker startup; changes require broker restart to take effect.
     public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
-        "controller.cluster.response.store.cleaner.frequencyPeriod";
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.frequencyPeriod";
     public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
     public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
-        "controller.cluster.response.store.cleaner.initialDelay";
+        PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".cleaner.initialDelay";
   }
 
   public static class ForwardIndexConfigs {

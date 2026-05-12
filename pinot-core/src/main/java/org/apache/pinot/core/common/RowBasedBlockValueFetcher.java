@@ -86,8 +86,12 @@ public class RowBasedBlockValueFetcher {
           return new FloatMultiValueFetcher(blockValSet.getFloatValuesMV());
         case DOUBLE:
           return new DoubleMultiValueFetcher(blockValSet.getDoubleValuesMV());
+        case BIG_DECIMAL:
+          return new BigDecimalMultiValueFetcher(blockValSet.getBigDecimalValuesMV());
         case STRING:
           return new StringMultiValueFetcher(blockValSet.getStringValuesMV());
+        case BYTES:
+          return new BytesMultiValueFetcher(blockValSet.getBytesValuesMV());
         default:
           throw new IllegalStateException("Unsupported value type: " + storedType + " for multi-value column");
       }
@@ -242,6 +246,18 @@ public class RowBasedBlockValueFetcher {
     }
   }
 
+  private static class BigDecimalMultiValueFetcher implements ValueFetcher {
+    private final BigDecimal[][] _values;
+
+    BigDecimalMultiValueFetcher(BigDecimal[][] values) {
+      _values = values;
+    }
+
+    public BigDecimal[] getValue(int docId) {
+      return _values[docId];
+    }
+  }
+
   private static class StringMultiValueFetcher implements ValueFetcher {
     private final String[][] _values;
 
@@ -251,6 +267,24 @@ public class RowBasedBlockValueFetcher {
 
     public String[] getValue(int docId) {
       return _values[docId];
+    }
+  }
+
+  /// Wraps each MV element into a [ByteArray] to match the SV convention ([BytesValueFetcher]).
+  private static class BytesMultiValueFetcher implements ValueFetcher {
+    private final byte[][][] _values;
+
+    BytesMultiValueFetcher(byte[][][] values) {
+      _values = values;
+    }
+
+    public ByteArray[] getValue(int docId) {
+      byte[][] raw = _values[docId];
+      ByteArray[] wrapped = new ByteArray[raw.length];
+      for (int i = 0; i < raw.length; i++) {
+        wrapped[i] = new ByteArray(raw[i]);
+      }
+      return wrapped;
     }
   }
 

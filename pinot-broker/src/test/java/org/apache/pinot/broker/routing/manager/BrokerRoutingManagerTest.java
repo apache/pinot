@@ -61,6 +61,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -260,6 +261,34 @@ public class BrokerRoutingManagerTest {
   private void putRoutingEntry(String tableNameWithType, Object routingEntry) {
     Map routingEntries = _routingManager._routingEntryMap;
     routingEntries.put(tableNameWithType, routingEntry);
+  }
+
+  @Test
+  public void testRoutableServerInstanceMapReflectsExclusion() {
+    // Enable server
+    List<ZNRecord> instanceConfigs = Collections.singletonList(createEnabledServerZNRecord(SERVER_INSTANCE_ID));
+    when(_zkDataAccessor.getChildren(eq(INSTANCE_CONFIGS_PATH), any(), eq(AccessOption.PERSISTENT), anyInt(), anyInt()))
+        .thenReturn(instanceConfigs);
+    _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+
+    // Server is present in both the enabled and routable maps initially.
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+
+    // Exclude the server (simulating FailureDetector marking it unhealthy).
+    _routingManager.excludeServerFromRouting(SERVER_INSTANCE_ID);
+
+    // Routable map no longer contains the server, but enabled map still does.
+    // This is the contract MSE WorkerManager relies on for intermediate-stage worker selection.
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertFalse(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+
+    // Re-include the server.
+    _routingManager.includeServerToRouting(SERVER_INSTANCE_ID);
+
+    // Routable map contains the server again.
+    assertTrue(_routingManager.getEnabledServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
+    assertTrue(_routingManager.getRoutableServerInstanceMap().containsKey(SERVER_INSTANCE_ID));
   }
 
   /**

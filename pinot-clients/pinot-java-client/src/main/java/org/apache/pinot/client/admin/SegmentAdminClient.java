@@ -189,7 +189,7 @@ public class SegmentAdminClient extends BaseServiceAdminClient {
     }
 
     Map<String, List<String>> result = new HashMap<>();
-    serversMapNode.fields().forEachRemaining(entry -> {
+    serversMapNode.properties().forEach(entry -> {
       List<String> segments = new ArrayList<>();
       JsonNode value = entry.getValue();
       if (value != null && value.isArray()) {

@@ -52,9 +52,17 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeOffsetAutoResetKafkaHandler.class);
   private static final String STREAM_TYPE = "kafka";
 
-  public RealtimeOffsetAutoResetKafkaHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+  /**
+   * @deprecated Use no-arg constructor + {@link #init} instead.
+   *     Kept for backward compatibility with subclasses compiled against the previous constructor-based contract.
+   */
+  @Deprecated
+  protected RealtimeOffsetAutoResetKafkaHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
       PinotHelixResourceManager pinotHelixResourceManager) {
     init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+  }
+
+  protected RealtimeOffsetAutoResetKafkaHandler() {
   }
 
   @Override
@@ -103,8 +111,6 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
   protected abstract Map<String, String> triggerDataReplicationAndGetTopicInfo(
       String tableNameWithType, StreamConfig streamConfig, String topicName, int partitionId, long fromOffset,
       long toOffset);
-
-  public abstract void ensureBackfillJobsRunning(String tableNameWithType, List<String> topicNames);
 
   /**
    * Cleanup completed backfill jobs by checking if the topic is complete.

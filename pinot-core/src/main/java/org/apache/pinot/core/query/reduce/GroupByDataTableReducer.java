@@ -163,7 +163,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         for (int i = 0; i < numColumns; i++) {
           Object value = row[i];
           if (value != null) {
-            row[i] = columnDataTypes[i].convert(row[i]);
+            row[i] = columnDataTypes[i].convert(value);
           }
         }
         if (havingFilterHandler.isMatch(row)) {
@@ -179,7 +179,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
         for (int j = 0; j < numColumns; j++) {
           Object value = row[j];
           if (value != null) {
-            row[j] = columnDataTypes[j].convert(row[j]);
+            row[j] = columnDataTypes[j].convert(value);
           }
         }
         rows.add(row);
@@ -296,8 +296,14 @@ public class GroupByDataTableReducer implements DataTableReducer {
                     case DOUBLE_ARRAY:
                       values[colId] = DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
                       break;
+                    case BIG_DECIMAL_ARRAY:
+                      values[colId] = ObjectArrayList.wrap(dataTable.getBigDecimalArray(rowId, colId));
+                      break;
                     case STRING_ARRAY:
                       values[colId] = ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+                      break;
+                    case BYTES_ARRAY:
+                      values[colId] = ObjectArrayList.wrap(dataTable.getBytesArray(rowId, colId));
                       break;
                     case OBJECT:
                       CustomObject customObject = dataTable.getCustomObject(rowId, colId);

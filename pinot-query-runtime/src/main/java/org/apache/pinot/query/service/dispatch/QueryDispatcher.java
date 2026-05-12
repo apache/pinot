@@ -113,6 +113,7 @@ public class QueryDispatcher {
   private final TlsConfig _tlsConfig;
   @Nullable
   private final SslContext _clientGrpcSslContext;
+  private final DispatchClient.KeepAliveConfig _keepAliveConfig;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
@@ -120,12 +121,28 @@ public class QueryDispatcher {
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        DispatchClient.KeepAliveConfig.DISABLED);
+  }
+
+  /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
+  /// disables keep-alive.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls));
+  }
+
+  private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig) {
     _cancelTimeout = cancelTimeout;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
     _clientGrpcSslContext = initClientSslContext(tlsConfig);
+    _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
 
     if (enableCancellation) {
@@ -522,7 +539,7 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
-        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext));
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig));
   }
 
   /**

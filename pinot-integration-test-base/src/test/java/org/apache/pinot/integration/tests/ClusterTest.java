@@ -758,8 +758,9 @@ public abstract class ClusterTest extends ControllerTest {
         case DOUBLE_ARRAY:
           array[k] = jsonValue.get(k).asDouble();
           break;
-        case STRING_ARRAY:
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
+        case STRING_ARRAY:
         case BYTES_ARRAY:
           array[k] = jsonValue.get(k).textValue();
           break;
@@ -791,11 +792,11 @@ public abstract class ClusterTest extends ControllerTest {
       case DOUBLE:
         object = jsonValue.asDouble();
         break;
+      case BIG_DECIMAL:
+      case TIMESTAMP:
       case STRING:
       case BYTES:
-      case TIMESTAMP:
       case JSON:
-      case BIG_DECIMAL:
         object = jsonValue.textValue();
         break;
       case UNKNOWN:

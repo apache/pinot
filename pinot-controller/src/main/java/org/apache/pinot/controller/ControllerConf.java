@@ -176,6 +176,13 @@ public class ControllerConf extends PinotConfiguration {
     public static final String ENABLE_DISTRIBUTED_LOCKING = "controller.task.enableDistributedLocking";
     public static final boolean DEFAULT_ENABLE_DISTRIBUTED_LOCKING = false;
 
+    // Cluster-level default for PinotTaskManager concurrent task scheduling. When true, scheduleTasks
+    // uses per-table JVM locks (plus the distributed ZK lock if enabled) instead of a global
+    // controller-wide synchronized lock, allowing task generation for different tables to run in
+    // parallel. Can be overridden per table via TableTaskConfig.concurrentSchedulingEnabled.
+    public static final String CONCURRENT_SCHEDULING_ENABLED = "controller.task.concurrentSchedulingEnabled";
+    public static final boolean DEFAULT_CONCURRENT_SCHEDULING_ENABLED = false;
+
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
 
     public static final String SEGMENT_RELOCATOR_REASSIGN_INSTANCES = "controller.segment.relocator.reassignInstances";
@@ -1262,6 +1269,11 @@ public class ControllerConf extends PinotConfiguration {
   public boolean isPinotTaskManagerDistributedLockingEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING,
         ControllerPeriodicTasksConf.DEFAULT_ENABLE_DISTRIBUTED_LOCKING);
+  }
+
+  public boolean isPinotTaskManagerConcurrentSchedulingEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.CONCURRENT_SCHEDULING_ENABLED,
+        ControllerPeriodicTasksConf.DEFAULT_CONCURRENT_SCHEDULING_ENABLED);
   }
 
   public long getPinotTaskExpireTimeInMs() {

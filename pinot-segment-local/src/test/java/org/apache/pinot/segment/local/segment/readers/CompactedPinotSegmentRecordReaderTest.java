@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import com.google.common.io.Files;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -59,7 +59,7 @@ public class CompactedPinotSegmentRecordReaderTest {
     Schema schema = createPinotSchema();
     TableConfig tableConfig = createTableConfig();
     String segmentName = "compactedPinotSegmentRecordReaderTest";
-    _segmentOutputDir = Files.createTempDir().toString();
+    _segmentOutputDir = Files.createTempDirectory("pinot-test-").toFile().toString();
     _rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = _rows.get(i);

@@ -365,9 +365,9 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(expectedGroups, series.size());
 
     for (JsonNode row : series) {
-      Map<String, String> metric;
+      Map metric;
       try {
-        metric = JsonUtils.jsonNodeToStringMap(row.path("metric"));
+        metric = JsonUtils.jsonNodeToMap(row.path("metric"));
       } catch (Exception e) {
         throw new RuntimeException("Failed to parse metric from row", e);
       }

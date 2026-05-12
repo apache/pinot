@@ -161,6 +161,15 @@ public class MultiClusterRoutingManager implements RoutingManager {
   }
 
   @Override
+  public Map<String, ServerInstance> getRoutableServerInstanceMap() {
+    Map<String, ServerInstance> combined = new HashMap<>(_localClusterRoutingManager.getRoutableServerInstanceMap());
+    for (BaseBrokerRoutingManager remoteCluster : _remoteClusterRoutingManagers) {
+      combined.putAll(remoteCluster.getRoutableServerInstanceMap());
+    }
+    return combined;
+  }
+
+  @Override
   public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
     return findFirst(mgr -> mgr.getTablePartitionInfo(tableNameWithType), tableNameWithType);
   }

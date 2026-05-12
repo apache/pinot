@@ -271,6 +271,25 @@ public class CalciteSqlParser {
       for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
         validateFilter(filter);
       }
+    } else if (operator.equals(FilterKind.SEMANTIC_MATCH.name())) {
+      // SEMANTIC_MATCH(column, 'query text', topK) — validated here, rewritten by QueryRewriter
+      List<Expression> smOperands = filterExpression.getFunctionCall().getOperands();
+      if (smOperands.size() < 2 || smOperands.size() > 3) {
+        throw new IllegalStateException(
+            "SEMANTIC_MATCH requires 2 or 3 arguments: SEMANTIC_MATCH(column, 'query text'[, topK])");
+      }
+      if (!smOperands.get(0).isSetIdentifier()) {
+        throw new IllegalStateException(
+            "The first argument of SEMANTIC_MATCH must be a column identifier");
+      }
+      if (!smOperands.get(1).isSetLiteral() || smOperands.get(1).getLiteral().isSetNullValue()) {
+        throw new IllegalStateException(
+            "The second argument of SEMANTIC_MATCH must be a non-null string literal (query text)");
+      }
+      if (smOperands.size() == 3 && !smOperands.get(2).isSetLiteral()) {
+        throw new IllegalStateException(
+            "The third argument of SEMANTIC_MATCH must be an integer literal (topK)");
+      }
     } else if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
       Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
       if (!vectorIdentifier.isSetIdentifier()) {

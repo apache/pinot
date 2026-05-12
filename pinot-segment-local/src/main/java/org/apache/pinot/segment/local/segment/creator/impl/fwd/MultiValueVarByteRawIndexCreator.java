@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV6;
@@ -110,6 +111,11 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
   @Override
   public DataType getValueType() {
     return _valueType;
+  }
+
+  @Override
+  public void putBigDecimalMV(final BigDecimal[] values) {
+    _indexWriter.putBigDecimalMV(values);
   }
 
   @Override

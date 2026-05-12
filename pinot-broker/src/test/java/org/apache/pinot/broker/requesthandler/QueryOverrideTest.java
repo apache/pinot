@@ -19,11 +19,9 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -64,24 +62,6 @@ public class QueryOverrideTest {
     BaseSingleStageBrokerRequestHandler.handleSegmentPartitionedDistinctCountOverride(pinotQuery,
         ImmutableSet.of("col1", "col2", "col3"));
     assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "segmentpartitioneddistinctcount");
-  }
-
-  @Test
-  public void testDistinctMultiValuedOverride()
-      throws IOException {
-    String query1 = "SELECT DISTINCT_COUNT(col1) FROM myTable";
-    PinotQuery pinotQuery1 = CalciteSqlParser.compileToPinotQuery(query1);
-    String query2 = "SELECT DISTINCT_COUNT(col2) FROM myTable";
-    PinotQuery pinotQuery2 = CalciteSqlParser.compileToPinotQuery(query2);
-    Schema tableSchema = Schema.fromString("{\"schemaName\":\"testSchema\","
-        + "\"dimensionFieldSpecs\":[ {\"name\":\"col2\",\"dataType\":\"LONG\",\"singleValueField\":\"false\"},"
-        + "{\"name\":\"col3\",\"dataType\":\"LONG\",\"singleValueField\":\"false\"}],"
-        + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1\",\"dataType\":\"INT\",\"format\":\"x:HOURS:EPOCH\","
-        + "\"granularity\":\"1:HOURS\"}]}");
-    BaseSingleStageBrokerRequestHandler.handleAggFunctionMVOverride(pinotQuery1, tableSchema);
-    assertEquals(pinotQuery1.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcount");
-    BaseSingleStageBrokerRequestHandler.handleAggFunctionMVOverride(pinotQuery2, tableSchema);
-    assertEquals(pinotQuery2.getSelectList().get(0).getFunctionCall().getOperator(), "distinctcountmv");
   }
 
   @Test

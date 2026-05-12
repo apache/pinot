@@ -39,7 +39,8 @@ public enum FilterKind {
   IS_NULL,
   IS_NOT_NULL,
   VECTOR_SIMILARITY,
-  VECTOR_SIMILARITY_RADIUS;
+  VECTOR_SIMILARITY_RADIUS,
+  SEMANTIC_MATCH;
 
   /**
    * Helper method that returns true if the enum maps to a Range.

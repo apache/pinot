@@ -155,23 +155,28 @@ public class SegmentOperationsThrottlerSet implements PinotClusterConfigChangeLi
       return;
     }
 
-    // Parse maxConcurrency
+    // Parse maxConcurrency. 0 is a valid kill-switch value; negative values are treated as misconfiguration.
     int maxConcurrency = parseConfigValue(clusterConfigs, maxConcurrencyConfigKey, maxConcurrencyDefault);
-    if (maxConcurrency <= 0) {
+    if (maxConcurrency < 0) {
       return;
     }
 
-    // Parse maxConcurrencyBeforeServingQueries
+    // Parse maxConcurrencyBeforeServingQueries. Same handling as maxConcurrency.
     int maxConcurrencyBeforeServingQueries =
         parseConfigValue(clusterConfigs, maxConcurrencyBeforeServingQueriesConfigKey,
             maxConcurrencyBeforeServingQueriesDefault);
-    if (maxConcurrencyBeforeServingQueries <= 0) {
+    if (maxConcurrencyBeforeServingQueries < 0) {
       return;
     }
 
     // Update throttler
     LOGGER.info("Updating {} throttler with maxConcurrency: {}, maxConcurrencyBeforeServingQueries: {}",
         throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries);
+    if (maxConcurrency == 0 || maxConcurrencyBeforeServingQueries == 0) {
+      LOGGER.warn("Throttler {} configured with 0 permits (maxConcurrency: {}, maxConcurrencyBeforeServingQueries: "
+              + "{}) — all operations will block until value is raised",
+          throttlerName, maxConcurrency, maxConcurrencyBeforeServingQueries);
+    }
     throttler.updatePermits(maxConcurrency, maxConcurrencyBeforeServingQueries);
   }
 

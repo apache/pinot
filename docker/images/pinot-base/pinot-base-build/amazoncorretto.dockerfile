@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 FROM debian:bookworm-slim
 
 LABEL MAINTAINER=dev@pinot.apache.org
@@ -45,7 +45,7 @@ RUN set -eux \
 # Install Amazon Corretto.
 # /etc/apt/keyrings/ is the correct path for user-managed keys referenced via
 # signed-by=; apt natively handles ASCII-armored .asc files at that path.
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 RUN set -eux \
   && mkdir -p /etc/apt/keyrings \
   && wget -qO /etc/apt/keyrings/corretto.asc https://apt.corretto.aws/corretto.key \
@@ -69,13 +69,18 @@ ENV LANG=C.UTF-8
 ENV JAVA_HOME=/usr/lib/jvm/java-${JAVA_VERSION}-amazon-corretto
 
 # install maven
+ARG MAVEN_VERSION=3.9.14
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && echo "Downloading Maven for $(uname -m) architecture..." \
-  && wget https://dlcdn.apache.org/maven/maven-3/3.9.14/binaries/apache-maven-3.9.14-bin.tar.gz -P /tmp \
-  && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
-  && rm -f /tmp/apache-maven-*.tar.gz \
+  && echo "Downloading Maven ${MAVEN_VERSION} for $(uname -m) architecture..." \
+  && wget https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz -O /tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
+  && wget https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz.sha512 -O /tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz.sha512 \
+  && echo "$(cat /tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz.sha512)  /tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | sha512sum -c - \
+  && tar -xzf /tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz -C /usr/share/maven --strip-components=1 \
+  && rm -f /tmp/apache-maven-${MAVEN_VERSION}-bin.tar.gz* \
   && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn \
-  && mvn --version
+  && mvn --version | tee /tmp/maven-version \
+  && grep -F "Apache Maven ${MAVEN_VERSION}" /tmp/maven-version \
+  && rm -f /tmp/maven-version
 ENV MAVEN_HOME=/usr/share/maven
 ENV MAVEN_CONFIG=/opt/.m2
 

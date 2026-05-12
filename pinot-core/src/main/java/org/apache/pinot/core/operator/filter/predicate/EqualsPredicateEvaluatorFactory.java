@@ -28,8 +28,6 @@ import org.apache.pinot.core.operator.filter.predicate.traits.IntValue;
 import org.apache.pinot.core.operator.filter.predicate.traits.LongValue;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.MultiValueVisitor;
-import org.apache.pinot.spi.data.SingleValueVisitor;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -147,16 +145,24 @@ public class EqualsPredicateEvaluatorFactory {
       super(predicate);
     }
 
-    /**
-     * Visits the matching value of this predicate.
-     */
-    public abstract <R> R accept(SingleValueVisitor<R> visitor);
+    /// Visits the matching value of this predicate.
+    public abstract <R> R accept(Visitor<R> visitor);
 
-    /**
-     * Visits the matching value of this predicate, which will be transformed into an array with a single value.
-     */
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return accept(visitor.asSingleValueVisitor());
+    /// Visitor for the matching value of an EQ predicate, dispatched by the stored value type.
+    public interface Visitor<R> {
+      R visitInt(int matchingValue);
+
+      R visitLong(long matchingValue);
+
+      R visitFloat(float matchingValue);
+
+      R visitDouble(double matchingValue);
+
+      R visitBigDecimal(BigDecimal matchingValue);
+
+      R visitString(String matchingValue);
+
+      R visitBytes(byte[] matchingValue);
     }
   }
 
@@ -169,7 +175,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitInt(_matchingValue);
     }
 
@@ -217,13 +223,8 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitLong(_matchingValue);
-    }
-
-    @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.asSingleValueVisitor().visitLong(_matchingValue);
     }
 
     @Override
@@ -270,7 +271,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitFloat(_matchingValue);
     }
 
@@ -318,7 +319,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitDouble(_matchingValue);
     }
 
@@ -365,7 +366,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBigDecimal(_matchingValue);
     }
 
@@ -394,7 +395,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitString(_matchingValue);
     }
 
@@ -423,7 +424,7 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBytes(_matchingValue);
     }
 

@@ -35,8 +35,9 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
  * Record reader for Apache Arrow IPC file format.
  */
 public class ArrowRecordReader implements RecordReader {
+  private final ArrowRecordExtractor _extractor = new ArrowRecordExtractor();
+  private final ArrowRecordExtractor.Record _record = new ArrowRecordExtractor.Record();
   private File _dataFile;
-  private ArrowToGenericRowConverter _converter;
   private RootAllocator _allocator;
   private FileInputStream _fileInputStream;
   private ArrowFileReader _arrowFileReader;
@@ -45,19 +46,18 @@ public class ArrowRecordReader implements RecordReader {
   private int _nextRowId;
   private int _currentBatchRowCount;
 
-  public ArrowRecordReader() {
-  }
-
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead,
-      @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
-    _dataFile = dataFile;
-    _converter = new ArrowToGenericRowConverter(fieldsToRead);
+    ArrowRecordExtractorConfig extractorConfig = new ArrowRecordExtractorConfig();
     long allocatorLimit = ArrowRecordReaderConfig.DEFAULT_ALLOCATOR_LIMIT;
     if (recordReaderConfig instanceof ArrowRecordReaderConfig) {
-      allocatorLimit = ((ArrowRecordReaderConfig) recordReaderConfig).getAllocatorLimit();
+      ArrowRecordReaderConfig arrowReaderConfig = (ArrowRecordReaderConfig) recordReaderConfig;
+      allocatorLimit = arrowReaderConfig.getAllocatorLimit();
+      extractorConfig.setExtractRawTimeValues(arrowReaderConfig.isExtractRawTimeValues());
     }
+    _extractor.init(fieldsToRead, extractorConfig);
+    _dataFile = dataFile;
     _allocator = new RootAllocator(allocatorLimit);
     openFile();
   }
@@ -67,6 +67,7 @@ public class ArrowRecordReader implements RecordReader {
     _fileInputStream = new FileInputStream(_dataFile);
     _arrowFileReader = new ArrowFileReader(_fileInputStream.getChannel(), _allocator);
     _root = _arrowFileReader.getVectorSchemaRoot();
+    _extractor.setReader(_arrowFileReader);
     _nextRowId = 0;
     _currentBatchRowCount = 0;
     advanceToNonEmptyBatch();
@@ -80,6 +81,7 @@ public class ArrowRecordReader implements RecordReader {
         _hasNextBatch = true;
         _currentBatchRowCount = rowCount;
         _nextRowId = 0;
+        _extractor.prepareBatch(_record);
         return;
       }
     }
@@ -94,7 +96,9 @@ public class ArrowRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _converter.convertSingleRow(_arrowFileReader, _root, _nextRowId, reuse);
+    reuse.clear();
+    _record.setRowId(_nextRowId);
+    _extractor.extract(_record, reuse);
     _nextRowId++;
     if (_nextRowId >= _currentBatchRowCount) {
       advanceToNonEmptyBatch();
@@ -125,6 +129,8 @@ public class ArrowRecordReader implements RecordReader {
   private void closeFile()
       throws IOException {
     IOException exception = null;
+
+    _record.close();
 
     if (_arrowFileReader != null) {
       try {

@@ -45,6 +45,7 @@ public class DefaultValueColumnReader implements ColumnReader {
   private long[] _defaultLongMV;
   private float[] _defaultFloatMV;
   private double[] _defaultDoubleMV;
+  private BigDecimal[] _defaultBigDecimalMV;
   private String[] _defaultStringMV;
   private byte[][] _defaultBytesMV;
 
@@ -95,6 +96,12 @@ public class DefaultValueColumnReader implements ColumnReader {
           _defaultDoubleMV = new double[defaultArray.length];
           for (int i = 0; i < defaultArray.length; i++) {
             _defaultDoubleMV[i] = ((Number) defaultArray[i]).doubleValue();
+          }
+          break;
+        case BIG_DECIMAL:
+          _defaultBigDecimalMV = new BigDecimal[defaultArray.length];
+          for (int i = 0; i < defaultArray.length; i++) {
+            _defaultBigDecimalMV[i] = (BigDecimal) defaultArray[i];
           }
           break;
         case STRING:
@@ -291,6 +298,15 @@ public class DefaultValueColumnReader implements ColumnReader {
   }
 
   @Override
+  public BigDecimal[] nextBigDecimalMV() {
+    if (!hasNext()) {
+      throw new IllegalStateException("No more values available");
+    }
+    _currentIndex++;
+    return _defaultBigDecimalMV;
+  }
+
+  @Override
   public String[] nextStringMV() {
     if (!hasNext()) {
       throw new IllegalStateException("No more values available");
@@ -398,6 +414,12 @@ public class DefaultValueColumnReader implements ColumnReader {
   public MultiValueResult<double[]> getDoubleMV(int docId) {
     validateDocId(docId);
     return MultiValueResult.of(_defaultDoubleMV, null);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId) {
+    validateDocId(docId);
+    return _defaultBigDecimalMV;
   }
 
   @Override

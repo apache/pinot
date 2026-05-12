@@ -57,6 +57,7 @@ public class FunctionRegistryTest {
   private static final EnumSet<FilterKind> IGNORED_FILTER_KINDS = EnumSet.of(
       // Special filter functions without implementation
       FilterKind.TEXT_MATCH, FilterKind.JSON_MATCH, FilterKind.VECTOR_SIMILARITY, FilterKind.VECTOR_SIMILARITY_RADIUS,
+      FilterKind.SEMANTIC_MATCH,
       // TODO: Support these functions
       FilterKind.RANGE, FilterKind.IN, FilterKind.NOT_IN);
 

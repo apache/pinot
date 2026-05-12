@@ -184,10 +184,11 @@ public class QueryOptionsUtils {
   /**
    * Returns the cost ratio for the inverted-index-based distinct heuristic, or null if not set.
    * The inverted index path is chosen when dictionaryCardinality * costRatio <= filteredDocCount.
+   * A cost ratio of 0 forces the inverted index path for any non-empty filter result.
    */
   @Nullable
   public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
-    return checkedParseDoublePositive(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
+    return checkedParseDoubleNonNegative(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
         queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
   }
 
@@ -617,6 +618,25 @@ public class QueryOptionsUtils {
     if (!Double.isFinite(value) || value <= 0) {
       throw new IllegalArgumentException(
           String.format("%s must be a positive number, got: %s", optionName, optionValue));
+    }
+    return value;
+  }
+
+  @Nullable
+  private static Double checkedParseDoubleNonNegative(String optionName, @Nullable String optionValue) {
+    if (optionValue == null) {
+      return null;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(optionValue.trim());
+    } catch (NumberFormatException nfe) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a non-negative number, got: %s", optionName, optionValue));
+    }
+    if (!Double.isFinite(value) || value < 0) {
+      throw new IllegalArgumentException(
+          String.format("%s must be a non-negative number, got: %s", optionName, optionValue));
     }
     return value;
   }

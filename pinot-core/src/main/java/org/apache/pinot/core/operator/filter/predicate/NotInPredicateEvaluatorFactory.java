@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
@@ -39,7 +40,6 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.MultiValueVisitor;
 import org.apache.pinot.spi.utils.ByteArray;
 
 
@@ -211,10 +211,28 @@ public class NotInPredicateEvaluatorFactory {
       super(predicate);
     }
 
-    /**
-     * Visits the not matching value of this predicate.
-     */
-    public abstract <R> R accept(MultiValueVisitor<R> visitor);
+    /// Visits the non-matching values of this predicate.
+    public abstract <R> R accept(Visitor<R> visitor);
+
+    /// Visitor for the non-matching values of a NOT_IN predicate, dispatched by the stored value type.
+    ///
+    /// The `BigDecimal` non-matching values are delivered in a [SortedSet] because `BigDecimal`'s `compareTo` is not
+    /// consistent with `equals` (e.g. `3.0` and `3` compare equal).
+    public interface Visitor<R> {
+      R visitInt(IntSet nonMatchingValues);
+
+      R visitLong(LongSet nonMatchingValues);
+
+      R visitFloat(FloatSet nonMatchingValues);
+
+      R visitDouble(DoubleSet nonMatchingValues);
+
+      R visitBigDecimal(SortedSet<BigDecimal> nonMatchingValues);
+
+      R visitString(Set<String> nonMatchingValues);
+
+      R visitBytes(Set<ByteArray> nonMatchingValues);
+    }
   }
 
   private static final class IntRawValueBasedNotInPredicateEvaluator extends NotInRawPredicateEvaluator {
@@ -254,8 +272,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitInt(_nonMatchingValues.toIntArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitInt(_nonMatchingValues);
     }
   }
 
@@ -296,8 +314,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitLong(_nonMatchingValues.toLongArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitLong(_nonMatchingValues);
     }
   }
 
@@ -338,8 +356,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitFloat(_nonMatchingValues.toFloatArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitFloat(_nonMatchingValues);
     }
   }
 
@@ -380,8 +398,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitDouble(_nonMatchingValues.toDoubleArray());
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitDouble(_nonMatchingValues);
     }
   }
 
@@ -411,8 +429,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitBigDecimal(_nonMatchingValues.toArray(new BigDecimal[0]));
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBigDecimal(_nonMatchingValues);
     }
   }
 
@@ -440,8 +458,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return visitor.visitString(_nonMatchingValues.toArray(new String[0]));
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitString(_nonMatchingValues);
     }
   }
 
@@ -469,9 +487,8 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      byte[][] bytes = _nonMatchingValues.stream().map(ByteArray::getBytes).toArray(byte[][]::new);
-      return visitor.visitBytes(bytes);
+    public <R> R accept(Visitor<R> visitor) {
+      return visitor.visitBytes(_nonMatchingValues);
     }
   }
 }

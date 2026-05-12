@@ -324,11 +324,13 @@ public class HelixHelper {
    */
   public static Set<String> getOfflineInstanceFromExternalView(ExternalView resourceExternalView) {
     Set<String> instanceSet = new HashSet<String>();
-    for (String partition : resourceExternalView.getPartitionSet()) {
-      Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
-      for (String instance : stateMap.keySet()) {
-        if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
-          instanceSet.add(instance);
+    if (resourceExternalView != null) {
+      for (String partition : resourceExternalView.getPartitionSet()) {
+        Map<String, String> stateMap = resourceExternalView.getStateMap(partition);
+        for (String instance : stateMap.keySet()) {
+          if (stateMap.get(instance).equalsIgnoreCase(OFFLINE)) {
+            instanceSet.add(instance);
+          }
         }
       }
     }

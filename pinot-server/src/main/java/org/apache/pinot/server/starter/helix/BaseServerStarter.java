@@ -777,7 +777,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
+        createSegmentOnlineOfflineStateModelFactory(instanceDataManager, _transitionThreadPoolManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -849,7 +849,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
+        createSegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
@@ -1253,6 +1253,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+  }
+
+  /**
+   * Creates the {@link SegmentMessageHandlerFactory} used to handle user-defined Helix messages for segments.
+   * Subclasses can override to return a custom factory that handles additional message sub-types.
+   */
+  protected SegmentMessageHandlerFactory createSegmentMessageHandlerFactory(InstanceDataManager instanceDataManager,
+      ServerMetrics serverMetrics) {
+    return new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
+  }
+
+  /**
+   * Creates the {@link SegmentOnlineOfflineStateModelFactory} used to handle Helix state transitions for segments.
+   * Subclasses can override to return a custom factory.
+   */
+  protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
+      InstanceDataManager instanceDataManager, StateTransitionThreadPoolManager transitionThreadPoolManager) {
+    return new SegmentOnlineOfflineStateModelFactory(instanceDataManager, transitionThreadPoolManager);
   }
 
   private void refreshMessageCount() {

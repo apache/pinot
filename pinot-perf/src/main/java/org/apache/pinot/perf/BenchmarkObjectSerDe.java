@@ -64,7 +64,7 @@ public class BenchmarkObjectSerDe {
   public void setUp()
       throws IOException {
     for (int i = 0; i < NUM_VALUES; i++) {
-      String stringValue = RandomStringUtils.randomAlphanumeric(10, 201);
+      String stringValue = RandomStringUtils.secure().nextAlphanumeric(10, 201);
       _stringList.add(stringValue);
       _stringSet.add(stringValue);
       _stringToStringMap.put(stringValue, stringValue);

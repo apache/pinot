@@ -22,22 +22,30 @@ import java.util.Map;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 
 
-/**
- * Config for {@link AvroRecordExtractor}
- */
+/// Config for [AvroRecordExtractor].
+///
+/// **`extractRawTimeValues`** (default `false`) controls how Avro temporal logical types are extracted:
+/// - `false`: `date` → [java.time.LocalDate], `time-millis`/`time-micros` → [java.time.LocalTime],
+///   `timestamp-millis`/`timestamp-micros` → [java.sql.Timestamp].
+/// - `true`: returns the raw underlying integer value per the Avro logical-type spec — `date` →
+///   `Integer` days-since-epoch, `time-millis` → `Integer` ms-since-midnight, `time-micros` → `Long`
+///   µs-since-midnight, `timestamp-millis` → `Long` epoch millis, `timestamp-micros` → `Long` epoch
+///   micros.
 public class AvroRecordExtractorConfig implements RecordExtractorConfig {
-  private boolean _enableLogicalTypes = true;
+  public static final String EXTRACT_RAW_TIME_VALUES = "extractRawTimeValues";
+
+  private boolean _extractRawTimeValues;
 
   @Override
   public void init(Map<String, String> props) {
-    _enableLogicalTypes = Boolean.parseBoolean(props.get("enableLogicalTypes"));
+    _extractRawTimeValues = Boolean.parseBoolean(props.get(EXTRACT_RAW_TIME_VALUES));
   }
 
-  public boolean isEnableLogicalTypes() {
-    return _enableLogicalTypes;
+  public boolean isExtractRawTimeValues() {
+    return _extractRawTimeValues;
   }
 
-  public void setEnableLogicalTypes(boolean enableLogicalTypes) {
-    _enableLogicalTypes = enableLogicalTypes;
+  public void setExtractRawTimeValues(boolean extractRawTimeValues) {
+    _extractRawTimeValues = extractRawTimeValues;
   }
 }

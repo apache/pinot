@@ -136,7 +136,6 @@ public class RexExpressionUtils {
         TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
         return rexBuilder.makeTimestampLiteral(tsString, 1);
       }
-      case JSON:
       case STRING: {
         assert value != null;
         return rexBuilder.makeLiteral((String) value);
@@ -148,16 +147,6 @@ public class RexExpressionUtils {
         ByteString byteString = new ByteString(bytes);
         return rexBuilder.makeBinaryLiteral(byteString);
       }
-      case BOOLEAN_ARRAY:
-      case BYTES_ARRAY:
-      case DOUBLE_ARRAY:
-      case FLOAT_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case STRING_ARRAY:
-      case TIMESTAMP_ARRAY:
-      case OBJECT:
-      case UNKNOWN:
       default:
         throw new IllegalStateException("Unsupported ColumnDataType: " + literal.getDataType());
     }
