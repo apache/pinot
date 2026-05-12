@@ -130,9 +130,8 @@ public class GcsPinotFS extends BasePinotFS {
       if (existsDirectoryOrBucket(gcsUri)) {
         return true;
       }
-      Blob blob =
-          _storage.create(BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), directoryPath)).build(), new byte[0]);
-      return blob.exists();
+      _storage.create(BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), directoryPath)).build(), new byte[0]);
+      return true;
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -563,7 +562,7 @@ public class GcsPinotFS extends BasePinotFS {
   private boolean copy(GcsUri srcUri, GcsUri dstUri)
       throws IOException {
     if (!exists(srcUri)) {
-      throw new IOException(String.format("Source URI '%s' does not exist", srcUri));
+      throw new IOException("Source URI '" + srcUri + "' does not exist");
     }
     if (srcUri.equals(dstUri)) {
       return true;
@@ -574,7 +573,7 @@ public class GcsPinotFS extends BasePinotFS {
     }
     // copy directory
     if (srcUri.hasSubpath(dstUri) || dstUri.hasSubpath(srcUri)) {
-      throw new IOException(String.format("Cannot copy from or to a subdirectory: '%s' -> '%s'", srcUri, dstUri));
+      throw new IOException("Cannot copy from or to a subdirectory: '" + srcUri + "' -> '" + dstUri + "'");
     }
     /**
      * If an non-empty blob exists and does not end with "/"
