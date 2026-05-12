@@ -196,7 +196,7 @@ public interface TableDataManager {
 
   /**
    * Deletes a segment from this table — offloads it if currently loaded, then removes its on-disk data (the per-segment
-   * directory and any tier-specific artefacts via {@link org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader}).
+   * directory and any tier-specific artefacts).
    */
   void deleteSegment(String segmentName)
       throws Exception;

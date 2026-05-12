@@ -634,21 +634,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   /**
-   * Single source of truth for on-disk cleanup of a physical segment. Removes the segment directory under
-   * {@code tableDataDir} and invokes the configured {@link SegmentDirectoryLoader#delete} for tier-aware cleanup.
-   *
-   * <p>Used by:
-   * <ul>
-   *   <li>{@link #deleteSegment} — the TDM-driven path triggered by a *_TO_DROPPED state transition.</li>
-   *   <li>{@code HelixInstanceDataManager.deleteSegment} fallback — when the per-table TDM is null because the
-   *       table was never instantiated, or has already been removed via {@code deleteTable()}.</li>
-   *   <li>TDM extensions that fan a single logical name out to multiple physical segments (e.g. segment-group
-   *       member fan-out) — these reuse this helper directly while holding all required per-member locks
-   *       acquired in lex order.</li>
-   * </ul>
-   *
-   * <p>Caller is responsible for holding the per-segment lock and for offloading the segment from the TDM if it
-   * is still loaded.
+   * Removes the segment directory locally and does tier-aware cleanup too
    */
   public static void deleteSegmentFilesFromDisk(String tableDataDir, String segmentName,
       InstanceDataManagerConfig instanceConfig)
@@ -1070,75 +1056,72 @@ public abstract class BaseTableDataManager implements TableDataManager {
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
+    boolean semaphoreAcquired = false;
     try {
       _segmentReloadSemaphore.acquire(segmentName, _logger);
-      try {
-        /*
-        Determines if a segment should be downloaded from deep storage based on:
-        1. A forced download flag.
-        2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
-           between ZK metadata and local metadata CRC.
-           - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
-             and the segment is available in deep storage or with a peer before discarding
-             the local copy.
+      semaphoreAcquired = true;
+      /*
+      Determines if a segment should be downloaded from deep storage based on:
+      1. A forced download flag.
+      2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
+         between ZK metadata and local metadata CRC.
+         - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
+           and the segment is available in deep storage or with a peer before discarding
+           the local copy.
 
-        Otherwise:
-        - Copy the backup directory back to the original index directory.
-        - Continue loading the segment from the index directory.
-        */
-        boolean shouldDownload =
-            forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
-                && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
-        if (shouldDownload) {
-          // Create backup directory to handle failure of segment reloading.
-          createBackup(indexDir);
-          if (forceDownload) {
-            _logger.info("Force downloading segment: {}", segmentName);
-          } else {
-            _logger.info("Downloading segment: {} because its CRC has changed from: {} to: {}", segmentName,
-                localMetadata.getCrc(), zkMetadata.getCrc());
-          }
-          indexDir = downloadSegment(zkMetadata);
+      Otherwise:
+      - Copy the backup directory back to the original index directory.
+      - Continue loading the segment from the index directory.
+      */
+      boolean shouldDownload =
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
+              && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
+      if (shouldDownload) {
+        // Create backup directory to handle failure of segment reloading.
+        createBackup(indexDir);
+        if (forceDownload) {
+          _logger.info("Force downloading segment: {}", segmentName);
         } else {
-          _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
-              TierConfigUtils.normalizeTierName(segmentTier));
-          SegmentDirectory segmentDirectory =
-              initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
-          // We should first try to reuse existing segment directory
-          if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
-            _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed",
-                segmentName);
-            // No reprocessing needed, reuse the same segment
-            ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
-            addSegment(segment, zkMetadata);
-            return;
-          }
-          // Create backup directory to handle failure of segment reloading.
-          createBackup(indexDir);
-          // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
-          // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
-          // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
-          try {
-            segmentDirectory.copyTo(indexDir);
-          } finally {
-            segmentDirectory.close();
-          }
+          _logger.info("Downloading segment: {} because its CRC has changed from: {} to: {}", segmentName,
+              localMetadata.getCrc(), zkMetadata.getCrc());
         }
-
-        // Load from indexDir and replace the old segment in memory. What's inside indexDir
-        // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
-        indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-        _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
-            TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
-        ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
-            _segmentOperationsThrottlerSet, zkMetadata);
-        addSegment(segment, zkMetadata);
-
-        // Remove backup directory to mark the completion of segment reloading.
-        removeBackup(indexDir);
-      } finally {
-        _segmentReloadSemaphore.release();
+        indexDir = downloadSegment(zkMetadata);
+      } else {
+        _logger.info("Reloading existing segment: {} on tier: {}", segmentName,
+            TierConfigUtils.normalizeTierName(segmentTier));
+        SegmentDirectory segmentDirectory =
+            initSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig, zkMetadata);
+        // We should first try to reuse existing segment directory
+        if (canReuseExistingDirectoryForReload(zkMetadata, segmentTier, segmentDirectory, indexLoadingConfig)) {
+          _logger.info("Reloading segment: {} using existing segment directory as no reprocessing needed", segmentName);
+          // No reprocessing needed, reuse the same segment
+          ImmutableSegment segment = ImmutableSegmentLoader.load(segmentDirectory, indexLoadingConfig);
+          addSegment(segment, zkMetadata);
+          return;
+        }
+        // Create backup directory to handle failure of segment reloading.
+        createBackup(indexDir);
+        // The indexDir is empty after calling createBackup, as it's renamed to a backup directory.
+        // The SegmentDirectory should initialize accordingly. Like for SegmentLocalFSDirectory, it
+        // doesn't load anything from an empty indexDir, but gets the info to complete the copyTo.
+        try {
+          segmentDirectory.copyTo(indexDir);
+        } finally {
+          segmentDirectory.close();
+        }
       }
+
+      // Load from indexDir and replace the old segment in memory. What's inside indexDir
+      // may come from SegmentDirectory.copyTo() or the segment downloaded from deep store.
+      indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
+      _logger.info("Loading segment: {} from indexDir: {} to tier: {}", segmentName, indexDir,
+          TierConfigUtils.normalizeTierName(zkMetadata.getTier()));
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig,
+          _segmentOperationsThrottlerSet, zkMetadata);
+      addSegment(segment, zkMetadata);
+
+      // Remove backup directory to mark the completion of segment reloading.
+      removeBackup(indexDir);
     } catch (Exception reloadFailureException) {
       try {
         LoaderUtils.reloadFailureRecovery(indexDir);
@@ -1151,6 +1134,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
               reloadFailureException));
       throw reloadFailureException;
     } finally {
+      if (semaphoreAcquired) {
+        _segmentReloadSemaphore.release();
+      }
       segmentLock.unlock();
     }
     _logger.info("Reloaded segment: {}", segmentName);
@@ -1480,11 +1466,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   /**
    * Just Loads a segment from the existing on-disk copy without registering it in {@code _segmentDataManagerMap} or
-   * invoking other hooks. Returns {@code null} when the on-disk copy is absent, has a stale CRC under
-   * {@code shouldCheckCRCOnSegmentLoad}, or fails to load — callers fall back to a fresh download in that case.
-   * Single-segment callers should use {@link #tryLoadExistingSegment} which performs the registration step.
-   * Multi-segment managers can compose this with {@link #downloadSegment} to load all members before wrapping them
-   * under a single map entry.
+   * invoking other hooks.
+   * Returns {@code null} when the on-disk copy is absent, has a stale CRC under or fails to load
    */
   @Nullable
   protected ImmutableSegment tryLoadExistingSegmentInternal(SegmentZKMetadata zkMetadata,
