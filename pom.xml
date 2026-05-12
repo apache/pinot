@@ -200,7 +200,7 @@
     <ayza.version>10.0.5</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <scala-xml.version>2.4.0</scala-xml.version>
-    <plexus-classworlds.version>2.10.0</plexus-classworlds.version>
+    <plexus-classworlds.version>2.11.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <checker-qual.version>4.1.0</checker-qual.version>
