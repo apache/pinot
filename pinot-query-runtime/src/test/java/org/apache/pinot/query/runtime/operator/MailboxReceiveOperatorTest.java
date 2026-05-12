@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +41,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator.Type;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.service.dispatch.AdaptiveRoutingUpstreamTimings;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
@@ -288,8 +290,10 @@ public class MailboxReceiveOperatorTest {
 
     // Use a short deadline so the test does not take too long waiting for the slow sender.
     long shortDeadlineMs = System.currentTimeMillis() + 500L;
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
     try (MailboxReceiveOperator operator = getOperator(_stageMetadataBoth, RelDistribution.Type.HASH_DISTRIBUTED,
-        shortDeadlineMs)) {
+        shortDeadlineMs, metadata)) {
       MseBlock block = operator.nextBlock();
       // The operator times out waiting for mailbox 2.
       assertTrue(block.isError(), "Expected a timeout error block");
@@ -308,7 +312,13 @@ public class MailboxReceiveOperatorTest {
 
   private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
       long deadlineMs) {
-    OpChainExecutionContext context = OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata);
+    return getOperator(stageMetadata, distributionType, deadlineMs, Map.of());
+  }
+
+  private MailboxReceiveOperator getOperator(StageMetadata stageMetadata, RelDistribution.Type distributionType,
+      long deadlineMs, Map<String, String> opChainMetadata) {
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, deadlineMs, stageMetadata, opChainMetadata);
     MailboxReceiveNode node = mock(MailboxReceiveNode.class);
     when(node.getDistributionType()).thenReturn(distributionType);
     when(node.getSenderStageId()).thenReturn(1);
