@@ -124,7 +124,7 @@ public class CompressionStatsCornerCaseTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
       row.putValue(INT_RAW_COL, RANDOM.nextInt(100000));
-      row.putValue(STRING_RAW_COL, RandomStringUtils.randomAlphanumeric(20 + RANDOM.nextInt(80)));
+      row.putValue(STRING_RAW_COL, RandomStringUtils.secure().nextAlphanumeric(20 + RANDOM.nextInt(80)));
       row.putValue(DICT_COL, "value_" + (i % 100));
       rows.add(row);
     }
@@ -168,7 +168,7 @@ public class CompressionStatsCornerCaseTest {
     for (String colName : schema.getColumnNames()) {
       ColumnMetadata colMeta = metadata.getColumnMetadataFor(colName);
       assertTrue(colMeta.hasDictionary(), colName + " should have dictionary");
-      assertEquals(colMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+      assertEquals(colMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
           colName + " should not have uncompressed forward index size");
       assertNull(colMeta.getCompressionCodec(),
           colName + " should not have compression codec");
@@ -184,7 +184,7 @@ public class CompressionStatsCornerCaseTest {
 
     ColumnMetadata rawMetaOff = metadataOff.getColumnMetadataFor(INT_RAW_COL);
     assertFalse(rawMetaOff.hasDictionary());
-    assertEquals(rawMetaOff.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(rawMetaOff.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Flag OFF should not track uncompressed size");
     assertNull(rawMetaOff.getCompressionCodec(),
         "Flag OFF should not track compression codec");
@@ -214,7 +214,7 @@ public class CompressionStatsCornerCaseTest {
     ColumnMetadata rawMeta = metadata.getColumnMetadataFor(INT_RAW_COL);
     assertNotNull(rawMeta);
     assertFalse(rawMeta.hasDictionary());
-    assertEquals(rawMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(rawMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Old segment should return INDEX_NOT_FOUND for uncompressed size");
     assertNull(rawMeta.getCompressionCodec(),
         "Old segment should return null for compression codec");
@@ -222,7 +222,7 @@ public class CompressionStatsCornerCaseTest {
     ColumnMetadata dictMeta = metadata.getColumnMetadataFor(DICT_COL);
     assertNotNull(dictMeta);
     assertTrue(dictMeta.hasDictionary());
-    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND);
+    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE);
     assertNull(dictMeta.getCompressionCodec());
   }
 

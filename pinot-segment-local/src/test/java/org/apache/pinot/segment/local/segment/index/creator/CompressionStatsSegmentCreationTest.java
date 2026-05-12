@@ -76,7 +76,7 @@ public class CompressionStatsSegmentCreationTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
       row.putValue(INT_RAW_COL, RANDOM.nextInt(100000));
-      row.putValue(STRING_RAW_COL, RandomStringUtils.randomAlphanumeric(20 + RANDOM.nextInt(80)));
+      row.putValue(STRING_RAW_COL, RandomStringUtils.secure().nextAlphanumeric(20 + RANDOM.nextInt(80)));
       row.putValue(DICT_COL, "value_" + (i % 100));
       rows.add(row);
     }
@@ -170,7 +170,7 @@ public class CompressionStatsSegmentCreationTest {
     ColumnMetadata dictMeta = metadata.getColumnMetadataFor(DICT_COL);
     assertNotNull(dictMeta);
     assertTrue(dictMeta.hasDictionary());
-    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(dictMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Dictionary-encoded column should not have uncompressed forward index size");
     assertNull(dictMeta.getCompressionCodec(),
         "Dictionary-encoded column should not have compression codec");
@@ -186,7 +186,7 @@ public class CompressionStatsSegmentCreationTest {
     // When compressionStatsEnabled is false, no uncompressed size should be persisted
     ColumnMetadata intMeta = metadata.getColumnMetadataFor(INT_RAW_COL);
     assertNotNull(intMeta);
-    assertEquals(intMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.INDEX_NOT_FOUND,
+    assertEquals(intMeta.getUncompressedForwardIndexSizeBytes(), ColumnMetadata.UNAVAILABLE,
         "Uncompressed size should not be tracked when compressionStatsEnabled is false");
     assertNull(intMeta.getCompressionCodec(),
         "Compression codec should not be tracked when compressionStatsEnabled is false");
