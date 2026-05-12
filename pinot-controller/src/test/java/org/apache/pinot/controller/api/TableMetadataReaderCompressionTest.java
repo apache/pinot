@@ -26,12 +26,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.ColumnCompressionStatsInfo;
+import org.apache.pinot.common.restlet.resources.CompressionStatsSummary;
+import org.apache.pinot.common.restlet.resources.StorageBreakdownInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -186,6 +189,97 @@ public class TableMetadataReaderCompressionTest {
     assertNull(result.getColumnCompressionStats(), "columnCompressionStats should be null when flag is OFF");
     assertNull(result.getCompressionStats(), "compressionStats should be null when flag is OFF");
     // storageBreakdown is always-on; it is null here only because test servers don't send it
+  }
+
+  @Test
+  public void testCompressionSummaryAndStorageBreakdownAggregation()
+      throws IOException {
+    // Build a server response that includes CompressionStatsSummary and StorageBreakdownInfo
+    Map<String, StorageBreakdownInfo.TierInfo> tiers = new HashMap<>();
+    tiers.put("default", new StorageBreakdownInfo.TierInfo(3, 150000));
+    tiers.put("cold", new StorageBreakdownInfo.TierInfo(1, 60000));
+    StorageBreakdownInfo breakdown = new StorageBreakdownInfo(tiers);
+
+    List<ColumnCompressionStatsInfo> colStats = new ArrayList<>();
+    colStats.add(new ColumnCompressionStatsInfo("col_a", 20000, 4000, 5.0, "LZ4", false, null));
+
+    CompressionStatsSummary summary = new CompressionStatsSummary(20000, 4000, 5.0, 3, 3, false);
+
+    TableMetadataInfo info = new TableMetadataInfo("testTable_OFFLINE", 200000, 4, 2000,
+        Map.of("col_a", 4.0), Map.of("col_a", 50.0),
+        Map.of(), Map.of(), Map.of(), colStats, summary, breakdown);
+
+    HttpServer summaryServer = startServer(11215, createHandler(info));
+    try {
+      ServerSegmentMetadataReader reader = new ServerSegmentMetadataReader(_executor, _connectionManager);
+      BiMap<String, String> endpoints = HashBiMap.create();
+      endpoints.put("srv", "http://localhost:11215");
+
+      TableMetadataInfo result = reader.getAggregatedTableMetadataFromServer(
+          "testTable_OFFLINE", endpoints, null, 1, TIMEOUT_MSEC, true);
+
+      assertNotNull(result);
+
+      // CompressionStatsSummary should be aggregated and returned
+      CompressionStatsSummary resultSummary = result.getCompressionStats();
+      assertNotNull(resultSummary, "compressionStats should be aggregated from server response");
+      assertEquals(resultSummary.getRawForwardIndexSizePerReplicaInBytes(), 20000);
+      assertEquals(resultSummary.getCompressedForwardIndexSizePerReplicaInBytes(), 4000);
+      assertEquals(resultSummary.getCompressionRatio(), 5.0, 0.01);
+      assertEquals(resultSummary.getSegmentsWithStats(), 3);
+      assertEquals(resultSummary.getTotalSegments(), 3);
+      assertFalse(resultSummary.isPartialCoverage());
+
+      // StorageBreakdownInfo should be aggregated and divided by numReplica (1 here)
+      StorageBreakdownInfo resultBreakdown = result.getStorageBreakdown();
+      assertNotNull(resultBreakdown, "storageBreakdown should be aggregated from server response");
+      assertNotNull(resultBreakdown.getTiers());
+      assertEquals(resultBreakdown.getTiers().size(), 2);
+      StorageBreakdownInfo.TierInfo defaultTier = resultBreakdown.getTiers().get("default");
+      assertNotNull(defaultTier);
+      assertEquals(defaultTier.getCount(), 3);
+      assertEquals(defaultTier.getSizePerReplicaInBytes(), 150000);
+    } finally {
+      summaryServer.stop(0);
+    }
+  }
+
+  @Test
+  public void testDictColumnSentinelAndSkipPath()
+      throws IOException {
+    // Dict column: uncompressed=-1 sentinel, codec=null, hasDictionary=true → preserved
+    // Old raw column: uncompressed=0, codec=null, hasDictionary=false → skipped
+    List<ColumnCompressionStatsInfo> colStats = new ArrayList<>();
+    colStats.add(new ColumnCompressionStatsInfo("dict_col", -1, 8000, 0.0, null, true,
+        List.of("forward_index")));
+    colStats.add(new ColumnCompressionStatsInfo("old_raw_col", 0, 5000, 0.0, null, false, null));
+
+    TableMetadataInfo info = new TableMetadataInfo("testTable_OFFLINE", 100000, 2, 1000,
+        Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), colStats);
+
+    HttpServer server = startServer(11216, createHandler(info));
+    try {
+      ServerSegmentMetadataReader reader = new ServerSegmentMetadataReader(_executor, _connectionManager);
+      BiMap<String, String> endpoints = HashBiMap.create();
+      endpoints.put("srv", "http://localhost:11216");
+
+      TableMetadataInfo result = reader.getAggregatedTableMetadataFromServer(
+          "testTable_OFFLINE", endpoints, null, 1, TIMEOUT_MSEC, true);
+
+      assertNotNull(result);
+      List<ColumnCompressionStatsInfo> stats = result.getColumnCompressionStats();
+      assertNotNull(stats);
+      // old_raw_col (codec=null, hasDictionary=false) must be skipped
+      assertEquals(stats.size(), 1);
+      ColumnCompressionStatsInfo dictColInfo = stats.get(0);
+      assertEquals(dictColInfo.getColumn(), "dict_col");
+      // dict column: sentinel -1 preserved (not divided as 0)
+      assertEquals(dictColInfo.getUncompressedSizeInBytes(), -1);
+      assertEquals(dictColInfo.getCompressedSizeInBytes(), 8000);
+      assertTrue(dictColInfo.isHasDictionary());
+    } finally {
+      server.stop(0);
+    }
   }
 
   private HttpHandler createHandler(TableMetadataInfo info) {
