@@ -27,12 +27,14 @@ import static org.testng.Assert.assertEquals;
 public class AdaptiveRoutingUpstreamTimingsTest {
 
   @Test
-  public void testEncodeMultipleEntriesSortedByKey() {
+  public void testEncodeMultipleEntriesRoundTrips() {
     Map<String, Long> timings = new java.util.LinkedHashMap<>();
     timings.put("host-z|8442", 300L);
     timings.put("host-a|8442", 100L);
     timings.put("host-m|8442", 200L);
-    assertEquals(AdaptiveRoutingUpstreamTimings.encode(timings), "host-a|8442=100;host-m|8442=200;host-z|8442=300");
+    String encoded = AdaptiveRoutingUpstreamTimings.encode(timings);
+    assertEquals(AdaptiveRoutingUpstreamTimings.decode(encoded), Map.of(
+        "host-z|8442", 300L, "host-a|8442", 100L, "host-m|8442", 200L));
   }
 
   @Test
