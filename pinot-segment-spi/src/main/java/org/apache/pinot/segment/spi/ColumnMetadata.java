@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
