@@ -33,6 +33,8 @@ import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -60,6 +62,10 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
     ValueBlock valueBlock;
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(valueBlock.getNumDocs());
+      }
       if (executor.process(valueBlock)) {
         break;
       }
@@ -116,5 +122,11 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
         .map(ExpressionContext::toString)
         .collect(Collectors.toList());
     attributeBuilder.putStringList("keyColumns", expressions);
+  }
+
+  @javax.annotation.Nullable
+  private static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

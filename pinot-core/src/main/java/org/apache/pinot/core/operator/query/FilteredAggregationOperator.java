@@ -35,6 +35,8 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -95,6 +97,10 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
         result[resultIndexMap.get(aggregationFunctions[i])] = filteredResult.get(i);
       }
       _numDocsScanned += numDocsScanned;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsScanned);
+      }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();
     }
@@ -126,5 +132,11 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
           .collect(Collectors.toList());
       attributeBuilder.putStringList("aggregations", aggregations);
     }
+  }
+
+  @javax.annotation.Nullable
+  private static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

@@ -47,7 +47,7 @@ public interface QueryKillingStrategy {
    * Only called when {@link #shouldTerminate} returns true.
    */
   QueryKillReport buildKillReport(QueryScanCostContext context,
-      String queryId, String tableName, String configSource);
+      long requestId, String queryId, String tableName, String configSource);
 
   /** Error code for the termination response. */
   default QueryErrorCode getErrorCode() {

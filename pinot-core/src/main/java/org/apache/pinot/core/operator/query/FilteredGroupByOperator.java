@@ -48,6 +48,8 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,6 +162,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       }
 
       _numDocsScanned += numDocsScanned;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsScanned);
+      }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();
       GroupByResultHolder[] filterGroupByResults = groupByExecutor.getGroupByResultHolders();
@@ -287,5 +293,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
           .collect(Collectors.toList());
       attributeBuilder.putStringList("aggregations", aggregations);
     }
+  }
+
+  @javax.annotation.Nullable
+  private static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

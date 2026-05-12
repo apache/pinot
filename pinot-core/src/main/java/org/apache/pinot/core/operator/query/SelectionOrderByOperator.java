@@ -52,6 +52,8 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -189,6 +191,10 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
         }
       }
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost = getScanCostContext();
+      if (scanCost != null) {
+        scanCost.addDocsScanned(numDocsFetched);
+      }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
@@ -253,6 +259,10 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
         }
       }
       _numDocsScanned += numDocsFetched;
+      QueryScanCostContext scanCost2 = getScanCostContext();
+      if (scanCost2 != null) {
+        scanCost2.addDocsScanned(numDocsFetched);
+      }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
 
@@ -367,5 +377,11 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, _numEntriesScannedPostFilter,
         numTotalDocs);
+  }
+
+  @javax.annotation.Nullable
+  private static QueryScanCostContext getScanCostContext() {
+    QueryThreadContext ctx = QueryThreadContext.getIfAvailable();
+    return ctx != null ? ctx.getExecutionContext().getQueryScanCostContext() : null;
   }
 }

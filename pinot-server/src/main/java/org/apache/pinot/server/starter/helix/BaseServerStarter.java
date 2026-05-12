@@ -87,6 +87,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
 import org.apache.pinot.core.instance.context.ServerContext;
+import org.apache.pinot.core.query.killing.QueryKillingManager;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerThreadPoolConfigChangeListener;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -189,6 +190,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected SegmentOperationsThrottlerSet _segmentOperationsThrottlerSet;
   protected ThreadAccountant _threadAccountant;
+  protected QueryKillingManager _queryKillingManager;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
   protected ScheduledExecutorService _helixMessageCountScheduler;
@@ -772,6 +774,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
+    // Initialize scan-based query killing
+    PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    _queryKillingManager = QueryKillingManager.init(schedulerConfig, ServerMetrics.get());
+
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate =
         KeepPipelineBreakerStatsPredicate.create(_serverConf);
@@ -789,6 +795,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
         new ServerRateLimitConfigChangeListener(_serverMetrics);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+
+    // Register query killing manager for dynamic config updates (threshold/mode changes via ZK)
+    if (_queryKillingManager != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(_queryKillingManager);
+    }
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
