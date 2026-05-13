@@ -55,7 +55,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
  *
  * <p>TODO: Rule lists may be consolidated into
  * {@link org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer} in a future refactor once
- * the {@link org.apache.pinot.query.planner.rules.RuleSetCustomizer} SPI is the established
+ * the {@link org.apache.pinot.query.planner.spi.RuleSetCustomizer} SPI is the established
  * extension point for broker rule customization.
  */
 public class PinotQueryRuleSets {
@@ -260,11 +260,12 @@ public class PinotQueryRuleSets {
   );
   //@formatter:on
 
-  /// Pinot specific post-logical rules.
-  ///
-  /// <p>The {@code sortExchangeCopyLimit} parameter is <b>no longer applied here</b>. Per-query
-  /// sort-exchange-copy threshold overrides are now handled by {@code QueryEnvironment.getTraitProgram},
-  /// which swaps the rule on a per-query copy of {@link #POST_LOGICAL_RULES}.
+  /// @deprecated Use {@link #POST_LOGICAL_RULES} directly. The
+  /// {@code sortExchangeCopyLimit} parameter is ignored — per-query
+  /// sort-exchange-copy threshold overrides are handled by
+  /// {@code QueryEnvironment.getTraitProgram}, which swaps the rule on a
+  /// per-query copy of {@link #POST_LOGICAL_RULES}.
+  @Deprecated
   public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
     return POST_LOGICAL_RULES;
   }

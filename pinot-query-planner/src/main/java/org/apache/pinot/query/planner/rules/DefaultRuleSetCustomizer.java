@@ -23,6 +23,8 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
+import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
 
 
 /// [RuleSetCustomizer] that seeds every [Phase] with the OSS default Calcite

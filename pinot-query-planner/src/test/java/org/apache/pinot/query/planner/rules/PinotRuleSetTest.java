@@ -21,6 +21,8 @@ package org.apache.pinot.query.planner.rules;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
+import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

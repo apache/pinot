@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.rules;
+package org.apache.pinot.query.planner.spi;
 
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
@@ -26,18 +26,18 @@ import org.apache.calcite.plan.RelOptRule;
 ///
 /// Implementations are discovered via [java.util.ServiceLoader]. Declare your
 /// customizer in
-/// `META-INF/services/org.apache.pinot.query.planner.rules.RuleSetCustomizer`
+/// `META-INF/services/org.apache.pinot.query.planner.spi.RuleSetCustomizer`
 /// inside the plugin JAR. Implementations must have a public no-arg constructor.
 ///
-/// [PinotRuleSet#loadFromServiceLoader()] first discovers application-classpath
-/// customizers, then iterates every plugin classloader registered with
+/// [org.apache.pinot.query.planner.rules.PinotRuleSet#loadFromServiceLoader()] first discovers
+/// application-classpath customizers, then iterates every plugin classloader registered with
 /// [org.apache.pinot.spi.plugin.PluginManager]. Plugin JARs must be loaded
-/// before [PinotRuleSet#defaultInstance()] is first called; the singleton is
-/// initialized once and not refreshed.
+/// before [org.apache.pinot.query.planner.rules.PinotRuleSet#defaultInstance()] is first called;
+/// the singleton is initialized once and not refreshed.
 ///
 ///
-/// [PinotRuleSet] invokes every discovered customizer once per [Phase] at
-/// broker startup. The customizer receives the mutable per-phase rule list
+/// [org.apache.pinot.query.planner.rules.PinotRuleSet] invokes every discovered customizer once
+/// per [Phase] at broker startup. The customizer receives the mutable per-phase rule list
 /// and can append, remove, replace, or reorder rules using standard `List`
 /// operations. After every customizer has run, `PinotRuleSet` defensively
 /// copies each list to an immutable form; mutations to the supplied list
@@ -47,8 +47,8 @@ import org.apache.calcite.plan.RelOptRule;
 ///
 /// Customizers run in `ServiceLoader` iteration order — typically classpath
 /// order, which is JVM-dependent. The OSS defaults are themselves contributed
-/// by [DefaultRuleSetCustomizer]; plugin authors that depend on observing the
-/// OSS defaults should not assume a specific position. To guarantee ordering
+/// by [org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer]; plugin authors that depend
+/// on observing the OSS defaults should not assume a specific position. To guarantee ordering
 /// across customizers, drop and re-add rules from your own `customize`
 /// implementation.
 ///
@@ -65,18 +65,19 @@ import org.apache.calcite.plan.RelOptRule;
 /// }
 /// ```
 ///
-/// And `META-INF/services/org.apache.pinot.query.planner.rules.RuleSetCustomizer`:
+/// And `META-INF/services/org.apache.pinot.query.planner.spi.RuleSetCustomizer`:
 /// ```
 /// com.example.MyPluginRules
 /// ```
 ///
 /// ### Thread safety
 ///
-/// Customizers are invoked single-threaded during [PinotRuleSet] construction.
+/// Customizers are invoked single-threaded during
+/// [org.apache.pinot.query.planner.rules.PinotRuleSet] construction.
 /// Implementations need not be thread-safe and must not retain references to
 /// the supplied list — the list is defensively copied after every customizer
 /// has run. A customizer that throws aborts construction and propagates the
-/// exception out of [PinotRuleSet#loadFromServiceLoader()].
+/// exception out of [org.apache.pinot.query.planner.rules.PinotRuleSet#loadFromServiceLoader()].
 public interface RuleSetCustomizer {
 
   /// Modify the broker's rule list for the given phase. The list is mutable

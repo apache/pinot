@@ -23,7 +23,7 @@ import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.util.Set;
 import java.util.jar.JarOutputStream;
-import org.apache.pinot.query.planner.rules.RuleSetCustomizer;
+import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

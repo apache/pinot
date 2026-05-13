@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.pinot.query.planner.spi.Phase;
+import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
@@ -79,7 +81,7 @@ public final class PinotRuleSet {
   ///    [DefaultRuleSetCustomizer] and any customizer bundled with the broker.
   /// 2. Plugin classloaders enumerated by [PluginManager#getPluginClassLoaders()] —
   ///    picks up customizers registered in plugin JARs via
-  ///    `META-INF/services/org.apache.pinot.query.planner.rules.RuleSetCustomizer`.
+  ///    `META-INF/services/org.apache.pinot.query.planner.spi.RuleSetCustomizer`.
   ///
   /// Call after all plugins have been loaded via [PluginManager]; plugins loaded
   /// after this method returns will not be included.

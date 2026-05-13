@@ -310,7 +310,7 @@ public class PluginManager {
         // TODO: implement the self-declaring META-INF/pinot-realm-exports mechanism.
         Stream.of(
             "org.apache.pinot.spi",
-            "org.apache.pinot.query.planner.rules",   // RuleSetCustomizer SPI (pinot-query-planner-spi)
+            "org.apache.pinot.query.planner.spi",     // RuleSetCustomizer SPI (pinot-query-planner-spi)
             "org.apache.calcite.plan"                 // RelOptRule, used by RuleSetCustomizer.customize
         ).forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
