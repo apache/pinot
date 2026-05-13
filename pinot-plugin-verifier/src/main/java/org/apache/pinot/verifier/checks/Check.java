@@ -21,20 +21,23 @@ package org.apache.pinot.verifier.checks;
 import org.apache.pinot.verifier.PluginVerifier.CheckContext;
 
 
-/// One verifier per plugin SPI. Implementations exercise the SAME factory API a real broker /
-/// server / minion uses to instantiate that kind of plugin — so a green run means "this
-/// plugin would actually load in production", not "the class file is on the classpath".
+/**
+ * One verifier per plugin SPI. Implementations exercise the SAME factory API a real broker /
+ * server / minion uses to instantiate that kind of plugin — so a green run means "this
+ * plugin would actually load in production", not "the class file is on the classpath".
+ */
 public interface Check {
 
-  /// Display name printed at the top of the section.
+  /** Display name printed at the top of the section. */
   String name();
 
-  /// Run the check and return a per-plugin tally. Implementations should not throw — failures
-  /// belong inside the [Outcome].
+  /**
+   * Run the check and return a per-plugin tally. Implementations should not throw — failures
+   * belong inside the {@link Outcome}.
+   */
   Outcome run(CheckContext context);
 
-  /// Per-section result. {@code passed + failed} equals the number of plugin classes the check
-  /// attempted to verify.
+  /** Per-section result. {@code passed + failed} equals the number of plugin classes attempted. */
   record Outcome(int passed, int failed) {
     public static Outcome empty() {
       return new Outcome(0, 0);

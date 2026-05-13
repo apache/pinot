@@ -430,9 +430,9 @@ public class PluginManagerTest {
     Assert.assertTrue(services.isEmpty());
   }
 
-  /// Regression test: a classloader in the realm walk that throws {@link NoClassDefFoundError}
-  /// (class bytecode found but transitive dep missing) must not propagate the error to the
-  /// caller. The walk must continue past it and ultimately surface {@link ClassNotFoundException}.
+  // Regression: a classloader in the realm walk that throws NoClassDefFoundError (class bytecode
+  // found but transitive dep missing) must not propagate the error to the caller — the walk must
+  // continue past it and ultimately surface ClassNotFoundException.
   @Test
   public void testRealmWalkContinuesPastNoClassDefFoundError() throws Exception {
     PluginManager pm = new PluginManager();

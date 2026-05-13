@@ -3004,6 +3004,10 @@
             <!-- Spark datasource register -->
             <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
 
+            <!-- ServiceLoader registration files under META-INF/services/ — plain text files
+                 listing FQCNs, no license header format applies -->
+            <exclude>**/META-INF/services/**</exclude>
+
             <!-- Binary files -->
             <exclude>**/*.avro</exclude>
             <exclude>**/*.avsc</exclude>

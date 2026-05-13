@@ -23,10 +23,12 @@ import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.verifier.PluginVerifier.CheckContext;
 
 
-/// Asks {@code PluginManager.loadServices(PinotMetricsFactory.class)} for the set of metrics
-/// factories the realm walk discovers. The post-PR migration path in
-/// {@code PinotMetricUtils.initializePinotMetricsFactory} uses exactly this call, so a green
-/// run here is the same coverage as a real broker initializing metrics.
+/**
+ * Asks {@code PluginManager.loadServices(PinotMetricsFactory.class)} for the set of metrics
+ * factories the realm walk discovers. The {@code PinotMetricUtils.initializePinotMetricsFactory}
+ * migration uses exactly this call, so a green run here is the same coverage as a real broker
+ * initializing metrics.
+ */
 public final class MetricsFactoryCheck implements Check {
 
   @Override

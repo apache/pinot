@@ -24,15 +24,17 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.verifier.PluginVerifier.CheckContext;
 
 
-/// Each {@link StreamConsumerFactory} is normally instantiated by
-/// {@code StreamConsumerFactoryProvider.create(StreamConfig)} after parsing a table's stream
-/// config. We don't synthesise a {@code StreamConfig} (it has many required fields per
-/// stream type) — we just instantiate the factory class via {@code PluginManager} the same
-/// way the provider does internally. That covers the realm-loading concern; talking to a real
-/// Kafka / Kinesis / Pulsar broker is integration-test territory.
+/**
+ * Each {@link StreamConsumerFactory} is normally instantiated by
+ * {@code StreamConsumerFactoryProvider.create(StreamConfig)} after parsing a table's stream
+ * config. We don't synthesise a {@code StreamConfig} (it has many required fields per stream
+ * type) — we just instantiate the factory class via {@code PluginManager} the same way the
+ * provider does internally. That covers the realm-loading concern; talking to a real
+ * Kafka / Kinesis / Pulsar broker is integration-test territory.
+ */
 public final class StreamConsumerCheck implements Check {
-  /// Map of pluginName → StreamConsumerFactory FQCN. Plugin name matches
-  /// {@code plugins/pinot-stream-ingestion/<name>}.
+  // Map of pluginName -> StreamConsumerFactory FQCN. Plugin name matches
+  // plugins/pinot-stream-ingestion/<name>.
   private static final Map<String, String> CONSUMERS = new LinkedHashMap<>() {{
     put("pinot-kafka-3.0", "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory");
     put("pinot-kafka-4.0", "org.apache.pinot.plugin.stream.kafka40.KafkaConsumerFactory");

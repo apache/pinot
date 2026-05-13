@@ -24,14 +24,16 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.verifier.PluginVerifier.CheckContext;
 
 
-/// Each {@link PinotFS} is registered in production via
-/// {@code PinotFSFactory.register(scheme, factoryClassName, config)}. We don't go through
-/// {@code register} here because it requires per-scheme config (credentials, region, etc.) we
-/// don't have; instead we instantiate the class directly through {@code PluginManager} —
-/// which is what {@code register} does internally. Connecting to the actual storage backend
-/// is the integration tests' job.
+/**
+ * Each {@link PinotFS} is registered in production via
+ * {@code PinotFSFactory.register(scheme, factoryClassName, config)}. We don't go through
+ * {@code register} here because it requires per-scheme config (credentials, region, etc.) we
+ * don't have; instead we instantiate the class directly through {@code PluginManager} —
+ * which is what {@code register} does internally. Connecting to the actual storage backend
+ * is the integration tests' job.
+ */
 public final class PinotFsCheck implements Check {
-  /// Map of pluginName → PinotFS FQCN. Plugin name matches {@code plugins/pinot-file-system/}.
+  // Map of pluginName -> PinotFS FQCN. Plugin name matches plugins/pinot-file-system/.
   private static final Map<String, String> FILESYSTEMS = new LinkedHashMap<>() {{
     put("pinot-s3", "org.apache.pinot.plugin.filesystem.S3PinotFS");
     put("pinot-gcs", "org.apache.pinot.plugin.filesystem.GcsPinotFS");

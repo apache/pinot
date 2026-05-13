@@ -24,14 +24,15 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.verifier.PluginVerifier.CheckContext;
 
 
-/// Loads each known {@link RecordReader} implementation through {@code PluginManager}. We
-/// don't drive {@code init(...)} against a real file because each reader expects a different
-/// on-disk format; the discovery + no-arg constructor path is what the realm work actually
-/// changes. Real file-format coverage lives in pinot-integration-tests.
+/**
+ * Loads each known {@link RecordReader} implementation through {@code PluginManager}. We don't
+ * drive {@code init(...)} against a real file because each reader expects a different on-disk
+ * format; the discovery + no-arg constructor path is what the realm work actually changes. Real
+ * file-format coverage lives in pinot-integration-tests.
+ */
 public final class InputFormatCheck implements Check {
-  /// Map of pluginName → RecordReader FQCN. Plugin name matches the plugin directory layout
-  /// under {@code plugins/pinot-input-format/<name>/} so {@code --strict-realm} can pin the
-  /// lookup.
+  // Map of pluginName -> RecordReader FQCN. Plugin name matches the plugin directory layout
+  // under plugins/pinot-input-format/<name>/ so --strict-realm can pin the lookup.
   private static final Map<String, String> READERS = new LinkedHashMap<>() {{
     put("pinot-avro", "org.apache.pinot.plugin.inputformat.avro.AvroRecordReader");
     put("pinot-csv", "org.apache.pinot.plugin.inputformat.csv.CSVRecordReader");
