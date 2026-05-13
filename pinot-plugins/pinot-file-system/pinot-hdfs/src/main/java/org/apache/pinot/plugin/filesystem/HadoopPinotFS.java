@@ -183,6 +183,9 @@ public class HadoopPinotFS extends BasePinotFS {
       throws IOException {
     // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
     FileStatus[] files = _hadoopFS.listStatus(path);
+    if (files == null) {
+      throw new IOException("FileSystem.listStatus() returned null for path: " + path);
+    }
     for (FileStatus file : files) {
       visitor.accept(file);
       if (file.isDirectory() && recursive) {
@@ -234,23 +237,15 @@ public class HadoopPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) {
-    try {
-      return _hadoopFS.getFileStatus(new Path(uri)).isDirectory();
-    } catch (IOException e) {
-      LOGGER.error("Could not get file status for {}", uri, e);
-      throw new RuntimeException(e);
-    }
+  public boolean isDirectory(URI uri)
+      throws IOException {
+    return _hadoopFS.getFileStatus(new Path(uri)).isDirectory();
   }
 
   @Override
-  public long lastModified(URI uri) {
-    try {
-      return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
-    } catch (IOException e) {
-      LOGGER.error("Could not get file status for {}", uri, e);
-      throw new RuntimeException(e);
-    }
+  public long lastModified(URI uri)
+      throws IOException {
+    return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
   }
 
   @Override
@@ -258,8 +253,9 @@ public class HadoopPinotFS extends BasePinotFS {
       throws IOException {
     Path path = new Path(uri);
     if (!exists(uri)) {
-      FSDataOutputStream fos = _hadoopFS.create(path);
-      fos.close();
+      try (FSDataOutputStream fos = _hadoopFS.create(path)) {
+        // create an empty file; stream closed by try-with-resources
+      }
     } else {
       _hadoopFS.setTimes(path, System.currentTimeMillis(), -1);
     }
@@ -307,7 +303,9 @@ public class HadoopPinotFS extends BasePinotFS {
   @Override
   public void close()
       throws IOException {
-    _hadoopFS.close();
+    if (_hadoopFS != null) {
+      _hadoopFS.close();
+    }
     super.close();
   }
 }

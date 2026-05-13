@@ -23,7 +23,10 @@
 <img src="https://imgur.com/wBkyzNm.png" align="center" alt="Apache Pinot"/>
 
 ---------------------------------------
-[![Build Status](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml)
+[![Unit Tests](https://github.com/apache/pinot/actions/workflows/pinot_unit_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_unit_tests.yml)
+[![Integration Tests](https://github.com/apache/pinot/actions/workflows/pinot_integration_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_integration_tests.yml)
+[![Quickstart Tests](https://github.com/apache/pinot/actions/workflows/pinot_quickstart_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_quickstart_tests.yml)
+[![Compatibility Checks](https://github.com/apache/pinot/actions/workflows/pinot_compatibility_checks.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_compatibility_checks.yml)
 [![Release](https://img.shields.io/github/release/apache/pinot/all.svg)](https://pinot.apache.org/download/)
 [![codecov.io](https://codecov.io/github/apache/pinot/branch/master/graph/badge.svg)](https://codecov.io/github/apache/pinot)
 [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot)

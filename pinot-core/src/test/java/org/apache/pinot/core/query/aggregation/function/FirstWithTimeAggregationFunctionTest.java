@@ -19,11 +19,11 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

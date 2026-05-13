@@ -123,7 +123,8 @@ public class PinotDispatchPlanner {
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
         dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
         dispatchablePlanContext.getTableNames(),
-        populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()));
+        populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()),
+        dispatchablePlanContext.getNumSegmentsPrunedByBroker());
   }
 
   private static Map<String, Set<String>> populateTableUnavailableSegments(

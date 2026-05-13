@@ -75,9 +75,12 @@ jobs:
             DOCKER_BUILD_TAGS+=" --tag ${DOCKER_IMAGE_NAME}:${tag}-${ARCH} "
           done
 
+          # Keep arch staging tags as image manifests; default BuildKit
+          # provenance turns them into OCI indexes with attestation entries.
           docker buildx build \
             --no-cache \
             --platform=linux/${ARCH} \
+            --provenance=false \
             --file Dockerfile \
             --build-arg SUPERSET_IMAGE_TAG=${SUPERSET_IMAGE_TAG} \
             ${DOCKER_BUILD_TAGS} \
@@ -93,15 +96,18 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
       - name: Create and push manifests
         env:
           DOCKER_IMAGE_NAME: apachepinot/pinot-superset
           TAGS: "${{ needs.generate-superset-info.outputs.tags }}"
         run: |
-          for tag in $(echo ${TAGS} | tr "," " "); do
-            echo "Creating manifest for ${DOCKER_IMAGE_NAME}:${tag}"
-            docker manifest create ${DOCKER_IMAGE_NAME}:${tag} \
-              --amend ${DOCKER_IMAGE_NAME}:${tag}-amd64 \
-              --amend ${DOCKER_IMAGE_NAME}:${tag}-arm64
-            docker manifest push ${DOCKER_IMAGE_NAME}:${tag}
+          for tag in $(echo "${TAGS}" | tr "," " "); do
+            image="${DOCKER_IMAGE_NAME}:${tag}"
+            echo "Creating manifest for ${image}"
+            docker buildx imagetools create \
+              --tag "${image}" \
+              "${image}-amd64" \
+              "${image}-arm64"
           done

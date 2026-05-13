@@ -28,6 +28,7 @@ import org.apache.pinot.segment.local.segment.index.loader.invertedindex.IFSTInd
 import org.apache.pinot.segment.local.segment.index.readers.LuceneIFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
@@ -96,13 +97,17 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
   @Override
   public FSTIndexCreator createIndexCreator(IndexCreationContext context, FstIndexConfig indexConfig)
       throws IOException {
-    Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
+    FieldSpec fieldSpec = context.getFieldSpec();
+    Preconditions.checkState(fieldSpec.isSingleValueField(),
         "IFST index is currently only supported on single-value columns");
-    Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
+    Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
         "IFST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
         "IFST index is currently only supported on dictionary-encoded columns");
-    return new LuceneIFSTIndexCreator(context);
+    ColumnStatistics columnStatistics = context.getColumnStatistics();
+    String[] sortedEntries = columnStatistics != null ? (String[]) columnStatistics.getUniqueValuesSet() : null;
+    return new LuceneIFSTIndexCreator(context.getIndexDir(), fieldSpec.getName(), context.getTableNameWithType(),
+        context.isContinueOnError(), sortedEntries);
   }
 
   @Override

@@ -8,7 +8,6 @@
     "segmentPushType" : "APPEND",
     "replication" : "2",
     "timeColumnName" : "timestamp",
-    "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy",
     "replicaGroupStrategyConfig" : null,
     "hllConfig" : null,
     "replicasPerPartition" : 2,

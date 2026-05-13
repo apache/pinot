@@ -18,58 +18,26 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
-import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
-import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 
-/// Extracts Pinot rows from Avro [org.apache.avro.generic.GenericRecord]s materialized by parquet-avro.
-///
-/// The reader sets `parquet.avro.add-list-element-records=false` in the Hadoop configuration, which tells
-/// parquet-avro to flatten the standard Parquet 3-level LIST encoding
-/// (`<list-rep> group <name> (LIST) { repeated group list { <elem-type> element; } }`) directly to an Avro
-/// `array<elem-type>`. This matches Apache Arrow's Parquet reader behavior and means there is no LIST wrapper
-/// to strip on the Pinot side — user-defined records like `array<record<UserTag, [element]>>` round-trip
-/// cleanly because the file's Avro schema is honored as-is, and hand-authored Parquet `LIST<T>` surfaces as
-/// flat values without a wrapper artifact.
+/// The type matrix is inherited from [AvroRecordExtractor]; the only override is the INT96 timestamp
+/// (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) → `Timestamp`
+/// (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via [ParquetUtils#convertInt96ToEpochNanos].
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
+  private static final int INT96_BYTE_SIZE = 12;
+  private static final String INT96_DOC = "INT96 represented as byte[12]";
 
   @Override
-  public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
-    super.init(fields, recordExtractorConfig);
-  }
-
-  @Override
-  protected Object transformValue(Object value, Schema.Field field) {
-    return handleDeprecatedTypes(convert(value), field);
-  }
-
-  Object handleDeprecatedTypes(Object value, Schema.Field field) {
-    Schema.Type avroColumnType = field.schema().getType();
-    if (avroColumnType == Schema.Type.UNION) {
-      Schema nonNullSchema = null;
-      for (Schema childFieldSchema : field.schema().getTypes()) {
-        if (childFieldSchema.getType() != Schema.Type.NULL) {
-          if (nonNullSchema == null) {
-            nonNullSchema = childFieldSchema;
-          } else {
-            throw new IllegalStateException("More than one non-null schema in UNION schema");
-          }
-        }
-      }
-      assert nonNullSchema != null;
-
-      // NOTE:
-      // INT96 is deprecated. We convert to long as we do in the native parquet extractor.
-      // See org.apache.parquet.avro.AvroSchemaConverter about how INT96 is converted into Avro schema.
-      // We have to rely on the doc to determine whether a field is INT96.
-      if (nonNullSchema.getType() == Schema.Type.FIXED && nonNullSchema.getFixedSize() == 12
-          && "INT96 represented as byte[12]".equals(nonNullSchema.getDoc())) {
-        return ParquetNativeRecordExtractor.convertInt96ToLong((byte[]) value);
-      }
+  protected Object convertSingleValue(Schema schema, Object value) {
+    if (schema.getType() == Schema.Type.FIXED && schema.getFixedSize() == INT96_BYTE_SIZE
+        && INT96_DOC.equals(schema.getDoc())) {
+      long nanos = ParquetUtils.convertInt96ToEpochNanos(((GenericFixed) value).bytes());
+      return _extractRawTimeValues ? nanos : TimestampUtils.fromNanosSinceEpoch(nanos);
     }
-    return value;
+    return super.convertSingleValue(schema, value);
   }
 }

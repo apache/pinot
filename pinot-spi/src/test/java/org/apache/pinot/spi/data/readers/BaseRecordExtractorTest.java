@@ -19,145 +19,77 @@
 package org.apache.pinot.spi.data.readers;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
-/**
- * Locks in {@link BaseRecordExtractor#convertSingleValue} type-preservation contract:
- * <ul>
- *   <li>Numbers (Byte, Short, Integer, Long, Float, Double, BigDecimal, BigInteger) are returned as-is — Short is
- *       NOT promoted to Integer.</li>
- *   <li>Boolean is returned as-is — NOT converted to "true"/"false" String.</li>
- *   <li>byte[] is returned as-is.</li>
- *   <li>ByteBuffer is materialized into byte[].</li>
- *   <li>Everything else falls back to {@code toString()}.</li>
- * </ul>
- */
 public class BaseRecordExtractorTest {
-  private static final TestExtractor EXTRACTOR = new TestExtractor();
+
+  // === init / include-list resolution ===
 
   @Test
-  void testBytePreserved() {
-    Object result = EXTRACTOR.convertSingleValue((byte) 42);
-    assertSame(result.getClass(), Byte.class, "Byte must remain Byte");
-    assertEquals(result, (byte) 42);
+  public void testInitNullFieldsExtractsAll() {
+    NoOpExtractor extractor = new NoOpExtractor();
+    extractor.init(null, null);
+    assertTrue(extractor._extractAll);
+    assertEquals(extractor._fields, Set.of());
   }
 
   @Test
-  void testShortPreserved() {
-    Object result = EXTRACTOR.convertSingleValue((short) 42);
-    assertSame(result.getClass(), Short.class, "Short must remain Short — not promoted to Integer");
-    assertEquals(result, (short) 42);
+  public void testInitEmptyFieldsExtractsAll() {
+    NoOpExtractor extractor = new NoOpExtractor();
+    extractor.init(Set.of(), null);
+    assertTrue(extractor._extractAll);
+    assertEquals(extractor._fields, Set.of());
   }
 
   @Test
-  void testIntegerPreserved() {
-    Object result = EXTRACTOR.convertSingleValue(42);
-    assertSame(result.getClass(), Integer.class);
-    assertEquals(result, 42);
+  public void testInitNonEmptyFieldsRestrictsToIncludeList() {
+    NoOpExtractor extractor = new NoOpExtractor();
+    extractor.init(Set.of("a", "b"), null);
+    assertFalse(extractor._extractAll);
+    assertEquals(extractor._fields, Set.of("a", "b"));
+  }
+
+  // === stringifyMapKey — shared helper for the Map<String, Object> contract ===
+
+  @Test
+  public void testStringifyMapKeyByteArrayBase64Encoded() {
+    assertEquals(BaseRecordExtractor.stringifyMapKey(new byte[]{0, 1, 2, 3}), "AAECAw==");
   }
 
   @Test
-  void testLongPreserved() {
-    Object result = EXTRACTOR.convertSingleValue(42L);
-    assertSame(result.getClass(), Long.class);
-    assertEquals(result, 42L);
+  public void testStringifyMapKeyTimestampUsesIsoUtcWithNanos() {
+    Timestamp ts = new Timestamp(1700000000123L);
+    ts.setNanos(123_456_789);
+    // ISO-8601 UTC, JVM-TZ-stable, full nanosecond precision preserved.
+    assertEquals(BaseRecordExtractor.stringifyMapKey(ts), "2023-11-14T22:13:20.123456789Z");
   }
 
   @Test
-  void testFloatPreserved() {
-    Object result = EXTRACTOR.convertSingleValue(1.5f);
-    assertSame(result.getClass(), Float.class);
-    assertEquals(result, 1.5f);
+  public void testStringifyMapKeyOtherTypesUseToString() {
+    assertEquals(BaseRecordExtractor.stringifyMapKey("k"), "k");
+    assertEquals(BaseRecordExtractor.stringifyMapKey(42), "42");
+    assertEquals(BaseRecordExtractor.stringifyMapKey(123L), "123");
+    assertEquals(BaseRecordExtractor.stringifyMapKey(true), "true");
+    assertEquals(BaseRecordExtractor.stringifyMapKey(new BigDecimal("1.50")), "1.50");
+    assertEquals(BaseRecordExtractor.stringifyMapKey(LocalDate.of(2024, 1, 1)), "2024-01-01");
+    assertEquals(BaseRecordExtractor.stringifyMapKey(LocalTime.of(8, 51, 32)), "08:51:32");
   }
 
-  @Test
-  void testDoublePreserved() {
-    Object result = EXTRACTOR.convertSingleValue(1.5);
-    assertSame(result.getClass(), Double.class);
-    assertEquals(result, 1.5);
-  }
+  // === Helper ===
 
-  @Test
-  void testBigDecimalPreserved() {
-    BigDecimal value = new BigDecimal("123.45");
-    Object result = EXTRACTOR.convertSingleValue(value);
-    assertSame(result, value, "BigDecimal must be returned as-is, not stringified");
-  }
-
-  @Test
-  void testBigIntegerPreserved() {
-    BigInteger value = new BigInteger("12345678901234567890");
-    Object result = EXTRACTOR.convertSingleValue(value);
-    assertSame(result, value, "BigInteger must be returned as-is, not stringified");
-  }
-
-  @Test
-  void testBooleanPreserved() {
-    Object trueResult = EXTRACTOR.convertSingleValue(true);
-    assertSame(trueResult.getClass(), Boolean.class, "Boolean must remain Boolean — not converted to String");
-    assertEquals(trueResult, true);
-
-    Object falseResult = EXTRACTOR.convertSingleValue(false);
-    assertSame(falseResult.getClass(), Boolean.class);
-    assertEquals(falseResult, false);
-  }
-
-  @Test
-  void testByteArrayPreserved() {
-    byte[] bytes = {1, 2, 3};
-    Object result = EXTRACTOR.convertSingleValue(bytes);
-    assertSame(result, bytes, "byte[] must be returned as-is (same reference)");
-  }
-
-  @Test
-  void testByteBufferConvertedToByteArray() {
-    ByteBuffer buf = ByteBuffer.wrap(new byte[]{1, 2, 3});
-    Object result = EXTRACTOR.convertSingleValue(buf);
-    assertEquals(result, new byte[]{1, 2, 3}, "ByteBuffer must be materialized into byte[]");
-    assertSame(result.getClass(), byte[].class);
-  }
-
-  @Test
-  void testByteBufferSliceDoesNotMutateOriginal() {
-    // Position the buffer to verify the slice — extractor must read the remaining bytes only and not consume
-    // the original buffer.
-    ByteBuffer buf = ByteBuffer.wrap(new byte[]{0, 1, 2, 3, 4});
-    buf.position(2);
-    byte[] result = (byte[]) EXTRACTOR.convertSingleValue(buf);
-    assertEquals(result, new byte[]{2, 3, 4});
-    assertEquals(buf.position(), 2, "Original buffer position must not be advanced");
-  }
-
-  @Test
-  void testStringPreserved() {
-    Object result = EXTRACTOR.convertSingleValue("hello");
-    assertSame(result.getClass(), String.class);
-    assertEquals(result, "hello");
-  }
-
-  @Test
-  void testNonStandardObjectFallsBackToToString() {
-    Object result = EXTRACTOR.convertSingleValue(new StringBuilder("hello"));
-    assertSame(result.getClass(), String.class, "Unknown types fall back to toString()");
-    assertEquals(result, "hello");
-  }
-
-  /// Minimal concrete subclass to exercise the protected {@code convertSingleValue}.
-  private static final class TestExtractor extends BaseRecordExtractor<Object> {
-    @Override
-    public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    }
-
+  private static final class NoOpExtractor extends BaseRecordExtractor<Object> {
     @Override
     public GenericRow extract(Object from, GenericRow to) {
-      return to;
+      throw new UnsupportedOperationException();
     }
   }
 }
