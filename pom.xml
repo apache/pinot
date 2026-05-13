@@ -181,7 +181,7 @@
     <lz4-java.version>1.11.0</lz4-java.version>
     <libthrift.verion>0.23.0</libthrift.verion>
     <log4j.version>2.26.0</log4j.version>
-    <slf4j.version>2.0.17</slf4j.version>
+    <slf4j.version>2.0.18</slf4j.version>
     <netty.version>4.1.133.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
