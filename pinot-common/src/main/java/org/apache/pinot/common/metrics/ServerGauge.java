@@ -147,6 +147,12 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   HELIX_MESSAGES_COUNT("count", true),
   STARTUP_STATUS_CHECK_IN_PROGRESS("state", true,
       "Indicates whether the server startup status check is currently in progress"),
+  STARTUP_CURRENT_STATE_MATCH_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until ideal-state/current-state match first reports GOOD"),
+  STARTUP_EXTERNAL_VIEW_MATCH_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until ideal-state/external-view match first reports GOOD"),
+  STARTUP_REALTIME_CONSUMPTION_CATCHUP_TIME_MS("milliseconds", true,
+      "Time in ms from status checker registration until realtime consumption catchup first reports GOOD"),
   CONSUMER_LOCK_WAIT_TIME_MS("milliseconds", false,
       "Indicates the time consumer spends while waiting on the consumer lock."),
 

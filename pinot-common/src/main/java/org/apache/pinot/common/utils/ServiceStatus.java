@@ -174,16 +174,17 @@ public class ServiceStatus {
 
     @Override
     public Status getServiceStatus() {
-      // Iterate through all callbacks, returning the first non GOOD one as the service status
+      // Iterate through all callbacks, returning the last non GOOD one as the service status
+      Status serviceStatusNotGood = null;
       for (ServiceStatusCallback statusCallback : _statusCallbacks) {
         final Status serviceStatus = statusCallback.getServiceStatus();
         if (serviceStatus != Status.GOOD) {
-          return serviceStatus;
+          serviceStatusNotGood = serviceStatus;
         }
       }
 
       // All callbacks report good, therefore we're good too
-      return Status.GOOD;
+      return serviceStatusNotGood == null ?  Status.GOOD : serviceStatusNotGood;
     }
 
     @Override
