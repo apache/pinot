@@ -825,6 +825,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return _segmentDataManagerMap;
   }
 
+  public Logger getLogger() {
+    return _logger;
+  }
+
   public SegmentReloadSemaphore getSegmentReloadSemaphore() {
     return _segmentReloadSemaphore;
   }
