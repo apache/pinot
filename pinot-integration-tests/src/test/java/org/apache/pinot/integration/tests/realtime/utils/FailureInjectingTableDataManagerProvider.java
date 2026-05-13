@@ -83,6 +83,7 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       BooleanSupplier isServerReadyToServeQueries,
+      BooleanSupplier isIngestionPausedDueToStartUp,
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;

@@ -106,6 +106,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
   private BooleanSupplier _isServerReadyToServeQueries = () -> false;
+  private BooleanSupplier _isIngestionPausedDueToStartUp = () -> false;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -125,6 +126,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
     _isServerReadyToServeQueries = isServingQueries;
+  }
+
+  @Override
+  public void setSupplierOfIsIngestionPausedDueToStartUp(BooleanSupplier isIngestionPausedDueToStartUp) {
+    _isIngestionPausedDueToStartUp = isIngestionPausedDueToStartUp;
   }
 
   @Override
@@ -343,7 +349,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
             _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries,
-            _enableAsyncSegmentRefresh, _reloadJobStatusCache);
+            _isIngestionPausedDueToStartUp, _enableAsyncSegmentRefresh, _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;

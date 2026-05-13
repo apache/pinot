@@ -200,6 +200,15 @@ public interface InstanceDataManager {
   void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServerReadyToServeQueries);
 
   /**
+   * Installs a supplier that gates consuming-segment ingestion. While the supplier returns {@code true}, newly created
+   * realtime consumers wait at the entry of their consumer thread before pulling any data. The supplier is consulted
+   * once per consumer at startup; once it returns {@code false} for a given consumer, that consumer proceeds and is
+   * not gated again. Implementations default to a no-op so subclasses opt in explicitly.
+   */
+  default void setSupplierOfIsIngestionPausedDueToStartUp(BooleanSupplier isIngestionPausedDueToStartUp) {
+  }
+
+  /**
    * Returns consumer directory paths on the instance
    */
   List<File> getConsumerDirPaths();

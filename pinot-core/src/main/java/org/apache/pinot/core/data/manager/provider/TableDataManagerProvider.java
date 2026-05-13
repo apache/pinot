@@ -55,6 +55,7 @@ public interface TableDataManagerProvider {
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       BooleanSupplier isServerReadyToServeQueries,
+      BooleanSupplier isIngestionPausedDueToStartUp,
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache);
 
@@ -64,6 +65,6 @@ public interface TableDataManagerProvider {
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
     return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, () -> true, false, new ServerReloadJobStatusCache("testInstance"));
+        null, null, () -> true, () -> false, false, new ServerReloadJobStatusCache("testInstance"));
   }
 }

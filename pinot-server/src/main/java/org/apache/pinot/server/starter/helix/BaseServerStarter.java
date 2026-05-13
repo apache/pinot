@@ -768,6 +768,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+    instanceDataManager.setSupplierOfIsIngestionPausedDueToStartUp(this::isIngestionPausedDueToStartUp);
 
     // Enable Server level realtime ingestion rate limier
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, _serverMetrics);
@@ -944,6 +945,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     NettyInspector.registerMetrics(_serverMetrics);
+  }
+
+  protected boolean isIngestionPausedDueToStartUp() {
+    return false;
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
