@@ -1034,7 +1034,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
               + "Change the cluster config: {} to `PROTECTED` for safer commit", segmentName, config.getConfigKey());
         } else {
           _logger.info("Reloading (force committing) consuming segment: {}", segmentName);
-          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          _segmentReloadSemaphore.acquire(segmentName, _logger);
+          try {
+            ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+          } finally {
+            _segmentReloadSemaphore.release();
+          }
         }
       } else {
         _logger.warn("Skip reloading consuming segment: {} as configured", segmentName);
