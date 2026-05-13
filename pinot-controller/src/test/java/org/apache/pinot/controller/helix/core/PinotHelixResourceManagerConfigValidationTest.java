@@ -52,7 +52,8 @@ public class PinotHelixResourceManagerConfigValidationTest {
   public void setUp()
       throws Exception {
     LineageManager lineageManager = Mockito.mock(LineageManager.class);
-    _resourceManager = new PinotHelixResourceManager("testCluster", null, false, false, 7, false, lineageManager);
+    _resourceManager =
+        new PinotHelixResourceManager("testCluster", null, false, false, 7, false, lineageManager, null);
 
     _helixAdmin = Mockito.mock(HelixAdmin.class);
     _helixDataAccessor = Mockito.mock(HelixDataAccessor.class);
@@ -160,6 +161,19 @@ public class PinotHelixResourceManagerConfigValidationTest {
 
     // Verify instance WAS persisted
     verify(_helixAdmin).addInstance(eq("testCluster"), any(InstanceConfig.class));
+  }
+
+  @Test
+  public void testMultiWriteZkThrowsBeforeStart() {
+    // The fixture never calls start(), so _helixZkManager is null. multiWriteZK() must refuse to
+    // build a client — the ZK address is derived from the Helix manager.
+    try {
+      _resourceManager.multiWriteZK();
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("not been started"),
+          "Unexpected message: " + expected.getMessage());
+    }
   }
 
   private void setField(String fieldName, Object value)

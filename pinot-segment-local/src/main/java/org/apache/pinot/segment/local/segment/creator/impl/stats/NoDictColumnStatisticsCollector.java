@@ -66,8 +66,8 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   public NoDictColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    _isFixedWidth = _valueType.isFixedWidth();
-    _isAscii = _valueType == DataType.STRING;
+    _isFixedWidth = _storedType.isFixedWidth();
+    _isAscii = _storedType == DataType.STRING;
     // Use default p and sp; can be made configurable via StatsCollectorConfig later if needed
     _hllPlus = new HyperLogLogPlus(
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P,
@@ -78,6 +78,8 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
+
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;
       int rowLength = 0;
@@ -179,7 +181,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   }
 
   private int getValueLength(Object value) {
-    switch (_valueType) {
+    switch (_storedType) {
       case BIG_DECIMAL:
         return BigDecimalUtils.byteSize((BigDecimal) value);
       case STRING:
@@ -187,13 +189,13 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
       case BYTES:
         return ((byte[]) value).length;
       default:
-        throw new IllegalStateException("Unsupported variable-width value type: " + _valueType);
+        throw new IllegalStateException("Unsupported variable-width value type: " + _storedType);
     }
   }
 
   @Nullable
   @Override
-  public Comparable getMinValue() {
+  public Comparable<?> getMinValue() {
     if (_sealed) {
       return _minValue;
     }
@@ -202,7 +204,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   @Nullable
   @Override
-  public Comparable getMaxValue() {
+  public Comparable<?> getMaxValue() {
     if (_sealed) {
       return _maxValue;
     }
@@ -231,7 +233,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getLengthOfShortestElement() {
     if (_isFixedWidth) {
-      return _valueType.size();
+      return _storedType.size();
     } else {
       return _minLength != Integer.MAX_VALUE ? _minLength : 0;
     }
@@ -239,7 +241,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public int getLengthOfLongestElement() {
-    return _isFixedWidth ? _valueType.size() : _maxLength;
+    return _isFixedWidth ? _storedType.size() : _maxLength;
   }
 
   @Override
@@ -250,7 +252,7 @@ public class NoDictColumnStatisticsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getMaxRowLengthInBytes() {
     if (_isFixedWidth) {
-      int elementSize = _valueType.size();
+      int elementSize = _storedType.size();
       return isSingleValue() ? elementSize : _maxNumberOfMultiValues * elementSize;
     } else {
       return isSingleValue() ? _maxLength : _maxRowLength;

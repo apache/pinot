@@ -33,7 +33,6 @@ import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionUtils;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -75,6 +74,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
@@ -82,6 +82,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -527,7 +528,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata information to the metadata properties.
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, totalDocs, fieldSpec, true,
-        dictionaryElementSize, true);
+        dictionaryElementSize, FieldConfig.EncodingType.DICTIONARY, true);
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
@@ -600,9 +601,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             nullValueVectorCreator.setNull(i);
           }
         } else if (outputValueType == null) {
-          Class<?> outputValueClass = outputValue.getClass();
-          outputValueType = FunctionUtils.getArgumentType(outputValueClass);
-          Preconditions.checkState(outputValueType != null, "Unsupported output value class: %s", outputValueClass);
+          outputValueType = FunctionUtils.getArgumentType(outputValue);
         }
 
         outputValues[i] = outputValue;
@@ -1099,7 +1098,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       boolean isSingleValue = fieldSpec.isSingleValueField();
 
       try (
-          ForwardIndexCreator forwardIndexCreator = getForwardIndexCreator(fieldSpec, columnStatistics, numDocs, column,
+          ForwardIndexCreator forwardIndexCreator = getForwardIndexCreator(columnStatistics, column,
               true)) {
         if (isSingleValue) {
           for (Object outputValue : outputValues) {
@@ -1112,7 +1111,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         }
         // Add the column metadata
         BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, true,
-            dictionaryCreator.getNumBytesPerEntry(), true);
+            dictionaryCreator.getNumBytesPerEntry(), FieldConfig.EncodingType.DICTIONARY, true);
       }
     }
   }
@@ -1129,7 +1128,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     boolean isSingleValue = fieldSpec.isSingleValueField();
 
     try (ForwardIndexCreator forwardIndexCreator
-        = getForwardIndexCreator(fieldSpec, columnStatistics, numDocs, column, false)) {
+        = getForwardIndexCreator(columnStatistics, column, false)) {
       if (isSingleValue) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
@@ -1197,23 +1196,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Add the column metadata
     BaseSegmentCreator.addColumnMetadataInfo(_segmentProperties, column, columnStatistics, numDocs, fieldSpec, false,
-        0, true);
+        0, FieldConfig.EncodingType.RAW, true);
   }
 
-  private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnStatistics columnStatistics,
-      int numDocs, String column, boolean hasDictionary)
+  private ForwardIndexCreator getForwardIndexCreator(ColumnStatistics columnStatistics,
+      String column, boolean hasDictionary)
       throws Exception {
-
-    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withFieldSpec(fieldSpec)
-        .withColumnStatistics(columnStatistics)
-        .withTotalDocs(numDocs)
-        .withDictionary(hasDictionary)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
-        .build();
+    IndexCreationContext indexCreationContext =
+        new IndexCreationContext.Builder(_indexDir, _tableConfig, columnStatistics, hasDictionary).build();
 
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
@@ -1221,7 +1211,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
     }
     if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
+      forwardIndexConfig = ForwardIndexConfig.getDefault(
+          hasDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
     }
     return StandardIndexes.forward().createIndexCreator(indexCreationContext, forwardIndexConfig);
   }
@@ -1237,7 +1228,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
       IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
       FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
-          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault(columnMetadata.getForwardIndexEncoding()))
           .build();
       _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {

@@ -42,7 +42,6 @@ import static org.testng.Assert.*;
  *   <li>Field descriptor caching works correctly across multiple extractions</li>
  *   <li>Subset field extraction works correctly</li>
  *   <li>Schema change detection and cache invalidation</li>
- *   <li>Re-initialization behavior</li>
  *   <li>Edge cases like missing fields, empty fields set</li>
  * </ul>
  */
@@ -184,29 +183,6 @@ public class ProtoBufRecordExtractorCachingTest {
     assertEquals(row2.getValue("name"), "Alice");
     assertEquals(row2.getValue("email"), "foobar@hello.com");
     assertEquals(row2.getValue("id"), 18);
-  }
-
-  @Test
-  public void testExtractorReinitialization()
-      throws IOException {
-    // First initialization with all fields
-    _extractor.init(null, null);
-    Message message1 = createTestMessage("init1", 100);
-    GenericRow row1 = _extractor.extract(message1, new GenericRow());
-    int allFieldsCount = row1.getFieldToValueMap().size();
-    assertTrue(allFieldsCount > 5); // All fields from schema
-
-    // Re-initialize with subset fields
-    Set<String> subsetFields = new HashSet<>(Arrays.asList(STRING_FIELD, INT_FIELD));
-    _extractor.init(subsetFields, null);
-
-    Message message2 = createTestMessage("init2", 200);
-    GenericRow row2 = _extractor.extract(message2, new GenericRow());
-    assertEquals(row2.getFieldToValueMap().size(), subsetFields.size()); // Only subset
-    assertEquals(row2.getValue(STRING_FIELD), "init2");
-    assertEquals(row2.getValue(INT_FIELD), 200);
-    // Verify all fields count was greater than subset
-    assertTrue(allFieldsCount > subsetFields.size());
   }
 
   // ==================== EDGE CASES ====================

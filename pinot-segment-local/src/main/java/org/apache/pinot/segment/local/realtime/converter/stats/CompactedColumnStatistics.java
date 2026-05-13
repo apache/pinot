@@ -38,6 +38,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// When commit-time compaction is enabled, only valid (non-deleted) documents should be considered.
 @SuppressWarnings("rawtypes")
 public class CompactedColumnStatistics extends MutableColumnStatistics {
+  private final int _totalDocs;
   private final Comparable _minValue;
   private final Comparable _maxValue;
   private final Object _uniqueValues;
@@ -55,9 +56,10 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     super(dataSource, sortedDocIds, isSortedColumn);
     Preconditions.checkState(!validDocIds.isEmpty(), "Use EmptyColumnStatistics for empty column: %s",
         _fieldSpec.getName());
-    DataType valueType = getValueType();
+    _totalDocs = validDocIds.getCardinality();
+    DataType storedType = getStoredType();
     boolean isSingleValue = isSingleValue();
-    boolean isFixedWidth = valueType.isFixedWidth();
+    boolean isFixedWidth = storedType.isFixedWidth();
     boolean isVarBytesMV = !isSingleValue && !isFixedWidth;
     MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Preconditions.checkState(forwardIndex != null, "Failed to find forward index for column: %s", _fieldSpec.getName());
@@ -135,10 +137,10 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     Comparable minValue = null;
     Comparable maxValue = null;
     // For fixed-width types element length is constant; for variable-width it is tracked per entry
-    int minElementLength = isFixedWidth ? valueType.size() : Integer.MAX_VALUE;
-    int maxElementLength = isFixedWidth ? valueType.size() : 0;
+    int minElementLength = isFixedWidth ? storedType.size() : Integer.MAX_VALUE;
+    int maxElementLength = isFixedWidth ? storedType.size() : 0;
     boolean isAscii = false;
-    switch (valueType) {
+    switch (storedType) {
       case INT: {
         int[] values = new int[_cardinality];
         if (_cardinality > 0) {
@@ -257,7 +259,7 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
         break;
       }
       default:
-        throw new IllegalStateException("Unsupported value type: " + valueType);
+        throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
     _minValue = minValue;
     _maxValue = maxValue;
@@ -269,7 +271,7 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
     } else if (isVarBytesMV) {
       _maxRowLength = maxRowLength;
     } else {
-      _maxRowLength = maxMultiValues * valueType.size();
+      _maxRowLength = maxMultiValues * storedType.size();
     }
     if (_isSortedColumn) {
       _isSorted = true;
@@ -281,12 +283,17 @@ public class CompactedColumnStatistics extends MutableColumnStatistics {
   }
 
   @Override
-  public Comparable getMinValue() {
+  public int getTotalDocs() {
+    return _totalDocs;
+  }
+
+  @Override
+  public Comparable<?> getMinValue() {
     return _minValue;
   }
 
   @Override
-  public Comparable getMaxValue() {
+  public Comparable<?> getMaxValue() {
     return _maxValue;
   }
 

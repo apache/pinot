@@ -21,14 +21,12 @@ package org.apache.pinot.plugin.inputformat.parquet;
 import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.parquet.example.data.Group;
-import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.PrimitiveType;
@@ -36,32 +34,46 @@ import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.joda.time.DateTimeConstants;
+import org.apache.pinot.spi.utils.TimestampUtils;
+import org.apache.pinot.spi.utils.UuidUtils;
 
 
-/// Extracts Pinot rows directly from Parquet [Group] objects, using Parquet [LogicalTypeAnnotation]s to drive
-/// LIST and MAP handling per the Parquet LogicalTypes spec backward-compatibility rules. Behavior matches
-/// Apache Arrow's Parquet reader so the same Parquet bytes produce the same logical rows across readers.
+/// Extracts Pinot [GenericRow] from Parquet [Group] objects, using Parquet [LogicalTypeAnnotation]s to drive
+/// LIST and MAP handling per the Parquet LogicalTypes spec backward-compatibility rules.
+///
+/// **Primitive types:**
+/// - `BOOLEAN` → `Boolean`
+/// - `INT32` → `Integer`
+/// - `INT64` → `Long`
+/// - `FLOAT` → `Float`
+/// - `DOUBLE` → `Double`
+/// - `BINARY` with `STRING` / `ENUM` annotation → `String`
+/// - `BINARY` / `FIXED_LEN_BYTE_ARRAY` without annotation → `byte[]`
+///
+/// **Logical types:**
+/// - `DECIMAL` (on `INT32` / `INT64` / `BINARY` / `FIXED_LEN_BYTE_ARRAY`) → `BigDecimal`
+/// - `INT64` + `TIMESTAMP_MILLIS` / `MICROS` / `NANOS` → `Timestamp`, or `Long` in the column's declared unit
+///   when `extractRawTimeValues` is `true`
+/// - `INT96` → `Timestamp`, or `Long` epoch nanos when `extractRawTimeValues` is `true`
+/// - `INT32` + `DATE` → `LocalDate`, or `Integer` days-since-epoch when `extractRawTimeValues` is `true`
+/// - `INT32` + `TIME_MILLIS` → `LocalTime`, or `Integer` ms-since-midnight when `extractRawTimeValues` is `true`
+/// - `INT64` + `TIME_MICROS` / `TIME_NANOS` → `LocalTime`, or `Long` value-since-midnight in the column's
+///   declared unit when `extractRawTimeValues` is `true`
+/// - `FIXED_LEN_BYTE_ARRAY(16)` + `UUID` → `java.util.UUID`
+///
+/// **Complex types:**
+/// - `LIST`-annotated group (standard 3-level wrapper or legacy non-wrapper forms) → `Object[]`
+/// - `MAP`-annotated group → `Map<String, Object>` (keys stringified via [BaseRecordExtractor#stringifyMapKey])
+/// - plain non-annotated group → `Map<String, Object>` (struct)
+/// - field with zero repetition count → `null`
 public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
-  /**
-   * Number of days between Julian day epoch (January 1, 4713 BC) and Unix day epoch (January 1, 1970).
-   * The value of this constant is {@value}.
-   */
-  public static final long JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH = 2440588;
-
-  public static final long NANOS_PER_MILLISECOND = 1000000;
-
-  private Set<String> _fields;
-  private boolean _extractAll = false;
+  private boolean _extractRawTimeValues;
 
   @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
-    if (fields == null || fields.isEmpty()) {
-      _extractAll = true;
-      _fields = Set.of();
-    } else {
-      _fields = Set.copyOf(fields);
+  protected void initConfig(@Nullable RecordExtractorConfig config) {
+    if (config instanceof ParquetNativeRecordExtractorConfig) {
+      _extractRawTimeValues = ((ParquetNativeRecordExtractorConfig) config).isExtractRawTimeValues();
     }
   }
 
@@ -72,19 +84,13 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       List<Type> fields = fromType.getFields();
       for (Type field : fields) {
         String fieldName = field.getName();
-        Object value = extractValue(from, fromType.getFieldIndex(fieldName));
-        if (value != null) {
-          value = convert(value);
-        }
-        to.putValue(fieldName, value);
+        to.putValue(fieldName, extractValue(from, fromType.getFieldIndex(fieldName)));
       }
     } else {
       for (String fieldName : _fields) {
-        Object value = fromType.containsField(fieldName) ? extractValue(from, fromType.getFieldIndex(fieldName)) : null;
-        if (value != null) {
-          value = convert(value);
+        if (fromType.containsField(fieldName)) {
+          to.putValue(fieldName, extractValue(from, fromType.getFieldIndex(fieldName)));
         }
-        to.putValue(fieldName, value);
       }
     }
     return to;
@@ -94,18 +100,20 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   private Object extractValue(Group from, int fieldIndex) {
     int numValues = from.getFieldRepetitionCount(fieldIndex);
     Type fieldType = from.getType().getType(fieldIndex);
+    // REPEATED fields are always multi-valued — even when 0 or 1 occurrences are present, the contract is
+    // `Object[]` (matching how LIST-annotated groups surface). For OPTIONAL / REQUIRED fields, 0 → null and
+    // 1 → the scalar.
+    if (fieldType.isRepetition(Type.Repetition.REPEATED)) {
+      Object[] results = new Object[numValues];
+      for (int i = 0; i < numValues; i++) {
+        results[i] = extractValue(from, fieldIndex, fieldType, i);
+      }
+      return results;
+    }
     if (numValues == 0) {
       return null;
     }
-    if (numValues == 1) {
-      return extractValue(from, fieldIndex, fieldType, 0);
-    }
-    // For multi-value (repeated field)
-    Object[] results = new Object[numValues];
-    for (int i = 0; i < numValues; i++) {
-      results[i] = extractValue(from, fieldIndex, fieldType, i);
-    }
-    return results;
+    return extractValue(from, fieldIndex, fieldType, 0);
   }
 
   @Nullable
@@ -123,6 +131,14 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
                 (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
             return BigDecimal.valueOf(intValue, decimalLogicalTypeAnnotation.getScale());
           }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
+            // `DATE` (int32 days-since-epoch) → [LocalDate] (TZ-independent), or raw days when configured.
+            return _extractRawTimeValues ? intValue : LocalDate.ofEpochDay(intValue);
+          }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
+            // `TIME_MILLIS` (int32 millis-since-midnight) → [LocalTime], or raw ms when configured.
+            return _extractRawTimeValues ? intValue : LocalTime.ofNanoOfDay(intValue * 1_000_000L);
+          }
           return intValue;
         case INT64:
           long longValue = from.getLong(fieldIndex, index);
@@ -131,51 +147,75 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
                 (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
             return BigDecimal.valueOf(longValue, decimalLogicalTypeAnnotation.getScale());
           }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
+            // `TIME_MICROS` / `TIME_NANOS` → [LocalTime] preserving full nanosecond precision, or raw value
+            // (in the column's declared unit) when configured.
+            if (_extractRawTimeValues) {
+              return longValue;
+            }
+            LogicalTypeAnnotation.TimeUnit timeUnit =
+                ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalTypeAnnotation).getUnit();
+            return LocalTime.ofNanoOfDay(timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS ? longValue * 1_000L
+                : longValue);
+          }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
+            // `TIMESTAMP_MILLIS` / `TIMESTAMP_MICROS` / `TIMESTAMP_NANOS` → [Timestamp] preserving sub-millisecond
+            // nanos via `setNanos`. Raw mode returns the value as stored in the column's declared unit.
+            // TODO: `isAdjustedToUTC()` is ignored — a `timestamp-* adjustToUTC=false` field is local-clock
+            //   time, not a UTC instant, but we treat all values as UTC instants per the Pinot TIMESTAMP
+            //   contract. For local-datetime data the produced `Timestamp` will be off by the JVM TZ offset.
+            if (_extractRawTimeValues) {
+              return longValue;
+            }
+            return ParquetUtils.convertLongToTimestamp(longValue,
+                ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) logicalTypeAnnotation).getUnit());
+          }
           return longValue;
-        case INT96:
-          Binary int96 = from.getInt96(fieldIndex, index);
-          return convertInt96ToLong(int96.getBytes());
+        case INT96: {
+          // INT96 has no Parquet logical-type spec, but its physical encoding (nanos-of-day + Julian day) is
+          // nanosecond-precision, so nanos is the natural raw unit.
+          long nanos = ParquetUtils.convertInt96ToEpochNanos(from.getInt96(fieldIndex, index).getBytes());
+          return _extractRawTimeValues ? nanos : TimestampUtils.fromNanosSinceEpoch(nanos);
+        }
         case FLOAT:
           return from.getFloat(fieldIndex, index);
         case DOUBLE:
           return from.getDouble(fieldIndex, index);
         case BINARY:
         case FIXED_LEN_BYTE_ARRAY:
-          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
-            return new BigDecimal(new BigInteger(from.getBinary(fieldIndex, index).getBytes()),
-                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation).getScale());
-          }
           if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation
               || logicalTypeAnnotation instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
             return from.getValueToString(fieldIndex, index);
           }
-          return from.getBinary(fieldIndex, index).getBytes();
+          byte[] binaryBytes = from.getBinary(fieldIndex, index).getBytes();
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+            return new BigDecimal(new BigInteger(binaryBytes),
+                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation).getScale());
+          }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
+            // `FIXED_LEN_BYTE_ARRAY(16) + UUID` → [UUID] (always converted; the downstream type
+            // transformer adapts to the Pinot column's storage type). UUID wire bytes are big-endian
+            // per RFC 4122.
+            return UuidUtils.fromBytes(binaryBytes);
+          }
+          return binaryBytes;
         default:
           throw new IllegalArgumentException(
               String.format("Unsupported field type: %s, primitive type: %s, logical type: %s", fieldType,
                   primitiveTypeName, logicalTypeAnnotation));
       }
-    } else if ((fieldType.isRepetition(Type.Repetition.OPTIONAL)) || (fieldType.isRepetition(Type.Repetition.REQUIRED))
-        || (fieldType.isRepetition(Type.Repetition.REPEATED))) {
-      Group group = from.getGroup(fieldIndex, index);
-      if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
-        return extractList(group);
-      }
-      if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
-        return extractKeyValueMap(group);
-      }
-      return extractStruct(group);
     }
-    return null;
+    Group group = from.getGroup(fieldIndex, index);
+    if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
+      return extractList(group);
+    }
+    if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
+      return extractKeyValueMap(group);
+    }
+    return extractStruct(group);
   }
 
-  public static long convertInt96ToLong(byte[] int96Bytes) {
-    ByteBuffer buf = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
-    return (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
-        + buf.getLong(0) / NANOS_PER_MILLISECOND;
-  }
-
-  public Object[] extractList(Group group) {
+  private Object[] extractList(Group group) {
     // Group is annotated with LIST. Per the Parquet LogicalTypes spec it always has exactly one child, the
     // repeated wrapper. The wrapper's schema (not the row data) decides which encoding we are reading, so we
     // resolve that once here and dispatch the whole list down a single branch.
@@ -211,7 +251,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
     return values;
   }
 
-  public Map<String, Object> extractStruct(Group group) {
+  private Map<String, Object> extractStruct(Group group) {
     // Plain Parquet group (no LIST/MAP annotation) — surfaces as a Map keyed by child field name. Reached for
     // nested struct fields and for groups read with the legacy/un-annotated branch.
     int numValues = group.getType().getFieldCount();
@@ -250,7 +290,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       Group keyValueGroup = group.getGroup(0, i);
       Object key = extractValue(keyValueGroup, keyIndex);
       Object value = extractValue(keyValueGroup, valueIndex);
-      map.put(key.toString(), value);
+      map.put(stringifyMapKey(key), value);
     }
     return map;
   }

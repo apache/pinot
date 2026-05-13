@@ -4,7 +4,6 @@
   "segmentsConfig": {
     "timeColumnName": "created_at_timestamp",
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "1"
   },
   "tenants": {

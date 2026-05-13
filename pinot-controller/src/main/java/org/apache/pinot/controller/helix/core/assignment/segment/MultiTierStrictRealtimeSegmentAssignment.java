@@ -21,13 +21,17 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.RebalanceConfig;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -82,5 +86,50 @@ public class MultiTierStrictRealtimeSegmentAssignment extends BaseStrictRealtime
     _logger.info("Rebalanced table: {}, number of segments to be added/removed for each instance: {}",
         _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
     return newAssignment;
+  }
+
+  /**
+   * Multi-tier override: pick the latest committed LLC segment in the partition (highest sequence number) and return
+   * its assignment only if the segment is still on the CONSUMING instance pool. If the latest segment has been moved
+   * to a tier (or its ZK metadata is unavailable), return {@code null} so the new CONSUMING segment falls back to the
+   * assignment derived from instance partitions.
+   */
+  @Nullable
+  @Override
+  protected Set<String> getExistingAssignment(int partitionId, Map<String, Map<String, String>> currentAssignment) {
+    LLCSegmentName latestLLCSegmentName = null;
+    Set<String> latestAssignment = null;
+    for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
+      if (isOfflineSegment(entry.getValue())) {
+        continue;
+      }
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(entry.getKey());
+      if (llcSegmentName == null) {
+        continue;
+      }
+      if (llcSegmentName.getPartitionGroupId() == partitionId && (latestLLCSegmentName == null
+          || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber())) {
+        latestLLCSegmentName = llcSegmentName;
+        latestAssignment = entry.getValue().keySet();
+      }
+    }
+    if (latestAssignment == null) {
+      return null;
+    }
+    String latestSegmentName = latestLLCSegmentName.getSegmentName();
+    SegmentZKMetadata segmentZKMetadata =
+        ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType,
+            latestSegmentName);
+    if (segmentZKMetadata == null) {
+      _logger.warn("Failed to find ZK metadata for latest segment: {} of partition: {}, skipping existing assignment",
+          latestSegmentName, partitionId);
+      return null;
+    }
+    if (segmentZKMetadata.getTier() != null) {
+      _logger.warn("Latest segment: {} for partition: {} is on tier: {}, skipping existing assignment",
+          latestSegmentName, partitionId, segmentZKMetadata.getTier());
+      return null;
+    }
+    return latestAssignment;
   }
 }

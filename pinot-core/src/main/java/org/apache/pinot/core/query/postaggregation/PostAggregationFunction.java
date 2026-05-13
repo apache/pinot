@@ -26,7 +26,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -68,7 +68,7 @@ public class PostAggregationFunction {
       }
       _argumentTypes = new PinotDataType[numArguments];
       for (int i = 0; i < numArguments; i++) {
-        _argumentTypes[i] = PinotDataType.getPinotDataTypeForExecution(argumentTypes[i]);
+        _argumentTypes[i] = argumentTypes[i].toPinotDataType();
       }
     }
   }

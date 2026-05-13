@@ -53,6 +53,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;

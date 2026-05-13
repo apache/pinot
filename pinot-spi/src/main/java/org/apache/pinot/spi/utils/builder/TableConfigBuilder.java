@@ -82,8 +82,6 @@ public class TableConfigBuilder {
   // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
-  @Deprecated
-  private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
   @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
@@ -236,11 +234,6 @@ public class TableConfigBuilder {
    */
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
-    return this;
-  }
-
-  public TableConfigBuilder setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
-    _segmentAssignmentStrategy = segmentAssignmentStrategy;
     return this;
   }
 
@@ -526,7 +519,6 @@ public class TableConfigBuilder {
     validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
     validationConfig.setSegmentPushType(_segmentPushType);
-    validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
     validationConfig.setReplication(_numReplicas);
