@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -816,6 +817,27 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return _segmentPreloadExecutor;
   }
 
+  public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    return _propertyStore;
+  }
+
+  public ConcurrentMap<String, SegmentDataManager> getSegmentDataManagerMap() {
+    return _segmentDataManagerMap;
+  }
+
+  public SegmentReloadSemaphore getSegmentReloadSemaphore() {
+    return _segmentReloadSemaphore;
+  }
+
+  @Nullable
+  public SegmentOperationsThrottlerSet getSegmentOperationsThrottlerSet() {
+    return _segmentOperationsThrottlerSet;
+  }
+
+  public ServerMetrics getServerMetrics() {
+    return _serverMetrics;
+  }
+
   @Override
   public boolean isDeleted() {
     return _isDeleted;
@@ -1163,7 +1185,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * existing segment with the same name.
    */
   @Nullable
-  protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
+  public SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
     SegmentDataManager oldSegmentDataManager;
     synchronized (_segmentDataManagerMap) {
       oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
@@ -1180,7 +1202,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * identify this scenario.
    */
   @Nullable
-  protected SegmentDataManager unregisterSegment(String segmentName) {
+  public SegmentDataManager unregisterSegment(String segmentName) {
     _recentlyDeletedSegments.put(segmentName, segmentName);
     synchronized (_segmentDataManagerMap) {
       return _segmentDataManagerMap.remove(segmentName);
@@ -1192,7 +1214,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * Segment can be downloaded from deep store or from peer servers. Downloaded segment might be compressed or
    * encrypted, and this method takes care of decompressing and decrypting the segment.
    */
-  protected File downloadSegment(SegmentZKMetadata zkMetadata)
+  public File downloadSegment(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     String downloadUrl = zkMetadata.getDownloadUrl();
@@ -1423,7 +1445,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * The original index directory is restored lazily, as depending on the conditions,
    * it may be restored from the backup directory or segment downloaded from deep store.
    */
-  protected void createBackup(File indexDir) {
+  public void createBackup(File indexDir) {
     if (!indexDir.exists()) {
       return;
     }
@@ -1440,7 +1462,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * When we rename the segment backup directory to segment temporary directory, we know the reload
    * already succeeded, so that we can safely delete the segment temporary directory.
    */
-  protected void removeBackup(File indexDir)
+  public void removeBackup(File indexDir)
       throws IOException {
     File parentDir = indexDir.getParentFile();
     File segmentBackupDir = new File(parentDir, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
@@ -1471,7 +1493,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * Returns {@code null} when the on-disk copy is absent, has a stale CRC under or fails to load
    */
   @Nullable
-  protected ImmutableSegment tryLoadExistingSegmentInternal(SegmentZKMetadata zkMetadata,
+  public ImmutableSegment tryLoadExistingSegmentInternal(SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig) {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(!_shutDown,
@@ -1604,7 +1626,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return staleSegments;
   }
 
-  protected StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
+  public StaleSegment isSegmentStale(IndexLoadingConfig indexLoadingConfig, SegmentDataManager segmentDataManager) {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert tableConfig != null && schema != null;
