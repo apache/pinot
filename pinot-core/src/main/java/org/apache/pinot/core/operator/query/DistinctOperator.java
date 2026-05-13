@@ -64,6 +64,8 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(valueBlock.getNumDocs());
+        scanCost.addEntriesScannedPostFilter(
+            (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
       }
       if (executor.process(valueBlock)) {
         break;

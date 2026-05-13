@@ -123,6 +123,8 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(valueBlock.getNumDocs());
+        scanCost.addEntriesScannedPostFilter(
+            (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
       }
       groupByExecutor.process(valueBlock);
     }

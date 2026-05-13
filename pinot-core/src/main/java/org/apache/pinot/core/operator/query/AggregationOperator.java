@@ -76,6 +76,8 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(valueBlock.getNumDocs());
+        scanCost.addEntriesScannedPostFilter(
+            (long) valueBlock.getNumDocs() * _projectOperator.getNumColumnsProjected());
       }
       aggregationExecutor.aggregate(valueBlock);
     }

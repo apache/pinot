@@ -128,6 +128,8 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsToAdd);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsToAdd * _projectOperator.getNumColumnsProjected());
       }
       if (_nullHandlingEnabled) {
         for (int i = 0; i < numExpressions; i++) {

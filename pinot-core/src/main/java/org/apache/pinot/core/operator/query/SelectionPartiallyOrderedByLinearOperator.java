@@ -74,6 +74,8 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
       }
       for (int i = 0; i < numDocsFetched; i++) {
         if (listBuilder.add(rowFetcher.apply(i))) {
