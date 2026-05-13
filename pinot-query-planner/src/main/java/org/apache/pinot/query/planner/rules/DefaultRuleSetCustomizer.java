@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.rules;
 
+import com.google.auto.service.AutoService;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
@@ -26,11 +27,12 @@ import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 
 /// [RuleSetCustomizer] that seeds every [Phase] with the OSS default Calcite
 /// rules for the multi-stage query planner. Registered as a [java.util.ServiceLoader]
-/// service entry so it is picked up automatically by [PinotRuleSet].
+/// service via [@AutoService], picked up automatically by [PinotRuleSet].
 ///
 /// Rule lists are defined in [PinotQueryRuleSets] and may be consolidated here
 /// in a future refactor once the [RuleSetCustomizer] SPI is the established
 /// extension point for broker rule customization.
+@AutoService(RuleSetCustomizer.class)
 public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
 
   /// No-arg constructor required by [java.util.ServiceLoader].
