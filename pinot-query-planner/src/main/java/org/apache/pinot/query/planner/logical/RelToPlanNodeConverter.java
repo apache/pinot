@@ -629,17 +629,11 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), literalRows);
   }
 
-  /**
-   * TODO: Add support for exclude clauses ({@link org.apache.calcite.rex.RexWindowExclusion})
-   */
   private WindowNode convertLogicalWindow(LogicalWindow node) {
     // Only a single Window Group should exist per WindowNode.
     Preconditions.checkState(node.groups.size() == 1, "Only a single window group is allowed, got: %s",
         node.groups.size());
     Window.Group windowGroup = node.groups.get(0);
-
-    Preconditions.checkState(windowGroup.exclude == RexWindowExclusion.EXCLUDE_NO_OTHER,
-        "EXCLUDE clauses for window functions are not currently supported");
 
     int numAggregates = windowGroup.aggCalls.size();
     List<RexExpression.FunctionCall> aggCalls = new ArrayList<>(numAggregates);
@@ -684,7 +678,18 @@ public final class RelToPlanNodeConverter {
     }
     return new WindowNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
         convertInputs(node.getInputs()), windowGroup.keys.asList(), windowGroup.orderKeys.getFieldCollations(),
-        aggCalls, windowFrameType, lowerBound, upperBound, constants);
+        aggCalls, windowFrameType, lowerBound, upperBound, fromRexWindowExclusion(windowGroup.exclude), constants);
+  }
+
+  public static WindowNode.WindowExclusion fromRexWindowExclusion(RexWindowExclusion exclude) {
+    if (exclude == RexWindowExclusion.EXCLUDE_CURRENT_ROW) {
+      return WindowNode.WindowExclusion.CURRENT_ROW;
+    } else if (exclude == RexWindowExclusion.EXCLUDE_GROUP) {
+      return WindowNode.WindowExclusion.GROUP;
+    } else if (exclude == RexWindowExclusion.EXCLUDE_TIES) {
+      return WindowNode.WindowExclusion.TIES;
+    }
+    return WindowNode.WindowExclusion.NO_OTHERS;
   }
 
   private SortNode convertLogicalSort(LogicalSort node) {

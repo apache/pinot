@@ -435,6 +435,9 @@ class PlanNodeMerger {
       if (node.getUpperBound() != otherNode.getUpperBound()) {
         return null;
       }
+      if (node.getExclude() != otherNode.getExclude()) {
+        return null;
+      }
       if (!node.getConstants().equals(otherNode.getConstants())) {
         return null;
       }
