@@ -193,6 +193,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter((long) numDocsFetched * numColumnsProjected);
       }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;
@@ -261,6 +262,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       QueryScanCostContext scanCost2 = getScanCostContext();
       if (scanCost2 != null) {
         scanCost2.addDocsScanned(numDocsFetched);
+        scanCost2.addEntriesScannedPostFilter((long) numDocsFetched * numColumnsProjected);
       }
     }
     _numEntriesScannedPostFilter = (long) _numDocsScanned * numColumnsProjected;

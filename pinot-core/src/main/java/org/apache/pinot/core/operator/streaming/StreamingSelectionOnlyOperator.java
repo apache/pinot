@@ -126,6 +126,8 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     QueryScanCostContext scanCost = getScanCostContext();
     if (scanCost != null) {
       scanCost.addDocsScanned(numDocs);
+      scanCost.addEntriesScannedPostFilter(
+          (long) numDocs * _projectOperator.getNumColumnsProjected());
     }
     return new SelectionResultsBlock(_dataSchema, rows, _queryContext);
   }

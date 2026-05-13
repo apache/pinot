@@ -99,6 +99,8 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsScanned);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsScanned * projectOperator.getNumColumnsProjected());
       }
       _numEntriesScannedInFilter += projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
       _numEntriesScannedPostFilter += (long) numDocsScanned * projectOperator.getNumColumnsProjected();

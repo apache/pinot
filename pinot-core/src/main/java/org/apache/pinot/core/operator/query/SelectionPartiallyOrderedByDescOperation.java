@@ -75,6 +75,8 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
       QueryScanCostContext scanCost = getScanCostContext();
       if (scanCost != null) {
         scanCost.addDocsScanned(numDocsFetched);
+        scanCost.addEntriesScannedPostFilter(
+            (long) numDocsFetched * _projectOperator.getNumColumnsProjected());
       }
       ListBuilder listBuilder = listBuilderSupplier.get();
 
