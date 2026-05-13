@@ -129,6 +129,66 @@ public class StreamingDispatchObserverTest {
   }
 
   /**
+   * STATUS_ERROR ack followed by ServerDone with no opchains: the DONE handler must drain the remaining expected count
+   * from the latch so {@link StreamingQuerySession#awaitCompletion} returns promptly, not at the query deadline.
+   */
+  @Test
+  public void testDoneWithNoReportedOpChainsAfterErrorAckDrainsLatch()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+    AtomicReference<Worker.QueryResponse> ackResponse = new AtomicReference<>();
+    AtomicReference<Throwable> ackError = new AtomicReference<>();
+
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 2,
+        (resp, err) -> {
+          ackResponse.set(resp);
+          ackError.set(err);
+        });
+    StreamObserver<Worker.BrokerToServer> outbound = Mockito.mock(StreamObserver.class);
+    observer.attachOutboundStream(outbound);
+    session.registerStream(observer);
+
+    Worker.QueryResponse errorResponse =
+        Worker.QueryResponse.newBuilder().putMetadata("STATUS_ERROR", "submit failed").build();
+    observer.onNext(Worker.ServerToBroker.newBuilder().setSubmitAck(errorResponse).build());
+    Assert.assertEquals(ackResponse.get(), errorResponse);
+    Assert.assertNull(ackError.get(), "STATUS_ERROR ack is not a transport error; ackError must be null");
+
+    // Server sends DONE without any OpChainCompletes — 2 latch counts still outstanding
+    observer.onNext(Worker.ServerToBroker.newBuilder().setDone(Worker.ServerDone.getDefaultInstance()).build());
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+        "awaitCompletion must return promptly after DONE drains remaining latch count");
+    Assert.assertEquals(session.getOutstandingCount(), 0L);
+  }
+
+  /**
+   * Partial reports + DONE (not onError): server reports 1 of 3 opchains then sends DONE early. The DONE handler must
+   * drain only the remaining 2 counts, not all 3.
+   */
+  @Test
+  public void testDoneAfterPartialOpChainsReportedDrainsRemaining()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 3);
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 3,
+        (resp, err) -> { });
+    StreamObserver<Worker.BrokerToServer> outbound = Mockito.mock(StreamObserver.class);
+    observer.attachOutboundStream(outbound);
+    session.registerStream(observer);
+
+    Worker.QueryResponse okResponse = Worker.QueryResponse.newBuilder().putMetadata("STATUS_OK", "").build();
+    observer.onNext(Worker.ServerToBroker.newBuilder().setSubmitAck(okResponse).build());
+    // 1 of 3 opchains reported
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 0, 3)).build());
+    // Server sends DONE early — 2 still owed
+    observer.onNext(Worker.ServerToBroker.newBuilder().setDone(Worker.ServerDone.getDefaultInstance()).build());
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+        "awaitCompletion must return after DONE drains remaining 2 counts");
+    Assert.assertEquals(session.getOutstandingCount(), 0L);
+  }
+
+  /**
    * Partial reports + onError: the latch is drained by exactly remaining-expected, not the full per-server count
    * (so we don't double-decrement).
    */

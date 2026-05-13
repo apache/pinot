@@ -61,6 +61,9 @@ public class StreamingDispatchObserver
   /**
    * Counts how many opchains we've already drained from the session for this server, so an onError doesn't
    * double-drain after some opchains already reported successfully.
+   *
+   * <p>Accessed only from gRPC inbound callbacks ({@code onNext}, {@code onError}, {@code onCompleted}), which gRPC
+   * serializes per stream — no additional synchronization is needed.
    */
   private int _opChainsReportedForThisServer = 0;
 
@@ -112,7 +115,19 @@ public class StreamingDispatchObserver
         _opChainsReportedForThisServer++;
         break;
       case DONE:
-        _session.unregisterStream(this);
+        int remaining = Math.max(0, _expectedOpChainsForThisServer - _opChainsReportedForThisServer);
+        if (remaining > 0) {
+          // Server declared done without all expected opchains reported (e.g. after STATUS_ERROR ack).
+          // Drain the latch so awaitCompletion unblocks promptly rather than waiting until query deadline.
+          // Intentionally reuses the error path: if this server couldn't execute its opchains the whole
+          // query is doomed, so canceling other servers is correct.
+          _session.recordStreamError(this, null, remaining);
+          // Advance the reported counter so a subsequent onError (stream reset after DONE) sees remaining==0
+          // and does not double-drain the latch.
+          _opChainsReportedForThisServer = _expectedOpChainsForThisServer;
+        } else {
+          _session.unregisterStream(this);
+        }
         break;
       case PAYLOAD_NOT_SET:
       default:
