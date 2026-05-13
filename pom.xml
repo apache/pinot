@@ -152,7 +152,7 @@
 
     <arrow.version>19.0.0</arrow.version>
     <avro.version>1.12.1</avro.version>
-    <parquet.version>1.17.0</parquet.version>
+    <parquet.version>1.17.1</parquet.version>
     <orc.version>1.9.8</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.2</helix.version>
@@ -200,7 +200,7 @@
     <ayza.version>10.0.5</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <scala-xml.version>2.4.0</scala-xml.version>
-    <plexus-classworlds.version>2.10.0</plexus-classworlds.version>
+    <plexus-classworlds.version>2.11.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <checker-qual.version>4.1.0</checker-qual.version>

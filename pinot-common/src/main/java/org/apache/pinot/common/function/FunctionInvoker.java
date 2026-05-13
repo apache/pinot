@@ -25,7 +25,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**

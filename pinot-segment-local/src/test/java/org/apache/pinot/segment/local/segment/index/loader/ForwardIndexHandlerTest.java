@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -236,7 +235,7 @@ public class ForwardIndexHandlerTest {
 
   private static final List<CompressionCodec> RAW_COMPRESSION_TYPES = Arrays.stream(CompressionCodec.values())
       .filter(CompressionCodec::isApplicableToRawIndex)
-      .collect(Collectors.toList());
+      .toList();
 
   //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)

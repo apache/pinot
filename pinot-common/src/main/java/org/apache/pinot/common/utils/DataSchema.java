@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -290,16 +291,16 @@ public class DataSchema {
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
       }
     },
-    MAP(NullValuePlaceHolder.MAP) {
-      @Override
-      public RelDataType toType(RelDataTypeFactory typeFactory) {
-        return typeFactory.createSqlType(SqlTypeName.MAP);
-      }
-    },
     BYTES(NullValuePlaceHolder.INTERNAL_BYTES) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      }
+    },
+    MAP(NullValuePlaceHolder.MAP) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.MAP);
       }
     },
     OBJECT(null) {
@@ -943,6 +944,57 @@ public class DataSchema {
           return BYTES_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
+      }
+    }
+
+    /// Returns the [PinotDataType] for this [ColumnDataType] for query execution purpose. Returns primitive array
+    /// type for multi-valued types.
+    public PinotDataType toPinotDataType() {
+      switch (this) {
+        case INT:
+          return PinotDataType.INTEGER;
+        case LONG:
+          return PinotDataType.LONG;
+        case FLOAT:
+          return PinotDataType.FLOAT;
+        case DOUBLE:
+          return PinotDataType.DOUBLE;
+        case BIG_DECIMAL:
+          return PinotDataType.BIG_DECIMAL;
+        case BOOLEAN:
+          return PinotDataType.BOOLEAN;
+        case TIMESTAMP:
+          return PinotDataType.TIMESTAMP;
+        case STRING:
+          return PinotDataType.STRING;
+        case JSON:
+          return PinotDataType.JSON;
+        case BYTES:
+          return PinotDataType.BYTES;
+        case MAP:
+          return PinotDataType.MAP;
+        case OBJECT:
+          return PinotDataType.OBJECT;
+        case INT_ARRAY:
+          return PinotDataType.PRIMITIVE_INT_ARRAY;
+        case LONG_ARRAY:
+          return PinotDataType.PRIMITIVE_LONG_ARRAY;
+        case FLOAT_ARRAY:
+          return PinotDataType.PRIMITIVE_FLOAT_ARRAY;
+        case DOUBLE_ARRAY:
+          return PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
+        case BIG_DECIMAL_ARRAY:
+          return PinotDataType.BIG_DECIMAL_ARRAY;
+        case BOOLEAN_ARRAY:
+          return PinotDataType.PRIMITIVE_BOOLEAN_ARRAY;
+        case TIMESTAMP_ARRAY:
+          return PinotDataType.TIMESTAMP_ARRAY;
+        case STRING_ARRAY:
+          return PinotDataType.STRING_ARRAY;
+        case BYTES_ARRAY:
+          return PinotDataType.BYTES_ARRAY;
+        default:
+          throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
       }
     }
 

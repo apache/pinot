@@ -20,8 +20,8 @@ package org.apache.pinot.common.evaluator;
 
 import java.util.Collections;
 import org.apache.pinot.common.function.FunctionUtils;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;

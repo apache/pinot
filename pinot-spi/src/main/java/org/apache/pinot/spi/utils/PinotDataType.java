@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import java.io.IOException;
@@ -30,16 +30,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.BooleanUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.MapUtils;
-import org.apache.pinot.spi.utils.TimestampUtils;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -1975,13 +1967,13 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
       case TIMESTAMP:
         return fieldSpec.isSingleValueField() ? TIMESTAMP : TIMESTAMP_ARRAY;
+      case STRING:
+        return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case JSON:
         if (fieldSpec.isSingleValueField()) {
           return JSON;
         }
         throw new IllegalStateException("There is no multi-value type for JSON");
-      case STRING:
-        return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
       case MAP:
@@ -1990,55 +1982,7 @@ public enum PinotDataType {
         }
         throw new IllegalStateException("There is no multi-value type for MAP");
       default:
-        throw new UnsupportedOperationException(
-            "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
-    }
-  }
-
-  /**
-   * Returns the {@link PinotDataType} for the given {@link ColumnDataType} for query execution purpose. Returns
-   * primitive array type for multi-valued types.
-   */
-  public static PinotDataType getPinotDataTypeForExecution(ColumnDataType columnDataType) {
-    switch (columnDataType) {
-      case INT:
-        return INTEGER;
-      case LONG:
-        return LONG;
-      case FLOAT:
-        return FLOAT;
-      case DOUBLE:
-        return DOUBLE;
-      case BIG_DECIMAL:
-        return BIG_DECIMAL;
-      case BOOLEAN:
-        return BOOLEAN;
-      case TIMESTAMP:
-        return TIMESTAMP;
-      case STRING:
-        return STRING;
-      case JSON:
-        return JSON;
-      case BYTES:
-        return BYTES;
-      case OBJECT:
-        return OBJECT;
-      case INT_ARRAY:
-        return PRIMITIVE_INT_ARRAY;
-      case LONG_ARRAY:
-        return PRIMITIVE_LONG_ARRAY;
-      case FLOAT_ARRAY:
-        return PRIMITIVE_FLOAT_ARRAY;
-      case DOUBLE_ARRAY:
-        return PRIMITIVE_DOUBLE_ARRAY;
-      case BIG_DECIMAL_ARRAY:
-        return BIG_DECIMAL_ARRAY;
-      case STRING_ARRAY:
-        return STRING_ARRAY;
-      case BYTES_ARRAY:
-        return BYTES_ARRAY;
-      default:
-        throw new IllegalStateException("Cannot convert ColumnDataType: " + columnDataType + " to PinotDataType");
+        throw new IllegalStateException("Unsupported data type: " + dataType);
     }
   }
 }

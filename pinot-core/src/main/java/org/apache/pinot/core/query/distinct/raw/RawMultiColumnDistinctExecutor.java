@@ -142,8 +142,8 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
 
   private Object[] getSVValues(BlockValSet blockValueSet, int numDocs) {
     Object[] values;
-    DataType valueType = blockValueSet.getValueType();
-    switch (valueType.getStoredType()) {
+    DataType storedType = blockValueSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[] intValues = blockValueSet.getIntValuesSV();
         values = new Object[numDocs];
@@ -188,7 +188,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
         }
         break;
       default:
-        throw new IllegalStateException("Unsupported value type: " + valueType + " for single-value column");
+        throw new IllegalStateException("Unsupported SV stored type: " + storedType);
     }
     if (_nullHandlingEnabled) {
       RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
@@ -202,8 +202,8 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   // TODO(https://github.com/apache/pinot/issues/10882): support NULL for multi-value
   private Object[][] getMVValues(BlockValSet blockValueSet, int numDocs) {
     Object[][] values;
-    DataType valueType = blockValueSet.getValueType();
-    switch (valueType.getStoredType()) {
+    DataType storedType = blockValueSet.getValueType().getStoredType();
+    switch (storedType) {
       case INT:
         int[][] intValues = blockValueSet.getIntValuesMV();
         values = new Object[numDocs][];
@@ -248,7 +248,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
         }
         break;
       default:
-        throw new IllegalStateException("Unsupported value type: " + valueType + " for multi-value column");
+        throw new IllegalStateException("Unsupported MV stored type: " + storedType);
     }
     return values;
   }

@@ -44,11 +44,11 @@ public class DefaultColumnStatistics implements ColumnStatistics {
     _fieldSpec = fieldSpec;
     _numDocs = numDocs;
 
-    DataType valueType = fieldSpec.getDataType().getStoredType();
+    DataType storedType = fieldSpec.getDataType().getStoredType();
     Object value = fieldSpec.getDefaultNullValue();
     int length = 0;
     boolean isAscii = false;
-    switch (valueType) {
+    switch (storedType) {
       case INT:
         _valueSet = new int[]{(Integer) value};
         break;
@@ -79,11 +79,10 @@ public class DefaultColumnStatistics implements ColumnStatistics {
         break;
       // TODO: Support MAP
       default:
-        throw new IllegalArgumentException(
-            "Unsupported value type: " + valueType + " for column: " + fieldSpec.getName());
+        throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
     _value = (Comparable) value;
-    _valueLength = valueType.isFixedWidth() ? valueType.size() : length;
+    _valueLength = storedType.isFixedWidth() ? storedType.size() : length;
     _isAscii = isAscii;
   }
 
@@ -93,12 +92,17 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public Comparable getMinValue() {
+  public int getTotalDocs() {
+    return _numDocs;
+  }
+
+  @Override
+  public Comparable<?> getMinValue() {
     return _value;
   }
 
   @Override
-  public Comparable getMaxValue() {
+  public Comparable<?> getMaxValue() {
     return _value;
   }
 

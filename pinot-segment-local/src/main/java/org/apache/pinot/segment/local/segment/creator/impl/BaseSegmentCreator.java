@@ -188,26 +188,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
   }
 
   private IndexCreationContext.Common getIndexCreationContext(FieldSpec fieldSpec, boolean dictEnabledColumn) {
-    ColumnStatistics columnStatistics = _columnStatisticsMap.get(fieldSpec.getName());
-    FieldIndexConfigs fieldIndexConfig = _config.getIndexConfigsByColName().get(fieldSpec.getName());
-    boolean forwardIndexDisabled = !fieldIndexConfig.getConfig(StandardIndexes.forward()).isEnabled();
-
-    return IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withDictionary(dictEnabledColumn)
-        .withFieldSpec(fieldSpec)
-        .withTotalDocs(_totalDocs)
-        .withColumnStatistics(columnStatistics)
+    ColumnStatistics columnStats = _columnStatisticsMap.get(fieldSpec.getName());
+    return new IndexCreationContext.Builder(_indexDir, _config.getTableConfig(), columnStats, dictEnabledColumn)
+        .withOnHeap(_config.isOnHeap())
         .withOptimizedDictionary(_config.isOptimizeDictionary()
             || _config.isOptimizeDictionaryForMetrics() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC)
-        .onHeap(_config.isOnHeap())
-        .withForwardIndexDisabled(forwardIndexDisabled)
         .withTextCommitOnClose(true)
         .withRealtimeConversion(_config.isRealtimeConversion())
         .withConsumerDir(_config.getConsumerDir())
         .withMutableSegmentCompacted(_config.isMutableSegmentCompacted())
         .withMutableToImmutableDocIdMap(_config.getMutableToImmutableDocIdMap())
-        .withTableNameWithType(_config.getTableConfig().getTableName())
         .withContinueOnError(_config.isContinueOnError())
         .build();
   }
@@ -240,10 +230,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         new DictionaryIndexPlugin().getIndexType().createIndexCreator(context, dictConfig);
 
     try {
-      dictionaryCreator.build(context.getSortedUniqueElementsArray());
+      dictionaryCreator.build(columnStatistics.getUniqueValuesSet());
     } catch (Exception e) {
       LOGGER.error("Error building dictionary for field: {}, cardinality: {}, number of bytes per entry: {}",
-          context.getFieldSpec().getName(), context.getCardinality(), dictionaryCreator.getNumBytesPerEntry());
+          columnName, columnStatistics.getCardinality(), dictionaryCreator.getNumBytesPerEntry());
       throw e;
     }
     return dictionaryCreator;
@@ -781,14 +771,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     // Format conversion
     convertFormatIfNecessary(_indexDir);
 
-    // Build indexes if there are documents
+    // Build indexes if there are documents. Empty segments have no values to index; index handlers (mirroring
+    // [SegmentPreProcessor#process]'s `totalDocs == 0` short-circuit) assume at least one doc.
     if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(_indexDir);
       buildMultiColumnTextIndex(_indexDir);
+      updatePostSegmentCreationIndexes(_indexDir);
     }
-
-    // Update post-creation indexes
-    updatePostSegmentCreationIndexes(_indexDir);
 
     // Persist creation metadata
     persistCreationMeta(_indexDir, dataCrc);

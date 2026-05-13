@@ -1009,7 +1009,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
       this.put(comparisonColumns.get(0), columnMetadata);
     }});
-    when(columnMetadata.getMaxValue()).thenReturn(endTime);
+    doReturn(endTime).when(columnMetadata).getMaxValue();
     if (snapshot != null) {
       when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
     } else {

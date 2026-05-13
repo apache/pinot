@@ -1134,6 +1134,9 @@ public class CommonConstants {
       // Parameters related to Hybrid score.
       public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
       public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
+      public static final String CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR =
+          CONFIG_PREFIX + ".hybrid.score.queue.size.floor";
+      public static final int DEFAULT_HYBRID_SCORE_QUEUE_FLOOR = 0;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
       // stats for servers upon query submission and response arrival.
@@ -2201,16 +2204,8 @@ public class CommonConstants {
     /// - "SAFE": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
     /// - "ALWAYS": MSE will always send stats, regardless of the version of the instances in the cluster.
     /// - "NEVER": MSE will never send stats.
-    ///
-    /// The reason for this flag that versions 1.3.0 and lower have two undesired behaviors:
-    /// 1. Some queries using intersection generate incorrect stats
-    /// 2. When stats from other nodes are sent but are different from expected, the query fails.
-    ///
-    /// In 1.4.0 the first issue is solved and instead of failing when unexpected stats are received, the query
-    /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
-    /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
-    public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+    public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
 
     /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
     /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
