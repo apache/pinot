@@ -968,16 +968,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new MseHandlerStreamingBrokerResponse(dispatcherResponse, context, estimatedNumQueryThreads,
           executionContext);
     } catch (QueryException e) {
-      _stagesFinishedMeter.mark(countStages(context.dispatchableSubPlan));
-      _opchainsCompletedMeter.mark(countOpChain(context.dispatchableSubPlan));
+      _stagesFinishedMeter.mark(countStages(context._dispatchableSubPlan));
+      _opchainsCompletedMeter.mark(countOpChain(context._dispatchableSubPlan));
       onQueryFinish(requestId);
       _queryThrottler.release(estimatedNumQueryThreads);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
       throw e;
     } catch (Throwable t) {
-      _stagesFinishedMeter.mark(countStages(context.dispatchableSubPlan));
-      _opchainsCompletedMeter.mark(countOpChain(context.dispatchableSubPlan));
+      _stagesFinishedMeter.mark(countStages(context._dispatchableSubPlan));
+      _opchainsCompletedMeter.mark(countOpChain(context._dispatchableSubPlan));
       onQueryFinish(requestId);
       _queryThrottler.release(estimatedNumQueryThreads);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
