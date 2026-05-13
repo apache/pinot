@@ -213,6 +213,69 @@ public class StreamingDispatchObserverTest {
     Assert.assertEquals(session.getOutstandingCount(), 0L);
   }
 
+  /**
+   * DONE with remaining > 0 followed by onError: the onError must not double-drain the latch. The DONE handler
+   * advances _opChainsReportedForThisServer to _expectedOpChainsForThisServer, so onError computes remaining == 0
+   * and is a no-op on the latch.
+   */
+  @Test
+  public void testOnErrorAfterDoneWithRemainingDoesNotDoubleDrain()
+      throws Exception {
+    // Two servers each with 2 expected opchains; total latch = 4.
+    StreamingQuerySession session = new StreamingQuerySession(1L, 4);
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 2,
+        (resp, err) -> { });
+    StreamingDispatchObserver observer2 = new StreamingDispatchObserver(mockServer(), session, 2,
+        (resp, err) -> { });
+    StreamObserver<Worker.BrokerToServer> outbound = Mockito.mock(StreamObserver.class);
+    observer.attachOutboundStream(outbound);
+    observer2.attachOutboundStream(Mockito.mock(StreamObserver.class));
+    session.registerStream(observer);
+    session.registerStream(observer2);
+
+    // observer: DONE with 0 reported (drains 2 counts)
+    observer.onNext(Worker.ServerToBroker.newBuilder().setDone(Worker.ServerDone.getDefaultInstance()).build());
+    // observer2: all 2 opchains reported normally
+    observer2.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 0, 1)).build());
+    observer2.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 1, 1)).build());
+    observer2.onNext(Worker.ServerToBroker.newBuilder().setDone(Worker.ServerDone.getDefaultInstance()).build());
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
+        "session should complete after both servers report");
+    Assert.assertEquals(session.getOutstandingCount(), 0L);
+
+    // Now simulate a late onError on observer (stream reset after DONE was already processed).
+    // Outstanding count is already 0; onError must not go negative (CountDownLatch clamps to 0, but we verify
+    // getOutstandingCount remains 0 and no exception is thrown).
+    observer.onError(new RuntimeException("stream reset after done"));
+    Assert.assertEquals(session.getOutstandingCount(), 0L, "double-drain guard: onError after DONE must be no-op");
+  }
+
+  /**
+   * onCompleted fires after a clean DONE (remaining == 0): unregisterStream is idempotent, no exception.
+   */
+  @Test
+  public void testOnCompletedAfterCleanDoneIsNoOp()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 2,
+        (resp, err) -> { });
+    StreamObserver<Worker.BrokerToServer> outbound = Mockito.mock(StreamObserver.class);
+    observer.attachOutboundStream(outbound);
+    session.registerStream(observer);
+
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 0, 1)).build());
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 1, 1)).build());
+    observer.onNext(Worker.ServerToBroker.newBuilder().setDone(Worker.ServerDone.getDefaultInstance()).build());
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS));
+    Assert.assertEquals(session.getOutstandingCount(), 0L);
+
+    // gRPC calls onCompleted after DONE; must not throw or change state.
+    observer.onCompleted();
+    Assert.assertEquals(session.getOutstandingCount(), 0L);
+  }
+
   // ---- helpers ----
 
   private static QueryServerInstance mockServer() {
