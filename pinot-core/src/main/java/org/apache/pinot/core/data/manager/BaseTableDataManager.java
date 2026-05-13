@@ -1054,12 +1054,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
+    _segmentReloadSemaphore.acquire(segmentName, _logger);
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
-    boolean semaphoreAcquired = false;
     try {
-      _segmentReloadSemaphore.acquire(segmentName, _logger);
-      semaphoreAcquired = true;
       /*
       Determines if a segment should be downloaded from deep storage based on:
       1. A forced download flag.
@@ -1134,10 +1132,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
               reloadFailureException));
       throw reloadFailureException;
     } finally {
-      if (semaphoreAcquired) {
-        _segmentReloadSemaphore.release();
-      }
       segmentLock.unlock();
+      _segmentReloadSemaphore.release();
     }
     _logger.info("Reloaded segment: {}", segmentName);
   }
