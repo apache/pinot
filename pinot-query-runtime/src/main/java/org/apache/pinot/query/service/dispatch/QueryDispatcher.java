@@ -90,6 +90,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -705,7 +706,7 @@ public class QueryDispatcher {
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
     OpChainExecutionContext opChainExecutionContext =
         OpChainExecutionContext.fromQueryContext(mailboxService, queryOptions, stageMetadata, workerMetadata.get(0),
-            null, true);
+            null, true, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = rootNode.getDataSchema();
