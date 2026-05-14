@@ -49,7 +49,9 @@ import static org.testng.Assert.fail;
  * {@code AbstractIndexType#convertToNewFormat}: <b>migration only writes
  * {@code FieldConfig.indexes[prettyName]} when the column does not already carry a JsonNode for
  * that index type</b>. Columns already in new format keep their slim shape verbatim; legacy-only
- * inputs are translated as before; both-format coexistence resolves "new format wins".
+ * inputs are translated as before. Same-column same-type coexistence is rejected upstream with
+ * {@code ConfigDeclaredTwiceException}; different index types on the same column translate
+ * independently.
  *
  * <p>This contract is load-bearing for downstream APIs (e.g. StarTree Preview / InferIndex) that
  * round-trip user-supplied {@code FieldConfig.indexes} JsonNodes through the migration step and
@@ -148,8 +150,41 @@ public class ConvertToNewFormatPreservesSlimTest {
       TableConfigUtils.createTableConfigFromOldFormat(tc, schemaWith("c1"));
       fail("Expected IllegalStateException from ForwardIndexType validator");
     } catch (IllegalStateException expected) {
-      assertTrue(expected.getMessage() != null && expected.getMessage().contains("forward index"),
-          "Expected forward-index validation error; got: " + expected.getMessage());
+      assertTrue(expected.getMessage() != null && expected.getMessage().contains("column: c1"),
+          "Expected validation error naming column c1; got: " + expected.getMessage());
+    }
+  }
+
+  @Test
+  public void newFormatPrimitiveAtPrettyNameRejected() {
+    // Adversarial input: {"forward": 42}. ForwardIndexType's createDeserializer rejects
+    // non-object values; pin the loud failure path.
+    ObjectNode slim = MAPPER.createObjectNode();
+    slim.put("forward", 42);
+    TableConfig tc = withFieldConfig("c1", EncodingType.DICTIONARY, slim);
+
+    try {
+      TableConfigUtils.createTableConfigFromOldFormat(tc, schemaWith("c1"));
+      fail("Expected IllegalStateException for primitive at prettyName");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage() != null && expected.getMessage().contains("column: c1"),
+          "Expected validation error naming column c1; got: " + expected.getMessage());
+    }
+  }
+
+  @Test
+  public void newFormatArrayAtPrettyNameRejected() {
+    // Adversarial input: {"forward": [1,2,3]}. Same validator path as above.
+    ObjectNode slim = MAPPER.createObjectNode();
+    slim.putArray("forward").add(1).add(2).add(3);
+    TableConfig tc = withFieldConfig("c1", EncodingType.DICTIONARY, slim);
+
+    try {
+      TableConfigUtils.createTableConfigFromOldFormat(tc, schemaWith("c1"));
+      fail("Expected IllegalStateException for array at prettyName");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage() != null && expected.getMessage().contains("column: c1"),
+          "Expected validation error naming column c1; got: " + expected.getMessage());
     }
   }
 

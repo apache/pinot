@@ -118,10 +118,13 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
    *       follows one of the rules above.
    * </ul>
    *
-   * <p>An explicit Jackson {@code NullNode} at {@code prettyName} (i.e. {@code "forward": null})
-   * is not a valid input shape — per-index-type validators (called from {@code getConfig}) reject
-   * it before the gap-fill loop runs. Use an empty object {@code {}} to mean "enabled with
-   * defaults", not {@code null}.
+   * <p>An explicit Jackson {@code NullNode} at {@code prettyName} (e.g. {@code "forward": null})
+   * is handled by two layers: (1) some index types (e.g. {@code ForwardIndexType}) reject
+   * non-object values via a {@code Preconditions.checkState(...)} in their
+   * {@code createDeserializer} lambda before the gap-fill loop runs; (2) for types without that
+   * upstream check, the gap-fill predicate itself treats {@code NullNode} as absent
+   * ({@code !existing.isNull()}) and falls through to {@code set()}. Use an empty object
+   * {@code {}} to mean "enabled with defaults", not {@code null}.
    */
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
     Map<String, C> deserialize = getConfig(tableConfig, schema);
