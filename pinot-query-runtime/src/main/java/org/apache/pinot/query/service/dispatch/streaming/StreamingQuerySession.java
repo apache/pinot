@@ -55,6 +55,15 @@ public class StreamingQuerySession {
   private final long _requestId;
   private final int _expectedOpChains;
   private final CountDownLatch _completionLatch;
+  /**
+   * Guards {@link #_stageAccumulator}, {@link #_respondedByStage}, {@link #_mergeFailedByStage},
+   * {@link #_openStreams}, and {@link #_peerErrorObserved}. Lock hold time is proportional to the merge work (a few
+   * map operations), not to proto decode; see {@link #recordOpChainComplete} for why decode is done outside.
+   *
+   * <p>If lock contention becomes a bottleneck at high QPS, a virtual-thread actor (one VT per query draining from
+   * an {@code ArrayBlockingQueue}, with gRPC I/O threads simply enqueuing) would eliminate the lock entirely and
+   * avoid any contention between concurrent inbound callbacks.
+   */
   private final ReentrantLock _lock = new ReentrantLock();
 
   /** Per-stage merged accumulator. Mutated under {@link #_lock}. */
@@ -188,41 +197,14 @@ public class StreamingQuerySession {
   }
 
   /**
-   * Records a transport-level error on one of the server streams (gRPC {@code onError}). Treated as a fatal report
-   * for that opchain (drains the latch by 1) and triggers fan-out cancel if not already triggered.
+   * Records a transport-level error on one of the server streams (gRPC {@code onError}). Drains exactly
+   * {@code remainingExpected} entries from the latch (the number of opchains that will not now report) and triggers
+   * fan-out cancel if not already triggered.
    *
-   * <p>Idempotent w.r.t. the same stream — if the stream already errored, subsequent calls are no-ops on the latch
-   * but may still trigger fan-out cancel if it hasn't fired yet.
-   */
-  public void recordStreamError(StreamingServerHandle stream, @Nullable Throwable error) {
-    boolean shouldFanOutCancel = false;
-    boolean wasOpen;
-    _lock.lock();
-    try {
-      wasOpen = _openStreams.remove(stream);
-      if (!_peerErrorObserved) {
-        _peerErrorObserved = true;
-        shouldFanOutCancel = true;
-      }
-    } finally {
-      _lock.unlock();
-    }
-    if (wasOpen) {
-      // Drain one pending opchain from the latch on the assumption that this stream represented at least one opchain
-      // that will not now report. The dispatcher passes per-server expected counts to {@link #recordStreamErrorWith}
-      // when finer accounting is needed.
-      _completionLatch.countDown();
-    }
-    LOGGER.warn("Stream error on request {} (open={}): {}", _requestId, wasOpen,
-        error == null ? "<null>" : error.getMessage());
-    if (shouldFanOutCancel) {
-      fanOutCancel();
-    }
-  }
-
-  /**
-   * Variant of {@link #recordStreamError} that drains exactly {@code remainingExpected} entries from the latch. Used
-   * by the dispatcher when it knows how many opchains a server still owed before its stream broke.
+   * <p>The caller must pass the precise per-server remaining count rather than a fixed 1, because a single stream can
+   * carry multiple opchains (one per worker per stage). Passing an incorrect count either under-drains (causes
+   * {@link #awaitCompletion} to block until the query deadline) or over-drains (causes the latch to reach zero before
+   * all reports have arrived).
    */
   public void recordStreamError(StreamingServerHandle stream, @Nullable Throwable error, int remainingExpected) {
     boolean shouldFanOutCancel = false;

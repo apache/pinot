@@ -246,6 +246,18 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
 
   /**
+   * Number of MSE queries that used the {@code SubmitWithStream} bidi-RPC stats path (stream mode).
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_QUERIES = create("MSE_STREAM_STATS_QUERIES", "queries", true);
+
+  /**
+   * Number of MSE stream-mode queries that returned with incomplete stats coverage (at least one stage had missing or
+   * merge-failed opchain reports). Operators can alert on this counter to detect persistent stats gaps.
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_INCOMPLETE_COVERAGE =
+      create("MSE_STREAM_STATS_INCOMPLETE_COVERAGE", "queries", true);
+
+  /**
    * How many MSE queries have encountered segments with invalid partitions.
    * <p>
    * This is only emitted for when usePhysicalOptimizer is set to true.

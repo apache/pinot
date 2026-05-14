@@ -433,6 +433,8 @@ public class QueryDispatcher {
     try {
       session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {
+      // Restore the interrupt flag but continue: mergeSessionStatsIntoResult does not block, so the flag will be
+      // observed by the caller rather than firing an unexpected InterruptedException inside this method.
       Thread.currentThread().interrupt();
     }
     QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());

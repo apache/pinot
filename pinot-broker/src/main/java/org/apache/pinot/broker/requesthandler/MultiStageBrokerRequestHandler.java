@@ -744,6 +744,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,
           queryResults.getStageCoverage());
+
+      if (QueryOptionsUtils.isStreamStats(effectiveOptions, false)) {
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_QUERIES, 1);
+        List<QueryDispatcher.QueryResult.StageCoverage> coverage = queryResults.getStageCoverage();
+        if (coverage != null && coverage.stream()
+            .anyMatch(c -> c != null && (c.getMissing() > 0 || c.getMergeFailed() > 0))) {
+          _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_INCOMPLETE_COVERAGE, 1);
+        }
+      }
+
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 

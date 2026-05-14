@@ -519,11 +519,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     @Override
     public void onError(Throwable t) {
       // Broker-side stream error / disconnect. Treat like a cancel and clean up; do not reply on the response stream
-      // (the underlying transport is gone).
+      // (the underlying transport is gone). Use compareAndSet to be consistent with sendDoneAndComplete and avoid
+      // double-cancelling if onOpChainComplete already completed the stream first.
       LOGGER.warn("SubmitWithStream stream error for request {}: {}", _requestId, t.getMessage());
-      _completed.set(true);
-      cleanupListener();
-      cancelIfSubmitted();
+      if (_completed.compareAndSet(false, true)) {
+        cleanupListener();
+        cancelIfSubmitted();
+      }
     }
 
     @Override
@@ -565,6 +567,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         opChainCount += stagePlan.getStageMetadata().getWorkerMetadataCount();
       }
       final int expected = opChainCount;
+      // Must set _expectedOpChains BEFORE registerOpChainCompletionListener. The AtomicInteger.set is a volatile
+      // write; ConcurrentHashMap.put (inside registerOpChainCompletionListener) provides a subsequent happens-before
+      // edge, so any thread that reads via ConcurrentHashMap.get (the listener callback) is guaranteed to observe
+      // the _expectedOpChains value set here. Reordering these two lines would break the JMM guarantee.
       _expectedOpChains.set(expected);
 
       // Register the per-request completion listener BEFORE submitting. Otherwise short opchains could finish before
