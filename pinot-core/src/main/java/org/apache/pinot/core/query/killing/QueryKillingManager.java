@@ -232,7 +232,7 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
           config);
     } catch (Exception e) {
       LOGGER.error("Error in scan-based killing evaluation for query {}", queryId, e);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_ERROR, 1);
+      emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN_ERROR, tableName);
     }
   }
 
@@ -276,7 +276,7 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
           resolvedTableName, config);
     } catch (Exception e) {
       LOGGER.error("Error in scan-based killing evaluation for query {}", resolvedQueryId, e);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_ERROR, 1);
+      emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN_ERROR, resolvedTableName);
     }
   }
 
@@ -298,11 +298,23 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
         configSource);
     if (logOnly) {
       LOGGER.info("Query killed in LogOnly mode: {}", report.toInternalLogMessage());
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1);
+      emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, report.getTableName());
       return;
     }
     LOGGER.warn("Query Killed in enforce mode: {}", report.toInternalLogMessage());
     executionContext.terminate(queryStrategy.getErrorCode(), report.toCustomerMessage());
-    _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1);
+    emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN, report.getTableName());
+  }
+
+  /**
+   * Emits a kill metric per-table when the table name is known, falling back to global emission
+   * when it is not.
+   */
+  private void emitKillMetric(ServerMeter meter, @Nullable String tableName) {
+    if (tableName != null && !tableName.isEmpty() && !"unknown".equals(tableName)) {
+      _serverMetrics.addMeteredTableValue(tableName, meter, 1);
+    } else {
+      _serverMetrics.addMeteredGlobalValue(meter, 1);
+    }
   }
 }
