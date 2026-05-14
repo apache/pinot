@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +41,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -139,12 +141,12 @@ public class ConvertToNewFormatPreservesSlimTest {
     // config and raise IllegalStateException. The gap-fill loop is never reached. Users wanting
     // "enabled with defaults" must use {} (empty object), not null.
     ObjectNode slim = MAPPER.createObjectNode();
-    slim.set("forward", com.fasterxml.jackson.databind.node.NullNode.getInstance());
+    slim.set("forward", NullNode.getInstance());
     TableConfig tc = withFieldConfig("c1", EncodingType.DICTIONARY, slim);
 
     try {
       TableConfigUtils.createTableConfigFromOldFormat(tc, schemaWith("c1"));
-      org.testng.Assert.fail("Expected IllegalStateException from ForwardIndexType validator");
+      fail("Expected IllegalStateException from ForwardIndexType validator");
     } catch (IllegalStateException expected) {
       assertTrue(expected.getMessage() != null && expected.getMessage().contains("forward index"),
           "Expected forward-index validation error; got: " + expected.getMessage());
