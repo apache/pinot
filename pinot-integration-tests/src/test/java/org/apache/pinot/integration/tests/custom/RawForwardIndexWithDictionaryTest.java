@@ -517,6 +517,31 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
     assertEquals(rawRows, dictRows, "DISTINCT rows must match between dictionary-only and raw+dictionary columns");
   }
 
+  /**
+   * Multi-column GROUP BY that mixes a dict-encoded column with a RAW+dictionary column. This forces the executor
+   * onto the {@code NoDictionaryMultiColumnGroupKeyGenerator} path. The per-column branch there must check the
+   * forward-index encoding in addition to {@code ColumnContext#getDictionary} — otherwise it keeps the dictionary
+   * for any column that has a dict file and calls {@code BlockValSet#getDictionaryIdsSV()} on it, which routes to
+   * {@code ForwardIndexReader#readDictIds} and throws {@code UnsupportedOperationException} on a RAW forward index.
+   */
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMultiColumnGroupByWithRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode dictRows = postQuery(
+        String.format("SELECT %s, %s, COUNT(*) FROM %s GROUP BY %s, %s ORDER BY %s, %s",
+            DICT_DIMENSION, DICT_INT_DIMENSION, getTableName(),
+            DICT_DIMENSION, DICT_INT_DIMENSION, DICT_DIMENSION, DICT_INT_DIMENSION))
+        .get("resultTable").get("rows");
+    JsonNode rawRows = postQuery(
+        String.format("SELECT %s, %s, COUNT(*) FROM %s GROUP BY %s, %s ORDER BY %s, %s",
+            RAW_DICT_DIMENSION, RAW_DICT_INT_DIMENSION, getTableName(),
+            RAW_DICT_DIMENSION, RAW_DICT_INT_DIMENSION, RAW_DICT_DIMENSION, RAW_DICT_INT_DIMENSION))
+        .get("resultTable").get("rows");
+    assertEquals(rawRows, dictRows,
+        "Multi-column GROUP BY rows must match between dictionary-only and raw+dictionary columns");
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testAggregationWithGroupByOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
