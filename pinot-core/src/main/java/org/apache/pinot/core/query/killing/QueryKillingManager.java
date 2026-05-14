@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.query.killing;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -141,12 +143,44 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
   /**
    * Handles ZK cluster config changes. Rebuilds the {@link QueryMonitorConfig} from the delta
    * and refreshes the killing strategy if scan-killing-related keys changed.
+   *
+   * <p>Raw ZK keys arrive with the full {@value CommonConstants#PINOT_QUERY_SCHEDULER_PREFIX}
+   * prefix. We strip it before passing to {@link QueryMonitorConfig}, matching the key space
+   * the init constructor uses (which reads from a config already subsetted to that prefix).</p>
    */
   @Override
   public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    QueryMonitorConfig updated = new QueryMonitorConfig(_configRef.get(), changedConfigs, clusterConfigs);
-    _configRef.set(updated);
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    int prefixLen = prefix.length();
+
+    Set<String> filteredChangedConfigs = new HashSet<>();
+    for (String key : changedConfigs) {
+      if (key.startsWith(prefix)) {
+        filteredChangedConfigs.add(key.substring(prefixLen));
+      }
+    }
+
+    if (filteredChangedConfigs.isEmpty()) {
+      return;
+    }
+
+    Map<String, String> filteredClusterConfigs = new HashMap<>();
+    for (Map.Entry<String, String> entry : clusterConfigs.entrySet()) {
+      if (entry.getKey().startsWith(prefix)) {
+        filteredClusterConfigs.put(entry.getKey().substring(prefixLen), entry.getValue());
+      }
+    }
+
+    QueryMonitorConfig oldConfig = _configRef.get();
+    QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+    _configRef.set(newConfig);
     rebuildStrategy();
+    LOGGER.info("Scan-based killing config updated: mode={}, maxEntriesScannedInFilter={}, "
+            + "maxDocsScanned={}, maxEntriesScannedPostFilter={}",
+        newConfig.getScanBasedKillingMode(),
+        newConfig.getScanBasedKillingMaxEntriesScannedInFilter(),
+        newConfig.getScanBasedKillingMaxDocsScanned(),
+        newConfig.getScanBasedKillingMaxEntriesScannedPostFilter());
   }
 
   /**
