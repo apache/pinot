@@ -86,6 +86,7 @@ import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracer;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -561,6 +562,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     QueryKillingStrategy queryStrategy = killingManager.resolveQueryStrategy(queryConfig);
     if (queryStrategy != null) {
       execCtx.setCachedKillingStrategy(queryStrategy);
+    }
+    // Resolve and store per-table kill mode override (null = use cluster mode)
+    if (queryConfig != null && queryConfig.getScanKillingMode() != null) {
+      ScanKillingMode tableMode = ScanKillingMode.fromConfigValue(queryConfig.getScanKillingMode());
+      if (tableMode != null) {
+        execCtx.setEffectiveScanKillingMode(tableMode);
+      } else {
+        LOGGER.warn("Invalid scanKillingMode '{}' in QueryConfig for table {}, falling back to cluster mode",
+            queryConfig.getScanKillingMode(), tableNameWithType);
+      }
     }
   }
 
