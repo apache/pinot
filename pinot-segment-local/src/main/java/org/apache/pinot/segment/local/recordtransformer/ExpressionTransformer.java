@@ -189,9 +189,6 @@ public class ExpressionTransformer implements RecordTransformer {
           // nested fields like arrays, collections, or maps since they were not included in the record
           // transformation before.
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
-          if (shouldPreserveExistingValue(column, existingValue, transformedValue)) {
-            continue;
-          }
           applyTransformedValue(record, column, transformedValue);
         } catch (Exception e) {
           if (!_continueOnError) {
@@ -219,20 +216,15 @@ public class ExpressionTransformer implements RecordTransformer {
     }
   }
 
-  /// Returns {@code true} when the transform yielded {@code null} but the row already has a non-null value that
-  /// must not be overwritten. Two cases:
+  /// Returns {@code true} when the transform yielded {@code null} but the existing non-null value must not be
+  /// overwritten. Only called from the path that already established `existingValue` is non-null. Two cases:
   /// 1. Implicit map transforms (e.g. `mapField__KEYS`/`mapField__VALUES`) — when the source map is absent, the
   ///    evaluator yields null. Preserve any pre-existing value for backward compatibility.
   /// 2. BYTES single-value columns — `byte[]` is logically a scalar even though `byte[].class.isArray()` returns
   ///    true. A transform yielding null should not clobber an existing `byte[]` value.
-  ///
-  /// Applies in both the populate-missing and overwrite branches; in the post-upsert overwrite path
-  /// (`_overwriteExistingValues == true`), this means a null-returning transform cannot clear an existing
-  /// `byte[]` value. If the caller previously marked the column as null via [GenericRow#putDefaultNullValue],
-  /// that null flag is intentionally left in place — only the value is preserved.
-  private boolean shouldPreserveExistingValue(String column, @Nullable Object existingValue,
+  private boolean shouldPreserveExistingValue(String column, Object existingValue,
       @Nullable Object transformedValue) {
-    if (transformedValue != null || existingValue == null) {
+    if (transformedValue != null) {
       return false;
     }
     return _implicitMapTransformColumns.contains(column) || existingValue instanceof byte[];

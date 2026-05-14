@@ -222,31 +222,6 @@ public class ExpressionTransformerTest {
   }
 
   @Test
-  public void testImplicitMapTransformDoesNotOverrideExistingBytesValueWhenSourceMissing() {
-    Schema schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("mapBytes__KEYS", FieldSpec.DataType.BYTES)
-        .addSingleValueDimension("mapBytes__VALUES", FieldSpec.DataType.BYTES)
-        .build();
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName("testImplicitMapTransformBytes").build();
-    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
-
-    // Simulate the case where the bytes column already has a non-null placeholder/default value but is also
-    // marked as null (e.g. via putDefaultNullValue). The source map is missing, so the implicit map transform
-    // should NOT overwrite the existing bytes value with null.
-    GenericRow row = new GenericRow();
-    byte[] existingKeys = new byte[]{1, 2, 3};
-    byte[] existingValues = new byte[]{4, 5, 6};
-    row.putDefaultNullValue("mapBytes__KEYS", existingKeys);
-    row.putDefaultNullValue("mapBytes__VALUES", existingValues);
-
-    expressionTransformer.transform(row);
-
-    Assert.assertSame(row.getValue("mapBytes__KEYS"), existingKeys);
-    Assert.assertSame(row.getValue("mapBytes__VALUES"), existingValues);
-  }
-
-  @Test
   public void testTransformReturningNullDoesNotOverrideExistingBytesValue() {
     // A BYTES column with an explicit transform that yields null should not clobber the existing byte[] value.
     // BYTES is a scalar type even though byte[] is technically an array.
@@ -260,24 +235,6 @@ public class ExpressionTransformerTest {
         .setIngestionConfig(ingestionConfig)
         .build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
-
-    GenericRow row = new GenericRow();
-    byte[] existing = new byte[]{7, 8, 9};
-    row.putValue("payload", existing);
-
-    expressionTransformer.transform(row);
-
-    Assert.assertSame(row.getValue("payload"), existing);
-    Assert.assertFalse(row.isNullValue("payload"));
-  }
-
-  @Test
-  public void testPostUpsertTransformReturningNullDoesNotOverrideExistingBytesValue() {
-    // In the post-upsert overwrite path (`overwriteExistingValues=true`), a null-returning transform on a BYTES
-    // column must still not clobber the existing byte[] value.
-    List<TransformConfig> transformConfigs =
-        Collections.singletonList(new TransformConfig("payload", "Groovy({null})"));
-    ExpressionTransformer expressionTransformer = new ExpressionTransformer(transformConfigs, true, false);
 
     GenericRow row = new GenericRow();
     byte[] existing = new byte[]{7, 8, 9};
