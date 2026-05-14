@@ -104,6 +104,12 @@ import org.slf4j.LoggerFactory;
 public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
+  /**
+   * Maximum time (ms) to wait for stats after a query that has already failed and fanned out cancel. A short cap is
+   * used here because the query result is already determined — we collect partial stats on a best-effort basis but
+   * must not make the client wait the full query timeout for a response that is already ready.
+   */
+  private static final long STATS_DRAIN_ON_ERROR_MS = 50L;
 
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
@@ -421,9 +427,11 @@ public class QueryDispatcher {
     }
     LOGGER.warn("Stream-mode query failed with a known exception. Fanning out cancel and waiting for stats.");
     session.fanOutCancel();
-    long remainingMs = Math.max(0, deadlineMs - System.currentTimeMillis());
+    // Cap the wait: the query result is already determined, so we collect stats on a best-effort basis only.
+    // Using the full remaining timeout here would regress error-path latency to the query deadline.
+    long statsWaitMs = Math.min(STATS_DRAIN_ON_ERROR_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
     try {
-      session.awaitCompletion(remainingMs, TimeUnit.MILLISECONDS);
+      session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
     }

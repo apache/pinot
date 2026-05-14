@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Concurrency model — all mutating methods acquire the per-session lock, so the accumulator and counters need no
  * additional internal synchronization. gRPC client {@code onNext} callbacks land on I/O threads and call into this
- * session directly; the work per call is short (decode + merge + decrement) so doing it on the I/O thread is fine.
+ * session directly. Stat decoding (proto → {@link StageStatsTreeNode}) is done <em>outside</em> the lock to minimise
+ * lock hold time; only the map mutations that update the accumulator are performed under the lock.
  *
  * <p>Completion semantics — {@link #awaitCompletion(long, TimeUnit)} returns {@code true} as soon as every expected
  * opchain has reported (early completion), and {@code false} if the timeout fires first. The dispatcher should call
@@ -114,11 +115,27 @@ public class StreamingQuerySession {
    * Records an {@link Worker.OpChainComplete} message decoded from a server stream. Decrements the outstanding count
    * and merges the contained tree into the per-stage accumulator (or marks the stage {@code mergeFailed} on a shape
    * mismatch / decode failure). Also records {@code success=false} reports as peer errors so fan-out cancel can fire.
+   *
+   * <p>Decoding (proto → {@link StageStatsTreeNode}) is performed <em>before</em> acquiring {@link #_lock} because
+   * the input proto is immutable and {@link MultiStageStatsTreeDecoder.Decoded} is a fresh allocation. Only the map
+   * mutations are done under the lock, which keeps lock hold time proportional to the (small) merge work rather than
+   * the full recursive decode.
    */
   public void recordOpChainComplete(Worker.OpChainComplete message) {
     int stageId = message.getStageId();
     boolean isSuccess = message.getSuccess();
     Worker.MultiStageStatsTree statsTree = message.getStats();
+
+    // Decode outside the lock — proto is immutable, Decoded is a fresh allocation with no shared state.
+    MultiStageStatsTreeDecoder.Decoded decoded = null;
+    MultiStageStatsTreeDecoder.DecodeFailedException decodeError = null;
+    if (statsTree.hasCurrentStage()) {
+      try {
+        decoded = MultiStageStatsTreeDecoder.decode(statsTree);
+      } catch (MultiStageStatsTreeDecoder.DecodeFailedException e) {
+        decodeError = e;
+      }
+    }
 
     boolean shouldFanOutCancel = false;
     _lock.lock();
@@ -129,22 +146,18 @@ public class StreamingQuerySession {
           shouldFanOutCancel = true;
         }
       }
-      if (statsTree.hasCurrentStage()) {
-        try {
-          MultiStageStatsTreeDecoder.Decoded decoded = MultiStageStatsTreeDecoder.decode(statsTree);
-          mergeIntoAccumulatorLocked(decoded.getCurrentStageId(), decoded.getCurrentStage());
-          for (Map.Entry<Integer, StageStatsTreeNode> upstream : decoded.getUpstreamStages().entrySet()) {
-            mergeIntoAccumulatorLocked(upstream.getKey(), upstream.getValue());
-          }
-          incrementLocked(_respondedByStage, stageId);
-        } catch (MultiStageStatsTreeDecoder.DecodeFailedException e) {
-          LOGGER.warn("Decode failed for opchain stage={} worker={} on request {}: {}",
-              stageId, message.getWorkerId(), _requestId, e.getMessage());
-          incrementLocked(_mergeFailedByStage, stageId);
+      if (decodeError != null) {
+        LOGGER.warn("Decode failed for opchain stage={} worker={} on request {}: {}",
+            stageId, message.getWorkerId(), _requestId, decodeError.getMessage());
+        incrementLocked(_mergeFailedByStage, stageId);
+      } else if (decoded != null) {
+        mergeIntoAccumulatorLocked(decoded.getCurrentStageId(), decoded.getCurrentStage());
+        for (Map.Entry<Integer, StageStatsTreeNode> upstream : decoded.getUpstreamStages().entrySet()) {
+          mergeIntoAccumulatorLocked(upstream.getKey(), upstream.getValue());
         }
+        incrementLocked(_respondedByStage, stageId);
       } else {
-        // Successful opchain that produced no stats tree (rare but possible — e.g. an empty plan). Still counts as
-        // "responded" so we can finalize.
+        // Successful opchain with no stats tree (e.g. empty plan). Still counts as responded.
         incrementLocked(_respondedByStage, stageId);
       }
     } finally {
