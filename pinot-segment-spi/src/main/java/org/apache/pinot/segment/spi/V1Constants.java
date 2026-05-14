@@ -163,10 +163,10 @@ public class V1Constants {
       public static final String BITS_PER_ELEMENT = "bitsPerElement";
       // Optional, exist for MV columns
       // TODO: Changed to optional on reader side in release 1.6.0. Change writer side after 1.6.0 release.
-      public static final String MAX_MULTI_VALUE_ELEMENTS = "maxNumberOfMultiValues";
+      public static final String TOTAL_NUMBER_OF_ENTRIES = "totalNumberOfEntries";
       // Optional, exist for MV columns
       // TODO: Changed to optional on reader side in release 1.6.0. Change writer side after 1.6.0 release.
-      public static final String TOTAL_NUMBER_OF_ENTRIES = "totalNumberOfEntries";
+      public static final String MAX_MULTI_VALUE_ELEMENTS = "maxNumberOfMultiValues";
       // Optional, exist for MV variable-length types
       // NOTE: Added in release 1.6.0. Only exist in segment created after 1.6.0 release.
       public static final String MAX_ROW_LENGTH_IN_BYTES = "maxRowLengthInBytes";
