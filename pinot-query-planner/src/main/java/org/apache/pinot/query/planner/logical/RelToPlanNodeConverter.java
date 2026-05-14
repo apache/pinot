@@ -774,6 +774,8 @@ public final class RelToPlanNodeConverter {
       Preconditions.checkState(projectInput instanceof TableScan,
           "Right input for lookup join must be a Project over TableScan, got Project over: %s",
           projectInput.getClass().getSimpleName());
+    } else if (PinotHintOptions.JoinHintOptions.useBroadcastRightJoinStrategy(join)) {
+      joinStrategy = JoinNode.JoinStrategy.BROADCAST_RIGHT;
     } else {
       // TODO: Consider adding DYNAMIC_BROADCAST as a separate join strategy
       joinStrategy = JoinNode.JoinStrategy.HASH;
