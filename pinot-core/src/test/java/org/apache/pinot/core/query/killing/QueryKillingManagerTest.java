@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.accounting.QueryMonitorConfig;
 import org.apache.pinot.core.query.killing.strategy.ScanEntriesThresholdStrategy;
@@ -36,7 +37,12 @@ import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -550,7 +556,139 @@ public class QueryKillingManagerTest {
         "Without table mode override, cluster enforce mode should kill");
   }
 
-  // --- Test fixtures for pluggable strategy ---
+  // --- Per-table metric emission ---
+
+  @Test
+  public void testEnforceKillEmitsPerTableMetric() {
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx, "q-metric-1", "myTable_REALTIME", null);
+
+    verify(_serverMetrics).addMeteredTableValue("myTable_REALTIME", ServerMeter.QUERIES_KILLED_SCAN, 1L);
+    verify(_serverMetrics, never()).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1L);
+  }
+
+  @Test
+  public void testLogOnlyKillEmitsPerTableDryRunMetric() {
+    QueryMonitorConfig config = buildConfig("logOnly", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx, "q-metric-2", "myTable_REALTIME", null);
+
+    verify(_serverMetrics).addMeteredTableValue("myTable_REALTIME", ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    verify(_serverMetrics, never()).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    // logOnly should not actually terminate
+    assertNull(execCtx.getTerminateException());
+  }
+
+  @Test
+  public void testNullTableNameFallsBackToGlobalErrorMetric() {
+    // When the strategy throws inside checkAndKillIfNeeded, the catch block emits the error
+    // metric. With a null table name, the helper falls back to global emission so we do not
+    // silently drop the error signal.
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    // Force the catch path with a cached strategy that throws inside shouldTerminate.
+    execCtx.setCachedKillingStrategy(new QueryKillingStrategy() {
+      @Override
+      public boolean shouldTerminate(QueryScanCostContext context) {
+        throw new RuntimeException("boom");
+      }
+
+      @Override
+      public QueryKillReport buildKillReport(QueryScanCostContext context, long requestId,
+          String queryId, String tableName, String configSource) {
+        // unused — shouldTerminate throws first
+        throw new UnsupportedOperationException();
+      }
+    });
+    execCtx.setTableName(null);
+    execCtx.setQueryId("q-metric-null");
+
+    manager.checkAndKillIfNeeded(execCtx, new QueryScanCostContext());
+
+    // Null table name → global fallback emission, never per-table
+    verify(_serverMetrics).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_ERROR, 1L);
+    verify(_serverMetrics, never()).addMeteredTableValue(anyString(),
+        eq(ServerMeter.QUERIES_KILLED_SCAN_ERROR), anyLong());
+  }
+
+  @Test
+  public void testNullTableNameInReportFallsBackToGlobalEnforceMetric() {
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    execCtx.setCachedKillingStrategy(new QueryKillingStrategy() {
+      @Override
+      public boolean shouldTerminate(QueryScanCostContext context) {
+        return true;
+      }
+
+      @Override
+      public QueryKillReport buildKillReport(QueryScanCostContext context, long requestId,
+          String queryId, String tableName, String configSource) {
+        // Intentionally drop the table name to exercise the null-fallback path
+        return new QueryKillReport(requestId, queryId, null, "TestStrategy", "test", 0, 0,
+            configSource, context);
+      }
+
+      @Override
+      public org.apache.pinot.spi.exception.QueryErrorCode getErrorCode() {
+        return org.apache.pinot.spi.exception.QueryErrorCode.QUERY_SCAN_LIMIT_EXCEEDED;
+      }
+    });
+    execCtx.setTableName(null);
+    execCtx.setQueryId("q-null-report");
+
+    manager.checkAndKillIfNeeded(execCtx, new QueryScanCostContext());
+
+    verify(_serverMetrics).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1L);
+    verify(_serverMetrics, never()).addMeteredTableValue(anyString(),
+        eq(ServerMeter.QUERIES_KILLED_SCAN), anyLong());
+  }
+
+  @Test
+  public void testUnknownTableNameSentinelFallsBackToGlobalMetric() {
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    // Use the convenience overload with null tableName → routes through "unknown" sentinel
+    execCtx.setTableName(null);
+    execCtx.setQueryId("q-unknown");
+    execCtx.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx);
+
+    verify(_serverMetrics).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1L);
+    verify(_serverMetrics, never()).addMeteredTableValue(eq("unknown"),
+        eq(ServerMeter.QUERIES_KILLED_SCAN), anyLong());
+  }
 
   /**
    * A test strategy that always kills — used to verify custom factory loading.
