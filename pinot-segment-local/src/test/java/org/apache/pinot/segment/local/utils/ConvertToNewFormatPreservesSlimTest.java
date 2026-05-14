@@ -117,6 +117,22 @@ public class ConvertToNewFormatPreservesSlimTest {
   }
 
   @Test
+  public void newFormatExplicitDisabledTruePreserved() {
+    // User opts out of forward by setting disabled=true. Migration must keep that exact shape,
+    // not overwrite with the typed POJO's disabled=false default — silent re-enable would be a
+    // correctness bug.
+    ObjectNode slim = MAPPER.createObjectNode();
+    slim.putObject("forward").put("disabled", true);
+    TableConfig tc = withFieldConfig("c1", EncodingType.RAW, slim);
+
+    TableConfig migrated = TableConfigUtils.createTableConfigFromOldFormat(tc, schemaWith("c1"));
+
+    JsonNode forward = indexesOf(migrated, "c1").get("forward");
+    assertEquals(forward.size(), 1);
+    assertTrue(forward.get("disabled").asBoolean(), "Explicit disabled=true preserved");
+  }
+
+  @Test
   public void newFormatEmptyObjectPreserved() {
     // {"inverted": {}} means "enabled with no settings" — must remain an empty object, not be
     // replaced with the typed POJO default.
