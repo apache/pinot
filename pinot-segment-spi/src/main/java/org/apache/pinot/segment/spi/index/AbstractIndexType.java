@@ -38,6 +38,8 @@ import org.apache.pinot.spi.data.Schema;
 public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator>
     implements IndexType<C, IR, IC> {
 
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
   private final String _id;
   private ColumnConfigDeserializer<C> _deserializer;
   private IndexReaderFactory<IR> _readerFactory;
@@ -88,6 +90,23 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
     return _readerFactory;
   }
 
+  /**
+   * Migrates legacy {@link org.apache.pinot.spi.config.table.IndexingConfig} index settings into
+   * the new {@code FieldConfig.indexes} JsonNode format.
+   *
+   * <p>The migration is <i>gap-filling</i>: for each column whose typed config is non-default, this
+   * method writes the typed config's verbose JsonNode into {@code FieldConfig.indexes} <b>only when
+   * the column does not already carry a new-format JsonNode for this index type</b>. Columns
+   * already supplied in new format keep their original (possibly slim) JsonNode shape — this
+   * preserves user-supplied keys verbatim through the round-trip and avoids fattening pure
+   * new-format inputs with the typed-POJO bean-serializer defaults.
+   *
+   * <p>Both-formats coexistence resolves "new format wins": if the user supplied both a legacy
+   * {@code indexingConfig.*} entry and a new-format {@code FieldConfig.indexes[prettyName]}
+   * JsonNode for the same column + type, the new-format JsonNode is the source of truth. The
+   * legacy entry is dropped by {@link #handleIndexSpecificCleanup} below, matching the documented
+   * migration intent.
+   */
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
     Map<String, C> deserialize = getConfig(tableConfig, schema);
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
@@ -103,15 +122,22 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
       FieldConfig fieldConfig = fieldConfigMap.get(entry.getKey());
       if (fieldConfig != null) {
         ObjectNode currentIndexes = fieldConfig.getIndexes().isNull()
-            ? new ObjectMapper().createObjectNode()
-            : new ObjectMapper().valueToTree(fieldConfig.getIndexes());
-        JsonNode indexes = currentIndexes.set(getPrettyName(), configValue.toJsonNode());
+            ? MAPPER.createObjectNode()
+            : MAPPER.valueToTree(fieldConfig.getIndexes());
+        JsonNode existing = currentIndexes.get(getPrettyName());
+        if (existing != null && !existing.isNull()) {
+          // Column already carries a new-format JsonNode for this index type — preserve the
+          // user's shape verbatim. Legacy-only inputs fall through to the set() branch below;
+          // both-formats coexistence resolves to "new format wins".
+          continue;
+        }
+        currentIndexes.set(getPrettyName(), configValue.toJsonNode());
         FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
-        builder.withIndexes(indexes);
+        builder.withIndexes(currentIndexes);
         fieldConfigList.remove(fieldConfig);
         fieldConfigList.add(builder.build());
       } else {
-        JsonNode indexes = new ObjectMapper().createObjectNode().set(getPrettyName(), configValue.toJsonNode());
+        JsonNode indexes = MAPPER.createObjectNode().set(getPrettyName(), configValue.toJsonNode());
         FieldConfig.Builder builder = new FieldConfig.Builder(entry.getKey());
         builder.withIndexes(indexes);
         builder.withEncodingType(FieldConfig.EncodingType.DICTIONARY);
