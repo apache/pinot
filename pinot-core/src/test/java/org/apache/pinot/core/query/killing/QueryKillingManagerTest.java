@@ -309,14 +309,18 @@ public class QueryKillingManagerTest {
     manager.rebuildStrategy();
     assertNull(manager.getActiveStrategy(), "Strategy should be null when disabled");
 
-    // Simulate cluster config change enabling killing with enforce mode + threshold
+    // Simulate cluster config change enabling killing with enforce mode + threshold.
+    // Keys arrive from ZK with full "pinot.query.scheduler." prefix — onChange() strips it.
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+
     Set<String> changedKeys = new HashSet<>();
-    changedKeys.add(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
-    changedKeys.add(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
+    changedKeys.add(prefix + CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
+    changedKeys.add(prefix + CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER);
 
     Map<String, String> clusterConfigs = new HashMap<>();
-    clusterConfigs.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
-    clusterConfigs.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "500");
+    clusterConfigs.put(prefix + CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "enforce");
+    clusterConfigs.put(
+        prefix + CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER, "500");
 
     manager.onChange(changedKeys, clusterConfigs);
     assertNotNull(manager.getActiveStrategy(),
@@ -332,16 +336,40 @@ public class QueryKillingManagerTest {
     manager.rebuildStrategy();
     assertNotNull(manager.getActiveStrategy(), "Strategy should be active when enabled");
 
-    // Simulate cluster config change to disable killing
+    // Simulate cluster config change to disable killing (full ZK-prefixed keys)
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+
     Set<String> changedKeys = new HashSet<>();
-    changedKeys.add(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
+    changedKeys.add(prefix + CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE);
 
     Map<String, String> clusterConfigs = new HashMap<>();
-    clusterConfigs.put(CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "disabled");
+    clusterConfigs.put(prefix + CommonConstants.Accounting.CONFIG_OF_SCAN_BASED_KILLING_MODE, "disabled");
 
     manager.onChange(changedKeys, clusterConfigs);
     assertNull(manager.getActiveStrategy(),
         "Strategy should be null after onChange disables killing");
+  }
+
+  @Test
+  public void testOnChangeIgnoresIrrelevantKeys() {
+    // Start with killing enabled
+    QueryMonitorConfig enabledConfig = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(enabledConfig);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+    assertNotNull(manager.getActiveStrategy(), "Strategy should be active when enabled");
+
+    // Simulate a ZK change that only touches non-scheduler keys — should be ignored
+    Set<String> changedKeys = new HashSet<>();
+    changedKeys.add("some.unrelated.config");
+    changedKeys.add("helix.rebalance.something");
+
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put("some.unrelated.config", "value");
+
+    manager.onChange(changedKeys, clusterConfigs);
+    assertNotNull(manager.getActiveStrategy(),
+        "Strategy should remain unchanged when no scheduler keys changed");
   }
 
   // --- Convenience overload (2-arg checkAndKillIfNeeded) ---
