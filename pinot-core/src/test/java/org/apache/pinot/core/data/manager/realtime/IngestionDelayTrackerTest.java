@@ -51,7 +51,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 
 public class IngestionDelayTrackerTest {
@@ -571,5 +574,75 @@ public class IngestionDelayTrackerTest {
   private void assertIncreasing(Map<String, List<Long>> metrics, String key) {
     List<Long> values = metrics.get(key);
     Assert.assertTrue(values.get(values.size() - 1) > values.get(0), key + " not increasing");
+  }
+
+  @Test
+  public void testCreateMetricsUsesTopicName() {
+    // The stream config in REALTIME_TABLE_DATA_MANAGER uses topic name "test"
+    String expectedTopicName = "test";
+    int partitionId = 0;
+
+    // Use a fresh ServerMetrics mock so we can verify calls on it
+    ServerMetrics serverMetricsMock = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker =
+        new IngestionDelayTracker(serverMetricsMock, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, () -> true);
+    tracker.createMetrics(partitionId);
+
+    // Verify that all ingestion gauges include the topic name
+    verify(serverMetricsMock).setOrUpdatePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_DELAY_MS), any());
+    verify(serverMetricsMock).setOrUpdatePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS), any());
+    verify(serverMetricsMock).setOrUpdatePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS), any());
+    // FakeStreamMetadataProvider.supportsOffsetLag() returns true, so these should also be called
+    verify(serverMetricsMock).setOrUpdatePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_OFFSET_LAG), any());
+    verify(serverMetricsMock).setOrUpdatePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET), any());
+    verify(serverMetricsMock).setOrUpdatePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET), any());
+
+    tracker.shutdown();
+  }
+
+  @Test
+  public void testRemoveMetricsUsesTopicName() {
+    String expectedTopicName = "test";
+    int partitionId = 0;
+
+    ServerMetrics serverMetricsMock = mock(ServerMetrics.class);
+    IngestionDelayTracker tracker =
+        new IngestionDelayTracker(serverMetricsMock, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, () -> true);
+    // createMetrics must be called first so the stream metadata provider is set up
+    tracker.createMetrics(partitionId);
+    tracker.removeMetrics(partitionId);
+
+    verify(serverMetricsMock).removePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_DELAY_MS));
+    verify(serverMetricsMock).removePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS));
+    verify(serverMetricsMock).removePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS));
+    verify(serverMetricsMock).removePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_OFFSET_LAG));
+    verify(serverMetricsMock).removePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET));
+    verify(serverMetricsMock).removePartitionTopicGauge(
+        eq(REALTIME_TABLE_NAME), eq(partitionId), eq(expectedTopicName),
+        eq(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET));
+
+    tracker.shutdown();
   }
 }
