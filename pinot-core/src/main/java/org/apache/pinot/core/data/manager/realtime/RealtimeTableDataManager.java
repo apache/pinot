@@ -137,8 +137,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
+  private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
-  private final BooleanSupplier _isIngestionPausedDueToStartUp;
 
   // Object to track ingestion delay for all partitions
   private IngestionDelayTracker _ingestionDelayTracker;
@@ -152,19 +152,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries) {
-    this(segmentBuildSemaphore, isServerReadyToServeQueries, () -> false);
+    this(segmentBuildSemaphore, () -> true, isServerReadyToServeQueries);
   }
 
   /**
-   * @param isIngestionPausedDueToStartUp returns {@code true} when consuming-segment ingestion should be held off
+   * @param isServerReadyToConsumeData returns {@code false} when consuming-segment ingestion should be held off
    *     (e.g. while the server is still draining startup-time work). Each consuming segment checks this gate at the
    *     entry of its consumer thread; once the gate clears, it is not consulted again for that segment.
    */
-  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries,
-      BooleanSupplier isIngestionPausedDueToStartUp) {
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToConsumeData,
+      BooleanSupplier isServerReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
+    _isServerReadyToConsumeData = isServerReadyToConsumeData;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
-    _isIngestionPausedDueToStartUp = isIngestionPausedDueToStartUp;
   }
 
   @Override
@@ -263,7 +263,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       readyForDedupOrPartialUpsert = () -> true;
     }
     _isTableReadyToConsumeData = () -> readyForDedupOrPartialUpsert.getAsBoolean()
-        && !_isIngestionPausedDueToStartUp.getAsBoolean();
+        && _isServerReadyToConsumeData.getAsBoolean();
   }
 
   @VisibleForTesting

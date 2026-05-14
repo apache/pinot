@@ -193,20 +193,19 @@ public interface InstanceDataManager {
   void forceCommit(String tableNameWithType, Set<String> segmentNames);
 
   /**
+   * Installs a supplier that gates consuming-segment ingestion. While the supplier returns {@code false}, newly created
+   * realtime consumers wait at the entry of their consumer thread before pulling any data. The supplier is consulted
+   * per consumer; once it returns {@code true} for a given consumer, that consumer should proceed and should
+   * not be gated again. Implementations default to a no-op so subclasses opt in explicitly.
+   */
+  void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData);
+
+  /**
    * Enables the installation of a method to determine if a server is ready to server queries.
    *
    * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
   void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServerReadyToServeQueries);
-
-  /**
-   * Installs a supplier that gates consuming-segment ingestion. While the supplier returns {@code true}, newly created
-   * realtime consumers wait at the entry of their consumer thread before pulling any data. The supplier is consulted
-   * per consumer; once it returns {@code false} for a given consumer, that consumer should proceed and should
-   * not be gated again. Implementations default to a no-op so subclasses opt in explicitly.
-   */
-  default void setSupplierOfIsIngestionPausedDueToStartUp(BooleanSupplier isIngestionPausedDueToStartUp) {
-  }
 
   /**
    * Returns consumer directory paths on the instance

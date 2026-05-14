@@ -105,8 +105,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
+  private BooleanSupplier _isServerReadyToConsumeData = () -> false;
   private BooleanSupplier _isServerReadyToServeQueries = () -> false;
-  private BooleanSupplier _isIngestionPausedDueToStartUp = () -> false;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -124,13 +124,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ExecutorService _segmentPreloadExecutor;
 
   @Override
-  public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
-    _isServerReadyToServeQueries = isServingQueries;
+  public void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData) {
+    _isServerReadyToConsumeData = isServerReadyToConsumeData;
   }
 
   @Override
-  public void setSupplierOfIsIngestionPausedDueToStartUp(BooleanSupplier isIngestionPausedDueToStartUp) {
-    _isIngestionPausedDueToStartUp = isIngestionPausedDueToStartUp;
+  public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
+    _isServerReadyToServeQueries = isServingQueries;
   }
 
   @Override
@@ -348,8 +348,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
-            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries,
-            _isIngestionPausedDueToStartUp, _enableAsyncSegmentRefresh, _reloadJobStatusCache);
+            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToConsumeData,
+            _isServerReadyToServeQueries, _enableAsyncSegmentRefresh, _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;

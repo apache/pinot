@@ -54,28 +54,10 @@ public interface TableDataManagerProvider {
       ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      BooleanSupplier isServerReadyToConsumeData,
       BooleanSupplier isServerReadyToServeQueries,
-      BooleanSupplier isIngestionPausedDueToStartUp,
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache);
-
-  /**
-   * Backward-compatible overload that does not gate ingestion at startup. Delegates to the full overload with
-   * {@code isIngestionPausedDueToStartUp = () -> false}.
-   */
-  default TableDataManager getTableDataManager(TableConfig tableConfig,
-      Schema schema,
-      SegmentReloadSemaphore segmentRefreshSemaphore,
-      ExecutorService segmentReloadRefreshExecutor,
-      @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      BooleanSupplier isServerReadyToServeQueries,
-      boolean enableAsyncSegmentRefresh,
-      ServerReloadJobStatusCache reloadJobStatusCache) {
-    return getTableDataManager(tableConfig, schema, segmentRefreshSemaphore, segmentReloadRefreshExecutor,
-        segmentPreloadExecutor, errorCache, isServerReadyToServeQueries, () -> false, enableAsyncSegmentRefresh,
-        reloadJobStatusCache);
-  }
 
   /**
    * This util is only used in test code. do not use in prod code.
@@ -83,6 +65,6 @@ public interface TableDataManagerProvider {
   @VisibleForTesting
   default TableDataManager getTableDataManager(TableConfig tableConfig, Schema schema) {
     return getTableDataManager(tableConfig, schema, new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(),
-        null, null, () -> true, () -> false, false, new ServerReloadJobStatusCache("testInstance"));
+        null, null, () -> true, () -> true, false, new ServerReloadJobStatusCache("testInstance"));
   }
 }

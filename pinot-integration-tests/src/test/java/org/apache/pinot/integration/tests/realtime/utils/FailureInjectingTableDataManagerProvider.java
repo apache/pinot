@@ -82,8 +82,8 @@ public class FailureInjectingTableDataManagerProvider implements TableDataManage
       ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      BooleanSupplier isServerReadyToConsumeData,
       BooleanSupplier isServerReadyToServeQueries,
-      BooleanSupplier isIngestionPausedDueToStartUp,
       boolean enableAsyncSegmentRefresh,
       ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;
