@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -46,6 +47,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -250,6 +252,127 @@ public class RealtimeOffsetAutoResetManagerTest {
 
     // Handler should be created only once and reused
     // We can verify this by checking that the process completes without exception
+  }
+
+  // ---- Circuit Breaker Tests ----
+
+  @Test
+  public void testCB3MaxConcurrentBackfillsSkipsNewTrigger() {
+    // Set max concurrent to 1
+    _controllerConf.setProperty(
+        ControllerConf.ControllerPeriodicTasksConf.MAX_CONCURRENT_BACKFILLS_PER_CONTROLLER, "1");
+
+    String secondTableName = "anotherTable_REALTIME";
+    TableConfig secondTableConfig = createTableConfigWithValidHandlerClass(secondTableName, "secondTopic");
+    when(_pinotHelixResourceManager.getTableConfig(secondTableName)).thenReturn(secondTableConfig);
+
+    // Trigger a backfill on the second table so _tableBackfillTopics gets a "secondTopic" entry
+    // The TestRealtimeOffsetAutoResetHandler.cleanupCompletedBackfillJobs returns empty list,
+    // so ensureCompletedBackfillJobsCleanedUp will not clean it up.
+    // We need the handler to report active backfill topics via ensureBackfillJobsRunning.
+    // Simplest: configure the stream config of the second table with isBackfillTopic=true
+    // so ensureBackfillJobsRunning picks it up as an active backfill topic.
+    Map<String, String> backfillStreamMap = new HashMap<>();
+    backfillStreamMap.put("streamType", "kafka");
+    backfillStreamMap.put("stream.kafka.topic.name", "secondTopic-backfill");
+    backfillStreamMap.put("stream.kafka.consumer.type", "simple");
+    backfillStreamMap.put("realtime.segment.isBackfillTopic", "true");
+    backfillStreamMap.put("stream.kafka.decoder.class.name", "testDecoder");
+    IngestionConfig ingestionConfig = secondTableConfig.getIngestionConfig();
+    List<Map<String, String>> streamMaps = new java.util.ArrayList<>(
+        ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps());
+    streamMaps.add(backfillStreamMap);
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(streamMaps));
+    ingestionConfig.getStreamIngestionConfig().setRealtimeOffsetAutoResetHandlerClass(TEST_HANDLER_CLASS_NAME);
+    when(_llcRealtimeSegmentManager.isTopicConsumptionPaused(secondTableName, 1)).thenReturn(false);
+
+    // Run processTable on second table with no trigger to populate _tableBackfillTopics via ensureBackfillJobsRunning
+    RealtimeOffsetAutoResetManager.Context noTriggerCtx = _realtimeOffsetAutoResetManager.preprocess(new Properties());
+    _realtimeOffsetAutoResetManager.processTable(secondTableName, noTriggerCtx);
+
+    // Now try to trigger backfill on the first table — CB3 should block it (1 table already backfilling)
+    TableConfig firstTableConfig = createTableConfigWithValidHandlerClass();
+    when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(firstTableConfig);
+    RealtimeOffsetAutoResetManager.Context firstCtx = _realtimeOffsetAutoResetManager.preprocess(_properties);
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, firstCtx);
+
+    RealtimeOffsetAutoResetHandler handler = _realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME);
+    Assert.assertNotNull(handler);
+    Assert.assertFalse(((TestRealtimeOffsetAutoResetHandler) handler)._triggedBackfillJob,
+        "CB3: backfill should be skipped when max concurrent limit is reached");
+  }
+
+  @Test
+  public void testCB4InFlightCollisionAtThresholdAutopauses() {
+    // threshold=1 means: the 1st collision triggers auto-pause
+    _controllerConf.setProperty(
+        ControllerConf.ControllerPeriodicTasksConf.MAX_BACKFILL_COLLISIONS_BEFORE_AUTO_PAUSE, "1");
+
+    // Set up a table config that has an active backfill topic (isBackfillTopic=true, not paused)
+    // so that _tableBackfillTopics contains TOPIC_NAME after the first processTable call.
+    Map<String, String> mainStreamMap = new HashMap<>();
+    mainStreamMap.put("streamType", "kafka");
+    mainStreamMap.put("stream.kafka.topic.name", TOPIC_NAME);
+    mainStreamMap.put("stream.kafka.consumer.type", "simple");
+    mainStreamMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
+    mainStreamMap.put("stream.kafka.decoder.class.name", "testDecoder");
+
+    Map<String, String> backfillStreamMap = new HashMap<>();
+    backfillStreamMap.put("streamType", "kafka");
+    backfillStreamMap.put("stream.kafka.topic.name", TOPIC_NAME + "-backfill");
+    backfillStreamMap.put("stream.kafka.consumer.type", "simple");
+    backfillStreamMap.put("realtime.segment.isBackfillTopic", "true");
+    backfillStreamMap.put("stream.kafka.decoder.class.name", "testDecoder");
+
+    List<Map<String, String>> maps = Arrays.asList(mainStreamMap, backfillStreamMap);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(maps);
+    streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(TEST_HANDLER_CLASS_NAME);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(REALTIME_TABLE_NAME).build();
+    tableConfig.setIngestionConfig(ingestionConfig);
+
+    when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    // backfill topic at index 1 is not paused → will be added to _tableBackfillTopics
+    when(_llcRealtimeSegmentManager.isTopicConsumptionPaused(REALTIME_TABLE_NAME, 1)).thenReturn(false);
+
+    // First processTable (no trigger) — populates _tableBackfillTopics with TOPIC_NAME via ensureBackfillJobsRunning
+    RealtimeOffsetAutoResetManager.Context noTriggerCtx = _realtimeOffsetAutoResetManager.preprocess(new Properties());
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, noTriggerCtx);
+
+    // Second processTable with trigger — collision #1, at threshold=1 → should auto-pause and skip
+    try {
+      doNothing().when(_pinotHelixResourceManager).updateTableConfig(tableConfig);
+    } catch (Exception ignored) {
+    }
+    RealtimeOffsetAutoResetManager.Context triggerCtx = _realtimeOffsetAutoResetManager.preprocess(_properties);
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, triggerCtx);
+
+    TestRealtimeOffsetAutoResetHandler handler =
+        (TestRealtimeOffsetAutoResetHandler) _realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME);
+    Assert.assertNotNull(handler);
+    Assert.assertFalse(handler._triggedBackfillJob,
+        "CB4: collision at threshold should skip the backfill trigger");
+    // Verify pause flag set on the main topic's stream config map
+    Assert.assertEquals(mainStreamMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE), "true",
+        "CB4: pause flag should be set on the main topic stream config");
+  }
+
+  private TableConfig createTableConfigWithValidHandlerClass(String tableName, String topicName) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", topicName);
+    streamConfigMap.put("stream.kafka.consumer.type", "simple");
+    streamConfigMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
+    streamConfigMap.put("stream.kafka.decoder.class.name", "testDecoder");
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(TEST_HANDLER_CLASS_NAME);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    tableConfig.setIngestionConfig(ingestionConfig);
+    return tableConfig;
   }
 
   private TableConfig createTableConfigWithoutHandlerClass() {

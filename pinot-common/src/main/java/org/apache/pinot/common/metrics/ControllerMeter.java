@@ -78,6 +78,10 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   PARTITION_GROUP_METADATA_FETCH_ERROR("failures", true),
   OFFSET_AUTO_RESET_SKIPPED_OFFSETS("autoResetSkippedOffsets", false),
   OFFSET_AUTO_RESET_BACKFILL_OFFSETS("autoResetBackfillOffsets", false),
+  OFFSET_AUTO_RESET_BACKFILL_SKIPPED_PAUSED("BackfillSkippedPaused", false),
+  OFFSET_AUTO_RESET_BACKFILL_SKIPPED_MAX_SEGMENTS("BackfillSkippedMaxSegments", false),
+  OFFSET_AUTO_RESET_BACKFILL_SKIPPED_MAX_CONCURRENT("BackfillSkippedMaxConcurrent", false),
+  OFFSET_AUTO_RESET_BACKFILL_SKIPPED_IN_FLIGHT("BackfillSkippedInFlight", false),
   // Audit logging metrics
   AUDIT_REQUEST_FAILURES("failures", true),
   AUDIT_RESPONSE_FAILURES("failures", true),

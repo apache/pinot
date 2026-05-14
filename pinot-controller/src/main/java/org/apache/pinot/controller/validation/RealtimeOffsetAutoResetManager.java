@@ -37,6 +37,7 @@ import org.apache.pinot.controller.helix.core.periodictask.RealtimeOffsetAutoRes
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -48,9 +49,12 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeOffsetAutoResetManager.class);
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ControllerConf _controllerConf;
   private final Map<String, RealtimeOffsetAutoResetHandler> _tableToHandler;
   private final Map<String, Set<String>> _tableTopicsUnderBackfill;
   private final Map<String, Set<String>> _tableBackfillTopics;
+  // Key: "tableNameWithType:topicName:partitionId" — tracks consecutive in-flight collisions per partition
+  private final Map<String, Integer> _partitionInFlightCollisionCount;
 
   public RealtimeOffsetAutoResetManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -60,9 +64,11 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
         leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _controllerConf = config;
     _tableToHandler = new ConcurrentHashMap<>();
     _tableTopicsUnderBackfill = new ConcurrentHashMap<>();
     _tableBackfillTopics = new ConcurrentHashMap<>();
+    _partitionInFlightCollisionCount = new ConcurrentHashMap<>();
   }
 
   @Override
@@ -105,31 +111,71 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       return;
     }
 
+    // CB3: Max concurrent backfills across all tables on this controller
+    int maxConcurrent = _controllerConf.getMaxConcurrentBackfillsPerController();
+    if (context._shouldTriggerBackfillJobs && maxConcurrent > 0
+        && _tableBackfillTopics.size() >= maxConcurrent) {
+      LOGGER.warn("Skipping backfill trigger for table {} — max concurrent backfills ({}) reached",
+          tableNameWithType, maxConcurrent);
+      _controllerMetrics.addMeteredTableValue(tableNameWithType,
+          ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_SKIPPED_MAX_CONCURRENT, 1L);
+      context._shouldTriggerBackfillJobs = false;
+    }
+
     if (context._shouldTriggerBackfillJobs) {
       _tableTopicsUnderBackfill.putIfAbsent(tableNameWithType, ConcurrentHashMap.newKeySet());
       String topicName = context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_NAME);
+      String partitionStr = context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION);
       _tableTopicsUnderBackfill.get(tableNameWithType).add(topicName);
+
+      // CB4: Per-partition in-flight collision guard.
+      // _tableBackfillTopics contains the backfill Kafka topic names (not the main topic names),
+      // so any non-empty set indicates a backfill is already in flight for this table.
+      String partitionKey = tableNameWithType + ":" + topicName + ":" + partitionStr;
+      Set<String> activeBackfillTopics = _tableBackfillTopics.get(tableNameWithType);
+      boolean anyBackfillInFlight = activeBackfillTopics != null && !activeBackfillTopics.isEmpty();
+      if (anyBackfillInFlight) {
+        int collisions = _partitionInFlightCollisionCount.merge(partitionKey, 1, Integer::sum);
+        int maxCollisions = _controllerConf.getMaxBackfillCollisionsBeforeAutoPause();
+        _controllerMetrics.addMeteredTableValue(tableNameWithType,
+            ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_SKIPPED_IN_FLIGHT, 1L);
+        LOGGER.warn("In-flight backfill collision #{} for partition key {} (active backfill topics: {})",
+            collisions, partitionKey, activeBackfillTopics);
+        if (maxCollisions > 0 && collisions >= maxCollisions) {
+          LOGGER.warn("Auto-pausing backfill for table {} topic {} after {} collisions",
+              tableNameWithType, topicName, collisions);
+          _controllerMetrics.addMeteredTableValue(tableNameWithType,
+              ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_SKIPPED_PAUSED, 1L);
+          setPauseFlag(tableNameWithType, tableConfig, topicName);
+          context._shouldTriggerBackfillJobs = false;
+        }
+        // Below threshold: allow trigger to proceed (new backfill coexists with the ongoing one)
+      } else {
+        _partitionInFlightCollisionCount.remove(partitionKey);
+      }
 
       StreamConfig topicStreamConfig = IngestionConfigUtils.getStreamConfigs(tableConfig).stream()
           .filter(config -> topicName.equals(config.getTopicName()))
           .findFirst().orElseThrow(() -> new RuntimeException("No matching topic found"));
-      LOGGER.info("Triggering backfill jobs with StreamConfig {}, topicName {}, properties {}",
-          topicStreamConfig, topicName, context._backfillJobProperties);
-      try {
-        long startOffset = Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM));
-        long endOffset = Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO));
-        if (_tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
-            topicStreamConfig,
-            topicName,
-            Integer.parseInt(context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION)),
-            startOffset,
-            endOffset)) {
-          _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_OFFSETS,
-              endOffset - startOffset);
+      if (context._shouldTriggerBackfillJobs) {
+        LOGGER.info("Triggering backfill jobs with StreamConfig {}, topicName {}, properties {}",
+            topicStreamConfig, topicName, context._backfillJobProperties);
+        try {
+          long startOffset = Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM));
+          long endOffset = Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO));
+          if (_tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
+              topicStreamConfig,
+              topicName,
+              Integer.parseInt(partitionStr),
+              startOffset,
+              endOffset)) {
+            _controllerMetrics.addMeteredTableValue(tableNameWithType,
+                ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_OFFSETS, endOffset - startOffset);
+          }
+        } catch (NumberFormatException e) {
+          LOGGER.error("Invalid backfill job properties for table: {}, properties: {}, error: {}",
+              tableNameWithType, context._backfillJobProperties, e.getMessage(), e);
         }
-      } catch (NumberFormatException e) {
-        LOGGER.error("Invalid backfill job properties for table: {}, properties: {}, error: {}",
-            tableNameWithType, context._backfillJobProperties, e.getMessage(), e);
       }
     }
 
@@ -175,6 +221,8 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     if (cleanedUpTopics.containsAll(_tableBackfillTopics.get(tableNameWithType))) {
       _tableTopicsUnderBackfill.remove(tableNameWithType);
       _tableBackfillTopics.remove(tableNameWithType);
+      // Remove all per-partition collision counters for this table
+      _partitionInFlightCollisionCount.keySet().removeIf(k -> k.startsWith(tableNameWithType + ":"));
       if (_tableToHandler.get(tableNameWithType) != null) {
         _tableToHandler.get(tableNameWithType).close();
         _tableToHandler.remove(tableNameWithType);
@@ -193,6 +241,24 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       _tableTopicsUnderBackfill.remove(tableNameWithType);
       _tableBackfillTopics.remove(tableNameWithType);
       _tableToHandler.remove(tableNameWithType);
+      _partitionInFlightCollisionCount.keySet().removeIf(k -> k.startsWith(tableNameWithType + ":"));
+    }
+  }
+
+  private void setPauseFlag(String tableNameWithType, TableConfig tableConfig, String topicName) {
+    List<Map<String, String>> streamConfigMaps =
+        tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
+    for (Map<String, String> map : streamConfigMaps) {
+      if (topicName.equals(map.get(StreamConfigProperties.STREAM_TOPIC_NAME))) {
+        map.put(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE, "true");
+        break;
+      }
+    }
+    try {
+      _pinotHelixResourceManager.updateTableConfig(tableConfig);
+      LOGGER.info("Set offset auto reset pause flag for table {} topic {}", tableNameWithType, topicName);
+    } catch (Exception e) {
+      LOGGER.error("Failed to set pause flag for table {} topic {}", tableNameWithType, topicName, e);
     }
   }
 
