@@ -78,6 +78,9 @@ public class QueryExecutionContext {
   @Nullable
   private volatile String _queryId;
 
+  @Nullable
+  private volatile Accounting.ScanKillingMode _effectiveScanKillingMode;
+
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {
     _queryType = queryType;
@@ -241,5 +244,23 @@ public class QueryExecutionContext {
 
   public void setQueryId(@Nullable String queryId) {
     _queryId = queryId;
+  }
+
+  /**
+   * Returns the per-table scan killing mode override set for this query, or {@code null} if no
+   * table-level override is configured. When {@code null}, the cluster-level mode from
+   * {@link org.apache.pinot.spi.utils.CommonConstants.Accounting} applies.
+   */
+  @Nullable
+  public Accounting.ScanKillingMode getEffectiveScanKillingMode() {
+    return _effectiveScanKillingMode;
+  }
+
+  /**
+   * Sets the per-table scan killing mode for this query. Pass {@code null} to fall back to the
+   * cluster-level mode. Called once during query initialization; thread-safe via {@code volatile}.
+   */
+  public void setEffectiveScanKillingMode(@Nullable Accounting.ScanKillingMode effectiveScanKillingMode) {
+    _effectiveScanKillingMode = effectiveScanKillingMode;
   }
 }

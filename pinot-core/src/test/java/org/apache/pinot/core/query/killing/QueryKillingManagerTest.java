@@ -32,6 +32,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting.ScanKillingMode;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -415,6 +416,110 @@ public class QueryKillingManagerTest {
     QueryKillingStrategy resolved = manager.resolveQueryStrategy(null);
     assertNotNull(resolved, "resolveQueryStrategy should return a strategy when killing is enabled");
     assertTrue(resolved instanceof ScanEntriesThresholdStrategy);
+  }
+
+  @Test
+  public void testTableModeEnforceOverridesClusterLogOnly() {
+    // Cluster is logOnly — normally no kills
+    QueryMonitorConfig config = buildConfig("logOnly", 50L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    // Table override: enforce
+    execCtx.setEffectiveScanKillingMode(ScanKillingMode.ENFORCE);
+    execCtx.setTableName("testTable_OFFLINE");
+    execCtx.setQueryId("tbl-mode-q1");
+
+    QueryKillingStrategy strategy = manager.resolveQueryStrategy(null);
+    assertNotNull(strategy);
+    execCtx.setCachedKillingStrategy(strategy);
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(100L); // exceeds cluster threshold of 50
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    assertNotNull(execCtx.getTerminateException(),
+        "Table enforce override should cause real termination even when cluster is logOnly");
+    assertEquals(execCtx.getTerminateException().getErrorCode(), QueryErrorCode.QUERY_SCAN_LIMIT_EXCEEDED);
+  }
+
+  @Test
+  public void testTableModeLogOnlyOverridesClusterEnforce() {
+    // Cluster is enforce — normally kills
+    QueryMonitorConfig config = buildConfig("enforce", 50L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    // Table override: logOnly — should downgrade to dry-run
+    execCtx.setEffectiveScanKillingMode(ScanKillingMode.LOG_ONLY);
+    execCtx.setTableName("testTable_OFFLINE");
+    execCtx.setQueryId("tbl-mode-q2");
+
+    QueryKillingStrategy strategy = manager.resolveQueryStrategy(null);
+    assertNotNull(strategy);
+    execCtx.setCachedKillingStrategy(strategy);
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(100L); // exceeds cluster threshold of 50
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    assertNull(execCtx.getTerminateException(),
+        "Table logOnly override should prevent real kill even when cluster is enforce");
+  }
+
+  @Test
+  public void testTableModeDisabledOverridesClusterEnforce() {
+    // Cluster is enforce — normally kills
+    QueryMonitorConfig config = buildConfig("enforce", 50L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    // Table override: disabled — fully exempt
+    execCtx.setEffectiveScanKillingMode(ScanKillingMode.DISABLED);
+    execCtx.setTableName("testTable_OFFLINE");
+    execCtx.setQueryId("tbl-mode-q3");
+
+    QueryKillingStrategy strategy = manager.resolveQueryStrategy(null);
+    assertNotNull(strategy);
+    execCtx.setCachedKillingStrategy(strategy);
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(100L); // exceeds cluster threshold of 50
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    assertNull(execCtx.getTerminateException(),
+        "Table disabled override should fully exempt the table from killing");
+  }
+
+  @Test
+  public void testNoTableModeOverrideFallsBackToCluster() {
+    // Cluster is enforce, no table mode override
+    QueryMonitorConfig config = buildConfig("enforce", 50L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    // No setEffectiveScanKillingMode call — should use cluster mode (enforce)
+    execCtx.setTableName("testTable_OFFLINE");
+    execCtx.setQueryId("tbl-mode-q4");
+
+    QueryKillingStrategy strategy = manager.resolveQueryStrategy(null);
+    assertNotNull(strategy);
+    execCtx.setCachedKillingStrategy(strategy);
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(100L); // exceeds cluster threshold of 50
+
+    manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    assertNotNull(execCtx.getTerminateException(),
+        "Without table mode override, cluster enforce mode should kill");
   }
 
   // --- Test fixtures for pluggable strategy ---

@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryScanCostContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -251,10 +252,17 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     if (!queryStrategy.shouldTerminate(scanCostContext)) {
       return;
     }
+    // Resolve effective mode: per-table override takes precedence over cluster config
+    CommonConstants.Accounting.ScanKillingMode effectiveMode = executionContext.getEffectiveScanKillingMode();
+    if (effectiveMode == CommonConstants.Accounting.ScanKillingMode.DISABLED) {
+      return;
+    }
+    boolean logOnly = effectiveMode == CommonConstants.Accounting.ScanKillingMode.LOG_ONLY
+        || (effectiveMode == null && config.isScanBasedKillingLogOnly());
     long requestId = executionContext.getRequestId();
     QueryKillReport report = queryStrategy.buildKillReport(scanCostContext, requestId, queryId, tableName,
         configSource);
-    if (config.isScanBasedKillingLogOnly()) {
+    if (logOnly) {
       LOGGER.info("Query killed in LogOnly mode: {}", report.toInternalLogMessage());
       _serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1);
       return;
