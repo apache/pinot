@@ -1069,6 +1069,52 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   /**
+   * Tests that the broadcast_right join hint broadcasts the right side to all workers and hash/random distributes
+   * the left side. This is useful for star-schema patterns where the right table is small but not pre-replicated.
+   */
+  @Test
+  public void testBroadcastRightJoinHintEquiJoin() {
+    String query = "SELECT /*+ joinOptions(join_strategy='broadcast_right') */ * FROM a JOIN b ON a.col1 = b.col1";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+    JoinNode joinNode = findJoinNode(dispatchableSubPlan);
+    assertNotNull(joinNode, "Should have a join node");
+    assertEquals(joinNode.getJoinStrategy(), JoinNode.JoinStrategy.BROADCAST_RIGHT,
+        "Join strategy should be BROADCAST_RIGHT");
+
+    MailboxReceiveNode leftInput = (MailboxReceiveNode) joinNode.getInputs().get(0);
+    MailboxReceiveNode rightInput = (MailboxReceiveNode) joinNode.getInputs().get(1);
+    assertEquals(leftInput.getDistributionType(), RelDistribution.Type.HASH_DISTRIBUTED,
+        "LEFT side of broadcast_right join should be HASH distributed");
+    assertEquals(rightInput.getDistributionType(), RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        "RIGHT side of broadcast_right join should be BROADCAST distributed");
+  }
+
+  /**
+   * Tests that the broadcast_right hint also works for non-equi joins (no join keys): left is RANDOM, right is
+   * BROADCAST, overriding the default behavior of a non-equi join which would also broadcast right but does not
+   * surface as an explicit BROADCAST_RIGHT strategy in the JoinNode.
+   */
+  @Test
+  public void testBroadcastRightJoinHintNonEquiJoin() {
+    String query =
+        "SELECT /*+ joinOptions(join_strategy='broadcast_right') */ * FROM a JOIN b ON a.col3 > b.col3";
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
+
+    JoinNode joinNode = findJoinNode(dispatchableSubPlan);
+    assertNotNull(joinNode, "Should have a join node");
+    assertEquals(joinNode.getJoinStrategy(), JoinNode.JoinStrategy.BROADCAST_RIGHT,
+        "Join strategy should be BROADCAST_RIGHT");
+
+    MailboxReceiveNode leftInput = (MailboxReceiveNode) joinNode.getInputs().get(0);
+    MailboxReceiveNode rightInput = (MailboxReceiveNode) joinNode.getInputs().get(1);
+    assertEquals(leftInput.getDistributionType(), RelDistribution.Type.RANDOM_DISTRIBUTED,
+        "LEFT side of broadcast_right non-equi join should be RANDOM");
+    assertEquals(rightInput.getDistributionType(), RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        "RIGHT side of broadcast_right non-equi join should be BROADCAST");
+  }
+
+  /**
    * Finds the JoinNode in the plan.
    */
   private JoinNode findJoinNode(DispatchableSubPlan dispatchableSubPlan) {

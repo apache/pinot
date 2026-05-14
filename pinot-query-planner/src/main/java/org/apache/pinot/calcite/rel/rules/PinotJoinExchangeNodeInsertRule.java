@@ -87,6 +87,19 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       // worker, avoiding hotspots.
       newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(Collections.emptyList()));
       newRight = PinotLogicalExchange.create(right, RelDistributions.hash(Collections.emptyList()));
+    } else if (PinotHintOptions.JoinHintOptions.useBroadcastRightJoinStrategy(join)) {
+      // Broadcast-right join: broadcast the entire right side to every worker; left side is hash/random-distributed.
+      // This eliminates the right-side network shuffle for star-schema patterns where the right table is small
+      // enough to fit in memory but is not pre-replicated as a dimension table.
+      if (leftDistributionType == null) {
+        leftDistributionType = joinInfo.leftKeys.isEmpty()
+            ? PinotHintOptions.DistributionType.RANDOM : PinotHintOptions.DistributionType.HASH;
+      }
+      if (rightDistributionType == null) {
+        rightDistributionType = PinotHintOptions.DistributionType.BROADCAST;
+      }
+      newLeft = createExchangeForHashJoin(leftDistributionType, joinInfo.leftKeys, left, null);
+      newRight = createExchangeForHashJoin(rightDistributionType, joinInfo.rightKeys, right, null);
     } else {
       // Hash join
       // Force pre-partitioned exchange when colocated join hint is provided
