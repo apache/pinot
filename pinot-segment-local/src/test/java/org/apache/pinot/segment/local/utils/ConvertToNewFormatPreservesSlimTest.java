@@ -120,7 +120,7 @@ public class ConvertToNewFormatPreservesSlimTest {
   public void newFormatExplicitDisabledTruePreserved() {
     // User opts out of forward by setting disabled=true. Migration must keep that exact shape,
     // not overwrite with the typed POJO's disabled=false default — silent re-enable would be a
-    // correctness bug.
+    // correctness bug. Non-default typed POJO → gap-fill branch fires.
     ObjectNode slim = MAPPER.createObjectNode();
     slim.putObject("forward").put("disabled", true);
     TableConfig tc = withFieldConfig("c1", EncodingType.RAW, slim);
@@ -130,6 +130,25 @@ public class ConvertToNewFormatPreservesSlimTest {
     JsonNode forward = indexesOf(migrated, "c1").get("forward");
     assertEquals(forward.size(), 1);
     assertTrue(forward.get("disabled").asBoolean(), "Explicit disabled=true preserved");
+  }
+
+  @Test
+  public void newFormatExplicitNullValueRejectedByIndexTypeValidator() {
+    // Pin the actual handling of {"forward": null}: per-index-type validators (here
+    // ForwardIndexType.createDeserializer's lambda) reject NullNode as an invalid forward index
+    // config and raise IllegalStateException. The gap-fill loop is never reached. Users wanting
+    // "enabled with defaults" must use {} (empty object), not null.
+    ObjectNode slim = MAPPER.createObjectNode();
+    slim.set("forward", com.fasterxml.jackson.databind.node.NullNode.getInstance());
+    TableConfig tc = withFieldConfig("c1", EncodingType.DICTIONARY, slim);
+
+    try {
+      TableConfigUtils.createTableConfigFromOldFormat(tc, schemaWith("c1"));
+      org.testng.Assert.fail("Expected IllegalStateException from ForwardIndexType validator");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage() != null && expected.getMessage().contains("forward index"),
+          "Expected forward-index validation error; got: " + expected.getMessage());
+    }
   }
 
   @Test

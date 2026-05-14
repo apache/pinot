@@ -38,6 +38,7 @@ import org.apache.pinot.spi.data.Schema;
 public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator>
     implements IndexType<C, IR, IC> {
 
+  // ObjectMapper is thread-safe after construction; share across invocations.
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private final String _id;
@@ -96,16 +97,31 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
    *
    * <p>The migration is <i>gap-filling</i>: for each column whose typed config is non-default, this
    * method writes the typed config's verbose JsonNode into {@code FieldConfig.indexes} <b>only when
-   * the column does not already carry a new-format JsonNode for this index type</b>. Columns
-   * already supplied in new format keep their original (possibly slim) JsonNode shape — this
-   * preserves user-supplied keys verbatim through the round-trip and avoids fattening pure
+   * the column does not already carry a JsonNode at {@code prettyName} for this index type</b>.
+   * Columns already supplied in new format keep their original (possibly slim) JsonNode shape —
+   * this preserves user-supplied keys verbatim through the round-trip and avoids fattening pure
    * new-format inputs with the typed-POJO bean-serializer defaults.
    *
-   * <p>Both-formats coexistence resolves "new format wins": if the user supplied both a legacy
-   * {@code indexingConfig.*} entry and a new-format {@code FieldConfig.indexes[prettyName]}
-   * JsonNode for the same column + type, the new-format JsonNode is the source of truth. The
-   * legacy entry is dropped by {@link #handleIndexSpecificCleanup} below, matching the documented
-   * migration intent.
+   * <p>Same-column + same-type conflict resolution is <b>not</b> handled here. If a column declares
+   * the same index type in both legacy {@code indexingConfig.*} and new-format
+   * {@code FieldConfig.indexes[prettyName]}, {@link #getConfig(TableConfig, Schema)} raises
+   * {@link MergedColumnConfigDeserializer.ConfigDeclaredTwiceException} <i>before</i> the gap-fill
+   * loop is reached. This method is only entered for non-conflicting inputs:
+   *
+   * <ul>
+   *   <li><b>Only new format set</b> — typed POJO comes from {@code fromIndexes};
+   *       {@code existing} is the user's JsonNode → {@code continue} → user shape preserved.
+   *   <li><b>Only legacy set</b> — typed POJO comes from {@code fromLegacyConfigs};
+   *       {@code existing} is {@code null} → falls through to {@code set()} → typed-POJO unwrap
+   *       written; legacy entry is then dropped by {@link #handleIndexSpecificCleanup}.
+   *   <li><b>Different index types on the same column</b> — independent loop iterations; each
+   *       follows one of the rules above.
+   * </ul>
+   *
+   * <p>An explicit Jackson {@code NullNode} at {@code prettyName} (i.e. {@code "forward": null})
+   * is not a valid input shape — per-index-type validators (called from {@code getConfig}) reject
+   * it before the gap-fill loop runs. Use an empty object {@code {}} to mean "enabled with
+   * defaults", not {@code null}.
    */
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
     Map<String, C> deserialize = getConfig(tableConfig, schema);
@@ -126,9 +142,10 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
             : MAPPER.valueToTree(fieldConfig.getIndexes());
         JsonNode existing = currentIndexes.get(getPrettyName());
         if (existing != null && !existing.isNull()) {
-          // Column already carries a new-format JsonNode for this index type — preserve the
-          // user's shape verbatim. Legacy-only inputs fall through to the set() branch below;
-          // both-formats coexistence resolves to "new format wins".
+          // Column already carries a JsonNode at prettyName for this index type — preserve the
+          // user's shape verbatim. Legacy-only inputs (existing == null) fall through to the
+          // set() branch below. Same-column + same-type conflicts are surfaced as
+          // ConfigDeclaredTwiceException by getConfig() before this loop is reached.
           continue;
         }
         currentIndexes.set(getPrettyName(), configValue.toJsonNode());
