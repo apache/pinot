@@ -20,6 +20,8 @@ package org.apache.pinot.query.runtime.operator.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -416,6 +418,22 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
      */
     public Map<String, Long> getSenderElapsedMs() {
       return Collections.unmodifiableMap(_senderElapsedMs);
+    }
+
+    /**
+     * Returns per-sender timing with pending (non-completing) senders injected at the current
+     * wall-clock elapsed time. Completed senders retain their actual measured latency.
+     */
+    public Map<String, Long> getSenderElapsedMsIncludingPending() {
+      if (_streamIdToSenderKey.isEmpty()) {
+        return Collections.unmodifiableMap(_senderElapsedMs);
+      }
+      long elapsedMs = _clock.getAsLong() - _startTimeMs;
+      Map<String, Long> result = new HashMap<>(_senderElapsedMs);
+      for (String senderKey : _streamIdToSenderKey.values()) {
+        result.putIfAbsent(senderKey, elapsedMs);
+      }
+      return Collections.unmodifiableMap(result);
     }
 
     @Override

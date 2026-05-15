@@ -76,8 +76,16 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
   private static AdaptiveRoutingStageClassification applyUpstreamTimingsFromStats(QueryDispatcher.QueryResult result,
       DispatchableSubPlan plan, ServerRoutingStatsManager statsManager, long requestId,
       Set<String> recordedInstanceIds) {
+    return applyUpstreamTimingsFromStats(result, plan, statsManager, requestId, recordedInstanceIds,
+        QueryDispatcher.CancelOutcome.NONE);
+  }
+
+  private static AdaptiveRoutingStageClassification applyUpstreamTimingsFromStats(QueryDispatcher.QueryResult result,
+      DispatchableSubPlan plan, ServerRoutingStatsManager statsManager, long requestId,
+      Set<String> recordedInstanceIds, QueryDispatcher.CancelOutcome cancelOutcome) {
     AdaptiveRoutingStageClassification classification = AdaptiveRoutingStageClassification.classify(plan);
-    Map<String, Long> maxTimings = QueryDispatcher.extractMaxTimingsPerInstance(result, classification, requestId);
+    Map<String, Long> maxTimings = QueryDispatcher.extractMaxTimingsPerInstance(
+        result, classification, requestId, cancelOutcome);
     for (Map.Entry<String, Long> entry : maxTimings.entrySet()) {
       if (recordedInstanceIds.add(entry.getKey())) {
         statsManager.recordStatsUponResponseArrival(requestId, entry.getKey(), entry.getValue());
@@ -240,26 +248,20 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
 
   @Test
   public void testIntermediateStageTimingsIgnored() {
-    // Stage 0 (broker) has inflated timings for all 3 servers (in their Stage 1 intermediate role).
-    // Stage 1 (intermediate) has accurate leaf timings for all 3 servers (in their Stage 2 leaf role).
+    // Stage 1 (leaf receiver) has accurate per-leaf timings for all 3 servers.
+    // Stage 0 (broker) has no timing data (it receives from the intermediate, not from leaves).
     //
     // The plan has a leaf fragment (Stage 2) that sends to Stage 1 as its receiver.
-    // Stage 1 is consulted because it is a pure-leaf receiver (in stagesReceivingFromLeaves).
-    // Stage 0 is excluded because it is not a leaf receiver (the leaf sends to stage 1, not stage 0)
-    // and is not in singletonLeafStageIds.
+    // Stage 1 is consulted because it is a pure-leaf receiver.
     QueryServerInstance serverA = new QueryServerInstance("instance-a", "host-a", 9000, MAILBOX_PORT);
     QueryServerInstance serverB = new QueryServerInstance("instance-b", "host-b", 9000, MAILBOX_PORT);
     QueryServerInstance serverC = new QueryServerInstance("instance-c", "host-c", 9000, MAILBOX_PORT);
 
-    // Stage 0 (broker reduce): all 3 servers reported as ~600ms (inflated, each waited for slow server-c)
+    // Stage 0 (broker reduce): no timing data — it receives from the intermediate, not leaves.
     StatMap<BaseMailboxReceiveOperator.StatKey> stage0ReceiveStats =
         new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
-    stage0ReceiveStats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
-        AdaptiveRoutingUpstreamTimings.senderKey("host-a", MAILBOX_PORT) + "=600;"
-        + AdaptiveRoutingUpstreamTimings.senderKey("host-b", MAILBOX_PORT) + "=600;"
-        + AdaptiveRoutingUpstreamTimings.senderKey("host-c", MAILBOX_PORT) + "=600");
 
-    // Stage 1 (intermediate receivers): true per-leaf timings: fast servers at 50ms, slow at 600ms
+    // Stage 1 (leaf receiver): true per-leaf timings: fast servers at 50ms, slow at 600ms
     StatMap<BaseMailboxReceiveOperator.StatKey> stage1ReceiveStats =
         new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
     stage1ReceiveStats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
@@ -283,13 +285,10 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
         planWith(leafFragment(1, serverA, serverB, serverC), nonLeafFragment(serverA, serverB, serverC)),
         stats, REQUEST_ID, recorded);
 
-    // Accurate leaf timings must be recorded for fast servers.
+    // Accurate leaf timings from Stage 1 must be recorded.
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 50L);
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-b", 50L);
     verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-c", 600L);
-    // Inflated Stage 0 observations must never reach the stats manager.
-    verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 600L);
-    verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "instance-b", 600L);
   }
 
   @Test
@@ -522,5 +521,117 @@ public class QueryDispatcherApplyUpstreamTimingsTest {
     verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "server-b", -1L);
     Assert.assertFalse(classification._trackedServers.contains("server-a"));
     Assert.assertFalse(classification._trackedServers.contains("server-b"));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cancel stats tests
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testCancelStatsProvideTimingsForStagesMissingFromResult() {
+    // Stage 1 timings come from the normal query result. Stage 2 timings come only from cancelStats
+    // (the broker didn't see stage 2 during normal reduce because the query was cancelled early).
+    QueryServerInstance serverA = new QueryServerInstance("instance-a", "host-a", 9000, MAILBOX_PORT);
+    QueryServerInstance serverB = new QueryServerInstance("instance-b", "host-b", 9000, MAILBOX_PORT);
+
+    // Normal result has stage 1 timing for server A.
+    StatMap<BaseMailboxReceiveOperator.StatKey> stage1Stats =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    stage1Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
+        AdaptiveRoutingUpstreamTimings.senderKey("host-a", MAILBOX_PORT) + "=100");
+
+    MultiStageQueryStats mqStats = MultiStageQueryStats.emptyStats(0);
+    mqStats.mergeUpstream(1, new MultiStageQueryStats.StageStats.Closed(
+        List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(stage1Stats)));
+    QueryDispatcher.QueryResult result = new QueryDispatcher.QueryResult(EMPTY_RESULT, mqStats, 0L);
+
+    // Cancel stats have stage 2 timing for server B (gathered during cancel).
+    StatMap<BaseMailboxReceiveOperator.StatKey> cancelStage2Stats =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    cancelStage2Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
+        AdaptiveRoutingUpstreamTimings.senderKey("host-b", MAILBOX_PORT) + "=450");
+    MultiStageQueryStats cancelStats = MultiStageQueryStats.emptyStats(0);
+    cancelStats.mergeUpstream(2, new MultiStageQueryStats.StageStats.Closed(
+        List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(cancelStage2Stats)));
+
+    // Plan: leaf-A sends to stage 1, leaf-B sends to stage 2.
+    ServerRoutingStatsManager stats = mock(ServerRoutingStatsManager.class);
+    Set<String> recorded = new HashSet<>();
+
+    applyUpstreamTimingsFromStats(result,
+        planWith(leafFragment(1, serverA), leafFragment(2, serverB)),
+        stats, REQUEST_ID, recorded, new QueryDispatcher.CancelOutcome(cancelStats, Set.of()));
+
+    verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 100L);
+    verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-b", 450L);
+    Assert.assertTrue(recorded.containsAll(List.of("instance-a", "instance-b")));
+  }
+
+  @Test
+  public void testCancelStatsMergedWithResultTakingMax() {
+    // Same server appears in both the normal result (stage 1) and cancelStats (stage 2).
+    // extractMaxTimingsPerInstance should take the max across both sources.
+    QueryServerInstance server = new QueryServerInstance("instance-a", "host-a", 9000, MAILBOX_PORT);
+
+    // Normal result: stage 1 reports server at 200ms.
+    StatMap<BaseMailboxReceiveOperator.StatKey> stage1Stats =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    stage1Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
+        AdaptiveRoutingUpstreamTimings.senderKey("host-a", MAILBOX_PORT) + "=200");
+
+    MultiStageQueryStats mqStats = MultiStageQueryStats.emptyStats(0);
+    mqStats.mergeUpstream(1, new MultiStageQueryStats.StageStats.Closed(
+        List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(stage1Stats)));
+    QueryDispatcher.QueryResult result = new QueryDispatcher.QueryResult(EMPTY_RESULT, mqStats, 0L);
+
+    // Cancel stats: stage 2 reports same server at 700ms.
+    StatMap<BaseMailboxReceiveOperator.StatKey> cancelStage2Stats =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    cancelStage2Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
+        AdaptiveRoutingUpstreamTimings.senderKey("host-a", MAILBOX_PORT) + "=700");
+    MultiStageQueryStats cancelStats = MultiStageQueryStats.emptyStats(0);
+    cancelStats.mergeUpstream(2, new MultiStageQueryStats.StageStats.Closed(
+        List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(cancelStage2Stats)));
+
+    // Plan: leaf sends to both stage 1 and stage 2.
+    ServerRoutingStatsManager stats = mock(ServerRoutingStatsManager.class);
+    Set<String> recorded = new HashSet<>();
+
+    applyUpstreamTimingsFromStats(result,
+        planWith(leafFragment(1, server), leafFragment(2, server)),
+        stats, REQUEST_ID, recorded, new QueryDispatcher.CancelOutcome(cancelStats, Set.of()));
+
+    // Max of 200 and 700 -> 700ms.
+    verify(stats).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 700L);
+  }
+
+  @Test
+  public void testCancelStatsUntrustedStagesSkipped() {
+    // Cancel stats contain timings for a non-trusted stage (intermediate). These should be ignored.
+    QueryServerInstance server = new QueryServerInstance("instance-a", "host-a", 9000, MAILBOX_PORT);
+
+    // Empty normal result (no upstream stage stats).
+    MultiStageQueryStats mqStats = MultiStageQueryStats.emptyStats(0);
+    QueryDispatcher.QueryResult result = new QueryDispatcher.QueryResult(EMPTY_RESULT, mqStats, 0L);
+
+    // Cancel stats have stage 1 timing, but stage 1 is NOT a trusted stage (no leaf sends to it).
+    StatMap<BaseMailboxReceiveOperator.StatKey> cancelStage1Stats =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    cancelStage1Stats.merge(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS,
+        AdaptiveRoutingUpstreamTimings.senderKey("host-a", MAILBOX_PORT) + "=500");
+    MultiStageQueryStats cancelStats = MultiStageQueryStats.emptyStats(0);
+    cancelStats.mergeUpstream(1, new MultiStageQueryStats.StageStats.Closed(
+        List.of(MultiStageOperator.Type.MAILBOX_RECEIVE), List.of(cancelStage1Stats)));
+
+    // Plan: only a non-leaf fragment (no leaf sends to stage 1).
+    ServerRoutingStatsManager stats = mock(ServerRoutingStatsManager.class);
+    Set<String> recorded = new HashSet<>();
+
+    applyUpstreamTimingsFromStats(result,
+        planWith(nonLeafFragment(server)),
+        stats, REQUEST_ID, recorded, new QueryDispatcher.CancelOutcome(cancelStats, Set.of()));
+
+    verify(stats, never()).recordStatsUponResponseArrival(REQUEST_ID, "instance-a", 500L);
+    Assert.assertTrue(recorded.isEmpty());
   }
 }

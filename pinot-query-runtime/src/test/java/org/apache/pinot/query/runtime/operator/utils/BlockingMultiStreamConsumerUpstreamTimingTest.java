@@ -119,4 +119,105 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
           "Unmapped stream must not produce a timing entry");
     }
   }
+
+  /**
+   * Full timeout: no senders complete. getSenderElapsedMsIncludingPending() injects elapsed time for all.
+   * Does not call readMseBlockBlocking() — simulates the state at cancel time when no EOS arrived.
+   */
+  @Test
+  public void testIncludingPendingFullTimeout() {
+    AtomicLong clock = new AtomicLong(0L);
+    String keyA = AdaptiveRoutingUpstreamTimings.senderKey("host-a", 8442);
+    String keyB = AdaptiveRoutingUpstreamTimings.senderKey("host-b", 8442);
+    String keyC = AdaptiveRoutingUpstreamTimings.senderKey("host-c", 8442);
+
+    AsyncStream<ReceivingMailbox.MseBlockWithStats> streamA = mockStream("mailbox-A");
+    AsyncStream<ReceivingMailbox.MseBlockWithStats> streamB = mockStream("mailbox-B");
+    AsyncStream<ReceivingMailbox.MseBlockWithStats> streamC = mockStream("mailbox-C");
+
+    List<StatMap<ReceivingMailbox.StatKey>> stats = List.of(
+        new StatMap<>(ReceivingMailbox.StatKey.class),
+        new StatMap<>(ReceivingMailbox.StatKey.class),
+        new StatMap<>(ReceivingMailbox.StatKey.class));
+
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      Map<Object, String> streamIdToSenderKey = new HashMap<>();
+      streamIdToSenderKey.put("mailbox-A", keyA);
+      streamIdToSenderKey.put("mailbox-B", keyB);
+      streamIdToSenderKey.put("mailbox-C", keyC);
+
+      BlockingMultiStreamConsumer.OfMseBlock consumer = new BlockingMultiStreamConsumer.OfMseBlock(
+          createContext(),
+          new ArrayList<>(List.of(streamA, streamB, streamC)),
+          /* senderStageId= */ 2,
+          List.of("host-a", "host-b", "host-c"),
+          stats,
+          streamIdToSenderKey,
+          clock::get);
+
+      // No reads performed — no EOS received
+      assertTrue(consumer.getSenderElapsedMs().isEmpty());
+
+      // Simulate time passing (as if timeout occurred at 9800ms)
+      clock.set(9800L);
+
+      Map<String, Long> timings = consumer.getSenderElapsedMsIncludingPending();
+      assertEquals(timings.size(), 3);
+      assertEquals((long) timings.get(keyA), 9800L);
+      assertEquals((long) timings.get(keyB), 9800L);
+      assertEquals((long) timings.get(keyC), 9800L);
+    }
+  }
+
+  /**
+   * All senders complete normally. getSenderElapsedMsIncludingPending matches getSenderElapsedMs
+   * even when called later (putIfAbsent is a no-op for already-recorded senders).
+   */
+  @Test
+  public void testIncludingPendingAllComplete() {
+    AtomicLong clock = new AtomicLong(0L);
+    String keyA = AdaptiveRoutingUpstreamTimings.senderKey("host-a", 8442);
+    String keyB = AdaptiveRoutingUpstreamTimings.senderKey("host-b", 8442);
+
+    AsyncStream<ReceivingMailbox.MseBlockWithStats> streamA = mockStream("mailbox-A");
+    AsyncStream<ReceivingMailbox.MseBlockWithStats> streamB = mockStream("mailbox-B");
+
+    when(streamA.poll()).thenAnswer(inv -> {
+      clock.set(50L);
+      return eos();
+    });
+    when(streamB.poll()).thenAnswer(inv -> {
+      clock.set(80L);
+      return eos();
+    });
+
+    List<StatMap<ReceivingMailbox.StatKey>> stats = List.of(
+        new StatMap<>(ReceivingMailbox.StatKey.class),
+        new StatMap<>(ReceivingMailbox.StatKey.class));
+
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      Map<Object, String> streamIdToSenderKey = new HashMap<>();
+      streamIdToSenderKey.put("mailbox-A", keyA);
+      streamIdToSenderKey.put("mailbox-B", keyB);
+
+      BlockingMultiStreamConsumer.OfMseBlock consumer = new BlockingMultiStreamConsumer.OfMseBlock(
+          createContext(),
+          new ArrayList<>(List.of(streamA, streamB)),
+          /* senderStageId= */ 2,
+          List.of("host-a", "host-b"),
+          stats,
+          streamIdToSenderKey,
+          clock::get);
+
+      consumer.readMseBlockBlocking();
+
+      // Both completed — includingPending should preserve actual latencies even at later clock
+      clock.set(5000L);
+      Map<String, Long> base = consumer.getSenderElapsedMs();
+      Map<String, Long> withPending = consumer.getSenderElapsedMsIncludingPending();
+      assertEquals(withPending, base, "When all senders completed, includingPending equals base");
+      assertEquals((long) withPending.get(keyA), 50L);
+      assertEquals((long) withPending.get(keyB), 80L);
+    }
+  }
 }

@@ -26,6 +26,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import java.io.DataInputStream;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,6 +52,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
@@ -80,6 +83,7 @@ import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -105,6 +109,22 @@ import org.slf4j.LoggerFactory;
  * {@code QueryDispatcher} dispatch a query to different workers.
  */
 public class QueryDispatcher {
+
+  static final class CancelOutcome {
+    static final CancelOutcome NONE = new CancelOutcome(null, Set.of());
+
+    @Nullable final MultiStageQueryStats _stats;
+    final Set<String> _respondingServerIds;
+
+    CancelOutcome(@Nullable MultiStageQueryStats stats, Set<String> respondingServerIds) {
+      _stats = stats;
+      _respondingServerIds = respondingServerIds;
+    }
+
+    boolean wasAttempted() {
+      return !_respondingServerIds.isEmpty();
+    }
+  }
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /**
@@ -226,17 +246,18 @@ public class QueryDispatcher {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
     Set<QueryServerInstance> incrementedServers = new HashSet<>();
-    Set<String> decrementedServers = new HashSet<>();
     long submitTimeMs = _clock.getAsLong();
     QueryResult result = null;
+    CancelOutcome cancelOutcome = CancelOutcome.NONE;
 
     AdaptiveRoutingStageClassification classification = null;
     if (statsManager != null) {
       classification = AdaptiveRoutingStageClassification.classify(dispatchableSubPlan);
+      dispatchableSubPlan.getQueryStageMap().get(0).getCustomProperties()
+          .put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
       for (DispatchablePlanFragment fragment : dispatchableSubPlan.getQueryStagesWithoutRoot()) {
         int stageId = fragment.getPlanFragment().getFragmentId();
         if (classification._trustedStageIds.contains(stageId)) {
-          // Safe to mutate: plan is fresh per request (not cached) and this runs before submit() serializes.
           fragment.getCustomProperties().put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, "true");
         }
       }
@@ -255,11 +276,13 @@ public class QueryDispatcher {
       }
       result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
-        cancel(requestId);
+        cancel(requestId, servers);
       }
       return result;
     } catch (Exception ex) {
-      result = tryRecover(context.getRequestId(), servers, ex);
+      Pair<QueryResult, CancelOutcome> recovered = tryRecover(context.getRequestId(), servers, ex);
+      result = recovered.getLeft();
+      cancelOutcome = recovered.getRight();
       return result;
     } catch (Throwable e) {
       // TODO: Consider always cancel when it returns (early terminate)
@@ -267,38 +290,16 @@ public class QueryDispatcher {
       throw e;
     } finally {
       if (statsManager != null) {
-        Set<String> trackedServers = Set.of();
+        Map<String, Long> knownTimings = Map.of();
         if (result != null && !incrementedServers.isEmpty() && !classification._trustedStageIds.isEmpty()) {
           try {
-            Map<String, Long> maxTimings = extractMaxTimingsPerInstance(result, classification, requestId);
-            for (Map.Entry<String, Long> entry : maxTimings.entrySet()) {
-              String instanceId = entry.getKey();
-              if (decrementedServers.add(instanceId)) {
-                LOGGER.debug("==[UPSTREAM_TIMING]== request {} recording indirect sender {} latency={}ms",
-                    requestId, instanceId, entry.getValue());
-                statsManager.recordStatsUponResponseArrival(requestId, instanceId, entry.getValue());
-              }
-            }
-            trackedServers = classification._trackedServers;
+            knownTimings = extractMaxTimingsPerInstance(result, classification, requestId, cancelOutcome);
           } catch (Exception e) {
             LOGGER.warn("Failed to apply upstream timings for request {}", requestId, e);
           }
         }
-        if (decrementedServers.isEmpty()) {
-          // Fallback 1: if we received no partial timings, avoid marking all servers with the full elapsed time.
-          for (QueryServerInstance server : incrementedServers) {
-            statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1L);
-          }
-        } else {
-          // Fallback 2: if we received partial timings, mark remaining leaf servers with the full elapsed time.
-          long elapsedMs = _clock.getAsLong() - submitTimeMs;
-          for (QueryServerInstance server : incrementedServers) {
-            String id = server.getInstanceId();
-            if (!decrementedServers.contains(id)) {
-              statsManager.recordStatsUponResponseArrival(requestId, id, trackedServers.contains(id) ? elapsedMs : -1L);
-            }
-          }
-        }
+        recordPerServerLatencies(statsManager, requestId, incrementedServers, classification, knownTimings,
+            cancelOutcome, _clock.getAsLong() - submitTimeMs);
       }
       if (isQueryCancellationEnabled()) {
         _serversByQuery.remove(requestId);
@@ -512,26 +513,35 @@ public class QueryDispatcher {
         brokerResult.getBrokerReduceTimeMs(), stageCoverage, accumulator);
   }
 
-  /// Tries to recover from an exception thrown during legacy (non-streaming) query dispatching.
+  private static void recordPerServerLatencies(ServerRoutingStatsManager statsManager, long requestId,
+      Set<QueryServerInstance> incrementedServers, AdaptiveRoutingStageClassification classification,
+      Map<String, Long> knownTimings, CancelOutcome cancelOutcome, long elapsedMs) {
+    for (QueryServerInstance server : incrementedServers) {
+      String id = server.getInstanceId();
+      long latency;
+      if (knownTimings.containsKey(id)) {
+        // Tier 1: actual upstream timing extracted — use it for tracked (leaf) servers, -1 otherwise.
+        latency = classification._trackedServers.contains(id) ? knownTimings.get(id) : -1L;
+      } else if (classification._trackedServers.contains(id) && !knownTimings.isEmpty()) {
+        // Tier 2: tracked leaf server whose timing is missing while other servers had data — mark degraded.
+        latency = elapsedMs;
+      } else if (cancelOutcome.wasAttempted() && !cancelOutcome._respondingServerIds.contains(id)) {
+        // Tier 3: cancel was attempted but this server didn't respond — mark degraded.
+        latency = elapsedMs;
+      } else {
+        // Tier 4: no timing data, but server is responsive (or cancel wasn't attempted).
+        latency = -1L;
+      }
+      LOGGER.debug("==[UPSTREAM_TIMING]== request {} recording server {} latency={}ms", requestId, id, latency);
+      statsManager.recordStatsUponResponseArrival(requestId, id, latency);
+    }
+  }
+
+  /// Tries to recover from an exception thrown during query dispatching.
   ///
-  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and empty
-  /// stats, while other exceptions are directly rethrown. Stats are not collected on the legacy cancel path.
-  ///
-  /// <b>Why {@code cancelWithStats} was removed:</b> a previous revision of this method called a synchronous
-  /// {@code cancelWithStats} RPC on every participating server (fan-out) to collect partial per-stage stats on the
-  /// error path. That approach was reverted for two reasons:
-  /// <ol>
-  ///   <li><b>Cascade risk.</b> At high QPS, every query failure triggered an extra fan-out RPC to every server that
-  ///       already handled the failed query. Servers under stress would receive a second wave of requests just as they
-  ///       were trying to recover, risking a cascading overload.</li>
-  ///   <li><b>No consumer.</b> The call site that used the returned {@code Map<Integer, StageStats.Closed>} was also
-  ///       reverted as part of the same change, leaving the RPC overhead with no benefit.</li>
-  /// </ol>
-  ///
-  /// Stats on the error path are now available only in stream mode ({@code SubmitWithStream}), where servers push
-  /// {@code OpChainComplete} messages independently and the broker collects whatever arrives before the drain
-  /// timeout (see {@link #tryRecoverWithStream}).
-  private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
+  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and stats,
+  /// while other exceptions are not known, so they are directly rethrown.
+  private Pair<QueryResult, CancelOutcome> tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
       throws Exception {
     if (servers.isEmpty()) {
       throw ex;
@@ -548,10 +558,13 @@ public class QueryDispatcher {
       cancel(requestId, servers);
       throw ex;
     }
-    LOGGER.warn("Query failed with a known exception. Cancelling remaining opchains.");
-    cancel(requestId, servers);
+    LOGGER.warn("Query failed with a known exception. Trying to cancel the other opchains");
+    CancelOutcome outcome = cancelWithStats(requestId, servers);
+    if (outcome._stats == null) {
+      throw ex;
+    }
     QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
-    return new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+    return Pair.of(new QueryResult(processingException, outcome._stats, 0L), outcome);
   }
 
   /// Tries to recover from an exception thrown during stream-mode ({@code SubmitWithStream}) query dispatching.
@@ -578,18 +591,14 @@ public class QueryDispatcher {
     }
     LOGGER.warn("Stream-mode query failed with a known exception. Fanning out cancel and waiting for stats.");
     session.fanOutCancel();
-    // Cap the wait: the query result is already determined, so we collect stats on a best-effort basis only.
-    // Using the full remaining timeout here would regress error-path latency to the query deadline.
     long statsWaitMs = Math.min(_statsDrainMs, Math.max(0, deadlineMs - System.currentTimeMillis()));
     try {
       session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {
-      // Restore the interrupt flag but continue: mergeSessionStatsIntoResult does not block, so the flag will be
-      // observed by the caller rather than firing an unexpected InterruptedException inside this method.
       Thread.currentThread().interrupt();
     }
-    QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
-    QueryResult errorResult = new QueryResult(processingException, MultiStageQueryStats.emptyStats(0), 0L);
+    QueryProcessingException streamProcessingException = new QueryProcessingException(errorCode, ex.getMessage());
+    QueryResult errorResult = new QueryResult(streamProcessingException, MultiStageQueryStats.emptyStats(0), 0L);
     return mergeSessionStatsIntoResult(errorResult, session, expectedByStage);
   }
 
@@ -685,7 +694,8 @@ public class QueryDispatcher {
    */
   @VisibleForTesting
   static Map<String, Long> extractMaxTimingsPerInstance(QueryResult result,
-      AdaptiveRoutingStageClassification classification, long requestId) {
+      AdaptiveRoutingStageClassification classification, long requestId,
+      CancelOutcome cancelOutcome) {
     Map<String, Long> maxTimingPerInstance = new HashMap<>();
     List<MultiStageQueryStats.StageStats.Closed> queryStatsList = result.getQueryStats();
     for (int stageIdx = 0; stageIdx < queryStatsList.size(); stageIdx++) {
@@ -693,39 +703,54 @@ public class QueryDispatcher {
         continue;
       }
       MultiStageQueryStats.StageStats.Closed stageStats = queryStatsList.get(stageIdx);
-      if (stageStats == null) {
-        continue;
+      if (stageStats != null) {
+        extractTimingsFromStage(stageStats, stageIdx, classification, requestId, maxTimingPerInstance);
       }
-      final int stage = stageIdx;
-      stageStats.forEach((opType, statMap) -> {
-        if (opType != MultiStageOperator.Type.MAILBOX_RECEIVE) {
-          return;
+    }
+    if (cancelOutcome._stats != null) {
+      MultiStageQueryStats cancelStats = cancelOutcome._stats;
+      for (int stageId = cancelStats.getCurrentStageId() + 1; stageId <= cancelStats.getMaxStageId(); stageId++) {
+        if (!classification._trustedStageIds.contains(stageId)) {
+          continue;
         }
-        @SuppressWarnings("unchecked")
-        StatMap<BaseMailboxReceiveOperator.StatKey> receiveStats =
-            (StatMap<BaseMailboxReceiveOperator.StatKey>) statMap;
-        String encoded =
-            receiveStats.getString(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS);
-        if (encoded == null) {
-          LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} MAILBOX_RECEIVE has null timing",
-              requestId, stage);
-          return;
+        MultiStageQueryStats.StageStats.Closed stageStats = cancelStats.getUpstreamStageStats(stageId);
+        if (stageStats != null) {
+          extractTimingsFromStage(stageStats, stageId, classification, requestId, maxTimingPerInstance);
         }
-        LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} encoded timing: {}",
-            requestId, stage, encoded);
-        Map<String, Long> timings = AdaptiveRoutingUpstreamTimings.decode(encoded);
-        for (Map.Entry<String, Long> entry : timings.entrySet()) {
-          String instanceId = classification._senderKeyToInstanceId.get(entry.getKey());
-          if (instanceId != null) {
-            maxTimingPerInstance.merge(instanceId, entry.getValue(), Math::max);
-          } else {
-            LOGGER.debug("==[UPSTREAM_TIMING]== request {} senderKey={} not found in known servers, skipping",
-                requestId, entry.getKey());
-          }
-        }
-      });
+      }
     }
     return maxTimingPerInstance;
+  }
+
+  private static void extractTimingsFromStage(MultiStageQueryStats.StageStats.Closed stageStats, int stageIdx,
+      AdaptiveRoutingStageClassification classification, long requestId, Map<String, Long> maxTimingPerInstance) {
+    stageStats.forEach((opType, statMap) -> {
+      if (opType != MultiStageOperator.Type.MAILBOX_RECEIVE) {
+        return;
+      }
+      @SuppressWarnings("unchecked")
+      StatMap<BaseMailboxReceiveOperator.StatKey> receiveStats =
+          (StatMap<BaseMailboxReceiveOperator.StatKey>) statMap;
+      String encoded =
+          receiveStats.getString(BaseMailboxReceiveOperator.StatKey.UPSTREAM_SERVER_RESPONSE_TIMES_MS);
+      if (encoded == null) {
+        LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} MAILBOX_RECEIVE has null timing",
+              requestId, stageIdx);
+        return;
+      }
+      LOGGER.debug("==[UPSTREAM_TIMING]== request {} consulted stage {} encoded timing: {}",
+            requestId, stageIdx, encoded);
+      Map<String, Long> timings = AdaptiveRoutingUpstreamTimings.decode(encoded);
+      for (Map.Entry<String, Long> entry : timings.entrySet()) {
+        String instanceId = classification._senderKeyToInstanceId.get(entry.getKey());
+        if (instanceId != null) {
+          maxTimingPerInstance.merge(instanceId, entry.getValue(), Math::max);
+        } else {
+          LOGGER.debug("==[UPSTREAM_TIMING]== request {} senderKey={} not found in known servers, skipping",
+              requestId, entry.getKey());
+        }
+      }
+    });
   }
 
 
@@ -922,6 +947,43 @@ public class QueryDispatcher {
     return true;
   }
 
+  @Nullable
+  private CancelOutcome cancelWithStats(long requestId, @Nullable Set<QueryServerInstance> servers) {
+    if (servers == null) {
+      return CancelOutcome.NONE;
+    }
+
+    Deadline deadline = Deadline.after(_cancelTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    SendRequest<Long, Worker.CancelResponse> sendRequest = DispatchClient::cancel;
+    BlockingQueue<AsyncResponse<Worker.CancelResponse>> dispatchCallbacks =
+        dispatch(sendRequest, servers, deadline, serverInstance -> requestId);
+
+    Set<String> respondedServerIds = new HashSet<>();
+    MultiStageQueryStats stats = MultiStageQueryStats.emptyStats(0);
+    StatMap<BaseMailboxReceiveOperator.StatKey> rootStats = new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    stats.getCurrentStats().addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE, rootStats);
+    try {
+      processResults(requestId, servers.size(), (response, server) -> {
+        respondedServerIds.add(server.getInstanceId());
+        Map<Integer, ByteString> statsByStage = response.getStatsByStageMap();
+        for (Map.Entry<Integer, ByteString> entry : statsByStage.entrySet()) {
+          try (InputStream is = entry.getValue().newInput(); DataInputStream dis = new DataInputStream(is)) {
+            MultiStageQueryStats.StageStats.Closed closed = MultiStageQueryStats.StageStats.Closed.deserialize(dis);
+            stats.mergeUpstream(entry.getKey(), closed);
+          } catch (Exception e) {
+            LOGGER.debug("Caught exception while deserializing stats on server: {}", server, e);
+          }
+        }
+      }, deadline, dispatchCallbacks);
+      return new CancelOutcome(stats, respondedServerIds);
+    } catch (InterruptedException e) {
+      throw QueryErrorCode.INTERNAL.asException("Interrupted while waiting for cancel response", e);
+    } catch (TimeoutException e) {
+      LOGGER.debug("Timed out waiting for cancel response", e);
+      return new CancelOutcome(stats, respondedServerIds);
+    }
+  }
+
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
@@ -977,8 +1039,14 @@ public class QueryDispatcher {
         workerMetadata.size());
 
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
+    Map<String, String> opChainMetadata = new HashMap<>(queryOptions);
+    String collectTiming = stagePlan.getCustomProperties()
+        .get(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY);
+    if (collectTiming != null) {
+      opChainMetadata.put(AdaptiveRoutingUpstreamTimings.COLLECT_UPSTREAM_TIMING_KEY, collectTiming);
+    }
     OpChainExecutionContext opChainExecutionContext =
-        OpChainExecutionContext.fromQueryContext(mailboxService, queryOptions, stageMetadata, workerMetadata.get(0),
+        OpChainExecutionContext.fromQueryContext(mailboxService, opChainMetadata, stageMetadata, workerMetadata.get(0),
             null, true, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
