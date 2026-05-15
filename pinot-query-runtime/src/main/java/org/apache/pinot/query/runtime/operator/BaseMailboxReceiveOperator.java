@@ -144,10 +144,10 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     if (statMap.getLong(StatKey.EMITTED_ROWS) == 0) {
       statMap.merge(StatKey.NON_ACTIVE_WORKERS, 1);
     }
-    // Flush partial timing data so that the timeout/cancellation path (where onEos() never ran)
-    // still captures timings for senders whose EOS did arrive. In the normal path onEos() has
-    // already merged the same data into _statMap, so this is idempotent via the Math::max merger.
-    mergeSenderTimingsInto(statMap);
+    // On the cancel/timeout path (where onEos() never ran), include ALL known senders:
+    // completed senders get their actual measured latency, pending senders get the current
+    // wall-clock elapsed time so the adaptive selector can identify slow servers.
+    mergeSenderTimingsInto(statMap, _multiConsumer.getSenderElapsedMsIncludingPending());
     return statMap;
   }
 
@@ -155,15 +155,14 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     for (StatMap<ReceivingMailbox.StatKey> receivingStats : _receivingStats) {
       addReceivingStats(receivingStats);
     }
-    mergeSenderTimingsInto(_statMap);
+    mergeSenderTimingsInto(_statMap, _multiConsumer.getSenderElapsedMs());
     LOGGER.debug("==[UPSTREAM_TIMING]== stage {} onEos: merged sender timings", _senderStageId);
   }
 
   /**
-   * Encodes per-sender elapsed-time data from the multi-consumer and merges it into {@code target}.
+   * Encodes per-sender elapsed-time data and merges it into {@code target}.
    */
-  private void mergeSenderTimingsInto(StatMap<StatKey> target) {
-    Map<String, Long> senderElapsedMs = _multiConsumer.getSenderElapsedMs();
+  private void mergeSenderTimingsInto(StatMap<StatKey> target, Map<String, Long> senderElapsedMs) {
     if (!senderElapsedMs.isEmpty()) {
       String encoded = AdaptiveRoutingUpstreamTimings.encode(senderElapsedMs);
       if (encoded != null) {
