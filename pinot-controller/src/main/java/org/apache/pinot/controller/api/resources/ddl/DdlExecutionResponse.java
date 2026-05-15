@@ -30,14 +30,21 @@ import org.apache.pinot.sql.ddl.compile.DdlOperation;
 /// The shape of the response varies by operation. [JsonInclude.Include#NON_NULL] keeps
 /// the wire payload focused on the fields that actually apply to the operation that ran.
 ///
-/// - CREATE_TABLE: `tableName, tableType, schema, tableConfig, ifNotExists, warnings`
-/// - DROP_TABLE: `tableName, tableType, deletedTables, ifExists`
+/// - CREATE_TABLE: `tableName, tableType, schema, tableConfig, ifNotExists, warnings, dryRun`
+/// - DROP_TABLE: `tableName, tableType, deletedTables, ifExists, dryRun`
 /// - SHOW_TABLES: `tableNames`
 /// - SHOW_CREATE_TABLE: `tableName, tableType, ddl`
+///
+/// `dryRun` is emitted only for operations that have dry-run semantics (CREATE, DROP); it is
+/// absent from SHOW responses where the concept does not apply.
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DdlExecutionResponse {
   private DdlOperation _operation;
-  private boolean _dryRun;
+  /// Boxed Boolean so that CREATE / DROP responses can carry the dry-run flag while SHOW
+  /// TABLES and SHOW CREATE TABLE responses elide it via {@link JsonInclude.Include#NON_NULL}
+  /// — those operations have no dry-run semantics and a serialized `"dryRun": false` on them
+  /// is meaningless to the caller.
+  private Boolean _dryRun;
   private String _databaseName;
   private String _tableName;
   private String _tableType;
@@ -60,7 +67,7 @@ public class DdlExecutionResponse {
     return this;
   }
 
-  public boolean isDryRun() {
+  public Boolean isDryRun() {
     return _dryRun;
   }
 

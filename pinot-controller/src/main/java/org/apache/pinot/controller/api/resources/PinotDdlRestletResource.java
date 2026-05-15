@@ -340,6 +340,13 @@ public class PinotDdlRestletResource {
       // (legitimate hybrid-pair pattern), and a hasTable re-check followed by deleteSchema is
       // racy in the same way the generic-failure branch below is. Stale schemas can be removed
       // via DELETE /schemas/{name} if needed.
+      //
+      // Second-order race: between TableAlreadyExistsException and the IF-NOT-EXISTS hasTable
+      // re-check, a third caller may have DROPped the table. In that narrow window the
+      // re-check returns false and we fall through to throw 409 even though IF NOT EXISTS
+      // would normally be satisfied. The user can retry; Pinot's `addTable` does not currently
+      // expose a version-checked create-or-no-op primitive that would close this window. If
+      // one is added, switch this branch to use it.
       if (create.isIfNotExists() && _pinotHelixResourceManager.hasTable(tableNameWithType)) {
         response.setMessage("Table " + tableNameWithType
             + " already exists; CREATE IF NOT EXISTS is a no-op.");
@@ -648,6 +655,15 @@ public class PinotDdlRestletResource {
     return response;
   }
 
+  /// Rejects the DROP when any target physical table is currently referenced by a logical table.
+  /// Matches the same safeguard enforced by the existing `DELETE /tables/{name}` endpoint.
+  ///
+  /// Cost: O(L) ZK reads to fetch every logical-table config, plus O(L × T) reference checks
+  /// where L is the cluster's logical-table count and T is the DROP target count (1 or 2). For
+  /// clusters with hundreds of logical tables, a tight loop of DDL DROPs can produce a
+  /// noticeable controller-side ZK read load; callers performing bulk drops may prefer the
+  /// existing JSON `DELETE` endpoint, which has the same cost per call but is friendlier to
+  /// concurrent batch tooling.
   private void assertNoLogicalTableReferences(List<String> targets) {
     List<LogicalTableConfig> allLogicalTableConfigs =
         ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
