@@ -900,6 +900,12 @@ public class CalciteSqlCompilerTest {
         "SELECT col1, count(*) FROM foo GROUP BY col1 /* option(skipUpsert=true) */");
     Assert.assertTrue(pinotQuery.getQueryOptions() == null || pinotQuery.getQueryOptions().isEmpty(),
         "option(...) inside a /* */ comment must not be parsed as a query option");
+
+    // Double dashes inside a double-quoted identifier must not be treated as a comment.
+    pinotQuery = compileToPinotQuery(
+        "SELECT \"my--column--name\" FROM foo");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getIdentifier().getName(), "my--column--name");
   }
 
   @Test
