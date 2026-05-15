@@ -209,6 +209,52 @@ public class PinotDdlRestletResourceTest extends ControllerTest {
         "Properties not in lex order:\n" + ddl);
   }
 
+  /// Cluster-level regression for the recommended TIMESTAMP-typed time column: CREATE persists,
+  /// SHOW CREATE renders the canonical short-form FORMAT 'TIMESTAMP' (DateTimeFieldSpec normalizes
+  /// the format token implicitly for TIMESTAMP), and the re-issued DDL compiles on the same
+  /// controller. This pins the end-to-end path against PinotHelixResourceManager.addTable /
+  /// addSchema, the validation pipeline, and the reverse emitter — the layers that the
+  /// in-process compiler/emitter unit tests do not exercise.
+  @Test
+  public void createWithTimestampTimeColumnRoundTrips()
+      throws IOException {
+    String tbl = "ddlTimestampTimeRoundtrip";
+    String createSql = "CREATE TABLE " + tbl + " ("
+        + "  id INT NOT NULL DIMENSION,"
+        + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:MILLISECONDS'"
+        + ") TABLE_TYPE = OFFLINE PROPERTIES ("
+        + "  'timeColumnName' = 'ts',"
+        + "  'replication' = '1'"
+        + ")";
+    JsonNode createResp = postDdl(createSql, false);
+    assertEquals(createResp.get("operation").asText(), "CREATE_TABLE");
+    assertEquals(createResp.get("tableName").asText(), tbl + "_OFFLINE");
+    // The stored Schema must carry the normalized TIMESTAMP format token, not the verbose
+    // 1:MILLISECONDS:TIMESTAMP form the user typed — DateTimeFieldSpec rewrites it because the
+    // format is implicit for TIMESTAMP.
+    JsonNode schema = createResp.get("schema");
+    JsonNode tsField = null;
+    for (JsonNode f : schema.get("dateTimeFieldSpecs")) {
+      if ("ts".equals(f.get("name").asText())) {
+        tsField = f;
+        break;
+      }
+    }
+    assertNotNull(tsField, "Schema must declare ts as a DateTimeFieldSpec: " + schema);
+    assertEquals(tsField.get("dataType").asText(), "TIMESTAMP");
+    assertEquals(tsField.get("format").asText(), "TIMESTAMP",
+        "DateTimeFieldSpec must normalize TIMESTAMP format to short form; got " + tsField);
+    assertEquals(tsField.get("granularity").asText(), "1:MILLISECONDS");
+
+    // SHOW CREATE TABLE must render the short form and be idempotent on re-compile.
+    JsonNode showResp = postDdl("SHOW CREATE TABLE " + tbl, false);
+    String ddl = showResp.get("ddl").asText();
+    assertTrue(ddl.contains("ts TIMESTAMP DATETIME FORMAT 'TIMESTAMP' GRANULARITY '1:MILLISECONDS'"),
+        "Canonical DDL must emit TIMESTAMP short-form format; got:\n" + ddl);
+    // DROP cleans up so the next test starts fresh.
+    postDdl("DROP TABLE " + tbl, false);
+  }
+
   @Test
   public void showCreateOnMissingTableReturns404()
       throws IOException {
