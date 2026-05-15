@@ -31,6 +31,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
+import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
@@ -101,7 +102,7 @@ final class SchemaEmitter {
     // Emit the legacy time column as a DATETIME column so it survives a round-trip.
     // Use the outgoing granularity spec to derive format and granularity strings matching
     // the DateTimeFieldSpec convention ({size}:{unit}:{format}).
-    org.apache.pinot.spi.data.TimeGranularitySpec tgs = spec.getOutgoingGranularitySpec();
+    TimeGranularitySpec tgs = spec.getOutgoingGranularitySpec();
     String format = tgs.getTimeUnitSize() + ":" + tgs.getTimeType().name() + ":"
         + tgs.getTimeFormat();
     String granularity = tgs.getTimeUnitSize() + ":" + tgs.getTimeType().name();

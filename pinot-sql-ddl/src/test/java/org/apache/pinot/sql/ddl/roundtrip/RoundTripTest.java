@@ -122,6 +122,39 @@ public class RoundTripTest {
     assertRoundTrip(schema, config);
   }
 
+  /// Regression: BOOLEAN columns store defaults internally as Integer 0/1; the SQL literal
+  /// `DEFAULT TRUE` must round-trip end-to-end. Calcite's `SqlLiteral.toValue()` returns the
+  /// upper-case token "TRUE" for `BOOLEAN_TRUE`; `FieldSpec.setDefaultNullValue` then routes
+  /// it through `DataType.BOOLEAN.convert(...)` (which calls `BooleanUtils.toInt`) to land
+  /// the stored value as Integer 1. The emitter writes the SQL literal form back. This test
+  /// locks in the full DDL → compile → emit → re-parse loop and also pins the natural-default
+  /// elision behaviour for `DEFAULT FALSE` (BOOLEAN's stored natural default is Integer 0, so
+  /// the canonical emitter intentionally omits the DEFAULT clause for `FALSE`).
+  @Test
+  public void offlineTableWithBooleanDefault() {
+    String ddl = "CREATE TABLE flags (\n"
+        + "  flag BOOLEAN NOT NULL DEFAULT TRUE DIMENSION,\n"
+        + "  inactive BOOLEAN DEFAULT FALSE DIMENSION\n"
+        + ")\n"
+        + "TABLE_TYPE = OFFLINE;\n";
+    CompiledCreateTable first = (CompiledCreateTable) DdlCompiler.compile(ddl);
+    String firstEmit = CanonicalDdlEmitter.emit(first.getSchema(), first.getTableConfig());
+    assertTrue(firstEmit.contains("flag BOOLEAN NOT NULL DEFAULT TRUE DIMENSION"),
+        "Initial emit must preserve BOOLEAN NOT NULL DEFAULT TRUE; got:\n" + firstEmit);
+    // DEFAULT FALSE is the natural default for BOOLEAN dimensions (stored as Integer 0), so the
+    // emitter elides the DEFAULT clause. The column itself still appears.
+    assertTrue(firstEmit.contains("inactive BOOLEAN DIMENSION"),
+        "BOOLEAN column at natural default FALSE must emit without a DEFAULT clause; got:\n"
+            + firstEmit);
+    assertFalse(firstEmit.contains("inactive BOOLEAN DEFAULT FALSE"),
+        "BOOLEAN natural default FALSE must not be emitted; got:\n" + firstEmit);
+    // Idempotency: emit -> parse -> emit must produce the same canonical text.
+    CompiledCreateTable second = (CompiledCreateTable) DdlCompiler.compile(firstEmit);
+    String secondEmit = CanonicalDdlEmitter.emit(second.getSchema(), second.getTableConfig());
+    assertEquals(secondEmit, firstEmit,
+        "BOOLEAN DEFAULT canonical DDL must be idempotent across re-emit:\n" + firstEmit);
+  }
+
   @Test
   public void offlineTableWithIndexingConfig() {
     Schema schema = new Schema.SchemaBuilder()

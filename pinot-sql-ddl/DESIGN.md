@@ -441,8 +441,33 @@ emit canonical DDL
   `PROPERTIES`, `TABLES`, `TABLE_TYPE`, `IF`) are added as **non-reserved**, so existing
   identifier usage continues to parse. A column named `metric` works in DQL exactly as
   before; on canonical-DDL emission it is double-quoted.
-- A pre-DDL controller serving the same cluster simply 404s on `POST /sql/ddl` —
-  rolling-upgrade safe.
+
+### 8.1 Rolling-upgrade safety
+
+The DDL surface is safe under any rolling-upgrade ordering because the only persisted
+artifacts it produces (Schema + TableConfig in ZK) are the same shape that
+`POST /tables` and `POST /schemas` already produce. Concretely:
+
+- **No ZK schema change.** `DdlCompiler` returns a stock `(Schema, TableConfig)` pair
+  and persists them through the existing `PinotHelixResourceManager` paths. There are
+  no new ZK property-store paths, no new fields on `TableConfig`/`Schema`, and no
+  versioning bumps. A new-controller CREATE produces a ZK record indistinguishable
+  from one written by an old controller via the JSON API.
+- **Old controllers, brokers, and servers see no difference at runtime.** They read
+  the same `TableConfig`/`Schema` JSON they always read. The DDL-created table is a
+  regular Pinot table from their perspective.
+- **Pre-DDL controllers simply 404 on `POST /sql/ddl`.** Clients that probe the new
+  endpoint during the rolling window get a clean 404 from the old binary and a
+  normal response from the new binary. There is no in-between state in which the
+  endpoint half-exists.
+- **Direction of rollout is irrelevant.** Upgrading controllers first, brokers
+  first, servers first, or any interleaving all produce the same on-disk
+  representation. A subsequent rollback to a pre-DDL controller continues to serve
+  tables created via DDL identically to JSON-API-created tables.
+- **New SQL keywords do not break DQL.** Because every new keyword is added under
+  `nonReservedKeywordsToAdd` in `config.fmpp`, existing user queries that use words
+  like `dimension`, `metric`, `format`, or `granularity` as identifiers continue to
+  parse on the new binary. A pre-DDL binary never saw the tokens at all.
 
 ## 9. Concurrency and consistency
 

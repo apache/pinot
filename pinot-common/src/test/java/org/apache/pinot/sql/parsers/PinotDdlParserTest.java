@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers;
 
+import java.util.Locale;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
@@ -329,7 +330,7 @@ public class PinotDdlParserTest {
         () -> CalciteSqlParser.compileToSqlNodeAndOptions(
             "CREATE TABLE t (id INT) PRIMARY KEY id TABLE_TYPE = OFFLINE"));
     String message = ex.getMessage() == null ? "" : ex.getMessage();
-    assertTrue(message.contains("(") || message.toUpperCase(java.util.Locale.ROOT).contains("LPAREN"),
+    assertTrue(message.contains("(") || message.toUpperCase(Locale.ROOT).contains("LPAREN"),
         "expected error to indicate the missing LPAREN, got: " + message);
   }
 

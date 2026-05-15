@@ -156,9 +156,12 @@ public class PinotDdlRestletResource {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success (DROP, SHOW TABLES, SHOW CREATE TABLE, dry-run, IF NOT EXISTS)"),
       @ApiResponse(code = 201, message = "Table created"),
-      @ApiResponse(code = 400, message = "Bad request (parse/semantic error)"),
-      @ApiResponse(code = 409, message = "Table already exists"),
-      @ApiResponse(code = 500, message = "Internal server error")
+      @ApiResponse(code = 400, message = "Bad request (parse error, semantic error, oversize input, "
+          + "unsupported emitter type, or type-incompatible default value)"),
+      @ApiResponse(code = 404, message = "Table or schema not found (DROP without IF EXISTS, SHOW CREATE)"),
+      @ApiResponse(code = 409, message = "Conflict (duplicate CREATE without IF NOT EXISTS, logical-table "
+          + "reference blocking DROP, or race lost to a concurrent writer)"),
+      @ApiResponse(code = 500, message = "Internal server error (Helix/ZK inconsistency or controller defect)")
   })
   public Response executeDdl(
       @ApiParam(value = "DDL request body with 'sql' field", required = true)
