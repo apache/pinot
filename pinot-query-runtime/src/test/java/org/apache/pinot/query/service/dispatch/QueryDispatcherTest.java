@@ -258,6 +258,12 @@ public class QueryDispatcherTest extends QueryTestSet {
     Mockito.reset(failingQueryServer);
   }
 
+  /**
+   * When no indirect timing is extracted (e.g. reduce phase fails before stats propagate), the
+   * finally block must still decrement in-flight for all submitted servers. With no known timings
+   * and no cancel attempted, all servers fall into Tier 4 (no timing data, server responsive)
+   * and get -1 (decrement only, no EMA update) rather than the contaminated wall-clock.
+   */
   @Test
   public void testStatsManagerRecordsSubmissionAndArrivalForDispatchedServers()
       throws Exception {
@@ -283,7 +289,7 @@ public class QueryDispatcherTest extends QueryTestSet {
       for (String instanceId : expectedInstanceIds) {
         Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
         // No indirect timing was extracted (mocked MailboxService -> no real stats), so
-        // decrementedServers is empty -> all servers get -1 (no EMA update, just decrement in-flight).
+        // knownTimings is empty -> all servers get -1 (Tier 4: no timing data).
         Mockito.verify(statsManager).recordStatsUponResponseArrival(
             Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.eq(-1L));
       }
@@ -382,8 +388,8 @@ public class QueryDispatcherTest extends QueryTestSet {
    * {@code QueryResult} — not propagate the exception.
    *
    * <p>Because {@code submit()} threw before the submission-stats loop ran, {@code incrementedServers}
-   * is empty and the {@code !incrementedServers.isEmpty()} guard skips {@code applyUpstreamTimingsFromStats}
-   * entirely — so {@code statsManager} receives zero interactions.
+   * is empty and the finally block's tiered latency recorder has nothing to update, so
+   * {@code statsManager} receives zero interactions.
    */
   @Test
   public void testSubmitAndReduceReturnsResultWhenSubmitTimesOut()
@@ -420,8 +426,8 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
 
     // submit() threw before recordStatsForQuerySubmission ran -> incrementedServers is empty.
-    // applyUpstreamTimingsFromStats finds no timing data (servers had not started the query),
-    // and the fallback loop iterates an empty incrementedServers set. No statsManager interactions.
+    // The finally block's tiered latency recorder iterates an empty incrementedServers set,
+    // so statsManager receives no interactions.
     Mockito.verifyNoInteractions(statsManager);
   }
 
