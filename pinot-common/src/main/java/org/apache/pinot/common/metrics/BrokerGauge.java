@@ -65,11 +65,18 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   ADAPTIVE_SERVER_SELECTOR_TYPE("adaptiveServerSelectorType", true),
 
   /**
-   * Per-server adaptive routing stats exported as metrics.
+   * Per-server adaptive routing stats exported as metrics (SSE / single-stage engine).
    */
   ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS("adaptiveServerNumInFlightRequests", false),
   ADAPTIVE_SERVER_LATENCY_EMA("adaptiveServerLatencyEma", false),
   ADAPTIVE_SERVER_HYBRID_SCORE("adaptiveServerHybridScore", false),
+
+  /**
+   * Per-server adaptive routing stats exported as metrics (MSE / multi-stage engine).
+   */
+  ADAPTIVE_SERVER_MSE_NUM_IN_FLIGHT_REQUESTS("adaptiveServerMseNumInFlightRequests", false),
+  ADAPTIVE_SERVER_MSE_LATENCY_EMA("adaptiveServerMseLatencyEma", false),
+  ADAPTIVE_SERVER_MSE_HYBRID_SCORE("adaptiveServerMseHybridScore", false),
 
   /**
    * The queue size of ServerRoutingStatsManager main executor service.
