@@ -32,9 +32,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
-import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
@@ -80,14 +78,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       _storedTypes[i] = columnContext.getDataType().getStoredType();
-      // Only take the dict-id path when the column has a dictionary AND its forward index is dict-encoded.
-      // A column can have a dictionary alongside a RAW forward index (e.g. dict + inverted/range), in which case
-      // BlockValSet#getDictionaryIdsSV would route to ForwardIndexReader#readDictIds and throw on the raw forward
-      // index. Fall back to an on-the-fly dictionary on raw values instead.
-      Dictionary dictionary = _nullHandlingEnabled ? null : columnContext.getDictionary();
-      if (dictionary != null && !hasDictEncodedForwardIndex(columnContext)) {
-        dictionary = null;
-      }
+      // Take the dict-id path only when the forward index is dict-encoded. A column with EncodingType.RAW +
+      // dictionaryIndex exposes a Dictionary but BlockValSet#getDictionaryIdsSV throws on its RAW forward
+      // index — fall back to an on-the-fly dictionary on raw values for that case.
+      Dictionary dictionary = _nullHandlingEnabled || !columnContext.isDictionaryEncoded() ? null
+          : columnContext.getDictionary();
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {
@@ -435,20 +430,6 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   @Override
   public Iterator<GroupKey> getGroupKeys() {
     return new GroupKeyIterator();
-  }
-
-  /**
-   * Returns {@code true} if the column has a dict-encoded forward index, i.e. {@link BlockValSet#getDictionaryIdsSV}
-   * is callable. A column referenced by a transform (rather than directly) has no underlying {@link DataSource}; in
-   * that case the transform builds its own dictionary on the fly, so the dict-id path is always usable.
-   */
-  private static boolean hasDictEncodedForwardIndex(ColumnContext columnContext) {
-    DataSource dataSource = columnContext.getDataSource();
-    if (dataSource == null) {
-      return true;
-    }
-    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-    return forwardIndex == null || forwardIndex.isDictionaryEncoded();
   }
 
   /**

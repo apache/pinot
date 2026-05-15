@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -96,6 +97,19 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return _dataSource.getDictionary();
+  }
+
+  /// A column with {@code EncodingType.RAW} + an explicit {@code dictionaryIndex} has {@link #getDictionary()}
+  /// non-null but a RAW forward index that throws on {@link ForwardIndexReader#readDictIds}. Callers selecting
+  /// between dict-id and value paths must gate on this method, not {@code getDictionary() != null}.
+  @Override
+  public boolean isDictionaryEncoded() {
+    Dictionary dictionary = _dataSource.getDictionary();
+    if (dictionary == null) {
+      return false;
+    }
+    ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
+    return forwardIndex == null || forwardIndex.isDictionaryEncoded();
   }
 
   @Override

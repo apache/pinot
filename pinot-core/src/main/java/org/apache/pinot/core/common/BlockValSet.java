@@ -48,10 +48,26 @@ public interface BlockValSet {
   boolean isSingleValue();
 
   /**
-   * Returns the dictionary for the column, or {@code null} if the column is not dictionary-encoded.
+   * Returns the dictionary file for the column if one exists, or {@code null} otherwise. The dictionary may be
+   * present even when {@link #isDictionaryEncoded()} returns {@code false} — a column declared as
+   * {@code EncodingType.RAW} with an explicit {@code dictionaryIndex} carries a dictionary file on disk but a RAW
+   * forward index. Callers that select between a dictionary-id read path
+   * ({@link #getDictionaryIdsSV()} / {@link #getDictionaryIdsMV()}) and a value read path MUST gate on
+   * {@link #isDictionaryEncoded()}, not {@code getDictionary() != null}.
    */
   @Nullable
   Dictionary getDictionary();
+
+  /**
+   * Returns {@code true} if the underlying forward index is dictionary-encoded and the dict-id read path
+   * ({@link #getDictionaryIdsSV()} / {@link #getDictionaryIdsMV()}) is callable. The default implementation falls
+   * back to {@code getDictionary() != null} for value sets that always couple the two (e.g., transform / row /
+   * data-block value sets); the projection-layer value set overrides this to check the forward-index encoding
+   * directly so that {@code EncodingType.RAW} + {@code dictionaryIndex} columns return {@code false}.
+   */
+  default boolean isDictionaryEncoded() {
+    return getDictionary() != null;
+  }
 
   /**
    * SINGLE-VALUED COLUMN APIs

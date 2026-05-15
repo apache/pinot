@@ -517,13 +517,12 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
     assertEquals(rawRows, dictRows, "DISTINCT rows must match between dictionary-only and raw+dictionary columns");
   }
 
-  /**
-   * Multi-column GROUP BY that mixes a dict-encoded column with a RAW+dictionary column. This forces the executor
-   * onto the {@code NoDictionaryMultiColumnGroupKeyGenerator} path. The per-column branch there must check the
-   * forward-index encoding in addition to {@code ColumnContext#getDictionary} — otherwise it keeps the dictionary
-   * for any column that has a dict file and calls {@code BlockValSet#getDictionaryIdsSV()} on it, which routes to
-   * {@code ForwardIndexReader#readDictIds} and throws {@code UnsupportedOperationException} on a RAW forward index.
-   */
+  /// Multi-column GROUP BY that mixes a dict-encoded column with a RAW+dictionary column. This forces the executor
+  /// onto the {@link org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator} path.
+  /// The per-column branch there must check the forward-index encoding in addition to
+  /// {@code ColumnContext#getDictionary} — otherwise it keeps the dictionary for any column that has a dict file
+  /// and calls {@code BlockValSet#getDictionaryIdsSV()} on it, which routes to
+  /// {@code ForwardIndexReader#readDictIds} and throws {@code UnsupportedOperationException} on a RAW forward index.
   @Test(dataProvider = "useBothQueryEngines")
   public void testMultiColumnGroupByWithRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -540,6 +539,146 @@ public class RawForwardIndexWithDictionaryTest extends CustomDataQueryClusterInt
         .get("resultTable").get("rows");
     assertEquals(rawRows, dictRows,
         "Multi-column GROUP BY rows must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// Multi-column DISTINCT exercises {@link org.apache.pinot.core.query.distinct.DistinctExecutorFactory}'s
+  /// multi-column path. The factory routes to {@code DictionaryBasedMultiColumnDistinctExecutor} whenever every
+  /// column has a non-null dictionary, then that executor calls {@code BlockValSet#getDictionaryIdsSV()}
+  /// — which throws on a RAW+dictionary column.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testMultiColumnDistinctWithRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode dictRows = postQuery(
+        String.format("SELECT DISTINCT %s, %s FROM %s ORDER BY %s, %s",
+            DICT_DIMENSION, DICT_INT_DIMENSION, getTableName(), DICT_DIMENSION, DICT_INT_DIMENSION))
+        .get("resultTable").get("rows");
+    JsonNode rawRows = postQuery(
+        String.format("SELECT DISTINCT %s, %s FROM %s ORDER BY %s, %s",
+            RAW_DICT_DIMENSION, RAW_DICT_INT_DIMENSION, getTableName(),
+            RAW_DICT_DIMENSION, RAW_DICT_INT_DIMENSION))
+        .get("resultTable").get("rows");
+    assertEquals(rawRows, dictRows,
+        "Multi-column DISTINCT rows must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// {@code DISTINCTCOUNT} on a RAW+dictionary column drives
+  /// {@link org.apache.pinot.core.query.aggregation.function.BaseDistinctAggregateAggregationFunction#svAggregate}
+  /// down the dictionary-id path because {@code blockValSet.getDictionary() != null}. That path then calls
+  /// {@code blockValSet.getDictionaryIdsSV()} on the RAW forward index. A {@code WHERE} predicate is included to
+  /// bypass {@link org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator}, which would otherwise
+  /// serve the aggregation directly from the dictionary and hide the bug.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountWithFilterOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    long dictResult = scalarLong(
+        String.format("SELECT DISTINCTCOUNT(%s) FROM %s WHERE %s > 100",
+            DICT_DIMENSION, getTableName(), METRIC_COLUMN));
+    long rawResult = scalarLong(
+        String.format("SELECT DISTINCTCOUNT(%s) FROM %s WHERE %s > 100",
+            RAW_DICT_DIMENSION, getTableName(), METRIC_COLUMN));
+    assertEquals(dictResult, UNIQUE_DIMENSION_VALUES, "Dict baseline must equal the unique value count");
+    assertEquals(rawResult, dictResult,
+        "DISTINCTCOUNT must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// {@code DISTINCTCOUNTHLL} drives {@link
+  /// org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction#aggregate} down the
+  /// dictionary-id path. A {@code WHERE} predicate is included to bypass
+  /// {@link org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator}.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountHLLWithFilterOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    long dictResult = scalarLong(
+        String.format("SELECT DISTINCTCOUNTHLL(%s) FROM %s WHERE %s > 100",
+            DICT_DIMENSION, getTableName(), METRIC_COLUMN));
+    long rawResult = scalarLong(
+        String.format("SELECT DISTINCTCOUNTHLL(%s) FROM %s WHERE %s > 100",
+            RAW_DICT_DIMENSION, getTableName(), METRIC_COLUMN));
+    // Sanity floor: catches a regression where both queries silently return 0 (e.g., planner short-circuit).
+    assertTrue(dictResult > 0, "Dict baseline DISTINCTCOUNTHLL must be > 0");
+    assertEquals(rawResult, dictResult,
+        "DISTINCTCOUNTHLL must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// {@code DISTINCTCOUNTBITMAP} drives {@link
+  /// org.apache.pinot.core.query.aggregation.function.DistinctCountBitmapAggregationFunction#aggregate} down the
+  /// dictionary-id path. Unlike {@code DISTINCTCOUNT} / {@code DISTINCTCOUNTHLL}, this function is NOT in
+  /// {@code AggregationPlanNode#DICTIONARY_BASED_FUNCTIONS} so it crashes even without a {@code WHERE}.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountBitmapOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    long dictResult = scalarLong(
+        String.format("SELECT DISTINCTCOUNTBITMAP(%s) FROM %s", DICT_INT_DIMENSION, getTableName()));
+    long rawResult = scalarLong(
+        String.format("SELECT DISTINCTCOUNTBITMAP(%s) FROM %s", RAW_DICT_INT_DIMENSION, getTableName()));
+    assertEquals(dictResult, UNIQUE_DIMENSION_VALUES, "Dict baseline must equal the unique value count");
+    assertEquals(rawResult, dictResult,
+        "DISTINCTCOUNTBITMAP must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// {@code SEGMENTPARTITIONEDDISTINCTCOUNT} drives {@link
+  /// org.apache.pinot.core.query.aggregation.function.SegmentPartitionedDistinctCountAggregationFunction#aggregate}
+  /// down the dictionary-id path. A {@code WHERE} predicate is included to bypass
+  /// {@link org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator}.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSegmentPartitionedDistinctCountWithFilterOnRawDictColumnReturnsSameResults(
+      boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    long dictResult = scalarLong(
+        String.format("SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(%s) FROM %s WHERE %s > 100",
+            DICT_DIMENSION, getTableName(), METRIC_COLUMN));
+    long rawResult = scalarLong(
+        String.format("SELECT SEGMENTPARTITIONEDDISTINCTCOUNT(%s) FROM %s WHERE %s > 100",
+            RAW_DICT_DIMENSION, getTableName(), METRIC_COLUMN));
+    // Sanity floor: catches a regression where both queries silently return 0 (e.g., planner short-circuit).
+    assertTrue(dictResult > 0, "Dict baseline SEGMENTPARTITIONEDDISTINCTCOUNT must be > 0");
+    assertEquals(rawResult, dictResult,
+        "SEGMENTPARTITIONEDDISTINCTCOUNT must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// {@code MODE} drives {@link
+  /// org.apache.pinot.core.query.aggregation.function.ModeAggregationFunction#aggregate} down the dictionary-id
+  /// path. {@code MODE} is NOT in {@code AggregationPlanNode#DICTIONARY_BASED_FUNCTIONS} so it crashes without a
+  /// filter.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testModeOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode dictRows = postQuery(
+        String.format("SELECT MODE(%s) FROM %s", DICT_INT_DIMENSION, getTableName()))
+        .get("resultTable").get("rows");
+    JsonNode rawRows = postQuery(
+        String.format("SELECT MODE(%s) FROM %s", RAW_DICT_INT_DIMENSION, getTableName()))
+        .get("resultTable").get("rows");
+    assertEquals(rawRows, dictRows,
+        "MODE rows must match between dictionary-only and raw+dictionary columns");
+  }
+
+  /// Single-column {@code DISTINCT} with a filter exercises
+  /// {@link org.apache.pinot.core.query.distinct.DistinctExecutorFactory}'s single-column path. Without a filter
+  /// the query routes to {@link org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator} which
+  /// iterates the dictionary directly and never hits the bug; with a filter it goes through
+  /// {@link org.apache.pinot.core.query.distinct.dictionary.DictionaryBasedSingleColumnDistinctExecutor}, which
+  /// calls {@code BlockValSet#getDictionaryIdsSV()} and throws on the RAW forward index.
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctWithFilterOnRawDictColumnReturnsSameResults(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    JsonNode dictRows = postQuery(
+        String.format("SELECT DISTINCT %s FROM %s WHERE %s > 100 ORDER BY %s",
+            DICT_DIMENSION, getTableName(), METRIC_COLUMN, DICT_DIMENSION))
+        .get("resultTable").get("rows");
+    JsonNode rawRows = postQuery(
+        String.format("SELECT DISTINCT %s FROM %s WHERE %s > 100 ORDER BY %s",
+            RAW_DICT_DIMENSION, getTableName(), METRIC_COLUMN, RAW_DICT_DIMENSION))
+        .get("resultTable").get("rows");
+    assertEquals(rawRows, dictRows,
+        "DISTINCT (with filter) rows must match between dictionary-only and raw+dictionary columns");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
