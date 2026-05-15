@@ -79,7 +79,10 @@ public class ColumnContext {
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     Dictionary dictionary = dataSource.getDictionary();
     ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-    boolean dictEncoded = dictionary != null && (forwardIndex == null || forwardIndex.isDictionaryEncoded());
+    // Dict-id reads require both a dictionary AND a dict-encoded forward index. A column with EncodingType.RAW +
+    // dictionaryIndex has the dictionary but a RAW forward index; a column with a disabled forward index (dict +
+    // inverted/range only) has no forward index at all. Both must take the value/index-based path.
+    boolean dictEncoded = dictionary != null && forwardIndex != null && forwardIndex.isDictionaryEncoded();
     return new ColumnContext(dataSourceMetadata.getDataType(), dataSourceMetadata.isSingleValue(), dictionary,
         dictEncoded, dataSource);
   }

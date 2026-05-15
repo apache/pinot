@@ -99,9 +99,14 @@ public class ProjectionBlockValSet implements BlockValSet {
     return _dataSource.getDictionary();
   }
 
-  /// A column with {@code EncodingType.RAW} + an explicit {@code dictionaryIndex} has {@link #getDictionary()}
-  /// non-null but a RAW forward index that throws on {@link ForwardIndexReader#readDictIds}. Callers selecting
-  /// between dict-id and value paths must gate on this method, not {@code getDictionary() != null}.
+  /// Returns {@code true} only when there is both a dictionary AND a dict-encoded forward index. Two cases return
+  /// {@code false} even though {@link #getDictionary()} is non-null:
+  /// <ul>
+  ///   <li>{@code EncodingType.RAW} + an explicit {@code dictionaryIndex}: the forward index throws on
+  ///   {@link ForwardIndexReader#readDictIds}.</li>
+  ///   <li>Disabled forward index (dict + inverted/range only): there is no forward index to read dict IDs from.</li>
+  /// </ul>
+  /// Callers selecting between dict-id and value paths must gate on this method, not {@code getDictionary() != null}.
   @Override
   public boolean isDictionaryEncoded() {
     Dictionary dictionary = _dataSource.getDictionary();
@@ -109,7 +114,7 @@ public class ProjectionBlockValSet implements BlockValSet {
       return false;
     }
     ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
-    return forwardIndex == null || forwardIndex.isDictionaryEncoded();
+    return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
 
   @Override
