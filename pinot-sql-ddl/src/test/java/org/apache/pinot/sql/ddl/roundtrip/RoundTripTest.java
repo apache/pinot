@@ -104,6 +104,24 @@ public class RoundTripTest {
     assertRoundTrip(schema, config);
   }
 
+  /// Regression: TIMESTAMP-typed time columns must round-trip through canonical emit, parse, and
+  /// re-compile. DateTimeFieldSpec normalizes the format string to "TIMESTAMP" on construction
+  /// (the format is implicit in the data type), so the emitted DDL carries `FORMAT 'TIMESTAMP'`
+  /// and the re-parsed schema must reproduce the same normalized form.
+  @Test
+  public void offlineTableWithTimestampTimeColumn() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .addSingleValueDimension("id", DataType.INT)
+        .addDateTime("ts", DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("events")
+        .setTimeColumnName("ts")
+        .build();
+    assertRoundTrip(schema, config);
+  }
+
   @Test
   public void offlineTableWithIndexingConfig() {
     Schema schema = new Schema.SchemaBuilder()

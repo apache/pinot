@@ -90,7 +90,7 @@ public class PinotDdlParserTest {
             + "  d2 INT NOT NULL DIMENSION,"
             + "  m1 LONG METRIC,"
             + "  m2 DOUBLE NOT NULL DEFAULT 0.0 METRIC,"
-            + "  ts LONG DATETIME FORMAT '1:MILLISECONDS:EPOCH' GRANULARITY '1:MILLISECONDS'"
+            + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:MILLISECONDS'"
             + ") TABLE_TYPE = OFFLINE");
     assertEquals(node.getColumns().size(), 5);
     SqlPinotColumnDeclaration d2 = (SqlPinotColumnDeclaration) node.getColumns().get(1);
@@ -104,7 +104,10 @@ public class PinotDdlParserTest {
     SqlPinotColumnDeclaration ts = (SqlPinotColumnDeclaration) node.getColumns().get(4);
     assertEquals(ts.getRole(), "DATETIME");
     assertNotNull(ts.getDateTimeFormat());
-    assertEquals(ts.getDateTimeFormat().toValue(), "1:MILLISECONDS:EPOCH");
+    // Parser captures the FORMAT literal verbatim; the post-compile DateTimeFieldSpec
+    // normalizes this to "TIMESTAMP" for TIMESTAMP data type, but the AST faithfully
+    // carries the original token.
+    assertEquals(ts.getDateTimeFormat().toValue(), "1:MILLISECONDS:TIMESTAMP");
     assertEquals(ts.getDateTimeGranularity().toValue(), "1:MILLISECONDS");
   }
 

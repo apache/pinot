@@ -70,7 +70,7 @@ public class CanonicalDdlEmitterTest {
         .setSchemaName("events")
         .addSingleValueDimension("dim", DataType.STRING)
         .addMetric("sum", DataType.LONG)
-        .addDateTime("ts", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addDateTime("ts", DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
         .build();
     TableConfig config = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("events")
@@ -80,8 +80,11 @@ public class CanonicalDdlEmitterTest {
     String emitted = CanonicalDdlEmitter.emit(schema, config);
     assertTrue(emitted.contains("dim STRING DIMENSION"), emitted);
     assertTrue(emitted.contains("sum LONG METRIC"), emitted);
+    // DateTimeFieldSpec normalizes the format to "TIMESTAMP" when the column data type is
+    // TIMESTAMP, so the canonical emission carries the short form regardless of what the
+    // caller passed to addDateTime.
     assertTrue(emitted.contains(
-        "ts LONG DATETIME FORMAT '1:MILLISECONDS:EPOCH' GRANULARITY '1:MILLISECONDS'"), emitted);
+        "ts TIMESTAMP DATETIME FORMAT 'TIMESTAMP' GRANULARITY '1:MILLISECONDS'"), emitted);
     assertTrue(emitted.contains("'timeColumnName' = 'ts'"), emitted);
   }
 

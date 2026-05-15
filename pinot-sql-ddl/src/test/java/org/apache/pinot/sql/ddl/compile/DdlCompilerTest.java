@@ -73,7 +73,7 @@ public class DdlCompilerTest {
         "CREATE TABLE t ("
             + "  d1 STRING DIMENSION,"
             + "  m1 LONG METRIC,"
-            + "  ts LONG DATETIME FORMAT '1:MILLISECONDS:EPOCH' GRANULARITY '1:MILLISECONDS'"
+            + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:MILLISECONDS'"
             + ") TABLE_TYPE = OFFLINE");
 
     Schema s = c.getSchema();
@@ -83,7 +83,10 @@ public class DdlCompilerTest {
     assertTrue(d1 instanceof DimensionFieldSpec);
     assertTrue(m1 instanceof MetricFieldSpec);
     assertTrue(ts instanceof DateTimeFieldSpec);
-    assertEquals(((DateTimeFieldSpec) ts).getFormat(), "1:MILLISECONDS:EPOCH");
+    // DateTimeFieldSpec normalizes the format string to "TIMESTAMP" when the column
+    // data type is TIMESTAMP, regardless of the user-supplied format. See
+    // DateTimeFieldSpec#setFormat — the format is implicit in the data type.
+    assertEquals(((DateTimeFieldSpec) ts).getFormat(), "TIMESTAMP");
     assertEquals(((DateTimeFieldSpec) ts).getGranularity(), "1:MILLISECONDS");
   }
 
