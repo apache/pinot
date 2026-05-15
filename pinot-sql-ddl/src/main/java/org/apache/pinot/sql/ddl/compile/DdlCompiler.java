@@ -340,6 +340,12 @@ public final class DdlCompiler {
       // the string lazily; without this check, "INT col DEFAULT 'abc'" would compile cleanly
       // and then fail at first ingestion with a less-specific error from the segment generator.
       // Failing here gives the user a 400 with the column name and the offending literal.
+      //
+      // Caveat for BOOLEAN: DataType.BOOLEAN.convert delegates to BooleanUtils.toInt which maps
+      // any non-true/false string to 0 (false) silently rather than throwing. This matches what
+      // happens for the JSON /tables endpoint with `"defaultNullValue": "<garbage>"`, so DDL
+      // behavior is consistent with the rest of Pinot. A user writing
+      // `BOOLEAN col DEFAULT 'maybe'` will see no compile error and the column will ingest 0.
       try {
         col.getDataType().convert(col.getDefaultValue());
       } catch (RuntimeException e) {
