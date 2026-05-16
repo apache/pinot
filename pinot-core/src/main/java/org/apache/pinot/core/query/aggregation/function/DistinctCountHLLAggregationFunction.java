@@ -81,8 +81,22 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns are stored as 16-byte BYTES, but a UUID value is a logical scalar — not a serialized
+    // HyperLogLog. Offer the canonical UUID string so the result matches DISTINCTCOUNTHLL on a STRING column
+    // holding the same logical UUIDs.
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        hyperLogLog.offer(uuidStringValues[i]);
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -232,8 +246,19 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: offer canonical UUID strings (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        getHyperLogLog(groupByResultHolder, groupKeyArray[i]).offer(uuidStringValues[i]);
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -381,8 +406,21 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: offer canonical UUID strings (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          getHyperLogLog(groupByResultHolder, groupKey).offer(uuidStringValues[i]);
+        }
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized HyperLogLog
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
