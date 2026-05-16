@@ -415,7 +415,7 @@ public class BaseTableDataManagerTest {
     tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
 
     // Mock the methods that will be called during segment replacement
-    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(SEGMENT_NAME);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
     doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
 
     // Use CountDownLatch to wait for async execution
@@ -458,7 +458,7 @@ public class BaseTableDataManagerTest {
     tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
 
     // Mock the methods that will be called during segment replacement
-    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(SEGMENT_NAME);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
     doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
         .when(tableDataManager).fetchIndexLoadingConfig();
 
@@ -487,7 +487,7 @@ public class BaseTableDataManagerTest {
     tableDataManager._segmentDataManagerMap.put(SEGMENT_NAME, segmentDataManager);
 
     // Mock the methods for the second part of the test
-    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(SEGMENT_NAME);
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
     doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
         .when(tableDataManager).fetchIndexLoadingConfig();
 
@@ -531,7 +531,7 @@ public class BaseTableDataManagerTest {
     tableDataManager._segmentDataManagerMap.put(segmentName, segmentDataManager);
 
     // Mock the methods that will be called during segment replacement
-    doAnswer(invocation -> zkMetadata).when(tableDataManager).fetchZKMetadata(segmentName);
+    seedZKMetadata(tableDataManager, segmentName, zkMetadata);
     doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
 
     // Use CountDownLatch to wait for async execution
@@ -933,6 +933,10 @@ public class BaseTableDataManagerTest {
    */
   protected HelixManager createHelixManagerMock() {
     return mock(HelixManager.class);
+  }
+
+  protected void seedZKMetadata(BaseTableDataManager spy, String segmentName, SegmentZKMetadata zkMetadata) {
+    doAnswer(invocation -> zkMetadata).when(spy).fetchZKMetadata(segmentName);
   }
 
   protected static InstanceDataManagerConfig createDefaultInstanceDataManagerConfig() {

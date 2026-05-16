@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +36,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -821,8 +821,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     return _propertyStore;
   }
 
-  public ConcurrentMap<String, SegmentDataManager> getSegmentDataManagerMap() {
-    return _segmentDataManagerMap;
+  @Nullable
+  public SegmentDataManager getSegmentDataManager(String segmentName) {
+    return _segmentDataManagerMap.get(segmentName);
+  }
+
+  public Collection<SegmentDataManager> getAllSegmentDataManagers() {
+    return Collections.unmodifiableCollection(_segmentDataManagerMap.values());
   }
 
   public Logger getLogger() {
@@ -1089,6 +1094,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
+      // Re-validate under the segment lock: the caller's map read in reloadSegment(String, boolean, String) is
+      // unlocked, so a concurrent offloadSegment can remove the entry between that read and this lock acquisition.
+      // Without this guard, reload would resurrect a segment the cluster has already dropped.
+      if (_segmentDataManagerMap.get(segmentName) == null) {
+        _logger.warn("Skipping reload for segment: {} — concurrently offloaded after dispatch", segmentName);
+        return;
+      }
       /*
       Determines if a segment should be downloaded from deep storage based on:
       1. A forced download flag.
