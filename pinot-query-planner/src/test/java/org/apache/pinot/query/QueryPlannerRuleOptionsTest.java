@@ -51,10 +51,18 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   private String explainQueryWithRuleEnabled(String query, String ruleToEnable) {
+    return explainQueryWithRules(query, ruleToEnable, null);
+  }
+
+  private String explainQueryWithRules(String query, String rulesToEnable, String rulesToDisable) {
     SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
     Map<String, String> options = new HashMap<>();
-    // disable rule
-    options.put(CommonConstants.Broker.Request.QueryOptionKey.USE_PLANNER_RULES, ruleToEnable);
+    if (rulesToEnable != null) {
+      options.put(CommonConstants.Broker.Request.QueryOptionKey.USE_PLANNER_RULES, rulesToEnable);
+    }
+    if (rulesToDisable != null) {
+      options.put(CommonConstants.Broker.Request.QueryOptionKey.SKIP_PLANNER_RULES, rulesToDisable);
+    }
     SqlNodeAndOptions sqlNodeAndOptions =
         new SqlNodeAndOptions(
             sqlNode,
@@ -169,8 +177,10 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "UNION\n"
         + "SELECT col1 FROM b;\n";
 
+    // Skip AggregateUnionTranspose too so the focus stays on PruneEmptyUnion; otherwise the surviving non-empty
+    // branch ends up with a partial aggregate, which is correct but unrelated to what this test is asserting.
     String explain = explainQueryWithRuleDisabled(query,
-        PlannerRuleNames.PRUNE_EMPTY_UNION);
+        PlannerRuleNames.PRUNE_EMPTY_UNION + "," + PlannerRuleNames.AGGREGATE_UNION_TRANSPOSE);
     //@formatter:off
     assertEquals(explain,
       "Execution Plan\n"
@@ -521,7 +531,10 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "(SELECT DISTINCT col1 FROM b)";
     //@formatter:on
 
-    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE);
+    // Disable AggregateUnionTranspose for this test so the AggregateUnionAggregate merge behavior is isolated;
+    // otherwise transpose pushes aggregates back into each branch and undoes the merge.
+    String explain = explainQueryWithRules(query, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
+        PlannerRuleNames.AGGREGATE_UNION_TRANSPOSE);
 
     // There shouldn't be aggregates above the table scans since they should be merged into the one above the UNION ALL
     assertEquals(explain,

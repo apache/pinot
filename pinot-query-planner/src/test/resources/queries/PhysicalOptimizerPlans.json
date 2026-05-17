@@ -656,11 +656,11 @@
           "\n            PhysicalAggregate(group=[{0}], aggType=[DIRECT])",
           "\n              PhysicalUnion(all=[true])",
           "\n                PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
-          "\n                  PhysicalProject(col2=[$1])",
+          "\n                  PhysicalAggregate(group=[{1}], aggType=[DIRECT])",
           "\n                    PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
           "\n                      PhysicalTableScan(table=[[default, a]])",
           "\n                PhysicalExchange(exchangeStrategy=[IDENTITY_EXCHANGE])",
-          "\n                  PhysicalProject(col2=[$1])",
+          "\n                  PhysicalAggregate(group=[{1}], aggType=[DIRECT])",
           "\n                    PhysicalFilter(condition=[=($2, 1)])",
           "\n                      PhysicalTableScan(table=[[default, a]])",
           "\n"
