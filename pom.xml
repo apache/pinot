@@ -205,7 +205,7 @@
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <checker-qual.version>4.1.0</checker-qual.version>
-    <groovy-all.version>2.4.21</groovy-all.version>
+    <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
@@ -1013,10 +1013,31 @@
         <artifactId>checker-qual</artifactId>
         <version>${checker-qual.version}</version>
       </dependency>
+      <!-- Groovy 3.x publishes groovy-all as a POM aggregator that pulls in every sub-module.
+           We exclude groovy-testng/groovy-test-junit5/groovy-test because their transitive TestNG and
+           JUnit jars collide with Surefire's TestNG fork classpath and cause NoClassDefFoundError on
+           unrelated test classes. Everything else (groovy core, templates, json, xml, sql, jmx, swing,
+           ant, cli-picocli, datetime, nio, jsr223, console, etc.) is kept to preserve the runtime
+           Groovy stdlib surface user transform/filter scripts may rely on from the old 2.4.21 fat jar. -->
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
         <artifactId>groovy-all</artifactId>
-        <version>${groovy-all.version}</version>
+        <version>${groovy.version}</version>
+        <type>pom</type>
+        <exclusions>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-testng</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-test-junit5</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-test</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
