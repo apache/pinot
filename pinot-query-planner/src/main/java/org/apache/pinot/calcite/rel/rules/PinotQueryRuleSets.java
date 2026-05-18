@@ -260,13 +260,4 @@ public class PinotQueryRuleSets {
   );
   //@formatter:on
 
-  /// @deprecated Use {@link #POST_LOGICAL_RULES} directly. The
-  /// {@code sortExchangeCopyLimit} parameter is ignored — per-query
-  /// sort-exchange-copy threshold overrides are handled by
-  /// {@code QueryEnvironment.getTraitProgram}, which swaps the rule on a
-  /// per-query copy of {@link #POST_LOGICAL_RULES}.
-  @Deprecated
-  public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
-    return POST_LOGICAL_RULES;
-  }
 }
