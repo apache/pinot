@@ -116,7 +116,8 @@ public class BenchmarkGrpcMailboxSend {
     _receiverService = new MailboxService("localhost", availablePort(), InstanceType.SERVER, cfg);
     _receiverService.start();
 
-    // Inlined MailboxIdUtils.toMailboxId(1L, 1, 0, 0, 0) format (requestId_senderStage_senderWorker_recvStage_recvWorker).
+    // Inlined MailboxIdUtils.toMailboxId(1L, 1, 0, 0, 0) format
+    // (requestId_senderStage_senderWorker_recvStage_recvWorker).
     String mailboxId = "1_1_0_0_0";
     long deadlineMs = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
     _sender = _senderService.getSendingMailbox("localhost", _receiverService.getPort(),
