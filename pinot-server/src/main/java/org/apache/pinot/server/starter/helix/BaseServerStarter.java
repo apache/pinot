@@ -666,13 +666,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverMetrics.initializeGlobalMeters();
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     ServerMetrics.register(_serverMetrics);
-    // Register the MSE metrics emitter on the server side. MSE intermediate-stage execution code
-    // in pinot-query-runtime emits through this emitter; the default ServerMetricsEmitter forwards
-    // every call to ServerMetrics so the pinot.server.* output is unchanged. Broker-side
-    // MSE-related counters in MultiStageBrokerRequestHandler use BrokerMetrics directly and do not
-    // go through this emitter. compareAndSet semantics mean a second startup attempt in the same
-    // JVM (e.g. integration tests that restart the server) leaves the previously registered emitter
-    // in place rather than throwing.
+    // Route MSE engine metrics through the default emitter; forwards to ServerMetrics. compareAndSet
+    // semantics: a second start() in the same JVM (integration tests) leaves the prior emitter installed.
     if (!MseMetricsEmitter.register(new ServerMetricsEmitter())) {
       LOGGER.info("MseMetricsEmitter already registered; leaving the existing emitter in place");
     }

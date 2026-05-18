@@ -140,16 +140,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
 
-  // Each volatile field caches the PinotMeter resolved on first emission against the live BrokerMetrics
-  // registry. Caching avoids a per-emission ConcurrentHashMap lookup on the hot path. The fields are
-  // volatile rather than final, and lazily populated (vs. eagerly initialized in the field initializer)
-  // to defeat the NOOP-binding hazard: if construction races BrokerMetrics.register(...), an eagerly
-  // initialized field would be bound to the NOOP registry for the lifetime of this handler.
-  //
-  // A small race is possible where two threads each resolve the meter handle the first time around;
-  // both end up calling addMeteredGlobalValue(..., null) which mints a fresh handle from the live
-  // registry and records the unit count exactly once. The "lost" cache write costs at most one extra
-  // registry lookup on a future emission — never correctness.
+  // Volatile + lazy: PinotMeter resolved against the live BrokerMetrics on first emission via
+  // addMeteredGlobalValue(..., previousHandle) which returns the resolved handle for caching.
+  // Eager final init would bind to the NOOP registry if construction races BrokerMetrics.register().
   protected volatile PinotMeter _stagesStartedMeter;
   protected volatile PinotMeter _stagesFinishedMeter;
   protected volatile PinotMeter _opchainsStartedMeter;

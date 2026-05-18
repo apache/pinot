@@ -279,14 +279,9 @@ public class OpChainSchedulerService {
     private static final String EXECUTION_TIME_MS = "EXECUTION_TIME_MS";
     private static final String ALLOCATED_MEMORY_BYTES = "ALLOCATED_MEMORY_BYTES";
 
-    /**
-     * Resolve the active {@link MseMetricsEmitter} at call time rather than caching a
-     * {@link org.apache.pinot.spi.metrics.PinotMeter} handle at construction. Opchain lifecycle
-     * events are coarse (one per stage worker, not per row), so the additional indirection is
-     * unmeasurable; resolving lazily eliminates the NOOP-binding hazard that arises when this
-     * class is constructed before {@code ServerMetrics.register(...)} has installed a real
-     * {@link ServerMetrics} instance.
-     */
+    // Resolve the emitter at call time rather than caching a PinotMeter at construction. OpChain
+    // lifecycle events are coarse, so the indirection cost is unmeasurable; lazy resolution avoids
+    // the NOOP-binding hazard when this class is constructed before ServerMetrics.register(...).
     public void onOpChainStarted() {
       MseMetricsEmitter.get().addMeteredGlobalValue(ServerMeter.MSE_OPCHAINS_STARTED, 1L);
     }

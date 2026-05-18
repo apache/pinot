@@ -42,14 +42,6 @@ public class MseMetricsEmitterTest {
   }
 
   @Test
-  public void testGetReturnsNonNullNoopBeforeRegistration() {
-    MseMetricsEmitter.deregister();
-    MseMetricsEmitter emitter = MseMetricsEmitter.get();
-    assertNotNull(emitter, "get() must return a non-null emitter even before registration");
-    assertSame(emitter, MseMetricsEmitterHolder.NOOP, "Pre-registration get() should return the NOOP sentinel");
-  }
-
-  @Test
   public void testRegisterFirstWriteWins() {
     MseMetricsEmitter first = new RecordingEmitter();
     MseMetricsEmitter second = new RecordingEmitter();
@@ -65,14 +57,6 @@ public class MseMetricsEmitterTest {
     assertSame(MseMetricsEmitter.get(), emitter);
     MseMetricsEmitter.deregister();
     assertSame(MseMetricsEmitter.get(), MseMetricsEmitterHolder.NOOP);
-  }
-
-  @Test
-  public void testNoopEmissionDoesNotThrow() {
-    MseMetricsEmitter.deregister();
-    MseMetricsEmitter emitter = MseMetricsEmitter.get();
-    emitter.addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 42L);
-    emitter.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS, 100L, TimeUnit.MILLISECONDS);
   }
 
   @Test

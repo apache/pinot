@@ -23,16 +23,8 @@ import org.apache.pinot.spi.metrics.PinotMeter;
 
 
 /**
- * Default {@link MseMetricsEmitter} implementation that forwards every emission to the
- * live {@link ServerMetrics} singleton.
- *
- * <p>The {@link ServerMetrics} singleton is resolved at call time via
- * {@link ServerMetrics#get()}, so the order in which {@link ServerMetrics#register} and
- * {@link MseMetricsEmitter#register} are invoked does not affect correctness. This is
- * intentional: it eliminates the NOOP-binding hazard that previously affected MSE call
- * sites which cached {@link PinotMeter} handles at construction time.
- *
- * <p>This class is stateless and safe to share across threads.
+ * Default {@link MseMetricsEmitter} that forwards every emission to {@link ServerMetrics#get()}
+ * resolved at call time. Stateless; safe to share across threads.
  */
 public class ServerMetricsEmitter implements MseMetricsEmitter {
 
