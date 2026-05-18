@@ -155,10 +155,14 @@ public class BaseTableDataManagerTest {
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
     when(localMetadata.getCrc()).thenReturn("0");
 
-    BaseTableDataManager tableDataManager = createTableManager();
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
+
     File dataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(dataDir.exists());
-    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, false);
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     assertTrue(dataDir.exists());
     assertEquals(new SegmentMetadataImpl(dataDir).getTotalDocs(), 5);
   }
@@ -175,18 +179,24 @@ public class BaseTableDataManagerTest {
     when(localMetadata.getCrc()).thenReturn("0");
 
     // No dataDir for coolTier, thus stay on default tier.
-    BaseTableDataManager tableDataManager = createTableManager();
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
     File defaultDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME);
     assertFalse(defaultDataDir.exists());
-    tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG), zkMetadata,
-        localMetadata, false);
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     assertTrue(defaultDataDir.exists());
     assertEquals(new SegmentMetadataImpl(defaultDataDir).getTotalDocs(), 5);
 
     // Configured dataDir for coolTier, thus move to new dir.
-    tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(TIER_TABLE_CONFIG), zkMetadata,
-        localMetadata, false);
+    tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
     assertTrue(tierDataDir.exists());
     assertFalse(defaultDataDir.exists());
@@ -205,15 +215,18 @@ public class BaseTableDataManagerTest {
     SegmentMetadata localMetadata = mock(SegmentMetadata.class);
     when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
 
-    BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, false);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
 
     FileUtils.deleteQuietly(indexDir);
     try {
-      tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, localMetadata, false);
+      tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
@@ -234,17 +247,23 @@ public class BaseTableDataManagerTest {
     when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
 
     // No dataDir for coolTier, thus stay on default tier.
-    BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG), zkMetadata,
-        localMetadata, false);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(DEFAULT_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
 
     // Configured dataDir for coolTier, thus move to new dir.
-    tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, createTierIndexLoadingConfig(TIER_TABLE_CONFIG), zkMetadata,
-        localMetadata, false);
+    tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> createTierIndexLoadingConfig(TIER_TABLE_CONFIG))
+        .when(tableDataManager).fetchIndexLoadingConfig();
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     File tierDataDir = tableDataManager.getSegmentDataDir(SEGMENT_NAME, TIER_NAME, TIER_TABLE_CONFIG);
     assertTrue(tierDataDir.exists());
     assertFalse(indexDir.exists());
@@ -267,8 +286,11 @@ public class BaseTableDataManagerTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
 
-    BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, false);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> indexLoadingConfig).when(tableDataManager).fetchIndexLoadingConfig();
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -295,8 +317,11 @@ public class BaseTableDataManagerTest {
         .setInvertedIndexColumns(List.of(STRING_COLUMN, LONG_COLUMN)).build();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
-    BaseTableDataManager tableDataManager = createTableManager();
-    tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, false);
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, localMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> indexLoadingConfig).when(tableDataManager).fetchIndexLoadingConfig();
+    tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
     assertEquals(tableDataManager.getSegmentDataDir(SEGMENT_NAME), indexDir);
     assertTrue(indexDir.exists());
     assertEquals(new SegmentMetadataImpl(indexDir).getTotalDocs(), 5);
@@ -311,22 +336,25 @@ public class BaseTableDataManagerTest {
     SegmentZKMetadata zkMetadata =
         makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION),
             false);
-
-    // Same CRC but force to download.
-    BaseTableDataManager tableDataManager = createTableManager();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
+
+    // Same CRC but force to download.
+    BaseTableDataManager tableDataManager = spy(createTableManager());
+    tableDataManager.registerSegment(SEGMENT_NAME, createImmutableSegmentDataManager(SEGMENT_NAME, segmentMetadata));
+    seedZKMetadata(tableDataManager, SEGMENT_NAME, zkMetadata);
+    doAnswer(invocation -> new IndexLoadingConfig()).when(tableDataManager).fetchIndexLoadingConfig();
 
     // Remove the local segment dir. Segment reloading fails unless force to download.
     FileUtils.deleteQuietly(indexDir);
     try {
-      tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segmentMetadata, false);
+      tableDataManager.reloadSegment(SEGMENT_NAME, false, null);
       fail();
     } catch (Exception e) {
       // As expected, segment reloading fails due to missing the local segment dir.
     }
 
-    tableDataManager.reloadSegment(SEGMENT_NAME, new IndexLoadingConfig(), zkMetadata, segmentMetadata, true);
+    tableDataManager.reloadSegment(SEGMENT_NAME, true, null);
     assertTrue(indexDir.exists());
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     assertEquals(Long.parseLong(segmentMetadata.getCrc()), zkMetadata.getCrc());
@@ -1006,13 +1034,18 @@ public class BaseTableDataManagerTest {
   }
 
   protected ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName, long crc) {
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getCrc()).thenReturn(Long.toString(crc));
+    return createImmutableSegmentDataManager(segmentName, segmentMetadata);
+  }
+
+  protected ImmutableSegmentDataManager createImmutableSegmentDataManager(String segmentName,
+      SegmentMetadata segmentMetadata) {
     ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
     when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
     ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
     when(segmentDataManager.getSegment()).thenReturn(immutableSegment);
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segmentMetadata.getCrc()).thenReturn(Long.toString(crc));
     return segmentDataManager;
   }
 
