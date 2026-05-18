@@ -109,6 +109,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     for (String taskType : taskTypes) {
       TaskCount taskTypeAccumulatedCount = new TaskCount();
       Map<String, TaskCount> tableAccumulatedCount = new HashMap<>();
+      Map<String, Long> tableMaxWaitTimeMs = new HashMap<>();
       try {
         // Capture the current execution timestamp for this task type collection cycle
         long currentExecutionTimestamp = System.currentTimeMillis();
@@ -147,8 +148,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
                 }
                 count.accumulate(taskCount);
                 taskStatusSummary.getSubtaskWaitingTimes().values().forEach(subtaskWaitingTime -> {
-                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_WAITING_TIME,
-                      subtaskWaitingTime, TimeUnit.MILLISECONDS);
+                  tableMaxWaitTimeMs.merge(tableNameWithType, subtaskWaitingTime, Math::max);
                 });
                 taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
                   _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_RUNNING_TIME,
@@ -210,6 +210,12 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
               ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, tablePercent);
         });
+
+        // Emit 0 for tables with no waiting subtasks so the gauge (and alert) self-resolves
+        tableAccumulatedCount.keySet().forEach(tableNameWithType ->
+            _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+                ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS,
+                tableMaxWaitTimeMs.getOrDefault(tableNameWithType, 0L)));
 
         if (_preReportedTables.containsKey(taskType)) {
           Set<String> tableNameWithTypeSet = _preReportedTables.get(taskType);
@@ -286,6 +292,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS);
     });
   }
 }

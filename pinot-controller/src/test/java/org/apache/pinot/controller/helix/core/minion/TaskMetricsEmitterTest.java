@@ -174,8 +174,8 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected 31 metrics: 29 original + 2 timing metrics (SUBTASK_WAITING_TIME and SUBTASK_RUNNING_TIME)
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 31);
+    // Expected 32 metrics: 29 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x2 tables) + SUBTASK_RUNNING_TIME timer
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 32);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -250,6 +250,16 @@ public class TaskMetricsEmitterTest {
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.percentMinionSubtasksInError.table2_OFFLINE.taskType1"))
         .getMetric()).value(), 50L);
+
+    // table1 has a waiting subtask (subtask2, 3000ms); table2 has none (0ms)
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskWaitTimeMs.table1_OFFLINE.taskType1"))
+        .getMetric()).value(), 3000L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskWaitTimeMs.table2_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
   }
 
   @Test
@@ -281,7 +291,7 @@ public class TaskMetricsEmitterTest {
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected at least 21 metrics: 20 original + 1 timing metric (SUBTASK_WAITING_TIME)
+    // Expected at least 21 metrics: 20 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x1 table)
     // The actual count may vary slightly based on test execution order
     Assert.assertTrue(metricsRegistry.allMetrics().size() >= 21);
 

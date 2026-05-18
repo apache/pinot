@@ -71,6 +71,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // TODO: Unify below subtask metrics into a single metric with status label
   NUM_MINION_TASKS_IN_PROGRESS("NumMinionTasksInProgress", true),
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
+  MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
