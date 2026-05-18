@@ -34,9 +34,7 @@ public interface ColumnMetadata extends ColumnShape {
   @JsonProperty("hasDictionary")
   boolean hasDictionary();
 
-  /// Returns the forward-index encoding for this column. The value is persisted under
-  /// [V1Constants.MetadataKeys.Column#FORWARD_INDEX_ENCODING]; for old segments that lack the key, implementations
-  /// derive it from [#hasDictionary()].
+  /// Returns the forward-index encoding for this column.
   EncodingType getForwardIndexEncoding();
 
   /// Returns `true` when both min and max value are invalid, and there is no need to regenerate them.

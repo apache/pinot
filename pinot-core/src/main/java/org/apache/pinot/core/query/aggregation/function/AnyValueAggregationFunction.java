@@ -183,7 +183,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
    */
   private void aggregateHelper(int length, BlockValSet bvs, ValueProcessor<Object> processor) {
     // Use dictionary-based access for efficiency when available
-    if (bvs.getDictionary() != null) {
+    if (bvs.isDictionaryEncoded()) {
       final int[] dictIds = bvs.getDictionaryIdsSV();
       final Dictionary dict = bvs.getDictionary();
       forEachNotNull(length, bvs, (from, to) -> {
