@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -33,7 +32,10 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
@@ -52,11 +54,11 @@ public class MapColumnPreIndexStatsCollectorTest {
         .build();
 
     Map<String, FieldSpec> children = new HashMap<>();
-    children.put("key", new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true));
+    children.put("key", new DimensionFieldSpec("key", DataType.STRING, true));
     // Values of heterogeneous types will drive per-key collectors of different types
-    children.put("value", new DimensionFieldSpec("value", FieldSpec.DataType.STRING, true));
+    children.put("value", new DimensionFieldSpec("value", DataType.STRING, true));
     Schema schema = new Schema();
-    schema.addField(new ComplexFieldSpec("col", FieldSpec.DataType.MAP, true, children));
+    schema.addField(new ComplexFieldSpec("col", DataType.MAP, true, children));
     return new StatsCollectorConfig(tableConfig, schema,
         tableConfig.getIndexingConfig().getSegmentPartitionConfig());
   }
@@ -113,7 +115,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(keyStrStats.getTotalNumberOfEntries(), 3);
     assertEquals(keyStrStats.getMaxNumberOfMultiValues(), 0);
     assertFalse(keyStrStats.isSorted());
-    assertEquals(keyStrStats.getLengthOfLargestElement(), 5);
+    assertEquals(keyStrStats.getLengthOfLongestElement(), 5);
     assertTrue(keyStrStats instanceof StringColumnPreIndexStatsCollector);
 
     AbstractColumnStatisticsCollector keyIntStats = mapCollector.getKeyStatistics("kInt");
@@ -216,7 +218,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(mapNoDict.getMaxNumberOfMultiValues(), mapDict.getMaxNumberOfMultiValues());
     assertEquals(mapNoDict.isSorted(), mapDict.isSorted());
     assertEquals(mapNoDict.getLengthOfShortestElement(), mapDict.getLengthOfShortestElement());
-    assertEquals(mapNoDict.getLengthOfLargestElement(), mapDict.getLengthOfLargestElement());
+    assertEquals(mapNoDict.getLengthOfLongestElement(), mapDict.getLengthOfLongestElement());
     assertEquals(mapNoDict.getMaxRowLengthInBytes(), mapDict.getMaxRowLengthInBytes());
 
     // Partition metadata
@@ -227,10 +229,8 @@ public class MapColumnPreIndexStatsCollectorTest {
       assertNull(pfDict);
     } else {
       assertEquals(pfNoDict.getName(), pfDict.getName());
-      assertEquals(mapNoDict.getNumPartitions(), mapDict.getNumPartitions());
-      Set<Integer> partsNoDict = mapNoDict.getPartitions();
-      Set<Integer> partsDict = mapDict.getPartitions();
-      assertEquals(partsNoDict, partsDict);
+      assertEquals(pfNoDict.getNumPartitions(), pfDict.getNumPartitions());
+      assertEquals(mapNoDict.getPartitions(), mapDict.getPartitions());
     }
 
     // Compare per-key collectors exposed via getKeyStatistics
@@ -259,7 +259,7 @@ public class MapColumnPreIndexStatsCollectorTest {
     r1.put("kLong", 7L);
     r1.put("kFloat", 1.5f);
     r1.put("kDouble", 2.25d);
-    r1.put("kBigDec", new java.math.BigDecimal("10.01"));
+    r1.put("kBigDec", new BigDecimal("10.01"));
     r1.put("kNull", null); // ignored
 
     Map<String, Object> r2 = new HashMap<>();
@@ -268,13 +268,13 @@ public class MapColumnPreIndexStatsCollectorTest {
     r2.put("kLong", 2L);
     r2.put("kFloat", 1.5f);
     r2.put("kDouble", 0.75d);
-    r2.put("kBigDec", new java.math.BigDecimal("10.01"));
+    r2.put("kBigDec", new BigDecimal("10.01"));
 
     Map<String, Object> r3 = new HashMap<>();
     r3.put("kStr", "alpha");
     r3.put("kInt", 3);
     r3.put("kFloat", 3.5f);
-    r3.put("kBigDec", new java.math.BigDecimal("5.25"));
+    r3.put("kBigDec", new BigDecimal("5.25"));
 
     StatsCollectorConfig cfg = newConfig(false);
     MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
@@ -298,13 +298,13 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertEquals(keys, new String[]{"kBigDec", "kDouble", "kFloat", "kInt", "kLong", "kStr"});
 
     // Row length metrics
-    int l1 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r1).length;
-    int l2 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r2).length;
-    int l3 = org.apache.pinot.spi.utils.MapUtils.serializeMap(r3).length;
+    int l1 = MapUtils.serializedSize(r1);
+    int l2 = MapUtils.serializedSize(r2);
+    int l3 = MapUtils.serializedSize(r3);
     int expectedMin = Math.min(l1, Math.min(l2, l3));
     int expectedMax = Math.max(l1, Math.max(l2, l3));
     assertEquals(col.getLengthOfShortestElement(), expectedMin);
-    assertEquals(col.getLengthOfLargestElement(), expectedMax);
+    assertEquals(col.getLengthOfLongestElement(), expectedMax);
     assertEquals(col.getMaxRowLengthInBytes(), expectedMax);
   }
 
@@ -340,8 +340,8 @@ public class MapColumnPreIndexStatsCollectorTest {
     AbstractColumnStatisticsCollector sDec = col.getKeyStatistics("kBigDec2");
     assertNotNull(sDec);
     assertTrue(sDec instanceof BigDecimalColumnPreIndexStatsCollector);
-    assertEquals(sDec.getMaxValue(), new java.math.BigDecimal("4.56"));
-    assertEquals(sDec.getMinValue(), new java.math.BigDecimal("1.23"));
+    assertEquals(sDec.getMaxValue(), new BigDecimal("4.56"));
+    assertEquals(sDec.getMinValue(), new BigDecimal("1.23"));
 
     // JSON serialization branch for String collector
     AbstractColumnStatisticsCollector sObj = col.getKeyStatistics("kObj");
@@ -349,6 +349,131 @@ public class MapColumnPreIndexStatsCollectorTest {
     assertTrue(sObj instanceof StringColumnPreIndexStatsCollector);
     assertEquals(sObj.getMinValue(), "[2,3]");
     assertEquals(sObj.getMaxValue(), "{\"k1\":\"v1\",\"k2\":\"v2\"}");
+  }
+
+  @Test
+  public void testNumericKeyTypePromotedToStringForMixedValues() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("traceId", 9876543210L);
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("traceId", "c69b6613-e174-49f1-ac47-4e9ab98e513f");
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.seal();
+
+    AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("traceId");
+    assertNotNull(keyStats);
+    assertTrue(keyStats instanceof StringColumnPreIndexStatsCollector);
+    assertEquals(keyStats.getCardinality(), 2);
+    assertEquals(keyStats.getMinValue(), "9876543210");
+    assertEquals(keyStats.getMaxValue(), "c69b6613-e174-49f1-ac47-4e9ab98e513f");
+    assertEquals(keyStats.getTotalNumberOfEntries(), 2);
+  }
+
+  @Test
+  public void testNumericKeyTypePromotedToStringForMixedValuesPreservesCounters() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("traceId", 9876543210L);
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("traceId", 9876543210L);
+
+    Map<String, Object> r3 = new HashMap<>();
+    r3.put("traceId", "2x");
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.collect(r3);
+    col.seal();
+
+    AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("traceId");
+    assertNotNull(keyStats);
+    assertTrue(keyStats instanceof StringColumnPreIndexStatsCollector);
+    assertEquals(keyStats.getCardinality(), 2);
+    assertEquals(keyStats.getMinValue(), "2x");
+    assertEquals(keyStats.getMaxValue(), "9876543210");
+    assertEquals(keyStats.getTotalNumberOfEntries(), 3);
+    assertEquals(keyStats.getMaxNumberOfMultiValues(), 0);
+    assertFalse(keyStats.isSorted());
+  }
+
+  @Test
+  public void testNumericKeyTypePromotedToStringForMixedValuesKeepsLexicographicOrdering() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("traceId", 2);
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("traceId", 10);
+
+    Map<String, Object> r3 = new HashMap<>();
+    r3.put("traceId", "2a");
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.collect(r3);
+    col.seal();
+
+    AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("traceId");
+    assertNotNull(keyStats);
+    assertTrue(keyStats instanceof StringColumnPreIndexStatsCollector);
+    assertEquals(keyStats.getCardinality(), 3);
+    assertEquals(keyStats.getMinValue(), "10");
+    assertEquals(keyStats.getMaxValue(), "2a");
+    assertEquals(keyStats.getTotalNumberOfEntries(), 3);
+    assertFalse(keyStats.isSorted());
+  }
+
+  @Test
+  public void testBooleanKeyTypeUsesStringCollector() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("active", true);
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("active", false);
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.seal();
+
+    AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("active");
+    assertNotNull(keyStats);
+    assertTrue(keyStats instanceof StringColumnPreIndexStatsCollector);
+    assertEquals(keyStats.getCardinality(), 2);
+    assertEquals(keyStats.getMinValue(), "false");
+    assertEquals(keyStats.getMaxValue(), "true");
+  }
+
+  @Test
+  public void testBytesKeyTypeUsesBytesCollector() {
+    Map<String, Object> r1 = new HashMap<>();
+    r1.put("blob", new byte[]{1, 2});
+
+    Map<String, Object> r2 = new HashMap<>();
+    r2.put("blob", new byte[]{1, 3});
+
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+    col.collect(r1);
+    col.collect(r2);
+    col.seal();
+
+    AbstractColumnStatisticsCollector keyStats = col.getKeyStatistics("blob");
+    assertNotNull(keyStats);
+    assertTrue(keyStats instanceof BytesColumnPreIndexStatsCollector);
+    assertEquals(keyStats.getMinValue(), new ByteArray(new byte[]{1, 2}));
+    assertEquals(keyStats.getMaxValue(), new ByteArray(new byte[]{1, 3}));
+    assertEquals(keyStats.getCardinality(), 2);
+    assertEquals(keyStats.getTotalNumberOfEntries(), 2);
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
@@ -372,6 +497,53 @@ public class MapColumnPreIndexStatsCollectorTest {
     col.seal(); // no-op
     String[] keys2 = col.getUniqueValuesSet();
     assertEquals(keys1, keys2);
+  }
+
+  @Test
+  public void testAllEmptyMaps() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    // Collect multiple rows with empty maps
+    col.collect(new HashMap<>());
+    col.collect(new HashMap<>());
+    col.collect(new HashMap<>());
+    col.seal();
+
+    // Should not throw AIOOBE; should return null for min/max/uniqueValuesSet
+    assertNull(col.getMinValue());
+    assertNull(col.getMaxValue());
+    assertNull(col.getUniqueValuesSet());
+    assertEquals(col.getCardinality(), 0);
+    assertEquals(col.getTotalNumberOfEntries(), 3);
+    // Serialized empty map is Integer.BYTES (4) bytes
+    assertEquals(col.getLengthOfShortestElement(), Integer.BYTES);
+    assertEquals(col.getLengthOfLongestElement(), Integer.BYTES);
+    assertEquals(col.getMaxRowLengthInBytes(), Integer.BYTES);
+    assertTrue(col.getAllKeyFrequencies().isEmpty());
+  }
+
+  @Test
+  public void testMixOfEmptyAndNonEmptyMaps() {
+    StatsCollectorConfig cfg = newConfig(false);
+    MapColumnPreIndexStatsCollector col = new MapColumnPreIndexStatsCollector("col", cfg);
+
+    col.collect(new HashMap<>());
+    col.collect(Map.of("k1", "v1"));
+    col.collect(new HashMap<>());
+    col.seal();
+
+    assertEquals(col.getMinValue(), "k1");
+    assertEquals(col.getMaxValue(), "k1");
+    assertNotNull(col.getUniqueValuesSet());
+    assertEquals(col.getUniqueValuesSet(), new String[]{"k1"});
+    assertEquals(col.getCardinality(), 1);
+    assertEquals(col.getTotalNumberOfEntries(), 3);
+
+    // Key appeared in 1 of 3 rows, so seal() inserted one default null value (2 total)
+    AbstractColumnStatisticsCollector k1Stats = col.getKeyStatistics("k1");
+    assertNotNull(k1Stats);
+    assertEquals(k1Stats.getTotalNumberOfEntries(), 2);
   }
 
   @Test

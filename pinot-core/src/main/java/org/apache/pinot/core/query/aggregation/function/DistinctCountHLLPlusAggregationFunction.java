@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -123,7 +124,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateSV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
@@ -172,7 +173,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
@@ -267,7 +268,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateSVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -317,7 +318,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
@@ -418,7 +419,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -468,7 +469,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
@@ -620,9 +621,10 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Long extractFinalResult(HyperLogLogPlus intermediateResult) {
-    return intermediateResult.cardinality();
+  public Long extractFinalResult(@Nullable HyperLogLogPlus intermediateResult) {
+    return intermediateResult == null ? 0L : intermediateResult.cardinality();
   }
 
   @Override

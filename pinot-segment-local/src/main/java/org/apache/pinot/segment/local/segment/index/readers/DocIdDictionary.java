@@ -26,11 +26,16 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * DocId dictionary for the segment
  */
 public class DocIdDictionary extends BaseImmutableDictionary {
-  final int _numDocs;
+  private final int _numDocs;
 
   public DocIdDictionary(int numDocs) {
     super(numDocs);
     _numDocs = numDocs;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
   @Override
@@ -47,12 +52,7 @@ public class DocIdDictionary extends BaseImmutableDictionary {
 
   @Override
   public int indexOf(int value) {
-    return insertionIndexOf(Integer.toString(value));
-  }
-
-  @Override
-  public DataType getValueType() {
-    return DataType.INT;
+    return (value >= 0 && value < _numDocs) ? value : NULL_VALUE_INDEX;
   }
 
   @Override

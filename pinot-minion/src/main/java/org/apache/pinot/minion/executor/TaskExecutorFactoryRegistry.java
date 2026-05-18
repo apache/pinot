@@ -53,7 +53,8 @@ public class TaskExecutorFactoryRegistry {
       TaskExecutorFactory annotation = clazz.getAnnotation(TaskExecutorFactory.class);
       if (annotation.enabled()) {
         try {
-          PinotTaskExecutorFactory taskExecutorFactory = (PinotTaskExecutorFactory) clazz.newInstance();
+          PinotTaskExecutorFactory taskExecutorFactory =
+              (PinotTaskExecutorFactory) clazz.getDeclaredConstructor().newInstance();
           taskExecutorFactory.init(zkMetadataManager, minionConf);
           registerTaskExecutorFactory(taskExecutorFactory);
         } catch (Exception e) {

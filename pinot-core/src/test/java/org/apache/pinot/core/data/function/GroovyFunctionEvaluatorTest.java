@@ -23,15 +23,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
-import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
+import org.apache.pinot.common.evaluator.GroovyFunctionEvaluator;
+import org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
-import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
-import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
+import static org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
+import static org.apache.pinot.common.evaluator.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -221,5 +221,22 @@ public class GroovyFunctionEvaluatorTest {
         Lists.newArrayList("nullValue"), genericRow11, null
     });
     return entries.toArray(new Object[entries.size()][]);
+  }
+
+  @Test
+  public void testEvaluateObjectArrayWithNullArgument() {
+    // Script that will throw when nullValue is null (calling length() on null)
+    GroovyFunctionEvaluator evaluator =
+        new GroovyFunctionEvaluator("Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)");
+    Object result = evaluator.evaluate(new Object[]{null});
+    assertEquals(result, null);
+  }
+
+  @Test(expectedExceptions = Exception.class)
+  public void testEvaluateObjectArrayWithoutNullThrowsException() {
+    // Script that will throw due to invalid operation, but no null arguments
+    GroovyFunctionEvaluator evaluator =
+        new GroovyFunctionEvaluator("Groovy({Integer.parseInt(value)}, value)");
+    evaluator.evaluate(new Object[]{"notANumber"});
   }
 }

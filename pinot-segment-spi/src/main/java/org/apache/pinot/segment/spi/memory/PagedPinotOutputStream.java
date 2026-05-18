@@ -277,9 +277,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
       try {
         _allocator.release(page);
       } catch (IOException e) {
+        // This module doesn't import pinot-common, so we cannot use ExceptionUtils.suppress here.
         if (ex == null) {
           ex = e;
-        } else {
+        } else if (e != ex) {
           ex.addSuppressed(e);
         }
       }

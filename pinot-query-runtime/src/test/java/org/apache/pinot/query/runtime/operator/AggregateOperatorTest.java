@@ -55,6 +55,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -145,6 +146,7 @@ public class AggregateOperatorTest {
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}, new Object[]{2, 2.0}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0}))
         .thenReturn(SuccessMseBlock.INSTANCE);
+    when(_input.calculateStats()).thenReturn(MultiStageQueryStats.emptyStats(0));
     DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys);
 
@@ -156,6 +158,10 @@ public class AggregateOperatorTest {
     assertEquals(resultRows.get(0), new Object[]{2, 6.0},
         "Expected two columns (group by key, agg value), agg value is final result");
     assertTrue(operator.nextBlock().isSuccess(), "Second block is EOS (done processing)");
+    MultiStageQueryStats stats = operator.calculateStats();
+    StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, stats);
+    assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
+        "Num groups should equal the number of distinct group keys");
   }
 
   @Test
@@ -312,6 +318,8 @@ public class AggregateOperatorTest {
         "num groups limit should be reached");
     assertTrue(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED),
         "num groups warning limit should be reached");
+    assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
+        "Num groups should equal the limit since only one group was accepted");
   }
 
   @Test
@@ -352,6 +360,37 @@ public class AggregateOperatorTest {
     return new AggregateOperator(context, _input,
         new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT, false,
             collations, limit));
+  }
+
+  @Test
+  public void shouldRecordNumGroupsBelowLimit() {
+    // Given: 1 distinct group key, limit = 2 — below limit, no overflow
+    List<RexExpression.FunctionCall> aggCalls = List.of(getSum(new RexExpression.InputRef(1)));
+    List<Integer> filterArgs = List.of(-1);
+    List<Integer> groupKeys = List.of(0);
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.AGGREGATE_HINT_OPTIONS,
+        Map.of(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT, "2")));
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+
+    _input = new BlockListMultiStageOperator.Builder(inSchema)
+        .addRow(2, 1.0)
+        .addRow(2, 2.0)
+        .buildWithEos();
+    DataSchema resultSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    AggregateOperator operator = getOperator(resultSchema, aggCalls, filterArgs, groupKeys, nodeHint, Map.of());
+
+    // When:
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
+
+    // Then:
+    assertEquals(resultRows.size(), 1);
+    assertTrue(operator.nextBlock().isEos());
+    MultiStageQueryStats stats = operator.calculateStats();
+    StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, stats);
+    assertFalse(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
+        "Num groups limit should not be reached when groups are below limit");
+    assertEquals(statMap.getLong(AggregateOperator.StatKey.NUM_GROUPS), 1,
+        "Num groups should equal 1");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

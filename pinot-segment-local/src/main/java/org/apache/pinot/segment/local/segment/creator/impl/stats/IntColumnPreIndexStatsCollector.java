@@ -57,6 +57,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
         updatePartition(Integer.toString(value));
       }
     }
+    _totalDocs++;
     _totalNumberOfEntries++;
   }
 
@@ -71,6 +72,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       _values.add(valueGetter.apply(i));
     }
     _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
     updateTotalNumberOfEntries(length);
   }
 
@@ -108,6 +110,10 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getCardinality() {
     return _sealed ? _sortedValues.length : _values.size();
+  }
+
+  int[] getValues() {
+    return _values.toIntArray();
   }
 
   @Override

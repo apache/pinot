@@ -74,7 +74,7 @@ import org.slf4j.LoggerFactory;
  *
  * </p>
  * The unnesting rule will flatten all the collections provided, which are the paths navigating to the collections. For
- * the same example above. If the the collectionToUnnest is provided as "t1.array", then the rule will unnest the
+ * the same example above. If the collectionToUnnest is provided as "t1.array", then the rule will unnest the
  * previous output to:
  *
  * <pre>

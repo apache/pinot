@@ -104,7 +104,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
@@ -177,7 +177,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -259,7 +259,7 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     }
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -377,9 +377,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     return ColumnDataType.LONG;
   }
 
+  @Nullable
   @Override
-  public Comparable extractFinalResult(UltraLogLog intermediateResult) {
-    return Math.round(intermediateResult.getDistinctCountEstimate());
+  public Comparable extractFinalResult(@Nullable UltraLogLog intermediateResult) {
+    return intermediateResult == null ? 0L : Math.round(intermediateResult.getDistinctCountEstimate());
   }
 
   @Override

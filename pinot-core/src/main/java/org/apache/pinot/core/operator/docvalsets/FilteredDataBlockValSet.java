@@ -97,6 +97,12 @@ public class FilteredDataBlockValSet implements BlockValSet {
     return null;
   }
 
+  /// Data-block value sets never carry a dictionary; the dict-id read methods below always throw.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
+  }
+
   @Override
   public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();
@@ -166,6 +172,11 @@ public class FilteredDataBlockValSet implements BlockValSet {
 
   @Override
   public double[][] getDoubleValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BigDecimal[][] getBigDecimalValuesMV() {
     throw new UnsupportedOperationException();
   }
 

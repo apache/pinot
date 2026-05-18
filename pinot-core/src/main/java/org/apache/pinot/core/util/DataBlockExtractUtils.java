@@ -95,8 +95,12 @@ public final class DataBlockExtractUtils {
         return dataBlock.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataBlock.getDoubleArray(rowId, colId);
+      case BIG_DECIMAL_ARRAY:
+        return dataBlock.getBigDecimalArray(rowId, colId);
       case STRING_ARRAY:
         return dataBlock.getStringArray(rowId, colId);
+      case BYTES_ARRAY:
+        return dataBlock.getBytesArray(rowId, colId);
 
       // Null
       case UNKNOWN:

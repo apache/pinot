@@ -101,4 +101,9 @@ public class OnHeapBigDecimalDictionary extends BaseImmutableDictionary {
   public byte[] getBytesValue(int dictId) {
     return BigDecimalUtils.serialize(_dictIdToVal[dictId]);
   }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return BigDecimalUtils.byteSize(_dictIdToVal[dictId]);
+  }
 }

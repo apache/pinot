@@ -59,12 +59,14 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -80,6 +82,7 @@ public abstract class BaseSegmentProcessorFrameworkTest {
   protected List<File> _multiValueSegments;
 
   protected TableConfig _tableConfig;
+  protected TableConfig _tableConfigWithComplexType;
   protected TableConfig _tableConfigWithoutTimeColumn;
   protected TableConfig _tableConfigNullValueEnabled;
   protected TableConfig _tableConfigSegmentNameGeneratorEnabled;
@@ -126,6 +129,14 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     _tableConfigWithFixedSegmentName =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
     _tableConfigWithFixedSegmentName.getIndexingConfig().setSegmentNameGeneratorType("fixed");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    List<String> fieldsToUnnest = new ArrayList<>();
+    fieldsToUnnest.add("targetusers");
+    ingestionConfig.setComplexTypeConfig(
+        new ComplexTypeConfig(fieldsToUnnest, ".", null, null));
+    _tableConfigWithComplexType = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTableComplex")
+        .setTimeColumnName("time").setIngestionConfig(ingestionConfig).build();
 
     _schema =
         new Schema.SchemaBuilder().setSchemaName("mySchema")
@@ -237,20 +248,12 @@ public abstract class BaseSegmentProcessorFrameworkTest {
 
     List<GenericRow> inputRows = List.of(genericRow);
 
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    List<String> fieldsToUnnest = new ArrayList<>();
-    fieldsToUnnest.add("targetusers");
-
-    ingestionConfig.setComplexTypeConfig(
-        new ComplexTypeConfig(fieldsToUnnest, ".", null, null));
-    _tableConfig.setIngestionConfig(ingestionConfig);
-
     // Create a segment with this data
     File complexTypeInputDir = new File(TEMP_DIR, "complex_type_input");
     FileUtils.forceMkdir(complexTypeInputDir);
     RecordReader recordReader = new GenericRowRecordReader(inputRows);
     SegmentGeneratorConfig segmentGeneratorConfig =
-        new SegmentGeneratorConfig(_tableConfig, _schemaWithComplexType);
+        new SegmentGeneratorConfig(_tableConfigWithComplexType, _schemaWithComplexType);
     segmentGeneratorConfig.setOutDir(complexTypeInputDir.getPath());
     segmentGeneratorConfig.setSequenceId(0);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -259,8 +262,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     List<File> segmentDirs = List.of(driver.getOutputDirectory());
 
     // Default configs
-    SegmentProcessorConfig config =
-        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schemaWithComplexType).build();
+    SegmentProcessorConfig config = new SegmentProcessorConfig.Builder()
+        .setTableConfig(_tableConfigWithComplexType).setSchema(_schemaWithComplexType).build();
 
     List<File> outputSegments = processSegments(segmentDirs, config, workingDir);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
@@ -268,13 +271,11 @@ public abstract class BaseSegmentProcessorFrameworkTest {
     // Pick the column created from complex type
     ColumnMetadata campaignInner2Metadata = segmentMetadata.getColumnMetadataFor("campaign.inner1.inner2");
     // Verify we see a specific value parsed from the complexType
-    Assert.assertEquals(campaignInner2Metadata.getMinValue().compareTo("inner2v"), 0);
+    assertEquals(campaignInner2Metadata.getMinValue(), "inner2v");
     ColumnMetadata campaignMetadata = segmentMetadata.getColumnMetadataFor("campaign");
-    Assert.assertEquals(
-        campaignMetadata.getMinValue().compareTo("{\"inner1\":{\"inner2\":\"inner2v\"},\"inner\":\"innerv\"}"), 0);
-
+    assertEquals(campaignMetadata.getMinValue(), "{\"inner\":\"innerv\",\"inner1\":{\"inner2\":\"inner2v\"}}");
     ColumnMetadata listMetadata = segmentMetadata.getColumnMetadataFor("targetusers.user");
-    Assert.assertEquals(listMetadata.getMinValue().compareTo("barfoo"), 0);
+    assertEquals(listMetadata.getMinValue(), "barfoo");
   }
 
   @Test
@@ -822,8 +823,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
       SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
       ColumnMetadata timeMetadata = metadata.getColumnMetadataFor("time");
       assertNotNull(timeMetadata, "Time column metadata should not be null");
-      long startTime = (long) timeMetadata.getMinValue();
-      long endTime = (long) timeMetadata.getMaxValue();
+      long startTime = (Long) timeMetadata.getMinValue();
+      long endTime = (Long) timeMetadata.getMaxValue();
       // Verify time range is exactly 1 day
       assertTrue(endTime - startTime <= 86400000, "Segment time range should be 1 day");
 

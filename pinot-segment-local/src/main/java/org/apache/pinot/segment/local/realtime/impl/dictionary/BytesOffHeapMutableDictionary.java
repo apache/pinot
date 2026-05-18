@@ -39,6 +39,8 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   private volatile byte[] _min = null;
   private volatile byte[] _max = null;
+  private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private volatile int _lengthOfLongestElement = 0;
 
   /**
    * Constructor the class.
@@ -58,13 +60,29 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   @Override
   public int index(Object value) {
     byte[] bytesValue = (byte[]) value;
-    updateMinMax(bytesValue);
+    updateStats(bytesValue);
     return indexValue(new ByteArray(bytesValue), bytesValue);
   }
 
   @Override
   public int[] index(Object[] values) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.BYTES;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    byte[] bytesValue = BytesUtils.toBytes(stringValue);
+    return getDictId(new ByteArray(bytesValue), bytesValue);
+  }
+
+  @Override
+  public int indexOf(ByteArray bytesValue) {
+    return getDictId(bytesValue, bytesValue.getBytes());
   }
 
   @Override
@@ -136,19 +154,13 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.BYTES;
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestElement;
   }
 
   @Override
-  public int indexOf(String stringValue) {
-    byte[] bytesValue = BytesUtils.toBytes(stringValue);
-    return getDictId(new ByteArray(bytesValue), bytesValue);
-  }
-
-  @Override
-  public int indexOf(ByteArray bytesValue) {
-    return getDictId(bytesValue, bytesValue.getBytes());
+  public int getLengthOfLongestElement() {
+    return _lengthOfLongestElement;
   }
 
   @Override
@@ -197,6 +209,11 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return _byteStore.getValueSize(dictId);
+  }
+
+  @Override
   protected void setValue(int dictId, Object value, byte[] serializedValue) {
     _byteStore.add(serializedValue);
   }
@@ -222,16 +239,25 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
     _byteStore.close();
   }
 
-  private void updateMinMax(byte[] value) {
+  private void updateStats(byte[] value) {
+    int length = value.length;
     if (_min == null) {
       _min = value;
       _max = value;
+      _lengthOfShortestElement = length;
+      _lengthOfLongestElement = length;
     } else {
       if (ByteArray.compare(value, _min) < 0) {
         _min = value;
       }
       if (ByteArray.compare(value, _max) > 0) {
         _max = value;
+      }
+      if (length < _lengthOfShortestElement) {
+        _lengthOfShortestElement = length;
+      }
+      if (length > _lengthOfLongestElement) {
+        _lengthOfLongestElement = length;
       }
     }
   }

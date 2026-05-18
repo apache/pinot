@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -63,7 +63,7 @@ public class SegmentV1V2ToV3FormatConverterTest {
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), _indexDir, "daysSinceEpoch",
             TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
     _segmentDirectory = new File(_indexDir, driver.getSegmentName());
@@ -118,5 +118,20 @@ public class SegmentV1V2ToV3FormatConverterTest {
     Assert.assertEquals(metaAfterConversion.getCrc(), beforeConversionMeta.getCrc());
     Assert.assertTrue(metaAfterConversion.getIndexCreationTime() != Long.MIN_VALUE);
     Assert.assertEquals(metaAfterConversion.getIndexCreationTime(), beforeConversionMeta.getIndexCreationTime());
+  }
+
+  @Test
+  public void testConvertCopiesIvfPqIndexFile()
+      throws Exception {
+    File ivfPqFile = new File(_segmentDirectory, "embedding" + V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+    FileUtils.writeByteArrayToFile(ivfPqFile, new byte[]{1, 2, 3, 4});
+
+    SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
+    converter.convert(_segmentDirectory);
+
+    File v3Location = SegmentDirectoryPaths.segmentDirectoryFor(_segmentDirectory, SegmentVersion.v3);
+    File copiedIvfPqFile = new File(v3Location, ivfPqFile.getName());
+    Assert.assertTrue(copiedIvfPqFile.exists());
+    Assert.assertEquals(FileUtils.readFileToByteArray(copiedIvfPqFile), new byte[]{1, 2, 3, 4});
   }
 }

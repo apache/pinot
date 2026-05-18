@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-kafka-4.0</artifactId>
@@ -41,11 +41,21 @@
       <artifactId>pinot-kafka-base</artifactId>
     </dependency>
 
-    <!-- Kafka 4.x client (pure Java, no Scala dependency) -->
+    <!--
+      VERSION OVERRIDE EXCEPTION: kafka-clients uses ${kafka4.version} instead of the root-managed
+      ${kafka3.version}. This module specifically targets Kafka 4.x which is a different major version
+      with breaking API changes from Kafka 3.x. The Kafka 4.x client is pure Java with no Scala dependency.
+    -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
       <version>${kafka4.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.lz4</groupId>
+          <artifactId>lz4-java</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- Test dependencies -->
@@ -63,7 +73,7 @@
     <!-- Testcontainers for embedded Kafka testing with KRaft mode -->
     <dependency>
       <groupId>org.testcontainers</groupId>
-      <artifactId>kafka</artifactId>
+      <artifactId>testcontainers-kafka</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

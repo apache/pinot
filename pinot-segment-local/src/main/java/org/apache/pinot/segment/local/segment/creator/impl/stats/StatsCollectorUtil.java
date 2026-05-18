@@ -29,9 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Utility class for creating column statistics collectors.
  */
 public final class StatsCollectorUtil {
-
   private StatsCollectorUtil() {
-    // Utility class
   }
 
   /**
@@ -45,12 +43,9 @@ public final class StatsCollectorUtil {
   public static AbstractColumnStatisticsCollector createStatsCollector(String columnName, FieldSpec fieldSpec,
       FieldIndexConfigs indexConfig, StatsCollectorConfig statsCollectorConfig) {
     boolean dictionaryEnabled = indexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
-    if (!dictionaryEnabled) {
-      // MAP collector is optimised for no-dictionary collection
-      if (!fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
-        if (ClusterConfigForTable.useOptimizedNoDictCollector(statsCollectorConfig.getTableConfig())) {
-          return new NoDictColumnStatisticsCollector(columnName, statsCollectorConfig);
-        }
+    if (!dictionaryEnabled && fieldSpec.getDataType().getStoredType() != FieldSpec.DataType.MAP) {
+      if (ClusterConfigForTable.useOptimizedNoDictCollector(statsCollectorConfig.getTableConfig())) {
+        return new NoDictColumnStatisticsCollector(columnName, statsCollectorConfig);
       }
     }
     switch (fieldSpec.getDataType().getStoredType()) {
@@ -67,7 +62,7 @@ public final class StatsCollectorUtil {
       case STRING:
         return new StringColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case BYTES:
-        return new BytesColumnPredIndexStatsCollector(columnName, statsCollectorConfig);
+        return new BytesColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case MAP:
         return new MapColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       default:

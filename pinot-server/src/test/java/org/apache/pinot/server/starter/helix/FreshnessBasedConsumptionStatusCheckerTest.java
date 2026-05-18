@@ -35,8 +35,10 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.testng.annotations.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -580,6 +582,60 @@ public class FreshnessBasedConsumptionStatusCheckerTest {
     when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
     when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(0)));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 0);
+  }
+
+  /**
+   * Validates that a RuntimeException from getStreamMetadataProvider() (e.g., stream auth failure, unreachable
+   * endpoint) does not crash the status checker. The faulty segment should be treated as "not caught up" while
+   * other segments continue to be checked normally.
+   */
+  @Test
+  public void testGetStreamMetadataProviderThrowsException() {
+    String segA0 = "tableA__0__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    FreshnessBasedConsumptionStatusChecker statusChecker =
+        new FreshnessBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments), 10L, 0L);
+
+    // setup TableDataManagers
+    RealtimeTableDataManager tableDataManagerA = mock(RealtimeTableDataManager.class);
+    RealtimeTableDataManager tableDataManagerB = mock(RealtimeTableDataManager.class);
+    when(instanceDataManager.getTableDataManager("tableA_REALTIME")).thenReturn(tableDataManagerA);
+    when(instanceDataManager.getTableDataManager("tableB_REALTIME")).thenReturn(tableDataManagerB);
+
+    // tableA works normally
+    RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
+    StreamMetadataProvider segA0Provider = mock(StreamMetadataProvider.class);
+    when(tableDataManagerA.getStreamMetadataProvider(segMngrA0)).thenReturn(segA0Provider);
+    when(segMngrA0.getStreamPartitionId()).thenReturn(0);
+    when(segA0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segA0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(20)));
+    when(segMngrA0.getCurrentOffset()).thenReturn(new LongMsgOffset(20));
+    setupMinimumIngestionLag(segMngrA0, 5L);
+
+    // tableB: getStreamMetadataProvider throws (simulates stream auth/connectivity failure)
+    RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
+    when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+    when(tableDataManagerB.getStreamMetadataProvider(segMngrB0))
+        .thenThrow(new RuntimeException("Failed to create stream metadata provider"));
+
+    // segA0 is caught up (freshness 5ms <= 10ms threshold), segB0 fails — treated as not caught up
+    assertThat(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria()).isEqualTo(1);
+
+    // On retry, if the stream issue is resolved, segB0 should catch up
+    StreamMetadataProvider segB0Provider = mock(StreamMetadataProvider.class);
+    doReturn(segB0Provider).when(tableDataManagerB).getStreamMetadataProvider(segMngrB0);
+    when(segMngrB0.getStreamPartitionId()).thenReturn(0);
+    when(segB0Provider.supportsOffsetLag()).thenReturn(true);
+    when(segB0Provider.fetchLatestStreamOffset(anySet(), anyLong())).thenReturn(Map.of(0, new LongMsgOffset(10)));
+    when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(10));
+    setupMinimumIngestionLag(segMngrB0, 5L);
+    assertThat(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria()).isEqualTo(0);
   }
 
   @Test

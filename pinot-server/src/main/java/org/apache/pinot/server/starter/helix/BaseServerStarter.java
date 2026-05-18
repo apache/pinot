@@ -84,23 +84,24 @@ import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
 import org.apache.pinot.core.data.manager.realtime.ServerRateLimitConfigChangeListener;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.core.instance.context.ServerContext;
+import org.apache.pinot.core.query.scheduler.QuerySchedulerThreadPoolConfigChangeListener;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
+import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.runtime.KeepPipelineBreakerStatsPredicate;
+import org.apache.pinot.query.runtime.SendStatsPredicate;
 import org.apache.pinot.query.runtime.operator.factory.DefaultQueryOperatorFactoryProvider;
 import org.apache.pinot.query.runtime.operator.factory.QueryOperatorFactoryProvider;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.ClusterConfigForTable;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
@@ -111,6 +112,7 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -132,8 +134,10 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -181,7 +185,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
-  protected SegmentOperationsThrottler _segmentOperationsThrottler;
+  protected SegmentOperationsThrottlerSet _segmentOperationsThrottlerSet;
   protected ThreadAccountant _threadAccountant;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
@@ -204,6 +208,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     PinotInsecureMode.setPinotInInsecureMode(
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
+    PinotMd5Mode.setPinotMd5Disabled(_serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+        PinotMd5Mode.isPinotMd5Disabled()));
 
     String tarCompressionCodecName =
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
@@ -284,8 +290,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     LOGGER.info("Registered ClusterConfigForTable change listener");
     // Register configuration change listener for upsert force commit/reload disable setting
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(
-        UpsertInconsistentStateConfig.getInstance());
-    LOGGER.info("Registered UpsertInconsistentStateConfig change listener for dynamic force commit/reload control");
+        ConsumingSegmentConsistencyModeListener.getInstance());
+    LOGGER.info(
+        "Registered ConsumingSegmentConsistencyModeListener change listener for dynamic force commit/reload control");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -294,6 +301,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
     initTransitionThreadPoolManager();
+
+    NettyInspector.logAllChecks();
   }
 
   /**
@@ -717,19 +726,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
 
-    if (_segmentOperationsThrottler == null) {
+    if (_segmentOperationsThrottlerSet == null) {
       // Only create segment operation throttlers if null
-      SegmentAllIndexPreprocessThrottler segmentAllIndexPreprocessThrottler =
+      SegmentOperationsThrottler segmentAllIndexPreprocessThrottler =
           createSegmentAllIndexPreprocessThrottler();
-      SegmentStarTreePreprocessThrottler segmentStarTreePreprocessThrottler =
+      SegmentOperationsThrottler segmentStarTreePreprocessThrottler =
           createSegmentStarTreePreprocessThrottler();
-      SegmentDownloadThrottler segmentDownloadThrottler = createSegmentDownloadThrottler();
+      SegmentOperationsThrottler segmentDownloadThrottler = createSegmentDownloadThrottler();
 
-      SegmentMultiColTextIndexPreprocessThrottler
+      SegmentOperationsThrottler
           segmentMultiColTextIndexPreprocessThrottler = createMultiColumnIndexPreprocessThrottler();
 
-      _segmentOperationsThrottler =
-          new SegmentOperationsThrottler(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
+      _segmentOperationsThrottlerSet =
+          new SegmentOperationsThrottlerSet(segmentAllIndexPreprocessThrottler, segmentStarTreePreprocessThrottler,
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
@@ -743,20 +752,23 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize workload budget manager and thread accountant. Workload budget manager must be initialized first
     // because it might be used by the accountant.
-    PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
-    WorkloadBudgetManager.set(createWorkloadBudgetManager(schedulerConfig));
-    _threadAccountant = ThreadAccountantUtils.createAccountant(schedulerConfig, _instanceId,
+    PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_serverConf,
+        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    WorkloadBudgetManager.set(createWorkloadBudgetManager(accountingConfig));
+    _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     KeepPipelineBreakerStatsPredicate keepPipelineBreakerStatsPredicate =
         KeepPipelineBreakerStatsPredicate.create(_serverConf);
     _serverInstance =
-        new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
+        new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory,
+            _segmentOperationsThrottlerSet,
             _threadAccountant, sendStatsPredicate, keepPipelineBreakerStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+    instanceDataManager.setSupplierOfIsServerReadyToConsumeData(this::isServerReadyToConsumeData);
+    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(this::isServerReadyToServeQueries);
 
     // Enable Server level realtime ingestion rate limier
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, _serverMetrics);
@@ -766,7 +778,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
+        createSegmentOnlineOfflineStateModelFactory(instanceDataManager, _transitionThreadPoolManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -792,8 +804,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (Exception e) {
       LOGGER.error("Failed to register DefaultClusterConfigChangeHandler as the Helix ClusterConfigChangeListener", e);
     }
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottler);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_segmentOperationsThrottlerSet);
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(keepPipelineBreakerStatsPredicate);
+    ResourceManager resourceManager = _serverInstance.getQueryScheduler().getResourceManager();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new QuerySchedulerThreadPoolConfigChangeListener(resourceManager));
+
+    // Keep the Lucene searcher pool in sync with query_worker_threads changes
+    resourceManager.addThreadPoolResizeListener((newRunnerThreads, newWorkerThreads) -> {
+      _realtimeLuceneTextIndexSearcherPool.resize(newWorkerThreads);
+    });
 
     if (sendStatsPredicate.needWatchForInstanceConfigChange()) {
       LOGGER.info("Initializing and registering the SendStatsPredicate");
@@ -802,6 +822,21 @@ public abstract class BaseServerStarter implements ServiceStartable {
       } catch (Exception e) {
         LOGGER.error("Failed to register SendStatsPredicate as the Helix InstanceConfigChangeListener", e);
       }
+    }
+
+    // Register handler to reset GRPC mailbox channel backoff when servers come online
+    WorkerQueryServer workerQueryServer = _serverInstance.getWorkerQueryServer();
+    if (workerQueryServer != null) {
+      MailboxService mailboxService = workerQueryServer.getQueryRunner().getMailboxService();
+      LOGGER.info("Registering ServerGrpcChannelBackoffResetHandler");
+      try {
+        _helixManager.addInstanceConfigChangeListener(
+            new ServerGrpcChannelBackoffResetHandler(_helixAdmin, _helixClusterName, _instanceId, mailboxService));
+      } catch (Exception e) {
+        LOGGER.error("Failed to register ServerGrpcChannelBackoffResetHandler", e);
+      }
+    } else {
+      LOGGER.info("Multi-stage query engine not enabled, skipping ServerGrpcChannelBackoffResetHandler registration");
     }
 
     // Start restlet server for admin API endpoint
@@ -815,7 +850,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
+        createSegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
@@ -908,9 +943,19 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } else {
       _serverMetrics.addTimedValue(ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
     }
+
+    NettyInspector.registerMetrics(_serverMetrics);
   }
 
-  protected SegmentMultiColTextIndexPreprocessThrottler createMultiColumnIndexPreprocessThrottler() {
+  protected boolean isServerReadyToConsumeData() {
+    return true;
+  }
+
+  protected boolean isServerReadyToServeQueries() {
+    return _isServerReadyToServeQueries;
+  }
+
+  protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
     int maxConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM));
@@ -919,10 +964,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new SegmentMultiColTextIndexPreprocessThrottler(maxConcurrency, maxBeforeServingQueries, false);
+    return new SegmentOperationsThrottler(maxConcurrency, maxBeforeServingQueries, false,
+        ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_THROTTLE_THRESHOLD,
+        ServerGauge.SEGMENT_MULTI_COL_TEXT_INDEX_PREPROCESS_COUNT, "MultiColumnIndexPreprocess");
   }
 
-  protected SegmentAllIndexPreprocessThrottler createSegmentAllIndexPreprocessThrottler() {
+  protected SegmentOperationsThrottler createSegmentAllIndexPreprocessThrottler() {
     int maxPreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
@@ -930,11 +977,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new SegmentAllIndexPreprocessThrottler(maxPreprocessConcurrency,
-        maxPreprocessConcurrencyBeforeServingQueries, false);
+    return new SegmentOperationsThrottler(maxPreprocessConcurrency,
+        maxPreprocessConcurrencyBeforeServingQueries, false,
+        ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD,
+        ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT, "AllIndexPreprocess");
   }
 
-  protected SegmentStarTreePreprocessThrottler createSegmentStarTreePreprocessThrottler() {
+  protected SegmentOperationsThrottler createSegmentStarTreePreprocessThrottler() {
     int maxStarTreePreprocessConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM));
@@ -942,11 +991,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_STARTREE_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new SegmentStarTreePreprocessThrottler(maxStarTreePreprocessConcurrency,
-        maxStarTreePreprocessConcurrencyBeforeServingQueries, false);
+    return new SegmentOperationsThrottler(maxStarTreePreprocessConcurrency,
+        maxStarTreePreprocessConcurrencyBeforeServingQueries, false,
+        ServerGauge.SEGMENT_STARTREE_PREPROCESS_THROTTLE_THRESHOLD,
+        ServerGauge.SEGMENT_STARTREE_PREPROCESS_COUNT, "StarTreePreprocess");
   }
 
-  protected SegmentDownloadThrottler createSegmentDownloadThrottler() {
+  protected SegmentOperationsThrottler createSegmentDownloadThrottler() {
     int maxDownloadConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM));
@@ -954,15 +1005,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES,
             Helix.DEFAULT_MAX_SEGMENT_DOWNLOAD_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    return new SegmentDownloadThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
-        false);
+    return new SegmentOperationsThrottler(maxDownloadConcurrency, maxDownloadConcurrencyBeforeServingQueries,
+        false, ServerGauge.SEGMENT_DOWNLOAD_THROTTLE_THRESHOLD, ServerGauge.SEGMENT_DOWNLOAD_COUNT, "SegmentDownload");
   }
 
   /**
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
-    _segmentOperationsThrottler.startServingQueries();
+    _segmentOperationsThrottlerSet.startServingQueries();
   }
 
   /**
@@ -1211,6 +1262,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+  }
+
+  /**
+   * Creates the {@link SegmentMessageHandlerFactory} used to handle user-defined Helix messages for segments.
+   * Subclasses can override to return a custom factory that handles additional message sub-types.
+   */
+  protected SegmentMessageHandlerFactory createSegmentMessageHandlerFactory(InstanceDataManager instanceDataManager,
+      ServerMetrics serverMetrics) {
+    return new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
+  }
+
+  /**
+   * Creates the {@link SegmentOnlineOfflineStateModelFactory} used to handle Helix state transitions for segments.
+   * Subclasses can override to return a custom factory.
+   */
+  protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
+      InstanceDataManager instanceDataManager, StateTransitionThreadPoolManager transitionThreadPoolManager) {
+    return new SegmentOnlineOfflineStateModelFactory(instanceDataManager, transitionThreadPoolManager);
   }
 
   private void refreshMessageCount() {

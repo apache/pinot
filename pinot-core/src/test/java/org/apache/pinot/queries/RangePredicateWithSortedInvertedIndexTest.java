@@ -112,7 +112,7 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int rowIndex = 0; rowIndex < NUM_ROWS; rowIndex++) {
       GenericRow row = new GenericRow();
-      _stringValues[rowIndex] = RandomStringUtils.randomAlphanumeric(10);
+      _stringValues[rowIndex] = RandomStringUtils.secure().nextAlphanumeric(10);
       row.putValue(D1, _stringValues[rowIndex]);
       row.putValue(M1, INT_BASE_VALUE + rowIndex);
       _longValues[rowIndex] = RANDOM.nextLong();

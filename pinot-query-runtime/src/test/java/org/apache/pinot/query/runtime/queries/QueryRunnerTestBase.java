@@ -178,7 +178,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo,
         ThreadAccountantUtils.getNoOpAccountant())) {
       // exception will be propagated through for assert purpose on runtime error
-      return QueryDispatcher.runReducer(dispatchableSubPlan, Map.of(), _mailboxService);
+      return QueryDispatcher.runReducer(dispatchableSubPlan, requestMetadataMap, _mailboxService);
     }
   }
 
@@ -583,6 +583,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public Integer _partitionCount;
       @JsonProperty("replicated")
       public boolean _replicated;
+      @JsonProperty("isDimTable")
+      public boolean _isDimTable;
+      @JsonProperty("primaryKeyColumns")
+      public List<String> _primaryKeyColumns;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -606,6 +610,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public Integer _expectedNumSegments;
       @JsonProperty("ignoreV2Optimizer")
       public Boolean _ignoreV2Optimizer = false;
+      @JsonProperty("ignoreLiteMode")
+      public Boolean _ignoreLiteMode = false;
     }
 
     public static class ColumnAndType {

@@ -29,11 +29,10 @@ import org.apache.pinot.spi.utils.BytesUtils;
 /**
  * Dictionary of a single bytes ({@code byte[]}) value.
  */
-public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
+public class ConstantValueBytesDictionary extends BaseConstantValueDictionary {
   private final byte[] _value;
 
   public ConstantValueBytesDictionary(byte[] value) {
-    super(1);
     _value = value;
   }
 
@@ -80,6 +79,16 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    return _value.length;
+  }
+
+  @Override
+  public int getLengthOfLongestElement() {
+    return _value.length;
+  }
+
+  @Override
   public byte[] get(int dictId) {
     return _value;
   }
@@ -122,5 +131,10 @@ public class ConstantValueBytesDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return _value;
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return _value.length;
   }
 }

@@ -289,6 +289,26 @@ public abstract class BaseDataBlock implements DataBlock {
   }
 
   @Override
+  public BigDecimal[] getBigDecimalArray(int rowId, int colId) {
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    int size = _fixedSizeData.getInt(offsetInFixed + 4);
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+
+    BigDecimal[] bigDecimals = new BigDecimal[size];
+    try (PinotInputStream stream = _variableSizeData.openInputStream(offsetInVar)) {
+      for (int i = 0; i < size; i++) {
+        int byteLength = stream.readInt();
+        byte[] bytes = new byte[byteLength];
+        stream.readFully(bytes);
+        bigDecimals[i] = BigDecimalUtils.deserialize(bytes);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return bigDecimals;
+  }
+
+  @Override
   public String[] getStringArray(int rowId, int colId) {
     int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
     int size = _fixedSizeData.getInt(offsetInFixed + 4);
@@ -303,6 +323,26 @@ public abstract class BaseDataBlock implements DataBlock {
       throw new UncheckedIOException(e);
     }
     return strings;
+  }
+
+  @Override
+  public ByteArray[] getBytesArray(int rowId, int colId) {
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    int size = _fixedSizeData.getInt(offsetInFixed + 4);
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+
+    ByteArray[] bytes = new ByteArray[size];
+    try (PinotInputStream stream = _variableSizeData.openInputStream(offsetInVar)) {
+      for (int i = 0; i < size; i++) {
+        int byteLength = stream.readInt();
+        byte[] value = new byte[byteLength];
+        stream.readFully(value);
+        bytes[i] = new ByteArray(value);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return bytes;
   }
 
   @Override

@@ -129,6 +129,17 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
           }
           setDoubleMV(docId, doubles);
           break;
+        case BIG_DECIMAL:
+          if (value instanceof BigDecimal[]) {
+            setBigDecimalMV(docId, (BigDecimal[]) value);
+          } else {
+            BigDecimal[] bigDecimals = new BigDecimal[length];
+            for (int i = 0; i < length; i++) {
+              bigDecimals[i] = (BigDecimal) value[i];
+            }
+            setBigDecimalMV(docId, bigDecimals);
+          }
+          break;
         case STRING:
           if (value instanceof String[]) {
             setStringMV(docId, (String[]) value);
@@ -170,6 +181,9 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
    * @return The length (size in bytes) of the longest elements inside the forward index.
    */
   int getLengthOfLongestElement();
+
+  /// Returns `true` when all elements of a STRING raw forward index contain only ASCII characters, `false` otherwise.
+  boolean isAscii();
 
   /**
    * DICTIONARY-ENCODED INDEX APIs
@@ -701,6 +715,16 @@ public interface MutableForwardIndex extends ForwardIndexReader<ForwardIndexRead
    * @param values Values to write
    */
   default void setDoubleMV(int docId, double[] values) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Writes the BIG_DECIMAL type multi-value into the given document id.
+   *
+   * @param docId Document id
+   * @param values Values to write
+   */
+  default void setBigDecimalMV(int docId, BigDecimal[] values) {
     throw new UnsupportedOperationException();
   }
 

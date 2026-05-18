@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -48,8 +49,12 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
     return ColumnDataType.STRING;
   }
 
+  @Nullable
   @Override
-  public String extractFinalResult(List<ThetaSketchAccumulator> accumulators) {
+  public String extractFinalResult(@Nullable List<ThetaSketchAccumulator> accumulators) {
+    if (accumulators == null) {
+      return null;
+    }
     int numAccumulators = accumulators.size();
     List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 

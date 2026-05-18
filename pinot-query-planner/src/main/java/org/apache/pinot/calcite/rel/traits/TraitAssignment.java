@@ -21,7 +21,6 @@ package org.apache.pinot.calcite.rel.traits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.calcite.plan.RelTraitSet;
@@ -32,6 +31,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
@@ -42,9 +42,7 @@ import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAsOfJoin;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
-import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalProject;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
-import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalWindow;
 
 
@@ -133,9 +131,11 @@ public class TraitAssignment {
    */
   @VisibleForTesting
   RelNode assignJoin(Join join) {
-    // Case-1: Handle lookup joins.
+    // Case-1: Lookup joins — no distribution traits needed. LookupJoinRule (post-pass) handles
+    // fragment isolation by converting the right exchange to LOOKUP_LOCAL_EXCHANGE, ensuring the
+    // left has an exchange, and wrapping the join with IDENTITY_EXCHANGE above.
     if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
-      return assignLookupJoin(join);
+      return join;
     }
     // Case-2: Handle dynamic filter for semi joins.
     JoinInfo joinInfo = join.analyzeCondition();
@@ -148,13 +148,25 @@ public class TraitAssignment {
         "Always expect left and right keys to be same size. Found: %s and %s",
         joinInfo.leftKeys, joinInfo.rightKeys);
     // Case-3: Default case.
-    RelDistribution rightDistribution = !joinInfo.rightKeys.isEmpty() ? RelDistributions.hash(joinInfo.rightKeys)
-        : RelDistributions.BROADCAST_DISTRIBUTED;
+    JoinRelType joinType = join.getJoinType();
     RelDistribution leftDistribution;
-    if (joinInfo.leftKeys.isEmpty() || rightDistribution == RelDistributions.BROADCAST_DISTRIBUTED) {
-      leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
-    } else {
+    RelDistribution rightDistribution;
+    if (!joinInfo.leftKeys.isEmpty()) {
       leftDistribution = RelDistributions.hash(joinInfo.leftKeys);
+      rightDistribution = RelDistributions.hash(joinInfo.rightKeys);
+    } else if (joinType == JoinRelType.FULL) {
+      // FULL OUTER JOIN with no equi keys: use SINGLETON to collect all data on one worker. Both sides need
+      // global visibility to correctly determine unmatched rows.
+      leftDistribution = RelDistributions.SINGLETON;
+      rightDistribution = RelDistributions.SINGLETON;
+    } else if (joinType == JoinRelType.RIGHT) {
+      // RIGHT JOIN with no equi keys: broadcast left so each worker has the full left table and can correctly
+      // determine which of its local right rows are unmatched.
+      leftDistribution = RelDistributions.BROADCAST_DISTRIBUTED;
+      rightDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+    } else {
+      leftDistribution = RelDistributions.RANDOM_DISTRIBUTED;
+      rightDistribution = RelDistributions.BROADCAST_DISTRIBUTED;
     }
     // left-input
     RelNode leftInput = join.getInput(0);
@@ -244,28 +256,6 @@ public class TraitAssignment {
     return window.copy(window.getTraitSet(), List.of(input));
   }
 
-  private RelNode assignLookupJoin(Join join) {
-    /*
-     * Lookup join expects right input to have project and table-scan nodes exactly. Moreover, lookup join is used
-     * with Dimension tables only. Given this, we expect the entire right input to be available in all workers
-     * selected for the left input. For now, we will assign broadcast trait to the entire right input. Worker
-     * assignment will have to handle this explicitly regardless.
-     */
-    RelNode leftInput = join.getInputs().get(0);
-    RelNode rightInput = join.getInputs().get(1);
-    Preconditions.checkState(rightInput instanceof PhysicalProject, "Expected project as right input of table scan");
-    Preconditions.checkState(rightInput.getInput(0) instanceof PhysicalTableScan,
-        "Expected table scan under project for right input of lookup join");
-    PhysicalProject oldProject = (PhysicalProject) rightInput;
-    PhysicalTableScan oldTableScan = (PhysicalTableScan) oldProject.getInput(0);
-    PhysicalTableScan newTableScan =
-        (PhysicalTableScan) oldTableScan.copy(oldTableScan.getTraitSet().plus(
-            RelDistributions.BROADCAST_DISTRIBUTED), Collections.emptyList());
-    PhysicalProject newProject =
-        (PhysicalProject) oldProject.copy(oldProject.getTraitSet().plus(RelDistributions.BROADCAST_DISTRIBUTED),
-            List.of(newTableScan));
-    return join.copy(join.getTraitSet(), List.of(leftInput, newProject));
-  }
 
   @SuppressWarnings("unused")
   private RelNode assignDynamicFilterSemiJoin(PhysicalJoin join) {

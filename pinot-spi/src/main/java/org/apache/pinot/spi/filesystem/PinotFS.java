@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -178,6 +180,37 @@ public interface PinotFS extends Closeable, Serializable {
   default List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Lists files with metadata, applying a path filter and stopping after {@code maxResults} matches.
+   * Cloud storage implementations (S3, GCS, ADLS) should override this to fetch pages lazily
+   * and terminate early once enough matching files are found — avoiding loading all objects into memory.
+   *
+   * @param fileUri location to list files from
+   * @param recursive if we want to list files recursively
+   * @param pathFilter predicate applied to each file path; only files passing this filter are included
+   * @param maxResults maximum number of matching (non-directory) files to return
+   * @return a list of FileMetadata capped at maxResults
+   * @throws IOException on IO failure
+   */
+  default List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive,
+      Predicate<String> pathFilter, int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      return new ArrayList<>();
+    }
+    final List<FileMetadata> all = listFilesWithMetadata(fileUri, recursive);
+    final List<FileMetadata> result = new ArrayList<>();
+    for (final FileMetadata fm : all) {
+      if (!fm.isDirectory() && pathFilter.test(fm.getFilePath())) {
+        result.add(fm);
+        if (result.size() >= maxResults) {
+          break;
+        }
+      }
+    }
+    return result;
   }
 
   /**

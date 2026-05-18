@@ -23,23 +23,31 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
+/**
+ * Re-runs all cursor integration tests using {@code FsResponseStore} (local filesystem) instead of
+ * {@code MemoryResponseStore}. This validates the single-pass {@code deleteExpiredResponses} override,
+ * real PinotFS file I/O, JSON serde roundtrip, and brokerId filtering against actual metadata files.
+ */
 public class CursorFsIntegrationTest extends CursorIntegrationTest {
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".protocol", "file");
-    File tmpPath = new File(_tempDir, "tmp");
-    File dataPath = new File(_tempDir, "data");
-    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".file.temp.dir",
-        tmpPath);
     configuration.setProperty(
-        CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".file.data.dir", "file://" + dataPath);
+        CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".type", "file");
+    File responseStoreDir = new File(_tempDir, "responseStore");
+    configuration.setProperty(
+        CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".file.data.dir",
+        new File(responseStoreDir, "data").toURI().toString());
+    configuration.setProperty(
+        CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".file.temp.dir",
+        new File(responseStoreDir, "temp").getAbsolutePath());
   }
 
   @Override
   protected Object[][] getPageSizesAndQueryEngine() {
     return new Object[][]{
-        {false, 1000}, {false, 0}, // 0 triggers default behaviour
-        {true, 1000}, {true, 0}, // 0 triggers default behaviour
+        {false, 1000}, {false, 0},
+        {true, 1000}, {true, 0}
     };
   }
 }

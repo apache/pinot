@@ -103,11 +103,11 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               new Field(colName, FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null);
           vector = new Float8Vector(colName, ALLOCATOR);
           break;
+        case BIG_DECIMAL:
         case TIMESTAMP:
         case STRING:
-        case BYTES:
-        case BIG_DECIMAL:
         case JSON:
+        case BYTES:
         case OBJECT:
           field = new Field(colName, FieldType.nullable(new ArrowType.Utf8()), null);
           vector = new VarCharVector(colName, ALLOCATOR);
@@ -178,6 +178,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
           // Initialize its children from the defined field.
           vector.initializeChildrenFromFields(children);
           break;
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
         case STRING_ARRAY:
         case BYTES_ARRAY:
@@ -229,11 +230,11 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case DOUBLE:
               ((Float8Vector) vector).setSafe(rowIndex, ((Number) value).doubleValue());
               break;
+            case BIG_DECIMAL:
             case TIMESTAMP:
             case STRING:
-            case BYTES:
-            case BIG_DECIMAL:
             case JSON:
+            case BYTES:
             case OBJECT:
               byte[] bytes = ((String) value).getBytes(StandardCharsets.UTF_8);
               ((VarCharVector) vector).setSafe(rowIndex, bytes);
@@ -341,6 +342,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               // Finalize the list entry by indicating the number of elements added.
               doubleArrayVector.endValue(rowIndex, doubleArray.length);
               break;
+            case BIG_DECIMAL_ARRAY:
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:
@@ -405,11 +407,11 @@ public class ArrowResponseEncoder implements ResponseEncoder {
             case BOOLEAN:
               row[col] = ((BitVector) vector).get(i) == 1;
               break;
+            case BIG_DECIMAL:
             case TIMESTAMP:
             case STRING:
-            case BYTES:
-            case BIG_DECIMAL:
             case JSON:
+            case BYTES:
             case OBJECT:
               row[col] = new String(((VarCharVector) vector).get(i), StandardCharsets.UTF_8);
               break;
@@ -464,6 +466,7 @@ public class ArrowResponseEncoder implements ResponseEncoder {
               }
               row[col] = doubleArray;
               break;
+            case BIG_DECIMAL_ARRAY:
             case TIMESTAMP_ARRAY:
             case STRING_ARRAY:
             case BYTES_ARRAY:

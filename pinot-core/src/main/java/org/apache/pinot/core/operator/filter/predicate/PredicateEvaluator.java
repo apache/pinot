@@ -247,6 +247,15 @@ public interface PredicateEvaluator {
   boolean applySV(BigDecimal value);
 
   /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(BigDecimal[] values, int length);
+
+  /**
    * Apply a single-value entry to the predicate.
    *
    * @param value Raw value

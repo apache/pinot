@@ -146,6 +146,17 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return value;
     }
 
+    private int getValueSize(int index) {
+      int startOffset = _pinotDataBuffer.getInt(index * Integer.BYTES);
+      int endOffset;
+      if (index != 0) {
+        endOffset = _pinotDataBuffer.getInt((index - 1) * Integer.BYTES);
+      } else {
+        endOffset = _size;
+      }
+      return endOffset - startOffset;
+    }
+
     private int getSize() {
       return _size;
     }
@@ -210,6 +221,18 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
         return buffer.get(index - buffer.getStartIndex());
+      }
+    }
+    // Assumed that we will never ask for an index that does not exist.
+    throw new RuntimeException("dictionary ID '" + index + "' too low");
+  }
+
+  public int getValueSize(int index) {
+    List<Buffer> bufList = _buffers;
+    for (int x = bufList.size() - 1; x >= 0; x--) {
+      Buffer buffer = bufList.get(x);
+      if (index >= buffer.getStartIndex()) {
+        return buffer.getValueSize(index - buffer.getStartIndex());
       }
     }
     // Assumed that we will never ask for an index that does not exist.

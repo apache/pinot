@@ -84,10 +84,8 @@ public class SegmentTestUtils {
       String timeColumn, TimeUnit timeUnit, String tableName)
       throws IOException {
     Schema schema = extractSchemaFromAvroWithoutTime(inputAvro);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName(tableName)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setInvertedIndexColumns(new ArrayList<>(schema.getColumnNames()))
-        .setCreateInvertedIndexDuringSegmentGeneration(true)
         .setIngestionConfig(getSkipTimeCheckIngestionConfig())
         .build();
 

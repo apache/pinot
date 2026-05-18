@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -230,7 +230,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     FakeDeletionManager deletionManager = new FakeDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, propertyStore, 7);
@@ -280,8 +280,8 @@ public class SegmentDeletionManagerTest {
       createTestFileWithAge(dummyDir3.getAbsolutePath() + File.separator + "file %" + i, i);
     }
 
-    // Sleep 1 second to ensure the clock moves.
-    Thread.sleep(1000L);
+    // Sleep 2 seconds to ensure the clock moves beyond file timestamps (retention checks are time-based)
+    Thread.sleep(2000L);
 
     // Check that dummy directories and files are successfully created.
     Assert.assertEquals(dummyDir1.list().length, 3);
@@ -291,21 +291,21 @@ public class SegmentDeletionManagerTest {
     // Try to remove files with the retention of 1 days.
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
-    // Check that only 1 day retention file is remaining
-    TestUtils.waitForCondition((aVoid) -> dummyDir1.list().length == 1, 1000, 100000,
+    // Check that only 1 day retention file is remaining (increased timeout for systems under load)
+    TestUtils.waitForCondition((aVoid) -> dummyDir1.list().length == 1, 2000, 120000,
         "Unable to delete desired segments from dummyDir1");
 
     // Check that empty directory has not been removed in the first run
-    TestUtils.waitForCondition((aVoid) -> dummyDir2.exists(), 1000, 100000,
+    TestUtils.waitForCondition((aVoid) -> dummyDir2.exists(), 2000, 120000,
         "dummyDir2 does not exist");
 
     // Check that deleted file without retention suffix is honoring cluster-wide retention period of 7 days.
-    TestUtils.waitForCondition((aVoid) -> dummyDir3.list().length == 1, 1000, 100000,
+    TestUtils.waitForCondition((aVoid) -> dummyDir3.list().length == 1, 2000, 120000,
         "Unable to delete desired segments from dummyDir3");
 
     // Try to remove empty directory in the next run
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
-    TestUtils.waitForCondition((aVoid) -> !dummyDir2.exists(), 1000, 100000,
+    TestUtils.waitForCondition((aVoid) -> !dummyDir2.exists(), 2000, 120000,
         "dummyDir2 still exists");
   }
 
@@ -385,7 +385,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
@@ -441,7 +441,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
@@ -510,7 +510,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);

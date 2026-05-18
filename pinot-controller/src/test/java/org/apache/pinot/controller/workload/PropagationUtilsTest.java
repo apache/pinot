@@ -194,7 +194,6 @@ public class PropagationUtilsTest {
     public TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
         return new TableConfigBuilder(type)
             .setTableName(tableName)
-            .setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
             .setNumReplicas(1)
             .setBrokerTenant(brokerTenant)
             .setServerTenant(serverTag)

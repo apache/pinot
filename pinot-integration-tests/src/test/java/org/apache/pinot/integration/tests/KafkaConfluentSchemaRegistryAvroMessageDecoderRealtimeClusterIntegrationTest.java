@@ -19,7 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.primitives.Longs;
-import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
@@ -116,7 +116,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
       throws Exception {
     Properties avroProducerProps = new Properties();
     avroProducerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:" + getKafkaPort());
-    avroProducerProps.put(AbstractKafkaAvroSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
+    avroProducerProps.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, _schemaRegistry.getUrl());
     avroProducerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         "org.apache.kafka.common.serialization.ByteArraySerializer");
     avroProducerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
@@ -235,7 +235,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
     if (onlyFirstSegment) {
       numSegments = 1;
     }
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles[0];

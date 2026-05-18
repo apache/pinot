@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.recordtransformer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -30,6 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -62,7 +62,8 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true, () -> true);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager.getInstanceId(), instanceDataManager,
+        null, () -> true, () -> true);
   }
 
   public int getPort() {
@@ -75,6 +76,10 @@ public class QueryServerEnclosure {
 
   public void shutDown() {
     _queryRunner.shutDown();
+  }
+
+  public void cancel(long requestId) {
+    _queryRunner.cancel(requestId);
   }
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,

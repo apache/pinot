@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -79,11 +78,16 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
+import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
+import org.apache.pinot.common.restlet.resources.BatchConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -104,8 +108,6 @@ import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
@@ -126,10 +128,14 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.controller.ControllerJobType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.ConfigValidationException;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -350,17 +356,15 @@ public class PinotTableRestletResource {
         return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult);
       }
 
-      List<Pair<PartitionGroupMetadata, Integer>> partitionGroupInfos = watermarkInductionResult.getWatermarks()
-          .stream()
-          .map(watermark -> Pair.of(
-              new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset())),
-              watermark.getSequenceNumber()))
-          .collect(Collectors.toList());
+      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(realtimeTableConfig);
+      List<StreamMetadata> streamMetadataList = getStreamMetadataList(streamConfigs, watermarkInductionResult);
 
       _pinotHelixResourceManager.addSchema(schema, true, false);
       LOGGER.info("[copyTable] Successfully added schema for table: {}", tableName);
+      TableConfigValidationUtils.validateTableConfig(
+          realtimeTableConfig, schema, null, _pinotHelixResourceManager, _controllerConf, _pinotTaskManager);
       // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
-      _pinotHelixResourceManager.addTable(realtimeTableConfig, partitionGroupInfos);
+      _pinotHelixResourceManager.addTable(realtimeTableConfig, streamMetadataList);
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
       CopyTableResponse response = new CopyTableResponse("success", "Table copied successfully", null, null, null);
       if (hasOffline) {
@@ -373,11 +377,49 @@ public class PinotTableRestletResource {
         response.setWatermarkInductionResult(watermarkInductionResult);
       }
       return response;
+    } catch (ConfigValidationException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       LOGGER.error("[copyTable] Error copying table: {}", tableName, e);
       throw new ControllerApplicationException(LOGGER, "Error copying table: " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @VisibleForTesting
+  List<StreamMetadata> getStreamMetadataList(List<StreamConfig> streamConfigs,
+      WatermarkInductionResult watermarkInductionResult)
+      throws Exception {
+    Map<Integer, Integer> streamPartitionCountMap =
+        _pinotHelixResourceManager.getRealtimeSegmentManager().getPartitionCountMap(streamConfigs);
+    Map<Integer, List<PartitionGroupMetadata>> partitionGroupMetadataByStreamConfigIndex = new HashMap<>();
+    for (WatermarkInductionResult.Watermark watermark : watermarkInductionResult.getWatermarks()) {
+      int streamConfigIndex =
+          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(watermark.getPartitionGroupId());
+      Preconditions.checkArgument(streamConfigIndex >= 0 && streamConfigIndex < streamConfigs.size(),
+          "Invalid stream config index %s from watermark partition ID %s. Expected index in range [0, %s)",
+          streamConfigIndex, watermark.getPartitionGroupId(), streamConfigs.size());
+      partitionGroupMetadataByStreamConfigIndex.computeIfAbsent(streamConfigIndex, ignored -> new ArrayList<>()).add(
+          new PartitionGroupMetadata(watermark.getPartitionGroupId(), new LongMsgOffset(watermark.getOffset()),
+              watermark.getSequenceNumber()));
+    }
+
+    // Iterate in order by streamConfigIndex to ensure deterministic ordering
+    List<StreamMetadata> streamMetadataList = new ArrayList<>(partitionGroupMetadataByStreamConfigIndex.size());
+    for (int streamConfigIndex = 0; streamConfigIndex < streamConfigs.size(); streamConfigIndex++) {
+      List<PartitionGroupMetadata> partitionGroupMetadataList =
+          partitionGroupMetadataByStreamConfigIndex.get(streamConfigIndex);
+      if (partitionGroupMetadataList == null) {
+        // No watermarks for this stream config index, skip it
+        continue;
+      }
+      Integer partitionCount = streamPartitionCountMap.get(streamConfigIndex);
+      Preconditions.checkState(partitionCount != null,
+          "Cannot find partition count for stream config index: %s", streamConfigIndex);
+      streamMetadataList.add(new StreamMetadata(streamConfigs.get(streamConfigIndex),
+          partitionCount, partitionGroupMetadataList));
+    }
+    return streamMetadataList;
   }
 
   /**
@@ -403,7 +445,7 @@ public class PinotTableRestletResource {
     if (instanceAssignmentConfigMap == null) {
       return;
     }
-    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.fields();
+    java.util.Iterator<Map.Entry<String, JsonNode>> iterator = instanceAssignmentConfigMap.properties().iterator();
     while (iterator.hasNext()) {
       Map.Entry<String, JsonNode> entry = iterator.next();
       JsonNode instanceAssignmentConfig = entry.getValue();
@@ -727,7 +769,10 @@ public class PinotTableRestletResource {
   public ConfigSuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders headers,
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
+      @ApiParam(value = "Force config changes")
+      @QueryParam("force") @DefaultValue("false") boolean force,
+      @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
@@ -762,7 +807,11 @@ public class PinotTableRestletResource {
         throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
             Response.Status.NOT_FOUND);
       }
-      _pinotHelixResourceManager.updateTableConfig(tableConfig);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, force);
+    } catch (TableConfigBackwardIncompatibleException e) {
+      String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
@@ -1232,6 +1281,57 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("/tables/{tableNameWithType}/aggregateMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate metadata of all segments for a table (deprecated endpoint)",
+      notes = "Deprecated endpoint. Use /tables/{tableName}/metadata instead.")
+  public String getTableAggregateMetadataDeprecated(
+      @ApiParam(value = "Name of the table with type suffix", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "Comma separated list of columns") @QueryParam("columns") @Nullable String columns,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableNameWithType);
+    String existingTableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableNameWithType, null, LOGGER).get(0);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(existingTableNameWithType);
+    if (tableType == TableType.REALTIME) {
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableType + " not yet supported.",
+          Response.Status.NOT_IMPLEMENTED);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(existingTableNameWithType);
+    int numReplica = tableConfig == null ? 1 : tableConfig.getReplication();
+
+    List<String> columnsList = List.of();
+    if (StringUtils.isNotBlank(columns)) {
+      String[] splitColumns = StringUtils.split(columns, ',');
+      if (splitColumns != null && splitColumns.length > 0) {
+        List<String> parsedColumns = new ArrayList<>(splitColumns.length);
+        for (String column : splitColumns) {
+          String trimmedColumn = StringUtils.trimToNull(column);
+          if (trimmedColumn != null) {
+            parsedColumns.add(trimmedColumn);
+          }
+        }
+        columnsList = parsedColumns;
+      }
+    }
+
+    try {
+      JsonNode segmentsMetadataJson =
+          getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica);
+      return JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
   }
 
   @GET

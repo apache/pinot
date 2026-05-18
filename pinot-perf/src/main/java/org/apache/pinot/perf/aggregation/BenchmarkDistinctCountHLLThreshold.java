@@ -201,15 +201,6 @@ public class BenchmarkDistinctCountHLLThreshold {
     }
 
     @Override
-    public Object getSortedValues() {
-      String[] values = new String[_length];
-      for (int i = 0; i < _length; i++) {
-        values[i] = "value_" + i;
-      }
-      return values;
-    }
-
-    @Override
     public Object get(int dictId) {
       return dictId;
     }
@@ -340,6 +331,11 @@ public class BenchmarkDistinctCountHLLThreshold {
 
     @Override
     public double[][] getDoubleValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public BigDecimal[][] getBigDecimalValuesMV() {
       throw new UnsupportedOperationException();
     }
 

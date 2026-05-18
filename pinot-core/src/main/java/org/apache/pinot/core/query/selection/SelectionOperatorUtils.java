@@ -437,8 +437,14 @@ public class SelectionOperatorUtils {
           case DOUBLE_ARRAY:
             dataTableBuilder.setColumn(i, (double[]) columnValue);
             break;
+          case BIG_DECIMAL_ARRAY:
+            dataTableBuilder.setColumn(i, (BigDecimal[]) columnValue);
+            break;
           case STRING_ARRAY:
             dataTableBuilder.setColumn(i, (String[]) columnValue);
+            break;
+          case BYTES_ARRAY:
+            dataTableBuilder.setColumn(i, (ByteArray[]) columnValue);
             break;
 
           default:
@@ -514,8 +520,14 @@ public class SelectionOperatorUtils {
         case DOUBLE_ARRAY:
           row[i] = dataTable.getDoubleArray(rowId, i);
           break;
+        case BIG_DECIMAL_ARRAY:
+          row[i] = dataTable.getBigDecimalArray(rowId, i);
+          break;
         case STRING_ARRAY:
           row[i] = dataTable.getStringArray(rowId, i);
+          break;
+        case BYTES_ARRAY:
+          row[i] = dataTable.getBytesArray(rowId, i);
           break;
 
         default:

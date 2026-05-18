@@ -118,6 +118,18 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
+  public boolean requiresDictionary(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // The null value vector is a bitmap of doc IDs whose value is null; no dictionary involvement.
+    return false;
+  }
+
+  @Override
+  public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, IndexConfig indexConfig) {
+    // The null value vector is keyed by doc ID and independent of the column's value representation.
+    return false;
+  }
+
+  @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
     return EXTENSIONS;
   }

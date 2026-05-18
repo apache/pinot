@@ -68,7 +68,7 @@ public class DoubleGroupByResultHolderTest {
 
   /**
    * This test is for the GroupByResultHolder.EnsureCapacity api.
-   * - Fills the the result holder with a set of values.
+   * - Fills the result holder with a set of values.
    * - Calls ensureCapacity to expand the result holder size.
    * - Checks that the expanded unfilled portion of the result holder contains {@ref #DEFAULT_VALUE}
    * - Fills the rest of the resultHolder, and ensures all values are returned as expected.

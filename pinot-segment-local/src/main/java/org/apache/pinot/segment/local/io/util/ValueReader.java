@@ -77,6 +77,12 @@ public interface ValueReader extends Closeable {
    */
   byte[] getBytes(int index, int numBytesPerValue);
 
+  /// Applicable to STRING only.
+  int getUnpaddedByteSize(int index, int numBytesPerValue);
+
+  /// Applicable to variable sized types other than STRING, i.e. BIG_DECIMAL, BYTES.
+  int getByteSize(int index, int numBytesPerValue);
+
   /**
    * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
    */

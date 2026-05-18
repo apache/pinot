@@ -28,8 +28,7 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.pinot.spi.utils.Utf8Utils;
 
 
 @SuppressWarnings("Duplicates")
@@ -38,6 +37,9 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   private volatile String _min = null;
   private volatile String _max = null;
+  private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private volatile int _lengthOfLongestElement = 0;
+  private volatile boolean _isAscii = true;
 
   public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgStringLen) {
@@ -48,8 +50,9 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   @Override
   public int index(Object value) {
     String stringValue = (String) value;
-    updateMinMax(stringValue);
-    return indexValue(stringValue, stringValue.getBytes(UTF_8));
+    byte[] utf8Bytes = Utf8Utils.encode(stringValue);
+    updateStats(stringValue, utf8Bytes.length);
+    return indexValue(stringValue, utf8Bytes);
   }
 
   @Override
@@ -58,10 +61,21 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     int[] dictIds = new int[numValues];
     for (int i = 0; i < numValues; i++) {
       String stringValue = (String) values[i];
-      updateMinMax(stringValue);
-      dictIds[i] = indexValue(stringValue, stringValue.getBytes(UTF_8));
+      byte[] utf8Bytes = Utf8Utils.encode(stringValue);
+      updateStats(stringValue, utf8Bytes.length);
+      dictIds[i] = indexValue(stringValue, utf8Bytes);
     }
     return dictIds;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.STRING;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(stringValue, Utf8Utils.encode(stringValue));
   }
 
   @Override
@@ -128,13 +142,18 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.STRING;
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestElement;
   }
 
   @Override
-  public int indexOf(String stringValue) {
-    return getDictId(stringValue, stringValue.getBytes(UTF_8));
+  public int getLengthOfLongestElement() {
+    return _lengthOfLongestElement;
+  }
+
+  @Override
+  public boolean isAscii() {
+    return _isAscii;
   }
 
   @Override
@@ -169,12 +188,17 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public String getStringValue(int dictId) {
-    return new String(_byteStore.get(dictId), UTF_8);
+    return Utf8Utils.decode(_byteStore.get(dictId));
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
     return _byteStore.get(dictId);
+  }
+
+  @Override
+  public int getValueSize(int dictId) {
+    return _byteStore.getValueSize(dictId);
   }
 
   @Override
@@ -203,16 +227,28 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     _byteStore.close();
   }
 
-  private void updateMinMax(String value) {
+  private void updateStats(String value, int utf8Length) {
     if (_min == null) {
       _min = value;
       _max = value;
+      _lengthOfShortestElement = utf8Length;
+      _lengthOfLongestElement = utf8Length;
+      _isAscii = utf8Length == value.length();
     } else {
       if (value.compareTo(_min) < 0) {
         _min = value;
       }
       if (value.compareTo(_max) > 0) {
         _max = value;
+      }
+      if (utf8Length < _lengthOfShortestElement) {
+        _lengthOfShortestElement = utf8Length;
+      }
+      if (utf8Length > _lengthOfLongestElement) {
+        _lengthOfLongestElement = utf8Length;
+      }
+      if (_isAscii) {
+        _isAscii = utf8Length == value.length();
       }
     }
   }

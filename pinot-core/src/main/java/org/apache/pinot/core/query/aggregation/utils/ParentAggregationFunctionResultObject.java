@@ -31,7 +31,9 @@ import org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewrite
 public interface ParentAggregationFunctionResultObject
     extends Comparable<ParentAggregationFunctionResultObject>, Serializable {
 
-  // get the nested value of the field at the given row, column
+  /// Get the field from a projection column in the internal form (e.g. `ByteArray` for BYTES, `ByteArray[]` for
+  /// BYTES_ARRAY). Callers that surface the value as a query result must convert to the external form first via
+  /// [DataSchema.ColumnDataType#convert]
   Object getField(int rowId, int colId);
 
   // get total number of rows

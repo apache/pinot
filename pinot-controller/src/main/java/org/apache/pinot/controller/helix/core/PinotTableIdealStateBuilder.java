@@ -19,14 +19,15 @@
 package org.apache.pinot.controller.helix.core;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionGroupMetadataFetcher;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMetadata;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -54,7 +55,7 @@ public class PinotTableIdealStateBuilder {
   }
 
   /**
-   * Fetches the list of {@link PartitionGroupMetadata} for the new partition groups for the stream,
+   * Fetches the list of {@link StreamMetadata} for all streams of the table,
    * with the help of the {@link PartitionGroupConsumptionStatus} of the current partitionGroups.
    * In particular, this method can also be used to fetch from multiple stream topics.
    *
@@ -90,19 +91,19 @@ public class PinotTableIdealStateBuilder {
    * @param pausedTopicIndices List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
    * @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
    */
-  public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
+  public static List<StreamMetadata> getStreamMetadataList(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
       boolean forceGetOffsetFromStream) {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
         streamConfigs, partitionGroupConsumptionStatusList, pausedTopicIndices, forceGetOffsetFromStream);
     try {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
-      return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();
+      return partitionGroupMetadataFetcher.getStreamMetadataList();
     } catch (Exception e) {
       Exception fetcherException = partitionGroupMetadataFetcher.getException();
       String tableNameWithType = streamConfigs.get(0).getTableNameWithType();
-      LOGGER.error("Could not get PartitionGroupMetadata for topic: {} of table: {}",
-          streamConfigs.stream().map(streamConfig -> streamConfig.getTopicName()).reduce((a, b) -> a + "," + b),
+      LOGGER.error("Could not get StreamMetadata for topic: {} of table: {}",
+          streamConfigs.stream().map(StreamConfig::getTopicName).collect(Collectors.joining(",")),
           tableNameWithType, fetcherException);
       ControllerMetrics controllerMetrics = ControllerMetrics.get();
       controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_GROUP_METADATA_FETCH_ERROR,

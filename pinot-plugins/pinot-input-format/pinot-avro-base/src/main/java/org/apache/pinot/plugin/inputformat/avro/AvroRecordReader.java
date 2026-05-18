@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.RecordFetchException;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
@@ -51,7 +52,7 @@ public class AvroRecordReader implements RecordReader {
     _avroReader = AvroUtils.getAvroReader(dataFile);
 
     AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
-    recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
+    recordExtractorConfig.setExtractRawTimeValues(config.isExtractRawTimeValues());
     _recordExtractor = new AvroRecordExtractor();
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }
@@ -64,7 +65,13 @@ public class AvroRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
+    // Record fetch: read next Avro record from stream.
+    try {
+      _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
+    } catch (IOException e) {
+      throw new RecordFetchException("Failed to read next Avro record", e);
+    }
+    // Data parsing: extract into GenericRow.
     _recordExtractor.extract(_reusableAvroRecord, reuse);
     return reuse;
   }

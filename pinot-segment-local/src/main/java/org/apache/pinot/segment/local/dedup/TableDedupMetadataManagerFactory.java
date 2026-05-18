@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -40,7 +40,7 @@ public class TableDedupMetadataManagerFactory {
 
   public static TableDedupMetadataManager create(PinotConfiguration instanceDedupConfig, TableConfig tableConfig,
       Schema schema, TableDataManager tableDataManager,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
+      @Nullable SegmentOperationsThrottlerSet segmentOperationsThrottlerSet) {
     String tableNameWithType = tableConfig.getTableName();
     Preconditions.checkArgument(tableConfig.isDedupEnabled(), "Dedup must be enabled for table: %s", tableNameWithType);
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
@@ -66,7 +66,7 @@ public class TableDedupMetadataManagerFactory {
       LOGGER.info("Creating ConcurrentMapTableDedupMetadataManager for table: {}", tableNameWithType);
       metadataManager = new ConcurrentMapTableDedupMetadataManager();
     }
-    metadataManager.init(instanceDedupConfig, tableConfig, schema, tableDataManager, segmentOperationsThrottler);
+    metadataManager.init(instanceDedupConfig, tableConfig, schema, tableDataManager, segmentOperationsThrottlerSet);
     return metadataManager;
   }
 }

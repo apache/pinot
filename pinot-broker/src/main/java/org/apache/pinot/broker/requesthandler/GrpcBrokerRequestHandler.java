@@ -59,9 +59,9 @@ import org.slf4j.LoggerFactory;
 public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcBrokerRequestHandler.class);
 
-  private final StreamingReduceService _streamingReduceService;
-  private final PinotServerStreamingQueryClient _streamingQueryClient;
-  private final FailureDetector _failureDetector;
+  protected final StreamingReduceService _streamingReduceService;
+  protected final PinotServerStreamingQueryClient _streamingQueryClient;
+  protected final FailureDetector _failureDetector;
 
   // TODO: Support TLS
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
@@ -94,15 +94,25 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
       throws Exception {
+    // TODO: Add servers queried/responded stats
+    assert route.getOfflineBrokerRequest() != null || route.getRealtimeBrokerRequest() != null;
+    Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = doScatter(requestId, route,
+        requestContext);
+    return doReduce(originalBrokerRequest, responseMap, timeoutMs);
+  }
+
+  /**
+   * Executes scatter: sends the query to servers and collects per-server streaming response iterators.
+   * Subclasses may override to replace or augment the scatter step.
+   */
+  protected Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> doScatter(long requestId, TableRouteInfo route,
+      RequestContext requestContext) {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
     // TODO: Routing bases on Map<ServerInstance, SegmentsToQuery> cannot be supported for logical tables.
     // The routing will be replaces to support table to segment list map in the future.
     Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = route.getOfflineRoutingTable();
     Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = route.getRealtimeRoutingTable();
-
-    // TODO: Add servers queried/responded stats
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
@@ -114,6 +124,16 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       sendRequest(requestId, TableType.REALTIME, realtimeBrokerRequest, realtimeRoutingTable, responseMap,
           requestContext.isSampledRequest());
     }
+    return responseMap;
+  }
+
+  /**
+   * Executes the reduce step on the given responseMap.
+   * Subclasses may override to perform custom reduce logic or augment the responseMap.
+   */
+  protected BrokerResponseNative doReduce(BrokerRequest originalBrokerRequest,
+      Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, long timeoutMs)
+      throws Exception {
     long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =
         _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);

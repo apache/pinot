@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 @ScalarFunction(names = {"ARRAYS_OVERLAP"})
@@ -58,8 +60,15 @@ public class ArraysOverlapScalarFunction implements PinotScalarFunction {
       TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.DOUBLE_ARRAY,
           new FunctionInfo(ArraysOverlapScalarFunction.class.getMethod("arraysOverlap", double[].class, double[].class),
               ArraysOverlapScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BIG_DECIMAL_ARRAY,
+          new FunctionInfo(
+              ArraysOverlapScalarFunction.class.getMethod("arraysOverlap", BigDecimal[].class, BigDecimal[].class),
+              ArraysOverlapScalarFunction.class, false));
       TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.STRING_ARRAY,
           new FunctionInfo(ArraysOverlapScalarFunction.class.getMethod("arraysOverlap", String[].class, String[].class),
+              ArraysOverlapScalarFunction.class, false));
+      TYPE_FUNCTION_INFO_MAP.put(DataSchema.ColumnDataType.BYTES_ARRAY,
+          new FunctionInfo(ArraysOverlapScalarFunction.class.getMethod("arraysOverlap", byte[][].class, byte[][].class),
               ArraysOverlapScalarFunction.class, false));
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
@@ -159,6 +168,31 @@ public class ArraysOverlapScalarFunction implements PinotScalarFunction {
     return false;
   }
 
+  private static boolean overlapBigDecimals(BigDecimal[] small, BigDecimal[] large) {
+    ObjectOpenHashSet<BigDecimal> set = new ObjectOpenHashSet<>(small);
+    for (BigDecimal v : large) {
+      if (set.contains(v)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Wraps each raw `byte[]` into a [ByteArray] so the hash set can use content-based equality; `byte[]`
+  /// itself only has reference equality.
+  private static boolean overlapBytes(byte[][] small, byte[][] large) {
+    ObjectOpenHashSet<ByteArray> set = new ObjectOpenHashSet<>(small.length);
+    for (byte[] v : small) {
+      set.add(new ByteArray(v));
+    }
+    for (byte[] v : large) {
+      if (set.contains(new ByteArray(v))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static boolean arraysOverlap(int[] array1, int[] array2) {
     return array1.length <= array2.length ? overlapInts(array1, array2) : overlapInts(array2, array1);
   }
@@ -175,7 +209,15 @@ public class ArraysOverlapScalarFunction implements PinotScalarFunction {
     return array1.length <= array2.length ? overlapDoubles(array1, array2) : overlapDoubles(array2, array1);
   }
 
+  public static boolean arraysOverlap(BigDecimal[] array1, BigDecimal[] array2) {
+    return array1.length <= array2.length ? overlapBigDecimals(array1, array2) : overlapBigDecimals(array2, array1);
+  }
+
   public static boolean arraysOverlap(String[] array1, String[] array2) {
     return array1.length <= array2.length ? overlapStrings(array1, array2) : overlapStrings(array2, array1);
+  }
+
+  public static boolean arraysOverlap(byte[][] array1, byte[][] array2) {
+    return array1.length <= array2.length ? overlapBytes(array1, array2) : overlapBytes(array2, array1);
   }
 }

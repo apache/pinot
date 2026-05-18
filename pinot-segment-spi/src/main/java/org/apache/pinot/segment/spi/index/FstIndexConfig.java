@@ -21,51 +21,19 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class FstIndexConfig extends IndexConfig {
-  public static final FstIndexConfig DISABLED = new FstIndexConfig(true, null);
-  private final FSTType _fstType;
+  public static final FstIndexConfig DISABLED = new FstIndexConfig(true);
 
-  public FstIndexConfig(@JsonProperty("type") @Nullable FSTType fstType) {
-    this(false, fstType);
+  public FstIndexConfig() {
+    this(false);
   }
 
   @JsonCreator
-  public FstIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
-      @JsonProperty("type") @Nullable FSTType fstType) {
+  public FstIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled) {
     super(disabled);
-    _fstType = fstType;
-  }
-
-  @JsonProperty("type")
-  public FSTType getFstType() {
-    return _fstType;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-    FstIndexConfig that = (FstIndexConfig) o;
-    return _fstType == that._fstType;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(_fstType);
-  }
-
-  @Override
-  public String toString() {
-    return "FstIndexConfig{\"fstType\":" + _fstType + '}';
   }
 }

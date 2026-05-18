@@ -25,11 +25,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 /**
  * Dictionary of a single double value.
  */
-public class ConstantValueDoubleDictionary extends BaseImmutableDictionary {
+public class ConstantValueDoubleDictionary extends BaseConstantValueDictionary {
   private final double _value;
 
   public ConstantValueDoubleDictionary(double value) {
-    super(1);
     _value = value;
   }
 

@@ -22,14 +22,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.io.DataOutputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +48,9 @@ import org.apache.pinot.core.instance.context.ServerContext;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.access.AuthorizationInterceptor;
 import org.apache.pinot.query.access.QueryAccessControlFactory;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -88,6 +93,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Nullable
   private final QueryAccessControlFactory _accessControlFactory;
   private final ThreadAccountant _threadAccountant;
+  private final int _permitKeepAliveTimeMs;
+  private final boolean _permitKeepAliveWithoutCalls;
 
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
@@ -144,6 +151,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       _accessControlFactory = accessControlFactory;
     }
     _threadAccountant = threadAccountant;
+    _permitKeepAliveTimeMs = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_TIME_MS);
+    _permitKeepAliveWithoutCalls = serverConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_QUERY_SERVER_PERMIT_KEEP_ALIVE_WITHOUT_CALLS);
 
     ExecutorService baseExecutorService =
         ExecutorServiceUtils.create(serverConf, CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -167,14 +180,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     LOGGER.info("Starting QueryServer");
     try {
       if (_server == null) {
-        ServerBuilder<?> serverBuilder;
-        if (_tlsConfig == null) {
-          serverBuilder = ServerBuilder.forPort(_port);
-        } else {
-          serverBuilder = NettyServerBuilder.forPort(_port).sslContext(getOrCreateServerSslContext());
+        // Always use NettyServerBuilder so we can configure Netty-specific gRPC server options
+        // (e.g. permitKeepAliveTime / permitKeepAliveWithoutCalls).
+        NettyServerBuilder serverBuilder = NettyServerBuilder.forPort(_port);
+        if (_tlsConfig != null) {
+          serverBuilder.sslContext(getOrCreateServerSslContext());
         }
         _server = buildGrpcServer(serverBuilder);
-        LOGGER.info("Initialized QueryServer on port: {}", _port);
+        LOGGER.info(
+            "Initialized QueryServer on port: {} with permitKeepAliveTimeMs: {}, permitKeepAliveWithoutCalls: {}",
+            _port, _permitKeepAliveTimeMs, _permitKeepAliveWithoutCalls);
       }
       _queryRunner.start();
       _server.start();
@@ -183,12 +198,28 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
   }
 
-  private <T extends ServerBuilder<T>> Server buildGrpcServer(ServerBuilder<T> builder) {
+  @VisibleForTesting
+  int getPermitKeepAliveTimeMs() {
+    return _permitKeepAliveTimeMs;
+  }
+
+  @VisibleForTesting
+  boolean isPermitKeepAliveWithoutCalls() {
+    return _permitKeepAliveWithoutCalls;
+  }
+
+  private Server buildGrpcServer(NettyServerBuilder builder) {
     // By using directExecutor, GRPC doesn't need to manage its own thread pool
     builder.directExecutor();
     if (_accessControlFactory != null) {
       builder.intercept(new AuthorizationInterceptor(_accessControlFactory));
     }
+    // Configure server-side keep-alive enforcement so that operators tuning down the broker dispatch keep-alive time
+    // (or enabling pings-without-calls) do not get their channels torn down with GOAWAY(ENHANCE_YOUR_CALM).
+    if (_permitKeepAliveTimeMs > 0) {
+      builder.permitKeepAliveTime(_permitKeepAliveTimeMs, TimeUnit.MILLISECONDS);
+    }
+    builder.permitKeepAliveWithoutCalls(_permitKeepAliveWithoutCalls);
     return builder.addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
   }
 
@@ -228,6 +259,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   //   starts in the query runner.
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
+    // Match the SSE QUERIES counter semantics by counting requests as soon as they reach the handler.
+    ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
     Map<String, String> reqMetadata;
     try {
       reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
@@ -304,8 +337,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// (normally cancelling other already started workers and sending the error through GRPC)
   private CompletableFuture<Void> submitWorker(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> reqMetadata, QueryExecutionContext executionContext) {
+    PlanNode rootNode = stagePlan.getRootNode();
+    Set<Integer> upstreamStageIds = collectUpstreamStageIds(rootNode);
+    Set<Integer> downstreamStageIds = collectDownstreamStageIds(rootNode);
     QueryThreadContext.MseWorkerInfo mseWorkerInfo =
-        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId());
+        new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(), workerMetadata.getWorkerId(),
+            upstreamStageIds, downstreamStageIds);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
       return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata);
     }
@@ -368,11 +405,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       StageMetadata stageMetadata = stagePlan.getStageMetadata();
 
       Worker.ExplainResponse.Builder builder = Worker.ExplainResponse.newBuilder();
+      PlanNode rootNode = stagePlan.getRootNode();
+      Set<Integer> upstreamStageIds = collectUpstreamStageIds(rootNode);
+      Set<Integer> downstreamStageIds = collectDownstreamStageIds(rootNode);
       List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
       for (WorkerMetadata workerMetadata : workerMetadataList) {
         QueryThreadContext.MseWorkerInfo mseWorkerInfo =
             new QueryThreadContext.MseWorkerInfo(stagePlan.getStageMetadata().getStageId(),
-                workerMetadata.getWorkerId());
+                workerMetadata.getWorkerId(), upstreamStageIds, downstreamStageIds);
         StagePlan explainPlan;
         try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant)) {
           explainPlan = _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
@@ -440,6 +480,36 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
+  }
+
+  // Collects sender stage IDs from all MailboxReceiveNodes in the plan tree via BFS,
+  // since MailboxReceiveNodes can appear at any depth (e.g. joins have multiple inputs).
+  @VisibleForTesting
+  static Set<Integer> collectUpstreamStageIds(PlanNode rootNode) {
+    Set<Integer> ids = new HashSet<>();
+    ArrayDeque<PlanNode> queue = new ArrayDeque<>();
+    queue.add(rootNode);
+    while (!queue.isEmpty()) {
+      PlanNode node = queue.poll();
+      if (node instanceof MailboxReceiveNode) {
+        ids.add(((MailboxReceiveNode) node).getSenderStageId());
+      }
+      queue.addAll(node.getInputs());
+    }
+    return ids;
+  }
+
+  // Collects receiver stage IDs from the root MailboxSendNode.
+  @VisibleForTesting
+  static Set<Integer> collectDownstreamStageIds(PlanNode rootNode) {
+    if (rootNode instanceof MailboxSendNode) {
+      Set<Integer> ids = new HashSet<>();
+      for (int receiverId : ((MailboxSendNode) rootNode).getReceiverStageIds()) {
+        ids.add(receiverId);
+      }
+      return ids;
+    }
+    return Set.of();
   }
 
   private StagePlan deserializePlan(long requestId, Worker.StagePlan protoStagePlan) {

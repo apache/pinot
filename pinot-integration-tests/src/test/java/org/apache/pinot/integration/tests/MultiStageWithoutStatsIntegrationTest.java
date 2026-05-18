@@ -26,7 +26,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.server.starter.helix.SendStatsPredicate;
+import org.apache.pinot.query.runtime.SendStatsPredicate;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;

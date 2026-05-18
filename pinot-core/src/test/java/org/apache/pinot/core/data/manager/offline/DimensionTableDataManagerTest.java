@@ -39,16 +39,13 @@ import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
-import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
-import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
-import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
-import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -86,11 +83,11 @@ public class DimensionTableDataManagerTest {
   private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
   private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
-  private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(1, 2, true),
-      new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(1, 2, true),
-      new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
+  private static final SegmentOperationsThrottlerSet SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottlerSet(
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(1, 2, true),
+      new SegmentOperationsThrottler(1, 2, true));
 
   private File _indexDir;
   private SegmentZKMetadata _segmentZKMetadata;
@@ -117,7 +114,7 @@ public class DimensionTableDataManagerTest {
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfig(csvFile, FileFormat.CSV, tableDataDir, RAW_TABLE_NAME, tableConfig,
             schema);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig);
     driver.build();
 

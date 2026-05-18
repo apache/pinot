@@ -23,14 +23,13 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.RebalanceSummaryResult;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -101,9 +100,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
   @Test
   public void testConsumingSegmentSummary()
       throws Exception {
-    String response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    RebalanceResult result = JsonUtils.stringToObject(response, RebalanceResult.class);
+    RebalanceResult result = getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, true, false, -1);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
     Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
@@ -117,9 +115,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         0);
 
     startServer();
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    result = JsonUtils.stringToObject(response, RebalanceResult.class);
+    result = getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, true, false, -1);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
     Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
@@ -143,9 +140,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         .reduce(0L, (a, b) -> a + b.getTotalOffsetsToCatchUpAcrossAllConsumingSegments(), Long::sum), 57801);
 
     // set includeConsuming to false
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, false, false, -1));
-    result = JsonUtils.stringToObject(response, RebalanceResult.class);
+    result = getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, false, false, -1);
     Assert.assertNotNull(result);
     Assert.assertNotNull(result.getRebalanceSummaryResult());
     Assert.assertNotNull(result.getRebalanceSummaryResult().getSegmentInfo());
@@ -158,9 +154,8 @@ public class KafkaConsumingSegmentToBeMovedSummaryIntegrationTest extends BaseRe
         0);
 
     stopKafka();
-    response = sendPostRequest(
-        getControllerRequestURLBuilder().forTableRebalance(getTableName(), "REALTIME", true, false, true, false, -1));
-    RebalanceResult resultNoInfo = JsonUtils.stringToObject(response, RebalanceResult.class);
+    RebalanceResult resultNoInfo = getOrCreateAdminClient().getRebalanceClient()
+        .rebalanceTable(getTableName(), "REALTIME", true, false, true, false, -1);
     Assert.assertNotNull(resultNoInfo);
     Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult());
     Assert.assertNotNull(resultNoInfo.getRebalanceSummaryResult().getSegmentInfo());

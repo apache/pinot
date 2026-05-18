@@ -26,7 +26,7 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
@@ -53,7 +53,7 @@ public class ConnectionFailureDetectorTest {
     config.setProperty(Broker.FailureDetector.CONFIG_OF_TYPE, Broker.FailureDetector.Type.CONNECTION.name());
     config.setProperty(Broker.FailureDetector.CONFIG_OF_RETRY_INITIAL_DELAY_MS, 100);
     config.setProperty(Broker.FailureDetector.CONFIG_OF_RETRY_DELAY_FACTOR, 1);
-    _brokerMetrics = new BrokerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    _brokerMetrics = new BrokerMetrics(new NoopPinotMetricsRegistry());
     _failureDetector = FailureDetectorFactory.getFailureDetector(config, _brokerMetrics);
     assertTrue(_failureDetector instanceof ConnectionFailureDetector);
     _healthyServerNotifier = new HealthyServerNotifier();

@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
@@ -33,7 +34,9 @@ import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +45,12 @@ import org.slf4j.LoggerFactory;
 public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
+  private static final Set<String> FORWARD_INDEX_ONLY_TYPES =
+      Set.of(StandardIndexes.FORWARD_ID, StandardIndexes.DICTIONARY_ID, StandardIndexes.NULL_VALUE_VECTOR_ID);
+
   private final IndexTypeMap _indexTypeMap;
+  @Nullable
+  private final VectorIndexConfig _vectorIndexConfig;
 
   // Reference to shared segment-level multi-column text index reader.
   // This reader is closed on segment destroy() and not in this class' close() method.
@@ -57,12 +65,17 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     if (fieldIndexConfigs == null) {
       fieldIndexConfigs = FieldIndexConfigs.EMPTY;
     }
+    _vectorIndexConfig = fieldIndexConfigs.getConfig(StandardIndexes.vector());
 
     ArrayList<IndexType> indexTypes = new ArrayList<>();
     ArrayList<IndexReader> readers = new ArrayList<>();
 
+    boolean forwardIndexOnly = indexLoadingConfig.isForwardIndexOnly();
     try {
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+        if (forwardIndexOnly && !FORWARD_INDEX_ONLY_TYPES.contains(indexType.getId())) {
+          continue;
+        }
         if (segmentReader.hasIndexFor(columnName, indexType)) {
           IndexReaderFactory<?> readerProvider = indexType.getReaderFactory();
           try {
@@ -94,6 +107,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   @Override
   public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
     return _indexTypeMap.getIndex(indexType);
+  }
+
+  @Nullable
+  @Override
+  public VectorIndexConfig getVectorIndexConfig() {
+    return _vectorIndexConfig != null && _vectorIndexConfig.isEnabled() ? _vectorIndexConfig : null;
   }
 
   @Override

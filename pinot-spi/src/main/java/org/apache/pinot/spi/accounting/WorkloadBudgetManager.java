@@ -25,7 +25,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,25 +44,36 @@ public class WorkloadBudgetManager {
     return _instance;
   }
 
+  private final String _secondaryWorkloadName;
   private long _enforcementWindowMs;
   private ConcurrentHashMap<String, Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
-  private volatile boolean _isEnabled;
+  private volatile boolean _enabled;
 
-  public WorkloadBudgetManager(PinotConfiguration config) {
-    _isEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
+  public WorkloadBudgetManager(PinotConfiguration accountingConfig) {
+    _secondaryWorkloadName = accountingConfig.getProperty(Accounting.Keys.SECONDARY_WORKLOAD_NAME,
+        Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
+    _enabled = accountingConfig.getProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION,
+        Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
     // Return an object even if disabled. All functionalities of this class will be noops.
-    if (!_isEnabled) {
+    if (!_enabled) {
       LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
       return;
     }
     _workloadBudgets = new ConcurrentHashMap<>();
-    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
-    initSecondaryWorkloadBudget(config);
+    _enforcementWindowMs = accountingConfig.getProperty(Accounting.Keys.WORKLOAD_ENFORCEMENT_WINDOW_MS,
+        Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
+    initSecondaryWorkloadBudget(accountingConfig);
     startBudgetResetTask();
     LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
+  }
+
+  public String getSecondaryWorkloadName() {
+    return _secondaryWorkloadName;
+  }
+
+  public boolean isEnabled() {
+    return _enabled;
   }
 
   /**
@@ -70,18 +81,13 @@ public class WorkloadBudgetManager {
    * This is fixed budget allocated during host startup and used across all secondary queries.
    */
   private void initSecondaryWorkloadBudget(PinotConfiguration config) {
-    double secondaryCpuPercentage = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
+    double secondaryCpuPercentage = config.getProperty(Accounting.Keys.SECONDARY_WORKLOAD_CPU_PERCENTAGE,
+        Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
 
     // Don't create a secondary workload if cpu percentage is non-zero.
     if (secondaryCpuPercentage <= 0.0) {
       return;
     }
-
-    String secondaryWorkloadName = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
 
     // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.
     // The memory budget is set to Long.MAX_VALUE for now, since we do not have a specific memory budget for
@@ -92,14 +98,14 @@ public class WorkloadBudgetManager {
     long totalCpuCapacityNs = _enforcementWindowMs * 1_000_000L * availableProcessors;
     long secondaryCpuBudget = (long) (secondaryCpuPercentage * totalCpuCapacityNs);
     // TODO: Add memory budget for secondary workload queries
-    addOrUpdateWorkload(secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
+    addOrUpdateWorkload(_secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
   }
 
   public void shutdown() {
-    if (!_isEnabled) {
+    if (!_enabled) {
       return;
     }
-    _isEnabled = false;
+    _enabled = false;
     _resetScheduler.shutdownNow();
     try {
       if (!_resetScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -115,7 +121,7 @@ public class WorkloadBudgetManager {
    * Adds or updates budget for a workload (Thread-Safe).
    */
   public void addOrUpdateWorkload(String workload, long cpuBudgetNs, long memoryBudgetBytes) {
-    if (!_isEnabled) {
+    if (!_enabled) {
       LOGGER.info("WorkloadBudgetManager is disabled. Not adding/updating workload: {}", workload);
       return;
     }
@@ -126,7 +132,7 @@ public class WorkloadBudgetManager {
   }
 
   public void deleteWorkload(String workload) {
-    if (!_isEnabled) {
+    if (!_enabled) {
       LOGGER.info("WorkloadBudgetManager is disabled. Not deleting workload: {}", workload);
       return;
     }
@@ -147,7 +153,7 @@ public class WorkloadBudgetManager {
    * Returns the remaining budget for CPU and memory after charge.
    */
   public BudgetStats tryCharge(String workload, long cpuUsedNs, long memoryUsedBytes) {
-    if (!_isEnabled) {
+    if (!_enabled) {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
@@ -163,7 +169,7 @@ public class WorkloadBudgetManager {
    * Retrieves the initial and remaining budget for a workload.
    */
   public BudgetStats getBudgetStats(String workload) {
-    if (!_isEnabled) {
+    if (!_enabled) {
       return null;
     }
     Budget budget = _workloadBudgets.get(workload);
@@ -174,7 +180,7 @@ public class WorkloadBudgetManager {
    * Retrieves the total remaining budget across all workloads (Thread-Safe).
    */
   public BudgetStats getRemainingBudgetAcrossAllWorkloads() {
-    if (!_isEnabled) {
+    if (!_enabled) {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
     long totalCpuBudget =
@@ -226,7 +232,7 @@ public class WorkloadBudgetManager {
    */
   public boolean canAdmitQuery(String workload) {
     // If disabled or no budget configured, always admit
-    if (!_isEnabled) {
+    if (!_enabled) {
       return true;
     }
     Budget budget = _workloadBudgets.get(workload);
@@ -239,7 +245,7 @@ public class WorkloadBudgetManager {
   }
 
   public Map<String, BudgetStats> getAllBudgetStats() {
-    if (!_isEnabled) {
+    if (!_enabled) {
       return null;
     }
     Map<String, BudgetStats> allStats = new ConcurrentHashMap<>();

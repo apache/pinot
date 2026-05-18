@@ -138,13 +138,39 @@ public interface Dictionary extends IndexReader {
    */
   Comparable getMaxVal();
 
-  /**
-   * Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array will
-   * be returned; for type BIG_DECIMAL, {@code BigDecimal[]} will be returned; for type STRING, {@code String[]} will be
-   * returned; for type BYTES, {@code ByteArray[]} will be returned.
-   * This method is for the stats collection phase when sealing the consuming segment.
-   */
-  Object getSortedValues();
+  /// Returns a sorted array of all values in the dictionary. For type INT/LONG/FLOAT/DOUBLE, primitive type array
+  /// will be returned; for type BIG_DECIMAL, `BigDecimal[]` will be returned; for type STRING, `String[]` will be
+  /// returned; for type BYTES, `ByteArray[]` will be returned.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default Object getSortedValues() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the length (in bytes) of the shortest element in the dictionary.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default int getLengthOfShortestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns the length (in bytes) of the longest element in the dictionary.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default int getLengthOfLongestElement() {
+    throw new UnsupportedOperationException();
+  }
+
+  /// Returns `true` when all elements in a STRING dictionary contain only ASCII characters, `false` otherwise.
+  ///
+  /// This method is for the stats-collection phase when sealing the consuming segment. It should be overridden when
+  /// the dictionary is used in a mutable segment.
+  default boolean isAscii() {
+    throw new UnsupportedOperationException();
+  }
 
   // Single-value read APIs
 
@@ -192,15 +218,22 @@ public interface Dictionary extends IndexReader {
 
   String getStringValue(int dictId);
 
-  /**
-   * NOTE: Should be overridden for STRING, BIG_DECIMAL and BYTES dictionary.
-   */
+  /// Returns the bytes representation of the value.
+  /// Should be overridden for variable sized types, i.e. BIG_DECIMAL, STRING, BYTES.
   default byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();
   }
 
   default ByteArray getByteArrayValue(int dictId) {
     return new ByteArray(getBytesValue(dictId));
+  }
+
+  /// Returns the size of the value in bytes.
+  /// Should be overridden for variable sized types, i.e. BIG_DECIMAL, STRING, BYTES.
+  /// - For BIG_DECIMAL, returns the length of the serialized bytes
+  /// - For STRING, returns the length of the UTF_8 encoded bytes
+  default int getValueSize(int dictId) {
+    return getValueType().size();
   }
 
   default int get32BitsMurmur3HashValue(int dictId) {

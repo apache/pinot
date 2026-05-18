@@ -122,8 +122,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeInt(i, value);
           }
         }
-        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedInts[0], sortedInts[numValues - 1]);
+        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case LONG:
@@ -142,8 +141,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeLong(i, value);
           }
         }
-        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedLongs[0], sortedLongs[numValues - 1]);
+        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case FLOAT:
@@ -162,8 +160,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeFloat(i, value);
           }
         }
-        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedFloats[0], sortedFloats[numValues - 1]);
+        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case DOUBLE:
@@ -182,8 +179,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
             writer.writeDouble(i, value);
           }
         }
-        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}", _columnName,
-            numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
+        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}", _columnName, numValues);
         return;
 
       case BIG_DECIMAL:
@@ -203,9 +199,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
 
         writeBytesValueDictionary(sortedBigDecimalBytes);
-        LOGGER.info("Created dictionary for BIG_DECIMAL column: {} with cardinality: {}, max length in bytes: {}, "
-                + "range: {} to {}", _columnName, numValues, _numBytesPerEntry, sortedBigDecimals[0],
-            sortedBigDecimals[numValues - 1]);
+        LOGGER.info("Created dictionary for BIG_DECIMAL column: {} with cardinality: {}, max length in bytes: {}",
+            _columnName, numValues, _numBytesPerEntry);
         return;
 
       case STRING:
@@ -225,9 +220,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
 
         writeBytesValueDictionary(sortedStringBytes);
-        LOGGER.info(
-            "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _columnName, numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
+        LOGGER.info("Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}",
+            _columnName, numValues, _numBytesPerEntry);
         return;
 
       case BYTES:
@@ -246,9 +240,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
 
         writeBytesValueDictionary(sortedByteArrays);
-        LOGGER.info(
-            "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _columnName, numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
+        LOGGER.info("Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}",
+            _columnName, numValues, _numBytesPerEntry);
         return;
 
       default:
@@ -268,8 +261,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         return _floatValueToIndexMap;
       case DOUBLE:
         return _doubleValueToIndexMap;
-      case STRING:
       case BIG_DECIMAL:
+      case STRING:
       case BYTES:
         return _objectValueToIndexMap;
       default:
@@ -321,8 +314,8 @@ public class SegmentDictionaryCreator implements IndexCreator {
         return _floatValueToIndexMap.get((float) value);
       case DOUBLE:
         return _doubleValueToIndexMap.get((double) value);
-      case STRING:
       case BIG_DECIMAL:
+      case STRING:
         return _objectValueToIndexMap.getInt(value);
       case BYTES:
         return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
@@ -405,6 +398,14 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return indexes;
   }
 
+  public int[] indexOfMV(BigDecimal[] values) {
+    int[] indexes = new int[values.length];
+    for (int i = 0; i < values.length; i++) {
+      indexes[i] = _objectValueToIndexMap.getInt(values[i]);
+    }
+    return indexes;
+  }
+
   public int[] indexOfMV(String[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
@@ -446,6 +447,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
           indexes[i] = _doubleValueToIndexMap.get((double) multiValues[i]);
         }
         break;
+      case BIG_DECIMAL:
       case STRING:
         for (int i = 0; i < multiValues.length; i++) {
           indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
@@ -480,9 +482,5 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   @Override
   public void close() {
-  }
-
-  public File getDictionaryFile() {
-    return _dictionaryFile;
   }
 }

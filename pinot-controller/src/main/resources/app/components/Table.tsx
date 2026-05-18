@@ -33,8 +33,9 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
+import TablePagination, { TablePaginationProps } from '@material-ui/core/TablePagination';
 import TableRow from '@material-ui/core/TableRow';
-import { TablePagination, Tooltip } from '@material-ui/core';
+import { Tooltip } from '@material-ui/core';
 import {TableData, TableSortFunction} from 'Models';
 import IconButton from '@material-ui/core/IconButton';
 import FirstPageIcon from '@material-ui/icons/FirstPage';
@@ -206,25 +207,43 @@ const usePaginationStyles = makeStyles({
   },
 });
 
-function TablePaginationActions(props) {
+type PageChangeHandler = (
+  event: React.MouseEvent<HTMLButtonElement> | null,
+  page: number
+) => void;
+
+type PaginationActionsProps = {
+  count: number,
+  onChangePage?: PageChangeHandler,
+  onPageChange?: PageChangeHandler,
+  page: number,
+  rowsPerPage: number
+};
+
+type DivTablePaginationProps = TablePaginationProps<'div'> & {
+  component: 'div'
+};
+
+function TablePaginationActions(props: PaginationActionsProps) {
   const classes = usePaginationStyles();
   const theme = useTheme();
-  const { count, page, rowsPerPage, onChangePage } = props;
+  const { count, page, rowsPerPage, onChangePage, onPageChange } = props;
+  const changePage = onPageChange || onChangePage;
 
   const handleFirstPageButtonClick = (event) => {
-    onChangePage(event, 0);
+    changePage?.(event, 0);
   };
 
   const handleBackButtonClick = (event) => {
-    onChangePage(event, page - 1);
+    changePage?.(event, page - 1);
   };
 
   const handleNextButtonClick = (event) => {
-    onChangePage(event, page + 1);
+    changePage?.(event, page + 1);
   };
 
   const handleLastPageButtonClick = (event) => {
-    onChangePage(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
+    changePage?.(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
   };
 
   return (
@@ -271,7 +290,8 @@ function TablePaginationActions(props) {
 
 TablePaginationActions.propTypes = {
   count: PropTypes.number.isRequired,
-  onChangePage: PropTypes.func.isRequired,
+  onChangePage: PropTypes.func,
+  onPageChange: PropTypes.func,
   page: PropTypes.number.isRequired,
   rowsPerPage: PropTypes.number.isRequired,
 };
@@ -333,6 +353,20 @@ export default function CustomizedTables({
   };
 
   const [search, setSearch] = React.useState<string>('');
+
+  const paginationProps: DivTablePaginationProps = {
+    rowsPerPageOptions: [5, 10, 25, 50, 100],
+    component: 'div',
+    count: finalData.length,
+    rowsPerPage,
+    page,
+    onChangePage: handleChangePage,
+    onPageChange: handleChangePage,
+    onChangeRowsPerPage: handleChangeRowsPerPage,
+    onRowsPerPageChange: handleChangeRowsPerPage,
+    ActionsComponent: TablePaginationActions,
+    classes: { spacer: classes.spacer },
+  };
 
   const timeoutId = React.useRef<NodeJS.Timeout>();
 
@@ -605,17 +639,7 @@ export default function CustomizedTables({
           </Table>
         </TableContainer>
         {finalData.length > 10 ? (
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50, 100]}
-            component="div"
-            count={finalData.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onChangePage={handleChangePage}
-            onChangeRowsPerPage={handleChangeRowsPerPage}
-            ActionsComponent={TablePaginationActions}
-            classes={{ spacer: classes.spacer }}
-          />
+          <TablePagination {...paginationProps} />
         ) : null}
       </>
     );

@@ -185,7 +185,7 @@ public class PinotQueryResource {
 
       Map<String, String> queryOptions = new HashMap<>();
       if (requestJson.has("queryOptions") && requestJson.get("queryOptions").isObject()) {
-        requestJson.get("queryOptions").fields().forEachRemaining(entry -> {
+        requestJson.get("queryOptions").properties().forEach(entry -> {
           queryOptions.put(entry.getKey(), entry.getValue().asText());
         });
       }
@@ -393,6 +393,11 @@ public class PinotQueryResource {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
       sqlNodeAndOptions.setExtraOptions(optionsFromString);
     }
+    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
+    if (sqlType == PinotSqlType.DDL) {
+      throw QueryErrorCode.QUERY_VALIDATION.asException(
+          "DDL statements are not supported on /sql; use POST /sql/ddl instead.");
+    }
 
     // Determine which engine to used based on query options.
     boolean isMse = Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
@@ -403,7 +408,6 @@ public class PinotQueryResource {
       throw QueryErrorCode.INTERNAL.asException("V2 Multi-Stage query engine not enabled.");
     }
 
-    PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     switch (sqlType) {
       case DQL:
         return isMse

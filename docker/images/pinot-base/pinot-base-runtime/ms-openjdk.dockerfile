@@ -17,12 +17,12 @@
 # under the License.
 #
 
-ARG JAVA_VERSION=11
+ARG JAVA_VERSION=21
 ARG JDK_IMAGE=mcr.microsoft.com/openjdk/jdk
 
 FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu AS builder
 
-FROM ubuntu:24.10
+FROM ubuntu:24.04
 ARG JAVA_VERSION
 ENV LANG=en_US.UTF-8
 ENV JAVA_HOME="/usr/lib/jvm/msopenjdk-${JAVA_VERSION}"
@@ -32,7 +32,8 @@ COPY --from=builder $JAVA_HOME $JAVA_HOME
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends vim less wget curl git python-is-python3 sysstat procps linux-tools-generic libtasn1-6 zstd ca-certificates && \
+  apt-get upgrade -y --no-install-recommends && \
+  apt-get install -y --no-install-recommends less wget curl sysstat procps libtasn1-6 zstd ca-certificates && \
   rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \
@@ -41,7 +42,7 @@ RUN case `uname -m` in \
   *) echo "platform=$(uname -m) un-supported, exit ..."; exit 1; ;; \
   esac \
   && mkdir -p /usr/local/lib/async-profiler \
-  && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.9/async-profiler-2.9-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
-  && ln -s /usr/local/lib/async-profiler/profiler.sh /usr/local/bin/async-profiler
+  && curl -L https://github.com/async-profiler/async-profiler/releases/download/v4.3/async-profiler-4.3-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
+  && ln -s /usr/local/lib/async-profiler/bin/asprof /usr/local/bin/async-profiler
 
 CMD ["bash"]

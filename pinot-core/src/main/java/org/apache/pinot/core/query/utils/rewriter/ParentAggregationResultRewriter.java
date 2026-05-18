@@ -166,7 +166,10 @@ public class ParentAggregationResultRewriter implements ResultRewriter {
                 (ParentAggregationFunctionResultObject) row[offset];
             // If the parent result has more rows than the current row, extract the value from the row
             if (rowIter < parentAggregationFunctionResultObject.getNumberOfRows()) {
-              newRow[fieldIter] = parentAggregationFunctionResultObject.getField(rowIter, nestedOffset);
+              // getField returns the value in internal form; convert to external form so downstream format() works
+              // (e.g. ByteArray -> byte[] for BYTES).
+              Object value = parentAggregationFunctionResultObject.getField(rowIter, nestedOffset);
+              newRow[fieldIter] = value != null ? newColumnDataTypes[fieldIter].convert(value) : null;
             } else {
               newRow[fieldIter] = null;
             }

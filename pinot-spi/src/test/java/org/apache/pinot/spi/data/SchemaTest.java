@@ -22,7 +22,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -33,6 +35,8 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 
 @SuppressWarnings("deprecation")
@@ -693,5 +697,102 @@ public class SchemaTest {
 
     Assert.assertEquals(withoutVirtualColumns.getPrimaryKeyColumns(), Collections.singletonList("metric"),
         "Unexpected primary key columns");
+  }
+
+  @Test
+  public void testSchemaDescriptionAndTagsSerdeRoundtrip()
+      throws IOException {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("events")
+        .setDescription("Tracks all user interaction events.")
+        .setTags(Arrays.asList("real-time", "production"))
+        .addSingleValueDimension("user_id", FieldSpec.DataType.STRING)
+        .addMetric("revenue_cents", FieldSpec.DataType.LONG)
+        .build();
+
+    String jsonString = schema.toSingleLineJsonString();
+    Schema deserialized = Schema.fromString(jsonString);
+
+    assertThat(deserialized.getDescription()).isEqualTo("Tracks all user interaction events.");
+    assertThat(deserialized.getTags()).isEqualTo(Arrays.asList("real-time", "production"));
+    assertThat(deserialized).isEqualTo(schema);
+    assertThat(deserialized.hashCode()).isEqualTo(schema.hashCode());
+  }
+
+  @Test
+  public void testSchemaDescriptionOmittedWhenNotSet()
+      throws IOException {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("test")
+        .addSingleValueDimension("col1", FieldSpec.DataType.INT)
+        .build();
+
+    String jsonString = schema.toSingleLineJsonString();
+    assertThat(jsonString).as("description should be absent").doesNotContain("\"description\"");
+    assertThat(jsonString).as("tags should be absent").doesNotContain("\"tags\"");
+
+    // Roundtrip produces identical JSON
+    Schema deserialized = Schema.fromString(jsonString);
+    assertThat(deserialized.toSingleLineJsonString()).isEqualTo(jsonString);
+  }
+
+  @Test
+  public void testSchemaEqualsIncludesDescription() {
+    Schema schema1 = new Schema.SchemaBuilder()
+        .setSchemaName("test")
+        .addSingleValueDimension("col1", FieldSpec.DataType.INT)
+        .build();
+
+    Schema schema2 = new Schema.SchemaBuilder()
+        .setSchemaName("test")
+        .setDescription("A description")
+        .addSingleValueDimension("col1", FieldSpec.DataType.INT)
+        .build();
+
+    // Schemas with different descriptions are NOT equal
+    assertThat(schema1).isNotEqualTo(schema2);
+    assertThat(schema1.hashCode()).isNotEqualTo(schema2.hashCode());
+  }
+
+  @Test
+  public void testSchemaBackwardCompatibilityIgnoresDescription() {
+    Schema oldSchema = new Schema.SchemaBuilder()
+        .setSchemaName("test")
+        .addSingleValueDimension("col1", FieldSpec.DataType.INT)
+        .build();
+
+    Schema newSchema = new Schema.SchemaBuilder()
+        .setSchemaName("test")
+        .setDescription("Added description")
+        .setTags(Arrays.asList("production"))
+        .addSingleValueDimension("col1", FieldSpec.DataType.INT)
+        .build();
+
+    // Description changes don't break backward compatibility
+    assertThat(newSchema.isBackwardCompatibleWith(oldSchema)).isTrue();
+  }
+
+  @Test
+  public void testOldJsonWithoutDescriptionDeserializesCleanly()
+      throws IOException {
+    String oldJson = "{\"schemaName\":\"test\",\"enableColumnBasedNullHandling\":false,"
+        + "\"dimensionFieldSpecs\":[{\"name\":\"col1\",\"dataType\":\"INT\"}]}";
+    Schema schema = Schema.fromString(oldJson);
+    assertThat(schema.getDescription()).isNull();
+    assertThat(schema.getTags()).isNull();
+  }
+
+  @Test
+  public void testWithoutVirtualColumnsCopiesDescription() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testSchema")
+        .setDescription("my description")
+        .setTags(List.of("tag1"))
+        .addMetricField("metric", FieldSpec.DataType.INT)
+        .build();
+
+    Schema withoutVirtual = schema.withoutVirtualColumns();
+    assertThat(withoutVirtual.getDescription()).isEqualTo("my description");
+    assertThat(withoutVirtual.getTags()).isEqualTo(List.of("tag1"));
   }
 }

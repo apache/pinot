@@ -22,6 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -34,7 +37,6 @@ import org.apache.pinot.spi.data.Schema;
  * the stats collector.
  */
 public class StatsCollectorConfig {
-
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final SegmentPartitionConfig _segmentPartitionConfig;
@@ -60,11 +62,36 @@ public class StatsCollectorConfig {
     }
   }
 
+  public TableConfig getTableConfig() {
+    return _tableConfig;
+  }
+
+  public Schema getSchema() {
+    return _schema;
+  }
+
   @Nullable
   public FieldSpec getFieldSpecForColumn(String column) {
     return _schema.getFieldSpecFor(column);
   }
 
+  @Nullable
+  public FieldConfig getFieldConfigForColumn(String column) {
+    return _columnFieldConfigMap.get(column);
+  }
+
+  @Nullable
+  public PartitionFunction getPartitionFunction(String column) {
+    if (_segmentPartitionConfig != null) {
+      ColumnPartitionConfig columnPartitionConfig = _segmentPartitionConfig.getColumnPartitionConfig(column);
+      if (columnPartitionConfig != null) {
+        return PartitionFunctionFactory.getPartitionFunction(columnPartitionConfig);
+      }
+    }
+    return null;
+  }
+
+  @Deprecated
   @Nullable
   public String getPartitionFunctionName(String column) {
     if (_segmentPartitionConfig == null) {
@@ -74,33 +101,15 @@ public class StatsCollectorConfig {
     return _segmentPartitionConfig.getFunctionName(column);
   }
 
-  /**
-   * Returns the number of partitions for the specified column.
-   * If segment partition config does not exist, returns {@link SegmentPartitionConfig#INVALID_NUM_PARTITIONS}.
-   *
-   * @param column Column for which to to return the number of partitions.
-   * @return Number of partitions for the column.
-   */
+  @Deprecated
   public int getNumPartitions(String column) {
     return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getNumPartitions(column)
         : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
   }
 
+  @Deprecated
   @Nullable
   public Map<String, String> getPartitionFunctionConfig(String column) {
     return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getFunctionConfig(column) : null;
-  }
-
-  public Schema getSchema() {
-    return _schema;
-  }
-
-  public TableConfig getTableConfig() {
-    return _tableConfig;
-  }
-
-  @Nullable
-  public FieldConfig getFieldConfigForColumn(String column) {
-    return _columnFieldConfigMap.get(column);
   }
 }

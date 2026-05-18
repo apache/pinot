@@ -23,14 +23,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.MaxLengthExceedStrategy;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class TransformPipelineTest {
@@ -90,6 +96,22 @@ public class TransformPipelineTest {
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = Fixtures.createMultipleRowPartialFailure(9527);
     pipeline.processRow(multipleRow);
+  }
+
+  @Test
+  public void testSkipRecordRow()
+      throws Exception {
+    TableConfig config = createTestTableConfig();
+    Schema schema = Fixtures.createSchema();
+    TransformPipeline pipeline = new TransformPipeline(config, schema);
+    GenericRow skipRow = new GenericRow();
+    skipRow.putValue(GenericRow.SKIP_RECORD_KEY, true);
+    TransformPipeline.Result result = pipeline.processRow(skipRow);
+    assertNotNull(result);
+    assertTrue(result.getTransformedRows().isEmpty());
+    assertEquals(result.getSkippedRowCount(), 1);
+    assertEquals(result.getIncompleteRowCount(), 0);
+    assertEquals(result.getSanitizedRowCount(), 0);
   }
 
   @Test
@@ -785,5 +807,62 @@ public class TransformPipelineTest {
     assertEquals(transformedRow.getValue("r.id"), 115911530);
     assertEquals(transformedRow.getValue("r.name"), "LimeVista/Tapes");
     assertEquals(transformedRow.getValue("r.url"), "https://api.github.com/repos/LimeVista/Tapes");
+  }
+
+  @Test
+  public void testSanitizedRowCount()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension("limitedStr", DataType.STRING, 2, "")
+        .addSingleValueDimension("intCol", DataType.INT)
+        .build();
+    schema.getFieldSpecFor("limitedStr").setMaxLengthExceedStrategy(MaxLengthExceedStrategy.TRIM_LENGTH);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    GenericRow row = new GenericRow();
+    row.putValue("limitedStr", "abc"); // exceeds maxLength=2, triggers sanitization
+    row.putValue("intCol", 42);
+
+    TransformPipeline.Result result = pipeline.processRow(row);
+    assertNotNull(result);
+    assertEquals(result.getTransformedRows().size(), 1);
+    assertEquals(result.getSanitizedRowCount(), 1);
+    assertEquals(result.getIncompleteRowCount(), 0);
+    assertEquals(result.getSkippedRowCount(), 0);
+  }
+
+  @Test
+  public void testIncompleteRowCount()
+      throws Exception {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .addSingleValueDimension("intCol", DataType.INT)
+        .addSingleValueDimension("strCol", DataType.STRING)
+        .build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setContinueOnError(true);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TransformPipeline pipeline = new TransformPipeline(tableConfig, schema);
+    GenericRow row = new GenericRow();
+    row.putValue("intCol", "NOT_A_NUMBER"); // invalid type triggers incomplete
+    row.putValue("strCol", "hello");
+
+    TransformPipeline.Result result = pipeline.processRow(row);
+    assertNotNull(result);
+    assertEquals(result.getTransformedRows().size(), 1);
+    assertEquals(result.getIncompleteRowCount(), 1);
+    assertEquals(result.getSanitizedRowCount(), 0);
+    assertEquals(result.getSkippedRowCount(), 0);
   }
 }

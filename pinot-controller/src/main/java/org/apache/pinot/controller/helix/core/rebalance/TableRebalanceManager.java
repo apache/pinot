@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -35,7 +34,11 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.common.restlet.resources.TableRebalanceContext;
+import org.apache.pinot.common.restlet.resources.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;

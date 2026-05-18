@@ -115,6 +115,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
+  QUERIES_KILLED_SCAN("queriesKilledScan", true),
+  QUERIES_KILLED_SCAN_DRY_RUN("queriesKilledScanDryRun", true),
+  QUERIES_KILLED_SCAN_ERROR("queriesKilledScanError", true),
   QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
@@ -123,6 +126,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
   NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_SEND_RESPONSE_FAILURES("nettyConnection", true),
 
   // GRPC related metrics
   GRPC_QUERIES("grpcQueries", true),
@@ -140,6 +144,13 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
   TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  /**
+   * Size of the initially serialized query response in bytes.
+   * Note: This may differ from the final response actually sent to the broker if the response
+   * is later replaced (for example, when exceeding the configured max response size).
+   */
+  QUERY_RESPONSE_SIZE("bytes", false,
+      "Size of the initially serialized query response in bytes (may differ from final response sent to broker)"),
 
   GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
 
@@ -264,7 +275,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
   /// Total number of rows emitted by multi-stage execution.
   /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
-  MSE_EMITTED_ROWS("rows", true);
+  MSE_EMITTED_ROWS("rows", true),
+
+  /// Number of MSE queries received by this server.
+  /// This metric is incremented once per query, even if the server is acting as a leaf, intermediate, or both.
+  MSE_QUERIES("queries", true,
+      "Number of MSE queries received by this server");
 
   private final String _meterName;
   private final String _unit;

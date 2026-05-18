@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-spark-3-connector</artifactId>
   <name>Pinot Spark 3 Connector</name>
@@ -80,7 +80,7 @@
       </properties>
     </profile>
     <profile>
-      <id>scala-2.12</id>
+      <id>scala-build</id>
       <activation>
         <activeByDefault>true</activeByDefault>
       </activation>
@@ -88,8 +88,13 @@
         <dependency>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-sql_${scala.compat.version}</artifactId>
-          <version>${spark3.version}</version>
           <scope>provided</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>org.lz4</groupId>
+              <artifactId>lz4-java</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang</groupId>

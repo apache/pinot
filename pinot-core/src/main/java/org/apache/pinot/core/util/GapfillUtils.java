@@ -20,6 +20,7 @@ package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +100,8 @@ public class GapfillUtils {
         return new float[0];
       case DOUBLE_ARRAY:
         return new double[0];
+      case BIG_DECIMAL_ARRAY:
+        return new BigDecimal[0];
       case STRING_ARRAY:
       case TIMESTAMP_ARRAY:
         return new String[0];

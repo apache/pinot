@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -81,7 +82,7 @@ public class DistinctCountOffHeapAggregationFunction
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       // For dictionary-encoded expression, store dictionary ids into the bitmap
       if (blockValSet.isSingleValue()) {
@@ -466,8 +467,10 @@ public class DistinctCountOffHeapAggregationFunction
   }
 
   @Override
-  public Integer extractFinalResult(BaseOffHeapSet set) {
-    assert set != null;
+  public Integer extractFinalResult(@Nullable BaseOffHeapSet set) {
+    if (set == null) {
+      return 0;
+    }
     int size = set.size();
     set.close();
     return size;

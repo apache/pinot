@@ -31,7 +31,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
@@ -141,10 +140,6 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
     startBroker();
     startServer();
 
-    if (_controllerRequestURLBuilder == null) {
-      _controllerRequestURLBuilder =
-          ControllerRequestURLBuilder.baseUrl("http://localhost:" + getControllerPort());
-    }
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // create & upload schema AND table config
     Schema schema = createSchema();
@@ -167,18 +162,16 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
   public void tearDown()
       throws Exception {
     LOGGER.warn("Tearing down integration test class: {}", getClass().getSimpleName());
-    dropOfflineTable(getTableName());
-    FileUtils.deleteDirectory(_tempDir);
-
-    // Stop Kafka
-    LOGGER.warn("Stop Kafka in the integration test class");
-    stopKafka();
-    // Shutdown the Pinot cluster
-    stopServer();
-    stopBroker();
-    stopController();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
+    try {
+      dropOfflineTable(getTableName());
+      stopServer();
+      stopBroker();
+      stopController();
+      stopKafka();
+      stopZk();
+    } finally {
+      FileUtils.deleteQuietly(_tempDir);
+    }
     LOGGER.warn("Finished tearing down integration test class: {}", getClass().getSimpleName());
   }
 

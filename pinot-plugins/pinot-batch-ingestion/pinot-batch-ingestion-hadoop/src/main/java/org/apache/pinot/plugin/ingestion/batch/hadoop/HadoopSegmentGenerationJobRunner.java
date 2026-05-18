@@ -333,7 +333,7 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       return;
     }
 
-    ArrayList<File> validPluginDirectories = new ArrayList();
+    ArrayList<File> validPluginDirectories = new ArrayList<>();
 
     for (String pluginsDirPath : pluginDirectories) {
       File pluginsDir = new File(pluginsDirPath);

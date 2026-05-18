@@ -56,14 +56,18 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.FileMetadata;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +127,14 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
-    _enableChecksum = config.getProperty(ENABLE_CHECKSUM, false);
+    boolean checksumEnabled = config.getProperty(ENABLE_CHECKSUM, false);
+    if (checksumEnabled && PinotMd5Mode.isPinotMd5Disabled()) {
+      throw new IllegalStateException(String.format(
+          "ADLS checksum requires MD5, but MD5 is disabled via '%s=true'. Set '%s=false' or '%s=false'.",
+          CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED, CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED,
+          ENABLE_CHECKSUM));
+    }
+    _enableChecksum = checksumEnabled;
 
     // Azure storage account name
     String accountName = config.getProperty(ACCOUNT_NAME);
@@ -465,6 +476,44 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     }
   }
 
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    LOGGER.debug("listFilesWithMetadata (paginated) is called with fileUri='{}', recursive='{}', maxResults={}",
+        fileUri, recursive, maxResults);
+    final List<FileMetadata> result = new ArrayList<>();
+    try {
+      // PagedIterable fetches pages lazily; breaking out stops further API calls
+      for (final PathItem item : listPathItems(fileUri, recursive)) {
+        if (item.isDirectory()) {
+          continue;
+        }
+        final String filePath = AzurePinotFSUtil.convertAzureStylePathToUriStylePath(item.getName());
+        if (pathFilter.test(filePath)) {
+          result.add(new FileMetadata.Builder()
+              .setFilePath(filePath)
+              .setLastModifiedTime(item.getLastModified().toInstant().toEpochMilli())
+              .setLength(item.getContentLength())
+              .setIsDirectory(false)
+              .build());
+          if (result.size() >= maxResults) {
+            break;
+          }
+        }
+      }
+    } catch (DataLakeStorageException e) {
+      throw new IOException(e);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, fileUri, recursive);
+    return result;
+  }
+
   private PagedIterable<PathItem> listPathItems(URI fileUri, boolean recursive)
       throws IOException {
     // Unlike other Azure SDK APIs that takes url encoded path, ListPathsOptions takes decoded url
@@ -539,7 +588,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   public void copyFromLocalFile(File srcFile, URI dstUri)
       throws Exception {
     LOGGER.debug("copyFromLocalFile is called with srcFile='{}', dstUri='{}'", srcFile, dstUri);
-    byte[] contentMd5 = computeContentMd5(srcFile);
+    byte[] contentMd5 = _enableChecksum ? computeContentMd5(srcFile) : null;
     try (InputStream fileInputStream = new FileInputStream(srcFile)) {
       copyInputStreamToDst(fileInputStream, dstUri, contentMd5);
     }

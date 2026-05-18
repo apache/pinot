@@ -55,6 +55,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
       description = "Config file path to override default pinot configs")
   private String _configFilePath;
 
+  @CommandLine.Option(names = {"-kafkaBrokerList"}, required = false,
+      description = "Kafka broker list for streaming quickstarts (e.g. localhost:9092)")
+  private String _kafkaBrokerList;
+
   @Override
   public String getName() {
     return "QuickStart";
@@ -107,6 +111,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
   public void setConfigFilePath(String configFilePath) {
     _configFilePath = configFilePath;
+  }
+
+  public void setKafkaBrokerList(String kafkaBrokerList) {
+    _kafkaBrokerList = kafkaBrokerList;
   }
 
   @Override
@@ -164,6 +172,10 @@ public class QuickStartCommand extends AbstractBaseAdminCommand implements Comma
 
     if (_configFilePath != null) {
       quickstart.setConfigFilePath(_configFilePath);
+    }
+
+    if (_kafkaBrokerList != null) {
+      quickstart.setKafkaBrokerList(_kafkaBrokerList);
     }
 
     quickstart.execute();

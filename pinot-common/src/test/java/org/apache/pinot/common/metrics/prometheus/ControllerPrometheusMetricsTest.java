@@ -20,7 +20,7 @@ package org.apache.pinot.common.metrics.prometheus;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -105,12 +105,12 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
       //some meters contain a "controller" prefix. For example, controllerInstancePostError. These meters are
       // exported as 'pinot_controller_pinot_controller_InstancePostError'. So we strip the 'controller' from
       // 'controllerInstancePostError'
-      String strippedMeterName = StringUtils.remove(meterName, "controller");
+      String strippedMeterName = Strings.CS.remove(meterName, "controller");
       assertMeterExportedCorrectly(strippedMeterName, EXPORTED_METRIC_PREFIX);
     } else {
 
       String meterName = meter.getMeterName();
-      String strippedMeterName = StringUtils.remove(meterName, "controller");
+      String strippedMeterName = Strings.CS.remove(meterName, "controller");
 
       if (meter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
         addMeterWithLabels(meter, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC);
@@ -178,6 +178,10 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
             String.format("%s.%s", ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, TaskState.IN_PROGRESS));
         assertGaugeExportedCorrectly(ControllerGauge.TASK_STATUS.getGaugeName(),
             ExportedLabels.JOBSTATUS_CONTROLLER_TASKTYPE, EXPORTED_METRIC_PREFIX);
+      } else if (controllerGauge == ControllerGauge.TASKS_TRACKED_FOR_TASK_TYPE) {
+        addGaugeWithLabels(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC);
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(),
+            List.of(LABEL_KEY_TASK_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC), EXPORTED_METRIC_PREFIX);
       } else {
         addGaugeWithLabels(controllerGauge, TABLE_NAME_WITH_TYPE);
         assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE,
@@ -191,7 +195,7 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
   }
 
   private static String getStrippedMetricName(ControllerGauge controllerGauge) {
-    return StringUtils.remove(controllerGauge.getGaugeName(), "controller");
+    return Strings.CS.remove(controllerGauge.getGaugeName(), "controller");
   }
 
   private void addMeterWithLabels(ControllerMeter meter, String labels) {

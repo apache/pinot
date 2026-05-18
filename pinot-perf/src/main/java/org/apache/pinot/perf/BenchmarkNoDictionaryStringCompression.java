@@ -86,7 +86,7 @@ public class BenchmarkNoDictionaryStringCompression {
       byte[][] tempRows = new byte[_rowLength][];
       int size = 0;
       for (int i = 0; i < _rowLength; i++) {
-        String value = RandomStringUtils.random(RANDOM.nextInt(MAX_CHARS_IN_LINE), true, true);
+        String value = RandomStringUtils.secure().next(RANDOM.nextInt(MAX_CHARS_IN_LINE), true, true);
         byte[] bytes = value.getBytes(UTF_8);
         tempRows[i] = bytes;
         size += bytes.length;

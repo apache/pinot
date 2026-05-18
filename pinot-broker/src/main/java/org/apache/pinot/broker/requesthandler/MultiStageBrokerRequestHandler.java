@@ -53,6 +53,7 @@ import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -148,20 +149,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
-      MultiClusterRoutingContext multiClusterRoutingContext) {
+      MultiClusterRoutingContext multiClusterRoutingContext,
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
 
-    _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
-    if (multiClusterRoutingContext != null) {
-      _multiClusterWorkerManager = new WorkerManager(_brokerId, hostname, port,
-          multiClusterRoutingContext.getMultiClusterRoutingManager());
-    } else {
-      // if multi-cluster routing is not enabled, use the same worker manager.
-      _multiClusterWorkerManager = _workerManager;
-    }
+    _workerManager = workerManager;
+    _multiClusterWorkerManager = multiClusterWorkerManager;
 
     TlsConfig tlsConfig = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
@@ -176,9 +172,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.KEY_OF_CANCEL_TIMEOUT_MS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_CANCEL_TIMEOUT_MS);
     Duration cancelTimeout = Duration.ofMillis(cancelMillis);
+    int dispatchKeepAliveTimeMs = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIME_MS);
+    int dispatchKeepAliveTimeoutMs = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_TIMEOUT_MS);
+    boolean dispatchKeepAliveWithoutCalls = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS);
     _queryDispatcher =
         new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
-            tlsConfig, isQueryCancellationEnabled(), cancelTimeout);
+            tlsConfig, isQueryCancellationEnabled(), cancelTimeout, dispatchKeepAliveTimeMs,
+            dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -203,6 +209,33 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public void start() {
     _queryDispatcher.start();
+    warmupCompile();
+  }
+
+  /**
+   * Best-effort warmup of the Calcite compile pipeline at broker startup. Running a trivial compile
+   * early ensures that JVM class-loading and Calcite initialization costs are paid before real
+   * queries arrive, so that the first MSE queries do not fail due to tight per-query timeout
+   * constraints.
+   */
+  private void warmupCompile() {
+    // TODO: extend warmup to exercise the full query execution path (planning + dispatch + execution),
+    //       not just compilation, to amortize all cold-start costs before serving traffic.
+    try {
+      ImmutableQueryEnvironment.Config warmupConf = getQueryEnvConf(null, Map.of(), -1L);
+      QueryEnvironment warmupEnv = new QueryEnvironment(warmupConf, _multiClusterRoutingContext);
+      long startMs = System.currentTimeMillis();
+      LOGGER.info("MSE startup warmup: compiling query");
+      ExecutorService exec = Executors.newSingleThreadExecutor();
+      try (var compiled = exec.submit(() -> warmupEnv.compile("SELECT 1")).get(5, TimeUnit.SECONDS)) {
+        // result discarded; compile call is for JVM warmup only
+      } finally {
+        exec.shutdownNow();
+      }
+      LOGGER.info("MSE startup warmup completed in {}ms", System.currentTimeMillis() - startMs);
+    } catch (Exception e) {
+      LOGGER.warn("MSE broker startup warmup failed", e);
+    }
   }
 
   @Override
@@ -354,10 +387,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     QueryExecutionContext executionContext =
         new QueryExecutionContext(QueryExecutionContext.QueryType.MSE, requestId, cid, workloadName, startTimeMs,
             activeDeadlineMs, passiveDeadlineMs, _brokerId, _brokerId, queryHash);
-    QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
+    // Stage 0 (broker reduce) always has stage 1 as its sole upstream — this is hard-coded
+    // in PinotLogicalQueryPlanner.planNodeToPlanFragment. It has no downstream (terminal stage).
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo =
+        new QueryThreadContext.MseWorkerInfo(0, 0, Set.of(1), Set.of());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant);
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {
+      validatePhysicalTablesWithMultiClusterRouting(compiledQuery.getTableNames(), compiledQuery.getOptions());
       AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
       checkAuthorization(requesterIdentity, requestContext, httpHeaders, compiledQuery, rlsFiltersApplied);
 
@@ -458,6 +495,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultUseBrokerPruning = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_BROKER_PRUNING,
         CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING);
+    boolean defaultLogicalPlannerUseBrokerPruning = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_LOGICAL_PLANNER_USE_BROKER_PRUNING,
+        CommonConstants.Broker.DEFAULT_LOGICAL_PLANNER_USE_BROKER_PRUNING);
     int defaultLiteModeLeafStageLimit = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
@@ -495,6 +535,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
+        .defaultLogicalPlannerUseBrokerPruning(defaultLogicalPlannerUseBrokerPruning)
         .defaultLiteModeLeafStageLimit(defaultLiteModeLeafStageLimit)
         .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
         .defaultLiteModeEnableJoins(defaultLiteModeEnableJoins)
@@ -787,6 +828,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         if (stageStats != null) { // for example pipeline breaker may not have stats
           stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
         }
+      }
+      // Broker-pruned segments are computed during routing in WorkerManager, not reported by servers.
+      // Inject the count directly since it doesn't flow through the LeafOperator stat pipeline.
+      long numSegmentsPrunedByBroker = dispatchableSubPlan.getNumSegmentsPrunedByBroker();
+      if (numSegmentsPrunedByBroker > 0) {
+        StatMap<BrokerResponseNativeV2.StatKey> brokerPruningStats =
+            new StatMap<>(BrokerResponseNativeV2.StatKey.class);
+        brokerPruningStats.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER,
+            (int) numSegmentsPrunedByBroker);
+        brokerResponse.addBrokerStats(brokerPruningStats);
       }
     } catch (Exception e) {
       LOGGER.warn("Error encountered while collecting multi-stage stats", e);

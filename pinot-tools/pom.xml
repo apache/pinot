@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-tools</artifactId>
   <name>Pinot Tools</name>
@@ -88,11 +88,6 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-thrift</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-kafka-2.0</artifactId>
-      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -182,7 +177,6 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-launcher_${scala.compat.version}</artifactId>
-      <version>${spark3.version}</version>
     </dependency>
 
     <dependency>
@@ -478,25 +472,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
         <executions>
-          <execution>
-            <id>copy-kafka-resources</id>
-            <phase>process-resources</phase>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <configuration>
-              <!-- this is important -->
-              <overwrite>true</overwrite>
-              <!-- target -->
-              <outputDirectory>${basedir}/target/classes/sample_data/</outputDirectory>
-              <resources>
-                <resource>
-                  <!-- source -->
-                  <directory>src/main/resources/sample_data/kafka_2.0</directory>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
           <execution>
             <id>copy-batch-ingestion-resources</id>
             <phase>process-resources</phase>

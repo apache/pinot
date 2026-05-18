@@ -40,6 +40,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
@@ -112,19 +113,34 @@ public class WorkerManager {
     DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(0);
     metadata.setWorkerIdToServerInstanceMap(
         Collections.singletonMap(0, new QueryServerInstance(_instanceId, _hostName, _port, _port)));
+
+    // Two-pass assignment: leaf stages must be assigned first so that the candidate server information
+    // (_nonLookupTables or _leafServerInstances) is fully populated before intermediate stages use it.
+    // Without this, literal-only stages (e.g. UNION ALL of constants) that are traversed before any table scan
+    // would see an empty candidate set and fall back to all enabled servers across all tenants.
     for (PlanFragment child : rootFragment.getChildren()) {
-      assignWorkersToNonRootFragment(child, context);
+      assignWorkersToNonRootFragment(child, context, true);
+    }
+    for (PlanFragment child : rootFragment.getChildren()) {
+      assignWorkersToNonRootFragment(child, context, false);
     }
   }
 
-  private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
+  /// Post-order traversal that assigns workers to either leaf or intermediate fragments.
+  /// @param leafOnly when true, only leaf fragments are assigned; when false, only intermediate fragments are assigned
+  private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context,
+      boolean leafOnly) {
     List<PlanFragment> children = fragment.getChildren();
     for (PlanFragment child : children) {
-      assignWorkersToNonRootFragment(child, context);
+      assignWorkersToNonRootFragment(child, context, leafOnly);
     }
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
-    if (isLeafPlan(metadata)) {
+    boolean isLeaf = isLeafPlan(metadata);
+    if (leafOnly != isLeaf) {
+      return;
+    }
+    if (isLeaf) {
       // TODO: Revisit this logic and see if we can generalize this
       // For LOOKUP join, join is leaf stage because there is no exchange added to the right side of the join. When we
       // find a single local exchange child in the leaf stage, assign workers based on the local exchange child.
@@ -134,7 +150,6 @@ public class WorkerManager {
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
         metadata.setPartitionFunction(childMetadata.getPartitionFunction());
         // Fake a segments map so that the worker can be correctly identified as leaf stage
-        // TODO: Add a query test for LOOKUP join
         Map<String, List<String>> segmentsMap = Map.of(TableType.OFFLINE.name(), List.of());
         Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
             Maps.newHashMapWithExpectedSize(workerIdToServerInstanceMap.size());
@@ -205,16 +220,17 @@ public class WorkerManager {
   // --------------------------------------------------------------------------
   // Intermediate stage assign logic
   // --------------------------------------------------------------------------
-  private void assignWorkersToIntermediateFragment(PlanFragment fragment, DispatchablePlanContext context) {
+  protected void assignWorkersToIntermediateFragment(PlanFragment fragment, DispatchablePlanContext context) {
     List<PlanFragment> children = fragment.getChildren();
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
 
     if (context.getTableNames().isEmpty()) {
-      // For constant expression query (no table is accessed), assign it to a random enabled server.
+      // For constant expression query (no table is accessed), assign it to a random routable server so we don't pick
+      // a server that's been excluded from routing by the FailureDetector.
       // TODO: Consider short-circuiting it and directly calculating the result on broker.
 
-      Collection<ServerInstance> serverInstances = _routingManager.getEnabledServerInstanceMap().values();
+      Collection<ServerInstance> serverInstances = _routingManager.getRoutableServerInstanceMap().values();
       int numServers = serverInstances.size();
       if (numServers == 0) {
         LOGGER.error("[RequestId: {}] No server instance found for constant expression query", context.getRequestId());
@@ -300,11 +316,13 @@ public class WorkerManager {
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
           }
         } else {
-          int numWorkers = candidateServers.size();
+          List<QueryServerInstance> replicatedLeafServers =
+              getCandidateServersForReplicatedLeaf(context, candidateServers);
+          int numWorkers = replicatedLeafServers.size();
           childWorkerIdToServerInstanceMap = Maps.newHashMapWithExpectedSize(numWorkers);
           childWorkerIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numWorkers);
           for (int workerId = 0; workerId < numWorkers; workerId++) {
-            childWorkerIdToServerInstanceMap.put(workerId, candidateServers.get(workerId));
+            childWorkerIdToServerInstanceMap.put(workerId, replicatedLeafServers.get(workerId));
             childWorkerIdToSegmentsMap.put(workerId, replicatedSegments);
           }
         }
@@ -359,17 +377,18 @@ public class WorkerManager {
   /**
    * Returns the servers serving any segment of the tables in the query.
    */
-  private List<QueryServerInstance> getCandidateServers(DispatchablePlanContext context) {
+  protected List<QueryServerInstance> getCandidateServers(DispatchablePlanContext context) {
     List<QueryServerInstance> candidateServers;
     if (context.isUseLeafServerForIntermediateStage()) {
       Set<QueryServerInstance> leafServerInstances = context.getLeafServerInstances();
       if (leafServerInstances.isEmpty()) {
-        // Fall back to use all enabled servers if no leaf server is found (e.g., when querying an empty table).
+        // Fall back to use all routable servers if no leaf server is found (e.g., when querying an empty table).
+        // Routable excludes servers removed from routing by the FailureDetector.
         LOGGER.warn("[RequestId: {}] No leaf server found with useLeafServerForIntermediateStage enabled, "
-            + "falling back to all enabled servers", context.getRequestId());
-        Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
-        candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
-        for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+            + "falling back to all routable servers", context.getRequestId());
+        Map<String, ServerInstance> routableServerInstanceMap = _routingManager.getRoutableServerInstanceMap();
+        candidateServers = new ArrayList<>(routableServerInstanceMap.size());
+        for (ServerInstance serverInstance : routableServerInstanceMap.values()) {
           candidateServers.add(new QueryServerInstance(serverInstance));
         }
         if (candidateServers.isEmpty()) {
@@ -385,7 +404,7 @@ public class WorkerManager {
     return candidateServers;
   }
 
-  private List<QueryServerInstance> getCandidateServersPerTables(DispatchablePlanContext context) {
+  protected List<QueryServerInstance> getCandidateServersPerTables(DispatchablePlanContext context) {
     Set<String> nonLookupTables = context.getNonLookupTables();
     assert !nonLookupTables.isEmpty();
     Set<String> servers = new HashSet<>();
@@ -409,21 +428,24 @@ public class WorkerManager {
         }
       }
     }
-    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
+    // Use the routable server map so that FailureDetector-excluded servers are filtered out from both the fallback and
+    // the per-table lookup paths. The {@code servers} set is already filtered via per-table InstanceSelector, but the
+    // routable map narrows the fallback path too.
+    Map<String, ServerInstance> routableServerInstanceMap = _routingManager.getRoutableServerInstanceMap();
     List<QueryServerInstance> candidateServers;
     if (servers.isEmpty()) {
-      // Fall back to use all enabled servers if no server is found for the tables.
+      // Fall back to use all routable servers if no server is found for the tables.
       // TODO: Revisit if we should throw an exception instead.
       LOGGER.warn("[RequestId: {}] No server instance found for intermediate stage for tables: {}, "
-          + "falling back to all enabled servers", context.getRequestId(), nonLookupTables);
-      candidateServers = new ArrayList<>(enabledServerInstanceMap.size());
-      for (ServerInstance serverInstance : enabledServerInstanceMap.values()) {
+          + "falling back to all routable servers", context.getRequestId(), nonLookupTables);
+      candidateServers = new ArrayList<>(routableServerInstanceMap.size());
+      for (ServerInstance serverInstance : routableServerInstanceMap.values()) {
         candidateServers.add(new QueryServerInstance(serverInstance));
       }
     } else {
       candidateServers = new ArrayList<>(servers.size());
       for (String server : servers) {
-        ServerInstance serverInstance = enabledServerInstanceMap.get(server);
+        ServerInstance serverInstance = routableServerInstanceMap.get(server);
         if (serverInstance != null) {
           candidateServers.add(new QueryServerInstance(serverInstance));
         }
@@ -435,6 +457,18 @@ public class WorkerManager {
       throw new IllegalStateException("No server instance found for intermediate stage for tables: " + nonLookupTables);
     }
     return candidateServers;
+  }
+
+  /**
+   * Returns the instances to assign to replicated leaf stage children when there is no local exchange peer. By default,
+   * uses the same candidates as the intermediate stage.
+   *
+   * <p>Subclasses can override to use different instances for replicated leaf stages (e.g., when intermediate stages
+   * run on non-server instances that cannot scan segments).</p>
+   */
+  protected List<QueryServerInstance> getCandidateServersForReplicatedLeaf(DispatchablePlanContext context,
+      List<QueryServerInstance> intermediateStageWorkers) {
+    return intermediateStageWorkers;
   }
 
   private void assignWorkersToLeafFragment(PlanFragment fragment, DispatchablePlanContext context) {
@@ -468,7 +502,7 @@ public class WorkerManager {
     if (metadata.getLogicalTableRouteInfo() != null) {
       assignWorkersToNonPartitionedLeafFragmentForLogicalTable(metadata, context);
     } else {
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+      assignWorkersToNonPartitionedLeafFragment(fragment, metadata, context);
     }
     addLeafServersToContext(metadata, context);
   }
@@ -484,11 +518,15 @@ public class WorkerManager {
   // --------------------------------------------------------------------------
   // Non-partitioned leaf stage assignment
   // --------------------------------------------------------------------------
-  private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+  private void assignWorkersToNonPartitionedLeafFragment(PlanFragment fragment, DispatchablePlanMetadata metadata,
       DispatchablePlanContext context) {
     String tableName = metadata.getScannedTables().get(0);
-    Map<String, RoutingTable> routingTableMap =
-        getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
+    PinotQuery routingPinotQuery = extractRoutingQuery(fragment.getFragmentRoot(), tableName, context);
+    // When broker pruning is enabled, routingPinotQuery carries the leaf stage filter so that segment pruners can
+    // eliminate segments. When disabled (null), fall back to an unfiltered SELECT * routing request.
+    Map<String, RoutingTable> routingTableMap = routingPinotQuery != null
+        ? getRoutingTable(routingPinotQuery, context.getRequestId())
+        : getRoutingTable(tableName, context.getRequestId(), context.getPlannerContext().getOptions());
     Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
 
     // acquire time boundary info if it is a hybrid table.
@@ -522,6 +560,9 @@ public class WorkerManager {
       if (!routingTable.getUnavailableSegments().isEmpty()) {
         metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
       }
+      if (routingPinotQuery != null) {
+        context.addNumSegmentsPrunedByBroker(routingTable.getNumPrunedSegments());
+      }
     }
     // Sort server instances to ensure deterministic worker ID assignment.
     // This is critical for pre-partitioned exchanges where worker ID N on one stage
@@ -550,7 +591,8 @@ public class WorkerManager {
   }
 
   /**
-   * Acquire routing table for items listed in {@link TableScanNode}.
+   * Acquire routing table for items listed in {@link TableScanNode}. Creates a bare {@code SELECT *} broker request
+   * with no filter, so no broker-side segment pruning occurs.
    *
    * @param tableName table name with or without type suffix.
    * @return keyed-map from table type(s) to routing table(s).
@@ -583,6 +625,61 @@ public class WorkerManager {
     }
   }
 
+  /**
+   * Acquire routing table using a pre-built {@link PinotQuery} that carries filter expressions for segment pruning.
+   * Unlike {@link #getRoutingTable(String, long)} which creates a bare {@code SELECT *} broker request,
+   * this overload forwards the filter to the routing manager so broker-side segment pruners can eliminate
+   * segments before dispatching to servers.
+   *
+   * @param pinotQuery the routing query with filter expressions for pruning. Table name may be raw or typed.
+   * @return keyed-map from table type(s) to routing table(s).
+   */
+  private Map<String, RoutingTable> getRoutingTable(PinotQuery pinotQuery, long requestId) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(pinotQuery.getDataSource().getTableName());
+    if (tableType == null) {
+      Map<String, RoutingTable> routingTableMap = new HashMap<>(4);
+      RoutingTable offlineRoutingTable = getRoutingTableHelper(pinotQuery, requestId, TableType.OFFLINE);
+      if (offlineRoutingTable != null) {
+        routingTableMap.put(TableType.OFFLINE.name(), offlineRoutingTable);
+      }
+      RoutingTable realtimeRoutingTable = getRoutingTableHelper(pinotQuery, requestId, TableType.REALTIME);
+      if (realtimeRoutingTable != null) {
+        routingTableMap.put(TableType.REALTIME.name(), realtimeRoutingTable);
+      }
+      return routingTableMap;
+    } else {
+      RoutingTable routingTable = getRoutingTableHelper(pinotQuery, requestId);
+      return routingTable != null ? Map.of(tableType.name(), routingTable) : Map.of();
+    }
+  }
+
+  /**
+   * Builds a {@link PinotQuery} from the leaf stage tree for broker-side segment pruning on the logical planner path.
+   * Returns {@code null} if broker pruning is disabled or the leaf stage shape is unsupported.
+   */
+  @Nullable
+  private PinotQuery extractRoutingQuery(PlanNode leafStageRoot, String tableName, DispatchablePlanContext context) {
+    boolean defaultLogicalPlannerUseBrokerPruning =
+        context.getPlannerContext().getEnvConfig().defaultLogicalPlannerUseBrokerPruning();
+    boolean useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(
+        context.getPlannerContext().getOptions(), defaultLogicalPlannerUseBrokerPruning);
+    if (!useBrokerPruning) {
+      return null;
+    }
+    try {
+      PinotQuery pinotQuery = PlanNodeRoutingQueryBuilder.createPinotQueryForRouting(tableName, leafStageRoot, false);
+      Map<String, String> queryOptions = context.getPlannerContext().getOptions();
+      if (MapUtils.isNotEmpty(queryOptions)) {
+        pinotQuery.setQueryOptions(new HashMap<>(queryOptions));
+      }
+      return pinotQuery;
+    } catch (RuntimeException e) {
+      LOGGER.warn("Broker pruning skipped for table {} due to unsupported leaf stage shape: {}",
+          tableName, e.getMessage());
+      return null;
+    }
+  }
+
   @Nullable
   private RoutingTable getRoutingTableHelper(String tableNameWithType, long requestId,
       Map<String, String> queryOptions) {
@@ -593,6 +690,19 @@ public class WorkerManager {
       brokerRequest.getPinotQuery().setQueryOptions(new HashMap<>(queryOptions));
     }
     return _routingManager.getRoutingTable(brokerRequest, requestId);
+  }
+
+  @Nullable
+  private RoutingTable getRoutingTableHelper(PinotQuery pinotQuery, long requestId) {
+    return _routingManager.getRoutingTable(CalciteSqlCompiler.convertToBrokerRequest(pinotQuery), requestId);
+  }
+
+  @Nullable
+  private RoutingTable getRoutingTableHelper(PinotQuery pinotQuery, long requestId, TableType tableType) {
+    PinotQuery copy = pinotQuery.deepCopy();
+    copy.getDataSource().setTableName(TableNameBuilder.forType(tableType).tableNameWithType(
+        TableNameBuilder.extractRawTableName(pinotQuery.getDataSource().getTableName())));
+    return getRoutingTableHelper(copy, requestId);
   }
 
   // --------------------------------------------------------------------------
