@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.MseMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -48,7 +49,6 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
-import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
@@ -275,26 +275,31 @@ public class OpChainSchedulerService {
   }
 
   private static class Metrics {
-    private final PinotMeter _startedOpchains = ServerMeter.MSE_OPCHAINS_STARTED.getGlobalMeter();
-    private final PinotMeter _competedOpchains = ServerMeter.MSE_OPCHAINS_COMPLETED.getGlobalMeter();
-    private final PinotMeter _emittedRows = ServerMeter.MSE_EMITTED_ROWS.getGlobalMeter();
-    private final PinotMeter _cpuExecutionTimeMs = ServerMeter.MSE_CPU_EXECUTION_TIME_MS.getGlobalMeter();
-    private final PinotMeter _memoryAllocatedBytes = ServerMeter.MSE_MEMORY_ALLOCATED_BYTES.getGlobalMeter();
-
     private static final String EMITTED_ROWS = "EMITTED_ROWS";
     private static final String EXECUTION_TIME_MS = "EXECUTION_TIME_MS";
     private static final String ALLOCATED_MEMORY_BYTES = "ALLOCATED_MEMORY_BYTES";
 
+    /**
+     * Resolve the active {@link MseMetricsEmitter} at call time rather than caching a
+     * {@link org.apache.pinot.spi.metrics.PinotMeter} handle at construction. Opchain lifecycle
+     * events are coarse (one per stage worker, not per row), so the additional indirection is
+     * unmeasurable; resolving lazily eliminates the NOOP-binding hazard that arises when this
+     * class is constructed before {@code ServerMetrics.register(...)} has installed a real
+     * {@link ServerMetrics} instance.
+     */
     public void onOpChainStarted() {
-      _startedOpchains.mark();
+      MseMetricsEmitter.get().addMeteredGlobalValue(ServerMeter.MSE_OPCHAINS_STARTED, 1L);
     }
 
     public void onOpChainFinished(MultiStageOperator rootOperator) {
-      _competedOpchains.mark();
+      MseMetricsEmitter emitter = MseMetricsEmitter.get();
+      emitter.addMeteredGlobalValue(ServerMeter.MSE_OPCHAINS_COMPLETED, 1L);
       StatMap<?> operatorStats = rootOperator.copyStatMaps();
-      _emittedRows.mark(operatorStats.getUnsafe(EMITTED_ROWS, 0L));
-      _cpuExecutionTimeMs.mark(operatorStats.getUnsafe(EXECUTION_TIME_MS, 0L));
-      _memoryAllocatedBytes.mark(operatorStats.getUnsafe(ALLOCATED_MEMORY_BYTES, 0L));
+      emitter.addMeteredGlobalValue(ServerMeter.MSE_EMITTED_ROWS, operatorStats.getUnsafe(EMITTED_ROWS, 0L));
+      emitter.addMeteredGlobalValue(ServerMeter.MSE_CPU_EXECUTION_TIME_MS,
+          operatorStats.getUnsafe(EXECUTION_TIME_MS, 0L));
+      emitter.addMeteredGlobalValue(ServerMeter.MSE_MEMORY_ALLOCATED_BYTES,
+          operatorStats.getUnsafe(ALLOCATED_MEMORY_BYTES, 0L));
     }
   }
 }

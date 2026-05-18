@@ -62,9 +62,11 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.MseMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.PinotAppConfigs;
@@ -664,6 +666,16 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverMetrics.initializeGlobalMeters();
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     ServerMetrics.register(_serverMetrics);
+    // Register the MSE metrics emitter on the server side. MSE intermediate-stage execution code
+    // in pinot-query-runtime emits through this emitter; the default ServerMetricsEmitter forwards
+    // every call to ServerMetrics so the pinot.server.* output is unchanged. Broker-side
+    // MSE-related counters in MultiStageBrokerRequestHandler use BrokerMetrics directly and do not
+    // go through this emitter. compareAndSet semantics mean a second startup attempt in the same
+    // JVM (e.g. integration tests that restart the server) leaves the previously registered emitter
+    // in place rather than throwing.
+    if (!MseMetricsEmitter.register(new ServerMetricsEmitter())) {
+      LOGGER.info("MseMetricsEmitter already registered; leaving the existing emitter in place");
+    }
 
     LOGGER.info("Initializing reload job status cache");
     _reloadJobStatusCache = new ServerReloadJobStatusCache(_instanceId);

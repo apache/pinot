@@ -29,8 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.MseMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
@@ -259,7 +259,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       /// So far this keys do not need to be modified from here because they are incremented in a per-worker basis:
       /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED
       /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED
-      /// public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics);
+      /// public void updateMseMetrics(StatMap<?> map, MseMetricsEmitter emitter);
     },
     FILTER(1, FilterOperator.StatKey.class) {
       @Override
@@ -280,15 +280,15 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
+      public void updateMseMetrics(StatMap<?> map, MseMetricsEmitter emitter) {
+        super.updateMseMetrics(map, emitter);
         @SuppressWarnings("unchecked")
         StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
         boolean maxRowsInJoinReached = stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED);
         if (maxRowsInJoinReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
+          emitter.addMeteredGlobalValue(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED, 1);
         }
-        serverMetrics.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
+        emitter.addTimedValue(ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS,
             stats.getLong(HashJoinOperator.StatKey.TIME_BUILDING_HASH_TABLE_MS), TimeUnit.MILLISECONDS);
       }
     },
@@ -329,23 +329,23 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
+      public void updateMseMetrics(StatMap<?> map, MseMetricsEmitter emitter) {
+        super.updateMseMetrics(map, emitter);
         @SuppressWarnings("unchecked")
         StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
 
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES,
+        emitter.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES,
             stats.getInt(BaseMailboxReceiveOperator.StatKey.IN_MEMORY_MESSAGES));
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_MESSAGES,
+        emitter.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_MESSAGES,
             stats.getInt(BaseMailboxReceiveOperator.StatKey.RAW_MESSAGES));
-        serverMetrics.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_BYTES,
+        emitter.addMeteredGlobalValue(ServerMeter.MULTI_STAGE_RAW_BYTES,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZED_BYTES));
 
-        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS,
+        emitter.addTimedValue(ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DESERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
+        emitter.addTimedValue(ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.DOWNSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
-        serverMetrics.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
+        emitter.addTimedValue(ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS,
             stats.getLong(BaseMailboxReceiveOperator.StatKey.UPSTREAM_WAIT_MS), TimeUnit.MILLISECONDS);
       }
     },
@@ -358,10 +358,10 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      public void updateMseMetrics(StatMap<?> map, MseMetricsEmitter emitter) {
         @SuppressWarnings("unchecked")
         StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
-        serverMetrics.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS,
+        emitter.addTimedValue(ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS,
             stats.getLong(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS), TimeUnit.MILLISECONDS);
       }
     },
@@ -417,11 +417,11 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       }
 
       @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+      public void updateMseMetrics(StatMap<?> map, MseMetricsEmitter emitter) {
         @SuppressWarnings("unchecked")
         StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
         if (stats.getBoolean(WindowAggregateOperator.StatKey.MAX_ROWS_IN_WINDOW_REACHED)) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
+          emitter.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
     },
@@ -508,7 +508,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
      */
     public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
 
-    public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+    public void updateMseMetrics(StatMap<?> map, MseMetricsEmitter emitter) {
       // Do nothing by default
     }
   }

@@ -39,8 +39,8 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.MseMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -163,10 +163,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             "query_submission_executor_on_" + _port + "_port",
             CommonConstants.Server.DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE);
 
-    ServerMetrics serverMetrics = ServerMetrics.get();
+    MseMetricsEmitter emitter = MseMetricsEmitter.get();
     _submissionExecutorService = new MetricsExecutor(baseExecutorService,
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
+        emitter.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),
+        emitter.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
 
     NamedThreadFactory explainThreadFactory = new NamedThreadFactory("query_explain_on_" + _port + "_port");
     _explainExecutorService = Executors.newSingleThreadExecutor(explainThreadFactory);
@@ -260,7 +260,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Match the SSE QUERIES counter semantics by counting requests as soon as they reach the handler.
-    ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
+    MseMetricsEmitter.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
     Map<String, String> reqMetadata;
     try {
       reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());

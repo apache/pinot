@@ -140,10 +140,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
 
-  protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
-  protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
-  protected final PinotMeter _opchainsStartedMeter = BrokerMeter.MSE_OPCHAINS_STARTED.getGlobalMeter();
-  protected final PinotMeter _opchainsCompletedMeter = BrokerMeter.MSE_OPCHAINS_COMPLETED.getGlobalMeter();
+  // Each volatile field caches the PinotMeter resolved on first emission against the live BrokerMetrics
+  // registry. Caching avoids a per-emission ConcurrentHashMap lookup on the hot path. The fields are
+  // volatile rather than final, and lazily populated (vs. eagerly initialized in the field initializer)
+  // to defeat the NOOP-binding hazard: if construction races BrokerMetrics.register(...), an eagerly
+  // initialized field would be bound to the NOOP registry for the lifetime of this handler.
+  //
+  // A small race is possible where two threads each resolve the meter handle the first time around;
+  // both end up calling addMeteredGlobalValue(..., null) which mints a fresh handle from the live
+  // registry and records the unit count exactly once. The "lost" cache write costs at most one extra
+  // registry lookup on a future emission — never correctness.
+  protected volatile PinotMeter _stagesStartedMeter;
+  protected volatile PinotMeter _stagesFinishedMeter;
+  protected volatile PinotMeter _opchainsStartedMeter;
+  protected volatile PinotMeter _opchainsCompletedMeter;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -652,8 +662,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       onQueryStart(requestId, clientRequestId, query.getTextQuery());
       long executionStartTimeNs = System.nanoTime();
 
-      _stagesStartedMeter.mark(stageCount);
-      _opchainsStartedMeter.mark(opChainCount);
+      _stagesStartedMeter =
+          _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STAGES_STARTED, stageCount, _stagesStartedMeter);
+      _opchainsStartedMeter =
+          _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_OPCHAINS_STARTED, opChainCount, _opchainsStartedMeter);
 
       QueryDispatcher.QueryResult queryResults;
       try {
@@ -668,8 +680,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(queryErrorCode);
         return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
       } finally {
-        _stagesFinishedMeter.mark(stageCount);
-        _opchainsCompletedMeter.mark(opChainCount);
+        _stagesFinishedMeter =
+            _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STAGES_COMPLETED, stageCount, _stagesFinishedMeter);
+        _opchainsCompletedMeter = _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_OPCHAINS_COMPLETED, opChainCount,
+            _opchainsCompletedMeter);
         onQueryFinish(requestId);
       }
 

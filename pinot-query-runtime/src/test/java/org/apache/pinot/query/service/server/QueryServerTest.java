@@ -33,8 +33,10 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.metrics.MseMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerMetricsEmitter;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -95,6 +97,8 @@ public class QueryServerTest extends QueryTestSet {
       throws Exception {
     ServerMetrics.deregister();
     ServerMetrics.register(new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()));
+    MseMetricsEmitter.deregister();
+    MseMetricsEmitter.register(new ServerMetricsEmitter());
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = mock(QueryRunner.class);
@@ -117,6 +121,7 @@ public class QueryServerTest extends QueryTestSet {
     for (QueryServer worker : _queryServerMap.values()) {
       worker.shutdown();
     }
+    MseMetricsEmitter.deregister();
     ServerMetrics.deregister();
   }
 

@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.metrics.MseMetricsEmitter;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
@@ -192,10 +193,10 @@ public class QueryRunner {
         ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
             Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
 
-    ServerMetrics serverMetrics = ServerMetrics.get();
+    MseMetricsEmitter emitter = MseMetricsEmitter.get();
     MetricsExecutor metricsExecutor = new MetricsExecutor(baseExecutorService,
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_COMPLETED_TASKS));
+        emitter.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
+        emitter.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_COMPLETED_TASKS));
     _executorService = QueryThreadContext.contextAwareExecutorService(metricsExecutor);
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
@@ -223,6 +224,8 @@ public class QueryRunner {
     }
 
     if (instanceDataManager != null) {
+      // SSE leaf-stage execution is server-only and stays on ServerMetrics directly.
+      ServerMetrics serverMetrics = ServerMetrics.get();
       try {
         _leafQueryExecutor = new ServerQueryExecutorV1Impl();
         _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,

@@ -242,7 +242,22 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter MSE_STAGES_STARTED = create("MSE_STAGES_STARTED", "stages", true);
   public static final BrokerMeter MSE_STAGES_COMPLETED = create("MSE_STAGES_COMPLETED", "stages", true);
+  /**
+   * Number of MSE op-chains that the broker has planned and started dispatching for execution.
+   * <p>
+   * This is a dispatch-side counter: it counts op-chains as the broker plans and dispatches them, not
+   * as they are executed on workers. The execution-side counterpart is
+   * {@link ServerMeter#MSE_OPCHAINS_STARTED}.
+   */
   public static final BrokerMeter MSE_OPCHAINS_STARTED = create("MSE_OPCHAINS_STARTED", "opchains", true);
+  /**
+   * Number of MSE op-chains for which dispatch has completed on the broker (either successfully or
+   * with an error).
+   * <p>
+   * This is a dispatch-side counter: it counts op-chains as the broker observes their dispatch
+   * complete, not as they finish execution on workers. The execution-side counterpart is
+   * {@link ServerMeter#MSE_OPCHAINS_COMPLETED}.
+   */
   public static final BrokerMeter MSE_OPCHAINS_COMPLETED = create("MSE_OPCHAINS_COMPLETED", "opchains", true);
 
   /**
