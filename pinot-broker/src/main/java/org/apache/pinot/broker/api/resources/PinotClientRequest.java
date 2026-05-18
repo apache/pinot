@@ -190,7 +190,12 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       if (!requestJson.has(Request.SQL)) {
         throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
@@ -202,9 +207,6 @@ public class PinotClientRequest {
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
       asyncResponse.resume(bre);
-    } catch (JsonProcessingException e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(new BadRequestException("Invalid JSON: " + e.getMessage(), e));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -236,7 +238,12 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       if (!requestJson.has(Request.SQL)) {
         throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
@@ -247,9 +254,6 @@ public class PinotClientRequest {
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
       throw bre;
-    } catch (JsonProcessingException e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       throw wae;
@@ -314,7 +318,12 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       if (!requestJson.has(Request.SQL)) {
         throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
@@ -326,9 +335,6 @@ public class PinotClientRequest {
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
       asyncResponse.resume(bre);
-    } catch (JsonProcessingException e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(new BadRequestException("Invalid JSON: " + e.getMessage(), e));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -461,7 +467,12 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       String v1Query;
       String v2Query;
 
@@ -512,9 +523,6 @@ public class PinotClientRequest {
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
       asyncResponse.resume(bre);
-    } catch (JsonProcessingException e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(new BadRequestException("Invalid JSON: " + e.getMessage(), e));
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
