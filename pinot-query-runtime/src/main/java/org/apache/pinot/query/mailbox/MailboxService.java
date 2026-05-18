@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
@@ -30,6 +31,10 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.instance.context.ControllerContext;
@@ -123,7 +128,43 @@ public class MailboxService {
     );
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
+    registerMailboxClientGauges();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
+  }
+
+  /// Registers gauges exposing the memory used by the gRPC client allocator
+  /// shared by every [GrpcSendingMailbox] this service creates. The companion
+  /// gauges for the server allocator are registered in [GrpcMailboxServer].
+  ///
+  /// Notice we are wiring the shaded gRPC Netty allocator
+  /// ([io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator]) rather than
+  /// the non-shaded one. This is the same pool whose exhaustion triggered the
+  /// `OutOfDirectMemoryError` documented in `grpc-oom-analysis.md`, so it is
+  /// the right number for operators to alert on.
+  private void registerMailboxClientGauges() {
+    PooledByteBufAllocatorMetric metric = _channelManager.getBufAllocatorMetric();
+    switch (_instanceType) {
+      case BROKER: {
+        BrokerMetrics brokerMetrics = BrokerMetrics.get();
+        brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
+            metric::usedDirectMemory);
+        brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
+            metric::usedHeapMemory);
+        break;
+      }
+      case SERVER: {
+        ServerMetrics serverMetrics = ServerMetrics.get();
+        serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
+            metric::usedDirectMemory);
+        serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
+            metric::usedHeapMemory);
+        break;
+      }
+      default:
+        // Controller does not run a MailboxService in production today, but if one is ever
+        // started for tests we silently skip metric registration rather than failing.
+        break;
+    }
   }
 
   /**
@@ -188,6 +229,37 @@ public class MailboxService {
    */
   public boolean resetConnectBackoff(String hostname, int port) {
     return _channelManager.resetConnectBackoff(hostname, port);
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] /
+  /// [ServerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] — bytes pinned by the
+  /// shared gRPC client allocator backing every [GrpcSendingMailbox] created
+  /// from this service.
+  public long getMailboxClientUsedDirectMemoryBytes() {
+    return _channelManager.getBufAllocatorMetric().usedDirectMemory();
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY] /
+  /// [ServerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY].
+  public long getMailboxClientUsedHeapMemoryBytes() {
+    return _channelManager.getBufAllocatorMetric().usedHeapMemory();
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] /
+  /// [ServerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] — bytes pinned by the
+  /// gRPC server allocator handling inbound mailbox traffic.
+  ///
+  /// Returns 0 before [#start] is called (the gRPC server is built lazily there).
+  public long getMailboxServerUsedDirectMemoryBytes() {
+    return _grpcMailboxServer != null ? _grpcMailboxServer.getBufAllocatorMetric().usedDirectMemory() : 0L;
+  }
+
+  /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY] /
+  /// [ServerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY].
+  ///
+  /// Returns 0 before [#start] is called.
+  public long getMailboxServerUsedHeapMemoryBytes() {
+    return _grpcMailboxServer != null ? _grpcMailboxServer.getBufAllocatorMetric().usedHeapMemory() : 0L;
   }
 
   /**

@@ -57,6 +57,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
   private final MailboxService _mailboxService;
   private final Server _server;
+  private final PooledByteBufAllocatorMetric _bufAllocatorMetric;
 
   /**
    * Constructs a gRPC-based mailbox server.
@@ -79,6 +80,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
 
     PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
+    _bufAllocatorMetric = metric;
 
     // Register memory metrics based on instance type
     InstanceType instanceType = mailboxService.getInstanceType();
@@ -164,6 +166,13 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /// Returns the metric view of the gRPC server allocator backing this mailbox
+  /// server. This is the same allocator whose `usedDirectMemory()` and
+  /// `usedHeapMemory()` are exported as `MAILBOX_SERVER_USED_*` gauges.
+  public PooledByteBufAllocatorMetric getBufAllocatorMetric() {
+    return _bufAllocatorMetric;
   }
 
   @Override
