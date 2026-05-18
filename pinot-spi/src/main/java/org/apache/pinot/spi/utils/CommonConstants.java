@@ -2167,6 +2167,21 @@ public class CommonConstants {
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
+    /**
+     * Whether the sender side of every {@code GrpcSendingMailbox} respects gRPC client-side flow control by waiting
+     * on {@code ClientCallStreamObserver.isReady()} before pushing each chunk.
+     *
+     * <p>Default {@code true}. Set to {@code false} to restore the pre-1.6 behaviour where the sender pushes
+     * unconditionally; useful as a production kill-switch if the gate causes an unexpected regression, and as an
+     * A/B knob for benchmarks (see {@code BenchmarkGrpcMailboxSend}).
+     *
+     * <p>Disabling this flag is what re-introduces the {@code OutOfDirectMemoryError} failure mode the gate exists
+     * to prevent. It is here as a safety valve, not as a recommended setting.
+     */
+    public static final String KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED =
+        "pinot.query.runner.grpc.sender.backpressure.enabled";
+    public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = true;
+
 
     /**
      * Configuration for channel idle timeout in seconds.

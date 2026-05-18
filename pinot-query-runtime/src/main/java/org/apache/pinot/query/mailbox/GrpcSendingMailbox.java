@@ -74,6 +74,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private final StatMap<MailboxSendOperator.StatKey> _statMap;
   private final MailboxStatusObserver _statusObserver = new MailboxStatusObserver();
   private final int _maxByteStringSize;
+  /// Kill-switch for the sender-side `isReady()` gate. When `false`, `awaitReady` short-circuits like the bypass
+  /// path and the sender pushes unconditionally — restoring the pre-1.6 behaviour. Plumbed from
+  /// `pinot.query.runner.grpc.sender.backpressure.enabled` so it can be flipped without code changes if the gate
+  /// causes a regression in production, and also used by `BenchmarkGrpcMailboxSend` for A/B measurements.
+  private final boolean _backpressureEnabled;
   /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
   private volatile boolean _senderSideClosed;
 
@@ -90,12 +95,18 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize) {
+    this(id, channelManager, hostname, port, deadlineMs, statMap, maxInboundMessageSize, true);
+  }
+
+  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
+      StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled) {
     _id = id;
     _channelManager = channelManager;
     _hostname = hostname;
     _port = port;
     _deadlineMs = deadlineMs;
     _statMap = statMap;
+    _backpressureEnabled = backpressureEnabled;
     // TODO: tune the maxByteStringSize based on experiments. We know the maxInboundMessageSize on the receiver side,
     //  but we want to leave some room for extra stuff for other fields like metadata, mailbox id, etc, whose size
     //  we don't know at the time of writing into the stream as it is serialized by protobuf.
@@ -322,7 +333,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// OpChain thread. This is intentional: the alternative (forking each destination onto its own thread) would
   /// re-introduce the unbounded outbound queue we are fixing here. Spool throughput is gated by the slowest consumer.
   private boolean awaitReady(boolean bypassReady) {
-    if (bypassReady) {
+    if (bypassReady || !_backpressureEnabled) {
       return !_statusObserver.isFinished();
     }
     // Fast path: don't take the lock if the observer is already ready. This is the common case in the steady state.

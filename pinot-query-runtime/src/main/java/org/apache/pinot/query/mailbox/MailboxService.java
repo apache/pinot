@@ -101,6 +101,7 @@ public class MailboxService {
    * bloating is added by gRPC and protobuf.
    */
   private final int _maxInboundMessageSize;
+  private final boolean _grpcSenderBackpressureEnabled;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -125,6 +126,10 @@ public class MailboxService {
     _maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
+    );
+    _grpcSenderBackpressureEnabled = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED
     );
     _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
@@ -207,7 +212,7 @@ public class MailboxService {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
       return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
-          _maxInboundMessageSize);
+          _maxInboundMessageSize, _grpcSenderBackpressureEnabled);
     }
   }
 
