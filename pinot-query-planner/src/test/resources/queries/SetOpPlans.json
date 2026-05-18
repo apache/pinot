@@ -133,6 +133,27 @@
         ]
       },
       {
+        "description": "Aggregate hints (e.g. is_skip_leaf_stage_group_by) are preserved on both the per-branch and rolled-up aggregates produced by AggregateUnionTranspose",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, SUM(col3) FROM (SELECT col2, col3 FROM a UNION ALL SELECT col2, col3 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalUnion(all=[true])",
+          "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Disabling AggregateUnionTranspose via skipPlannerRules keeps the aggregate above the UNION ALL",
         "sql": "SET skipPlannerRules='AggregateUnionTranspose'; EXPLAIN PLAN FOR SELECT col2, SUM(col3) FROM (SELECT col2, col3 FROM a UNION ALL SELECT col2, col3 FROM b) GROUP BY col2",
         "output": [

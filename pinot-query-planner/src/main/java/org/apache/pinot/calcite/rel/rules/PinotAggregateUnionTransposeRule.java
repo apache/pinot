@@ -30,6 +30,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Union;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.metadata.RelMdUtil;
@@ -113,6 +114,10 @@ public final class PinotAggregateUnionTransposeRule extends RelOptRule implement
       return;
     }
 
+    // Preserve the original aggregate's hints on every replacement aggregate; Pinot reads hints like
+    // is_skip_leaf_stage_group_by, is_partitioned_by_group_by_keys, is_leaf_return_final_result, and group-trim
+    // options from the Aggregate node in later planning stages.
+    List<RelHint> hints = aggRel.getHints();
     RelBuilder relBuilder = call.builder();
     RelDataType origUnionType = union.getRowType();
     for (RelNode input : union.getInputs()) {
@@ -138,8 +143,7 @@ public final class PinotAggregateUnionTransposeRule extends RelOptRule implement
           childAggCalls.set(i, newCall);
         }
       }
-      relBuilder.push(input);
-      relBuilder.aggregate(relBuilder.groupKey(aggRel.getGroupSet()), childAggCalls);
+      relBuilder.push(LogicalAggregate.create(input, hints, aggRel.getGroupSet(), null, childAggCalls));
     }
 
     // Build the new top-level Union over the branch aggregates, then wrap with the rolled-up top aggregate.
@@ -154,8 +158,8 @@ public final class PinotAggregateUnionTransposeRule extends RelOptRule implement
     ImmutableBitSet topGroupSet = Mappings.apply(topGroupMapping, groupSet);
     ImmutableList<ImmutableBitSet> topGroupSets = Mappings.apply2(topGroupMapping, aggRel.getGroupSets());
 
-    relBuilder.aggregate(relBuilder.groupKey(topGroupSet, topGroupSets), transformedAggCalls);
-    call.transformTo(relBuilder.build());
+    call.transformTo(
+        LogicalAggregate.create(relBuilder.build(), hints, topGroupSet, topGroupSets, transformedAggCalls));
   }
 
   /**
