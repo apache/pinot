@@ -82,6 +82,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.lineage.SegmentsInLineageException;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.core.auth.Actions;
@@ -689,8 +690,12 @@ public class PinotSegmentRestletResource {
 
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
       @Nullable String retentionPeriod) {
-    PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
-        retentionPeriod);
+    PinotResourceManagerResponse response;
+    try {
+      response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod);
+    } catch (SegmentsInLineageException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.CONFLICT, e);
+    }
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),

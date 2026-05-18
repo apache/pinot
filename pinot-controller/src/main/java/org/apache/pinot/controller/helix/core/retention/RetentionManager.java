@@ -37,6 +37,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
+import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
@@ -191,6 +192,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         segmentsToDelete.add(segmentZKMetadata.getSegmentName());
       }
     }
+    removeLineageLockedSegments(offlineTableName, segmentsToDelete);
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), offlineTableName);
       _pinotHelixResourceManager.deleteSegments(offlineTableName, segmentsToDelete);
@@ -229,6 +231,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     // Remove last sealed segments such that the table can still create new consuming segments if it's paused
     segmentsToDelete.removeAll(_pinotHelixResourceManager.getLastLLCCompletedSegments(realtimeTableName));
 
+    removeLineageLockedSegments(realtimeTableName, segmentsToDelete);
     if (!segmentsToDelete.isEmpty()) {
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -276,6 +279,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
           segmentsToDelete.add(segmentZKMetadata.getSegmentName());
         }
       }
+      removeLineageLockedSegments(realtimeTableName, segmentsToDelete);
       LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       if (!segmentsToDelete.isEmpty()) {
         _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
@@ -451,6 +455,36 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     return segmentName;
   }
 
+  /**
+   * Strips out any segments that participate in a live segment lineage entry from the retention-driven
+   * delete batch. Time-based retention must not delete lineage-locked segments — they are owned by the
+   * lineage lifecycle and get cleaned up by {@link #manageSegmentLineageCleanupForTable} when the lineage
+   * entry becomes eligible. If we left them in, the public delete check would reject the whole batch and
+   * the rest of the eligible segments would never get cleaned up.
+   */
+  private void removeLineageLockedSegments(String tableNameWithType, List<String> segmentsToDelete) {
+    if (segmentsToDelete.isEmpty()) {
+      return;
+    }
+    SegmentLineage segmentLineage =
+        SegmentLineageAccessHelper.getSegmentLineage(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+    if (segmentLineage == null) {
+      return;
+    }
+    Set<String> blocked = SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage);
+    if (blocked.isEmpty()) {
+      return;
+    }
+    int sizeBefore = segmentsToDelete.size();
+    segmentsToDelete.removeIf(blocked::contains);
+    int removed = sizeBefore - segmentsToDelete.size();
+    if (removed > 0) {
+      LOGGER.info(
+          "Skipping {} segments in retention pass for table: {} because they participate in a live lineage entry; "
+              + "they will be cleaned up by the lineage retention path.", removed, tableNameWithType);
+    }
+  }
+
   private void manageSegmentLineageCleanupForTable(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
     List<String> segmentsToDelete = new ArrayList<>();
@@ -496,7 +530,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
     // Delete segments based on the segment lineage
     if (!segmentsToDelete.isEmpty()) {
-      _pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentsToDelete);
+      _pinotHelixResourceManager.deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToDelete);
       LOGGER.info("Finished cleaning up segment lineage for table: {} in {}ms, deleted segments: {}",
           tableNameWithType, (System.currentTimeMillis() - cleanupStartTime), segmentsToDelete);
     }
