@@ -44,6 +44,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.runtime.PairList;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
@@ -624,6 +625,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
+    // Fast-path: when all segments are pruned at the broker (no real servers to dispatch to),
+    // skip the query throttler, network dispatch, and return an empty result immediately.
+    // This eliminates unnecessary network round-trips and query-throttler slot acquisition
+    // for queries that the broker already knows will produce no results.
+    if (servers.size() <= 1) {
+      return buildEmptyBrokerResponse(dispatchableSubPlan, tableNames, requestContext, query, rlsFiltersApplied,
+          requesterIdentity, queryWasLogged);
+    }
+
     int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
@@ -764,6 +774,72 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
           _queryThrottler.currentQueryServerThreads());
     }
+  }
+
+  /**
+   * Builds an empty broker response when all segments have been pruned at the broker.
+   * This avoids dispatching to servers and acquiring query throttler slots when the broker
+   * already knows the result will be empty.
+   */
+  BrokerResponse buildEmptyBrokerResponse(DispatchableSubPlan dispatchableSubPlan, Set<String> tableNames,
+      RequestContext requestContext, QueryEnvironment.CompiledQuery query, boolean rlsFiltersApplied,
+      RequesterIdentity requesterIdentity, boolean queryWasLogged) {
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+
+    // Build the result schema from the plan's root stage
+    PairList<Integer, String> resultFields = dispatchableSubPlan.getQueryResultFields();
+    DispatchablePlanFragment rootStage = dispatchableSubPlan.getQueryStageMap().get(0);
+    DataSchema sourceSchema = rootStage.getPlanFragment().getFragmentRoot().getDataSchema();
+    int numColumns = resultFields.size();
+    String[] columnNames = new String[numColumns];
+    DataSchema.ColumnDataType[] columnTypes = new DataSchema.ColumnDataType[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      Map.Entry<Integer, String> field = resultFields.get(i);
+      columnNames[i] = field.getValue();
+      columnTypes[i] = sourceSchema.getColumnDataType(field.getKey());
+    }
+    DataSchema resultSchema = new DataSchema(columnNames, columnTypes);
+    brokerResponse.setResultTable(new ResultTable(resultSchema, List.of()));
+
+    brokerResponse.setTablesQueried(tableNames);
+    brokerResponse.setNumServersQueried(0);
+    brokerResponse.setNumServersResponded(0);
+
+    // Report broker-pruned segment count
+    long numSegmentsPrunedByBroker = dispatchableSubPlan.getNumSegmentsPrunedByBroker();
+    if (numSegmentsPrunedByBroker > 0) {
+      StatMap<BrokerResponseNativeV2.StatKey> brokerPruningStats =
+          new StatMap<>(BrokerResponseNativeV2.StatKey.class);
+      brokerPruningStats.merge(BrokerResponseNativeV2.StatKey.NUM_SEGMENTS_PRUNED_BY_BROKER,
+          (int) numSegmentsPrunedByBroker);
+      brokerResponse.addBrokerStats(brokerPruningStats);
+    }
+
+    long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
+
+    String clientRequestId = extractClientRequestId(query.getSqlNodeAndOptions());
+    brokerResponse.setClientRequestId(clientRequestId);
+
+    _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+    for (String table : tableNames) {
+      _brokerMetrics.addTimedTableValue(
+          table, BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+    }
+
+    augmentStatistics(requestContext, brokerResponse);
+
+    if (QueryOptionsUtils.shouldDropResults(query.getOptions())) {
+      brokerResponse.setResultTable(null);
+    }
+
+    _queryLogger.logQueryCompleted(
+        new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
+            QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null),
+        queryWasLogged);
+
+    return brokerResponse;
   }
 
   private static void throwTableAccessError(TableAuthorizationResult tableAuthorizationResult) {
