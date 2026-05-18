@@ -82,8 +82,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
   private volatile boolean _senderSideClosed;
 
-  /// Guards [#_readyCond]. [#_contentObserver] is mutated only by the sending thread before any waiter exists, so it
-  /// does not need to be protected by this lock.
+  /// Guards [#_readyCond]. [#_contentObserver] is normally written once by the sending thread on its first call to
+  /// [#sendInternal]. The field is declared `volatile` because [#cancel] and [#close] can read it from a different
+  /// thread (e.g. an external cancel from an OpChain on-failure callback or a watchdog in tests), and we need a
+  /// happens-before edge for the sender's lazy initialization.
   private final ReentrantLock _readyLock = new ReentrantLock();
   /// Signalled whenever any of the predicates `awaitReady()` waits on may have changed: the gRPC outbound becomes
   /// ready, the receiver acknowledges a chunk, the receiver-side stream closes (success or error), or the sender
@@ -91,7 +93,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// waking up.
   private final Condition _readyCond = _readyLock.newCondition();
 
-  private ClientCallStreamObserver<MailboxContent> _contentObserver;
+  private volatile ClientCallStreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize) {
@@ -230,6 +232,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
     wakeWaiters();
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_contentObserver == null) {
+      // Sender thread never created the stream (e.g. cancel arrived before the first send). Open one now so the
+      // receiver gets an explicit cancel-error EOS instead of waiting for its own deadline — the receiving
+      // mailbox is registered per the dispatch plan and is blocked on this stream.
       _contentObserver = getContentObserver();
     }
     try {
@@ -499,7 +504,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   public void close()
       throws Exception {
     if (!isTerminated()) {
-      String errorMsg = "Closing gPRC mailbox without proper EOS message";
+      String errorMsg = "Closing gRPC mailbox without proper EOS message";
       RuntimeException ex = new RuntimeException(errorMsg);
       ex.fillInStackTrace();
       LOGGER.error(errorMsg, ex);
