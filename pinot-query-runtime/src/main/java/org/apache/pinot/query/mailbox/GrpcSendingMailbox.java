@@ -126,7 +126,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   @Override
   public void send(MseBlock.Eos block, List<DataBuffer> serializedStats) {
-    if (sendInternal(block, serializedStats)) {
+    // EOS blocks (success or error) carry control-plane info — including the original error code on the error path —
+    // and must always reach the receiver, so they bypass the back-pressure gate. Bypassing also disables the
+    // cooperative termination poll inside [#awaitReady]; without it, a terminate signal raised while the sender is
+    // mid-way through pushing an error EOS would unwind [#sendInternal] with a TerminationException, leave
+    // [#_senderSideClosed] false, and let [#cancel] run and overwrite the original error code with
+    // QUERY_CANCELLATION on the receiver side.
+    if (sendInternal(block, serializedStats, /* bypassReady */ true)) {
       LOGGER.debug("Completing mailbox: {}", _id);
       _contentObserver.onCompleted();
       _senderSideClosed = true;
@@ -137,6 +143,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   /// Tries to send the block to the receiver. Returns true if the block is sent, false otherwise.
   private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats) {
+    return sendInternal(block, serializedStats, /* bypassReady */ false);
+  }
+
+  private boolean sendInternal(MseBlock block, List<DataBuffer> serializedStats, boolean bypassReady) {
     if (isTerminated() || (isEarlyTerminated() && block.isData())) {
       LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
           block, _id);
@@ -149,7 +159,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       _contentObserver = getContentObserver();
     }
     try {
-      processAndSend(block, serializedStats);
+      processAndSend(block, serializedStats, bypassReady);
     } catch (IOException e) {
       throw new QueryException(QueryErrorCode.INTERNAL, "Failed to split and send mailbox", e);
     }
