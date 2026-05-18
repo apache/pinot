@@ -20,6 +20,8 @@ package org.apache.pinot.query.mailbox;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -38,30 +40,29 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-/// Reproducer for the missing sender-side gRPC backpressure described in
-/// `grpc-oom-analysis.md`.
+/// Validates the sender-side gRPC back-pressure described in `grpc-oom-analysis.md`.
 ///
-/// A "fast sender" pushes the same small data block over and over on the test
-/// thread while a "slow reader" thread polls the receiving mailbox at roughly
-/// 50 blocks per second. Because [GrpcSendingMailbox] does not use gRPC's
-/// `isReady()` / `setOnReadyHandler()` hooks and ignores the receiver-side
-/// buffer-size feedback (see the TODO in
-/// [org.apache.pinot.query.mailbox.channel.MailboxStatusObserver]), every
-/// `send()` returns immediately — the proto bytes pile up in Netty's outbound
-/// direct memory regardless of how slowly the consumer drains.
+/// A "fast sender" tries to push the same small data block over and over on the
+/// test thread while a "slow reader" thread polls the receiving mailbox at
+/// roughly 50 blocks per second. With back-pressure in place, the sender thread
+/// blocks inside [GrpcSendingMailbox.awaitReady] whenever the gRPC outbound
+/// queue fills, so the send rate tracks the polling rate plus a bounded
+/// in-flight pipeline (gRPC HTTP/2 stream window + Netty WriteQueue + the
+/// receiver's bounded mailbox queue).
 ///
-/// The test asserts that within a few seconds the sender pushes
-/// significantly more blocks than the receiver could ever consume. The direct
-/// memory delta is logged but not asserted because Netty's pooled allocator
-/// reuses freed chunks and the measurement is sensitive to other JVM activity.
+/// We assert two complementary properties:
+///  1. `sendCount` is bounded by `polledCount` plus a generous in-flight
+///     allowance — pre-fix the ratio was ~1700x, which would still fail this
+///     check by orders of magnitude.
+///  2. The peak growth of the sender's client allocator stays under a small
+///     constant — pre-fix it reached 50+ MB in 3 s, post-fix we expect at most
+///     one or two Netty pool chunks.
 ///
-/// When sender-side flow control is added, this test should be rewritten to
-/// assert the opposite: that `send()` blocks (or yields cooperatively) once the
-/// receiver falls behind, so that `sendCount` stays close to `polledCount`.
+/// The thresholds are intentionally generous; tightening them would require
+/// per-channel Netty watermark tuning, which is deferred to a follow-up.
 public class GrpcSenderBackpressureReproTest {
   private static final DataSchema SCHEMA = new DataSchema(
       new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.STRING});
@@ -135,17 +136,24 @@ public class GrpcSenderBackpressureReproTest {
     long peakClient = baselineClient;
     long peakServer = baselineServer;
     int sendCount = 0;
-    long sendDeadlineNs = System.nanoTime() + SEND_BUDGET_NS;
+
+    // Watchdog: with back-pressure in place, `sender.send` blocks once the gRPC outbound is full, so a wall-clock
+    // deadline checked between sends is not enough to bound the test runtime. We cancel the sender from a separate
+    // thread when the budget elapses, which wakes the blocked `awaitReady()` waiter and lets the send loop exit
+    // via the `isTerminated()` check.
+    ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor(r -> {
+      Thread t = new Thread(r, "test-budget-watchdog");
+      t.setDaemon(true);
+      return t;
+    });
+    watchdog.schedule(() -> sender.cancel(new RuntimeException("test budget elapsed")),
+        SEND_BUDGET_NS, TimeUnit.NANOSECONDS);
 
     try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
-      while (System.nanoTime() < sendDeadlineNs) {
+      while (!sender.isTerminated()) {
         sender.send(block);
         sendCount++;
-        if (sender.isTerminated()) {
-          break;
-        }
-        // Sample pool memory periodically rather than on every send to keep
-        // the hot loop tight.
+        // Sample pool memory periodically rather than on every send to keep the hot loop tight.
         if ((sendCount & 0xff) == 0) {
           peakClient = Math.max(peakClient, senderClientPool(_senderService));
           peakServer = Math.max(peakServer, receiverServerPool(_receiverService));
@@ -153,15 +161,16 @@ public class GrpcSenderBackpressureReproTest {
       }
       peakClient = Math.max(peakClient, senderClientPool(_senderService));
       peakServer = Math.max(peakServer, receiverServerPool(_receiverService));
+    } finally {
+      watchdog.shutdownNow();
     }
 
-    // Snapshot the sender stats before `cancel()` — cancel sends an error EOS
-    // through `processAndSend`, which would otherwise bump RAW_MESSAGES by 1.
-    int rawMessagesBeforeCancel = stats.getInt(MailboxSendOperator.StatKey.RAW_MESSAGES);
+    // RAW_MESSAGES at this point may already include the error EOS the watchdog's cancel pushed through, so we use
+    // `<=` rather than `==` in the assertion below.
+    int rawMessages = stats.getInt(MailboxSendOperator.StatKey.RAW_MESSAGES);
 
     stop.set(true);
     slowReader.join(TimeUnit.SECONDS.toMillis(10));
-    sender.cancel(new RuntimeException("test done"));
 
     long polledCount = polled.get();
     long clientGrowth = peakClient - baselineClient;
@@ -180,17 +189,31 @@ public class GrpcSenderBackpressureReproTest {
         _receiverService.getMailboxServerUsedHeapMemoryBytes(),
         serverGrowth);
 
-    assertEquals(rawMessagesBeforeCancel, sendCount,
-        "RAW_MESSAGES stat should match successful send() call count");
+    // RAW_MESSAGES counts every block we pushed through processAndSend, including the error EOS the watchdog's
+    // cancel may have emitted. So `rawMessages` is `sendCount` or `sendCount + 1`.
+    assertTrue(rawMessages == sendCount || rawMessages == sendCount + 1,
+        "RAW_MESSAGES (" + rawMessages + ") should equal sendCount (" + sendCount + ") or sendCount+1");
 
-    // With proper sender-side flow control, `sendCount` would be close to
-    // `polledCount` plus a small in-flight buffer (~ReceivingMailbox.
-    // DEFAULT_MAX_PENDING_BLOCKS + the HTTP/2 window worth of messages). The
-    // bug we are documenting: the sender outpaces the receiver by many orders
-    // of magnitude. We require at least a 10x ratio here to stay robust on
-    // slow CI hosts; in practice the ratio is much higher.
-    assertTrue(sendCount > polledCount * 10,
-        "Sender failed to outpace receiver. sent=" + sendCount + " polled=" + polledCount);
+    // (1) Bounded in-flight pipeline.
+    //
+    // After back-pressure the sender pace tracks the receiver pace plus the bytes that gRPC will let us pre-buffer
+    // on the channel (Netty WriteQueue + HTTP/2 stream flow-control window) and the receiver's bounded mailbox
+    // queue. With ~150-byte serialized chunks and default Netty/gRPC windows, that allowance can be on the order of
+    // thousands of messages, so we pick a generous absolute cap. Pre-fix `sendCount` was ~200,000 in this same
+    // 3-second window, which would still fail this check by an order of magnitude.
+    long allowedSendCount = polledCount * 50 + 10_000;
+    assertTrue(sendCount < allowedSendCount,
+        "Sender outpaced the receiver beyond the in-flight allowance. sent=" + sendCount
+            + " polled=" + polledCount + " allowed=" + allowedSendCount);
+
+    // (2) Bounded sender-side direct memory growth.
+    //
+    // The sender's PooledByteBufAllocator reserves direct memory in 16 MB chunks. With back-pressure we expect at
+    // most one or two chunks to be reserved over a 3-second run; pre-fix peaks were >50 MB.
+    long clientGrowthCap = 48L * 1024 * 1024;
+    assertTrue(clientGrowth < clientGrowthCap,
+        "Sender client allocator grew beyond expected steady-state. growth=" + clientGrowth
+            + " cap=" + clientGrowthCap);
   }
 
   private static void sleepQuiet(long ms) {

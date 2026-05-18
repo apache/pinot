@@ -22,8 +22,9 @@ import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Metadata;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.MetadataUtils;
-import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -32,10 +33,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
+import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
@@ -73,7 +77,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// Indicates whether the sending side has attempted to close the mailbox (either via complete() or cancel()).
   private volatile boolean _senderSideClosed;
 
-  private StreamObserver<MailboxContent> _contentObserver;
+  /// Guards [#_readyCond]. [#_contentObserver] is mutated only by the sending thread before any waiter exists, so it
+  /// does not need to be protected by this lock.
+  private final ReentrantLock _readyLock = new ReentrantLock();
+  /// Signalled whenever any of the predicates `awaitReady()` waits on may have changed: the gRPC outbound becomes
+  /// ready, the receiver acknowledges a chunk, the receiver-side stream closes (success or error), or the sender
+  /// itself is cancelled. Multiple producers fire the signal; the waiter always re-checks the predicates after
+  /// waking up.
+  private final Condition _readyCond = _readyLock.newCondition();
+
+  private ClientCallStreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize) {
@@ -137,11 +150,19 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private void processAndSend(MseBlock block, List<DataBuffer> serializedStats)
       throws IOException {
+    processAndSend(block, serializedStats, false);
+  }
+
+  /// Same as [#processAndSend(MseBlock, List)] but with a flag to bypass the [#awaitReady] gate. Used by the
+  /// cancel / close paths to push the error EOS through without waiting on back-pressure relief — without this,
+  /// a cancel issued while the receiver is congested would itself block until the receiver drains.
+  private void processAndSend(MseBlock block, List<DataBuffer> serializedStats, boolean bypassReady)
+      throws IOException {
     _statMap.merge(MailboxSendOperator.StatKey.RAW_MESSAGES, 1);
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = MseBlockSerializer.toDataBlock(block, serializedStats);
-      int sizeInBytes = processAndSend(dataBlock);
+      int sizeInBytes = processAndSend(dataBlock, bypassReady);
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
       }
@@ -157,6 +178,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
    */
   protected int processAndSend(DataBlock dataBlock)
       throws IOException {
+    return processAndSend(dataBlock, false);
+  }
+
+  protected int processAndSend(DataBlock dataBlock, boolean bypassReady)
+      throws IOException {
     List<ByteString> byteStrings = toByteStrings(dataBlock, _maxByteStringSize);
     int sizeInBytes = 0;
     for (ByteString byteString : byteStrings) {
@@ -166,7 +192,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     while (byteStringIt.hasNext()) {
       ByteString byteString = byteStringIt.next();
       boolean waitForMore = byteStringIt.hasNext();
-      sendContent(byteString, waitForMore);
+      sendContent(byteString, waitForMore, bypassReady);
     }
     return sizeInBytes;
   }
@@ -178,6 +204,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
       return;
     }
     _senderSideClosed = true;
+    // Wake any sender thread blocked in awaitReady() so it observes the termination and exits without racing this
+    // cancel path on the same observer.
+    wakeWaiters();
     LOGGER.debug("Cancelling mailbox: {}", _id);
     if (_contentObserver == null) {
       _contentObserver = getContentObserver();
@@ -187,7 +216,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
       MseBlock errorBlock = ErrorMseBlock.fromError(
           QueryErrorCode.QUERY_CANCELLATION, "Cancelled by sender with exception: " + msg);
-      processAndSend(errorBlock, List.of());
+      processAndSend(errorBlock, List.of(), /* bypassReady */ true);
       _contentObserver.onCompleted();
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
@@ -208,23 +237,138 @@ public class GrpcSendingMailbox implements SendingMailbox {
     return _senderSideClosed || _statusObserver.isFinished();
   }
 
-  private StreamObserver<MailboxContent> getContentObserver() {
+  private ClientCallStreamObserver<MailboxContent> getContentObserver() {
     Metadata metadata = new Metadata();
     metadata.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, _id);
 
-    return PinotMailboxGrpc.newStub(_channelManager.getChannel(_hostname, _port))
+    // We wrap `_statusObserver` in a ClientResponseObserver so we can register the on-ready handler through
+    // `beforeStart` — gRPC rejects setOnReadyHandler() if it is called after open() returns. Wrapping (rather than
+    // making MailboxStatusObserver itself a ClientResponseObserver) keeps the back-pressure plumbing local to this
+    // class. The wrapper delegates the data callbacks unchanged, and signals our `_readyCond` on stream close so a
+    // blocked sender wakes up to observe `_statusObserver.isFinished()` becoming true.
+    ClientResponseObserver<MailboxContent, MailboxStatus> responseObserver =
+        new ClientResponseObserver<MailboxContent, MailboxStatus>() {
+          @Override
+          public void beforeStart(ClientCallStreamObserver<MailboxContent> requestStream) {
+            // Fires on a gRPC channel/Netty thread whenever isReady() transitions false -> true. Just signal; the
+            // sender re-checks the predicate after waking.
+            requestStream.setOnReadyHandler(GrpcSendingMailbox.this::wakeWaiters);
+          }
+
+          @Override
+          public void onNext(MailboxStatus value) {
+            _statusObserver.onNext(value);
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            try {
+              _statusObserver.onError(t);
+            } finally {
+              wakeWaiters();
+            }
+          }
+
+          @Override
+          public void onCompleted() {
+            try {
+              _statusObserver.onCompleted();
+            } finally {
+              wakeWaiters();
+            }
+          }
+        };
+
+    return (ClientCallStreamObserver<MailboxContent>) PinotMailboxGrpc.newStub(
+            _channelManager.getChannel(_hostname, _port))
         .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(metadata))
         .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
-        .open(_statusObserver);
+        .open(responseObserver);
   }
 
   protected void sendContent(ByteString byteString, boolean waitForMore) {
+    sendContent(byteString, waitForMore, false);
+  }
+
+  protected void sendContent(ByteString byteString, boolean waitForMore, boolean bypassReady) {
+    if (!awaitReady(bypassReady)) {
+      // Either the mailbox was cancelled while we were waiting (normal path) or the gRPC stream is already dead
+      // (bypass path). Either way, skip the send.
+      return;
+    }
     MailboxContent content = MailboxContent.newBuilder()
         .setMailboxId(_id)
         .setPayload(byteString)
         .setWaitForMore(waitForMore)
         .build();
     _contentObserver.onNext(content);
+  }
+
+  /// Blocks the calling (query-runner) thread until the gRPC client outbound is ready to accept another chunk, the
+  /// mailbox terminates, or the query deadline is exceeded. Returns `true` if the caller should proceed with the
+  /// `onNext` call, `false` if the send should be skipped.
+  ///
+  /// Two modes:
+  ///  * `bypassReady = false` (normal user sends): waits for [#_contentObserver]`.isReady()` to flip, but exits
+  ///    early if the mailbox has been [#isTerminated terminated] in the meantime. This makes [#cancel] able to
+  ///    unblock a blocked sender promptly.
+  ///  * `bypassReady = true` (the cancel / close paths): never waits, never short-circuits on `isTerminated()`.
+  ///    The only check is whether the underlying gRPC stream is already dead ([MailboxStatusObserver#isFinished]),
+  ///    in which case there is nothing to send. This is what lets a cancel issued while the receiver is congested
+  ///    push its error EOS through without blocking behind back-pressure of its own.
+  ///
+  /// Spool note: when a stage spools to multiple destination mailboxes via [BlockExchange.BlockExchangeSendingMailbox],
+  /// one slow downstream worker will throttle the whole spool — every wrapped mailbox is awaited in turn from the same
+  /// OpChain thread. This is intentional: the alternative (forking each destination onto its own thread) would
+  /// re-introduce the unbounded outbound queue we are fixing here. Spool throughput is gated by the slowest consumer.
+  private boolean awaitReady(boolean bypassReady) {
+    if (bypassReady) {
+      return !_statusObserver.isFinished();
+    }
+    // Fast path: don't take the lock if the observer is already ready. This is the common case in the steady state.
+    if (_contentObserver.isReady()) {
+      return true;
+    }
+    if (isTerminated()) {
+      return false;
+    }
+    _readyLock.lock();
+    try {
+      while (!_contentObserver.isReady()) {
+        if (isTerminated()) {
+          return false;
+        }
+        // Cooperative termination poll so query cancellation can unblock the wait through the same mechanism we use
+        // elsewhere in the MSE.
+        QueryThreadContext.checkTerminationAndSampleUsage(SEND_SCOPE);
+        long remainingMs = _deadlineMs - System.currentTimeMillis();
+        if (remainingMs <= 0) {
+          throw new QueryException(QueryErrorCode.EXECUTION_TIMEOUT,
+              "Deadline exceeded while waiting for gRPC outbound to become ready on mailbox: " + _id);
+        }
+        try {
+          _readyCond.await(remainingMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new QueryException(QueryErrorCode.INTERNAL,
+              "Interrupted while waiting for gRPC outbound to become ready on mailbox: " + _id, e);
+        }
+      }
+      return true;
+    } finally {
+      _readyLock.unlock();
+    }
+  }
+
+  /// Wakes every waiter in [#awaitReady]. Called from the gRPC ready handler, from [MailboxStatusObserver] events,
+  /// and from [#cancel] / [#close]. Must be cheap because it can fire from Netty event-loop threads.
+  private void wakeWaiters() {
+    _readyLock.lock();
+    try {
+      _readyCond.signalAll();
+    } finally {
+      _readyLock.unlock();
+    }
   }
 
   @Override
@@ -339,10 +483,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
       ex.fillInStackTrace();
       LOGGER.error(errorMsg, ex);
       _senderSideClosed = true;
+      wakeWaiters();
 
       MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
       if (_contentObserver != null) {
-        processAndSend(errorBlock, List.of());
+        processAndSend(errorBlock, List.of(), /* bypassReady */ true);
       }
     }
   }
