@@ -624,7 +624,7 @@ public class AbstractColumnStatisticsCollectorTest {
 
     // Verify the collector uses the correct stored type
     DataType expectedStoredType = dataType.getStoredType();
-    assertEquals(collector.getValueType(), expectedStoredType);
+    assertEquals(collector.getStoredType(), expectedStoredType);
   }
 
   // Test 8: isAscii Tests

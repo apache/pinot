@@ -1134,6 +1134,9 @@ public class CommonConstants {
       // Parameters related to Hybrid score.
       public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
       public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
+      public static final String CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR =
+          CONFIG_PREFIX + ".hybrid.score.queue.size.floor";
+      public static final int DEFAULT_HYBRID_SCORE_QUEUE_FLOOR = 0;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
       // stats for servers upon query submission and response arrival.
@@ -1874,6 +1877,57 @@ public class CommonConstants {
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
+
+    // Scan-based query killing
+    public enum ScanKillingMode {
+      DISABLED("disabled"),
+      LOG_ONLY("logOnly"),
+      ENFORCE("enforce");
+
+      private final String _configValue;
+
+      ScanKillingMode(String configValue) {
+        _configValue = configValue;
+      }
+
+      public String getConfigValue() {
+        return _configValue;
+      }
+
+      /**
+       * Parses a config string into a {@link ScanKillingMode}. Case-insensitive.
+       * Returns {@code null} if the value is not recognized.
+       */
+      public static ScanKillingMode fromConfigValue(String value) {
+        if (value == null) {
+          return null;
+        }
+        for (ScanKillingMode mode : values()) {
+          if (mode._configValue.equalsIgnoreCase(value)) {
+            return mode;
+          }
+        }
+        return null;
+      }
+    }
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MODE = "accounting.scan.based.killing.mode";
+    public static final ScanKillingMode DEFAULT_SCAN_BASED_KILLING_MODE = ScanKillingMode.DISABLED;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_STRATEGY_FACTORY_CLASS_NAME =
+        "accounting.scan.based.killing.strategy.factory.class.name";
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.in.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_IN_FILTER = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_DOCS_SCANNED =
+        "accounting.scan.based.killing.max.docs.scanned";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_DOCS_SCANNED = Long.MAX_VALUE;
+
+    public static final String CONFIG_OF_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER =
+        "accounting.scan.based.killing.max.entries.scanned.post.filter";
+    public static final long DEFAULT_SCAN_BASED_KILLING_MAX_ENTRIES_SCANNED_POST_FILTER = Long.MAX_VALUE;
   }
 
   public static class ExecutorService {
@@ -2150,16 +2204,8 @@ public class CommonConstants {
     /// - "SAFE": MSE will only send stats if all instances in the cluster are running 1.4.0 or later.
     /// - "ALWAYS": MSE will always send stats, regardless of the version of the instances in the cluster.
     /// - "NEVER": MSE will never send stats.
-    ///
-    /// The reason for this flag that versions 1.3.0 and lower have two undesired behaviors:
-    /// 1. Some queries using intersection generate incorrect stats
-    /// 2. When stats from other nodes are sent but are different from expected, the query fails.
-    ///
-    /// In 1.4.0 the first issue is solved and instead of failing when unexpected stats are received, the query
-    /// continues without children stats. But if a query involves servers in versions 1.3.0 and 1.4.0, the one
-    /// running 1.3.0 may fail, which breaks backward compatibility.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
-    public static final String DEFAULT_SEND_STATS_MODE = "SAFE";
+    public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
 
     /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
     /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,

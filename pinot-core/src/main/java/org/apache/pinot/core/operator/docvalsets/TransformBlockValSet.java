@@ -79,6 +79,15 @@ public class TransformBlockValSet implements BlockValSet {
     return _transformFunction.getDictionary();
   }
 
+  /// A transform function that exposes a dictionary always builds it itself (e.g.,
+  /// {@link org.apache.pinot.core.operator.transform.function.IdentifierTransformFunction} only exposes the
+  /// underlying column's dictionary when its forward index is dict-encoded), so the dict-id read path is callable
+  /// whenever the dictionary is present.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return _transformFunction.getDictionary() != null;
+  }
+
   @Override
   public int[] getDictionaryIdsSV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(TransformBlockValSet.class)) {

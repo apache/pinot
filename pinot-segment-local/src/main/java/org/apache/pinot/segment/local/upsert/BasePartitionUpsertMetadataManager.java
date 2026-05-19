@@ -1239,6 +1239,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       throws IOException {
   }
 
+  @Nullable
+  @Override
   public UpsertViewManager getUpsertViewManager() {
     return _upsertViewManager;
   }

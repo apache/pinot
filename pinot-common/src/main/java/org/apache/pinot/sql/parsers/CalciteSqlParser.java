@@ -66,6 +66,10 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -137,6 +141,17 @@ public class CalciteSqlParser {
         } else {
           throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
         }
+      } else if (sqlNode instanceof SqlPinotCreateTable
+          || sqlNode instanceof SqlPinotDropTable
+          || sqlNode instanceof SqlPinotShowTables
+          || sqlNode instanceof SqlPinotShowCreateTable) {
+        // Pinot-native DDL statements; the controller dispatches these via the DDL endpoint.
+        if (sqlType == null) {
+          sqlType = PinotSqlType.DDL;
+          statementNode = sqlNode;
+        } else {
+          throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
+        }
       } else if (sqlNode instanceof SqlSetOption) {
         // extract options, these are non-execution statements
         List<SqlNode> operandList = ((SqlSetOption) sqlNode).getOperandList();
@@ -164,9 +179,7 @@ public class CalciteSqlParser {
     return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
   }
 
-  /**
-   * Should only be used for testing query rewriters.
-   */
+  /// Should only be used for testing query rewriters.
   public static PinotQuery compileToPinotQueryWithoutRewrites(String sql) {
     return compileWithoutRewrite(compileToSqlNodeAndOptions(sql).getSqlNode());
   }
@@ -365,9 +378,7 @@ public class CalciteSqlParser {
     return expressions;
   }
 
-  /**
-   * Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
-   */
+  /// Check recursively if an expression contains any reference not appearing in the GROUP BY clause.
   private static boolean expressionOutsideGroupByList(Expression expr, Set<Expression> groupByExprs) {
     // return early for Literal, Aggregate and if we have an exact match
     if (expr.getType() == ExpressionType.LITERAL || isAggregateExpression(expr) || groupByExprs.contains(expr)) {
@@ -409,13 +420,11 @@ public class CalciteSqlParser {
     return function != null && function.getOperator().equals("as");
   }
 
-  /**
-   * Extract all the identifiers from given expressions.
-   *
-   * @param expressions
-   * @param excludeAs if true, ignores the right side identifier for AS function.
-   * @return all the identifier names.
-   */
+  /// Extract all the identifiers from given expressions.
+  ///
+  /// @param expressions
+  /// @param excludeAs if true, ignores the right side identifier for AS function.
+  /// @return all the identifier names.
   public static Set<String> extractIdentifiers(List<Expression> expressions, boolean excludeAs) {
     Set<String> identifiers = new HashSet<>();
     for (Expression expression : expressions) {
@@ -436,14 +445,12 @@ public class CalciteSqlParser {
     return identifiers;
   }
 
-  /**
-   * Compiles a String expression into {@link Expression}.
-   *
-   * @param expression String expression.
-   * @return {@link Expression} equivalent of the string.
-   *
-   * @throws SqlCompilationException if String is not a valid expression.
-   */
+  /// Compiles a String expression into [Expression].
+  ///
+  /// @param expression String expression.
+  /// @return [Expression] equivalent of the string.
+  ///
+  /// @throws SqlCompilationException if String is not a valid expression.
   public static Expression compileToExpression(String expression) {
     SqlNode sqlNode;
     try (StringReader inStream = new StringReader(expression)) {
@@ -609,14 +616,12 @@ public class CalciteSqlParser {
     validate(pinotQuery);
   }
 
-  /**
-   * Applies a specific query rewriter to the given PinotQuery and validates the result.
-   * This method searches for a rewriter by class name and applies it to transform the query.
-   *
-   * @param pinotQuery the query to be rewritten
-   * @param rewriterClass the class name of the query rewriter to apply
-   * @throws IllegalArgumentException if no rewriter with the specified class name is found
-   */
+  /// Applies a specific query rewriter to the given PinotQuery and validates the result.
+  /// This method searches for a rewriter by class name and applies it to transform the query.
+  ///
+  /// @param pinotQuery the query to be rewritten
+  /// @param rewriterClass the class name of the query rewriter to apply
+  /// @throws IllegalArgumentException if no rewriter with the specified class name is found
   public static void queryRewrite(PinotQuery pinotQuery, Class<? extends QueryRewriter> rewriterClass) {
     QueryRewriter queryRewriter = QUERY_REWRITERS.stream()
         .filter(rewriter -> rewriter.getClass().equals(rewriterClass))
@@ -705,13 +710,11 @@ public class CalciteSqlParser {
     return expression;
   }
 
-  /**
-   * DISTINCT is implemented as an aggregation function so need to take the select list items
-   * and convert them into a single function expression for handing over to execution engine
-   * either as a PinotQuery or BrokerRequest via conversion
-   * @param selectList select list items
-   * @return DISTINCT function expression
-   */
+  /// DISTINCT is implemented as an aggregation function so need to take the select list items
+  /// and convert them into a single function expression for handing over to execution engine
+  /// either as a PinotQuery or BrokerRequest via conversion
+  /// @param selectList select list items
+  /// @return DISTINCT function expression
   private static Expression convertDistinctAndSelectListToFunctionExpression(SqlNodeList selectList) {
     List<Expression> operands = new ArrayList<>(selectList.size());
     for (SqlNode node : selectList) {
@@ -874,25 +877,23 @@ public class CalciteSqlParser {
     }
   }
 
-  /**
-   * Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
-   * shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
-   *
-   * ├── ITEM(jsoncolumn.data[0][1].a.b[0])
-   *      ├── LITERAL (0)
-   *      └── DOT (jsoncolumn.daa[0][1].a.b)
-   *            ├── IDENTIFIER (b)
-   *            └── DOT (jsoncolumn.data[0][1].a)
-   *                  ├── IDENTIFIER (a)
-   *                  └── ITEM (jsoncolumn.data[0][1])
-   *                        ├── LITERAL (1)
-   *                        └── ITEM (jsoncolumn.data[0])
-   *                              ├── LITERAL (1)
-   *                              └── IDENTIFIER (jsoncolumn.data)
-   *
-   * @param functionNode Root node of the DOT and/or ITEM operator function chain.
-   * @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
-   */
+  /// Convert Calcite operator tree made up of ITEM and DOT functions to an identifier. For example, the operator tree
+  /// shown below will be converted to IDENTIFIER "jsoncolumn.data[0][1].a.b[0]".
+  ///
+  /// ├── ITEM(jsoncolumn.data[0][1].a.b[0])
+  /// ├── LITERAL (0)
+  /// └── DOT (jsoncolumn.daa[0][1].a.b)
+  /// ├── IDENTIFIER (b)
+  /// └── DOT (jsoncolumn.data[0][1].a)
+  /// ├── IDENTIFIER (a)
+  /// └── ITEM (jsoncolumn.data[0][1])
+  /// ├── LITERAL (1)
+  /// └── ITEM (jsoncolumn.data[0])
+  /// ├── LITERAL (1)
+  /// └── IDENTIFIER (jsoncolumn.data)
+  ///
+  /// @param functionNode Root node of the DOT and/or ITEM operator function chain.
+  /// @param pathBuilder StringBuilder representation of path represented by DOT and/or ITEM function chain.
   private static void compilePathExpression(SqlBasicCall functionNode, StringBuilder pathBuilder) {
     List<SqlNode> operands = functionNode.getOperandList();
 
@@ -925,9 +926,7 @@ public class CalciteSqlParser {
     }
   }
 
-  /**
-   * Helper method to flatten the operands for the AND expression.
-   */
+  /// Helper method to flatten the operands for the AND expression.
   private static Expression compileAndExpression(SqlBasicCall andNode) {
     List<Expression> operands = new ArrayList<>();
     for (SqlNode childNode : andNode.getOperandList()) {
@@ -941,9 +940,7 @@ public class CalciteSqlParser {
     return RequestUtils.getFunctionExpression(FilterKind.AND.name(), operands);
   }
 
-  /**
-   * Helper method to flatten the operands for the OR expression.
-   */
+  /// Helper method to flatten the operands for the OR expression.
   private static Expression compileOrExpression(SqlBasicCall orNode) {
     List<Expression> operands = new ArrayList<>();
     for (SqlNode childNode : orNode.getOperandList()) {

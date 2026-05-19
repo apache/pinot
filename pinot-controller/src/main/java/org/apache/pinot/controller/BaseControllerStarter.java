@@ -145,6 +145,7 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableConfigValidatorRegistry;
@@ -287,9 +288,11 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _helixResourceManager = null;
       _executorService = null;
     } else {
-      // Initialize FunctionRegistry before starting the admin application (PinotQueryResource requires it to compile
-      // queries)
+      // Initialize FunctionRegistry and PartitionFunctionFactory before starting the admin application
+      // (PinotQueryResource requires the function registry to compile queries; the partition factory must be
+      // populated before any segment metadata is read)
       FunctionRegistry.init();
+      PartitionFunctionFactory.init();
       _adminApp = createControllerAdminApp();
       // This executor service is used to do async tasks from multiget util or table rebalancing.
       _executorService = createExecutorService(_config.getControllerExecutorNumThreads(), "async-task-thread-%d");

@@ -33,9 +33,12 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -50,12 +53,12 @@ public class VectorIndexHandlerTest {
     File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
     try {
       SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
-      SegmentDirectory.Reader reader = Mockito.mock(SegmentDirectory.Reader.class);
-      Mockito.when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
+      SegmentDirectory.Reader reader = mock(SegmentDirectory.Reader.class);
+      when(reader.toSegmentDirectory()).thenReturn(segmentDirectory);
 
       VectorIndexHandler handler = createHandler(segmentDirectory, vectorIndexConfig("IVF_PQ"));
 
-      Assert.assertTrue(handler.needUpdateIndices(reader));
+      assertTrue(handler.needUpdateIndices(reader));
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
@@ -67,13 +70,13 @@ public class VectorIndexHandlerTest {
     File indexDir = createSegmentDirWithVectorIndex(V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
     try {
       SegmentDirectory segmentDirectory = mockSegmentDirectory(indexDir);
-      SegmentDirectory.Writer writer = Mockito.mock(SegmentDirectory.Writer.class);
-      Mockito.when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
+      SegmentDirectory.Writer writer = mock(SegmentDirectory.Writer.class);
+      when(writer.toSegmentDirectory()).thenReturn(segmentDirectory);
 
       VectorIndexHandler handler = createHandler(segmentDirectory, vectorIndexConfig("IVF_PQ"));
       handler.updateIndices(writer);
 
-      Mockito.verify(writer).removeIndex(COLUMN, StandardIndexes.vector());
+      verify(writer).removeIndex(COLUMN, StandardIndexes.vector());
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
@@ -83,20 +86,21 @@ public class VectorIndexHandlerTest {
       VectorIndexConfig vectorIndexConfig) {
     FieldIndexConfigs fieldIndexConfigs =
         new FieldIndexConfigs.Builder().add(StandardIndexes.vector(), vectorIndexConfig).build();
-    return new VectorIndexHandler(segmentDirectory, Map.of(COLUMN, fieldIndexConfigs), Mockito.mock(TableConfig.class),
-        Mockito.mock(Schema.class));
+    return new VectorIndexHandler(segmentDirectory, Map.of(COLUMN, fieldIndexConfigs), mock(TableConfig.class),
+        mock(Schema.class));
   }
 
   private static SegmentDirectory mockSegmentDirectory(File indexDir) {
-    SegmentMetadataImpl segmentMetadata = Mockito.mock(SegmentMetadataImpl.class);
-    Mockito.when(segmentMetadata.getName()).thenReturn("testSegment");
-    Mockito.when(segmentMetadata.getIndexDir()).thenReturn(indexDir);
-    Mockito.when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
-    Mockito.when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    when(segmentMetadata.getName()).thenReturn("testSegment");
+    when(segmentMetadata.getIndexDir()).thenReturn(indexDir);
+    when(segmentMetadata.getTotalDocs()).thenReturn(10);
+    when(segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Set.of(COLUMN)));
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>());
 
-    SegmentDirectory segmentDirectory = Mockito.mock(SegmentDirectory.class);
-    Mockito.when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
-    Mockito.when(segmentDirectory.getColumnsWithIndex(StandardIndexes.vector())).thenReturn(Set.of(COLUMN));
+    SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
+    when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
+    when(segmentDirectory.getColumnsWithIndex(StandardIndexes.vector())).thenReturn(Set.of(COLUMN));
     return segmentDirectory;
   }
 
@@ -109,9 +113,9 @@ public class VectorIndexHandlerTest {
       throws Exception {
     File indexDir = new File(FileUtils.getTempDirectory(), "vector-index-handler-test-" + System.nanoTime());
     FileUtils.deleteQuietly(indexDir);
-    Assert.assertTrue(indexDir.mkdirs());
+    assertTrue(indexDir.mkdirs());
     File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
-    Assert.assertTrue(v3Dir.mkdir());
+    assertTrue(v3Dir.mkdir());
     FileUtils.touch(new File(v3Dir, COLUMN + suffix));
     return indexDir;
   }

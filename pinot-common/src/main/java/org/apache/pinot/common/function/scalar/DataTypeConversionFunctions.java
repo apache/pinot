@@ -21,13 +21,13 @@ package org.apache.pinot.common.function.scalar;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Base64;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
-import static org.apache.pinot.common.utils.PinotDataType.*;
+import static org.apache.pinot.spi.utils.PinotDataType.*;
 
 
 /**

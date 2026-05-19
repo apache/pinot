@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

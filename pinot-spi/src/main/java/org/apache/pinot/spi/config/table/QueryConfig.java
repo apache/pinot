@@ -56,18 +56,41 @@ public class QueryConfig extends BaseJsonConfig {
   // Indicates the maximum length of the serialized response per server for a query.
   private final Long _maxServerResponseSizeBytes;
 
+  private final Long _maxEntriesScannedInFilter;
+
+  private final Long _maxDocsScanned;
+
+  private final Long _maxEntriesScannedPostFilter;
+
+
+  public QueryConfig(@Nullable Long timeoutMs, @Nullable Boolean disableGroovy,
+      @Nullable Boolean useApproximateFunction, @Nullable Map<String, String> expressionOverrideMap,
+      @Nullable Long maxQueryResponseSizeBytes, @Nullable Long maxServerResponseSizeBytes) {
+    this(timeoutMs, disableGroovy, useApproximateFunction, expressionOverrideMap,
+        maxQueryResponseSizeBytes, maxServerResponseSizeBytes, null, null, null);
+  }
+
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
       @JsonProperty("disableGroovy") @Nullable Boolean disableGroovy,
       @JsonProperty("useApproximateFunction") @Nullable Boolean useApproximateFunction,
       @JsonProperty("expressionOverrideMap") @Nullable Map<String, String> expressionOverrideMap,
       @JsonProperty("maxQueryResponseSizeBytes") @Nullable Long maxQueryResponseSizeBytes,
-      @JsonProperty("maxServerResponseSizeBytes") @Nullable Long maxServerResponseSizeBytes) {
+      @JsonProperty("maxServerResponseSizeBytes") @Nullable Long maxServerResponseSizeBytes,
+      @JsonProperty("maxEntriesScannedInFilter") @Nullable Long maxEntriesScannedInFilter,
+      @JsonProperty("maxDocsScanned") @Nullable Long maxDocsScanned,
+      @JsonProperty("maxEntriesScannedPostFilter") @Nullable Long maxEntriesScannedPostFilter) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
     Preconditions.checkArgument(maxQueryResponseSizeBytes == null || maxQueryResponseSizeBytes > 0,
         "Invalid 'maxQueryResponseSizeBytes': %s", maxQueryResponseSizeBytes);
     Preconditions.checkArgument(maxServerResponseSizeBytes == null || maxServerResponseSizeBytes > 0,
         "Invalid 'maxServerResponseSizeBytes': %s", maxServerResponseSizeBytes);
+    Preconditions.checkArgument(maxEntriesScannedInFilter == null || maxEntriesScannedInFilter > 0,
+        "Invalid 'maxEntriesScannedInFilter': %s", maxEntriesScannedInFilter);
+    Preconditions.checkArgument(maxDocsScanned == null || maxDocsScanned > 0,
+        "Invalid 'maxDocsScanned': %s", maxDocsScanned);
+    Preconditions.checkArgument(maxEntriesScannedPostFilter == null || maxEntriesScannedPostFilter > 0,
+        "Invalid 'maxEntriesScannedPostFilter': %s", maxEntriesScannedPostFilter);
 
     _timeoutMs = timeoutMs;
     _disableGroovy = disableGroovy;
@@ -75,6 +98,9 @@ public class QueryConfig extends BaseJsonConfig {
     _expressionOverrideMap = expressionOverrideMap;
     _maxQueryResponseSizeBytes = maxQueryResponseSizeBytes;
     _maxServerResponseSizeBytes = maxServerResponseSizeBytes;
+    _maxEntriesScannedInFilter = maxEntriesScannedInFilter;
+    _maxDocsScanned = maxDocsScanned;
+    _maxEntriesScannedPostFilter = maxEntriesScannedPostFilter;
   }
 
   @Nullable
@@ -111,5 +137,23 @@ public class QueryConfig extends BaseJsonConfig {
   @JsonProperty("maxServerResponseSizeBytes")
   public Long getMaxServerResponseSizeBytes() {
     return _maxServerResponseSizeBytes;
+  }
+
+  @Nullable
+  @JsonProperty("maxEntriesScannedInFilter")
+  public Long getMaxEntriesScannedInFilter() {
+    return _maxEntriesScannedInFilter;
+  }
+
+  @Nullable
+  @JsonProperty("maxDocsScanned")
+  public Long getMaxDocsScanned() {
+    return _maxDocsScanned;
+  }
+
+  @Nullable
+  @JsonProperty("maxEntriesScannedPostFilter")
+  public Long getMaxEntriesScannedPostFilter() {
+    return _maxEntriesScannedPostFilter;
   }
 }

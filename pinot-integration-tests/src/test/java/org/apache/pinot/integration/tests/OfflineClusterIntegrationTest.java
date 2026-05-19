@@ -2296,7 +2296,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Add expression override
     TableConfig tableConfig = createOfflineTableConfig();
     tableConfig.setQueryConfig(
-        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null, null));
+        new QueryConfig(null, null, null, Map.of("DaysSinceEpoch * 24", "NewAddedDerivedHoursSinceEpoch"), null,
+            null));
     updateTableConfig(tableConfig);
 
     TestUtils.waitForCondition(aVoid -> {

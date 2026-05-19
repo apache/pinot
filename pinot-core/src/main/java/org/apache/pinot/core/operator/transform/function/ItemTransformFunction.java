@@ -60,7 +60,7 @@ public class ItemTransformFunction extends BaseTransformFunction {
     DataSource dataSource = columnContextMap.get(column).getDataSource();
     Preconditions.checkState(dataSource instanceof MapDataSource, "Column: %s must be a MAP column", column);
     MapDataSource mapDataSource = (MapDataSource) dataSource;
-    DataSource valueDataSource = mapDataSource.getKeyDataSource(key);
+    DataSource valueDataSource = mapDataSource.getDataSource(key);
     // Only expose the dictionary when the forward index is dict-encoded. A column can have a dictionary alongside
     // a RAW forward index (e.g. dict + inverted/range), in which case transformToDictIdsSV would fail because
     // BlockValueSet.getDictionaryIdsSV requires a dict-encoded forward index.

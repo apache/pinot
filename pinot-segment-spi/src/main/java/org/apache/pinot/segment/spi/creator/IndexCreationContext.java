@@ -19,205 +19,176 @@
 package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
-import java.util.Objects;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.spi.config.table.IndexConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.segment.spi.ColumnShape;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * Provides parameters for constructing indexes via
- * {@link IndexType#createIndexCreator(IndexCreationContext, IndexConfig)}.
- * The responsibility for ensuring that the correct parameters for a particular
- * index type lies with the caller.
- */
-public interface IndexCreationContext {
+/// Context of a column for index creation. Inherits the [ColumnShape] accessors and sources shape values from either
+/// [ColumnStatistics] (segment-creation path) or [ColumnMetadata] (index-handler path) via [Builder].
+public interface IndexCreationContext extends ColumnShape {
 
-  FieldSpec getFieldSpec();
+  // Identity.
 
+  /// Returns the directory where the index file(s) should be written.
   File getIndexDir();
 
-  boolean isOnHeap();
-
-  int getLengthOfLongestEntry();
-
-  int getMaxNumberOfMultiValueElements();
-
-  int getMaxRowLengthInBytes();
-
-  boolean isSorted();
-
-  int getCardinality();
-
-  int getTotalNumberOfEntries();
-
-  int getTotalDocs();
-
-  boolean hasDictionary();
-
-  Comparable<?> getMinValue();
-
-  Comparable<?> getMaxValue();
-
-  boolean forwardIndexDisabled();
-
-  /**
-   * Returns a sorted array with the unique values for the associated column.
-   *
-   * Primitive types will be stored in an unboxed array (ie if the column contains {@code int}s, this method returns an
-   * {@code int[]}).
-   *
-   * This is an abstraction leak from Text and FST indexes.
-   */
-  Object getSortedUniqueElementsArray();
-
-  /**
-   * This could be set for all metrics in {@link IndexingConfig#isOptimizeDictionary()} or only when the field is a
-   * metric with {@link IndexingConfig#isOptimizeDictionaryForMetrics()}, in which case this method will only return
-   * true if the column is a metric.
-   *
-   * Therefore the caller code doesn't need to verify the later condition.
-   */
-  boolean isOptimizeDictionary();
-
-  boolean isFixedLength();
-
-  /**
-   * This is an abstraction leak from TextIndexType.
-   * @return
-   */
-  boolean isTextCommitOnClose();
-
-  ColumnStatistics getColumnStatistics();
-  /**
-   * This flags whether the index creation is done during realtime segment conversion
-   * @return
-   */
-  boolean isRealtimeConversion();
-
-  /**
-   * Used in conjunction with isRealtimeConversion, this returns the location of the consumer directory used
-   */
-  File getConsumerDir();
-
-  boolean isMutableSegmentCompacted();
-
-  /**
-   * This contains immutableToMutableIdMap mapping generated in {@link SegmentIndexCreationDriver}
-   *
-   * This allows for index creation during realtime segment conversion to take advantage of mutable to immutable
-   * docId mapping
-   * @return
-   */
-  int[] getMutableToImmutableDocIdMap();
-
+  /// Returns the fully-qualified table name (e.g. `myTable_OFFLINE`).
   String getTableNameWithType();
 
+  /// Returns the source [ColumnStatistics] on the segment-creation path, or `null` on the index-handler path.
+  @Nullable
+  ColumnStatistics getColumnStatistics();
+
+  /// Returns the source [ColumnMetadata] on the index-handler path, or `null` on the segment-creation path.
+  @Nullable
+  ColumnMetadata getColumnMetadata();
+
+  // Overridable column attributes (IndexCreationContext-specific; not on ColumnShape).
+
+  /// Returns `true` when the column has a dictionary.
+  boolean hasDictionary();
+
+  // Build-time toggles.
+
+  /// Returns `true` when index buffers should be allocated on-heap, `false` for off-heap (memory-mapped).
+  boolean isOnHeap();
+
+  /// Returns `true` when the dictionary-optimization pass selected this column for raw encoding.
+  boolean isOptimizeDictionary();
+
+  /// Returns `true` when the text-index creator should commit the underlying Lucene index on close.
+  boolean isTextCommitOnClose();
+
+  // Realtime-conversion context.
+
+  /// Returns `true` when this index creation is part of a realtime → offline segment conversion.
+  boolean isRealtimeConversion();
+
+  /// Returns the realtime consumer directory; only meaningful when [#isRealtimeConversion] is `true`.
+  @Nullable
+  File getConsumerDir();
+
+  /// Returns `true` when the source mutable segment was compacted prior to conversion; only meaningful when
+  /// [#isRealtimeConversion] is `true`.
+  boolean isMutableSegmentCompacted();
+
+  /// Returns the mutable-to-immutable docId mapping generated during realtime segment conversion, or `null` when not
+  /// applicable.
+  @Nullable
+  int[] getMutableToImmutableDocIdMap();
+
+  // Error handling.
+
+  /// Returns `true` when index creation should continue past errors instead of aborting the whole segment.
   boolean isContinueOnError();
 
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  default int getLengthOfLongestEntry() {
+    return getLengthOfLongestElement();
+  }
+
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  default int getMaxNumberOfMultiValueElements() {
+    return getMaxNumberOfMultiValues();
+  }
+
+  @Deprecated(since = "1.6.0", forRemoval = true)
+  @Nullable
+  default Object getSortedUniqueElementsArray() {
+    ColumnStatistics columnStatistics = getColumnStatistics();
+    return columnStatistics != null ? columnStatistics.getUniqueValuesSet() : null;
+  }
+
+  @SuppressWarnings("UnusedReturnValue")
   final class Builder {
-    private ColumnStatistics _columnStatistics;
-    private File _indexDir;
-    private int _lengthOfLongestEntry;
-    private int _maxNumberOfMultiValueElements;
-    private int _maxRowLengthInBytes;
-    private boolean _onHeap = false;
-    private FieldSpec _fieldSpec;
-    private boolean _sorted;
-    private int _cardinality;
+    // Identity. Non-overridable shape accessors delegate to `_columnShape`.
+    private final File _indexDir;
+    private final String _tableNameWithType;
+    private final ColumnShape _columnShape;
+
+    // Overridable column attributes. Source-derived defaults populated in the constructors below;
+    // handlers may override via `withXxx` setters.
+    private int _lengthOfShortestElement;
+    private int _lengthOfLongestElement;
+    private boolean _isAscii;
     private int _totalNumberOfEntries;
-    private int _totalDocs;
-    private boolean _hasDictionary = true;
-    private Comparable<?> _minValue;
-    private Comparable<?> _maxValue;
-    private boolean _forwardIndexDisabled;
-    private Object _sortedUniqueElementsArray;
+    private int _maxNumberOfMultiValues;
+    private int _maxRowLengthInBytes;
+    private boolean _hasDictionary;
+
+    // Build-time toggles.
+    private boolean _onHeap;
     private boolean _optimizedDictionary;
-    private boolean _fixedLength;
     private boolean _textCommitOnClose;
+
+    // Realtime-conversion context (meaningful only when `_realtimeConversion` is true).
     private boolean _realtimeConversion;
+    @Nullable
     private File _consumerDir;
     private boolean _mutableSegmentCompacted;
+    @Nullable
     private int[] _mutableToImmutableDocIdMap;
-    private String _tableNameWithType;
+
+    // Error handling.
     private boolean _continueOnError;
 
-    public Builder withColumnStatistics(ColumnStatistics columnStatistics) {
-      _columnStatistics = columnStatistics;
-      _minValue = (Comparable<?>) columnStatistics.getMinValue();
-      _maxValue = (Comparable<?>) columnStatistics.getMaxValue();
-      _sortedUniqueElementsArray = columnStatistics.getUniqueValuesSet();
-      _cardinality = columnStatistics.getCardinality();
-      _lengthOfLongestEntry = columnStatistics.getLengthOfLongestElement();
-      _fixedLength = columnStatistics.isFixedLength();
-      _sorted = columnStatistics.isSorted();
-      _totalNumberOfEntries = columnStatistics.getTotalNumberOfEntries();
-      _maxNumberOfMultiValueElements = columnStatistics.getMaxNumberOfMultiValues();
-      _maxRowLengthInBytes = columnStatistics.getMaxRowLengthInBytes();
-      return this;
+    /// Segment-creation path. Shape values come from the freshly-collected [ColumnStatistics]; `hasDictionary` is
+    /// supplied separately because it's a driver decision not carried on [ColumnStatistics]. `_tableNameWithType`
+    /// and `_continueOnError` are derived from `tableConfig`.
+    public Builder(File indexDir, TableConfig tableConfig, ColumnStatistics columnStatistics, boolean hasDictionary) {
+      this(indexDir, tableConfig.getTableName(), columnStatistics, hasDictionary, isContinueOnError(tableConfig));
     }
 
-    public Builder withIndexDir(File indexDir) {
+    /// Index-handler path. Shape values (including `hasDictionary`) come from [ColumnMetadata]; `_tableNameWithType`
+    /// and `_continueOnError` are derived from `tableConfig`.
+    public Builder(File indexDir, TableConfig tableConfig, ColumnMetadata columnMetadata) {
+      this(indexDir, tableConfig.getTableName(), columnMetadata, columnMetadata.hasDictionary(),
+          isContinueOnError(tableConfig));
+    }
+
+    /// Generic constructor for callers that have a [ColumnShape] but not a [TableConfig] — every value the
+    /// convenience constructors would derive (`tableNameWithType`, `hasDictionary`, `continueOnError`) must be
+    /// supplied explicitly.
+    public Builder(File indexDir, String tableNameWithType, ColumnShape columnShape, boolean hasDictionary,
+        boolean continueOnError) {
       _indexDir = indexDir;
+      _tableNameWithType = tableNameWithType;
+      _columnShape = columnShape;
+      _lengthOfShortestElement = columnShape.getLengthOfShortestElement();
+      _lengthOfLongestElement = columnShape.getLengthOfLongestElement();
+      _isAscii = columnShape.isAscii();
+      _totalNumberOfEntries = columnShape.getTotalNumberOfEntries();
+      _maxNumberOfMultiValues = columnShape.getMaxNumberOfMultiValues();
+      _maxRowLengthInBytes = columnShape.getMaxRowLengthInBytes();
+      _hasDictionary = hasDictionary;
+      _continueOnError = continueOnError;
+    }
+
+    private static boolean isContinueOnError(TableConfig tableConfig) {
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      return ingestionConfig != null && ingestionConfig.isContinueOnError();
+    }
+
+    // Overridable column-attribute setters.
+
+    public Builder withLengthOfShortestElement(int lengthOfShortestElement) {
+      _lengthOfShortestElement = lengthOfShortestElement;
       return this;
     }
 
-    public Builder onHeap(boolean onHeap) {
-      _onHeap = onHeap;
+    public Builder withLengthOfLongestElement(int lengthOfLongestElement) {
+      _lengthOfLongestElement = lengthOfLongestElement;
       return this;
     }
 
-    public Builder withColumnMetadata(ColumnMetadata columnMetadata) {
-      return withFieldSpec(columnMetadata.getFieldSpec())
-          .sorted(columnMetadata.isSorted())
-          .withCardinality(columnMetadata.getCardinality())
-          .withTotalNumberOfEntries(columnMetadata.getTotalNumberOfEntries())
-          .withTotalDocs(columnMetadata.getTotalDocs())
-          .withDictionary(columnMetadata.hasDictionary())
-          .withMinValue(columnMetadata.getMinValue())
-          .withMaxValue(columnMetadata.getMaxValue())
-          .withMaxNumberOfMultiValueElements(columnMetadata.getMaxNumberOfMultiValues());
-    }
-
-    public Builder withOptimizedDictionary(boolean optimized) {
-      _optimizedDictionary = optimized;
-      return this;
-    }
-
-    public Builder withFixedLength(boolean fixedLength) {
-      _fixedLength = fixedLength;
-      return this;
-    }
-
-    public Builder withLengthOfLongestEntry(int lengthOfLongestEntry) {
-      _lengthOfLongestEntry = lengthOfLongestEntry;
-      return this;
-    }
-
-    public Builder withMaxNumberOfMultiValueElements(int maxNumberOfMultiValueElements) {
-      _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
-      return this;
-    }
-
-    public Builder withMaxRowLengthInBytes(int maxRowLengthInBytes) {
-      _maxRowLengthInBytes = maxRowLengthInBytes;
-      return this;
-    }
-
-    public Builder withFieldSpec(FieldSpec fieldSpec) {
-      _fieldSpec = fieldSpec;
-      return this;
-    }
-
-    public Builder sorted(boolean sorted) {
-      _sorted = sorted;
-      return this;
-    }
-
-    public Builder withCardinality(int cardinality) {
-      _cardinality = cardinality;
+    public Builder withAscii(boolean isAscii) {
+      _isAscii = isAscii;
       return this;
     }
 
@@ -226,8 +197,13 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withTotalDocs(int totalDocs) {
-      _totalDocs = totalDocs;
+    public Builder withMaxNumberOfMultiValues(int maxNumberOfMultiValues) {
+      _maxNumberOfMultiValues = maxNumberOfMultiValues;
+      return this;
+    }
+
+    public Builder withMaxRowLengthInBytes(int maxRowLengthInBytes) {
+      _maxRowLengthInBytes = maxRowLengthInBytes;
       return this;
     }
 
@@ -236,18 +212,15 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withMinValue(Comparable<?> minValue) {
-      _minValue = minValue;
+    // Build-time toggle setters.
+
+    public Builder withOnHeap(boolean onHeap) {
+      _onHeap = onHeap;
       return this;
     }
 
-    public Builder withMaxValue(Comparable<?> maxValue) {
-      _maxValue = maxValue;
-      return this;
-    }
-
-    public Builder withForwardIndexDisabled(boolean forwardIndexDisabled) {
-      _forwardIndexDisabled = forwardIndexDisabled;
+    public Builder withOptimizedDictionary(boolean optimized) {
+      _optimizedDictionary = optimized;
       return this;
     }
 
@@ -255,6 +228,8 @@ public interface IndexCreationContext {
       _textCommitOnClose = textCommitOnClose;
       return this;
     }
+
+    // Realtime-conversion context setters.
 
     public Builder withRealtimeConversion(boolean realtimeConversion) {
       _realtimeConversion = realtimeConversion;
@@ -276,158 +251,184 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withTableNameWithType(String tableNameWithType) {
-      _tableNameWithType = tableNameWithType;
-      return this;
-    }
+    // Error handling setter.
 
+    /// Overrides the `continueOnError` value supplied at construction. Useful when the
+    /// [TableConfig]-derived default doesn't match the caller's needs (e.g. a [SegmentGeneratorConfig] override).
     public Builder withContinueOnError(boolean continueOnError) {
       _continueOnError = continueOnError;
       return this;
     }
 
     public Common build() {
-      return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
-          _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
-          _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
-          _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
-          _realtimeConversion, _consumerDir, _mutableSegmentCompacted, _mutableToImmutableDocIdMap, _tableNameWithType,
-          _continueOnError);
+      return new Common(this);
     }
-
-    public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
-      _sortedUniqueElementsArray = sortedUniqueElementsArray;
-      return this;
-    }
-  }
-
-  static Builder builder() {
-    return new Builder();
   }
 
   final class Common implements IndexCreationContext {
+    // Identity. Non-overridable shape accessors delegate to `_columnShape`.
+    private final String _tableNameWithType;
     private final File _indexDir;
-    private final int _lengthOfLongestEntry;
-    private final int _maxNumberOfMultiValueElements;
-    private final int _maxRowLengthInBytes;
-    private final boolean _onHeap;
-    private final FieldSpec _fieldSpec;
-    private final boolean _sorted;
-    private final int _cardinality;
+    private final ColumnShape _columnShape;
+
+    // Overridable column attributes.
+    private final int _lengthOfShortestElement;
+    private final int _lengthOfLongestElement;
+    private final boolean _isAscii;
     private final int _totalNumberOfEntries;
-    private final int _totalDocs;
+    private final int _maxNumberOfMultiValues;
+    private final int _maxRowLengthInBytes;
     private final boolean _hasDictionary;
-    private final Comparable<?> _minValue;
-    private final Comparable<?> _maxValue;
-    private final boolean _forwardIndexDisabled;
-    private final Object _sortedUniqueElementsArray;
+
+    // Build-time toggles.
+    private final boolean _onHeap;
     private final boolean _optimizeDictionary;
-    private final boolean _fixedLength;
     private final boolean _textCommitOnClose;
-    private final ColumnStatistics _columnStatistics;
+
+    // Realtime-conversion context.
     private final boolean _realtimeConversion;
+    @Nullable
     private final File _consumerDir;
     private final boolean _mutableSegmentCompacted;
+    @Nullable
     private final int[] _mutableToImmutableDocIdMap;
-    private final String _tableNameWithType;
+
+    // Error handling.
     private final boolean _continueOnError;
 
-    private Common(File indexDir, int lengthOfLongestEntry, int maxNumberOfMultiValueElements, int maxRowLengthInBytes,
-        boolean onHeap, FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries, int totalDocs,
-        boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue, boolean forwardIndexDisabled,
-        Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength, boolean textCommitOnClose,
-        ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
-        boolean mutableSegmentCompacted, int[] mutableToImmutableDocIdMap, String tableNameWithType,
-        boolean continueOnError) {
-      _indexDir = indexDir;
-      _lengthOfLongestEntry = lengthOfLongestEntry;
-      _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
-      _maxRowLengthInBytes = maxRowLengthInBytes;
-      _onHeap = onHeap;
-      _fieldSpec = fieldSpec;
-      _sorted = sorted;
-      _cardinality = cardinality;
-      _totalNumberOfEntries = totalNumberOfEntries;
-      _totalDocs = totalDocs;
-      _hasDictionary = hasDictionary;
-      _minValue = minValue;
-      _maxValue = maxValue;
-      _forwardIndexDisabled = forwardIndexDisabled;
-      _sortedUniqueElementsArray = sortedUniqueElementsArray;
-      _optimizeDictionary = optimizeDictionary;
-      _fixedLength = fixedLength;
-      _textCommitOnClose = textCommitOnClose;
-      _columnStatistics = columnStatistics;
-      _realtimeConversion = realtimeConversion;
-      _consumerDir = consumerDir;
-      _mutableSegmentCompacted = mutableSegmentCompacted;
-      _mutableToImmutableDocIdMap = mutableToImmutableDocIdMap;
-      _tableNameWithType = tableNameWithType;
-      _continueOnError = continueOnError;
+    private Common(Builder builder) {
+      _tableNameWithType = builder._tableNameWithType;
+      _indexDir = builder._indexDir;
+      _columnShape = builder._columnShape;
+      _lengthOfShortestElement = builder._lengthOfShortestElement;
+      _lengthOfLongestElement = builder._lengthOfLongestElement;
+      _isAscii = builder._isAscii;
+      _totalNumberOfEntries = builder._totalNumberOfEntries;
+      _maxNumberOfMultiValues = builder._maxNumberOfMultiValues;
+      _maxRowLengthInBytes = builder._maxRowLengthInBytes;
+      _hasDictionary = builder._hasDictionary;
+      _onHeap = builder._onHeap;
+      _optimizeDictionary = builder._optimizedDictionary;
+      _textCommitOnClose = builder._textCommitOnClose;
+      _realtimeConversion = builder._realtimeConversion;
+      _consumerDir = builder._consumerDir;
+      _mutableSegmentCompacted = builder._mutableSegmentCompacted;
+      _mutableToImmutableDocIdMap = builder._mutableToImmutableDocIdMap;
+      _continueOnError = builder._continueOnError;
     }
 
-    public FieldSpec getFieldSpec() {
-      return _fieldSpec;
+    // Identity accessors.
+
+    @Override
+    public String getTableNameWithType() {
+      return _tableNameWithType;
     }
 
+    @Override
     public File getIndexDir() {
       return _indexDir;
     }
 
-    public boolean isOnHeap() {
-      return _onHeap;
+    @Override
+    public FieldSpec getFieldSpec() {
+      return _columnShape.getFieldSpec();
     }
 
-    public int getLengthOfLongestEntry() {
-      return _lengthOfLongestEntry;
+    @Override
+    @Nullable
+    public ColumnStatistics getColumnStatistics() {
+      return _columnShape instanceof ColumnStatistics ? (ColumnStatistics) _columnShape : null;
     }
 
-    public int getMaxNumberOfMultiValueElements() {
-      return _maxNumberOfMultiValueElements;
+    @Override
+    @Nullable
+    public ColumnMetadata getColumnMetadata() {
+      return _columnShape instanceof ColumnMetadata ? (ColumnMetadata) _columnShape : null;
     }
 
-    public int getMaxRowLengthInBytes() {
-      return _maxRowLengthInBytes;
+    // Non-overridable shape accessors delegate to the source [ColumnShape].
+
+    @Override
+    public int getTotalDocs() {
+      return _columnShape.getTotalDocs();
     }
 
-    public boolean isSorted() {
-      return _sorted;
-    }
-
+    @Override
     public int getCardinality() {
-      return _cardinality;
+      return _columnShape.getCardinality();
     }
 
+    @Override
+    public boolean isSorted() {
+      return _columnShape.isSorted();
+    }
+
+    @Override
+    @Nullable
+    public Comparable<?> getMinValue() {
+      return _columnShape.getMinValue();
+    }
+
+    @Override
+    @Nullable
+    public Comparable<?> getMaxValue() {
+      return _columnShape.getMaxValue();
+    }
+
+    @Override
+    @Nullable
+    public PartitionFunction getPartitionFunction() {
+      return _columnShape.getPartitionFunction();
+    }
+
+    @Override
+    @Nullable
+    public Set<Integer> getPartitions() {
+      return _columnShape.getPartitions();
+    }
+
+    // Overridable column-attribute accessors.
+
+    @Override
+    public int getLengthOfShortestElement() {
+      return _lengthOfShortestElement;
+    }
+
+    @Override
+    public int getLengthOfLongestElement() {
+      return _lengthOfLongestElement;
+    }
+
+    @Override
+    public boolean isAscii() {
+      return _isAscii;
+    }
+
+    @Override
     public int getTotalNumberOfEntries() {
       return _totalNumberOfEntries;
     }
 
-    public int getTotalDocs() {
-      return _totalDocs;
+    @Override
+    public int getMaxNumberOfMultiValues() {
+      return _maxNumberOfMultiValues;
     }
 
+    @Override
+    public int getMaxRowLengthInBytes() {
+      return _maxRowLengthInBytes;
+    }
+
+    @Override
     public boolean hasDictionary() {
       return _hasDictionary;
     }
 
-    @Override
-    public Comparable<?> getMinValue() {
-      return _minValue;
-    }
+    // Build-time toggles.
 
     @Override
-    public Comparable<?> getMaxValue() {
-      return _maxValue;
-    }
-
-    @Override
-    public boolean forwardIndexDisabled() {
-      return _forwardIndexDisabled;
-    }
-
-    @Override
-    public Object getSortedUniqueElementsArray() {
-      return _sortedUniqueElementsArray;
+    public boolean isOnHeap() {
+      return _onHeap;
     }
 
     @Override
@@ -436,19 +437,11 @@ public interface IndexCreationContext {
     }
 
     @Override
-    public boolean isFixedLength() {
-      return _fixedLength;
-    }
-
-    @Override
     public boolean isTextCommitOnClose() {
       return _textCommitOnClose;
     }
 
-    @Override
-    public ColumnStatistics getColumnStatistics() {
-      return _columnStatistics;
-    }
+    // Realtime-conversion context.
 
     @Override
     public boolean isRealtimeConversion() {
@@ -456,6 +449,7 @@ public interface IndexCreationContext {
     }
 
     @Override
+    @Nullable
     public File getConsumerDir() {
       return _consumerDir;
     }
@@ -466,14 +460,12 @@ public interface IndexCreationContext {
     }
 
     @Override
+    @Nullable
     public int[] getMutableToImmutableDocIdMap() {
       return _mutableToImmutableDocIdMap;
     }
 
-    @Override
-    public String getTableNameWithType() {
-      return _tableNameWithType;
-    }
+    // Error handling.
 
     @Override
     public boolean isContinueOnError() {
