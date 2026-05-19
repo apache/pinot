@@ -317,14 +317,16 @@ public class TablesResource {
                 accum[1] += (fwdIndexSize > 0 ? fwdIndexSize : 0);
                 columnCodecMap.merge(column, codec,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
-                columnHasDictMap.put(column, columnMetadata.hasDictionary());
+                // Raw columns never have a dictionary; once any segment is raw, mark the column as no-dict
+                columnHasDictMap.merge(column, false, (existing, incoming) -> false);
                 columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
                 segmentHasCompressionStats = true;
               } else if (columnMetadata.hasDictionary() && fwdIndexSize > 0) {
                 // Dictionary-encoded column: track forward index size but no raw uncompressed size
                 long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
                 accum[1] += fwdIndexSize;
-                columnHasDictMap.put(column, columnMetadata.hasDictionary());
+                // Only set hasDictionary=true if not already seen as raw (raw wins)
+                columnHasDictMap.merge(column, true, (existing, incoming) -> existing && incoming);
                 columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
               }
               // Old segments without stats (codec==null, uncompressed==INDEX_NOT_FOUND) are

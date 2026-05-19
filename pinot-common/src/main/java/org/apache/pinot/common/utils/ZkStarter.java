@@ -178,6 +178,8 @@ public class ZkStarter {
         }
       }.start();
 
+      // Give ZK a moment to initialize before first connection attempt
+      Thread.sleep(2000L);
       // Wait until the ZK server is started
       for (int retry = 0; retry < DEFAULT_ZK_CLIENT_RETRIES; retry++) {
         try {
@@ -192,7 +194,7 @@ public class ZkStarter {
             LOGGER.warn("Failed to connect to zk server.", e);
             throw e;
           }
-          Thread.sleep(50L);
+          Thread.sleep(500L);
         }
       }
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath, port);
