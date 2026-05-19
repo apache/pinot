@@ -35,7 +35,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -183,9 +182,8 @@ public class IngestionDelayTracker {
     _tableNameWithType = tableNameWithType;
     _metricName = tableNameWithType;
     InstanceDataManagerConfig instanceDataManagerConfig = realtimeTableDataManager.getInstanceDataManagerConfig();
-    String consumerClientIdSuffix =
+    _consumerClientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
-    _consumerClientIdSuffix = StringUtils.isNotBlank(consumerClientIdSuffix) ? consumerClientIdSuffix : null;
     _realTimeTableDataManager = realtimeTableDataManager;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
 
