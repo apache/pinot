@@ -129,7 +129,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
             new SegmentOperationsThrottler(10, 20, true),
             new SegmentOperationsThrottler(4, 8, true));
     TableDataManager tableDataManager = newTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, schema,
+    tableDataManager.init(instanceDataManagerConfig, createHelixManagerMock(), new SegmentLocks(), tableConfig, schema,
         new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, segmentOperationsThrottlerSet,
         false, mock(ServerReloadJobStatusCache.class));
     tableDataManager.start();
@@ -146,6 +146,15 @@ public class BaseTableDataManagerAcquireSegmentTest {
    */
   protected TableDataManager newTableDataManager() {
     return new OfflineTableDataManager();
+  }
+
+  /**
+   * Returns the {@link HelixManager} mock wired into the TDM under test. Default returns a bare Mockito mock
+   * — fine for the inherited test bodies which do not read cluster config or property store directly.
+   * Subclasses that exercise paths reading those override to stub them.
+   */
+  protected HelixManager createHelixManagerMock() {
+    return mock(HelixManager.class);
   }
 
   /**
