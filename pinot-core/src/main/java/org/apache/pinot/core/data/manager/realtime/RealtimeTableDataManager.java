@@ -335,6 +335,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
         currentOffset);
+  }
 
   /**
    * Returns the ingestion time of the last consumed message for the partition of the given segment. Returns
