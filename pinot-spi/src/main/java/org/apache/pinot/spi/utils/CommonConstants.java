@@ -2220,6 +2220,22 @@ public class CommonConstants {
     public static final int DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES = 32 * 1024 * 1024;
 
     /**
+     * Number of inbound gRPC messages the receiver will accept in flight per stream, before requiring the
+     * application to consume one (via {@code MailboxContentObserver.onNext} returning). Implemented by
+     * disabling gRPC's default auto-inbound-flow-control on the server side and calling
+     * {@code ServerCallStreamObserver.request(int)} explicitly.
+     *
+     * <p>Larger values let the sender pipeline more messages without waiting for per-message round trips,
+     * which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
+     * is still bounded by the HTTP/2 stream window (see
+     * {@link #KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES}), so this credit count is effectively a per-stream
+     * message-count limit on top of the byte-count limit. Whichever fires first applies.
+     */
+    public static final String KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT =
+        "pinot.query.runner.grpc.inbound.message.credit";
+    public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 128;
+
+    /**
      * Configuration for channel idle timeout in seconds.
      *
      * gRPC channels go idle after a period of inactivity. When a channel is idle, its resources are released. The next

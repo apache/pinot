@@ -26,6 +26,7 @@ import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +63,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final Server _server;
   private final PooledByteBufAllocatorMetric _bufAllocatorMetric;
   private final int _flowControlWindowBytes;
+  private final int _inboundMessageCredit;
 
   /**
    * Constructs a gRPC-based mailbox server.
@@ -141,6 +143,13 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     _flowControlWindowBytes = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES);
+    _inboundMessageCredit = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT);
+    Preconditions.checkArgument(_inboundMessageCredit > 0,
+        "%s must be positive, got: %s",
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT,
+        _inboundMessageCredit);
     builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
@@ -161,7 +170,8 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   }
 
   public void start() {
-    LOGGER.info("Starting GrpcMailboxServer with flowControlWindow={} bytes", _flowControlWindowBytes);
+    LOGGER.info("Starting GrpcMailboxServer with flowControlWindow={} bytes, inboundMessageCredit={}",
+        _flowControlWindowBytes, _inboundMessageCredit);
     try {
       _server.start();
     } catch (IOException e) {
@@ -193,6 +203,10 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   @Override
   public StreamObserver<Mailbox.MailboxContent> open(StreamObserver<Mailbox.MailboxStatus> responseObserver) {
     String mailboxId = ChannelUtils.MAILBOX_ID_CTX_KEY.get();
-    return new MailboxContentObserver(_mailboxService, mailboxId, responseObserver);
+    ServerCallStreamObserver<Mailbox.MailboxStatus> serverCallObserver =
+        (ServerCallStreamObserver<Mailbox.MailboxStatus>) responseObserver;
+    serverCallObserver.disableAutoInboundFlowControl();
+    serverCallObserver.request(_inboundMessageCredit);
+    return new MailboxContentObserver(_mailboxService, mailboxId, serverCallObserver);
   }
 }

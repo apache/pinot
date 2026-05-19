@@ -19,7 +19,7 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import com.google.protobuf.ByteString;
-import io.grpc.stub.StreamObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.Mailbox.MailboxStatus;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -38,7 +38,8 @@ public class MailboxContentObserverTest {
     MailboxService mailboxService = mock(MailboxService.class);
     ReceivingMailbox receivingMailbox = mock(ReceivingMailbox.class);
     when(mailboxService.getReceivingMailbox(TEST_MAILBOX_ID)).thenReturn(receivingMailbox);
-    StreamObserver<MailboxStatus> mockStatusObserver = mock(StreamObserver.class);
+    @SuppressWarnings("unchecked")
+    ServerCallStreamObserver<MailboxStatus> mockStatusObserver = mock(ServerCallStreamObserver.class);
     MailboxContentObserver observer = new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver);
     verify(mailboxService, times(1)).getReceivingMailbox(TEST_MAILBOX_ID);
 
@@ -51,5 +52,26 @@ public class MailboxContentObserverTest {
     // No new interactions with the mailboxService.
     verify(mailboxService, times(1)).getReceivingMailbox(TEST_MAILBOX_ID);
     verifyNoMoreInteractions(mailboxService);
+  }
+
+  @Test
+  public void testOnNextReplenishesInboundCredit() {
+    MailboxService mailboxService = mock(MailboxService.class);
+    ReceivingMailbox receivingMailbox = mock(ReceivingMailbox.class);
+    when(mailboxService.getReceivingMailbox(TEST_MAILBOX_ID)).thenReturn(receivingMailbox);
+    @SuppressWarnings("unchecked")
+    ServerCallStreamObserver<MailboxStatus> mockStatusObserver = mock(ServerCallStreamObserver.class);
+    MailboxContentObserver observer = new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver);
+
+    // Each onNext call should request(1) exactly once, regardless of whether the stream is already closed.
+    MailboxContent mockContent = mock(MailboxContent.class);
+    when(mockContent.getPayload()).thenReturn(ByteString.copyFrom(new byte[0]));
+    when(mockContent.getMailboxId()).thenReturn(TEST_MAILBOX_ID);
+
+    observer.onNext(mockContent);
+    verify(mockStatusObserver, times(1)).request(1);
+
+    observer.onNext(mockContent);
+    verify(mockStatusObserver, times(2)).request(1);
   }
 }
