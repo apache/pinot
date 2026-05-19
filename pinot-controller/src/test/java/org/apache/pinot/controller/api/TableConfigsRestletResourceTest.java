@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
