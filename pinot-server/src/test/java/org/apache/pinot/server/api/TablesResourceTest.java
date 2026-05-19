@@ -857,7 +857,7 @@ public class TablesResourceTest extends BaseResourceTest {
       Assert.assertNotNull(ccs, "columnCompressionStats should be present when flag=ON and segments have stats");
       for (ColumnCompressionStatsInfo colStats : ccs) {
         if ("column1".equals(colStats.getColumn()) || "column2".equals(colStats.getColumn())) {
-          Assert.assertFalse(colStats.isHasDictionary(),
+          Assert.assertFalse(colStats.hasDictionary(),
               "column " + colStats.getColumn() + " should report hasDictionary=false (raw wins over dict)");
         }
       }

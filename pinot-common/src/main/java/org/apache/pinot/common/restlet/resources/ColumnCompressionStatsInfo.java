@@ -81,7 +81,8 @@ public class ColumnCompressionStatsInfo {
     return _codec;
   }
 
-  public boolean isHasDictionary() {
+  @JsonProperty("hasDictionary")
+  public boolean hasDictionary() {
     return _hasDictionary;
   }
 

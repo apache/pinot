@@ -58,7 +58,7 @@ public class SegmentSizeInfoTest {
     assertEquals(col1Stats.getCompressedSizeInBytes(), 2500);
     assertEquals(col1Stats.getCompressionRatio(), 4.0, 0.01);
     assertEquals(col1Stats.getCodec(), "LZ4");
-    assertFalse(col1Stats.isHasDictionary());
+    assertFalse(col1Stats.hasDictionary());
   }
 
   @Test

@@ -545,7 +545,7 @@ public class TableSizeReader {
           if (colStats != null) {
             for (Map.Entry<String, ColumnCompressionStatsInfo> colEntry : colStats.entrySet()) {
               ColumnCompressionStatsInfo colInfo = colEntry.getValue();
-              columnDictMap.putIfAbsent(colEntry.getKey(), colInfo.isHasDictionary());
+              columnDictMap.putIfAbsent(colEntry.getKey(), colInfo.hasDictionary());
               if (colInfo.getIndexes() != null) {
                 columnIndexesMap.computeIfAbsent(colEntry.getKey(), k -> new LinkedHashSet<>())
                     .addAll(colInfo.getIndexes());

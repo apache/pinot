@@ -164,7 +164,7 @@ public class ServerSegmentMetadataReader {
         if (serverColStats != null) {
           for (ColumnCompressionStatsInfo info : serverColStats) {
             // Skip columns with no meaningful compression data (old raw segments without persisted codec)
-            if (info.getCodec() == null && !info.isHasDictionary()) {
+            if (info.getCodec() == null && !info.hasDictionary()) {
               continue;
             }
             String col = info.getColumn();
@@ -178,7 +178,7 @@ public class ServerSegmentMetadataReader {
               columnCodecMap.merge(col, info.getCodec(),
                   (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
             }
-            columnHasDictMap.put(col, info.isHasDictionary());
+            columnHasDictMap.put(col, info.hasDictionary());
             if (info.getIndexes() != null) {
               columnIndexNamesMap.computeIfAbsent(col, k -> new HashSet<>()).addAll(info.getIndexes());
             }

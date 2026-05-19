@@ -603,11 +603,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       ForwardIndexConfig newConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
       ChunkCompressionType compressionType =
           ForwardIndexType.resolveCompressionType(newConfig, columnMetadata.getFieldSpec().getFieldType());
-      Map<String, String> metadataProperties = new HashMap<>();
-      metadataProperties.put(
-          getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC),
-          compressionType.name());
-      SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      if (compressionType != null) {
+        Map<String, String> metadataProperties = new HashMap<>();
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
+        SegmentMetadataUtils.updateMetadataProperties(_segmentDirectory, metadataProperties);
+      }
     }
 
     // Delete the marker file.
@@ -1136,7 +1136,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       ForwardIndexConfig fwdConfig = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.forward());
       ChunkCompressionType compressionType =
           ForwardIndexType.resolveCompressionType(fwdConfig, existingColMetadata.getFieldSpec().getFieldType());
-      metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
+      if (compressionType != null) {
+        metadataProperties.put(getKeyFor(column, FORWARD_INDEX_COMPRESSION_CODEC), compressionType.name());
+      }
       if (uncompressedSize > 0) {
         metadataProperties.put(getKeyFor(column, FORWARD_INDEX_UNCOMPRESSED_SIZE),
             String.valueOf(uncompressedSize));

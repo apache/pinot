@@ -116,7 +116,7 @@ public class TableMetadataInfoCompressionTest {
     assertEquals(stats.getCompressedSizeInBytes(), 8000);
     assertEquals(stats.getCompressionRatio(), 6.25, 0.01);
     assertEquals(stats.getCodec(), "SNAPPY");
-    assertFalse(stats.isHasDictionary());
+    assertFalse(stats.hasDictionary());
     assertNotNull(stats.getIndexes());
   }
 

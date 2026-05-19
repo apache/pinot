@@ -39,7 +39,7 @@ public class ColumnCompressionStatsInfoTest {
     assertEquals(info.getCompressedSizeInBytes(), 2000L);
     assertEquals(info.getCompressionRatio(), 4.0, 1e-9);
     assertEquals(info.getCodec(), "LZ4");
-    assertFalse(info.isHasDictionary());
+    assertFalse(info.hasDictionary());
     assertEquals(info.getIndexes(), indexes);
   }
 
@@ -49,7 +49,7 @@ public class ColumnCompressionStatsInfoTest {
         new ColumnCompressionStatsInfo("dictCol", 5000L, 1000L, 5.0, "SNAPPY", true,
             List.of("forward_index"));
 
-    assertTrue(info.isHasDictionary());
+    assertTrue(info.hasDictionary());
     assertEquals(info.getCodec(), "SNAPPY");
   }
 
@@ -69,7 +69,7 @@ public class ColumnCompressionStatsInfoTest {
     assertEquals(deserialized.getCompressedSizeInBytes(), 2500L);
     assertEquals(deserialized.getCompressionRatio(), 4.0, 1e-9);
     assertEquals(deserialized.getCodec(), "ZSTANDARD");
-    assertFalse(deserialized.isHasDictionary());
+    assertFalse(deserialized.hasDictionary());
     assertNotNull(deserialized.getIndexes());
     assertEquals(deserialized.getIndexes().size(), 2);
     assertTrue(deserialized.getIndexes().contains("forward_index"));
@@ -91,7 +91,7 @@ public class ColumnCompressionStatsInfoTest {
     assertEquals(deserialized.getCompressedSizeInBytes(), 1500L);
     assertEquals(deserialized.getCompressionRatio(), 2.0, 1e-9);
     assertNull(deserialized.getCodec());
-    assertFalse(deserialized.isHasDictionary());
+    assertFalse(deserialized.hasDictionary());
     assertNull(deserialized.getIndexes());
   }
 
@@ -111,7 +111,7 @@ public class ColumnCompressionStatsInfoTest {
     assertEquals(deserialized.getCompressedSizeInBytes(), 1200L);
     assertEquals(deserialized.getCompressionRatio(), 5.0, 1e-9);
     assertEquals(deserialized.getCodec(), "LZ4");
-    assertFalse(deserialized.isHasDictionary());
+    assertFalse(deserialized.hasDictionary());
     assertNotNull(deserialized.getIndexes());
     assertEquals(deserialized.getIndexes(), List.of("forward_index"));
   }
@@ -128,7 +128,7 @@ public class ColumnCompressionStatsInfoTest {
         JsonUtils.stringToObject(json, ColumnCompressionStatsInfo.class);
 
     assertEquals(deserialized.getColumn(), "dictRoundTrip");
-    assertTrue(deserialized.isHasDictionary());
+    assertTrue(deserialized.hasDictionary());
     assertNull(deserialized.getCodec());
   }
 }
