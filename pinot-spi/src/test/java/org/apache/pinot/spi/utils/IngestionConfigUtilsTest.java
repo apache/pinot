@@ -184,8 +184,15 @@ public class IngestionConfigUtilsTest {
   }
 
   @Test
-  public void testGetStreamConsumerClientIdWithoutSuffix() {
-    Assert.assertEquals(IngestionConfigUtils.getStreamConsumerClientIdWithoutSuffix(
-        "db.myTable_REALTIME", "events", 3), "db.myTable_REALTIME-events-3");
+  public void testGetStreamIngestionMetricTableKey() {
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", "events");
+    StreamConfig streamConfig = new StreamConfig("db.myTable_REALTIME", streamConfigMap);
+    String tableWithType = "db.myTable_REALTIME";
+    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType,
+        streamConfig.getTopicName(), 7, null), "db.myTable_REALTIME-events-7");
+    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType,
+        streamConfig.getTopicName(), 7, "host1"), "db.myTable_REALTIME-events-7-host1");
   }
 }
