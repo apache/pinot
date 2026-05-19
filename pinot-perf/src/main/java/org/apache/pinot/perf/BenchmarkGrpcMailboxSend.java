@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -54,21 +55,26 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /// A/B benchmark for the gRPC sender-side back-pressure gate in `GrpcSendingMailbox`.
 ///
-/// Two real `MailboxService` instances run on localhost; a background drainer thread polls the
-/// receiver as fast as it can. Crucially, the **drainer is rate-limited** (`@Param drainSleepMicros`)
-/// so that the sender cannot trivially keep up — for non-zero sleeps the gRPC HTTP/2 stream
-/// window does close, and we exercise the slow path of `awaitReady()` (park/wake on a Condition).
-/// Combined with `@Param backpressureEnabled`, this lets us measure both regimes on identical
-/// code paths:
+/// Two real `MailboxService` instances run on localhost; a background drainer thread consumes
+/// messages from the receiver. The drainer's pace is controlled by `@Param _drainSleepMicros`,
+/// which selects one of two measurement regimes:
+///
+///  * `_drainSleepMicros = 0` (spin-poll): the drainer keeps the receiver queue empty at full
+///    speed. `isReady()` stays `true` permanently — only the **fast-path overhead** of the gate
+///    is measured (one volatile read). The A/B between `backpressureEnabled=true/false` is
+///    dominated by that single read.
+///  * `_drainSleepMicros > 0` (throttled): the drainer parks for the given number of
+///    microseconds after every poll, regardless of whether a message was found. This lets the
+///    gRPC outbound queue fill, causing `isReady()` to flip to `false` and forcing the sender's
+///    `awaitReady()` **slow path** (park/wake on a Condition). The A/B now also captures
+///    park/wake overhead.
+///
+/// Combined with `@Param _backpressureEnabled`:
 ///
 ///  * `backpressureEnabled=true`: sender blocks in `awaitReady` until the receiver advances the
-///    window. Throughput is rate-limited by the drainer.
+///    window. Throughput is rate-limited by the drainer when `_drainSleepMicros > 0`.
 ///  * `backpressureEnabled=false`: sender pushes unconditionally (pre-fix behaviour). Throughput
 ///    is unbounded — direct memory grows until something fails or the iteration ends.
-///
-/// The interesting comparison is **per-call latency at small payloads** (which captures the
-/// fast-path overhead — one volatile `isReady()` read) versus **per-call latency at payloads
-/// that exceed the HTTP/2 window** (which captures the slow-path park/wake overhead).
 ///
 /// Run with `org.openjdk.jmh.Main org.apache.pinot.perf.BenchmarkGrpcMailboxSend`.
 @BenchmarkMode(Mode.Throughput)
@@ -98,6 +104,13 @@ public class BenchmarkGrpcMailboxSend {
   @Param({"true", "false"})
   public boolean _backpressureEnabled;
 
+  /// Microseconds the drainer sleeps between polls. `0` means spin-poll (the drainer keeps the
+  /// receiver queue empty so back-pressure never activates — useful for measuring the gate's
+  /// fast-path overhead). Non-zero values throttle the drainer, letting the gRPC HTTP/2 stream
+  /// window fill and forcing the sender's `awaitReady()` slow path (park/wake on a Condition).
+  @Param({"0", "100"})
+  public int _drainSleepMicros;
+
   private MailboxService _senderService;
   private MailboxService _receiverService;
   private SendingMailbox _sender;
@@ -125,13 +138,23 @@ public class BenchmarkGrpcMailboxSend {
     ReceivingMailbox receiver = _receiverService.getReceivingMailbox(mailboxId);
     receiver.registeredReader(() -> { });
 
-    // Spin-poll drainer: as fast as possible, so back-pressure activates only when the
-    // sender genuinely outruns gRPC + receiver throughput (e.g. at large payloads).
+    // Drainer: pace is controlled by _drainSleepMicros.
+    // _drainSleepMicros == 0: spin-poll — receiver is drained at full speed; only fast-path
+    //   gate overhead is measured (isReady() stays true).
+    // _drainSleepMicros > 0: park after every iteration (whether or not a message was found)
+    //   so the gRPC outbound queue fills and isReady() flips false, exercising the slow-path
+    //   park/wake in awaitReady().
     _drainer = new Thread(() -> {
       while (!_stop.get()) {
         ReceivingMailbox.MseBlockWithStats msg = receiver.poll();
         if (msg == null) {
-          Thread.onSpinWait();
+          if (_drainSleepMicros == 0) {
+            Thread.onSpinWait();
+          } else {
+            LockSupport.parkNanos(_drainSleepMicros * 1_000L);
+          }
+        } else if (_drainSleepMicros > 0) {
+          LockSupport.parkNanos(_drainSleepMicros * 1_000L);
         }
       }
     }, "bench-grpc-mailbox-drainer");
