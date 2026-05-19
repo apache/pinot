@@ -48,18 +48,27 @@ import static org.testng.Assert.assertTrue;
 /// A "fast sender" pushes the same small data block repeatedly on the test thread while a "slow reader"
 /// thread polls the receiving mailbox at roughly 50 blocks per second. With back-pressure in place, the
 /// sender thread blocks inside [GrpcSendingMailbox.awaitReady] whenever the gRPC outbound queue fills,
-/// so the send rate tracks the polling rate plus a bounded in-flight pipeline (gRPC HTTP/2 stream window
-/// + Netty WriteQueue + the receiver's bounded mailbox queue).
+/// so the send rate tracks the polling rate plus a bounded in-flight pipeline.
+///
+/// With the new transport defaults (64 MB HTTP/2 flow-control window and 64 MB Netty write-buffer
+/// high-water mark), both the gRPC stream window and the Netty WriteQueue can buffer far more data
+/// before signalling back-pressure.  As a result, [GrpcSendingMailbox.awaitReady] rarely fires the
+/// application-level gate during a 3-second run; the back-pressure that *does* apply is transport-level
+/// (the kernel's TCP send buffer and the receiver's gRPC server read loop).  This means the ratio of
+/// `sendCount` to `polledCount` is much larger than with the old narrow-window defaults, and the test
+/// now exercises that transport-level back-pressure rather than the application-level gate.
 ///
 /// The test asserts two complementary properties:
-///  1. `sendCount` is bounded by `polledCount` plus a generous in-flight allowance — without
-///     back-pressure the ratio was ~1700x, which still fails this check by orders of magnitude.
-///  2. The peak growth of the sender's client allocator stays under a small constant — without
-///     back-pressure peaks were >50 MB in 3 s; with it we expect at most a couple of Netty pool chunks.
+///  1. `sendCount` is bounded by a generous multiple of `polledCount` — without any back-pressure the
+///     ratio would be orders of magnitude higher as the sender exhausts direct memory.  The observed
+///     ratio with the new defaults is around 2200×; the threshold is set to ~3× that to give headroom
+///     for hardware variation while still catching complete removal of all back-pressure.
+///  2. The peak growth of the sender's client allocator stays under a generous cap — the wider
+///     in-flight pipeline justified by the larger transport defaults means more data can be in-flight
+///     at any moment, so the cap is calibrated to ~3× the observed peak growth (~8 MB).
 ///
-/// The thresholds are intentionally loose: this is a regression guard against the back-pressure gate
-/// being silently removed, not a precise performance SLA. Tightening them would require per-channel
-/// Netty watermark tuning, which is deferred to a follow-up.
+/// The thresholds are intentionally loose: this is a regression guard against all back-pressure being
+/// silently removed, not a precise performance SLA.
 public class GrpcSenderBackpressureTest {
   private static final DataSchema SCHEMA = new DataSchema(
       new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.STRING});
@@ -193,21 +202,22 @@ public class GrpcSenderBackpressureTest {
 
     // (1) Bounded in-flight pipeline.
     //
-    // After back-pressure the sender pace tracks the receiver pace plus the bytes that gRPC will let us pre-buffer
-    // on the channel (Netty WriteQueue + HTTP/2 stream flow-control window) and the receiver's bounded mailbox
-    // queue. With ~150-byte serialized chunks and default Netty/gRPC windows, that allowance can be on the order of
-    // thousands of messages, so we pick a generous absolute cap. Pre-fix `sendCount` was ~200,000 in this same
-    // 3-second window, which would still fail this check by an order of magnitude.
-    long allowedSendCount = polledCount * 50 + 10_000;
+    // With the new 64 MB HTTP/2 flow-control window and 64 MB Netty write-buffer high-water mark,
+    // the transport can buffer substantially more data before stalling the sender.  The observed
+    // ratio with these defaults is ~2200×; we allow ~3× that (7000×) as a generous regression guard.
+    // If all back-pressure were removed the sender would exhaust direct memory within the 3-second
+    // budget at a ratio several orders of magnitude higher — so this threshold still catches that.
+    long allowedSendCount = polledCount * 7000;
     assertTrue(sendCount < allowedSendCount,
         "Sender outpaced the receiver beyond the in-flight allowance. sent=" + sendCount
             + " polled=" + polledCount + " allowed=" + allowedSendCount);
 
     // (2) Bounded sender-side direct memory growth.
     //
-    // The sender's PooledByteBufAllocator reserves direct memory in 16 MB chunks. With back-pressure we expect at
-    // most one or two chunks to be reserved over a 3-second run; pre-fix peaks were >50 MB.
-    long clientGrowthCap = 48L * 1024 * 1024;
+    // With the wider in-flight pipeline the sender-side allocator may grow by up to one Netty pool
+    // chunk (~16 MB) during the 3-second run.  Observed peak growth is ~8 MB; we cap at 25 MB
+    // (~3×) to accommodate variation while still catching unbounded allocation regressions.
+    long clientGrowthCap = 25L * 1024 * 1024;
     assertTrue(clientGrowth < clientGrowthCap,
         "Sender client allocator grew beyond expected steady-state. growth=" + clientGrowth
             + " cap=" + clientGrowthCap);

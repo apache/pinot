@@ -44,6 +44,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -53,11 +55,13 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * send by the sender of the sender/receiver pair.
  */
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxServer.class);
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000L;
 
   private final MailboxService _mailboxService;
   private final Server _server;
   private final PooledByteBufAllocatorMetric _bufAllocatorMetric;
+  private final int _flowControlWindowBytes;
 
   /**
    * Constructs a gRPC-based mailbox server.
@@ -134,13 +138,17 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     if (accessControlFactory != null) {
       builder.intercept(new AuthorizationInterceptor(accessControlFactory));
     }
+    _flowControlWindowBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES);
     builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
         .maxInboundMessageSize(config.getProperty(
             CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES));
+            CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
+        .flowControlWindow(_flowControlWindowBytes);
 
     // Add SSL context only if TLS is configured
     if (tlsConfig != null) {
@@ -153,6 +161,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   }
 
   public void start() {
+    LOGGER.info("Starting GrpcMailboxServer with flowControlWindow={} bytes", _flowControlWindowBytes);
     try {
       _server.start();
     } catch (IOException e) {

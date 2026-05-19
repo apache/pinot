@@ -131,7 +131,14 @@ public class MailboxService {
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED,
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED
     );
-    _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config));
+    int writeBufferHighWaterMarkBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES);
+    int writeBufferLowWaterMarkBytes = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES);
+    _channelManager = new ChannelManager(_clientSslContext, _maxInboundMessageSize, getIdleTimeout(config),
+        writeBufferHighWaterMarkBytes, writeBufferLowWaterMarkBytes);
     _accessControlFactory = accessControlFactory;
     registerMailboxClientGauges();
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
@@ -205,6 +212,11 @@ public class MailboxService {
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
    * data is sent for the first time.
    */
+  // TODO: Consider adding an application-level global byte budget for sender outbound. The
+  //  transport-layer WriteBufferWaterMark already caps sender direct memory per (host, port)
+  //  channel, so the OOM the original PR fixed is bounded by watermark.high × #peers. A global
+  //  byte budget would tighten the bound to a single configurable cap across all peers, but is
+  //  unnecessary unless fan-outs hit hundreds of peers per query.
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {

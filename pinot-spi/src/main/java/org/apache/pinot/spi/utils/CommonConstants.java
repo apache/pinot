@@ -2182,6 +2182,42 @@ public class CommonConstants {
         "pinot.query.runner.grpc.sender.backpressure.enabled";
     public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = true;
 
+    /**
+     * Per-stream HTTP/2 flow control window, in bytes. The receiver advertises this value to the sender as
+     * the number of bytes it will accept before requiring a `WINDOW_UPDATE` frame. Wider windows let the
+     * sender push a whole `MseBlock` without {@link io.grpc.stub.ClientCallStreamObserver#isReady} flipping
+     * mid-block. Applied via `NettyServerBuilder.flowControlWindow` in `GrpcMailboxServer`.
+     *
+     * <p>This is per HTTP/2 stream, so total inbound buffering at the receiver scales as
+     * {@code value × #concurrent streams to this server}.
+     */
+    public static final String KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES =
+        "pinot.query.runner.grpc.flow.control.window.bytes";
+    public static final int DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES = 64 * 1024 * 1024;
+
+    /**
+     * Netty per-channel WriteQueue high watermark, in bytes. Applied via
+     * `ChannelOption.WRITE_BUFFER_WATER_MARK` on the sender's `NettyChannelBuilder`. When the channel's
+     * outbound queue exceeds this value, `Channel.isWritable()` flips to `false` and gRPC's
+     * `ClientCallStreamObserver.isReady()` returns `false` until the queue drops below the low watermark.
+     *
+     * <p>This is a per-channel (per `host:port`) setting, shared across all streams to that peer. The
+     * sender's direct-memory footprint is therefore bounded by {@code value × #peers}, not by
+     * {@code value × #streams}. Pairs with {@link #KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES}.
+     */
+    public static final String KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES =
+        "pinot.query.runner.grpc.write.buffer.high.water.mark.bytes";
+    public static final int DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES = 64 * 1024 * 1024;
+
+    /**
+     * Netty per-channel WriteQueue low watermark, in bytes. Once the WriteQueue has exceeded the high
+     * watermark (see {@link #KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES}), it must drop below this
+     * value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of the high
+     * watermark.
+     */
+    public static final String KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES =
+        "pinot.query.runner.grpc.write.buffer.low.water.mark.bytes";
+    public static final int DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES = 32 * 1024 * 1024;
 
     /**
      * Configuration for channel idle timeout in seconds.

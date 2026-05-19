@@ -53,7 +53,8 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/// A/B benchmark for the gRPC sender-side back-pressure gate in `GrpcSendingMailbox`.
+/// Benchmark for the gRPC sender-side back-pressure gate in `GrpcSendingMailbox` across four axes:
+/// `_backpressureEnabled`, `_drainSleepMicros`, `_flowControlWindowBytes`, and `_payloadBytes`.
 ///
 /// Two real `MailboxService` instances run on localhost; a background drainer thread consumes
 /// messages from the receiver. The drainer's pace is controlled by `@Param _drainSleepMicros`,
@@ -73,8 +74,24 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 ///
 ///  * `backpressureEnabled=true`: sender blocks in `awaitReady` until the receiver advances the
 ///    window. Throughput is rate-limited by the drainer when `_drainSleepMicros > 0`.
-///  * `backpressureEnabled=false`: sender pushes unconditionally (pre-fix behaviour). Throughput
-///    is unbounded — direct memory grows until something fails or the iteration ends.
+///  * `backpressureEnabled=false`: sender pushes unconditionally (kill-switch). Throughput is
+///    unbounded — direct memory grows until something fails or the iteration ends.
+///
+/// The key new axis is `@Param _flowControlWindowBytes`, which sweeps three representative sizes:
+///
+///  * `65535` (~64 KB): gRPC's historical initial default. `isReady()` flips to `false` almost
+///    immediately with any non-trivial payload, so the slow path of `awaitReady()` engages often.
+///    This exercises the application-level gate most aggressively.
+///  * `1048576` (~1 MB): gRPC's typical BDP-estimated value in LAN environments. An intermediate
+///    regime where the gate engages under moderate backlog.
+///  * `67108864` (64 MB): Pinot's new default. The transport can absorb large bursts before
+///    stalling the sender; `isReady()` stays `true` for whole blocks of sends, so the benchmark
+///    measures primarily serialisation throughput and transport overhead rather than gate
+///    park/wake latency.
+///
+/// The interesting cross-axis comparison is `_flowControlWindowBytes` at fixed `_drainSleepMicros > 0`:
+/// small window → gate engages frequently → lower throughput; large window → gate rarely engages →
+/// higher throughput until the drainer becomes the bottleneck.
 ///
 /// Run with `org.openjdk.jmh.Main org.apache.pinot.perf.BenchmarkGrpcMailboxSend`.
 @BenchmarkMode(Mode.Throughput)
@@ -111,6 +128,14 @@ public class BenchmarkGrpcMailboxSend {
   @Param({"0", "100"})
   public int _drainSleepMicros;
 
+  /// HTTP/2 per-stream flow-control window in bytes, passed to `GrpcMailboxServer` via
+  /// `pinot.query.runner.grpc.flow.control.window.bytes`. Three representative sizes:
+  ///  * `65535`    (~64 KB)  — gRPC's historical initial default; gate engages frequently.
+  ///  * `1048576`  (~1 MB)   — typical BDP-estimated value in LAN environments.
+  ///  * `67108864` (64 MB)   — Pinot's new default; gate rarely engages under typical loads.
+  @Param({"65535", "1048576", "67108864"})
+  public int _flowControlWindowBytes;
+
   private MailboxService _senderService;
   private MailboxService _receiverService;
   private SendingMailbox _sender;
@@ -123,7 +148,8 @@ public class BenchmarkGrpcMailboxSend {
   public void setup()
       throws IOException {
     PinotConfiguration cfg = new PinotConfiguration(Map.of(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED, _backpressureEnabled));
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED, _backpressureEnabled,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, _flowControlWindowBytes));
     _senderService = new MailboxService("localhost", availablePort(), InstanceType.SERVER, cfg);
     _senderService.start();
     _receiverService = new MailboxService("localhost", availablePort(), InstanceType.SERVER, cfg);

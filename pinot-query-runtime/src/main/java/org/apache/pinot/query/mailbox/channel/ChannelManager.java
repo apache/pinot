@@ -23,6 +23,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.channel.WriteBufferWaterMark;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +63,8 @@ public class ChannelManager {
   private final PooledByteBufAllocator _bufAllocator;
   @Nullable
   private final SslContext _clientSslContext;
+  private final int _writeBufferHighWaterMarkBytes;
+  private final int _writeBufferLowWaterMarkBytes;
 
   /**
    * Constructs a {@code ChannelManager}.
@@ -69,11 +72,22 @@ public class ChannelManager {
    * @param clientSslContext optional cached client {@link SslContext} to reuse across channels
    * @param maxInboundMessageSize maximum inbound message size for gRPC channels
    * @param idleTimeout idle timeout for gRPC channels; channels close after this period of inactivity
+   * @param writeBufferHighWaterMarkBytes Netty per-channel {@link WriteBufferWaterMark} high watermark. This limit is
+   *                                     per {@code (host, port)} peer and is shared across all streams multiplexed on
+   *                                     that channel. The low watermark must be ≤ the high watermark; misordered values
+   *                                     will be rejected by Netty at channel construction.
+   * @param writeBufferLowWaterMarkBytes Netty per-channel {@link WriteBufferWaterMark} low mark. Once the channel's
+   *                                     pending write queue grows above the high watermark, the channel is marked
+   *                                     unwritable; it becomes writable again only when the queue drains below this
+   *                                     low watermark. Must be ≤ {@code writeBufferHighWaterMarkBytes}.
    */
-  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout) {
+  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout,
+      int writeBufferHighWaterMarkBytes, int writeBufferLowWaterMarkBytes) {
     _clientSslContext = clientSslContext;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
+    _writeBufferHighWaterMarkBytes = writeBufferHighWaterMarkBytes;
+    _writeBufferLowWaterMarkBytes = writeBufferLowWaterMarkBytes;
     // Use direct buffers (off-heap) for better performance - matches server-side configuration
     _bufAllocator = new PooledByteBufAllocator(true);
   }
@@ -86,6 +100,8 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+                .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
+                    new WriteBufferWaterMark(_writeBufferLowWaterMarkBytes, _writeBufferHighWaterMarkBytes))
                 .sslContext(_clientSslContext);
             return decorate(channelBuilder).build();
           }
@@ -97,6 +113,8 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+                .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
+                    new WriteBufferWaterMark(_writeBufferLowWaterMarkBytes, _writeBufferHighWaterMarkBytes))
                 .usePlaintext();
             return decorate(channelBuilder).build();
           });
