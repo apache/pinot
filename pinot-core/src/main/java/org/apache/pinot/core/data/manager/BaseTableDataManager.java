@@ -1495,7 +1495,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
-    ImmutableSegment segment = tryLoadExistingSegmentInternal(zkMetadata, indexLoadingConfig);
+    ImmutableSegment segment = tryLoadExistingSegmentWithoutRegistering(zkMetadata, indexLoadingConfig);
     if (segment == null) {
       return false;
     }
@@ -1509,7 +1509,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * Returns {@code null} when the on-disk copy is absent, has a stale CRC under or fails to load
    */
   @Nullable
-  public ImmutableSegment tryLoadExistingSegmentInternal(SegmentZKMetadata zkMetadata,
+  public ImmutableSegment tryLoadExistingSegmentWithoutRegistering(SegmentZKMetadata zkMetadata,
       IndexLoadingConfig indexLoadingConfig) {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(!_shutDown,
