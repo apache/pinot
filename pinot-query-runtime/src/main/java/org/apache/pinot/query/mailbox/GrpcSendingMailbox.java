@@ -136,8 +136,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
     // QUERY_CANCELLATION on the receiver side.
     if (sendInternal(block, serializedStats, /* bypassReady */ true)) {
       LOGGER.debug("Completing mailbox: {}", _id);
-      _contentObserver.onCompleted();
+      // Set _senderSideClosed BEFORE calling onCompleted() so that a concurrent cancel() racing in the narrow
+      // window between onCompleted() returning and the flag being written sees isTerminated() == true and does
+      // not attempt to call onNext() on an already half-closed stream, which would throw IllegalStateException.
       _senderSideClosed = true;
+      _contentObserver.onCompleted();
     } else {
       LOGGER.warn("Trying to send EOS to the already terminated mailbox: {}", _id);
     }
@@ -284,6 +287,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
           @Override
           public void onNext(MailboxStatus value) {
             _statusObserver.onNext(value);
+            // Wake any sender blocked in awaitReady() so it can observe state changes delivered via this
+            // callback — in particular an early-terminate signal from the receiver, which does not close the
+            // stream and therefore never triggers onError / onCompleted.
+            wakeWaiters();
           }
 
           @Override
@@ -322,6 +329,15 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // (bypass path). Either way, skip the send.
       return;
     }
+    // Narrow-window race mitigation: a concurrent cancel() may have run between awaitReady() returning true and
+    // here, setting _senderSideClosed and pushing its own error EOS. If we proceed, both threads would call
+    // onNext() on the same non-thread-safe ClientCallStreamObserver. Re-checking after the gate reduces (but
+    // does not fully eliminate) that window; fully eliminating it would require serializing all onNext() calls
+    // under _readyLock, which is more invasive. The bypass path (cancel/close) must push through regardless,
+    // so this guard only applies when bypassReady == false.
+    if (!bypassReady && isTerminated()) {
+      return;
+    }
     MailboxContent content = MailboxContent.newBuilder()
         .setMailboxId(_id)
         .setPayload(byteString)
@@ -355,13 +371,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (_contentObserver.isReady()) {
       return true;
     }
-    if (isTerminated()) {
+    if (isTerminated() || isEarlyTerminated()) {
       return false;
     }
     _readyLock.lock();
     try {
       while (!_contentObserver.isReady()) {
-        if (isTerminated()) {
+        if (isTerminated() || isEarlyTerminated()) {
           return false;
         }
         // Cooperative termination poll so query cancellation can unblock the wait through the same mechanism we use
