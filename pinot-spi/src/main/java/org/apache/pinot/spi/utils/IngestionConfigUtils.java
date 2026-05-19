@@ -349,7 +349,7 @@ public final class IngestionConfigUtils {
    * @param consumerClientIdSuffix optional suffix; ignored if null or blank
    */
   public static String getStreamIngestionMetricTableKey(String tableNameWithType, String topicName,
-      int streamPartitionId, String consumerClientIdSuffix) {
+      int streamPartitionId, @Nullable String consumerClientIdSuffix) {
     if (StringUtils.isNotBlank(consumerClientIdSuffix)) {
       return tableNameWithType + "-" + topicName + "-" + streamPartitionId + "-" + consumerClientIdSuffix;
     }
