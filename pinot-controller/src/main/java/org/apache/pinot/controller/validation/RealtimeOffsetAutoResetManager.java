@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -111,7 +112,7 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       return;
     }
 
-    // CB3: Max concurrent backfills across all tables on this controller
+    // Skip triggering if the controller is already handling the maximum number of concurrent backfills
     int maxConcurrent = _controllerConf.getMaxConcurrentBackfillsPerController();
     if (context._shouldTriggerBackfillJobs && maxConcurrent > 0
         && _tableBackfillTopics.size() >= maxConcurrent) {
@@ -128,9 +129,9 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       String partitionStr = context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION);
       _tableTopicsUnderBackfill.get(tableNameWithType).add(topicName);
 
-      // CB4: Per-partition in-flight collision guard.
-      // _tableBackfillTopics contains the backfill Kafka topic names (not the main topic names),
-      // so any non-empty set indicates a backfill is already in flight for this table.
+      // Per-partition in-flight guard: _tableBackfillTopics contains the backfill Kafka topic names
+      // (not the main topic names), so any non-empty set indicates a backfill is already in flight.
+      // Track collisions per (table, topic, partition); auto-pause if collisions exceed the threshold.
       String partitionKey = tableNameWithType + ":" + topicName + ":" + partitionStr;
       Set<String> activeBackfillTopics = _tableBackfillTopics.get(tableNameWithType);
       boolean anyBackfillInFlight = activeBackfillTopics != null && !activeBackfillTopics.isEmpty();
@@ -181,6 +182,11 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
 
     ensureBackfillJobsRunning(tableNameWithType);
     ensureCompletedBackfillJobsCleanedUp(tableConfig);
+
+    Set<String> activeTopics = _tableBackfillTopics.get(tableNameWithType);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+        ControllerGauge.BACKFILL_TOPICS_IN_PROGRESS,
+        activeTopics != null ? activeTopics.size() : 0L);
   }
 
   /**
@@ -232,6 +238,8 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     }
     if (cleanedUpTopics.size() > 0) {
       LOGGER.info("Cleaned up complete backfill topics {} for table {}", cleanedUpTopics, tableNameWithType);
+      _controllerMetrics.addMeteredTableValue(tableNameWithType,
+          ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_CLEANUP_COMPLETED, cleanedUpTopics.size());
     }
   }
 
@@ -249,7 +257,10 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     List<Map<String, String>> streamConfigMaps =
         tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
     for (Map<String, String> map : streamConfigMaps) {
-      if (topicName.equals(map.get(StreamConfigProperties.STREAM_TOPIC_NAME))) {
+      // Topic name is stored under the prefixed key "stream.<type>.topic.name"
+      String streamType = map.get(StreamConfigProperties.STREAM_TYPE);
+      String topicKey = StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME);
+      if (topicName.equals(map.get(topicKey))) {
         map.put(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE, "true");
         break;
       }
@@ -259,6 +270,8 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       LOGGER.info("Set offset auto reset pause flag for table {} topic {}", tableNameWithType, topicName);
     } catch (Exception e) {
       LOGGER.error("Failed to set pause flag for table {} topic {}", tableNameWithType, topicName, e);
+      _controllerMetrics.addMeteredTableValue(tableNameWithType,
+          ControllerMeter.OFFSET_AUTO_RESET_AUTO_PAUSE_FAILURE, 1L);
     }
   }
 
@@ -301,6 +314,8 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       return handler;
     } catch (Exception e) {
       LOGGER.error("Cannot create RealtimeOffsetAutoResetHandler", e);
+      _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(),
+          ControllerMeter.OFFSET_AUTO_RESET_HANDLER_INIT_FAILURE, 1L);
       return null;
     }
   }

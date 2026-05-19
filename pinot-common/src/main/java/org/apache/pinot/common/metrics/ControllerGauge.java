@@ -226,7 +226,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // HTTP thread utilization
   HTTP_THREAD_UTILIZATION("httpThreadUtilization", true),
   // Track the concurrent executions of the API resources that use @ManagedAsync
-  MANAGED_ASYNC_ACTIVE_THREADS("threads", true);
+  MANAGED_ASYNC_ACTIVE_THREADS("threads", true),
+  // Backfill circuit breaking: number of active backfill Kafka topics currently running for this table
+  BACKFILL_TOPICS_IN_PROGRESS("backfillTopicsInProgress", false);
 
 
   private final String _gaugeName;

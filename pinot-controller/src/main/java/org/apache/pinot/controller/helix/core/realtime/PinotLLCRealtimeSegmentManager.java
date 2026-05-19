@@ -1077,13 +1077,13 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (!streamConfig.isEnableOffsetAutoReset() || streamConfig.isBackfillTopic()) {
       return nextOffset;
     }
-    // CB1: pause flag per topic
+    // Skip if backfill is manually paused for this topic
     if (streamConfig.isOffsetAutoResetPaused()) {
       LOGGER.info("Skipping offset auto reset for table {} topic {} — backfill is paused",
           streamConfig.getTableNameWithType(), streamConfig.getTopicName());
       return nextOffset;
     }
-    // CB2: max segments guard (lightweight ZK child-name list, no data deserialization)
+    // Skip if the table already has too many segments (lightweight ZK child-name list, no data deserialization)
     int maxSegments = streamConfig.getOffsetAutoResetMaxSegmentsBeforeSkip();
     if (maxSegments > 0) {
       int segmentCount = ZKMetadataProvider.getSegments(_propertyStore, streamConfig.getTableNameWithType()).size();

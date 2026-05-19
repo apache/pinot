@@ -257,7 +257,7 @@ public class RealtimeOffsetAutoResetManagerTest {
   // ---- Circuit Breaker Tests ----
 
   @Test
-  public void testCB3MaxConcurrentBackfillsSkipsNewTrigger() {
+  public void testMaxConcurrentBackfillsSkipsNewTrigger() {
     // Set max concurrent to 1
     _controllerConf.setProperty(
         ControllerConf.ControllerPeriodicTasksConf.MAX_CONCURRENT_BACKFILLS_PER_CONTROLLER, "1");
@@ -291,7 +291,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     RealtimeOffsetAutoResetManager.Context noTriggerCtx = _realtimeOffsetAutoResetManager.preprocess(new Properties());
     _realtimeOffsetAutoResetManager.processTable(secondTableName, noTriggerCtx);
 
-    // Now try to trigger backfill on the first table — CB3 should block it (1 table already backfilling)
+    // Now try to trigger backfill on the first table — should be blocked (1 table already backfilling)
     TableConfig firstTableConfig = createTableConfigWithValidHandlerClass();
     when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(firstTableConfig);
     RealtimeOffsetAutoResetManager.Context firstCtx = _realtimeOffsetAutoResetManager.preprocess(_properties);
@@ -300,11 +300,11 @@ public class RealtimeOffsetAutoResetManagerTest {
     RealtimeOffsetAutoResetHandler handler = _realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME);
     Assert.assertNotNull(handler);
     Assert.assertFalse(((TestRealtimeOffsetAutoResetHandler) handler)._triggedBackfillJob,
-        "CB3: backfill should be skipped when max concurrent limit is reached");
+        "backfill should be skipped when max concurrent limit is reached");
   }
 
   @Test
-  public void testCB4InFlightCollisionAtThresholdAutopauses() {
+  public void testInFlightCollisionAtThresholdAutopauses() {
     // threshold=1 means: the 1st collision triggers auto-pause
     _controllerConf.setProperty(
         ControllerConf.ControllerPeriodicTasksConf.MAX_BACKFILL_COLLISIONS_BEFORE_AUTO_PAUSE, "1");
@@ -353,10 +353,10 @@ public class RealtimeOffsetAutoResetManagerTest {
         (TestRealtimeOffsetAutoResetHandler) _realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME);
     Assert.assertNotNull(handler);
     Assert.assertFalse(handler._triggedBackfillJob,
-        "CB4: collision at threshold should skip the backfill trigger");
+        "collision at threshold should skip the backfill trigger");
     // Verify pause flag set on the main topic's stream config map
     Assert.assertEquals(mainStreamMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE), "true",
-        "CB4: pause flag should be set on the main topic stream config");
+        "pause flag should be set on the main topic stream config");
   }
 
   private TableConfig createTableConfigWithValidHandlerClass(String tableName, String topicName) {
