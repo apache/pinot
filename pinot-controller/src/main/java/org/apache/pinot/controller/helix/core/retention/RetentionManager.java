@@ -88,6 +88,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   private volatile boolean _isHybridTableRetentionStrategyEnabled;
   private volatile boolean _useCreationTimeFallbackForRetention;
   private final BrokerServiceHelper _brokerServiceHelper;
+  private final ControllerConf _controllerConf;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
@@ -101,6 +102,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
     _useCreationTimeFallbackForRetention = config.isRetentionCreationTimeFallbackEnabled();
     _brokerServiceHelper = brokerServiceHelper;
+    _controllerConf = config;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
   }
 
@@ -461,9 +463,16 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
    * lineage lifecycle and get cleaned up by {@link #manageSegmentLineageCleanupForTable} when the lineage
    * entry becomes eligible. If we left them in, the public delete check would reject the whole batch and
    * the rest of the eligible segments would never get cleaned up.
+   * <p>
+   * Gated by {@link ControllerConf#LINEAGE_EXCLUSIVE_DELETE_ENABLED}: when the kill switch is off,
+   * {@code deleteSegments} also stops rejecting lineage-locked targets, so retention must mirror legacy
+   * behavior and pass them through to the delete path instead of silently dropping them here.
    */
   private void removeLineageLockedSegments(String tableNameWithType, List<String> segmentsToDelete) {
     if (segmentsToDelete.isEmpty()) {
+      return;
+    }
+    if (!_controllerConf.isLineageExclusiveDeleteEnabled()) {
       return;
     }
     SegmentLineage segmentLineage =
