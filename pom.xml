@@ -282,7 +282,7 @@
     <scala.compat.version>2.13</scala.compat.version>
 
     <!-- For Dependency Verifier module -->
-    <enforcer-api.version>3.6.2</enforcer-api.version>
+    <enforcer-api.version>3.6.3</enforcer-api.version>
     <maven.version>3.9.16</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <plexus-utils.version>4.0.3</plexus-utils.version>
