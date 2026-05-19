@@ -767,7 +767,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
             _threadAccountant, sendStatsPredicate, keepPipelineBreakerStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+    instanceDataManager.setSupplierOfIsServerReadyToConsumeData(this::isServerReadyToConsumeData);
+    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(this::isServerReadyToServeQueries);
 
     // Enable Server level realtime ingestion rate limier
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, _serverMetrics);
@@ -944,6 +945,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     NettyInspector.registerMetrics(_serverMetrics);
+  }
+
+  protected boolean isServerReadyToConsumeData() {
+    return true;
+  }
+
+  protected boolean isServerReadyToServeQueries() {
+    return _isServerReadyToServeQueries;
   }
 
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {

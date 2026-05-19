@@ -75,8 +75,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
       SegmentReloadSemaphore segmentReloadSemaphore, ExecutorService segmentReloadRefreshExecutor,
       @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      BooleanSupplier isServerReadyToServeQueries, boolean enableAsyncSegmentRefresh,
-      ServerReloadJobStatusCache reloadJobStatusCache) {
+      BooleanSupplier isServerReadyToConsumeData, BooleanSupplier isServerReadyToServeQueries,
+      boolean enableAsyncSegmentRefresh, ServerReloadJobStatusCache reloadJobStatusCache) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {
       case OFFLINE:
@@ -94,7 +94,8 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
                   + "configured the segmentstore uri. Configure the server config %s",
               StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI));
         }
-        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
+        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToConsumeData,
+            isServerReadyToServeQueries);
         break;
       default:
         throw new IllegalStateException();

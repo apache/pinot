@@ -57,19 +57,6 @@ public class UpsertUtils {
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
 
-  /**
-   * Returns whether the segment has no queryable documents, when no delete record column we look into validDocIds
-   * for an upsert table
-   */
-  public static boolean hasNoQueryableDocs(IndexSegment segment) {
-    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
-    if (queryableDocIds != null) {
-      return queryableDocIds.isEmpty();
-    }
-    ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-    return validDocIds != null && validDocIds.isEmpty();
-  }
-
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
     validDocIds.replace(oldDocId, newDocId);

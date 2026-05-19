@@ -62,6 +62,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -2544,6 +2545,131 @@ public class ForwardIndexHandlerTest {
     } else {
       assertEquals(actual.getTotalNumberOfEntries(), expected.getTotalNumberOfEntries());
       assertEquals(actual.getMaxNumberOfMultiValues(), expected.getMaxNumberOfMultiValues());
+    }
+  }
+
+  @Test
+  public void testBackfillMissingStats()
+      throws Exception {
+    // For each var-length column, strip the 1.6.0-era stats from metadata to simulate a pre-1.6.0 segment, then
+    // trigger a compression change. The pre-pass in `ForwardIndexHandler.updateIndices` should backfill the
+    // missing stats from a column scan before any per-op handler runs.
+    for (String column : List.of(DIM_SNAPPY_STRING, DIM_MV_PASS_THROUGH_STRING)) {
+      ColumnMetadata expected;
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+          SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        _segmentDirectory = segmentDirectory;
+        _writer = writer;
+        expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        boolean isSingleValue = expected.isSingleValue();
+
+        // Strip the 1.6.0-era stats: shortest/longest, isAscii (STRING only), and maxRowLengthInBytes (MV only).
+        Map<String, String> stripped = new HashMap<>();
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_SHORTEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.IS_ASCII), null);
+        if (!isSingleValue) {
+          stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+              V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+        }
+        SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+        ColumnMetadata afterStrip = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        assertTrue(afterStrip.getLengthOfShortestElement() < 0);
+        if (!isSingleValue) {
+          assertTrue(afterStrip.getMaxRowLengthInBytes() < 0);
+        }
+
+        // Trigger a compression change to drive `updateIndices`, which runs the backfill pre-pass.
+        _fieldConfigMap.put(column,
+            new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
+        updateIndices();
+      }
+
+      // Reopen and verify the stats were backfilled to the values the original (pre-strip) build produced.
+      ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+      assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+      assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+      assertEquals(actual.isAscii(), expected.isAscii());
+      assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
+    }
+  }
+
+  @Test
+  public void testBackfillMissingStatsForMvViaMaxRowLengthTrigger()
+      throws Exception {
+    // The pre-pass uses `getMaxRowLengthInBytes() >= 0` (not `getLengthOfShortestElement() >= 0`) as the trigger
+    // for MV columns, because `MAX_ROW_LENGTH_IN_BYTES` was added after the other 1.6.0 keys. A segment that
+    // already has shortest/longest but is missing only `MAX_ROW_LENGTH_IN_BYTES` should still get backfilled.
+    String column = DIM_MV_PASS_THROUGH_STRING;
+    ColumnMetadata expected;
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      _segmentDirectory = segmentDirectory;
+      _writer = writer;
+      expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+
+      // Strip only MAX_ROW_LENGTH_IN_BYTES; shortest/longest/isAscii stay.
+      Map<String, String> stripped = new HashMap<>();
+      stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+      SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+      ColumnMetadata afterStrip = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      assertTrue(afterStrip.getMaxRowLengthInBytes() < 0);
+      assertTrue(afterStrip.getLengthOfShortestElement() >= 0);
+
+      _fieldConfigMap.put(column,
+          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
+      updateIndices();
+    }
+
+    ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+    assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
+  }
+
+  @Test
+  public void testBackfillFromInvertedIndexRebuild()
+      throws Exception {
+    // For a forward-index-disabled var-length column, strip the 1.6.0-era stats and then re-enable the forward
+    // index. The InvertedIndexAndDictionaryBasedForwardIndexCreator rebuild path tracks per-element stats inline
+    // from the dictionary and persists them as part of the metadata update.
+    for (String column : List.of(DIM_SV_FORWARD_INDEX_DISABLED_STRING, DIM_MV_FORWARD_INDEX_DISABLED_STRING)) {
+      ColumnMetadata expected;
+      try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+          SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+        _segmentDirectory = segmentDirectory;
+        _writer = writer;
+        expected = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        boolean isSingleValue = expected.isSingleValue();
+
+        Map<String, String> stripped = new HashMap<>();
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_SHORTEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT), null);
+        stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.IS_ASCII), null);
+        if (!isSingleValue) {
+          stripped.put(V1Constants.MetadataKeys.Column.getKeyFor(column,
+              V1Constants.MetadataKeys.Column.MAX_ROW_LENGTH_IN_BYTES), null);
+        }
+        SegmentMetadataUtils.updateMetadataProperties(segmentDirectory, stripped);
+
+        // Drop FORWARD_INDEX_DISABLED from the field config so `updateIndices` runs ENABLE_DICT_FORWARD_INDEX,
+        // which rebuilds the forward index via `InvertedIndexAndDictionaryBasedForwardIndexCreator`.
+        _fieldConfigMap.remove(column);
+        updateIndices();
+      }
+
+      ColumnMetadata actual = new SegmentMetadataImpl(INDEX_DIR).getColumnMetadataFor(column);
+      assertEquals(actual.getLengthOfShortestElement(), expected.getLengthOfShortestElement());
+      assertEquals(actual.getLengthOfLongestElement(), expected.getLengthOfLongestElement());
+      assertEquals(actual.isAscii(), expected.isAscii());
+      if (!expected.isSingleValue()) {
+        assertEquals(actual.getMaxRowLengthInBytes(), expected.getMaxRowLengthInBytes());
+      }
     }
   }
 

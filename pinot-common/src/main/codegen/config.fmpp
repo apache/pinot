@@ -53,6 +53,18 @@ data: {
       "BIG_DECIMAL"
       "STRING"
       "BYTES"
+      # Pinot DDL (CREATE/DROP/SHOW TABLE) keywords
+      "DIMENSION"
+      "METRIC"
+      "GRANULARITY"
+      "OFFLINE"
+      "REALTIME"
+      "PROPERTIES"
+      "TABLES"
+      "TABLE_TYPE"
+      # IF is not a SQL reserved word but Calcite core does not declare it as a token; we need it
+      # for DDL "IF [NOT] EXISTS" clauses.
+      "IF"
     ]
 
     # List of non-reserved keywords to add;
@@ -70,6 +82,16 @@ data: {
       "DATETIME"
       "VARIANT"
       "UUID"
+      # Pinot DDL keywords kept non-reserved so users can still use them as identifiers
+      "DIMENSION"
+      "METRIC"
+      "GRANULARITY"
+      "OFFLINE"
+      "REALTIME"
+      "PROPERTIES"
+      "TABLES"
+      "TABLE_TYPE"
+      "IF"
 
       # The following keywords are reserved in core Calcite,
       # are reserved in some version of SQL,
@@ -568,6 +590,9 @@ data: {
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
+      "SqlPinotCreateTable()"
+      "SqlPinotDropTable()"
+      "SqlPinotShow()"
     ]
 
     # List of methods for parsing custom literals.
