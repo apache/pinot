@@ -164,8 +164,7 @@ public class IFSTIndexHandler extends BaseIndexHandler {
     }
     LOGGER.info("Creating new IFST index for column: {} in segment: {}, cardinality: {}", columnName, segmentName,
         columnMetadata.getCardinality());
-    IndexCreationContext context =
-        IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata).build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.ifst());
     try (FSTIndexCreator ifstIndexCreator = StandardIndexes.ifst().createIndexCreator(context, config);
         Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata)) {

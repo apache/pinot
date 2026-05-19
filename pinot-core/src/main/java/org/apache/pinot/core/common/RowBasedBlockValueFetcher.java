@@ -74,7 +74,7 @@ public class RowBasedBlockValueFetcher {
         case UNKNOWN:
           return new UnknownValueFetcher();
         default:
-          throw new IllegalStateException("Unsupported value type: " + storedType + " for single-value column");
+          throw new IllegalStateException("Unsupported SV stored type: " + storedType);
       }
     } else {
       switch (storedType) {
@@ -93,7 +93,7 @@ public class RowBasedBlockValueFetcher {
         case BYTES:
           return new BytesMultiValueFetcher(blockValSet.getBytesValuesMV());
         default:
-          throw new IllegalStateException("Unsupported value type: " + storedType + " for multi-value column");
+          throw new IllegalStateException("Unsupported MV stored type: " + storedType);
       }
     }
   }

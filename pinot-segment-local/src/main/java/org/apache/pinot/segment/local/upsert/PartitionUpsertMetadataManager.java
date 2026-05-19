@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
 import java.util.List;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -138,4 +139,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * segments can be processed by the server even before they get included in the broker's routing table.
    */
   void trackNewlyAddedSegment(String segmentName);
+
+  /**
+   * Returns the upsert view manager that maintains the per-segment queryable-doc-id snapshot for consistency-mode
+   * upsert tables, or null when consistency mode is not enabled for this partition.
+   */
+  @Nullable
+  UpsertViewManager getUpsertViewManager();
 }

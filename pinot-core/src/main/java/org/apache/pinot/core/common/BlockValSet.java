@@ -48,10 +48,30 @@ public interface BlockValSet {
   boolean isSingleValue();
 
   /**
-   * Returns the dictionary for the column, or {@code null} if the column is not dictionary-encoded.
+   * Returns the dictionary for the column if one exists, or {@code null} otherwise. The dictionary may live on disk
+   * (segment-backed columns) or be built on the fly (transform functions). It may be present even when
+   * {@link #isDictionaryEncoded()} returns {@code false} — a column declared as {@code EncodingType.RAW} with an
+   * explicit {@code dictionaryIndex} carries a dictionary on disk but a RAW forward index, and a column with a
+   * disabled forward index has no way to read dict IDs at all. Callers that select between a dictionary-id read
+   * path ({@link #getDictionaryIdsSV()} / {@link #getDictionaryIdsMV()}) and a value read path MUST gate on
+   * {@link #isDictionaryEncoded()}, not {@code getDictionary() != null}.
    */
   @Nullable
   Dictionary getDictionary();
+
+  /**
+   * Returns {@code true} if the dict-id read path ({@link #getDictionaryIdsSV()} / {@link #getDictionaryIdsMV()})
+   * is callable on this value set.
+   *
+   * <p>The default implementation falls back to {@code getDictionary() != null}, which is correct for value sets
+   * where dictionary presence and dict-id readability are coupled. Implementers MUST override this whenever the
+   * two can diverge — most notably the segment projection layer, where a column can declare
+   * {@code EncodingType.RAW} alongside an explicit {@code dictionaryIndex} (dictionary present, but
+   * {@code readDictIds} throws), or where the forward index is disabled outright (no forward index to read).
+   */
+  default boolean isDictionaryEncoded() {
+    return getDictionary() != null;
+  }
 
   /**
    * SINGLE-VALUED COLUMN APIs

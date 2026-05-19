@@ -23,10 +23,8 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
-import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 // TODO: THIS IS A HACK with all stats UNAVAILABLE. Revisit to fill the actual stats for the column.
@@ -38,10 +36,6 @@ public class SimpleColumnMetadata implements ColumnMetadata {
   public SimpleColumnMetadata(FieldSpec fieldSpec, int totalDocs) {
     _fieldSpec = fieldSpec;
     _totalDocs = totalDocs;
-  }
-
-  public SimpleColumnMetadata(String columnName, DataType dataType, int totalDocs) {
-    this(new DimensionFieldSpec(columnName, dataType, true), totalDocs);
   }
 
   @Override
@@ -65,8 +59,8 @@ public class SimpleColumnMetadata implements ColumnMetadata {
   }
 
   @Override
-  public FieldConfig.EncodingType getForwardIndexEncoding() {
-    return FieldConfig.EncodingType.RAW;
+  public EncodingType getForwardIndexEncoding() {
+    return EncodingType.RAW;
   }
 
   @Override
@@ -76,13 +70,13 @@ public class SimpleColumnMetadata implements ColumnMetadata {
 
   @Nullable
   @Override
-  public Comparable getMinValue() {
+  public Comparable<?> getMinValue() {
     return null;
   }
 
   @Nullable
   @Override
-  public Comparable getMaxValue() {
+  public Comparable<?> getMaxValue() {
     return null;
   }
 
@@ -102,17 +96,17 @@ public class SimpleColumnMetadata implements ColumnMetadata {
   }
 
   @Override
-  public boolean isAscii() {
-    return false;
-  }
-
-  @Override
   public int getTotalNumberOfEntries() {
     return UNAVAILABLE;
   }
 
   @Override
   public int getMaxNumberOfMultiValues() {
+    return UNAVAILABLE;
+  }
+
+  @Override
+  public int getMaxRowLengthInBytes() {
     return UNAVAILABLE;
   }
 

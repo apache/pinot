@@ -388,6 +388,73 @@ public class ServerRoutingStatsManagerTest {
     assertNull(_brokerMetrics.getGaugeValue(numInFlightKey));
   }
 
+  @Test
+  public void testHybridScoreWithQueueFloor() {
+    // With floor=1 the formula is Math.pow(1+A+B, N)*C instead of Math.pow(A+B, N)*C.
+    // This prevents the score from collapsing to 0 when all servers are idle so that latency
+    // still drives routing decisions in low-traffic conditions.
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+
+    // floor=0 (default): after 1 submit + 1 response at latency=10,
+    // numInFlight=0, inFlightEMA=1, latencyEMA=10 -> (0+1)^3 * 10 = 10.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR, 0);
+    ServerRoutingStatsManager managerNoFloor =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
+    managerNoFloor.init();
+    int requestId = 0;
+    managerNoFloor.recordStatsForQuerySubmission(requestId++, "floorServer");
+    waitForStatsUpdate(managerNoFloor, requestId);
+    managerNoFloor.recordStatsUponResponseArrival(requestId++, "floorServer", 10);
+    waitForStatsUpdate(managerNoFloor, requestId);
+    assertEquals(managerNoFloor.fetchHybridScoreForServer("floorServer"), 10.0);
+
+    // floor=1: same sequence -> (1+0+1)^3 * 10 = 80.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR, 1);
+    ServerRoutingStatsManager managerWithFloor =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
+    managerWithFloor.init();
+    requestId = 0;
+    managerWithFloor.recordStatsForQuerySubmission(requestId++, "floorServer");
+    waitForStatsUpdate(managerWithFloor, requestId);
+    managerWithFloor.recordStatsUponResponseArrival(requestId++, "floorServer", 10);
+    waitForStatsUpdate(managerWithFloor, requestId);
+    assertEquals(managerWithFloor.fetchHybridScoreForServer("floorServer"), 80.0);
+
+    // Multiple idle servers (numInFlight=0 after queries complete) should be ranked by latency.
+    // In this config (autodecay disabled, alpha=1) inFlightEMA freezes at 1 after the first
+    // submission, so with floor=1: score = (1+0+1)^3 * latency = 8 * latency.
+    // The server with lower observed latency gets a lower score and is therefore preferred.
+    // When autodecay is enabled, inFlightEMA eventually decays to 0 during idle periods; at that
+    // point floor=0 collapses all scores to (0+0+0)^3 * latency = 0, destroying latency ordering,
+    // while floor=1 keeps score = 1^3 * latency = latency and preserves the ranking.
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_QUEUE_FLOOR, 1);
+    ServerRoutingStatsManager managerMultiServer =
+        new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
+    managerMultiServer.init();
+    requestId = 0;
+
+    managerMultiServer.recordStatsForQuerySubmission(requestId++, "fastServer");
+    waitForStatsUpdate(managerMultiServer, requestId);
+    managerMultiServer.recordStatsUponResponseArrival(requestId++, "fastServer", 5);
+    waitForStatsUpdate(managerMultiServer, requestId);
+
+    managerMultiServer.recordStatsForQuerySubmission(requestId++, "slowServer");
+    waitForStatsUpdate(managerMultiServer, requestId);
+    managerMultiServer.recordStatsUponResponseArrival(requestId++, "slowServer", 20);
+    waitForStatsUpdate(managerMultiServer, requestId);
+
+    // Both servers are now idle (numInFlight=0). The fast server should rank better (lower score).
+    double fastScore = managerMultiServer.fetchHybridScoreForServer("fastServer");
+    double slowScore = managerMultiServer.fetchHybridScoreForServer("slowServer");
+    assertTrue(fastScore < slowScore, "Idle servers should be ranked by latency");
+  }
+
   private void assertStatsNullForInstance(ServerRoutingStatsManager manager, String instanceId) {
     Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer(instanceId);
     assertNull(numInFlightReq);

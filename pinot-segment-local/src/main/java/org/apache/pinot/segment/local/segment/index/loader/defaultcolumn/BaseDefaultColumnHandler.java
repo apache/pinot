@@ -33,7 +33,6 @@ import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.evaluator.FunctionEvaluatorFactory;
 import org.apache.pinot.common.function.FunctionUtils;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -83,6 +82,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.function.FunctionEvaluator;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1098,7 +1098,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       boolean isSingleValue = fieldSpec.isSingleValueField();
 
       try (
-          ForwardIndexCreator forwardIndexCreator = getForwardIndexCreator(fieldSpec, columnStatistics, numDocs, column,
+          ForwardIndexCreator forwardIndexCreator = getForwardIndexCreator(columnStatistics, column,
               true)) {
         if (isSingleValue) {
           for (Object outputValue : outputValues) {
@@ -1128,7 +1128,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     boolean isSingleValue = fieldSpec.isSingleValueField();
 
     try (ForwardIndexCreator forwardIndexCreator
-        = getForwardIndexCreator(fieldSpec, columnStatistics, numDocs, column, false)) {
+        = getForwardIndexCreator(columnStatistics, column, false)) {
       if (isSingleValue) {
         for (Object outputValue : outputValues) {
           switch (fieldSpec.getDataType().getStoredType()) {
@@ -1199,20 +1199,11 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         0, FieldConfig.EncodingType.RAW, true);
   }
 
-  private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnStatistics columnStatistics,
-      int numDocs, String column, boolean hasDictionary)
+  private ForwardIndexCreator getForwardIndexCreator(ColumnStatistics columnStatistics,
+      String column, boolean hasDictionary)
       throws Exception {
-
-    IndexCreationContext indexCreationContext = IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withFieldSpec(fieldSpec)
-        .withColumnStatistics(columnStatistics)
-        .withTotalDocs(numDocs)
-        .withDictionary(hasDictionary)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
-        .build();
+    IndexCreationContext indexCreationContext =
+        new IndexCreationContext.Builder(_indexDir, _tableConfig, columnStatistics, hasDictionary).build();
 
     ForwardIndexConfig forwardIndexConfig = null;
     FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
