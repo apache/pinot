@@ -35,11 +35,14 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
@@ -53,7 +56,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A Class to track realtime ingestion delay for table partitions on a given server.
+ * Tracks realtime ingestion delay for table partitions on the current server.
+ * Ingestion gauges are keyed like stream consumer metrics ({@code tableNameWithType-topic-streamPartition}).
  * Highlights:
  * 1-An object of this class is hosted by each RealtimeTableDataManager.
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
@@ -98,15 +102,12 @@ public class IngestionDelayTracker {
     @Nullable
     volatile StreamPartitionMsgOffset _currentOffset;
     volatile long _firstStreamIngestionTimeMs;
-    @Nullable
-    final String _streamTopicName;
 
     IngestionInfo(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-        long firstStreamIngestionTimeMs, @Nullable String streamTopicName) {
+        long firstStreamIngestionTimeMs) {
       _ingestionTimeMs = ingestionTimeMs;
       _currentOffset = currentOffset;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
-      _streamTopicName = streamTopicName;
     }
 
     void update(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
@@ -135,6 +136,8 @@ public class IngestionDelayTracker {
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
   private final String _metricName;
+  @Nullable
+  private final String _consumerClientIdSuffix;
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private final BooleanSupplier _isServerReadyToServeQueries;
   private final Cache<String, Boolean> _segmentsToIgnore =
@@ -179,6 +182,10 @@ public class IngestionDelayTracker {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = tableNameWithType;
+    InstanceDataManagerConfig instanceDataManagerConfig = realtimeTableDataManager.getInstanceDataManagerConfig();
+    String consumerClientIdSuffix =
+        instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
+    _consumerClientIdSuffix = StringUtils.isNotBlank(consumerClientIdSuffix) ? consumerClientIdSuffix : null;
     _realTimeTableDataManager = realtimeTableDataManager;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
 
@@ -336,9 +343,9 @@ public class IngestionDelayTracker {
    */
   private void removePartitionId(int partitionId) {
     _partitionsHostedByThisServer.remove(partitionId);
-    IngestionInfo removed = _ingestionInfoMap.remove(partitionId);
+    _ingestionInfoMap.remove(partitionId);
     _partitionsTracked.computeIfPresent(partitionId, (k, v) -> {
-      removeMetrics(partitionId, removed != null ? removed._streamTopicName : null);
+      removeMetrics(partitionId);
       return null;
     });
 
@@ -372,50 +379,58 @@ public class IngestionDelayTracker {
     _clock = clock;
   }
 
+  /** Table key for ingestion gauges for {@code pinotPartitionId}, aligned with stream consumer metrics. */
+  private String getIngestionGaugeTableKey(int pinotPartitionId) {
+    TableConfig tableConfig = _realTimeTableDataManager.getCachedTableConfigAndSchema().getLeft();
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+    StreamConfig streamConfig = IngestionConfigUtils.getStreamConfigFromPinotPartitionId(streamConfigs,
+        pinotPartitionId);
+    int streamPartitionId =
+        IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, pinotPartitionId);
+    return IngestionConfigUtils.getStreamIngestionMetricTableKey(_tableNameWithType, streamConfig.getTopicName(),
+        streamPartitionId, _consumerClientIdSuffix);
+  }
+
   @VisibleForTesting
   void createMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider = _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    String tableKey = getIngestionGaugeTableKey(partitionId);
 
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
+      _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
           () -> getPartitionIngestionOffsetLag(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET, () -> getPartitionIngestionConsumingOffset(partitionId));
+      _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET,
+          () -> getPartitionIngestionConsumingOffset(partitionId));
 
-      _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
+      _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET,
+          () -> getLatestPartitionOffset(partitionId));
     }
-    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    @Nullable String streamTopicName = ingestionInfo != null ? ingestionInfo._streamTopicName : null;
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, streamTopicName,
-          ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, streamTopicName,
-          ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> getPartitionEndToEndIngestionDelayMs(partitionId));
-    _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS, () -> getPartitionIngestionReportingStatus(partitionId));
+    _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+        () -> getPartitionIngestionDelayMs(partitionId));
+    _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
+        () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+    _serverMetrics.setOrUpdateTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS,
+        () -> getPartitionIngestionReportingStatus(partitionId));
 
     LOGGER.info("Successfully created ingestion metrics for partition id: {}", partitionId);
   }
 
-  private void removeMetrics(int partitionId, @Nullable String streamTopicName) {
+  private void removeMetrics(int partitionId) {
     int streamConfigIndex = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(partitionId);
     StreamMetadataProvider streamMetadataProvider =
         _streamConfigIndexToStreamMetadataProvider.get(streamConfigIndex);
+    String tableKey = getIngestionGaugeTableKey(partitionId);
     // Remove all metrics associated with this partition
     if (streamMetadataProvider != null && streamMetadataProvider.supportsOffsetLag()) {
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
-      _serverMetrics.removePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
+      _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+      _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+      _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
     }
-    _serverMetrics.removePartitionGauge(_metricName, partitionId, streamTopicName,
-        ServerGauge.REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId, streamTopicName,
-        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-    _serverMetrics.removePartitionGauge(_metricName, partitionId,
-        ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
+    _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removeTableGauge(tableKey, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removeTableGauge(tableKey, ServerGauge.REALTIME_INGESTION_DELAY_REPORTING_STATUS);
 
     LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
   }
@@ -426,14 +441,12 @@ public class IngestionDelayTracker {
    * @param segmentName                name of the consuming segment
    * @param partitionId                partition id of the consuming segment (directly passed in to avoid parsing the
    *                                   segment name)
-   * @param streamTopicName            stream topic name for this consumer (e.g. Kafka topic); when blank, metrics use
-   *                                   the legacy name without a topic label
    * @param ingestionTimeMs            ingestion time of the last consumed message (from {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    * {@link StreamMessageMetadata})
    * @param currentOffset              offset of the last consumed message (from {@link StreamMessageMetadata})
    */
-  public void updateMetrics(String segmentName, int partitionId, @Nullable String streamTopicName, long ingestionTimeMs,
+  public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.getAsBoolean() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
@@ -452,7 +465,7 @@ public class IngestionDelayTracker {
         return v;
       }
       if (v == null) {
-        return new IngestionInfo(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs, streamTopicName);
+        return new IngestionInfo(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs);
       }
       v.update(ingestionTimeMs, currentOffset, firstStreamIngestionTimeMs);
       return v;
