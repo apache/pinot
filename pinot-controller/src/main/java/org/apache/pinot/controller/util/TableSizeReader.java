@@ -210,7 +210,7 @@ public class TableSizeReader {
       for (Map.Entry<String, TierSizeInfo> tierEntry : breakdown._tiers.entrySet()) {
         String tierKey = tierEntry.getKey();
         currentTierKeys.add(tierKey);
-        _controllerMetrics.setValueOfTableGauge(tableNameWithType + "." + tierKey,
+        _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, tierKey,
             ControllerGauge.TABLE_TIERED_STORAGE_SIZE, tierEntry.getValue()._sizePerReplicaInBytes);
       }
     }
@@ -226,7 +226,7 @@ public class TableSizeReader {
       for (String oldKey : previousTierKeys) {
         if (!currentTierKeys.contains(oldKey)) {
           if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-            _controllerMetrics.removeTableGauge(tableNameWithType + "." + oldKey,
+            _controllerMetrics.removeTableGauge(tableNameWithType, oldKey,
                 ControllerGauge.TABLE_TIERED_STORAGE_SIZE);
           }
         }
@@ -252,7 +252,7 @@ public class TableSizeReader {
     Set<String> previousTierKeys = _emittedTierKeys.remove(tableNameWithType);
     if (previousTierKeys != null) {
       for (String tierKey : previousTierKeys) {
-        _controllerMetrics.removeTableGauge(tableNameWithType + "." + tierKey,
+        _controllerMetrics.removeTableGauge(tableNameWithType, tierKey,
             ControllerGauge.TABLE_TIERED_STORAGE_SIZE);
       }
     }
