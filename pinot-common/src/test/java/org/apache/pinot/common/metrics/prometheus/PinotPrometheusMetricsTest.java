@@ -316,10 +316,6 @@ public abstract class PinotPrometheusMetricsTest {
     public static final List<String> PARTITION_TABLENAME_TABLETYPE =
         List.of(PARTITION, "3", TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TableType.REALTIME.toString());
 
-    public static final List<String> PARTITIONNUM_TABLENAME_TABLETYPE_KAFKATOPIC =
-        List.of(PARTITION, "3", TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TableType.REALTIME.toString(), TOPIC,
-            KAFKA_TOPIC);
-
     public static final List<String> TABLENAME_TABLETYPE_CONTROLLER_TASKTYPE =
         List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME, TASKTYPE,
             CONTROLLER_PERIODIC_TASK_CHC);
