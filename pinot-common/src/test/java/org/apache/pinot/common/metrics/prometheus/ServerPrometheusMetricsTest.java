@@ -54,12 +54,9 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
 
   private static final List<ServerGauge> GAUGES_ACCEPTING_PARTITION =
       List.of(ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
-          ServerGauge.REALTIME_INGESTION_OFFSET_LAG, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
-          ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET,
-          ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
-
-  private static final List<ServerGauge> GAUGES_ACCEPTING_PARTITION_WITH_STREAM_TOPIC =
-      List.of(ServerGauge.REALTIME_INGESTION_DELAY_MS, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
+          ServerGauge.REALTIME_INGESTION_OFFSET_LAG, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+          ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
 
   private static final List<ServerGauge> GAUGES_ACCEPTING_RAW_TABLE_NAME =
       List.of(ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS,
@@ -125,10 +122,6 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
         addGaugeWithLabels(serverGauge, CLIENT_ID);
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(),
             ExportedLabels.PARTITION_TABLENAME_TABLETYPE_KAFKATOPIC, EXPORTED_METRIC_PREFIX);
-      } else if (GAUGES_ACCEPTING_PARTITION_WITH_STREAM_TOPIC.contains(serverGauge)) {
-        addPartitionGaugeWithStreamTopicLabels(serverGauge, TABLE_NAME_WITH_TYPE);
-        assertGaugeExportedCorrectly(serverGauge.getGaugeName(),
-            ExportedLabels.PARTITIONNUM_TABLENAME_TABLETYPE_KAFKATOPIC, EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_PARTITION.contains(serverGauge)) {
         addPartitionGaugeWithLabels(serverGauge, TABLE_NAME_WITH_TYPE);
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(), ExportedLabels.PARTITION_TABLENAME_TABLETYPE,
@@ -150,10 +143,6 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
 
   private void addPartitionGaugeWithLabels(ServerGauge serverGauge, String labels) {
     _serverMetrics.setValueOfPartitionGauge(labels, 3, serverGauge, 100L);
-  }
-
-  private void addPartitionGaugeWithStreamTopicLabels(ServerGauge serverGauge, String tableNameWithType) {
-    _serverMetrics.setValueOfTableGauge(tableNameWithType + "-" + KAFKA_TOPIC + "-3", serverGauge, 100L);
   }
 
   public void addMeterWithLabels(ServerMeter serverMeter, String labels) {
