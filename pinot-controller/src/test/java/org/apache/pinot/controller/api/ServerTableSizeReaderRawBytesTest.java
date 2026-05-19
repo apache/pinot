@@ -130,7 +130,7 @@ public class ServerTableSizeReaderRawBytesTest {
     assertEquals(colStats.get("col_a").getCompressedSizeInBytes(), 2000);
     assertEquals(colStats.get("col_a").getCompressionRatio(), 5.0, 0.01);
     assertEquals(colStats.get("col_a").getCodec(), "LZ4");
-    assertFalse(colStats.get("col_a").isHasDictionary());
+    assertFalse(colStats.get("col_a").hasDictionary());
 
     // s2 has tier but no column stats
     SegmentSizeInfo s2 = segments.get(1);

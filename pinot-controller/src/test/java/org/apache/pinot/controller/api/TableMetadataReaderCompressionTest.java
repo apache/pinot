@@ -130,7 +130,7 @@ public class TableMetadataReaderCompressionTest {
     assertEquals(colA.getCompressedSizeInBytes(), 2000);
     assertEquals(colA.getCompressionRatio(), 5.0, 0.01);
     assertEquals(colA.getCodec(), "LZ4");
-    assertFalse(colA.isHasDictionary());
+    assertFalse(colA.hasDictionary());
 
     ColumnCompressionStatsInfo colB = colStats.get(1);
     assertNotNull(colB);
@@ -140,7 +140,7 @@ public class TableMetadataReaderCompressionTest {
     assertEquals(colB.getCompressedSizeInBytes(), 5000);
     assertEquals(colB.getCompressionRatio(), 4.0, 0.01);
     assertEquals(colB.getCodec(), "ZSTANDARD");
-    assertFalse(colB.isHasDictionary());
+    assertFalse(colB.hasDictionary());
   }
 
   @Test
@@ -276,7 +276,7 @@ public class TableMetadataReaderCompressionTest {
       // dict column: sentinel -1 preserved (not divided as 0)
       assertEquals(dictColInfo.getUncompressedSizeInBytes(), -1);
       assertEquals(dictColInfo.getCompressedSizeInBytes(), 8000);
-      assertTrue(dictColInfo.isHasDictionary());
+      assertTrue(dictColInfo.hasDictionary());
     } finally {
       server.stop(0);
     }
