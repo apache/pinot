@@ -32,7 +32,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -186,14 +185,10 @@ public class IngestionConfigUtilsTest {
 
   @Test
   public void testGetStreamIngestionMetricTableKey() {
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put("streamType", "kafka");
-    streamConfigMap.put("stream.kafka.topic.name", "events");
-    StreamConfig streamConfig = new StreamConfig("db.myTable_REALTIME", streamConfigMap);
     String tableWithType = "db.myTable_REALTIME";
-    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType,
-        streamConfig.getTopicName(), 7, null), "db.myTable_REALTIME-events-7");
-    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType,
-        streamConfig.getTopicName(), 7, "host1"), "db.myTable_REALTIME-events-7-host1");
+    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType, "events", 7, null),
+        "db.myTable_REALTIME-events-7");
+    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType, "events", 7, "host1"),
+        "db.myTable_REALTIME-events-7-host1");
   }
 }
