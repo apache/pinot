@@ -210,7 +210,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       // Track which groups were modified to check cardinality only once per group per batch
       IntSet modifiedGroups = new IntOpenHashSet();
@@ -347,7 +347,7 @@ abstract class BaseDistinctCountSmartSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       // Track which groups were modified to check cardinality only once per group per batch
       IntSet modifiedGroups = new IntOpenHashSet();
