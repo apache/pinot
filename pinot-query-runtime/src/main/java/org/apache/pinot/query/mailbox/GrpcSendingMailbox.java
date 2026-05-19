@@ -287,10 +287,16 @@ public class GrpcSendingMailbox implements SendingMailbox {
           @Override
           public void onNext(MailboxStatus value) {
             _statusObserver.onNext(value);
-            // Wake any sender blocked in awaitReady() so it can observe state changes delivered via this
-            // callback — in particular an early-terminate signal from the receiver, which does not close the
-            // stream and therefore never triggers onError / onCompleted.
-            wakeWaiters();
+            // Only wake on receiver early-terminate. Transport-level isReady() transitions reach a parked
+            // sender through setOnReadyHandler (registered in beforeStart above); normal buffer-size ACKs
+            // do not change any predicate awaitReady() actually waits on, so signalling them would force a
+            // spurious park/unpark cycle on every receiver ACK. Early-terminate is the one status-only
+            // change (the stream stays open) that awaitReady() must observe promptly, so we still signal
+            // here when its metadata is set.
+            if (Boolean.parseBoolean(
+                value.getMetadataMap().get(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE))) {
+              wakeWaiters();
+            }
           }
 
           @Override
