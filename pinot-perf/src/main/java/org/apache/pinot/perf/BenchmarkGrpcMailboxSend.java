@@ -20,11 +20,15 @@ package org.apache.pinot.perf;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -53,96 +57,83 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 
-/// Benchmark for the gRPC sender-side back-pressure gate in `GrpcSendingMailbox` across four axes:
-/// `_backpressureEnabled`, `_drainSleepMicros`, `_flowControlWindowBytes`, and `_payloadBytes`.
+/// Benchmark for the gRPC sender → receiver MSE mailbox path.
 ///
-/// Two real `MailboxService` instances run on localhost; a background drainer thread consumes
-/// messages from the receiver. The drainer's pace is controlled by `@Param _drainSleepMicros`,
-/// which selects one of two measurement regimes:
+/// One @Benchmark invocation sends a fixed total payload (`TOTAL_BYTES = 128 MiB`) split into
+/// pre-computed `MseBlock.Data` blocks of size `_blockSizeBytes`, and waits until every block has
+/// been polled out of the receiver mailbox. Measured time is therefore end-to-end "ship a request
+/// of this size and process it on the other side" — closer to the unit Pinot actually cares about
+/// than throughput of one-block-at-a-time hot-loop send.
 ///
-///  * `_drainSleepMicros = 0` (spin-poll): the drainer keeps the receiver queue empty at full
-///    speed. `isReady()` stays `true` permanently — only the **fast-path overhead** of the gate
-///    is measured (one volatile read). The A/B between `backpressureEnabled=true/false` is
-///    dominated by that single read.
-///  * `_drainSleepMicros > 0` (throttled): the drainer parks for the given number of
-///    microseconds after every poll, regardless of whether a message was found. This lets the
-///    gRPC outbound queue fill, causing `isReady()` to flip to `false` and forcing the sender's
-///    `awaitReady()` **slow path** (park/wake on a Condition). The A/B now also captures
-///    park/wake overhead.
+/// Axes:
 ///
-/// Combined with `@Param _backpressureEnabled`:
+///  * `_blockSizeBytes` — three representative block sizes:
+///      - `8 KiB`   → 16384 blocks per invocation; sender is dominated by per-block overhead.
+///      - `8 MiB`   → 16 blocks; one block fits in a single gRPC chunk
+///        (`maxInboundMessageSize / 2 ≈ 8 MiB`).
+///      - `32 MiB`  → 4 blocks; each block is split by `toByteStrings` into ~4 gRPC chunks.
+///  * `_backpressureEnabled` — toggles the `GrpcSendingMailbox` `isReady()`-gate. `false` reverts
+///    to the pre-fix unconditional `onNext` (kill-switch).
+///  * `_flowControlWindowBytes` — HTTP/2 per-stream inbound window the receiver advertises
+///    (`pinot.query.runner.grpc.flow.control.window.bytes`). Sweeps `{64 KiB, 1 MiB, 64 MiB}`,
+///    spanning the historical default, BDP-estimated LAN value, and the new MB-scale default.
 ///
-///  * `backpressureEnabled=true`: sender blocks in `awaitReady` until the receiver advances the
-///    window. Throughput is rate-limited by the drainer when `_drainSleepMicros > 0`.
-///  * `backpressureEnabled=false`: sender pushes unconditionally (kill-switch). Throughput is
-///    unbounded — direct memory grows until something fails or the iteration ends.
-///
-/// The key new axis is `@Param _flowControlWindowBytes`, which sweeps three representative sizes:
-///
-///  * `65535` (~64 KB): gRPC's historical initial default. `isReady()` flips to `false` almost
-///    immediately with any non-trivial payload, so the slow path of `awaitReady()` engages often.
-///    This exercises the application-level gate most aggressively.
-///  * `1048576` (~1 MB): gRPC's typical BDP-estimated value in LAN environments. An intermediate
-///    regime where the gate engages under moderate backlog.
-///  * `67108864` (64 MB): Pinot's new default. The transport can absorb large bursts before
-///    stalling the sender; `isReady()` stays `true` for whole blocks of sends, so the benchmark
-///    measures primarily serialisation throughput and transport overhead rather than gate
-///    park/wake latency.
-///
-/// The interesting cross-axis comparison is `_flowControlWindowBytes` at fixed `_drainSleepMicros > 0`:
-/// small window → gate engages frequently → lower throughput; large window → gate rarely engages →
-/// higher throughput until the drainer becomes the bottleneck.
+/// The drainer runs as a separate thread (modelling the cross-operator boundary in a real query),
+/// blocks on a `Semaphore` released by the receiver's `Reader` callback, and counts down a
+/// per-invocation `CountDownLatch` for each polled block. The @Benchmark thread sends every block
+/// then awaits the latch.
 ///
 /// Run with `org.openjdk.jmh.Main org.apache.pinot.perf.BenchmarkGrpcMailboxSend`.
-@BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(value = 1, jvmArgsAppend = {
     "-Xms2g", "-Xmx4g",
     "-XX:MaxDirectMemorySize=4g"
 })
-@Warmup(iterations = 2, time = 3)
-@Measurement(iterations = 3, time = 5)
+@Warmup(iterations = 2, time = 5)
+@Measurement(iterations = 3, time = 10)
 @State(Scope.Benchmark)
 public class BenchmarkGrpcMailboxSend {
+
+  /// Total bytes shipped per @Benchmark invocation. Sized so that even at 32 MiB-per-block we
+  /// get a handful of blocks to bound the per-invocation latency.
+  private static final long TOTAL_BYTES = 128L * 1024 * 1024;
 
   private static final DataSchema SCHEMA = new DataSchema(
       new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.STRING});
 
-  /// Bytes of String payload per row. The block carries one row, so this is roughly the on-wire
-  /// size of one gRPC `MailboxContent` chunk plus per-row overhead. With gRPC's default ~1 MB
-  /// HTTP/2 stream window, payloads ≥ ~16 KB will start hitting the slow path of `awaitReady`
-  /// once the drainer falls behind.
-  @Param({"16", "256", "16384", "1048576"})
-  public int _payloadBytes;
+  /// Approximate bytes per `MseBlock.Data` payload. Each block carries a single String column,
+  /// one row, where the String is roughly `_blockSizeBytes` characters (ASCII → 1 byte per char
+  /// when serialised on the wire, ~2 bytes on heap). The number of blocks per invocation is
+  /// `ceil(TOTAL_BYTES / _blockSizeBytes)`.
+  @Param({"8192", "8388608", "33554432"})
+  public int _blockSizeBytes;
 
-  /// `true` exercises the sender-side gate added in this PR. `false` restores the pre-fix
-  /// behaviour (unconditional `onNext`) — useful as a baseline and as a production kill-switch.
-  /// Wired through `MailboxService` via `pinot.query.runner.grpc.sender.backpressure.enabled`.
+  /// `true` exercises the sender-side `isReady()`-gate; `false` restores the pre-fix
+  /// unconditional `onNext` (kill-switch). Wired via
+  /// `pinot.query.runner.grpc.sender.backpressure.enabled`.
   @Param({"true", "false"})
   public boolean _backpressureEnabled;
 
-  /// Microseconds the drainer sleeps between polls. `0` means spin-poll (the drainer keeps the
-  /// receiver queue empty so back-pressure never activates — useful for measuring the gate's
-  /// fast-path overhead). Non-zero values throttle the drainer, letting the gRPC HTTP/2 stream
-  /// window fill and forcing the sender's `awaitReady()` slow path (park/wake on a Condition).
-  @Param({"0", "100"})
-  public int _drainSleepMicros;
-
-  /// HTTP/2 per-stream flow-control window in bytes, passed to `GrpcMailboxServer` via
-  /// `pinot.query.runner.grpc.flow.control.window.bytes`. Three representative sizes:
-  ///  * `65535`    (~64 KB)  — gRPC's historical initial default; gate engages frequently.
-  ///  * `1048576`  (~1 MB)   — typical BDP-estimated value in LAN environments.
-  ///  * `67108864` (64 MB)   — Pinot's new default; gate rarely engages under typical loads.
+  /// HTTP/2 per-stream flow-control window the receiver advertises, in bytes
+  /// (`pinot.query.runner.grpc.flow.control.window.bytes`):
+  ///  * `65535`    (~64 KiB) — historical gRPC default; gate engages frequently.
+  ///  * `1048576`  (~1 MiB)  — typical BDP-estimated LAN value.
+  ///  * `67108864` (64 MiB)  — Pinot's new default; gate rarely engages under typical loads.
   @Param({"65535", "1048576", "67108864"})
   public int _flowControlWindowBytes;
 
   private MailboxService _senderService;
   private MailboxService _receiverService;
   private SendingMailbox _sender;
-  private RowHeapDataBlock _block;
+  private ReceivingMailbox _receiver;
+  private List<RowHeapDataBlock> _blocks;
 
-  private Thread _drainer;
+  // Drainer signalling.
+  private final Semaphore _readSignal = new Semaphore(0);
   private final AtomicBoolean _stop = new AtomicBoolean();
+  private Thread _drainer;
+  private volatile CountDownLatch _drainedLatch;
 
   @Setup
   public void setup()
@@ -161,37 +152,43 @@ public class BenchmarkGrpcMailboxSend {
     long deadlineMs = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
     _sender = _senderService.getSendingMailbox("localhost", _receiverService.getPort(),
         mailboxId, deadlineMs, new StatMap<>(MailboxSendOperator.StatKey.class));
-    ReceivingMailbox receiver = _receiverService.getReceivingMailbox(mailboxId);
-    receiver.registeredReader(() -> { });
+    _receiver = _receiverService.getReceivingMailbox(mailboxId);
+    // Reader callback fires once per `offer` — wake the drainer.
+    _receiver.registeredReader(_readSignal::release);
 
-    // Drainer: pace is controlled by _drainSleepMicros.
-    // _drainSleepMicros == 0: spin-poll — receiver is drained at full speed; only fast-path
-    //   gate overhead is measured (isReady() stays true).
-    // _drainSleepMicros > 0: park after every iteration (whether or not a message was found)
-    //   so the gRPC outbound queue fills and isReady() flips false, exercising the slow-path
-    //   park/wake in awaitReady().
+    // Pre-compute the block list. All blocks share the same payload String (immutable, so
+    // sharing is safe and keeps heap usage bounded). The serialiser still emits independent
+    // byte buffers per send.
+    int numBlocks = (int) ((TOTAL_BYTES + _blockSizeBytes - 1) / _blockSizeBytes);
+    char[] chars = new char[_blockSizeBytes];
+    Arrays.fill(chars, 'x');
+    String payload = new String(chars);
+    _blocks = new ArrayList<>(numBlocks);
+    for (int i = 0; i < numBlocks; i++) {
+      _blocks.add(new RowHeapDataBlock(
+          Collections.singletonList(new Object[]{payload}), SCHEMA));
+    }
+
+    // Drainer: block on the reader signal, then drain everything available with non-blocking
+    // poll. The semaphore may accumulate spurious permits (we poll more aggressively than the
+    // reader fires) but those just cause a no-op wakeup later, which is harmless.
     _drainer = new Thread(() -> {
       while (!_stop.get()) {
-        ReceivingMailbox.MseBlockWithStats msg = receiver.poll();
-        if (msg == null) {
-          if (_drainSleepMicros == 0) {
-            Thread.onSpinWait();
-          } else {
-            LockSupport.parkNanos(_drainSleepMicros * 1_000L);
+        try {
+          _readSignal.acquire();
+        } catch (InterruptedException e) {
+          return;
+        }
+        while (_receiver.poll() != null) {
+          CountDownLatch latch = _drainedLatch;
+          if (latch != null) {
+            latch.countDown();
           }
-        } else if (_drainSleepMicros > 0) {
-          LockSupport.parkNanos(_drainSleepMicros * 1_000L);
         }
       }
     }, "bench-grpc-mailbox-drainer");
     _drainer.setDaemon(true);
     _drainer.start();
-
-    StringBuilder sb = new StringBuilder(_payloadBytes);
-    for (int i = 0; i < _payloadBytes; i++) {
-      sb.append('x');
-    }
-    _block = new RowHeapDataBlock(Collections.singletonList(new Object[]{sb.toString()}), SCHEMA);
   }
 
   private static int availablePort()
@@ -210,6 +207,7 @@ public class BenchmarkGrpcMailboxSend {
       // best-effort
     }
     _stop.set(true);
+    _readSignal.release();
     _drainer.join(TimeUnit.SECONDS.toMillis(10));
     _senderService.shutdown();
     _receiverService.shutdown();
@@ -217,8 +215,7 @@ public class BenchmarkGrpcMailboxSend {
 
   /// `GrpcSendingMailbox.send` calls `QueryThreadContext.checkTerminationAndSampleUsage`, which
   /// requires a context to be open on the calling thread. Opening it as a thread-scoped @State
-  /// ensures the JMH worker thread has one open across the iteration, without paying
-  /// open/close cost per @Benchmark invocation.
+  /// ensures the JMH worker thread has one open across the iteration.
   @State(Scope.Thread)
   public static class ThreadCtx {
     private QueryThreadContext _ctx;
@@ -235,8 +232,14 @@ public class BenchmarkGrpcMailboxSend {
   }
 
   @Benchmark
-  public void send(ThreadCtx ignored) {
-    _sender.send(_block);
+  public void sendRequest(ThreadCtx ignored)
+      throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(_blocks.size());
+    _drainedLatch = latch;
+    for (RowHeapDataBlock block : _blocks) {
+      _sender.send(block);
+    }
+    latch.await();
   }
 
   public static void main(String[] args)
