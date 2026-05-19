@@ -357,6 +357,8 @@ public class TableSizeReader {
     public Map<String, SegmentSizeInfo> _serverInfo = new HashMap<>();
   }
 
+  // Mutable accumulator used during per-server aggregation. Intentionally separate from the immutable
+  // CompressionStatsSummary DTO in pinot-common, which is only constructed once aggregation is complete.
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class CompressionStats {
     @JsonProperty("rawForwardIndexSizePerReplicaInBytes")

@@ -105,7 +105,9 @@ public interface IndexCreationContext extends ColumnShape {
     return columnStatistics != null ? columnStatistics.getUniqueValuesSet() : null;
   }
 
-  boolean isCompressionStatsEnabled();
+  default boolean isCompressionStatsEnabled() {
+    return false;
+  }
 
   @SuppressWarnings("UnusedReturnValue")
   final class Builder {
