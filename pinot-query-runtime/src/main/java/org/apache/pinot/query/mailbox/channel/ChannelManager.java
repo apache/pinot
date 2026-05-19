@@ -22,7 +22,6 @@ import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
-import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
@@ -124,13 +123,19 @@ public class ChannelManager {
     return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
   }
 
-  /// Exposes the metric view of the shared gRPC client allocator. The returned
-  /// metric covers every channel managed by this instance and reports both
-  /// `usedDirectMemory()` and `usedHeapMemory()`, so it remains meaningful
-  /// regardless of whether Netty is configured to prefer direct or heap buffers
-  /// (e.g. `-Dio.netty.noPreferDirect=true`). Consumed by [MailboxService] to
-  /// register the `MAILBOX_CLIENT_USED_*` gauges.
-  public PooledByteBufAllocatorMetric getBufAllocatorMetric() {
-    return _bufAllocator.metric();
+  /// Bytes of direct (off-heap) memory currently pinned by the shared gRPC
+  /// client allocator. Covers every channel managed by this instance and remains
+  /// meaningful regardless of whether Netty is configured to prefer direct or
+  /// heap buffers (e.g. `-Dio.netty.noPreferDirect=true`). Consumed by
+  /// [MailboxService] to register the `MAILBOX_CLIENT_USED_DIRECT_MEMORY` gauge.
+  public long usedDirectMemoryBytes() {
+    return _bufAllocator.metric().usedDirectMemory();
+  }
+
+  /// Bytes of heap memory currently pinned by the shared gRPC client allocator.
+  /// Consumed by [MailboxService] to register the
+  /// `MAILBOX_CLIENT_USED_HEAP_MEMORY` gauge.
+  public long usedHeapMemoryBytes() {
+    return _bufAllocator.metric().usedHeapMemory();
   }
 }

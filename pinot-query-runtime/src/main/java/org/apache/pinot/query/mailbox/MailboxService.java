@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.query.mailbox;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
@@ -147,22 +147,21 @@ public class MailboxService {
   /// `OutOfDirectMemoryError` documented in `grpc-oom-analysis.md`, so it is
   /// the right number for operators to alert on.
   private void registerMailboxClientGauges() {
-    PooledByteBufAllocatorMetric metric = _channelManager.getBufAllocatorMetric();
     switch (_instanceType) {
       case BROKER: {
         BrokerMetrics brokerMetrics = BrokerMetrics.get();
         brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
-            metric::usedDirectMemory);
+            _channelManager::usedDirectMemoryBytes);
         brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
-            metric::usedHeapMemory);
+            _channelManager::usedHeapMemoryBytes);
         break;
       }
       case SERVER: {
         ServerMetrics serverMetrics = ServerMetrics.get();
         serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_DIRECT_MEMORY,
-            metric::usedDirectMemory);
+            _channelManager::usedDirectMemoryBytes);
         serverMetrics.setOrUpdateGlobalGauge(ServerGauge.MAILBOX_CLIENT_USED_HEAP_MEMORY,
-            metric::usedHeapMemory);
+            _channelManager::usedHeapMemoryBytes);
         break;
       }
       default:
@@ -240,14 +239,16 @@ public class MailboxService {
   /// [ServerGauge#MAILBOX_CLIENT_USED_DIRECT_MEMORY] — bytes pinned by the
   /// shared gRPC client allocator backing every [GrpcSendingMailbox] created
   /// from this service.
+  @VisibleForTesting
   public long getMailboxClientUsedDirectMemoryBytes() {
-    return _channelManager.getBufAllocatorMetric().usedDirectMemory();
+    return _channelManager.usedDirectMemoryBytes();
   }
 
   /// Current value of [BrokerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY] /
   /// [ServerGauge#MAILBOX_CLIENT_USED_HEAP_MEMORY].
+  @VisibleForTesting
   public long getMailboxClientUsedHeapMemoryBytes() {
-    return _channelManager.getBufAllocatorMetric().usedHeapMemory();
+    return _channelManager.usedHeapMemoryBytes();
   }
 
   /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_DIRECT_MEMORY] /
@@ -255,16 +256,18 @@ public class MailboxService {
   /// gRPC server allocator handling inbound mailbox traffic.
   ///
   /// Returns 0 before [#start] is called (the gRPC server is built lazily there).
+  @VisibleForTesting
   public long getMailboxServerUsedDirectMemoryBytes() {
-    return _grpcMailboxServer != null ? _grpcMailboxServer.getBufAllocatorMetric().usedDirectMemory() : 0L;
+    return _grpcMailboxServer != null ? _grpcMailboxServer.usedDirectMemoryBytes() : 0L;
   }
 
   /// Current value of [BrokerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY] /
   /// [ServerGauge#MAILBOX_SERVER_USED_HEAP_MEMORY].
   ///
   /// Returns 0 before [#start] is called.
+  @VisibleForTesting
   public long getMailboxServerUsedHeapMemoryBytes() {
-    return _grpcMailboxServer != null ? _grpcMailboxServer.getBufAllocatorMetric().usedHeapMemory() : 0L;
+    return _grpcMailboxServer != null ? _grpcMailboxServer.usedHeapMemoryBytes() : 0L;
   }
 
   /**

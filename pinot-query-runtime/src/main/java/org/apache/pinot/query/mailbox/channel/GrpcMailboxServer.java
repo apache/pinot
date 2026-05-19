@@ -168,11 +168,17 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     }
   }
 
-  /// Returns the metric view of the gRPC server allocator backing this mailbox
-  /// server. This is the same allocator whose `usedDirectMemory()` and
-  /// `usedHeapMemory()` are exported as `MAILBOX_SERVER_USED_*` gauges.
-  public PooledByteBufAllocatorMetric getBufAllocatorMetric() {
-    return _bufAllocatorMetric;
+  /// Bytes of direct (off-heap) memory currently pinned by the gRPC server
+  /// allocator backing this mailbox server. This is the same allocator whose
+  /// values are exported as `MAILBOX_SERVER_USED_DIRECT_MEMORY` gauges.
+  public long usedDirectMemoryBytes() {
+    return _bufAllocatorMetric.usedDirectMemory();
+  }
+
+  /// Bytes of heap memory currently pinned by the gRPC server allocator backing
+  /// this mailbox server. Exported as `MAILBOX_SERVER_USED_HEAP_MEMORY` gauges.
+  public long usedHeapMemoryBytes() {
+    return _bufAllocatorMetric.usedHeapMemory();
   }
 
   @Override
