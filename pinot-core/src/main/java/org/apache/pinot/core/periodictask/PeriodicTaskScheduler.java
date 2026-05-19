@@ -49,7 +49,7 @@ public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
 
   private ScheduledExecutorService _executorService;
-  private Scheduler _quartzScheduler;
+  private Scheduler _scheduler;
   private Map<String, PeriodicTask> _periodicTasks;
 
   /**
@@ -102,8 +102,12 @@ public class PeriodicTaskScheduler {
 
     if (hasCronTasks) {
       try {
-        _quartzScheduler = StdSchedulerFactory.getDefaultScheduler();
-        _quartzScheduler.start();
+        try {
+          _scheduler = new StdSchedulerFactory().getScheduler();
+        } catch (SchedulerException e) {
+          throw new RuntimeException("Caught exception while setting up the scheduler", e);
+        }
+        _scheduler.start();
       } catch (SchedulerException e) {
         throw new RuntimeException("Failed to initialize Quartz scheduler. Halting controller startup.", e);
       }
@@ -130,7 +134,7 @@ public class PeriodicTaskScheduler {
               .withSchedule(CronScheduleBuilder.cronSchedule(cronExpression))
               .build();
 
-          _quartzScheduler.scheduleJob(jobDetail, trigger);
+          _scheduler.scheduleJob(jobDetail, trigger);
         } else {
           // Legacy fallback for blank/unset crons
           long intervalInSeconds = periodicTask.getIntervalInSeconds();
@@ -167,11 +171,11 @@ public class PeriodicTaskScheduler {
       _periodicTasks.values().parallelStream().forEach(PeriodicTask::stop);
     }
 
-    if (_quartzScheduler != null) {
+    if (_scheduler != null) {
       try {
         LOGGER.info("Stopping Quartz scheduler");
-        _quartzScheduler.shutdown(true);
-        _quartzScheduler = null;
+        _scheduler.shutdown(true);
+        _scheduler = null;
       } catch (SchedulerException e) {
         LOGGER.error("Failed to shutdown Quartz scheduler", e);
       }

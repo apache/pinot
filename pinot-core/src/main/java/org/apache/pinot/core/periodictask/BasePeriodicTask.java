@@ -68,11 +68,23 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       String cronExpression) {
     _taskName = taskName;
-    _intervalInSeconds = runFrequencyInSeconds;
-    _initialDelayInSeconds = initialDelayInSeconds;
-    _cronExpression = cronExpression;
     _runLock = new ReentrantLock();
     _lifeCycleLock = new Object();
+    boolean hasCronScheduling = cronExpression != null && !cronExpression.trim().isEmpty();
+    boolean hasFrequencyScheduling = runFrequencyInSeconds > 0;
+
+    if (hasCronScheduling && hasFrequencyScheduling) {
+      LOGGER.warn("Task '{}' is configured with both a cron expression ('{}') and a fixed execution frequency ({}s). Preferring cron scheduling.",
+          taskName, cronExpression, runFrequencyInSeconds);
+      _intervalInSeconds = 0;
+      _initialDelayInSeconds = 0;
+      _cronExpression = cronExpression;
+    } else {
+      _intervalInSeconds = runFrequencyInSeconds;
+      _initialDelayInSeconds = initialDelayInSeconds;
+      //this will be null/empty anyway if it's not set.
+      _cronExpression = cronExpression;
+    }
   }
 
   @Override
