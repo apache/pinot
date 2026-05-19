@@ -751,6 +751,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     removeGauge(fullGaugeName);
   }
 
+
   /**
    * Removes a table gauge given the table name, the partition id and the gauge.
    * The add/remove is expected to work correctly in case of being invoked across multiple threads.
