@@ -220,6 +220,104 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testAllLeafStagesEmptyBrokerResponses()
+      throws Exception {
+    assertAllLeafStagesEmptyRows("SELECT AirlineID, Carrier FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(), "LONG", "STRING");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(0)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT SUM(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) + 1 FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(1)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT COALESCE(SUM(ActualElapsedTime), 0) FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(0)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 HAVING COUNT(*) > 0",
+        List.of(), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 LIMIT 0",
+        List.of(), "LONG");
+    assertAllLeafStagesEmptyRows(
+        "SELECT AirlineID, COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
+        List.of(), "LONG", "LONG");
+  }
+
+  @Test
+  public void testReplicatedLeavesThatCanProduceRowsDoNotShortCircuit()
+      throws Exception {
+    assertDoesNotShortCircuitRows("SELECT d.dayId FROM " + DIM_TABLE
+            + " d LEFT JOIN (SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f "
+            + "ON d.dayId = f.DayOfWeek ORDER BY d.dayId",
+        DIM_NUMBER_OF_RECORDS);
+    assertDoesNotShortCircuitRows("SELECT d.dayId FROM (SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f "
+            + "RIGHT JOIN " + DIM_TABLE + " d ON f.DayOfWeek = d.dayId ORDER BY d.dayId",
+        DIM_NUMBER_OF_RECORDS);
+    assertDoesNotShortCircuitRows("SELECT d.dayId FROM (SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f "
+            + "FULL JOIN " + DIM_TABLE + " d ON f.DayOfWeek = d.dayId ORDER BY d.dayId",
+        DIM_NUMBER_OF_RECORDS);
+    assertDoesNotShortCircuitSingleLong("SELECT COUNT(*) FROM "
+            + "(SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f LEFT JOIN " + DIM_TABLE
+            + " d ON f.DayOfWeek = d.dayId",
+        0);
+    assertDoesNotShortCircuitSingleLong("SELECT COUNT(*) FROM (SELECT dayId FROM " + DIM_TABLE
+            + " UNION ALL SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) u",
+        DIM_NUMBER_OF_RECORDS);
+  }
+
+  private JsonNode assertAllLeafStagesEmptyRows(String query, List<List<Object>> expectedRows, String... expectedTypes)
+      throws Exception {
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
+    assertEquals(response.get("numServersQueried").asInt(), 0, "Query should not dispatch to servers: " + query);
+    assertEquals(response.get("numServersResponded").asInt(), 0, "Query should not dispatch to servers: " + query);
+
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), expectedRows.size(), "Unexpected row count for query: " + query);
+    for (int rowId = 0; rowId < expectedRows.size(); rowId++) {
+      List<Object> expectedRow = expectedRows.get(rowId);
+      JsonNode actualRow = rows.get(rowId);
+      assertEquals(actualRow.size(), expectedRow.size(), "Unexpected column count for query: " + query);
+      for (int colId = 0; colId < expectedRow.size(); colId++) {
+        Object expectedValue = expectedRow.get(colId);
+        if (expectedValue == null) {
+          assertTrue(actualRow.get(colId).isNull(), "Expected null for query: " + query);
+        } else if (expectedValue instanceof Number) {
+          assertEquals(actualRow.get(colId).asLong(), ((Number) expectedValue).longValue(),
+              "Unexpected numeric value for query: " + query);
+        } else {
+          assertEquals(actualRow.get(colId).asText(), expectedValue, "Unexpected value for query: " + query);
+        }
+      }
+    }
+
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), expectedTypes.length, "Unexpected schema width for query: " + query);
+    for (int i = 0; i < expectedTypes.length; i++) {
+      assertEquals(columnDataTypes.get(i).asText(), expectedTypes[i], "Unexpected type for query: " + query);
+    }
+    return response;
+  }
+
+  private void assertDoesNotShortCircuitRows(String query, int expectedRowCount)
+      throws Exception {
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
+    assertTrue(response.get("numServersQueried").asInt() > 0, "Query should dispatch to servers: " + query);
+    assertEquals(response.get("resultTable").get("rows").size(), expectedRowCount,
+        "Unexpected row count for query: " + query);
+  }
+
+  private void assertDoesNotShortCircuitSingleLong(String query, long expectedValue)
+      throws Exception {
+    JsonNode response = postQuery(query);
+    assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
+    assertTrue(response.get("numServersQueried").asInt() > 0, "Query should dispatch to servers: " + query);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Unexpected row count for query: " + query);
+    assertEquals(rows.get(0).get(0).asLong(), expectedValue, "Unexpected value for query: " + query);
+  }
+
+  @Test
   @Override
   public void testGeneratedQueries()
       throws Exception {

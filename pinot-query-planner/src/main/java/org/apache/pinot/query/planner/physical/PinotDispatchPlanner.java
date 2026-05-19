@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.physical;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -120,11 +121,33 @@ public class PinotDispatchPlanner {
 
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
       DispatchablePlanContext dispatchablePlanContext) {
+    // TODO: Physical Optimizer path does not track empty leaf stages. To support short-circuit,
+    //  check if all leaf TableScanMetadata have empty workerIdToSegmentsMap.
+    boolean allLeafStagesEmpty = dispatchablePlanContext.isAllNonReplicatedLeafStagesEmpty();
+    if (allLeafStagesEmpty && hasNonEmptyReplicatedLeaf(dispatchablePlanContext.getDispatchablePlanMetadataMap())) {
+      allLeafStagesEmpty = false;
+    }
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
         dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
         dispatchablePlanContext.getTableNames(),
         populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()),
-        dispatchablePlanContext.getNumSegmentsPrunedByBroker());
+        dispatchablePlanContext.getNumSegmentsPrunedByBroker(),
+        allLeafStagesEmpty);
+  }
+
+  static boolean hasNonEmptyReplicatedLeaf(Map<Integer, DispatchablePlanMetadata> metadataMap) {
+    for (DispatchablePlanMetadata metadata : metadataMap.values()) {
+      Map<String, List<String>> replicatedSegments = metadata.getReplicatedSegments();
+      if (replicatedSegments == null) {
+        continue;
+      }
+      for (List<String> segments : replicatedSegments.values()) {
+        if (segments != null && !segments.isEmpty()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private static Map<String, Set<String>> populateTableUnavailableSegments(

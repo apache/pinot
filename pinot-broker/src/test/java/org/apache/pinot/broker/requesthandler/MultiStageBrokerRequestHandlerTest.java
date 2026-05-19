@@ -20,7 +20,9 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
@@ -32,27 +34,39 @@ import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
-public class MultiStageBrokerRequestHandlerTest {
+public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase {
 
   @Test
   public void testOnQueryCompletionHookReceivesBrokerResponseForMse()
@@ -116,7 +130,6 @@ public class MultiStageBrokerRequestHandlerTest {
   @Test
   public void testApplyBrokerDefaultQueryOptionsInjectsStreamingGroupByFlushThreshold()
       throws Exception {
-    // When the broker config is set, the option is injected for queries that don't already specify it.
     MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold("5000");
 
     Map<String, String> queryOptions = new HashMap<>();
@@ -128,7 +141,6 @@ public class MultiStageBrokerRequestHandlerTest {
   @Test
   public void testApplyBrokerDefaultQueryOptionsPerQueryOverrideWins()
       throws Exception {
-    // A per-query SET — including SET = 0 to disable — must take precedence over the broker default.
     MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold("5000");
 
     Map<String, String> queryOptions = new HashMap<>();
@@ -147,7 +159,6 @@ public class MultiStageBrokerRequestHandlerTest {
   @Test
   public void testApplyBrokerDefaultQueryOptionsNoInjectionWhenConfigUnset()
       throws Exception {
-    // With the broker config unset (default -1), no option is injected.
     MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold(null);
 
     Map<String, String> queryOptions = new HashMap<>();
@@ -180,13 +191,75 @@ public class MultiStageBrokerRequestHandlerTest {
         ThreadAccountantUtils.getNoOpAccountant(), null, mock(WorkerManager.class), mock(WorkerManager.class)) {
       @Override
       public void start() {
-        // Skip dispatcher.start() and Calcite warmupCompile — neither is needed for this test.
       }
 
       @Override
       public void shutDown() {
-        // Match start() — no dispatcher was started, so there is nothing to shut down.
       }
     };
+  }
+
+  // Timeout guards against deadlock: if rewriteReduceStageForEmptyLeaves fails to inline
+  // all MailboxReceiveNodes, the reducer will block forever polling a mailbox with no sender.
+  @Test(timeOut = 2_000)
+  public void testAllLeafStagesEmptyReducerDoesNotWaitForChildStageMailbox() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SELECT COUNT(*) FROM a WHERE ts < 0 LIMIT 1");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+
+    QueryDispatcher.QueryResult queryResult = runReducer(fragmentMap, subPlan);
+    assertNull(queryResult.getProcessingException());
+    ResultTable resultTable = queryResult.getResultTable();
+    assertNotNull(resultTable);
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 0L);
+  }
+
+  @Test(timeOut = 2_000)
+  public void testAllLeafStagesEmptyReducerRunsPushedDownAggregates() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery(
+        "SELECT COUNT(*), DISTINCTCOUNT(col1), DISTINCTCOUNT(col2), SUM(col3) FROM a WHERE ts < 0 LIMIT 1");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+
+    QueryDispatcher.QueryResult queryResult = runReducer(fragmentMap, subPlan);
+    assertNull(queryResult.getProcessingException());
+    ResultTable resultTable = queryResult.getResultTable();
+    assertNotNull(resultTable);
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(((Number) rows.get(0)[0]).longValue(), 0L);
+    assertEquals(((Number) rows.get(0)[1]).longValue(), 0L);
+    assertEquals(((Number) rows.get(0)[2]).longValue(), 0L);
+    assertNull(rows.get(0)[3]);
+  }
+
+  @Test(timeOut = 2_000)
+  public void testAllLeafStagesEmptyReducerWithJoin() {
+    DispatchableSubPlan subPlan =
+        _queryEnvironment.planQuery("SELECT COUNT(*) FROM a JOIN b ON a.col1 = b.col1 WHERE a.ts < 0");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+
+    QueryDispatcher.QueryResult queryResult = runReducer(fragmentMap, subPlan);
+    assertNull(queryResult.getProcessingException());
+    ResultTable resultTable = queryResult.getResultTable();
+    assertNotNull(resultTable);
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0)[0], 0L);
+  }
+
+  private static QueryDispatcher.QueryResult runReducer(Map<Integer, DispatchablePlanFragment> fragmentMap,
+      DispatchableSubPlan originalSubPlan) {
+    // Match production: drop orphan stages after rewrite inlines them into stage 0.
+    fragmentMap.keySet().retainAll(Set.of(0));
+    DispatchableSubPlan rewrittenPlan = new DispatchableSubPlan(
+        originalSubPlan.getQueryResultFields(), fragmentMap, originalSubPlan.getTableNames(),
+        originalSubPlan.getTableToUnavailableSegmentsMap(), originalSubPlan.getNumSegmentsPrunedByBroker(), true);
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      return QueryDispatcher.runReducer(rewrittenPlan, Map.of(), Mockito.mock(MailboxService.class));
+    }
   }
 }
