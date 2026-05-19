@@ -45,30 +45,32 @@ import static org.testng.Assert.assertTrue;
 
 
 /// Guards the back-pressure kill-switch flag
-/// ({@code pinot.query.runner.grpc.sender.backpressure.enabled}) introduced to
+/// (`pinot.query.runner.grpc.sender.backpressure.enabled`) introduced to
 /// allow operators to opt out of gRPC sender-side flow control.
 ///
-/// <h2>What this test checks</h2>
-/// When the flag is set to {@code false}, {@link GrpcSendingMailbox#awaitReady}
-/// must short-circuit immediately — i.e. the {@code !_backpressureEnabled} branch
+/// ## What this test checks
+///
+/// When the flag is set to `false`, [GrpcSendingMailbox#awaitReady]
+/// must short-circuit immediately — i.e. the `!_backpressureEnabled` branch
 /// in the guard must fire — so the sender pushes blocks without waiting for the
-/// receiver to drain them.  Under that condition a fast sender can push orders of
+/// receiver to drain them. Under that condition a fast sender can push orders of
 /// magnitude more blocks than a slow receiver polls in the same wall-clock window.
 ///
-/// <h2>Regression risk</h2>
-/// If someone accidentally removes or inverts the
-/// {@code bypassReady || !_backpressureEnabled} short-circuit in
-/// {@code awaitReady}, the gate would become permanently active and this flag
-/// would have no effect.  The test would then see {@code sendCount} track
-/// {@code polledCount} closely (as in the <em>enabled</em> repro test), causing
-/// the {@code sendCount > polledCount * 10} assertion to fail and surfacing the
-/// regression in CI.
+/// ## Regression risk
 ///
-/// <h2>Relation to the companion test</h2>
-/// {@link GrpcSenderBackpressureReproTest} verifies the <em>enabled</em>
-/// (default) path — that the gate keeps the sender in check.  This test verifies
-/// the <em>disabled</em> path — that turning the gate off actually removes it.
-/// Together they pin both sides of the boolean.
+/// If someone accidentally removes or inverts the
+/// `bypassReady || !_backpressureEnabled` short-circuit in `awaitReady`, the gate
+/// would become permanently active and this flag would have no effect. The test
+/// would then see `sendCount` track `polledCount` closely (as in the *enabled*
+/// repro test), causing the `sendCount > polledCount * 10` assertion to fail and
+/// surfacing the regression in CI.
+///
+/// ## Relation to the companion test
+///
+/// [GrpcSenderBackpressureTest] verifies the *enabled* (default) path — that the
+/// gate keeps the sender in check. This test verifies the *disabled* path — that
+/// turning the gate off actually removes it. Together they pin both sides of the
+/// boolean.
 public class GrpcSenderBackpressureDisabledTest {
   private static final DataSchema SCHEMA = new DataSchema(
       new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.STRING});
