@@ -43,27 +43,24 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/// Validates the sender-side gRPC back-pressure described in `grpc-oom-analysis.md`.
+/// Validates that sender-side gRPC back-pressure keeps a fast sender roughly in step with a slow receiver.
 ///
-/// A "fast sender" tries to push the same small data block over and over on the
-/// test thread while a "slow reader" thread polls the receiving mailbox at
-/// roughly 50 blocks per second. With back-pressure in place, the sender thread
-/// blocks inside [GrpcSendingMailbox.awaitReady] whenever the gRPC outbound
-/// queue fills, so the send rate tracks the polling rate plus a bounded
-/// in-flight pipeline (gRPC HTTP/2 stream window + Netty WriteQueue + the
-/// receiver's bounded mailbox queue).
+/// A "fast sender" pushes the same small data block repeatedly on the test thread while a "slow reader"
+/// thread polls the receiving mailbox at roughly 50 blocks per second. With back-pressure in place, the
+/// sender thread blocks inside [GrpcSendingMailbox.awaitReady] whenever the gRPC outbound queue fills,
+/// so the send rate tracks the polling rate plus a bounded in-flight pipeline (gRPC HTTP/2 stream window
+/// + Netty WriteQueue + the receiver's bounded mailbox queue).
 ///
-/// We assert two complementary properties:
-///  1. `sendCount` is bounded by `polledCount` plus a generous in-flight
-///     allowance — pre-fix the ratio was ~1700x, which would still fail this
-///     check by orders of magnitude.
-///  2. The peak growth of the sender's client allocator stays under a small
-///     constant — pre-fix it reached 50+ MB in 3 s, post-fix we expect at most
-///     one or two Netty pool chunks.
+/// The test asserts two complementary properties:
+///  1. `sendCount` is bounded by `polledCount` plus a generous in-flight allowance — without
+///     back-pressure the ratio was ~1700x, which still fails this check by orders of magnitude.
+///  2. The peak growth of the sender's client allocator stays under a small constant — without
+///     back-pressure peaks were >50 MB in 3 s; with it we expect at most a couple of Netty pool chunks.
 ///
-/// The thresholds are intentionally generous; tightening them would require
-/// per-channel Netty watermark tuning, which is deferred to a follow-up.
-public class GrpcSenderBackpressureReproTest {
+/// The thresholds are intentionally loose: this is a regression guard against the back-pressure gate
+/// being silently removed, not a precise performance SLA. Tightening them would require per-channel
+/// Netty watermark tuning, which is deferred to a follow-up.
+public class GrpcSenderBackpressureTest {
   private static final DataSchema SCHEMA = new DataSchema(
       new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.STRING});
   // Small but not empty — enough that each MailboxContent has a real payload
@@ -94,7 +91,7 @@ public class GrpcSenderBackpressureReproTest {
   }
 
   @Test
-  public void fastSenderOutpacesSlowReceiver()
+  public void senderObservesBackpressureFromSlowReceiver()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(1, 1, 0, 0, 0);
     long deadlineMs = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(5);
@@ -177,7 +174,7 @@ public class GrpcSenderBackpressureReproTest {
     long serverGrowth = peakServer - baselineServer;
 
     System.out.printf(Locale.ROOT,
-        "[GrpcSenderBackpressureReproTest] sent=%d polled=%d ratio=%.1fx%n"
+        "[GrpcSenderBackpressureTest] sent=%d polled=%d ratio=%.1fx%n"
             + "  sender   MAILBOX_CLIENT_USED_*: direct=%dB heap=%dB (peak growth=%dB)%n"
             + "  receiver MAILBOX_SERVER_USED_*: direct=%dB heap=%dB (peak growth=%dB)%n",
         sendCount, polledCount,
