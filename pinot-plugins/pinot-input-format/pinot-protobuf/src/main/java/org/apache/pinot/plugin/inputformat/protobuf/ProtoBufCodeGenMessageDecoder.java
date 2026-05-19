@@ -29,6 +29,7 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.plugin.inputformat.protobuf.codegen.MessageCodeGen;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -38,6 +39,7 @@ import org.codehaus.janino.SimpleCompiler;
 public class ProtoBufCodeGenMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String PROTOBUF_JAR_FILE_PATH = "jarFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
+  public static final String BATCH_MESSAGE_FIELD = "batchMessageField";
   private Method _decodeMethod;
 
   @Override
@@ -49,9 +51,13 @@ public class ProtoBufCodeGenMessageDecoder implements StreamMessageDecoder<byte[
         "Protocol Buffer Message class name must be provided");
     String protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
     String jarPath = props.getOrDefault(PROTOBUF_JAR_FILE_PATH, "");
+    String batchMessageField = props.get(BATCH_MESSAGE_FIELD);
     ClassLoader protoMessageClsLoader = loadClass(jarPath);
     Descriptors.Descriptor descriptor = getDescriptorForProtoClass(protoMessageClsLoader, protoClassName);
-    String codeGenCode = new MessageCodeGen().codegen(descriptor, fieldsToRead);
+    MessageCodeGen codeGen = new MessageCodeGen();
+    String codeGenCode = StringUtils.isNotEmpty(batchMessageField)
+        ? codeGen.codegen(descriptor, fieldsToRead, batchMessageField)
+        : codeGen.codegen(descriptor, fieldsToRead);
     Class<?> recordExtractor = compileClass(protoMessageClsLoader,
         MessageCodeGen.EXTRACTOR_PACKAGE_NAME + "." + MessageCodeGen.EXTRACTOR_CLASS_NAME, codeGenCode);
     _decodeMethod = recordExtractor.getMethod(MessageCodeGen.EXTRACTOR_METHOD_NAME, byte[].class, GenericRow.class);

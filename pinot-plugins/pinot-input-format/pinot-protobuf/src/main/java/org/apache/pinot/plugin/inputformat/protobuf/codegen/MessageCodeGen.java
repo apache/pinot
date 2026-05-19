@@ -46,6 +46,44 @@ public class MessageCodeGen {
     return generateRecordExtractorCode(descriptor, fieldsToRead, msgDecodeCode);
   }
 
+  /**
+   * Batch decoder codegen. The batchMessageField is a dot-separated path through repeated MESSAGE
+   * fields (e.g., "resource_logs.scope_logs.log_records"). The execute() method produced by this
+   * codegen iterates over nested repeated fields and stores the innermost records as a
+   * List&lt;GenericRow&gt; under GenericRow.MULTIPLE_RECORDS_KEY.
+   */
+  public String codegen(Descriptors.Descriptor descriptor, Set<String> fieldsToRead, String batchMessageField) {
+    String[] pathSegments = batchMessageField.split("\\.");
+    List<Descriptors.FieldDescriptor> batchFieldChain = new ArrayList<>();
+    Descriptors.Descriptor currentDescriptor = descriptor;
+
+    for (String segment : pathSegments) {
+      Descriptors.FieldDescriptor field = currentDescriptor.findFieldByName(segment);
+      if (field == null) {
+        throw new IllegalArgumentException(String.format(
+            "Field '%s' not found in descriptor '%s'. Available fields: %s",
+            segment, currentDescriptor.getName(),
+            currentDescriptor.getFields().stream()
+                .map(Descriptors.FieldDescriptor::getName).collect(Collectors.toList())));
+      }
+      if (!field.isRepeated() || field.isMapField()) {
+        throw new IllegalArgumentException(String.format(
+            "Field '%s' must be a repeated (non-map) field", segment));
+      }
+      if (field.getType() != Descriptors.FieldDescriptor.Type.MESSAGE) {
+        throw new IllegalArgumentException(String.format(
+            "Field '%s' must be of message type", segment));
+      }
+      batchFieldChain.add(field);
+      currentDescriptor = field.getMessageType();
+    }
+
+    Descriptors.Descriptor innerDescriptor = currentDescriptor;
+    HashMap<String, MessageDecoderMethod> msgDecodeCode =
+        generateMessageDeserializeCode(innerDescriptor, fieldsToRead);
+    return generateBatchRecordExtractorCode(descriptor, batchFieldChain, innerDescriptor, fieldsToRead, msgDecodeCode);
+  }
+
   /*
    * Generate the code for the Record Extractor that's specific to the given descriptor
    * Generates a class org.apache.pinot.plugin.inputformat.protobuf.decoder.ProtobufRecorderMessageExtractor with a
@@ -81,18 +119,7 @@ public class MessageCodeGen {
             ++indent));
 
     // Find all the fields in the descriptor to read based on fieldsToRead
-    List<Descriptors.FieldDescriptor> allDesc = new ArrayList<>();
-    if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
-      for (String fieldName: fieldsToRead.stream().sorted().collect(Collectors.toList())) {
-        if (descriptor.findFieldByName(fieldName) == null) {
-          LOGGER.debug("Field " + fieldName + " not found in the descriptor");
-        } else {
-          allDesc.add(descriptor.findFieldByName(fieldName));
-        }
-      }
-    } else {
-      allDesc = descriptor.getFields();
-    }
+    List<Descriptors.FieldDescriptor> allDesc = resolveFieldsToRead(descriptor, fieldsToRead);
     // Add the values to the GenericRow object
     // Example: to.putValue("email", msgMap.getOrDefault("email", null));
     for (Descriptors.FieldDescriptor desc: allDesc) {
@@ -112,6 +139,90 @@ public class MessageCodeGen {
     return code.toString();
   }
 
+
+  // Batch-mode Record Extractor code. The execute() method parses the wrapper message,
+  // iterates over nested repeated fields (one for-loop per level in batchFieldChain), and stores the
+  // innermost records as a List<GenericRow> under GenericRow.MULTIPLE_RECORDS_KEY.
+  public String generateBatchRecordExtractorCode(
+      Descriptors.Descriptor wrapperDescriptor,
+      List<Descriptors.FieldDescriptor> batchFieldChain,
+      Descriptors.Descriptor innerDescriptor,
+      Set<String> fieldsToRead,
+      HashMap<String, MessageDecoderMethod> msgDecodeCode) {
+    String wrapperFullName = ProtoBufUtils.getFullJavaName(wrapperDescriptor);
+    String innerFullName = ProtoBufUtils.getFullJavaName(innerDescriptor);
+    String innerDecoderMethodName = msgDecodeCode.get(innerFullName).getMethodName();
+
+    StringBuilder code = new StringBuilder();
+    code.append(completeLine("package " + EXTRACTOR_PACKAGE_NAME, 0));
+    code.append(addImports(List.of(
+        "org.apache.pinot.spi.data.readers.GenericRow",
+        "java.util.ArrayList",
+        "java.util.HashMap",
+        "java.util.List",
+        "java.util.Map")));
+    code.append("\n");
+    code.append(String.format("public class %s {\n", EXTRACTOR_CLASS_NAME));
+    int indent = 1;
+    code.append(
+        addIndent(String.format("public static GenericRow %s(byte[] from, GenericRow to) throws Exception {",
+            EXTRACTOR_METHOD_NAME), indent));
+    indent++;
+
+    // Parse the wrapper message
+    code.append(completeLine(String.format("%s wrapper = %s.parseFrom(from)", wrapperFullName, wrapperFullName),
+        indent));
+
+    // Create the list for multiple records
+    code.append(completeLine("List<GenericRow> multipleRecords = new ArrayList<>()", indent));
+
+    // Generate nested for-loops, one per level in the batch field chain
+    int chainSize = batchFieldChain.size();
+    String parentVar = "wrapper";
+    for (int i = 0; i < chainSize; i++) {
+      Descriptors.FieldDescriptor field = batchFieldChain.get(i);
+      String fieldType = ProtoBufUtils.getFullJavaName(field.getMessageType());
+      String fieldCamelCase = ProtobufInternalUtils.underScoreToCamelCase(field.getName(), true);
+      String loopVar = (i == chainSize - 1) ? "innerMsg" : "lvl" + i;
+
+      code.append(addIndent(String.format("for (%s %s : %s.get%sList()) {",
+          fieldType, loopVar, parentVar, fieldCamelCase), indent));
+      indent++;
+      parentVar = loopVar;
+    }
+
+    // Decode each inner message
+    code.append(completeLine(String.format("Map<String, Object> msgMap = %s(innerMsg)", innerDecoderMethodName),
+        indent));
+    code.append(completeLine("GenericRow row = new GenericRow()", indent));
+
+    // Populate fields from the inner descriptor
+    List<Descriptors.FieldDescriptor> allDesc = resolveFieldsToRead(innerDescriptor, fieldsToRead);
+    for (Descriptors.FieldDescriptor desc : allDesc) {
+      code.append(completeLine(String.format("row.putValue(\"%s\", msgMap.getOrDefault(\"%s\", null))",
+          desc.getName(), desc.getName()), indent));
+    }
+
+    code.append(completeLine("multipleRecords.add(row)", indent));
+
+    // Close all for-loops
+    for (int i = 0; i < chainSize; i++) {
+      code.append(addIndent("}", --indent));
+    }
+
+    // Store under MULTIPLE_RECORDS_KEY
+    code.append(completeLine("to.putValue(GenericRow.MULTIPLE_RECORDS_KEY, multipleRecords)", indent));
+    code.append(completeLine("return to", indent));
+    code.append(addIndent("}", --indent));
+
+    // Append all decoder methods
+    for (MessageDecoderMethod msgCode : msgDecodeCode.values()) {
+      code.append("\n");
+      code.append(msgCode.getCode());
+    }
+    code.append(addIndent("}", --indent));
+    return code.toString();
+  }
 
   // Generates methods to decode each message type in the descriptor as needed.
   public HashMap<String, MessageDecoderMethod> generateMessageDeserializeCode(
@@ -146,18 +257,7 @@ public class MessageCodeGen {
         String.format("public static Map<String, Object> %s(%s msg) {", methodNameOfDecoder,
             fullyQualifiedMsgName), indent));
     code.append(completeLine("Map<String, Object> msgMap = new HashMap<>()", ++indent));
-    List<Descriptors.FieldDescriptor> descriptorsToDerive = new ArrayList<>();
-    if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
-      for (String fieldName: fieldsToRead.stream().sorted().collect(Collectors.toList())) {
-        if (null == descriptor.findFieldByName(fieldName)) {
-          LOGGER.debug("Field " + fieldName + " not found in the descriptor");
-        } else {
-          descriptorsToDerive.add(descriptor.findFieldByName(fieldName));
-        }
-      }
-    } else {
-      descriptorsToDerive = descriptor.getFields();
-    }
+    List<Descriptors.FieldDescriptor> descriptorsToDerive = resolveFieldsToRead(descriptor, fieldsToRead);
 
     for (Descriptors.FieldDescriptor desc : descriptorsToDerive) {
       Descriptors.FieldDescriptor.JavaType javaType = desc.getJavaType();
@@ -426,6 +526,23 @@ public class MessageCodeGen {
           indent));
     }
     return code;
+  }
+
+  private List<Descriptors.FieldDescriptor> resolveFieldsToRead(
+      Descriptors.Descriptor descriptor, Set<String> fieldsToRead) {
+    if (fieldsToRead != null && !fieldsToRead.isEmpty()) {
+      List<Descriptors.FieldDescriptor> result = new ArrayList<>();
+      for (String fieldName : fieldsToRead.stream().sorted().collect(Collectors.toList())) {
+        Descriptors.FieldDescriptor fd = descriptor.findFieldByName(fieldName);
+        if (fd == null) {
+          LOGGER.debug("Field " + fieldName + " not found in the descriptor");
+        } else {
+          result.add(fd);
+        }
+      }
+      return result;
+    }
+    return descriptor.getFields();
   }
 
   private String getDecoderMethodName(String fullJavaType) {
