@@ -148,7 +148,7 @@ public class DictionaryIndexConfig extends IndexConfig {
   private static <C extends IndexConfig> boolean requiresDictionaryBy(IndexType<C, ?, ?> indexType,
       FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs) {
     C config = fieldIndexConfigs.getConfig(indexType);
-    if (config == null || config.isDisabled()) {
+    if (config.isDisabled()) {
       return false;
     }
     return indexType.requiresDictionary(fieldSpec, config);

@@ -119,8 +119,11 @@ public class SegmentAssignmentStrategyFactoryTest {
     int numInstancesPerPartition = numInstancesPerReplicaGroup / NUM_REPLICAS;
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         new ReplicaGroupStrategyConfig(PARTITION_COLUMN, numInstancesPerPartition);
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = new HashMap<>();
+    segmentAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.toString(),
+        new SegmentAssignmentConfig("ReplicaGroup"));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME_WITH_PARTITION)
-        .setNumReplicas(NUM_REPLICAS).setSegmentAssignmentStrategy("ReplicaGroup")
+        .setNumReplicas(NUM_REPLICAS).setSegmentAssignmentConfigMap(segmentAssignmentConfigMap)
         .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig).build();
 
     // {

@@ -67,7 +67,7 @@ public class ProjectionBlock implements ValueBlock {
     // TODO: only support one level of path for now, e.g. `map.key`
     assert paths.length == 2;
     MapDataSource mapDataSource = (MapDataSource) _dataSourceMap.get(paths[0]);
-    DataSource keyDataSource = mapDataSource.getKeyDataSource(paths[1]);
+    DataSource keyDataSource = mapDataSource.getDataSource(paths[1]);
     String fullColumnKeyName = ComplexFieldSpec.getFullChildName(paths);
     _dataSourceMap.put(fullColumnKeyName, keyDataSource);
     _dataBlockCache.addDataSource(fullColumnKeyName, keyDataSource);

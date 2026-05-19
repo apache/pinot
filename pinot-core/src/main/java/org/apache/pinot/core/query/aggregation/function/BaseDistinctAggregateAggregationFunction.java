@@ -199,7 +199,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
    */
   protected void svAggregate(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
@@ -293,7 +293,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
    */
   protected void mvAggregate(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
@@ -407,7 +407,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregateGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
 
@@ -501,7 +501,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void mvAggregateGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -619,7 +619,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregateGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
 
@@ -709,7 +709,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void mvAggregateGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
 

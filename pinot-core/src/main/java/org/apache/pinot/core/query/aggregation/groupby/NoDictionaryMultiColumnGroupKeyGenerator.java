@@ -78,7 +78,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       _storedTypes[i] = columnContext.getDataType().getStoredType();
-      Dictionary dictionary = _nullHandlingEnabled ? null : columnContext.getDictionary();
+      // Take the dict-id path only when the forward index is dict-encoded. A column with EncodingType.RAW +
+      // dictionaryIndex exposes a Dictionary but BlockValSet#getDictionaryIdsSV throws on its RAW forward
+      // index — fall back to an on-the-fly dictionary on raw values for that case.
+      Dictionary dictionary = _nullHandlingEnabled || !columnContext.isDictionaryEncoded() ? null
+          : columnContext.getDictionary();
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {

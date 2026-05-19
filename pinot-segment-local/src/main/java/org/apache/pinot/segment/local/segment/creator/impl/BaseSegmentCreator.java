@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -148,7 +149,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       } else {
         FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
         _colIndexes.put(columnName,
-            new ColumnIndexCreators(columnName, fieldSpec, null, List.of(), null));
+            new ColumnIndexCreators(columnName, fieldSpec,
+                _config.getIndexConfigsByColName().get(columnName), null, List.of(), null));
       }
     }
   }
@@ -172,7 +174,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     }
     IndexCreationContext.Common context = getIndexCreationContext(fieldSpec, dictEnabledColumn);
 
-    FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnStatistics, _config);
+    FieldIndexConfigs config = adaptConfig(columnName, originalConfig, columnStatistics, _config, dictEnabledColumn);
 
     SegmentDictionaryCreator dictionaryCreator = null;
     if (dictEnabledColumn) {
@@ -181,31 +183,21 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     List<IndexCreator> indexCreators = getIndexCreatorsByColumn(fieldSpec, context, config, dictEnabledColumn);
 
-    return new ColumnIndexCreators(columnName, fieldSpec, dictionaryCreator,
+    return new ColumnIndexCreators(columnName, fieldSpec, config, dictionaryCreator,
         indexCreators, getNullValueCreator(fieldSpec));
   }
 
   private IndexCreationContext.Common getIndexCreationContext(FieldSpec fieldSpec, boolean dictEnabledColumn) {
-    ColumnStatistics columnStatistics = _columnStatisticsMap.get(fieldSpec.getName());
-    FieldIndexConfigs fieldIndexConfig = _config.getIndexConfigsByColName().get(fieldSpec.getName());
-    boolean forwardIndexDisabled = !fieldIndexConfig.getConfig(StandardIndexes.forward()).isEnabled();
-
-    return IndexCreationContext.builder()
-        .withIndexDir(_indexDir)
-        .withDictionary(dictEnabledColumn)
-        .withFieldSpec(fieldSpec)
-        .withTotalDocs(_totalDocs)
-        .withColumnStatistics(columnStatistics)
+    ColumnStatistics columnStats = _columnStatisticsMap.get(fieldSpec.getName());
+    return new IndexCreationContext.Builder(_indexDir, _config.getTableConfig(), columnStats, dictEnabledColumn)
+        .withOnHeap(_config.isOnHeap())
         .withOptimizedDictionary(_config.isOptimizeDictionary()
             || _config.isOptimizeDictionaryForMetrics() && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC)
-        .onHeap(_config.isOnHeap())
-        .withForwardIndexDisabled(forwardIndexDisabled)
         .withTextCommitOnClose(true)
         .withRealtimeConversion(_config.isRealtimeConversion())
         .withConsumerDir(_config.getConsumerDir())
         .withMutableSegmentCompacted(_config.isMutableSegmentCompacted())
         .withMutableToImmutableDocIdMap(_config.getMutableToImmutableDocIdMap())
-        .withTableNameWithType(_config.getTableConfig().getTableName())
         .withContinueOnError(_config.isContinueOnError())
         .build();
   }
@@ -238,10 +230,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
         new DictionaryIndexPlugin().getIndexType().createIndexCreator(context, dictConfig);
 
     try {
-      dictionaryCreator.build(context.getSortedUniqueElementsArray());
+      dictionaryCreator.build(columnStatistics.getUniqueValuesSet());
     } catch (Exception e) {
       LOGGER.error("Error building dictionary for field: {}, cardinality: {}, number of bytes per entry: {}",
-          context.getFieldSpec().getName(), context.getCardinality(), dictionaryCreator.getNumBytesPerEntry());
+          columnName, columnStatistics.getCardinality(), dictionaryCreator.getNumBytesPerEntry());
       throw e;
     }
     return dictionaryCreator;
@@ -307,7 +299,7 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
    * Adapts field index configs based on column properties.
    */
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
-      ColumnStatistics columnStatistics, SegmentGeneratorConfig segmentCreationSpec) {
+      ColumnStatistics columnStatistics, SegmentGeneratorConfig segmentCreationSpec, boolean dictEnabledColumn) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder(config);
     // Sorted columns treat the 'forwardIndexDisabled' flag as a no-op
     ForwardIndexConfig fwdConfig = config.getConfig(StandardIndexes.forward());
@@ -315,6 +307,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       builder.add(StandardIndexes.forward(),
           new ForwardIndexConfig.Builder(fwdConfig).withLegacyProperties(segmentCreationSpec.getColumnProperties(),
               columnName).build());
+    } else if (fwdConfig.isEnabled() && !dictEnabledColumn
+        && fwdConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY) {
+      // Segment-time dictionary optimizers (`optimizeDictionary` / `optimizeDictionaryForMetrics`) can flip
+      // dictEnabledColumn=false for a column whose configured encoding is DICTIONARY. Without a dictionary the
+      // forward index must be RAW, so reconcile here before the creator factory branches on encoding.
+      builder.add(StandardIndexes.forward(),
+          new ForwardIndexConfig.Builder(fwdConfig, FieldConfig.EncodingType.RAW).build());
     }
     // Initialize inverted index creator; skip creating inverted index if sorted
     if (columnStatistics.isSorted()) {
@@ -333,7 +332,8 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       IndexType<C, ?, ?> index, IndexCreationContext.Common context, FieldIndexConfigs fieldIndexConfigs)
       throws Exception {
     C config = fieldIndexConfigs.getConfig(index);
-    if (config.isEnabled()) {
+    if (config.isEnabled() && index.shouldCreateIndex(context, config)) {
+      //noinspection resource
       creatorsByIndex.put(index, index.createIndexCreator(context, config));
     }
   }
@@ -361,6 +361,19 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
 
     String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
+    // If any enabled index requires a dictionary for this column, create one regardless of the user's
+    // explicit dictionary setting or the optimizeDictionary heuristics — the alternative is segment
+    // creation failure (e.g., inverted index can't be built without a dict) or silent index loss
+    // (FST/IFST expect a dictionary).
+    boolean dictionaryRequired = DictionaryIndexConfig.requiresDictionary(spec, fieldIndexConfigs);
+    if (dictionaryRequired) {
+      if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+        LOGGER.warn("Column: {} has dictionary disabled but required by indexes: {}; creating dictionary anyway",
+            column, DictionaryIndexConfig.getIndexTypesWithDictionaryRequired(spec, fieldIndexConfigs));
+      }
+      return true;
+    }
+
     if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
       return false;
     }
@@ -530,10 +543,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     for (Map.Entry<String, ColumnStatistics> entry : _columnStatisticsMap.entrySet()) {
       String column = entry.getKey();
       ColumnStatistics columnStatistics = entry.getValue();
-      SegmentDictionaryCreator dictionaryCreator = _colIndexes.get(column).getDictionaryCreator();
-      int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
+      ColumnIndexCreators columnIndexCreators = _colIndexes.get(column);
+      SegmentDictionaryCreator dictionaryCreator = columnIndexCreators.getDictionaryCreator();
+      boolean hasDictionary = dictionaryCreator != null;
+      int dictionaryElementSize = hasDictionary ? dictionaryCreator.getNumBytesPerEntry() : 0;
+      // Use the adapted (post-`adaptConfig`) FieldIndexConfigs so the persisted encoding matches what was actually
+      // built on disk (the dictionary optimizer may have flipped DICTIONARY to RAW at segment-creation time).
+      ForwardIndexConfig fwdConfig =
+          columnIndexCreators.getIndexConfigs().getConfig(StandardIndexes.forward());
       addColumnMetadataInfo(properties, column, columnStatistics, _totalDocs, _schema.getFieldSpecFor(column),
-          dictionaryCreator != null, dictionaryElementSize, false);
+          hasDictionary, dictionaryElementSize, fwdConfig.getEncodingType(), false);
     }
 
     SegmentZKPropsConfig segmentZKPropsConfig = _config.getSegmentZKPropsConfig();
@@ -544,17 +563,16 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
-  /**
-   * Adds column metadata information to the properties configuration.
-   */
+  /// Adds column metadata information to the properties configuration.
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
       ColumnStatistics columnStatistics, int totalDocs, FieldSpec fieldSpec, boolean hasDictionary,
-      int dictionaryElementSize, boolean autoGenerated) {
+      int dictionaryElementSize, FieldConfig.EncodingType forwardIndexEncoding, boolean autoGenerated) {
     addFieldSpec(properties, column, fieldSpec);
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     int cardinality = columnStatistics.getCardinality();
     properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));
+    properties.setProperty(getKeyFor(column, FORWARD_INDEX_ENCODING), forwardIndexEncoding.name());
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnStatistics.isSorted()));
     DataType storedType = fieldSpec.getDataType().getStoredType();
     if (!storedType.isFixedWidth()) {
@@ -571,6 +589,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
       if (storedType == DataType.STRING) {
         properties.setProperty(getKeyFor(column, IS_ASCII), String.valueOf(columnStatistics.isAscii()));
       }
+      if (!fieldSpec.isSingleValueField()) {
+        properties.setProperty(getKeyFor(column, MAX_ROW_LENGTH_IN_BYTES),
+            String.valueOf(columnStatistics.getMaxRowLengthInBytes()));
+      }
     }
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     // TODO: When the column is raw (no dictionary), we should set BITS_PER_ELEMENT to -1 (invalid). Currently we set
@@ -580,10 +602,10 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     //       See https://github.com/apache/pinot/pull/16921 for details
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
-    properties.setProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
-        String.valueOf(columnStatistics.getTotalNumberOfEntries()));
     properties.setProperty(getKeyFor(column, MAX_MULTI_VALUE_ELEMENTS),
         String.valueOf(columnStatistics.getMaxNumberOfMultiValues()));
+    properties.setProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES),
+        String.valueOf(columnStatistics.getTotalNumberOfEntries()));
     if (autoGenerated) {
       properties.setProperty(getKeyFor(column, IS_AUTO_GENERATED), "true");
     }
@@ -751,14 +773,13 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     // Format conversion
     convertFormatIfNecessary(_indexDir);
 
-    // Build indexes if there are documents
+    // Build indexes if there are documents. Empty segments have no values to index; index handlers (mirroring
+    // [SegmentPreProcessor#process]'s `totalDocs == 0` short-circuit) assume at least one doc.
     if (_totalDocs > 0) {
       buildStarTreeV2IfNecessary(_indexDir);
       buildMultiColumnTextIndex(_indexDir);
+      updatePostSegmentCreationIndexes(_indexDir);
     }
-
-    // Update post-creation indexes
-    updatePostSegmentCreationIndexes(_indexDir);
 
     // Persist creation metadata
     persistCreationMeta(_indexDir, dataCrc);

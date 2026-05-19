@@ -221,6 +221,31 @@ public class ExpressionTransformerTest {
     Assert.assertFalse(row.isNullValue("mapDim1__VALUES"));
   }
 
+  @Test
+  public void testTransformReturningNullDoesNotOverrideExistingBytesValue() {
+    // A BYTES column with an explicit transform that yields null should not clobber the existing byte[] value.
+    // BYTES is a scalar type even though byte[] is technically an array.
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("payload", FieldSpec.DataType.BYTES)
+        .build();
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("payload", "Groovy({null})")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testBytesNullTransform")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+    ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
+
+    GenericRow row = new GenericRow();
+    byte[] existing = new byte[]{7, 8, 9};
+    row.putValue("payload", existing);
+
+    expressionTransformer.transform(row);
+
+    Assert.assertSame(row.getValue("payload"), existing);
+    Assert.assertFalse(row.isNullValue("payload"));
+  }
+
   /**
    * If destination field already exists in the row, do not execute transform function
    */

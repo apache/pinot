@@ -52,7 +52,7 @@ public class AvroRecordReader implements RecordReader {
     _avroReader = AvroUtils.getAvroReader(dataFile);
 
     AvroRecordExtractorConfig recordExtractorConfig = new AvroRecordExtractorConfig();
-    recordExtractorConfig.setEnableLogicalTypes(config.isEnableLogicalTypes());
+    recordExtractorConfig.setExtractRawTimeValues(config.isExtractRawTimeValues());
     _recordExtractor = new AvroRecordExtractor();
     _recordExtractor.init(fieldsToRead, recordExtractorConfig);
   }

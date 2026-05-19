@@ -32,7 +32,6 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatPatternSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -918,12 +917,6 @@ public class DateTimeConversionTransformFunctionTest extends BaseTransformFuncti
     @Override
     public TransformResultMetadata getResultMetadata() {
       return new TransformResultMetadata(DataType.LONG, true, false);
-    }
-
-    @Nullable
-    @Override
-    public Dictionary getDictionary() {
-      return null;
     }
 
     @Override

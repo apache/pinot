@@ -140,7 +140,6 @@
                 org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*,
                 org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.*,
                 org.apache.pinot.client.utils.Constants.*,
-                org.apache.pinot.common.utils.PinotDataType.*,
                 org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.*,
                 org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.*,
                 org.apache.pinot.segment.local.utils.GeometryType.*,
@@ -165,6 +164,7 @@
                 org.apache.pinot.spi.utils.CommonConstants.Server.*,
                 org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*,
                 org.apache.pinot.spi.utils.EqualityUtils.*,
+                org.apache.pinot.spi.utils.PinotDataType.*,
                 org.apache.pinot.tools.Quickstart.*"/>
     </module>
     <!-- Do not import 'sun' packages -->

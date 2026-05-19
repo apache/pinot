@@ -82,6 +82,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -179,6 +180,7 @@ public final class TableConfigUtils {
     }
 
     validateValidationConfig(tableConfig, schema);
+    validateSegmentAssignmentConfig(tableConfig);
     validateIngestionConfig(tableConfig, schema);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
@@ -372,16 +374,6 @@ public final class TableConfigUtils {
           "Dimension table must be of OFFLINE table type.");
       Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
           "Dimension table must have primary key[s]");
-
-      String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
-      if (segmentAssignmentStrategy != null
-          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
-        throw new IllegalStateException(
-            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
-              tableConfig.getTableName(),
-              CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
-              segmentAssignmentStrategy));
-      }
     }
 
     String peerSegmentDownloadScheme = validationConfig.getPeerSegmentDownloadScheme();
@@ -397,6 +389,29 @@ public final class TableConfigUtils {
     }
 
     validateRetentionConfig(tableConfig);
+  }
+
+  private static void validateSegmentAssignmentConfig(TableConfig tableConfig) {
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap == null) {
+      return;
+    }
+    if (tableConfig.isDimTable()) {
+      SegmentAssignmentConfig segmentAssignmentConfig =
+          segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
+      if (segmentAssignmentConfig == null) {
+        return;
+      }
+      String segmentAssignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
+      if (segmentAssignmentStrategy != null
+          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
+        throw new IllegalStateException(
+            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
+                tableConfig.getTableName(),
+                CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
+                segmentAssignmentStrategy));
+      }
+    }
   }
 
   private static boolean isValidPeerDownloadScheme(String peerSegmentDownloadScheme) {

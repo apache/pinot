@@ -189,10 +189,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
       // AGGREGATE OPERATORS
       SqlStdOperatorTable.COUNT,
-      SqlStdOperatorTable.SUM,
+      PinotSumFunction.INSTANCE,
       PinotMinMaxFunction.MIN,
       PinotMinMaxFunction.MAX,
-      SqlStdOperatorTable.AVG,
+      PinotAvgFunction.INSTANCE,
       SqlStdOperatorTable.MODE,
       SqlStdOperatorTable.STDDEV_POP,
       SqlStdOperatorTable.COVAR_POP,
@@ -490,8 +490,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
   /// the return type inference and operand type checker in {@link AggregationFunctionType} like we do for other
   /// functions because {@link org.apache.calcite.sql.fun.SqlSumAggFunction} has some customizations that we need to
   /// retain here to ensure that rules like {@link org.apache.calcite.rel.rules.AggregateRemoveRule} work as expected.
-  /// TODO: Replace {@link SqlStdOperatorTable#SUM} with this instance after the next release (there's a dependency
-  /// on AVG window function, see https://github.com/apache/pinot/pull/17109).
   private static final class PinotSumFunction extends PinotSqlAggFunction {
     static final SqlOperator INSTANCE = new PinotSumFunction();
 
@@ -510,6 +508,24 @@ public class PinotOperatorTable implements SqlOperatorTable {
     @Override
     public SqlAggFunction getRollup() {
       return this;
+    }
+  }
+
+  /// Pinot's custom AVG aggregation function that can aggregate on SV or MV numeric inputs. Using a custom function
+  /// (instead of {@link SqlStdOperatorTable#AVG}) also avoids the standard Calcite convertlet that rewrites window
+  /// AVG into SUM / COUNT, since Pinot has native window AVG support via
+  /// {@link org.apache.pinot.query.runtime.operator.window.aggregate.AvgWindowValueAggregator}.
+  /// <p>NOTE: Unlike {@link PinotSumFunction} and {@link PinotMinMaxFunction}, this class intentionally does not
+  /// override {@code unwrap(SqlSplittableAggFunction)} or {@code getRollup()}, matching the standard
+  /// {@link org.apache.calcite.sql.fun.SqlAvgAggFunction}. Calcite's {@code AggregateReduceFunctionsRule} reduces
+  /// {@code AVG} to {@code SUM / COUNT} before any rule that needs a splitter (e.g. {@code AggregateRemoveRule})
+  /// would fire on it, so a splitter override is unnecessary.
+  private static final class PinotAvgFunction extends PinotSqlAggFunction {
+    static final SqlOperator INSTANCE = new PinotAvgFunction();
+
+    public PinotAvgFunction() {
+      super("AVG", ReturnTypes.AVG_AGG_FUNCTION, OperandTypes.or(OperandTypes.NUMERIC, OperandTypes.ARRAY),
+          SqlKind.AVG);
     }
   }
 

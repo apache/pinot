@@ -45,7 +45,7 @@ public class PinotFileUploadTest {
     TEST_INSTANCE.addDummySchema(TABLE_NAME);
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
+        .setNumReplicas(2).build();
     TEST_INSTANCE.getHelixResourceManager().addTable(tableConfig);
   }
 

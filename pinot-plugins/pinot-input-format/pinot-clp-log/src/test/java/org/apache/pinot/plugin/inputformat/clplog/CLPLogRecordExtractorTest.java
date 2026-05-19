@@ -21,7 +21,11 @@ package org.apache.pinot.plugin.inputformat.clplog;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
@@ -86,6 +90,49 @@ public class CLPLogRecordExtractorTest {
     assertEquals(row.getValue(MESSAGE_1_FIELD_NAME), MESSAGE_1_FIELD_VALUE);
     assertEquals(row.getValue(MESSAGE_2_FIELD_NAME), MESSAGE_2_FIELD_VALUE);
     assertNull(row.getValue(MESSAGE_1_FIELD_NAME + ClpRewriter.LOGTYPE_COLUMN_SUFFIX));
+  }
+
+  // === Un-encoded field conversion (same dispatch as JSONRecordExtractor) ===
+
+  @Test
+  public void testBigIntegerWidenedToBigDecimal() {
+    // Default Jackson parses integer literals that overflow `Long` as `BigInteger`. The extractor widens
+    // to `BigDecimal` since Pinot has no `BigInteger` type.
+    BigInteger value = new BigInteger("99999999999999999999999999");
+    GenericRow row = extractUnencoded("payload", value);
+    assertEquals(row.getValue("payload"), new BigDecimal(value));
+  }
+
+  @Test
+  public void testListExtractedAsArray() {
+    GenericRow row = extractUnencoded("payload", List.of(1, "a", true));
+    assertEquals((Object[]) row.getValue("payload"), new Object[]{1, "a", true});
+  }
+
+  @Test
+  public void testNestedMapRecursivelyConverted() {
+    // Inner List values become Object[]; inner BigInteger widens to BigDecimal.
+    GenericRow row = extractUnencoded("payload", Map.of(
+        "list", List.of(1, 2),
+        "big", new BigInteger("100")
+    ));
+    Map<?, ?> result = (Map<?, ?>) row.getValue("payload");
+    assertEquals((Object[]) result.get("list"), new Object[]{1, 2});
+    assertEquals(result.get("big"), new BigDecimal("100"));
+  }
+
+  /// Run the extractor with no CLP-encoded fields configured, so `payload` flows through the un-encoded
+  /// path (the same `convert` dispatch as JSON).
+  private GenericRow extractUnencoded(String fieldName, Object value) {
+    CLPLogRecordExtractorConfig extractorConfig = new CLPLogRecordExtractorConfig();
+    extractorConfig.init(Map.of());
+    CLPLogRecordExtractor extractor = new CLPLogRecordExtractor();
+    extractor.init(null, extractorConfig, TOPIC_NAME);
+    Map<String, Object> input = new HashMap<>();
+    input.put(fieldName, value);
+    GenericRow row = new GenericRow();
+    extractor.extract(input, row);
+    return row;
   }
 
   @Test

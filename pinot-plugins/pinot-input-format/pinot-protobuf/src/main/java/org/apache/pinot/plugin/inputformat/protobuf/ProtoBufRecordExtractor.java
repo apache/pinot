@@ -31,22 +31,21 @@ import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-/// Extracts Pinot [GenericRow] from a ProtoBuf [Message]. Conversion is dispatched directly off the field's
-/// [Descriptors.FieldDescriptor] (`isMapField` / `isRepeated` / `getJavaType`) — no [BaseRecordExtractor#convert]
-/// pipeline, no per-value wrapper allocation.
+/// Extracts Pinot [GenericRow] from a ProtoBuf [Message].
 ///
 /// **Proto source type → Java input → Java output type:**
-/// - proto `bool` → `Boolean` → `Boolean`
-/// - proto `int32` / `sint32` / `sfixed32` / `uint32` / `fixed32` → `Integer` → `Integer`
-/// - proto `int64` / `sint64` / `sfixed64` / `uint64` / `fixed64` → `Long` → `Long`
-/// - proto `float` → `Float` → `Float`
-/// - proto `double` → `Double` → `Double`
-/// - proto `string` → `String` → `String`
-/// - proto `bytes` → [ByteString] → `byte[]` (via [ByteString#toByteArray])
-/// - proto `enum` → [Descriptors.EnumValueDescriptor] → enum constant name `String`
-/// - proto nested `message` → [Message] → `Map<String, Object>` (recursive over the message's set fields)
-/// - proto `repeated X` → `List<X>` → `Object[]` (each element recursively converted)
-/// - proto `map<K, V>` → `Map<K, V>` → `Map<Object, Object>` (each key + value recursively converted)
+/// - `bool` → `Boolean` → `Boolean`
+/// - `int32` / `sint32` / `sfixed32` / `uint32` / `fixed32` → `Integer` → `Integer`
+/// - `int64` / `sint64` / `sfixed64` / `uint64` / `fixed64` → `Long` → `Long`
+/// - `float` → `Float` → `Float`
+/// - `double` → `Double` → `Double`
+/// - `string` → `String` → `String`
+/// - `bytes` → [ByteString] → `byte[]` (via [ByteString#toByteArray])
+/// - `enum` → [Descriptors.EnumValueDescriptor] → enum constant name `String`
+/// - `message` → [Message] → `Map<String, Object>` (recursive over the message's set fields)
+/// - `repeated X` → `List<X>` → `Object[]` (each element recursively converted)
+/// - `map<K, V>` → `Map<K, V>` → `Map<String, Object>` (keys stringified via
+///   [BaseRecordExtractor#stringifyMapKey], values recursively converted)
 /// - proto3 `optional` field that is unset / cleared → `null`
 public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
@@ -118,7 +117,7 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   }
 
   /// Dispatches a non-null protobuf field value off `fd`'s shape:
-  /// - `map<K, V>` → [#extractMap] → `Map<Object, Object>`
+  /// - `map<K, V>` → [#extractMap] → `Map<String, Object>`
   /// - `repeated X` → [#extractList] → `Object[]`
   /// - scalar / message → [#extractSingleValue]
   private static Object extractValue(Descriptors.FieldDescriptor fd, Object value) {
@@ -163,18 +162,20 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     return result;
   }
 
-  /// Converts a `map<K, V>` field's [List] of entry messages to `Map<Object, Object>`. Each entry message
+  /// Converts a `map<K, V>` field's [List] of entry messages to `Map<String, Object>`. Each entry message
   /// has exactly two fields (key at index 0, value at index 1) per the protobuf encoding. By the protobuf
-  /// map spec, both keys and values must always be present, so no null-guard is needed on either.
-  private static Map<Object, Object> extractMap(Descriptors.FieldDescriptor fd, Collection<Message> entries) {
+  /// map spec, both keys and values must always be present, so no null-guard is needed on either. Keys are
+  /// stringified via [BaseRecordExtractor#stringifyMapKey] per the `Map<String, Object>` contract — protobuf
+  /// allows numeric / bool / string key types, all of which have a stable `toString()`.
+  private static Map<String, Object> extractMap(Descriptors.FieldDescriptor fd, Collection<Message> entries) {
     List<Descriptors.FieldDescriptor> entryFields = fd.getMessageType().getFields();
     Descriptors.FieldDescriptor keyFd = entryFields.get(0);
     Descriptors.FieldDescriptor valueFd = entryFields.get(1);
-    Map<Object, Object> map = Maps.newHashMapWithExpectedSize(entries.size());
+    Map<String, Object> map = Maps.newHashMapWithExpectedSize(entries.size());
     for (Message entry : entries) {
       Object key = extractSingleValue(keyFd, entry.getField(keyFd));
       Object value = extractSingleValue(valueFd, entry.getField(valueFd));
-      map.put(key, value);
+      map.put(BaseRecordExtractor.stringifyMapKey(key), value);
     }
     return map;
   }

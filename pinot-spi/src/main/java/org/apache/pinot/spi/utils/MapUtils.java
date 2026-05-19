@@ -19,8 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -50,11 +49,13 @@ public class MapUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MapUtils.class);
-  private static final ObjectMapper SORTED_MAPPER =
-      new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-  private static final ObjectMapper UNSORTED_MAPPER = new ObjectMapper();
-  private static final TypeReference<Map<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() {
-  };
+
+  // Pinot's standard ObjectMapper config (JSR-310 / ISO-8601 for LocalDate / LocalTime — see JsonUtils),
+  // plus key-ordered output for the sorted variant so byte output is a pure function of the logical map.
+  // Writes only — read paths delegate to JsonUtils, whose DEFAULT_READER is already JSR-310-aware.
+  private static final ObjectWriter SORTED_WRITER = JsonUtils.newObjectMapperWithJavaTime()
+      .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true).writer();
+  private static final ObjectWriter UNSORTED_WRITER = JsonUtils.newObjectMapperWithJavaTime().writer();
 
   /// Serializes a map into a length-prefixed binary frame: `[size][keyLen][keyBytes][valueLen][valueBytes]...`.
   /// Entries are sorted by key before writing for canonical output.
@@ -70,7 +71,7 @@ public class MapUtils {
     if (size == 0) {
       return new byte[Integer.BYTES];
     }
-    ObjectMapper mapper = sortByKey ? SORTED_MAPPER : UNSORTED_MAPPER;
+    ObjectWriter writer = sortByKey ? SORTED_WRITER : UNSORTED_WRITER;
 
     // Sorted path on a non-SortedMap: copy entries to a sortable array. Otherwise iterate the entrySet directly to
     // avoid the array allocation (`SortedMap.entrySet()` is already sorted; the unsorted path doesn't care).
@@ -96,7 +97,7 @@ public class MapUtils {
       bufferSize += keyBytes.length;
       byte[] valueBytes;
       try {
-        valueBytes = mapper.writeValueAsBytes(entry.getValue());
+        valueBytes = writer.writeValueAsBytes(entry.getValue());
       } catch (JsonProcessingException e) {
         throw new RuntimeException(e);
       }
@@ -134,7 +135,7 @@ public class MapUtils {
     for (Entry<String, Object> entry : map.entrySet()) {
       bufferSize += Utf8Utils.encodedLength(entry.getKey());
       try {
-        UNSORTED_MAPPER.writeValue(sink, entry.getValue());
+        UNSORTED_WRITER.writeValue(sink, entry.getValue());
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -173,7 +174,7 @@ public class MapUtils {
       String key = Utf8Utils.decode(readLengthPrefixed(byteBuffer));
       byte[] valueBytes = readLengthPrefixed(byteBuffer);
       try {
-        Object value = UNSORTED_MAPPER.readValue(valueBytes, Object.class);
+        Object value = JsonUtils.bytesToObject(valueBytes, Object.class);
         map.put(key, value);
       } catch (IOException e) {
         LOGGER.error("Caught exception while deserializing value for key: {}", key, e);
@@ -197,7 +198,7 @@ public class MapUtils {
   /// not required.
   public static String toString(Map<String, Object> map, boolean sortByKey) {
     try {
-      return (sortByKey ? SORTED_MAPPER : UNSORTED_MAPPER).writeValueAsString(map);
+      return (sortByKey ? SORTED_WRITER : UNSORTED_WRITER).writeValueAsString(map);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
@@ -205,7 +206,7 @@ public class MapUtils {
 
   public static Map<String, Object> fromString(String json) {
     try {
-      return UNSORTED_MAPPER.readValue(json, MAP_TYPE_REFERENCE);
+      return JsonUtils.stringToMap(json);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

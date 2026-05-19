@@ -33,7 +33,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 /**
  * Column statistics for a column coming from an in-memory realtime segment.
  */
-@SuppressWarnings("rawtypes")
 public class MutableColumnStatistics implements ColumnStatistics {
   protected final DataSource _dataSource;
   protected final DataSourceMetadata _dataSourceMetadata;
@@ -64,13 +63,18 @@ public class MutableColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public Comparable getMinValue() {
-    return _dictionary.getMinVal();
+  public int getTotalDocs() {
+    return _dataSourceMetadata.getNumDocs();
   }
 
   @Override
-  public Comparable getMaxValue() {
-    return _dictionary.getMaxVal();
+  public Comparable<?> getMinValue() {
+    return (Comparable<?>) _dictionary.getMinVal();
+  }
+
+  @Override
+  public Comparable<?> getMaxValue() {
+    return (Comparable<?>) _dictionary.getMaxVal();
   }
 
   @Override

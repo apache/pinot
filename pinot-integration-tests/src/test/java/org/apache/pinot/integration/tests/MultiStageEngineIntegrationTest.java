@@ -1994,7 +1994,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         .setRetentionTimeUnit("DAYS")
         .setRetentionTimeValue("5000")
         .setDeletedSegmentsRetentionPeriod("7d")
-        .setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
         .setNumReplicas(1)
         .setSegmentPushType("APPEND")
         .setBrokerTenant("DefaultTenant")

@@ -64,7 +64,7 @@ public class EmptyColumnStatisticsTest {
 
     // Identity
     assertEquals(stats.getFieldSpec(), fieldSpec);
-    assertEquals(stats.getValueType(), storedType);
+    assertEquals(stats.getStoredType(), storedType);
     assertEquals(stats.isSingleValue(), sv);
 
     // Empty: no values

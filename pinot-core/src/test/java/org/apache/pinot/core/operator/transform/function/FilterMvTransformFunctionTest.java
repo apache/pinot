@@ -33,6 +33,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.core.function.scalar.FilterMvScalarFunction;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -42,6 +43,8 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -345,6 +348,114 @@ public class FilterMvTransformFunctionTest extends BaseTransformFunctionTest {
     // All match: always-true predicate returns original array
     byte[][] filteredAll = function.filterMv(values, "v != '0000'");
     assertEquals(filteredAll.length, 3);
+  }
+
+  /// filterMv on a column with a shared dictionary on a RAW forward index. FilterMvTransformFunction
+  /// drops the dictionary internally because RAW forward indexes throw UnsupportedOperationException
+  /// from getDictIdMV — the dict-id path is not viable. The predicate evaluator falls back to per-value
+  /// raw matching, and the transform output must still match the dict-encoded baseline produced by the
+  /// regular `INT_MV_COLUMN` (both columns hold the same values).
+  @Test(dataProvider = "filterMvIntPredicates")
+  public void testFilterMvOnSharedDictRawForwardColumn(String predicate, IntPredicate matcher) {
+    // Sanity: the data source must actually be RAW + dict for this test to be meaningful.
+    DataSource dataSource = _dataSourceMap.get(INT_MV_DICT_RAW_COLUMN);
+    assertNotNull(dataSource);
+    assertFalse(dataSource.getForwardIndex().isDictionaryEncoded(),
+        "Pre-condition: " + INT_MV_DICT_RAW_COLUMN + " must have a RAW forward index");
+    assertNotNull(dataSource.getDictionary(),
+        "Pre-condition: " + INT_MV_DICT_RAW_COLUMN + " must carry a shared dictionary alongside the RAW forward");
+
+    String escaped = predicate.replace("'", "''");
+    String expressionStr = String.format("filterMv(%s, '%s')", INT_MV_DICT_RAW_COLUMN, escaped);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof FilterMvTransformFunction);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.INT);
+    assertFalse(resultMetadata.isSingleValue());
+    // FilterMvTransformFunction drops the dictionary internally for RAW forward — getDictIdMV throws
+    // UnsupportedOperationException on RAW forward indexes, so the dict-id path isn't viable. The
+    // predicate evaluator runs the raw-value matching path instead.
+    assertFalse(resultMetadata.hasDictionary(),
+        "FilterMvTransformFunction over a RAW forward column must report hasDictionary=false so the predicate "
+            + "evaluator takes the raw-value matching path");
+    assertNull(transformFunction.getDictionary());
+
+    int[][] intValuesMV = transformFunction.transformToIntValuesMV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      IntList expectedList = new IntArrayList();
+      for (int value : _intMVValues[i]) {
+        if (matcher.test(value)) {
+          expectedList.add(value);
+        }
+      }
+      int[] expectedValues = expectedList.toIntArray();
+      assertEquals(intValuesMV[i].length, expectedValues.length, "Row " + i + " predicate=" + predicate);
+      for (int j = 0; j < expectedValues.length; j++) {
+        assertEquals(intValuesMV[i][j], expectedValues[j], "Row " + i + " idx " + j + " predicate=" + predicate);
+      }
+    }
+  }
+
+  /// filterMv on a column with a shared dictionary on a RAW forward index AND an inverted index. The
+  /// inverted index doesn't influence filterMv's per-value evaluation — FilterMvTransformFunction still
+  /// drops the dictionary internally because the underlying forward index is RAW (getDictIdMV would
+  /// throw), so the result matches the dict-encoded baseline via the raw-value matching path.
+  @Test(dataProvider = "filterMvIntPredicates")
+  public void testFilterMvOnSharedDictRawForwardWithInvertedColumn(String predicate, IntPredicate matcher) {
+    // Sanity: confirm the on-disk shape is dict + inverted + RAW forward.
+    DataSource dataSource = _dataSourceMap.get(INT_MV_DICT_RAW_INV_COLUMN);
+    assertNotNull(dataSource);
+    assertFalse(dataSource.getForwardIndex().isDictionaryEncoded(),
+        "Pre-condition: " + INT_MV_DICT_RAW_INV_COLUMN + " must have a RAW forward index");
+    assertNotNull(dataSource.getDictionary(),
+        "Pre-condition: " + INT_MV_DICT_RAW_INV_COLUMN + " must carry a shared dictionary");
+    assertNotNull(dataSource.getInvertedIndex(),
+        "Pre-condition: " + INT_MV_DICT_RAW_INV_COLUMN + " must carry an inverted index");
+
+    String escaped = predicate.replace("'", "''");
+    String expressionStr = String.format("filterMv(%s, '%s')", INT_MV_DICT_RAW_INV_COLUMN, escaped);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof FilterMvTransformFunction);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.INT);
+    assertFalse(resultMetadata.isSingleValue());
+    // FilterMvTransformFunction drops the dictionary internally for RAW forward — even with an inverted
+    // index sitting on disk, the dict-id path is not viable because getDictIdMV throws on RAW forward.
+    assertFalse(resultMetadata.hasDictionary(),
+        "FilterMvTransformFunction over a RAW forward column must report hasDictionary=false even when an "
+            + "inverted index sits on the column");
+    assertNull(transformFunction.getDictionary());
+
+    // Compute filterMv on the same predicate over INT_MV_COLUMN (dict-encoded baseline) and over
+    // INT_MV_DICT_RAW_COLUMN (RAW + dict, no inverted) and assert all three produce identical results.
+    int[][] resultWithInverted = transformFunction.transformToIntValuesMV(_projectionBlock);
+    int[][] resultDictBaseline = filterMvIntValues(INT_MV_COLUMN, predicate);
+    int[][] resultRawDictNoInverted = filterMvIntValues(INT_MV_DICT_RAW_COLUMN, predicate);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      IntList expectedList = new IntArrayList();
+      for (int value : _intMVValues[i]) {
+        if (matcher.test(value)) {
+          expectedList.add(value);
+        }
+      }
+      int[] expected = expectedList.toIntArray();
+      assertEquals(resultWithInverted[i], expected, "RAW + dict + inverted, row=" + i + " predicate=" + predicate);
+      assertEquals(resultDictBaseline[i], expected, "dict-encoded baseline, row=" + i + " predicate=" + predicate);
+      assertEquals(resultRawDictNoInverted[i], expected,
+          "RAW + dict (no inverted), row=" + i + " predicate=" + predicate);
+    }
+  }
+
+  /// Helper: run filterMv on a named column with the given predicate string and return the resulting
+  /// per-row int MV arrays. Used for cross-column result-equivalence assertions.
+  private int[][] filterMvIntValues(String columnName, String predicate) {
+    String escaped = predicate.replace("'", "''");
+    String expressionStr = String.format("filterMv(%s, '%s')", columnName, escaped);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    return transformFunction.transformToIntValuesMV(_projectionBlock);
   }
 
   @Test(dataProvider = "illegalArguments", expectedExceptions = {BadQueryRequestException.class})

@@ -21,16 +21,14 @@ package org.apache.pinot.plugin.inputformat.arrow;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 
-/**
- * Config for {@link ArrowRecordReader}.
- */
+/// Config for [ArrowRecordReader]. Carries the Arrow allocator limit plus the
+/// [ArrowRecordExtractorConfig] `extractRawTimeValues` flag so the reader can construct the
+/// extractor's config at init time.
 public class ArrowRecordReaderConfig implements RecordReaderConfig {
   public static final long DEFAULT_ALLOCATOR_LIMIT = 268435456L; // 256MB
 
   private long _allocatorLimit = DEFAULT_ALLOCATOR_LIMIT;
-
-  public ArrowRecordReaderConfig() {
-  }
+  private boolean _extractRawTimeValues;
 
   public long getAllocatorLimit() {
     return _allocatorLimit;
@@ -38,5 +36,13 @@ public class ArrowRecordReaderConfig implements RecordReaderConfig {
 
   public void setAllocatorLimit(long allocatorLimit) {
     _allocatorLimit = allocatorLimit;
+  }
+
+  public boolean isExtractRawTimeValues() {
+    return _extractRawTimeValues;
+  }
+
+  public void setExtractRawTimeValues(boolean extractRawTimeValues) {
+    _extractRawTimeValues = extractRawTimeValues;
   }
 }

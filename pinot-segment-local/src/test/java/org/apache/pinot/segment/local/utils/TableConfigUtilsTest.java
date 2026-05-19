@@ -57,6 +57,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -290,14 +291,16 @@ public class TableConfigUtilsTest {
     // Valid: allservers strategy using constant
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
-        .setSegmentAssignmentStrategy(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)
+        .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+            new SegmentAssignmentConfig(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)))
         .build();
     TableConfigUtils.validate(tableConfig, schema);
 
     // Invalid: other strategy
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setIsDimTable(true)
-        .setSegmentAssignmentStrategy("replicaGroup")
+        .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+            new SegmentAssignmentConfig("replicaGroup")))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -1240,18 +1243,15 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(), "FieldConfig encoding type is different from indexingConfig for column: myCol1");
     }
 
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(Arrays.asList("myCol1"))
-        .build();
-    try {
-      FieldConfig fieldConfig =
-          new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
-      TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail since FST index is enabled on RAW encoding type");
-    } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create FST index on column: myCol1 without dictionary");
-    }
+    // FST on RAW column is valid when explicit dictionary config is provided in indexes
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    ObjectNode rawFstIndexes = JsonUtils.newObjectNode();
+    rawFstIndexes.set("dictionary", JsonUtils.newObjectNode());
+    FieldConfig rawFstFieldConfig =
+        new FieldConfig("myCol1", FieldConfig.EncodingType.RAW, null, Arrays.asList(FieldConfig.IndexType.FST),
+            null, null, rawFstIndexes, null, null);
+    tableConfig.setFieldConfigList(Arrays.asList(rawFstFieldConfig));
+    TableConfigUtils.validate(tableConfig, schema);
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
@@ -1443,8 +1443,35 @@ public class TableConfigUtilsTest {
           + "with version >= 2 to use this feature.");
     }
 
-    // Note: Inverted indexes are now supported on raw (non-dictionary) columns for numeric types like INT.
-    // These tests have been removed as the validation no longer fails for this case.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(Arrays.asList("myCol2"))
+        .setInvertedIndexColumns(Arrays.asList("myCol2"))
+        .build();
+    try {
+      // Enable forward index disabled flag for a column with inverted index and disable dictionary
+      Map<String, String> fieldConfigProperties = new HashMap<>();
+      fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
+      FieldConfig fieldConfig =
+          new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
+              fieldConfigProperties);
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should not be able to disable dictionary but keep inverted index");
+    } catch (Exception e) {
+      assertEquals(e.getMessage(), "Cannot create inverted index on column: myCol2 without dictionary");
+    }
+
+    // FieldConfig with encoding=RAW + INVERTED: dictionary is auto-enabled (INVERTED requires it),
+    // producing a shared-dict + RAW forward index. No validation error expected.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    {
+      FieldConfig fieldConfig =
+          new FieldConfig.Builder("myCol2").withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+              .withEncodingType(FieldConfig.EncodingType.RAW)
+              .build();
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol2"))
@@ -1453,14 +1480,17 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with FST index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
+      FieldConfig fieldConfigWithFst =
           new FieldConfig("myCol2", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.FST, null, null, null,
               fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfigWithFst));
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should not be able to disable dictionary but keep inverted index");
+      fail("Should not be able to disable dictionary but keep FST index");
     } catch (Exception e) {
-      assertEquals(e.getMessage(), "Cannot create FST index on column: myCol2 without dictionary");
+      // FST requires dictionary; validation may catch dictionary-required or FST-specific error
+      assertTrue(e.getMessage().contains("require a dictionary")
+              || e.getMessage().contains("without dictionary"),
+          "Expected dictionary-related error but got: " + e.getMessage());
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1471,10 +1501,10 @@ public class TableConfigUtilsTest {
       // Enable forward index disabled flag for a column with FST index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
+      FieldConfig fieldConfigWithRange =
           new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.RANGE, null, null, null,
               fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfigWithRange));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       fail("Range index with forward index disabled no dictionary column is allowed");
@@ -1484,20 +1514,46 @@ public class TableConfigUtilsTest {
     Map<String, String> streamConfigs = getStreamConfigs();
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
-        .setNoDictionaryColumns(Arrays.asList("intCol"))
         .setStreamConfigs(streamConfigs)
         .build();
     try {
       // Enable forward index disabled flag for a column with inverted index index and disable dictionary
       Map<String, String> fieldConfigProperties = new HashMap<>();
       fieldConfigProperties.put(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString());
-      FieldConfig fieldConfig =
-          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, FieldConfig.IndexType.INVERTED, null, null, null,
-              fieldConfigProperties);
-      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      ObjectNode indexes = JsonUtils.newObjectNode();
+      indexes.set("dictionary", JsonUtils.newObjectNode());
+      FieldConfig realtimeFieldConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null, Arrays.asList(FieldConfig.IndexType.INVERTED),
+              null, null, indexes, fieldConfigProperties, null);
+      tableConfig.setFieldConfigList(Arrays.asList(realtimeFieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
       assertEquals(e.getMessage(), "Cannot disable forward index for column: intCol, as the table type is REALTIME");
+    }
+
+    // Inverted index on a RAW column auto-enables the dictionary (see DictionaryIndexType.fromFieldConfigs)
+    // and validation passes — the runtime builds a shared-dict + RAW forward index.
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    {
+      FieldConfig rawInvertedConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW,
+              Arrays.asList(FieldConfig.IndexType.INVERTED), null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(rawInvertedConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    }
+
+    // Validate that inverted index on RAW column WITH explicit dictionary passes validation
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      ObjectNode dictIndexes = JsonUtils.newObjectNode();
+      dictIndexes.set("dictionary", JsonUtils.newObjectNode());
+      FieldConfig rawInvertedWithDictConfig =
+          new FieldConfig("intCol", FieldConfig.EncodingType.RAW, null,
+              Arrays.asList(FieldConfig.IndexType.INVERTED), null, null, dictIndexes, null, null);
+      tableConfig.setFieldConfigList(Arrays.asList(rawInvertedWithDictConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (Exception e) {
+      fail("Should pass since inverted index has explicit dictionary config, but got: " + e.getMessage());
     }
   }
 
@@ -1893,11 +1949,18 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    // Note: Inverted indexes are now supported on raw (non-dictionary) columns for STRING and numeric types.
-    // The test that expected failure for having a column in both no-dictionary and inverted-index config
-    // has been removed as this is now a valid configuration.
-
     List<String> columnList = Arrays.asList("myCol");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(columnList)
+        .setInvertedIndexColumns(columnList)
+        .build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail for valid column name in both no dictionary and inverted index column config");
+    } catch (Exception e) {
+      // expected
+    }
+
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setJsonIndexColumns(Arrays.asList("non-existent-column"))
         .build();

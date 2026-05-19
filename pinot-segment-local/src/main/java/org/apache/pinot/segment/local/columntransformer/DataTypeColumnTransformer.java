@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.columntransformer;
 
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.columntransformer.ColumnTransformer;
@@ -26,6 +25,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
+import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
