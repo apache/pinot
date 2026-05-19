@@ -150,9 +150,7 @@ public class MailboxService {
   ///
   /// Notice we are wiring the shaded gRPC Netty allocator
   /// ([io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator]) rather than
-  /// the non-shaded one. This is the same pool whose exhaustion triggered the
-  /// `OutOfDirectMemoryError` documented in `grpc-oom-analysis.md`, so it is
-  /// the right number for operators to alert on.
+  /// the non-shaded one.
   private void registerMailboxClientGauges() {
     switch (_instanceType) {
       case BROKER: {
