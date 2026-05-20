@@ -2192,6 +2192,11 @@ public class CommonConstants {
      * {@code value × #concurrent streams to this server}. Concretely:
      * {@code Peak receiver direct memory ≈ flowControlWindow × #concurrent_incoming_streams.}
      *
+     * <p>This value is the <b>per-stalled-stream receiver-side direct-memory exposure</b>, not just a
+     * throughput knob: when an inbound stream's receiver application queue stalls (e.g. the downstream
+     * operator is slow to drain via {@code MailboxContentObserver.onNext}), the wire can still buffer
+     * up to {@code flowControlWindow} bytes of data on that stream before the HTTP/2 peer stops sending.
+     *
      * <p>This is a direct-memory bound, not just a throughput knob: operators must size it against
      * {@code -XX:MaxDirectMemorySize} given the expected concurrent inbound stream count.
      */

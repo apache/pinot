@@ -67,6 +67,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
     // offerData lock acquisition inside _mailbox.offerRaw). This decouples the sender's HTTP/2 window
     // replenishment from the receiver's per-message processing time — gRPC will issue the WINDOW_UPDATE
     // for this message as soon as this request(1) call sets the credit, not waiting for onNext to return.
+    // Do not move this below the blocking _mailbox.offerRaw call — it must replenish credit
+    // BEFORE the offer so the receiver doesn't gate the sender on per-message application drain time.
     _responseObserver.request(1);
     if (_closedStream) {
       LOGGER.debug("Received a late message once the stream was closed. Ignoring it.");
