@@ -22,7 +22,6 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -197,10 +196,7 @@ public class CovarianceAggregationFunction implements AggregationFunction<Covari
   }
 
   @Override
-  public Double extractFinalResult(@Nullable CovarianceTuple covarianceTuple) {
-    if (covarianceTuple == null) {
-      return null;
-    }
+  public Double extractFinalResult(CovarianceTuple covarianceTuple) {
     long count = covarianceTuple.getCount();
     if (count == 0L) {
       return DEFAULT_FINAL_RESULT;

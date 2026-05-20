@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -103,7 +102,7 @@ public class AnyValueAggregationFunction extends NullableSingleInputAggregationF
   }
 
   @Override
-  public Comparable<?> extractFinalResult(@Nullable Object intermediateResult) {
+  public Comparable<?> extractFinalResult(Object intermediateResult) {
     return (Comparable<?>) intermediateResult;
   }
 
