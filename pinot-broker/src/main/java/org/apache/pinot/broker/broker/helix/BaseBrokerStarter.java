@@ -79,6 +79,7 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -408,6 +409,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
             Broker.AdaptiveServerSelector.DEFAULT_TYPE), 1);
     BrokerMetrics.register(_brokerMetrics);
+    MseMetrics.registerFromConfig(_brokerConf, _metricsRegistry);
 
     LOGGER.info("Connecting spectator Helix manager");
     initSpectatorHelixManager();
