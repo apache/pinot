@@ -73,8 +73,22 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized RoaringBitmap state. Add the
+    // hashCode of the canonical UUID string so DISTINCTCOUNTBITMAP(uuidCol) matches
+    // DISTINCTCOUNTBITMAP(CAST(uuidCol AS STRING)).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      RoaringBitmap bitmap = getValueBitmap(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        bitmap.add(uuidStringValues[i].hashCode());
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized RoaringBitmap
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       RoaringBitmap valueBitmap = aggregationResultHolder.getResult();
@@ -211,8 +225,19 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: add hashCode of canonical UUID string (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(uuidStringValues[i].hashCode());
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized RoaringBitmap
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
@@ -352,8 +377,22 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: add hashCode of canonical UUID string (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        int hash = uuidStringValues[i].hashCode();
+        for (int groupKey : groupKeysArray[i]) {
+          getValueBitmap(groupByResultHolder, groupKey).add(hash);
+        }
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized RoaringBitmap
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {

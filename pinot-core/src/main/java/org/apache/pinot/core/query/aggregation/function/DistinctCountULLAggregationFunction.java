@@ -82,8 +82,21 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized UltraLogLog state. Hash the
+    // canonical UUID string so DISTINCTCOUNTULL(uuidCol) matches DISTINCTCOUNTULL(CAST(uuidCol AS STRING)).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      UltraLogLog ull = getULL(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        UltraLogLogUtils.hashObject(uuidStringValues[i]).ifPresent(ull::add);
+      }
+      return;
+    }
+
+    // Treat BYTES value as serialized UltraLogLog
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -155,8 +168,20 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: hash canonical UUID strings (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
+        UltraLogLogUtils.hashObject(uuidStringValues[i]).ifPresent(ull::add);
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized UltraLogLogs
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -234,8 +259,22 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized HyperLogLogPlus
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: hash canonical UUID strings (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          UltraLogLog ull = getULL(groupByResultHolder, groupKey);
+          UltraLogLogUtils.hashObject(uuidStringValues[i]).ifPresent(ull::add);
+        }
+      }
+      return;
+    }
+
+    // Treat BYTES value as serialized UltraLogLogs
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
