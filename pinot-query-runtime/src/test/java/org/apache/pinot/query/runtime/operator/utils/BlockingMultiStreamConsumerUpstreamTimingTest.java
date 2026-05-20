@@ -135,11 +135,6 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
     AsyncStream<ReceivingMailbox.MseBlockWithStats> streamB = mockStream("mailbox-B");
     AsyncStream<ReceivingMailbox.MseBlockWithStats> streamC = mockStream("mailbox-C");
 
-    List<StatMap<ReceivingMailbox.StatKey>> stats = List.of(
-        new StatMap<>(ReceivingMailbox.StatKey.class),
-        new StatMap<>(ReceivingMailbox.StatKey.class),
-        new StatMap<>(ReceivingMailbox.StatKey.class));
-
     try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
       Map<Object, String> streamIdToSenderKey = new HashMap<>();
       streamIdToSenderKey.put("mailbox-A", keyA);
@@ -150,8 +145,6 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
           createContext(),
           new ArrayList<>(List.of(streamA, streamB, streamC)),
           /* senderStageId= */ 2,
-          List.of("host-a", "host-b", "host-c"),
-          stats,
           streamIdToSenderKey,
           clock::get);
 
@@ -191,10 +184,6 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
       return eos();
     });
 
-    List<StatMap<ReceivingMailbox.StatKey>> stats = List.of(
-        new StatMap<>(ReceivingMailbox.StatKey.class),
-        new StatMap<>(ReceivingMailbox.StatKey.class));
-
     try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
       Map<Object, String> streamIdToSenderKey = new HashMap<>();
       streamIdToSenderKey.put("mailbox-A", keyA);
@@ -204,8 +193,6 @@ public class BlockingMultiStreamConsumerUpstreamTimingTest {
           createContext(),
           new ArrayList<>(List.of(streamA, streamB)),
           /* senderStageId= */ 2,
-          List.of("host-a", "host-b"),
-          stats,
           streamIdToSenderKey,
           clock::get);
 
