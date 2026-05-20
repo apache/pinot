@@ -2197,6 +2197,11 @@ public class CommonConstants {
     ///
     /// This is a direct-memory bound, not just a throughput knob: operators must size it against
     /// `-XX:MaxDirectMemorySize` given the expected concurrent inbound stream count.
+    ///
+    /// Receiver-side counterpart to [#KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES] (the sender-side
+    /// outbound queue cap). The two are aligned at the same default by design — they cap roughly the
+    /// same conceptual thing (one peer's worth of in-flight bytes) from the two ends of the wire — but
+    /// kept as separate keys so operators can tune them independently for asymmetric workloads.
     public static final String KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES =
         "pinot.query.runner.grpc.flow.control.window.bytes";
     public static final int DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES = 64 * 1024 * 1024;
@@ -2216,6 +2221,10 @@ public class CommonConstants {
     /// This is a direct-memory bound, not just a throughput knob: operators must size it against
     /// `-XX:MaxDirectMemorySize` given the expected per-query peer fan-out and the number of concurrent
     /// queries. Pairs with [#KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES].
+    ///
+    /// Sender-side counterpart to [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES] (the receiver-side inbound
+    /// window). The two are aligned at the same default by design, sized together to bound one peer's
+    /// worth of in-flight bytes from each end of the wire.
     public static final String KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES =
         "pinot.query.runner.grpc.write.buffer.high.water.mark.bytes";
     public static final int DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES = 64 * 1024 * 1024;
