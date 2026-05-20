@@ -259,7 +259,8 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     for (Map<String, String> map : streamConfigMaps) {
       // Topic name is stored under the prefixed key "stream.<type>.topic.name"
       String streamType = map.get(StreamConfigProperties.STREAM_TYPE);
-      String topicKey = StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME);
+      String topicKey =
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME);
       if (topicName.equals(map.get(topicKey))) {
         map.put(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE, "true");
         break;
