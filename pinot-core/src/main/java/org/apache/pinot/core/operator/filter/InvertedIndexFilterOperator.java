@@ -44,6 +44,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
   private final InvertedIndexReader<ImmutableRoaringBitmap> _invertedIndexReader;
   private final boolean _exclusive;
+  private final boolean _isSingleValue;
 
   InvertedIndexFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator, DataSource dataSource,
       int numDocs) {
@@ -54,6 +55,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         (InvertedIndexReader<ImmutableRoaringBitmap>) dataSource.getInvertedIndex();
     _invertedIndexReader = invertedIndexReader;
     _exclusive = predicateEvaluator.isExclusive();
+    _isSingleValue = dataSource.getDataSourceMetadata().isSingleValue();
   }
 
   @Override
@@ -102,28 +104,38 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   public int getNumMatchingDocs() {
-    int count = 0;
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
-    switch (dictIds.length) {
-      case 0:
-        break;
-      case 1: {
-        count = _invertedIndexReader.getDocIds(dictIds[0]).getCardinality();
-        break;
+    int count;
+    if (_isSingleValue) {
+      // On a single-value column, per-dictId bitmaps partition the docId space (each docId has exactly one
+      // dictId), so the union cardinality equals the sum of per-bitmap cardinalities. No scratch bitmap is
+      // allocated and no OR pass is performed.
+      count = 0;
+      for (int dictId : dictIds) {
+        count += _invertedIndexReader.getDocIds(dictId).getCardinality();
       }
-      case 2: {
-        count = ImmutableRoaringBitmap.orCardinality(_invertedIndexReader.getDocIds(dictIds[0]),
-            _invertedIndexReader.getDocIds(dictIds[1]));
-        break;
-      }
-      default: {
-        // this could be optimised if the bitmaps are known to be disjoint (as in a single value bitmap index)
-        MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-        for (int dictId : dictIds) {
-          bitmap.or(_invertedIndexReader.getDocIds(dictId));
-        }
-        count = bitmap.getCardinality();
-        break;
+    } else {
+      // TODO: For MV column, per-dictId bitmaps may overlap, so we must materialize the union to count.
+      // A streaming union-cardinality variant was benchmarked but not implemented as a few combinations of
+      // cardinality and number of matching dictIds shows regressions.
+      count = 0;
+      switch (dictIds.length) {
+        case 0:
+          break;
+        case 1:
+          count = _invertedIndexReader.getDocIds(dictIds[0]).getCardinality();
+          break;
+        case 2:
+          count = ImmutableRoaringBitmap.orCardinality(_invertedIndexReader.getDocIds(dictIds[0]),
+              _invertedIndexReader.getDocIds(dictIds[1]));
+          break;
+        default:
+          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+          for (int dictId : dictIds) {
+            bitmap.or(_invertedIndexReader.getDocIds(dictId));
+          }
+          count = bitmap.getCardinality();
+          break;
       }
     }
     return _exclusive ? _numDocs - count : count;
