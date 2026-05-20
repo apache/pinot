@@ -42,9 +42,7 @@ public class PinotRuleSetTest {
     assertEquals(ruleSet.rulesFor(Phase.PROJECT_PUSHDOWN), PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES);
     assertEquals(ruleSet.rulesFor(Phase.PRUNE), PinotQueryRuleSets.PRUNE_RULES);
     assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL), PinotQueryRuleSets.POST_LOGICAL_RULES);
-    assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL), PinotQueryRuleSets.PINOT_POST_RULES_V2);
-    assertTrue(ruleSet.rulesFor(Phase.POST_LOGICAL_ENRICHED_JOIN).size() > 0,
-        "POST_LOGICAL_ENRICHED_JOIN should be populated by PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES");
+    assertEquals(ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL_OPT), PinotQueryRuleSets.PINOT_POST_RULES_V2);
   }
 
   @Test

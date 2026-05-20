@@ -259,5 +259,4 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_REDUCE_EXPRESSIONS
   );
   //@formatter:on
-
 }

@@ -21,7 +21,6 @@ package org.apache.pinot.query.planner.rules;
 import com.google.auto.service.AutoService;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
-import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
@@ -59,11 +58,8 @@ public final class DefaultRuleSetCustomizer implements RuleSetCustomizer {
       case POST_LOGICAL:
         rules.addAll(PinotQueryRuleSets.POST_LOGICAL_RULES);
         return;
-      case POST_LOGICAL_PHYSICAL:
+      case POST_LOGICAL_PHYSICAL_OPT:
         rules.addAll(PinotQueryRuleSets.PINOT_POST_RULES_V2);
-        return;
-      case POST_LOGICAL_ENRICHED_JOIN:
-        rules.addAll(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
         return;
       default:
         throw new IllegalStateException(

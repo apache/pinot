@@ -656,13 +656,8 @@ public class QueryEnvironment {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
       }
-      if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet,
-          config.defaultDisabledPlannerRules())) {
-        // push filter and project above join to enrichedJoin, does not work with physical optimizer
-        hepProgramBuilder.addRuleCollection(ruleSet.rulesFor(Phase.POST_LOGICAL_ENRICHED_JOIN));
-      }
     } else {
-      for (RelOptRule relOptRule : ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL)) {
+      for (RelOptRule relOptRule : ruleSet.rulesFor(Phase.POST_LOGICAL_PHYSICAL_OPT)) {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }

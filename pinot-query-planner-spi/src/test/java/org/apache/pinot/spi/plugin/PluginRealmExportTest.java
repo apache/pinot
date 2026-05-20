@@ -56,7 +56,7 @@ public class PluginRealmExportTest {
 
       ClassLoader pluginRealm = loaders.iterator().next();
 
-      // RuleSetCustomizer is in org.apache.pinot.query.planner.rules, which PluginManager
+      // RuleSetCustomizer is in org.apache.pinot.query.planner.spi, which PluginManager
       // exports from the pinotRealm. Loading it from the plugin realm must succeed.
       Class<?> customizerClass = pluginRealm.loadClass(RuleSetCustomizer.class.getName());
       Assert.assertNotNull(customizerClass);

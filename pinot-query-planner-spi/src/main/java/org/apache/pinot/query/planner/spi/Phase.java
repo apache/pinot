@@ -55,10 +55,5 @@ public enum Phase {
 
   /// Post-logical rules used when the physical optimizer **is** enabled.
   /// OSS defaults: `DefaultRuleSetCustomizer.POST_LOGICAL_PHYSICAL_RULES`.
-  POST_LOGICAL_PHYSICAL,
-
-  /// Conditional enriched-join rules applied after the post-logical phase
-  /// when the `JOIN_TO_ENRICHED_JOIN` rule is not skipped.
-  /// OSS defaults: `PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES`.
-  POST_LOGICAL_ENRICHED_JOIN
+  POST_LOGICAL_PHYSICAL_OPT
 }
