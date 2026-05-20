@@ -61,7 +61,8 @@ public class MailboxContentObserverTest {
     when(mailboxService.getReceivingMailbox(TEST_MAILBOX_ID)).thenReturn(receivingMailbox);
     @SuppressWarnings("unchecked")
     ServerCallStreamObserver<MailboxStatus> mockStatusObserver = mock(ServerCallStreamObserver.class);
-    MailboxContentObserver observer = new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver);
+    MailboxContentObserver observer =
+        new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver, true);
 
     // Each onNext call should request(1) exactly once, regardless of whether the stream is already closed.
     MailboxContent mockContent = mock(MailboxContent.class);
@@ -73,5 +74,35 @@ public class MailboxContentObserverTest {
 
     observer.onNext(mockContent);
     verify(mockStatusObserver, times(2)).request(1);
+  }
+
+  /// Asserts the manual-inbound-flow-control kill-switch
+  /// (`pinot.query.runner.grpc.manual.inbound.flow.control.enabled` = `false`) really removes the
+  /// `request(1)` replenishment from the top of `onNext`. With the flag off, gRPC's auto-inbound is in
+  /// place and will replenish 1 credit after `onNext` returns; calling `request(1)` here too would
+  /// double-count and defeat the rollback.
+  ///
+  /// If someone removes the `if (_manualInboundFlowControlEnabled)` guard, this test fails and surfaces
+  /// the regression in CI.
+  @Test
+  public void testOnNextDoesNotReplenishCreditWhenManualFlowControlDisabled() {
+    MailboxService mailboxService = mock(MailboxService.class);
+    ReceivingMailbox receivingMailbox = mock(ReceivingMailbox.class);
+    when(mailboxService.getReceivingMailbox(TEST_MAILBOX_ID)).thenReturn(receivingMailbox);
+    @SuppressWarnings("unchecked")
+    ServerCallStreamObserver<MailboxStatus> mockStatusObserver = mock(ServerCallStreamObserver.class);
+    MailboxContentObserver observer =
+        new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver, false);
+
+    MailboxContent mockContent = mock(MailboxContent.class);
+    when(mockContent.getPayload()).thenReturn(ByteString.copyFrom(new byte[0]));
+    when(mockContent.getMailboxId()).thenReturn(TEST_MAILBOX_ID);
+
+    observer.onNext(mockContent);
+    observer.onNext(mockContent);
+
+    // With manual flow control disabled, onNext must NOT call request(1) — gRPC's auto-inbound machinery
+    // handles credit replenishment after onNext returns.
+    verify(mockStatusObserver, never()).request(anyInt());
   }
 }

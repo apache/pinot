@@ -64,6 +64,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final PooledByteBufAllocatorMetric _bufAllocatorMetric;
   private final int _flowControlWindowBytes;
   private final int _inboundMessageCredit;
+  private final boolean _manualInboundFlowControlEnabled;
 
   /**
    * Constructs a gRPC-based mailbox server.
@@ -146,6 +147,9 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     _inboundMessageCredit = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT);
+    _manualInboundFlowControlEnabled = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED);
     int maxInboundMessageSize = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES);
@@ -178,8 +182,9 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   }
 
   public void start() {
-    LOGGER.info("Starting GrpcMailboxServer with flowControlWindow={} bytes, inboundMessageCredit={}",
-        _flowControlWindowBytes, _inboundMessageCredit);
+    LOGGER.info("Starting GrpcMailboxServer with flowControlWindow={} bytes, inboundMessageCredit={}, "
+            + "manualInboundFlowControlEnabled={}",
+        _flowControlWindowBytes, _inboundMessageCredit, _manualInboundFlowControlEnabled);
     try {
       _server.start();
     } catch (IOException e) {
@@ -213,8 +218,17 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     String mailboxId = ChannelUtils.MAILBOX_ID_CTX_KEY.get();
     ServerCallStreamObserver<Mailbox.MailboxStatus> serverCallObserver =
         (ServerCallStreamObserver<Mailbox.MailboxStatus>) responseObserver;
-    serverCallObserver.disableAutoInboundFlowControl();
-    serverCallObserver.request(_inboundMessageCredit);
-    return new MailboxContentObserver(_mailboxService, mailboxId, serverCallObserver);
+    if (_manualInboundFlowControlEnabled) {
+      // Manual inbound flow control: override gRPC's auto-inbound (which calls request(1) after each
+      // onNext) and prefetch _inboundMessageCredit messages up-front. MailboxContentObserver.onNext will
+      // then replenish one credit at the top of each call so the in-flight window stays full while the
+      // application drains. This is the primary throughput knob for small/medium MSE blocks.
+      serverCallObserver.disableAutoInboundFlowControl();
+      serverCallObserver.request(_inboundMessageCredit);
+    }
+    // Else: leave gRPC's auto-inbound in place — only 1 message in flight at a time. This is the pre-PR
+    // behaviour, retained as a rollback knob via KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED.
+    return new MailboxContentObserver(_mailboxService, mailboxId, serverCallObserver,
+        _manualInboundFlowControlEnabled);
   }
 }

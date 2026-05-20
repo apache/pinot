@@ -2238,16 +2238,54 @@ public class CommonConstants {
     /// Number of inbound gRPC messages the receiver will accept in flight per stream, before requiring the
     /// application to consume one (via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]
     /// returning). Implemented by disabling gRPC's default auto-inbound-flow-control on the server side and
-    /// calling [io.grpc.stub.ServerCallStreamObserver#request] explicitly.
+    /// calling [io.grpc.stub.ServerCallStreamObserver#request] explicitly. Only takes effect when
+    /// [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is `true` (its default).
     ///
     /// Larger values let the sender pipeline more messages without waiting for per-message round trips,
     /// which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
     /// is still bounded by the HTTP/2 stream window (see [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES]), so this
     /// credit count is effectively a per-stream message-count limit on top of the byte-count limit.
     /// Whichever fires first applies.
+    ///
+    /// ## Cancel-propagation tradeoff
+    ///
+    /// Higher credit values widen the in-flight window, which improves throughput for small/medium blocks
+    /// but also **widens worst-case cancel-propagation latency** when the receiver's application queue
+    /// (capacity 5 by default) is stuck. The sender's
+    /// [org.apache.pinot.query.mailbox.GrpcSendingMailbox#cancel] pushes an error EOS **in-band** on the
+    /// same gRPC stream as data; when the receiver's dispatch thread is parked in `_notFull.await`, that
+    /// EOS sits behind every inbound message that already made it past flow control. Worst-case cancel
+    /// latency is bounded by `min(credit messages, flowControlWindow bytes)` worth of buffered inbound that
+    /// has to drain before the EOS reaches the application.
+    ///
+    /// Note that this hang surface is **pre-existing** — the in-band EOS path can stall even with gRPC's
+    /// auto-inbound default of 1 in-flight message if the receiver's application queue is permanently
+    /// stuck (e.g. the consumer is gone). The credit value just controls how much worse the latency gets
+    /// before the hang surfaces. See https://github.com/apache/pinot/issues/18541 for the proper
+    /// out-of-band cancel work.
     public static final String KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT =
         "pinot.query.runner.grpc.inbound.message.credit";
     public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 128;
+
+    /// Whether the receiver overrides gRPC's auto-inbound-flow-control on the mailbox stream and prefetches
+    /// [#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT] messages of credit up-front, then replenishes one credit
+    /// before each `onNext` does the (possibly blocking) hand-off to the application queue.
+    ///
+    /// Default `true`. When `true` (default): the receiver disables gRPC's auto-inbound and prefetches
+    /// [#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT] messages of credit. This is the primary throughput knob for
+    /// small/medium MSE blocks introduced in #18519.
+    ///
+    /// When `false`: the receiver leaves gRPC's auto-inbound in place — only 1 message in flight at a
+    /// time. This is the pre-PR-#18519 behaviour, intended as a rollback knob if the wider in-flight
+    /// window causes a regression in the field. Cancel-propagation latency is bounded more tightly when
+    /// this is `false`, but the worst case (a stuck receiver dispatch thread) is still possible because
+    /// the sender's cancel travels in-band; see https://github.com/apache/pinot/issues/18541.
+    ///
+    /// This is an independent rollback knob from [#KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED]; the two
+    /// control different sides of the mailbox path.
+    public static final String KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED =
+        "pinot.query.runner.grpc.manual.inbound.flow.control.enabled";
+    public static final boolean DEFAULT_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED = true;
 
     /**
      * Configuration for channel idle timeout in seconds.

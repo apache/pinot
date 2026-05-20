@@ -228,6 +228,24 @@ public class GrpcSendingMailbox implements SendingMailbox {
     return sizeInBytes;
   }
 
+  /// Cancels this mailbox by pushing an error EOS to the receiver and closing the gRPC stream.
+  ///
+  /// ## Known limitation: in-band EOS on a stuck receiver
+  ///
+  /// The error EOS is pushed **in-band** on the same gRPC stream as data, via
+  /// [#processAndSend] with `bypassReady=true`. If the receiver's application queue
+  /// ([org.apache.pinot.query.mailbox.ReceivingMailbox], default capacity 5) is full and its dispatch
+  /// thread is parked in `_notFull.await`, the EOS sits behind every other inbound message that already
+  /// made it past gRPC's inbound flow-control window. Worst-case cancel-propagation latency is bounded by
+  /// the receiver's inbound credit
+  /// ([org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT])
+  /// and [org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES].
+  ///
+  /// This is **pre-existing** behaviour — the hang surface existed even with gRPC's auto-inbound default of
+  /// 1 in-flight message, and survives the rollback knob
+  /// [org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED]
+  /// = `false`. The proper fix is an out-of-band cancel channel; see
+  /// https://github.com/apache/pinot/issues/18541.
   @Override
   public void cancel(Throwable t) {
     if (isTerminated()) {
