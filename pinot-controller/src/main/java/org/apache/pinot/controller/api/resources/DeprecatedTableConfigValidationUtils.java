@@ -484,6 +484,14 @@ public final class DeprecatedTableConfigValidationUtils {
       return _severity;
     }
 
+    /// Returns the raw `since` string from the source `@DeprecatedConfig`. Exposed for tests so they can lock
+    /// the build-time invariant that every annotated `since` parses to a non-null version (see
+    /// `testEveryRuleHasParseableSince`); a typo here would resolve to `Severity.ERROR` and turn every REST
+    /// PUT/POST that touches this path into a 400 the moment the soft-launch flag flips.
+    String since() {
+      return _since;
+    }
+
     /// Returns the bean class that declares the leaf annotated getter. Exposed for tests so they can verify the
     /// default-value invariant assumed by [#isJacksonDefault].
     Class<?> leafOwner() {

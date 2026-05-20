@@ -385,6 +385,22 @@ public class DeprecatedTableConfigValidationUtilsTest {
     }
   }
 
+  /// Locks the build-time invariant that every `@DeprecatedConfig.since` value is parseable. Without this guard
+  /// a typo like `@DeprecatedConfig(since = "")` would classify as ERROR (Severity.ERROR is the unparseable-
+  /// since fallback in `classifySeverity`). Today, under `SOFT_LAUNCH_WARNING_ONLY = true`, an ERROR fires the
+  /// throw branch in `validateOnCreate`/`validateOnUpdate` → 400 from the REST endpoints. When the soft-launch
+  /// flag flips, a since-typo on any annotation becomes a permanent production outage for every PUT/POST that
+  /// touches that path. Fail at class-load instead.
+  @Test
+  public void testEveryRuleHasParseableSince() {
+    for (DeprecatedConfigRule rule : DeprecatedTableConfigValidationUtils.rulesForTesting()) {
+      assertEquals(rule.severity(), Severity.WARNING,
+          "Rule at " + rule.pathSegments() + " has @DeprecatedConfig(since=\"" + rule.since() + "\") that the "
+              + "soft-launch classifier resolved to " + rule.severity() + ". Under SOFT_LAUNCH_WARNING_ONLY=true "
+              + "this means `since` is unparseable. Use MAJOR.MINOR or MAJOR.MINOR.PATCH form (e.g. \"1.6.0\").");
+    }
+  }
+
   /// Locks the dual-annotation invariant: every getter annotated with `@DeprecatedConfig` (the validator metadata)
   /// must also carry `@Deprecated` (the JDK marker that surfaces IDE/compiler warnings). Without this guard a
   /// future contributor can add a `@DeprecatedConfig` annotation without `@Deprecated`, so callers continue to
