@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -64,7 +65,19 @@ public final class SegmentProcessorAvroUtils {
     for (String field : fields) {
       Object value = genericRow.getValue(field);
       if (value instanceof Object[]) {
-        reusableRecord.put(field, Arrays.asList((Object[]) value));
+        Schema.Field avroField = avroSchema.getField(field);
+        if (avroField != null && isUuidArrayLogicalType(avroField.schema())) {
+          // MV UUID columns are emitted with an Avro array<string{logicalType:uuid}> schema; convert each
+          // 16-byte element to its canonical UUID string so GenericDatumWriter accepts the record.
+          Object[] elements = (Object[]) value;
+          List<Object> converted = new ArrayList<>(elements.length);
+          for (Object element : elements) {
+            converted.add(element instanceof byte[] ? UuidUtils.toString((byte[]) element) : element);
+          }
+          reusableRecord.put(field, converted);
+        } else {
+          reusableRecord.put(field, Arrays.asList((Object[]) value));
+        }
       } else {
         if (value instanceof byte[]) {
           // UUID columns are emitted with an Avro string{logicalType:uuid} schema (Avro 1.x only allows the
@@ -86,6 +99,10 @@ public final class SegmentProcessorAvroUtils {
   private static boolean isUuidLogicalType(Schema schema) {
     LogicalType logicalType = LogicalTypes.fromSchemaIgnoreInvalid(schema);
     return logicalType != null && "uuid".equals(logicalType.getName());
+  }
+
+  private static boolean isUuidArrayLogicalType(Schema schema) {
+    return schema.getType() == Schema.Type.ARRAY && isUuidLogicalType(schema.getElementType());
   }
 
   /**
