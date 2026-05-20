@@ -6,9 +6,12 @@
     "timeType": "DAYS",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",
-    "segmentPushType": "APPEND",
-    "replication": "3",
-    "replicasPerPartition": "1"
+    "replication": "3"
+  },
+  "segmentAssignmentConfigMap": {
+    "COMPLETED": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tenants": {
     "broker": "brokerOne",
@@ -19,17 +22,23 @@
     "invertedIndexColumns": [
       "column1",
       "column2"
-    ],
-    "streamConfigs": {
-      "streamType": "kafka",
-      "stream.kafka.topic.name": "kafkaTopicName",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder",
-      "stream.kafka.decoder.prop.schema.registry.rest.url": "http://localhost:2222/schemaRegistry",
-      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
-      "stream.kafka.consumer.prop.auto.offset.reset": "largest",
-      "stream.kafka.broker.list": "localhost:19092",
-      "realtime.segment.flush.threshold.time": "12h",
-      "realtime.segment.flush.threshold.size": "100000"
+    ]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "kafkaTopicName",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaAvroMessageDecoder",
+          "stream.kafka.decoder.prop.schema.registry.rest.url": "http://localhost:2222/schemaRegistry",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory",
+          "stream.kafka.consumer.prop.auto.offset.reset": "largest",
+          "stream.kafka.broker.list": "localhost:19092",
+          "realtime.segment.flush.threshold.time": "12h",
+          "realtime.segment.flush.threshold.size": "100000"
+        }
+      ]
     }
   },
   "metadata": {

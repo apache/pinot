@@ -3668,11 +3668,10 @@ public class TableConfigUtilsTest {
     String expectedPushType = "APPEND";
 
     Map<String, String> expectedStreamConfigsMap = getTestStreamConfigs();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setSegmentPushFrequency(expectedPushFrequency)
-        .setSegmentPushType(expectedPushType)
-        .setStreamConfigs(expectedStreamConfigsMap)
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    tableConfig.getValidationConfig().setSegmentPushFrequency(expectedPushFrequency);
+    tableConfig.getValidationConfig().setSegmentPushType(expectedPushType);
+    tableConfig.getIndexingConfig().setStreamConfigs(expectedStreamConfigsMap);
 
     // Before conversion, the ingestion config should be null.
     assertNull(tableConfig.getIngestionConfig());

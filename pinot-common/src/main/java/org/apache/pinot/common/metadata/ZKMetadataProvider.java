@@ -539,6 +539,16 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT), replaceVariables, applyDecorator);
   }
 
+  /// Returns the raw [ZNRecord] for a stored table config without deserializing it. Use this when callers need the
+  /// byte-faithful view of what was last written to ZK (e.g. update-time deprecation diffing). Returns null when
+  /// the table does not exist.
+  @Nullable
+  public static ZNRecord getTableConfigZNRecord(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    return propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
+        AccessOption.PERSISTENT);
+  }
+
   @Nullable
   public static ImmutablePair<TableConfig, Stat> getTableConfigWithStat(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {

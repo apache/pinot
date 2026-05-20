@@ -2,13 +2,17 @@
   "tableName": "dailySales",
   "tableType": "REALTIME",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "timeColumnName": "daysSinceEpoch",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "50000",
     "replication": "1"
   },
   "tenants": {
+  },
+  "segmentAssignmentConfigMap": {
+    "COMPLETED": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
@@ -18,6 +22,9 @@
     ]
   },
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "streamIngestionConfig": {
       "streamConfigMaps": [
         {

@@ -22,6 +22,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.helix.core.WatermarkInductionResult;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -44,16 +45,26 @@ public class CopyTableResponse {
   @JsonProperty("watermarkInductionResult")
   private WatermarkInductionResult _watermarkInductionResult;
 
+  @JsonProperty("deprecationWarnings")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<String> _deprecationWarnings;
+
   @JsonCreator
   public CopyTableResponse(@JsonProperty("status") String status, @JsonProperty("msg") String msg,
       @JsonProperty("schema") @Nullable Schema schema,
       @JsonProperty("realtimeTableConfig") @Nullable TableConfig tableConfig,
       @JsonProperty("watermarkInductionResult") @Nullable WatermarkInductionResult watermarkInductionResult) {
+    this(status, msg, schema, tableConfig, watermarkInductionResult, null);
+  }
+
+  public CopyTableResponse(String status, String msg, @Nullable Schema schema, @Nullable TableConfig tableConfig,
+      @Nullable WatermarkInductionResult watermarkInductionResult, @Nullable List<String> deprecationWarnings) {
     _status = status;
     _msg = msg;
     _schema = schema;
     _tableConfig = tableConfig;
     _watermarkInductionResult = watermarkInductionResult;
+    _deprecationWarnings = deprecationWarnings == null ? List.of() : deprecationWarnings;
   }
 
   public String getMsg() {
@@ -95,5 +106,13 @@ public class CopyTableResponse {
   public void setWatermarkInductionResult(
       WatermarkInductionResult watermarkInductionResult) {
     _watermarkInductionResult = watermarkInductionResult;
+  }
+
+  public List<String> getDeprecationWarnings() {
+    return _deprecationWarnings;
+  }
+
+  public void setDeprecationWarnings(@Nullable List<String> deprecationWarnings) {
+    _deprecationWarnings = deprecationWarnings == null ? List.of() : deprecationWarnings;
   }
 }

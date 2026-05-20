@@ -2,10 +2,14 @@
   "tableName": "fineFoodReviews",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
   "tenants": {
+  },
+  "segmentAssignmentConfigMap": {
+    "OFFLINE": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
@@ -16,6 +20,11 @@
       "columns": ["UserId", "ProductId", "Summary"]
     }
   },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
+  },
   "metadata": {
     "customConfigs": {
     }
@@ -23,7 +32,9 @@
   "fieldConfigList": [
     {
       "encodingType": "RAW",
-      "indexType": "VECTOR",
+      "indexTypes": [
+        "VECTOR"
+      ],
       "name": "embedding",
       "properties": {
         "vectorIndexType": "HNSW",

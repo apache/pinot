@@ -6,8 +6,12 @@
     "timeType": "DAYS",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "365",
-    "segmentPushType": "APPEND",
     "replication": "3"
+  },
+  "segmentAssignmentConfigMap": {
+    "OFFLINE": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tenants": {
     "broker": "brokerOne",
@@ -22,6 +26,11 @@
   },
   "metadata": {
     "customConfigs": {
+    }
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
     }
   }
 }

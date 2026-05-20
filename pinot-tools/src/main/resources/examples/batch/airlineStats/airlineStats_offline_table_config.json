@@ -4,8 +4,12 @@
   "segmentsConfig": {
     "timeColumnName": "DaysSinceEpoch",
     "timeType": "DAYS",
-    "segmentPushType": "APPEND",
     "replication": "1"
+  },
+  "segmentAssignmentConfigMap": {
+    "OFFLINE": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tenants": {},
   "fieldConfigList": [
@@ -117,6 +121,9 @@
     }
   ],
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "transformConfigs": [
       {
         "columnName": "ts",

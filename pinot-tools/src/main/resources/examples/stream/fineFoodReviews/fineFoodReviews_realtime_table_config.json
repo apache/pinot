@@ -2,13 +2,17 @@
   "tableName": "fineFoodReviews",
   "tableType": "REALTIME",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "timeColumnName": "ts",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",
     "replication": "1"
   },
   "tenants": {
+  },
+  "segmentAssignmentConfigMap": {
+    "COMPLETED": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
@@ -23,6 +27,9 @@
     ]
   },
   "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    },
     "streamIngestionConfig": {
       "streamConfigMaps": [
         {
@@ -52,7 +59,9 @@
   "fieldConfigList": [
     {
       "encodingType": "RAW",
-      "indexType": "VECTOR",
+      "indexTypes": [
+        "VECTOR"
+      ],
       "name": "embedding",
       "properties": {
         "vectorIndexType": "HNSW",

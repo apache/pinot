@@ -93,6 +93,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
@@ -231,6 +232,7 @@ public class PinotTableRestletResource {
     TableConfig tableConfig;
     String tableNameWithType;
     Schema schema;
+    List<String> deprecationWarnings;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
@@ -252,6 +254,8 @@ public class PinotTableRestletResource {
       schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
 
+      deprecationWarnings = DeprecatedTableConfigValidationUtils.validateOnCreate(
+          JsonUtils.stringToJsonNode(tableConfigStr), null);
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       TableConfigValidationUtils.validateTableConfig(
@@ -271,7 +275,7 @@ public class PinotTableRestletResource {
       // the validation manager)
       LOGGER.info("Successfully added table: {} with config: {}", tableNameWithType, tableConfig);
       return new ConfigSuccessResponse("Table " + tableNameWithType + " successfully added",
-          tableConfigAndUnrecognizedProperties.getRight());
+          tableConfigAndUnrecognizedProperties.getRight(), deprecationWarnings);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
@@ -346,6 +350,13 @@ public class PinotTableRestletResource {
 
       ObjectNode realtimeTableConfigNode = (ObjectNode) tableConfigNode.get(TableType.REALTIME.name());
       tweakRealtimeTableConfig(realtimeTableConfigNode, copyTablePayload);
+      List<String> copyDeprecationWarnings;
+      try {
+        copyDeprecationWarnings =
+            DeprecatedTableConfigValidationUtils.validateOnCreate(realtimeTableConfigNode, null);
+      } catch (IllegalArgumentException e) {
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
+      }
       TableConfig realtimeTableConfig = JsonUtils.jsonNodeToObject(realtimeTableConfigNode, TableConfig.class);
       if (realtimeTableConfig.getUpsertConfig() != null) {
         throw new IllegalStateException("upsert table copy not supported");
@@ -353,7 +364,8 @@ public class PinotTableRestletResource {
       LOGGER.info("[copyTable] Successfully fetched and tweaked table config for table: {}", tableName);
 
       if (dryRun) {
-        return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult);
+        return new CopyTableResponse("success", "Dry run", schema, realtimeTableConfig, watermarkInductionResult,
+            copyDeprecationWarnings);
       }
 
       List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(realtimeTableConfig);
@@ -366,10 +378,11 @@ public class PinotTableRestletResource {
       // Add the table with designated starting kafka offset and segment sequence number to create consuming segments
       _pinotHelixResourceManager.addTable(realtimeTableConfig, streamMetadataList);
       LOGGER.info("[copyTable] Successfully added table config: {} with designated high watermark", tableName);
-      CopyTableResponse response = new CopyTableResponse("success", "Table copied successfully", null, null, null);
+      CopyTableResponse response = new CopyTableResponse("success", "Table copied successfully", null, null, null,
+          copyDeprecationWarnings);
       if (hasOffline) {
         response = new CopyTableResponse("warn", "detect offline too; it will only copy real-time segments",
-            null, null, null);
+            null, null, null, copyDeprecationWarnings);
       }
       if (verbose) {
         response.setSchema(schema);
@@ -777,12 +790,17 @@ public class PinotTableRestletResource {
       throws Exception {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
+    JsonNode newTableConfigJson;
     String tableNameWithType;
     Schema schema;
+    List<String> deprecationWarnings = List.of();
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
+      // Capture the raw JsonNode view alongside the typed view so the deprecation diff below does not re-parse
+      // the same input.
+      newTableConfigJson = JsonUtils.stringToJsonNode(tableConfigString);
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
       tableConfig.setTableName(tableNameWithType);
       String tableNameFromPath = DatabaseUtils.translateTableName(
@@ -802,11 +820,37 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
 
+    // Existence check runs before the deprecation diff so a PUT to a missing table reports 404 rather than a
+    // misleading 400 about deprecated keys.
+    if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
+          Response.Status.NOT_FOUND);
+    }
+
+    // Deprecation diff is computed against the byte-faithful stored ZNRecord. Runs outside the BAD_REQUEST catch
+    // so ZK transient failures propagate as 5xx rather than masquerading as client-side validation errors.
+    // Best-effort: read and write are not atomic, so a concurrent legal write between the read here and the write
+    // below can leave deprecated keys in the stored config without firing a deprecation error.
+    // TODO(SOFT_LAUNCH_WARNING_ONLY): when DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY is
+    // flipped to false (severity promotion), replace this best-effort read-then-write with a version-checked
+    // CAS so a deprecated key cannot slip past the diff via a concurrent update on the same table. See the
+    // promotion pre-conditions in DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY Javadoc.
     try {
-      if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
-        throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
-            Response.Status.NOT_FOUND);
-      }
+      JsonNode oldTableConfigJson = TableConfigSerDeUtils.toRawJsonNode(
+          ZKMetadataProvider.getTableConfigZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+              tableNameWithType));
+      deprecationWarnings = DeprecatedTableConfigValidationUtils.validateOnUpdate(
+          newTableConfigJson, oldTableConfigJson, null);
+    } catch (IllegalArgumentException e) {
+      String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
+      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
+    } catch (RuntimeException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      LOGGER.warn("Failed to compute deprecation diff for update of table: {}", tableNameWithType, e);
+      throw e;
+    }
+
+    try {
       _pinotHelixResourceManager.updateTableConfig(tableConfig, force);
     } catch (TableConfigBackwardIncompatibleException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
@@ -822,7 +866,7 @@ public class PinotTableRestletResource {
     }
     LOGGER.info("Successfully updated table: {} with new config: {}", tableNameWithType, tableConfig);
     return new ConfigSuccessResponse("Table config updated for " + tableName,
-        tableConfigAndUnrecognizedProperties.getRight());
+        tableConfigAndUnrecognizedProperties.getRight(), deprecationWarnings);
   }
 
   @POST
@@ -837,12 +881,14 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
+    JsonNode tableConfigJson;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
+      tableConfigJson = JsonUtils.stringToJsonNode(tableConfigStr);
     } catch (IOException e) {
-      String msg = String.format("Invalid table config json string: %s. Reason: %s", tableConfigStr, e.getMessage());
-      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, "Invalid table config json string. " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
     }
     TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
@@ -851,10 +897,34 @@ public class PinotTableRestletResource {
     // validate permission
     ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
         AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
+    JsonNode oldTableConfigJson;
+    try {
+      oldTableConfigJson = TableConfigSerDeUtils.toRawJsonNode(
+          ZKMetadataProvider.getTableConfigZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+              tableNameWithType));
+    } catch (RuntimeException e) {
+      LOGGER.warn("Failed to read stored config for validate of table: {}", tableNameWithType, e);
+      throw e;
+    }
+    List<String> deprecationWarnings;
+    try {
+      if (oldTableConfigJson == null) {
+        deprecationWarnings = DeprecatedTableConfigValidationUtils.validateOnCreate(tableConfigJson, null);
+      } else {
+        deprecationWarnings = DeprecatedTableConfigValidationUtils.validateOnUpdate(tableConfigJson,
+            oldTableConfigJson, null);
+      }
+    } catch (IllegalArgumentException e) {
+      String msg = String.format("Invalid table config: %s. %s", tableNameWithType, e.getMessage());
+      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
+    }
 
     ObjectNode validationResponse = validateConfig(tableConfig, typesToSkip);
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
+    if (!deprecationWarnings.isEmpty()) {
+      validationResponse.set("deprecationWarnings", JsonUtils.objectToJsonNode(deprecationWarnings));
+    }
     return validationResponse;
   }
 

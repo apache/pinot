@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
 
 
 public class FieldConfig extends BaseJsonConfig {
@@ -202,6 +204,8 @@ public class FieldConfig extends BaseJsonConfig {
 
   @Nullable
   @Deprecated
+  @JsonIgnore
+  @DeprecatedConfig(replacement = "Use 'fieldConfigList[].indexTypes' instead.", since = "0.9.0")
   public IndexType getIndexType() {
     return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
   }

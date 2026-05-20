@@ -4,16 +4,22 @@
   "segmentsConfig": {
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "1",
-    "segmentPushType": "APPEND",
     "replication": "1"
   },
   "tenants": {
+  },
+  "segmentAssignmentConfigMap": {
+    "OFFLINE": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "fieldConfigList": [
     {
       "name": "location_st_point",
       "encodingType": "RAW",
-      "indexType": "H3",
+      "indexTypes": [
+        "H3"
+      ],
       "properties": {
         "resolutions": "5"
       }
@@ -24,6 +30,11 @@
     "noDictionaryColumns": [
       "location_st_point"
     ]
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
+    }
   },
   "metadata": {
     "customConfigs": {

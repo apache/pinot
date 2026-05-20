@@ -2,8 +2,12 @@
   "tableName": "baseballStats",
   "tableType": "OFFLINE",
   "segmentsConfig": {
-    "segmentPushType": "APPEND",
     "replication": "1"
+  },
+  "segmentAssignmentConfigMap": {
+    "OFFLINE": {
+      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
+    }
   },
   "tenants": {
   },
@@ -16,6 +20,11 @@
   },
   "metadata": {
     "customConfigs": {
+    }
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND"
     }
   }
 }

@@ -147,6 +147,71 @@ String status = tableClient.getTableStatus("myTable");
 String rebalanceResult = tableClient.rebalanceTable("myTable", true, "default", 1);
 ```
 
+### Creating Tables With Modern Config Fields
+
+Table create and update endpoints surface deprecated table-config properties via a `deprecationWarnings` field on
+the success response. The validator is in soft-launch mode: requests with deprecated keys succeed (HTTP 200) and the
+controller logs a warning. A future release will promote older deprecations to a `400 BAD_REQUEST` rejection, so
+clients should treat any value in `deprecationWarnings` as a migration TODO and update their payloads accordingly.
+
+Common migrations:
+
+- `segmentsConfig.segmentPushType` -> `ingestionConfig.batchIngestionConfig.segmentIngestionType`
+- `segmentsConfig.segmentPushFrequency` -> `ingestionConfig.batchIngestionConfig.segmentIngestionFrequency`
+- `tableIndexConfig.streamConfigs` -> `ingestionConfig.streamIngestionConfig.streamConfigMaps`
+- `fieldConfigList[].indexType` -> `fieldConfigList[].indexTypes`
+
+Sample REALTIME table config for create:
+
+```json
+{
+  "tableName": "events",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "ts",
+    "replication": "1"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "fieldConfigList": [
+    {
+      "name": "userId",
+      "encodingType": "DICTIONARY",
+      "indexTypes": [
+        "INVERTED"
+      ]
+    }
+  ],
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "APPEND",
+      "segmentIngestionFrequency": "DAILY"
+    },
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "events",
+          "stream.kafka.consumer.type": "lowlevel",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder"
+        }
+      ]
+    }
+  },
+  "metadata": {}
+}
+```
+
+A create or update request that includes deprecated fields succeeds (HTTP 200) with a populated
+`deprecationWarnings` array on the response body. Each entry names the offending JSON path and the replacement
+field to use. The response shape is identical for the `/tables/.../validate` and `/tableConfigs/.../validate`
+endpoints, so the same parser can surface warnings from any of them.
+
 ### Schema Operations
 
 ```java

@@ -57,6 +57,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -708,11 +710,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer =
           new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
-      TableConfig tableConfig =
-          new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-              .setNumReplicas(1)
-              .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-              .build();
+      TableConfig tableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(1).build();
       // Create the table
       addDummySchema(RAW_TABLE_NAME);
       _helixResourceManager.addTable(tableConfig);
@@ -885,7 +883,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(null), false, 0, null), null,
         replicaGroupPartitionConfig,
         InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), true);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+    TableConfig tableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME)
         .setNumReplicas(numReplicas)
         .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
@@ -988,9 +986,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     // "Repartition" and add two new partitions
     int newNumPartitions = 20;
-    tableConfig.getIndexingConfig()
-        .setStreamConfigs(
-            FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(newNumPartitions).getStreamConfigsMap());
+    setStreamIngestionConfig(tableConfig,
+        FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(newNumPartitions).getStreamConfigsMap());
     _helixResourceManager.updateTableConfig(tableConfig);
 
     // Add segments for the new partitions
@@ -1061,6 +1058,24 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       numSegmentsMoved += newInstanceStateMap.size() - commonInstances.size();
     }
     return numSegmentsMoved;
+  }
+
+  private static TableConfigBuilder getRealtimeTableConfigBuilder(String tableName) {
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5")
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap());
+  }
+
+  private static void setStreamIngestionConfig(TableConfig tableConfig, Map<String, String> streamConfigs) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig == null) {
+      ingestionConfig = new IngestionConfig();
+      tableConfig.setIngestionConfig(ingestionConfig);
+    }
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigs)));
   }
 
   @Test
@@ -1233,11 +1248,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(2)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .build();
+    TableConfig tableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(2).build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);
@@ -1279,7 +1290,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig.setUpdateTargetTier(false);
     rebalanceConfig.setBootstrap(false);
     rebalanceConfig.setBestEfforts(false);
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+    tableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME)
         .setTierConfigList(Collections.singletonList(
             new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
                 TierFactory.PINOT_SERVER_STORAGE_TYPE,
@@ -1293,8 +1304,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getMessage(), "updateTargetTier should be enabled when tier configs are present");
 
     // trigger downtime warning
-    TableConfig newTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
+    TableConfig newTableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(3).build();
 
     rebalanceConfig.setBootstrap(false);
     rebalanceConfig.setBestEfforts(false);
@@ -1309,7 +1319,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         "Number of replicas (3) is greater than 1, downtime is not recommended.");
 
     // no downtime warning with 1 replica
-    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(1).build();
+    newTableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(1).build();
 
     rebalanceConfig.setDowntime(true);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
@@ -1330,7 +1340,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         "Replication of the table is 1, which is not recommended for peer-download enabled tables as it may "
             + "cause data loss during rebalance");
 
-    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
+    newTableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(3).build();
     newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("https");
 
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
@@ -1379,7 +1389,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
 
     // change num replicas from 3 to 4
-    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(4).build();
+    newTableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(4).build();
 
     // now the new server (the 4th server) should expect to be added all the existing segments (including consuming)
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
@@ -2175,11 +2185,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
     TableRebalancer tableRebalancerOriginal =
         new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(numReplica)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .build();
+    TableConfig tableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(numReplica).build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);
@@ -2286,11 +2292,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     TableRebalancer tableRebalancerOriginal =
         new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(numReplica)
-            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
-            .build();
+    TableConfig tableConfig = getRealtimeTableConfigBuilder(RAW_TABLE_NAME).setNumReplicas(numReplica).build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);

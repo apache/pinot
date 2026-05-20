@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.spi.config.table.CompletionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -606,5 +608,32 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(dedupConfig.getHashFunction(), HashFunction.MD5);
     assertEquals(dedupConfig.getMetadataTTL(), 10);
     assertEquals(dedupConfig.getDedupTimeColumn(), "dedupTimeColumn");
+  }
+
+  /**
+   * Confirms that {@code toRawJsonNode} preserves keys that are stripped by the deserialize/re-serialize round-trip
+   * (e.g. {@code @JsonIgnore} or {@code @JsonInclude(NON_DEFAULT)} getters). The deprecation diff in
+   * {@code DeprecatedTableConfigValidationUtils} relies on this.
+   */
+  @Test
+  public void testToRawJsonNodePreservesStrippedKeys() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_TYPE_KEY, "OFFLINE");
+    // The fieldConfigList stored in ZK still contains the legacy 'indexType' key (written before @JsonIgnore).
+    znRecord.setSimpleField(TableConfig.FIELD_CONFIG_LIST_KEY,
+        "[{\"name\":\"c1\",\"indexType\":\"INVERTED\",\"indexTypes\":[\"INVERTED\"]}]");
+
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    JsonNode legacy = raw.get(TableConfig.FIELD_CONFIG_LIST_KEY);
+    assertNotNull(legacy);
+    assertTrue(legacy.isArray());
+    assertEquals(legacy.get(0).get("indexType").asText(), "INVERTED");
+  }
+
+  @Test
+  public void testToRawJsonNodeHandlesNull() {
+    assertNull(TableConfigSerDeUtils.toRawJsonNode(null));
   }
 }
