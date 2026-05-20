@@ -389,8 +389,19 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
         _scalarArguments[_nonLiteralIndices[j]] = _nonLiteralValues[j][i];
       }
       Object value = _functionInvoker.invoke(_scalarArguments);
-      _bytesValuesMV[i] =
-          value != null ? toBytesArray((ByteArray[]) _resultType.toInternal(value)) : NullValuePlaceHolder.BYTES_ARRAY;
+      if (value == null) {
+        _bytesValuesMV[i] = NullValuePlaceHolder.BYTES_ARRAY;
+        continue;
+      }
+      // BYTES_ARRAY scalars return ByteArray[] via toInternal (default returns value as-is and the convention
+      // is ByteArray[]); UUID_ARRAY scalars return byte[][] directly (PinotDataType.UUID_ARRAY#toInternal
+      // overrides to byte[][]). Handle both shapes so callers do not ClassCast.
+      Object internal = _resultType.toInternal(value);
+      if (internal instanceof byte[][]) {
+        _bytesValuesMV[i] = (byte[][]) internal;
+      } else {
+        _bytesValuesMV[i] = toBytesArray((ByteArray[]) internal);
+      }
     }
     return _bytesValuesMV;
   }

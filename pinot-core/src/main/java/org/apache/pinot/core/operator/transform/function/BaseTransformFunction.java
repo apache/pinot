@@ -875,6 +875,13 @@ public abstract class BaseTransformFunction implements TransformFunction {
       }
     } else {
       DataType resultDataType = getResultMetadata().getDataType();
+      if (resultDataType == DataType.UUID) {
+        // Symmetric to the SV guard in transformToBytesValuesSV: UUID transform functions must override
+        // transformToBytesValuesMV directly. The default switch below would otherwise fall through to a
+        // confusing "Cannot read MV BYTES as BYTES" error because UUID.getStoredType() == BYTES.
+        throw new UnsupportedOperationException(
+            "UUID MV transform function must override transformToBytesValuesMV: " + getClass().getName());
+      }
       switch (resultDataType.getStoredType()) {
         case BIG_DECIMAL:
           BigDecimal[][] bigDecimalValuesMV = transformToBigDecimalValuesMV(valueBlock);
