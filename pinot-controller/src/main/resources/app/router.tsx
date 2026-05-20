@@ -39,10 +39,12 @@ import UserPage from "./pages/UserPage";
 import LogicalTableDetails from './pages/LogicalTableDetails';
 import MaterializedViewListingPage from './pages/MaterializedViewListingPage';
 import MaterializedViewDetails from './pages/MaterializedViewDetails';
+import DataSourcesPage from './pages/DataSourcesPage';
 
 export default [
   // TODO: make async
   { path: '/', Component: HomePage },
+  { path: '/data-sources', Component: DataSourcesPage },
   { path: '/query/timeseries', Component: TimeseriesQueryPageWrapper },
   { path: '/query', Component: QueryPage },
   { path: '/tenants', Component: TenantsListingPage },

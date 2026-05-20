@@ -28,14 +28,14 @@ import ZookeeperIcon from './SvgIcons/ZookeeperIcon';
 import MinionTaskIcon from './SvgIcons/MinionTaskIcon';
 import app_state from '../app_state';
 import AccountCircleOutlinedIcon from '@material-ui/icons/AccountCircleOutlined';
-import LayersIcon from '@material-ui/icons/Layers';
+import StorageIcon from '@material-ui/icons/Storage';
 
 const BASE_NAVIGATION_ITEMS = [
   { id: 1, name: 'Cluster Manager', link: '/', icon: <ClusterManagerIcon /> },
+  { id: 8, name: 'Data Sources', link: '/data-sources',
+    icon: <StorageIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }} /> },
   { id: 2, name: 'Query Console', link: '/query', icon: <QueryConsoleIcon /> },
   { id: 6, name: 'Minion Tasks', link: '/minion-task-manager', icon: <MinionTaskIcon /> },
-  { id: 7, name: 'Materialized Views', link: '/materialized-views',
-    icon: <LayersIcon style={{ width: 24, height: 24, verticalAlign: 'sub' }} /> },
   { id: 4, name: 'Swagger REST API', link: 'help', target: '_blank', icon: <SwaggerIcon /> }
 ];
 
