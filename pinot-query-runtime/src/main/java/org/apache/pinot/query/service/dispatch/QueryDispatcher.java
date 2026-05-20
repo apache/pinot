@@ -129,24 +129,29 @@ public class QueryDispatcher {
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
   private final Duration _cancelTimeout;
+  /// Cluster-level default for stream-stats mode. Used as the fallback in {@link #submitAndReduce} when the query
+  /// does not carry an explicit {@link QueryOptionKey#STREAM_STATS} override.
+  private final boolean _streamStatsDefault;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        DispatchClient.KeepAliveConfig.DISABLED);
+        DispatchClient.KeepAliveConfig.DISABLED, false);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
   /// disables keep-alive.
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
-      boolean keepAliveWithoutCalls) {
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls));
+        new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
+        streamStatsDefault);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
-      boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig) {
+      boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig,
+      boolean streamStatsDefault) {
     _cancelTimeout = cancelTimeout;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
@@ -155,6 +160,7 @@ public class QueryDispatcher {
     _clientGrpcSslContext = initClientSslContext(tlsConfig);
     _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
+    _streamStatsDefault = streamStatsDefault;
 
     if (enableCancellation) {
       _serversByQuery = new ConcurrentHashMap<>();
@@ -178,7 +184,7 @@ public class QueryDispatcher {
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
-    if (QueryOptionsUtils.isStreamStats(queryOptions, false)) {
+    if (QueryOptionsUtils.isStreamStats(queryOptions, _streamStatsDefault)) {
       return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions);
     }
     long requestId = context.getRequestId();

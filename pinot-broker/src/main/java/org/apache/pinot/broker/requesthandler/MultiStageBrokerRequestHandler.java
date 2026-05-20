@@ -26,7 +26,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -141,7 +140,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final Set<String> _defaultDisabledPlannerRules;
   protected final long _extraPassiveTimeoutMs;
   protected final boolean _enableQueryFingerprinting;
-  private final boolean _streamStats;
+  private final boolean _streamStatsDefault;
 
   protected final PinotMeter _stagesStartedMeter = BrokerMeter.MSE_STAGES_STARTED.getGlobalMeter();
   protected final PinotMeter _stagesFinishedMeter = BrokerMeter.MSE_STAGES_COMPLETED.getGlobalMeter();
@@ -184,10 +183,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean dispatchKeepAliveWithoutCalls = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_DISPATCH_CHANNEL_KEEP_ALIVE_WITHOUT_CALLS);
+    _streamStatsDefault = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
+        CommonConstants.Broker.DEFAULT_STREAM_STATS);
     _queryDispatcher =
         new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
             tlsConfig, isQueryCancellationEnabled(), cancelTimeout, dispatchKeepAliveTimeMs,
-            dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls);
+            dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -207,9 +209,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _enableQueryFingerprinting = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING,
         CommonConstants.Broker.DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING);
-    _streamStats = _config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
-        CommonConstants.Broker.DEFAULT_STREAM_STATS);
   }
 
   @Override
@@ -661,18 +660,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _stagesStartedMeter.mark(stageCount);
       _opchainsStartedMeter.mark(opChainCount);
 
-      // Inject the cluster-default stream-stats mode unless the query already overrides it.
-      Map<String, String> effectiveOptions = query.getOptions();
-      if (_streamStats && !effectiveOptions.containsKey(
-          CommonConstants.Broker.Request.QueryOptionKey.STREAM_STATS)) {
-        effectiveOptions = new HashMap<>(effectiveOptions);
-        effectiveOptions.put(CommonConstants.Broker.Request.QueryOptionKey.STREAM_STATS, "true");
-      }
-
       QueryDispatcher.QueryResult queryResults;
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
-            effectiveOptions);
+            query.getOptions());
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -745,7 +736,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,
           queryResults.getStageCoverage());
 
-      if (QueryOptionsUtils.isStreamStats(effectiveOptions, false)) {
+      if (QueryOptionsUtils.isStreamStats(query.getOptions(), _streamStatsDefault)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_QUERIES, 1);
         List<QueryDispatcher.QueryResult.StageCoverage> coverage = queryResults.getStageCoverage();
         if (coverage != null && coverage.stream()
