@@ -17,10 +17,11 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
 import { RouteComponentProps, useHistory } from 'react-router-dom';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
+import sqlFormatter from '@sqltools/formatter';
 import { TableData } from 'Models';
 import AppLoader from '../components/AppLoader';
 import CustomizedTables from '../components/Table';
@@ -50,7 +51,7 @@ const useStyles = makeStyles(() => ({
   },
   sqlOutput: {
     border: '1px solid #BDCCD9',
-    '& .CodeMirror': { height: 220 },
+    '& .CodeMirror': { height: 280 },
   },
   jsonOutput: {
     border: '1px solid #BDCCD9',
@@ -186,6 +187,21 @@ const MaterializedViewDetails = ({ match }: RouteComponentProps<Props>) => {
 
   const reload = () => setReloadNonce((n) => n + 1);
 
+  // Pretty-print the persisted single-line SQL for display. Memoized so the formatter only runs
+  // when the definition actually changes, and so falls back to raw text if formatting throws
+  // (e.g. on a query the parser doesn't recognize) — never block the page on a formatter error.
+  const formattedSQL = useMemo(() => {
+    const raw = definition?.definedSQL || '';
+    if (!raw) {
+      return '';
+    }
+    try {
+      return sqlFormatter.format(raw);
+    } catch {
+      return raw;
+    }
+  }, [definition?.definedSQL]);
+
   const buildPartitionRows = (): TableData => {
     const partitions = runtime?.partitions ?? [];
     const records = partitions.map((p) => [
@@ -264,7 +280,7 @@ const MaterializedViewDetails = ({ match }: RouteComponentProps<Props>) => {
         <SimpleAccordion headerTitle="Defined SQL" showSearchBox={false}>
           <CodeMirror
             options={sqlOptions}
-            value={definition?.definedSQL || ''}
+            value={formattedSQL}
             className={classes.sqlOutput}
             autoCursor={false}
           />
