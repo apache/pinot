@@ -210,11 +210,9 @@ public class MailboxService {
    * not open the underlying channel or acquire any additional resources. Instead, it will initialize lazily when the
    * data is sent for the first time.
    */
-  // TODO: Consider adding an application-level global byte budget for sender outbound. The
-  //  transport-layer WriteBufferWaterMark already caps sender direct memory per (host, port)
-  //  channel, so the OOM the original PR fixed is bounded by watermark.high × #peers. A global
-  //  byte budget would tighten the bound to a single configurable cap across all peers, but is
-  //  unnecessary unless fan-outs hit hundreds of peers per query.
+  // TODO(https://github.com/apache/pinot/issues/18539): add a global byte budget across peers; the
+  //  per-channel WriteBufferWaterMark bound is watermark.high × #peers × #concurrent_queries, which can
+  //  reach multiple GiB and re-trigger OutOfDirectMemoryError at large fan-outs.
   public SendingMailbox getSendingMailbox(String hostname, int port, String mailboxId, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap) {
     if (_hostname.equals(hostname) && _port == port) {
