@@ -19,6 +19,8 @@
 package org.apache.pinot.core.util;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -62,5 +64,34 @@ public class SegmentProcessorAvroUtilsTest {
         "UUID byte[] must be converted to canonical UUID string for string{logicalType:uuid} fields");
     assertEquals(reusableRecord.get("bytesCol"), ByteBuffer.wrap(rawBytes),
         "Plain BYTES columns must continue to be wrapped as ByteBuffer");
+  }
+
+  /**
+   * Regression: MV UUID columns are emitted as Avro {@code array<string{logicalType:uuid}>}. The 16-byte
+   * canonical-form elements must be converted to canonical UUID strings, otherwise GenericDatumWriter would
+   * reject the byte[] elements against the string-typed array schema.
+   */
+  @Test
+  public void testConvertGenericRowToAvroRecordRendersMvUuidBytesAsCanonicalStrings() {
+    Schema uuidElementSchema = LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING));
+    Schema uuidArraySchema = Schema.createArray(uuidElementSchema);
+    Schema recordSchema = SchemaBuilder.record("record").fields()
+        .name("uuidArrayCol").type(uuidArraySchema).noDefault()
+        .endRecord();
+
+    String canonicalA = "12345678-1234-1234-1234-1234567890ab";
+    String canonicalB = "550e8400-e29b-41d4-a716-446655440000";
+    Object[] uuidMv = new Object[]{UuidUtils.toBytes(canonicalA), UuidUtils.toBytes(canonicalB)};
+
+    GenericRow row = new GenericRow();
+    row.putValue("uuidArrayCol", uuidMv);
+
+    GenericData.Record reusableRecord = new GenericData.Record(recordSchema);
+    SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(row, reusableRecord);
+
+    Object emitted = reusableRecord.get("uuidArrayCol");
+    assertEquals(emitted instanceof List, true, "MV UUID column must be emitted as a List for Avro array schema");
+    assertEquals(emitted, Arrays.asList(canonicalA, canonicalB),
+        "MV UUID byte[] elements must each be converted to canonical UUID strings");
   }
 }
