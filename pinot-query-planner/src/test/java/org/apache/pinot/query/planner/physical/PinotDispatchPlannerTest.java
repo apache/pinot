@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.query.QueryEnvironmentTestBase;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class PinotDispatchPlannerTest {
+public class PinotDispatchPlannerTest extends QueryEnvironmentTestBase {
 
   @Test
   public void testHasNonEmptyReplicatedLeafAllNull() {
@@ -60,5 +64,50 @@ public class PinotDispatchPlannerTest {
   @Test
   public void testHasNonEmptyReplicatedLeafEmptyMap() {
     assertFalse(PinotDispatchPlanner.hasNonEmptyReplicatedLeaf(Map.of()));
+  }
+
+  @Test
+  public void testRewriteReduceStageSetAllNodeStageIdsToZero() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SELECT COUNT(*) FROM a WHERE ts < 0");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+    PlanNode root = fragmentMap.get(0).getPlanFragment().getFragmentRoot();
+    assertAllStageIdsAreZero(root);
+  }
+
+  @Test
+  public void testRewriteReduceStageWithEmptyWorkerMetadataListIsNoOp() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SELECT COUNT(*) FROM a WHERE ts < 0");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    fragmentMap.get(0).getWorkerMetadataList().clear();
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+    assertTrue(fragmentMap.get(0).getWorkerMetadataList().isEmpty());
+  }
+
+  @Test
+  public void testRewriteReduceStageStripsMailboxInfos() {
+    DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SELECT COUNT(*) FROM a WHERE ts < 0 LIMIT 1");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    assertTrue(fragmentMap.get(0).getWorkerMetadataList().get(0).getMailboxInfosMap().containsKey(1));
+
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+    assertTrue(fragmentMap.get(0).getWorkerMetadataList().get(0).getMailboxInfosMap().isEmpty());
+  }
+
+  @Test
+  public void testRewriteReduceStageWithJoinInlinesAllBranches() {
+    DispatchableSubPlan subPlan =
+        _queryEnvironment.planQuery("SELECT COUNT(*) FROM a JOIN b ON a.col1 = b.col1 WHERE a.ts < 0");
+    Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
+    PinotDispatchPlanner.rewriteReduceStageForEmptyLeaves(fragmentMap);
+    PlanNode root = fragmentMap.get(0).getPlanFragment().getFragmentRoot();
+    assertAllStageIdsAreZero(root);
+  }
+
+  private static void assertAllStageIdsAreZero(PlanNode node) {
+    assertEquals(node.getStageId(), 0);
+    for (PlanNode input : node.getInputs()) {
+      assertAllStageIdsAreZero(input);
+    }
   }
 }

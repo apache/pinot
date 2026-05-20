@@ -19,9 +19,7 @@
 package org.apache.pinot.query.planner.physical;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.common.utils.DataSchema;
@@ -70,27 +68,6 @@ public class DispatchableSubPlanTest {
         PairList.of(0, "col1"), Collections.emptyMap(), Collections.emptySet(),
         Collections.emptyMap(), 0, false);
     assertFalse(plan.isAllLeafStagesEmpty());
-  }
-
-  @Test
-  public void testReplaceStageUpdatesMap() {
-    ValueNode dummyNode = new ValueNode(0, new DataSchema(new String[0], new ColumnDataType[0]),
-        PlanNode.NodeHint.EMPTY, List.of(), List.of());
-    PlanFragment fragment = new PlanFragment(0, dummyNode, List.of());
-    DispatchablePlanFragment original = new DispatchablePlanFragment(fragment);
-
-    DispatchableSubPlan plan = new DispatchableSubPlan(
-        PairList.of(0, "col1"), new HashMap<>(Map.of(0, original)), Set.of("testTable"),
-        Collections.emptyMap(), 0, false);
-
-    ValueNode newNode = new ValueNode(0, new DataSchema(new String[0], new ColumnDataType[0]),
-        PlanNode.NodeHint.EMPTY, List.of(), List.of());
-    PlanFragment newFragment = new PlanFragment(0, newNode, List.of());
-    DispatchablePlanFragment newDispFragment = new DispatchablePlanFragment(newFragment);
-
-    plan.replaceStage(0, newDispFragment);
-
-    assertSame(plan.getQueryStageMap().get(0), newDispFragment);
   }
 
   @Test

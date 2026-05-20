@@ -82,14 +82,9 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
-import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.planner.plannode.TableScanNode;
-import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -687,7 +682,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // tracks stage/opchain meters, and must re-throw QueryException from server responses.
       QueryDispatcher.QueryResult queryResults;
       if (allLeafStagesEmpty) {
-        rewriteReduceStageForEmptyLeaves(dispatchableSubPlan);
         try {
           queryResults = QueryDispatcher.runReducer(dispatchableSubPlan, query.getOptions(), _mailboxService);
         } catch (Throwable t) {
@@ -868,59 +862,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     return stagePlans;
-  }
-
-  static void rewriteReduceStageForEmptyLeaves(DispatchableSubPlan dispatchableSubPlan) {
-    DispatchablePlanFragment reduceStage = dispatchableSubPlan.getQueryStageMap().get(0);
-    List<WorkerMetadata> workerMetadataList = reduceStage.getWorkerMetadataList();
-    if (workerMetadataList.isEmpty()) {
-      return;
-    }
-    PlanNode inlinedRoot = inlineAllLeafStagesEmptyInputs(reduceStage.getPlanFragment().getFragmentRoot());
-    if (inlinedRoot != reduceStage.getPlanFragment().getFragmentRoot()) {
-      // Inlined nodes originally belonged to leaf stages (ID 1, 2, etc.) but now execute within
-      // the broker reduce stage (ID 0). PlanFragment's constructor asserts that the root's stageId
-      // matches the fragmentId, so we must update all node IDs before wrapping in a new fragment.
-      setStageIdRecursively(inlinedRoot, 0);
-      reduceStage = DispatchablePlanFragment.copyWithRoot(reduceStage, inlinedRoot);
-      dispatchableSubPlan.replaceStage(0, reduceStage);
-    }
-    WorkerMetadata workerMetadata = workerMetadataList.get(0);
-    reduceStage.setWorkerMetadataList(List.of(
-        new WorkerMetadata(workerMetadata.getWorkerId(), Map.of(), workerMetadata.getCustomProperties())));
-  }
-
-  private static PlanNode inlineAllLeafStagesEmptyInputs(PlanNode node) {
-    if (node instanceof TableScanNode) {
-      return new ValueNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), List.of(), List.of());
-    }
-    if (node instanceof MailboxReceiveNode) {
-      MailboxReceiveNode mailboxReceiveNode = (MailboxReceiveNode) node;
-      MailboxSendNode sender = mailboxReceiveNode.getSender();
-      List<PlanNode> senderInputs = sender.getInputs();
-      Preconditions.checkState(!senderInputs.isEmpty(),
-          "MailboxSendNode (stageId=%s) has no inputs", sender.getStageId());
-      return inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
-    }
-    List<PlanNode> inputs = node.getInputs();
-    if (inputs.isEmpty()) {
-      return node;
-    }
-    boolean changed = false;
-    List<PlanNode> inlinedInputs = new ArrayList<>(inputs.size());
-    for (PlanNode input : inputs) {
-      PlanNode inlinedInput = inlineAllLeafStagesEmptyInputs(input);
-      inlinedInputs.add(inlinedInput);
-      changed |= inlinedInput != input;
-    }
-    return changed ? node.withInputs(inlinedInputs) : node;
-  }
-
-  private static void setStageIdRecursively(PlanNode node, int stageId) {
-    node.setStageId(stageId);
-    for (PlanNode input : node.getInputs()) {
-      setStageIdRecursively(input, stageId);
-    }
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,

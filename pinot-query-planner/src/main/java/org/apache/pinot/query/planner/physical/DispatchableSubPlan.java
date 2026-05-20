@@ -81,10 +81,6 @@ public class DispatchableSubPlan {
     return Collections.unmodifiableMap(_queryStageMap);
   }
 
-  public void replaceStage(int stageId, DispatchablePlanFragment fragment) {
-    _queryStageMap.put(stageId, fragment);
-  }
-
   private static Comparator<DispatchablePlanFragment> byStageIdComparator() {
     return Comparator.comparing(d -> d.getPlanFragment().getFragmentId());
   }
