@@ -57,6 +57,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
         updatePartition(Float.toString(value));
       }
     }
+    _totalDocs++;
     _totalNumberOfEntries++;
   }
 
@@ -71,6 +72,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       _values.add(valueGetter.apply(i));
     }
     _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, length);
+    _totalDocs++;
     updateTotalNumberOfEntries(length);
   }
 

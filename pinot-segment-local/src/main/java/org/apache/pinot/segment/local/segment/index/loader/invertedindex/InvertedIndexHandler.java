@@ -163,13 +163,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new inverted index for segment: {}, column: {}", segmentName, columnName);
     int numDocs = columnMetadata.getTotalDocs();
 
-    IndexCreationContext.Common context = IndexCreationContext.builder()
-        .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
-        .build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     // Raw-forward columns that require an inverted index must have a shared standalone dictionary created first by
     // ForwardIndexHandler (which runs before this handler). If we reach this point without a dictionary, it indicates
     // a bug in the handler pipeline — fail fast rather than leave the segment in an inconsistent state.

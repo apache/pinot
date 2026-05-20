@@ -296,13 +296,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
-    IndexCreationContext context = IndexCreationContext.builder()
-        .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig.getTableName())
-        .withContinueOnError(_tableConfig.getIngestionConfig() != null
-            && _tableConfig.getIngestionConfig().isContinueOnError())
-        .build();
+    IndexCreationContext context = new IndexCreationContext.Builder(indexDir, _tableConfig, columnMetadata).build();
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());
     return StandardIndexes.range().createIndexCreator(context, config);

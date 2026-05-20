@@ -28,7 +28,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 public class FunctionUtils {

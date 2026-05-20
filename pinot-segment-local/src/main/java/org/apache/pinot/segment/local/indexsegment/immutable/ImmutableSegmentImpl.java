@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -358,6 +359,27 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
     return _queryableDocIds;
+  }
+
+  @Override
+  public boolean hasNoQueryableDocs() {
+    if (_partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = _partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap queryableDocIdsSnapshot = viewManager.getQueryableDocIdsSnapshot(this);
+      if (queryableDocIdsSnapshot != null) {
+        return queryableDocIdsSnapshot.isEmpty();
+      }
+      return false;
+    }
+    ThreadSafeMutableRoaringBitmap queryableDocIds = getQueryableDocIds();
+    if (queryableDocIds != null) {
+      return queryableDocIds.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
   }
 
   @Override

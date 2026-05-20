@@ -106,6 +106,10 @@ public interface IndexSegment {
   @Nullable
   ThreadSafeMutableRoaringBitmap getQueryableDocIds();
 
+  default boolean hasNoQueryableDocs() {
+    return false;
+  }
+
   /**
    * Returns the record for the given document id. Virtual column values are not returned.
    * <p>NOTE: don't use this method for high performance code. Use PinotSegmentRecordReader when reading multiple
