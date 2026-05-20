@@ -38,10 +38,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -99,10 +97,10 @@ public class LineageDeleteExclusionTest {
     addSegments("ipfA1", "ipfA2", "ipfB1");
     writeLineageEntry("e1", Arrays.asList("ipfA1", "ipfA2"), Collections.singletonList("ipfB1"),
         LineageEntryState.IN_PROGRESS);
-    SegmentsInLineageException ex = expectThrows(SegmentsInLineageException.class,
-        () -> _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("ipfA1")));
-    assertEquals(ex.getTableNameWithType(), OFFLINE_TABLE_NAME);
-    assertTrue(ex.getBlockingSegments().contains("ipfA1"));
+    PinotResourceManagerResponse response =
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("ipfA1"));
+    assertFalse(response.isSuccessful());
+    assertTrue(response.getMessage().contains("ipfA1"));
     // IdealState untouched
     assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("ipfA1"));
   }
@@ -112,8 +110,9 @@ public class LineageDeleteExclusionTest {
     addSegments("iptA1", "iptB1");
     writeLineageEntry("e1", Collections.singletonList("iptA1"), Collections.singletonList("iptB1"),
         LineageEntryState.IN_PROGRESS);
-    assertThrows(SegmentsInLineageException.class,
-        () -> _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("iptB1")));
+    PinotResourceManagerResponse response =
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("iptB1"));
+    assertFalse(response.isSuccessful());
     assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("iptB1"));
   }
 
@@ -122,8 +121,9 @@ public class LineageDeleteExclusionTest {
     addSegments("cpfA1", "cpfB1");
     writeLineageEntry("e1", Collections.singletonList("cpfA1"), Collections.singletonList("cpfB1"),
         LineageEntryState.COMPLETED);
-    assertThrows(SegmentsInLineageException.class,
-        () -> _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("cpfA1")));
+    PinotResourceManagerResponse response =
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Collections.singletonList("cpfA1"));
+    assertFalse(response.isSuccessful());
     assertTrue(_resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false).contains("cpfA1"));
   }
 
@@ -153,8 +153,9 @@ public class LineageDeleteExclusionTest {
     addSegments("batchA1", "batchA2", "batchFree");
     writeLineageEntry("e1", Collections.singletonList("batchA1"), Collections.singletonList("batchA2"),
         LineageEntryState.IN_PROGRESS);
-    assertThrows(SegmentsInLineageException.class,
-        () -> _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Arrays.asList("batchA1", "batchFree")));
+    PinotResourceManagerResponse response =
+        _resourceManager.deleteSegments(OFFLINE_TABLE_NAME, Arrays.asList("batchA1", "batchFree"));
+    assertFalse(response.isSuccessful());
     // Neither "batchA1" nor "batchFree" should have been removed
     List<String> segments = _resourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, false);
     assertTrue(segments.contains("batchA1"));

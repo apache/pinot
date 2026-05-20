@@ -19,37 +19,34 @@
 package org.apache.pinot.controller.helix.core.lineage;
 
 import java.util.Collections;
-import java.util.Set;
+import java.util.List;
 
 
-/**
- * Thrown when a segment deletion request targets segments that participate in a live segment lineage entry.
- *
- * <p>A segment is considered lineage-locked when some lineage entry has state {@code IN_PROGRESS} and the segment
- * appears in either {@code segmentsFrom} or {@code segmentsTo}, or has state {@code COMPLETED} and the segment
- * appears in {@code segmentsFrom}. Such segments must be cleaned up through the lineage lifecycle (end / revert /
- * retention) rather than via the generic delete path. The whole batch is rejected so callers never observe a
- * partial commit.
- */
+/// Thrown when a segment deletion request targets segments that participate in a live segment lineage entry.
+///
+/// A segment is considered lineage-locked when some lineage entry has state `IN_PROGRESS` and the segment appears
+/// in either `segmentsFrom` or `segmentsTo`, or has state `COMPLETED` and the segment appears in `segmentsFrom`.
+/// Such segments must be cleaned up through the lineage lifecycle (end / revert / retention) rather than via the
+/// generic delete path. The whole batch is rejected so callers never observe a partial commit.
 public class SegmentsInLineageException extends RuntimeException {
   private final String _tableNameWithType;
-  private final Set<String> _blockingSegments;
+  private final List<String> _blockingSegments;
 
-  public SegmentsInLineageException(String tableNameWithType, Set<String> blockingSegments) {
+  public SegmentsInLineageException(String tableNameWithType, List<String> blockingSegments) {
     super(buildMessage(tableNameWithType, blockingSegments));
     _tableNameWithType = tableNameWithType;
-    _blockingSegments = Collections.unmodifiableSet(blockingSegments);
+    _blockingSegments = Collections.unmodifiableList(blockingSegments);
   }
 
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
 
-  public Set<String> getBlockingSegments() {
+  public List<String> getBlockingSegments() {
     return _blockingSegments;
   }
 
-  private static String buildMessage(String tableNameWithType, Set<String> blockingSegments) {
+  private static String buildMessage(String tableNameWithType, List<String> blockingSegments) {
     return "Cannot delete segments from table: " + tableNameWithType
         + " because they participate in a live segment lineage entry. Use the lineage lifecycle "
         + "(endReplaceSegments / revertReplaceSegments with forceRevert=true) to clean them up. "

@@ -41,7 +41,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -1069,12 +1068,11 @@ public class PinotHelixResourceManager {
   /**
    * Delete a list of segments from ideal state and remove them from the local storage.
    *
-   * <p>Pre-checks the table's segment lineage znode and rejects the whole batch with a
-   * {@link SegmentsInLineageException} if any target segment participates
-   * in a live lineage entry. If we don't do this and a segment is deleted while it is being
-   * replaced, it could lead to the deleted data resurfacing with the replaced segment.
-   * To prevent that, we will block segment deletion if its part of the FROM list in an
-   * IN_PROGRESS / COMPLETED Segment Lineage entry.
+   * <p>Pre-checks the table's segment lineage znode and rejects the whole batch with a failure response if any
+   * target segment participates in a live lineage entry (signalled internally via {@link SegmentsInLineageException}).
+   * If we don't do this and a segment is deleted while it is being replaced, it could lead to the deleted data
+   * resurfacing with the replaced segment. To prevent that, we will block segment deletion if its part of the FROM
+   * list in an IN_PROGRESS / COMPLETED Segment Lineage entry.
    *
    * <p>Cleanup paths that already coordinated with the lineage lifecycle must call
    * {@link #deleteSegmentsForLineageCleanup} instead.
@@ -1125,7 +1123,7 @@ public class PinotHelixResourceManager {
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (SegmentsInLineageException e) {
       LOGGER.warn("Refusing to delete segments from table: {}. {}", tableNameWithType, e.getMessage());
-      throw e;
+      return PinotResourceManagerResponse.failure(e.getMessage());
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);
       return PinotResourceManagerResponse.failure(e.getMessage());
@@ -1145,7 +1143,7 @@ public class PinotHelixResourceManager {
     if (blocked.isEmpty()) {
       return;
     }
-    Set<String> blockingTargets = new LinkedHashSet<>();
+    List<String> blockingTargets = new ArrayList<>();
     for (String segment : segmentNames) {
       if (blocked.contains(segment)) {
         blockingTargets.add(segment);

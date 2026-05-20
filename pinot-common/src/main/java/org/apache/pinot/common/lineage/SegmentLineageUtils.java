@@ -65,9 +65,6 @@ public class SegmentLineageUtils {
    * </ul>
    */
   public static Set<String> getDeleteBlockedSegments(SegmentLineage segmentLineage) {
-    if (segmentLineage == null) {
-      return Set.of();
-    }
     Set<String> blocked = new HashSet<>();
     for (LineageEntry lineageEntry : segmentLineage.getLineageEntries().values()) {
       switch (lineageEntry.getState()) {
