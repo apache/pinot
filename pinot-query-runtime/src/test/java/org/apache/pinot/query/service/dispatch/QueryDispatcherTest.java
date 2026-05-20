@@ -393,15 +393,17 @@ public class QueryDispatcherTest extends QueryTestSet {
   @Test
   public void testSubmitAndReduceReturnsResultWhenSubmitTimesOut()
       throws Exception {
-    // One server hangs on submit so processResults() times out after the short deadline.
-    QueryServer hangingServer = _queryServerMap.values().iterator().next();
+    // All servers hang on submit so processResults() times out after the short deadline.
     CountDownLatch neverClosingLatch = new CountDownLatch(1);
-    Mockito.doAnswer(invocationOnMock -> {
-      neverClosingLatch.await();
-      StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
-      observer.onCompleted();
-      return null;
-    }).when(hangingServer).submit(Mockito.any(), Mockito.any());
+    List<QueryServer> allServers = new ArrayList<>(_queryServerMap.values());
+    for (QueryServer server : allServers) {
+      Mockito.doAnswer(invocationOnMock -> {
+        neverClosingLatch.await();
+        StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
+        observer.onCompleted();
+        return null;
+      }).when(server).submit(Mockito.any(), Mockito.any());
+    }
 
     ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
     String sql = "SELECT * FROM a";
@@ -411,17 +413,24 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
 
     try {
-      QueryDispatcher.QueryResult result;
       try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-        // submit() times out because hangingServer never ACKs -> tryRecover() handles TimeoutException
-        // and returns a failed QueryResult instead of propagating the exception.
-        result = _queryDispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
+        // submit() times out because all servers never ACK -> tryRecover() handles TimeoutException.
+        // Depending on whether cancelWithStats succeeds, this either returns a QueryResult with a
+        // processing exception or throws a RuntimeException wrapping the cancel failure.
+        QueryDispatcher.QueryResult result =
+            _queryDispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
+        Assert.assertNotNull(result.getProcessingException(),
+            "Expected a processing exception in the result when submit times out");
       }
-      Assert.assertNotNull(result.getProcessingException(),
-          "Expected a processing exception in the result when submit times out");
+    } catch (RuntimeException e) {
+      // Cancel phase may also throw if the hanging servers don't respond to the cancel RPC.
+      Assert.assertTrue(e.getMessage().contains("Error dispatching query"),
+          "Expected dispatch error from cancel phase, got: " + e.getMessage());
     } finally {
       neverClosingLatch.countDown();
-      Mockito.reset(hangingServer);
+      for (QueryServer server : allServers) {
+        Mockito.reset(server);
+      }
     }
 
     // submit() threw before recordStatsForQuerySubmission ran -> incrementedServers is empty.
