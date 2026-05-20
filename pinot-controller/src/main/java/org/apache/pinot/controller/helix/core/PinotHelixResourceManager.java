@@ -1145,9 +1145,7 @@ public class PinotHelixResourceManager {
     }
     List<String> blockingTargets = new ArrayList<>();
     for (String segment : segmentNames) {
-      if (blocked.contains(segment)) {
-        blockingTargets.add(segment);
-      }
+      blockingTargets.add(segment);
     }
     if (blockingTargets.isEmpty()) {
       return;
