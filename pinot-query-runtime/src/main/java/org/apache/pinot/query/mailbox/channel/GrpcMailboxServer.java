@@ -146,17 +146,25 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     _inboundMessageCredit = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT);
+    int maxInboundMessageSize = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES);
     Preconditions.checkArgument(_inboundMessageCredit > 0,
         "%s must be positive, got: %s",
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT,
         _inboundMessageCredit);
+    // A window smaller than the largest possible single message makes the stream pathological: the sender's
+    // isReady() flaps on every message, since no single message can ever fit in the available credit. Fail fast
+    // at startup rather than letting it manifest as flapping back-pressure mid-query.
+    Preconditions.checkArgument(_flowControlWindowBytes >= maxInboundMessageSize,
+        "%s (%s) must be >= %s (%s)",
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, _flowControlWindowBytes,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, maxInboundMessageSize);
     builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
-        .maxInboundMessageSize(config.getProperty(
-            CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
+        .maxInboundMessageSize(maxInboundMessageSize)
         .flowControlWindow(_flowControlWindowBytes);
 
     // Add SSL context only if TLS is configured
