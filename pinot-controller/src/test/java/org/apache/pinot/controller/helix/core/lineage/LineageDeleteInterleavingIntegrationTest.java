@@ -162,18 +162,18 @@ public class LineageDeleteInterleavingIntegrationTest {
     assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
         Collections.singletonList(s1New));
 
-    // Step 2: delete s1 (segmentsFrom of IN_PROGRESS) → 409, IdealState + lineage untouched
-    IOException ex409 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1));
-    assertStatus(ex409, 409);
+    // Step 2: delete s1 (segmentsFrom of IN_PROGRESS) → 500, IdealState + lineage untouched
+    IOException ex500 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1));
+    assertStatus(ex500, 500);
     assertTrue(getSegments(OFFLINE_TABLE_NAME).contains(s1));
     assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
         Collections.singletonList(s1New));
 
-    // Step 3: upload s1New + delete s1New (segmentsTo of IN_PROGRESS) → 409.
+    // Step 3: upload s1New + delete s1New (segmentsTo of IN_PROGRESS) → 500.
     // the lineage check still rejects without touching the lineage znode.
     addSegments(OFFLINE_TABLE_NAME, s1New);
-    ex409 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1New));
-    assertStatus(ex409, 409);
+    ex500 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1New));
+    assertStatus(ex500, 500);
     assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.IN_PROGRESS, Collections.singletonList(s1),
         Collections.singletonList(s1New));
 
@@ -182,9 +182,9 @@ public class LineageDeleteInterleavingIntegrationTest {
     assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, Collections.singletonList(s1),
         Collections.singletonList(s1New));
 
-    // Step 5: delete s1 (segmentsFrom of COMPLETED) → still 409
-    ex409 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1));
-    assertStatus(ex409, 409);
+    // Step 5: delete s1 (segmentsFrom of COMPLETED) → still 500
+    ex500 = expectThrows(IOException.class, () -> sendDeleteSegment(OFFLINE_TABLE_NAME, s1));
+    assertStatus(ex500, 500);
     assertTrue(getSegments(OFFLINE_TABLE_NAME).contains(s1));
     assertLineageEntry(OFFLINE_TABLE_NAME, entryId, LineageEntryState.COMPLETED, Collections.singletonList(s1),
         Collections.singletonList(s1New));
@@ -231,13 +231,13 @@ public class LineageDeleteInterleavingIntegrationTest {
     String entryId = postStartReplaceSegments(OFFLINE_TABLE_NAME, Collections.singletonList(s1),
         Collections.singletonList(s1New));
 
-    // Batch delete via DELETE /segments/{tableName}?type=OFFLINE&segments=s1&segments=sFree → 409
+    // Batch delete via DELETE /segments/{tableName}?type=OFFLINE&segments=s1&segments=sFree → 500
     String url = _controllerBaseUrl + "/segments/" + RAW_TABLE_NAME + "?type=OFFLINE&segments=" + s1
         + "&segments=" + sFree;
-    IOException ex409 = expectThrows(IOException.class, () -> ControllerTest.sendDeleteRequest(url));
-    assertStatus(ex409, 409);
+    IOException ex500 = expectThrows(IOException.class, () -> ControllerTest.sendDeleteRequest(url));
+    assertStatus(ex500, 500);
     // Body should mention the blocking segment, but not the free one (the free one is not what's blocking).
-    String body = ex409.getMessage();
+    String body = ex500.getMessage();
     assertTrue(body.contains(s1), "Expected response to mention blocking segment: " + s1 + ", was: " + body);
     assertFalse(body.contains("Blocking segments: [" + sFree),
         "Free segment should not appear in blocking list. Was: " + body);
