@@ -49,9 +49,13 @@ public class CopyTableResponse {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private List<String> _deprecationWarnings;
 
+  /// `status` and `msg` are `@Nullable` here to match the historical wire contract: the class is
+  /// `@JsonInclude(NON_NULL)`, so both fields have always been omittable from the JSON, and existing setters allow
+  /// either to be null. Older deserializers (admin SDK, integration tests) must continue to parse responses that
+  /// elide one or both fields.
   @JsonCreator
-  public CopyTableResponse(@JsonProperty("status") String status, @JsonProperty("msg") String msg,
-      @JsonProperty("schema") @Nullable Schema schema,
+  public CopyTableResponse(@JsonProperty("status") @Nullable String status,
+      @JsonProperty("msg") @Nullable String msg, @JsonProperty("schema") @Nullable Schema schema,
       @JsonProperty("realtimeTableConfig") @Nullable TableConfig tableConfig,
       @JsonProperty("watermarkInductionResult") @Nullable WatermarkInductionResult watermarkInductionResult) {
     this(status, msg, schema, tableConfig, watermarkInductionResult, null);
@@ -108,11 +112,9 @@ public class CopyTableResponse {
     _watermarkInductionResult = watermarkInductionResult;
   }
 
+  /// Read-only: callers must populate deprecation warnings via the all-args constructor. No setter is exposed so
+  /// the field cannot drift after the response is constructed by the REST handler.
   public List<String> getDeprecationWarnings() {
     return _deprecationWarnings;
-  }
-
-  public void setDeprecationWarnings(@Nullable List<String> deprecationWarnings) {
-    _deprecationWarnings = deprecationWarnings == null ? List.of() : deprecationWarnings;
   }
 }

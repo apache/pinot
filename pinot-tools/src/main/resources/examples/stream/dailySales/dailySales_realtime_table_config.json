@@ -16,9 +16,6 @@
     ]
   },
   "ingestionConfig": {
-    "batchIngestionConfig": {
-      "segmentIngestionType": "APPEND"
-    },
     "streamIngestionConfig": {
       "streamConfigMaps": [
         {

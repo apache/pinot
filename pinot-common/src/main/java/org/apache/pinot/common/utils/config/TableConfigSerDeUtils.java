@@ -325,6 +325,12 @@ public class TableConfigSerDeUtils {
     for (Map.Entry<String, String> entry : simpleFields.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
+      if (value == null) {
+        // ZNRecord simpleFields is a regular HashMap that permits null values. Preserve the null in the JSON tree
+        // (NullNode) so a downstream diff sees the original ZK state byte-faithfully.
+        root.putNull(key);
+        continue;
+      }
       if (looksLikeJsonContainer(value)) {
         try {
           root.set(key, JsonUtils.stringToJsonNode(value));

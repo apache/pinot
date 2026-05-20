@@ -19,12 +19,22 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils.DeprecatedConfigRule;
 import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils.Result;
 import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils.Severity;
+import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.DeprecatedConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -33,7 +43,6 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-
 
 public class DeprecatedTableConfigValidationUtilsTest {
 
@@ -49,7 +58,7 @@ public class DeprecatedTableConfigValidationUtilsTest {
         + "\"instanceAssignmentConfigMap\":{\"CONSUMING\":{\"replicaGroupPartitionConfig\":"
         + "{\"minimizeDataMovement\":false}}}}");
 
-    java.util.List<String> warnings =
+    List<String> warnings =
         DeprecatedTableConfigValidationUtils.validateOnCreate(tableConfigJson, "realtime");
     assertTrue(warnings.stream().anyMatch(w -> w.contains("realtime.segmentsConfig.replicasPerPartition")), warnings
         .toString());
@@ -71,7 +80,7 @@ public class DeprecatedTableConfigValidationUtilsTest {
     JsonNode tableConfigJson = JsonUtils.stringToJsonNode(
         "{\"tableIndexConfig\":{\"createInvertedIndexDuringSegmentGeneration\":false}}");
 
-    java.util.List<String> warnings = DeprecatedTableConfigValidationUtils.validateOnCreate(tableConfigJson, null);
+    List<String> warnings = DeprecatedTableConfigValidationUtils.validateOnCreate(tableConfigJson, null);
     assertTrue(warnings.stream().anyMatch(
             w -> w.contains("tableIndexConfig.createInvertedIndexDuringSegmentGeneration")),
         "expected warning for current-version deprecation, got: " + warnings);
@@ -258,7 +267,7 @@ public class DeprecatedTableConfigValidationUtilsTest {
   }
 
   /// Locks in the contract assumed by [DeprecatedTableConfigValidationUtils#isJacksonDefault]: every getter
-  /// annotated with [org.apache.pinot.spi.config.DeprecatedConfig @DeprecatedConfig] must be on a bean whose
+  /// annotated with [DeprecatedConfig @DeprecatedConfig] must be on a bean whose
   /// no-arg-constructed default value for that getter is a Java zero-value (`false`, `0`, `null`, empty string,
   /// empty collection). If a future contributor adds the annotation on a getter whose bean default is non-zero
   /// (e.g. an int defaulting to `1`), this test fails at compile/test time rather than silently suppressing
@@ -268,7 +277,7 @@ public class DeprecatedTableConfigValidationUtilsTest {
       throws Exception {
     for (DeprecatedConfigRule rule : DeprecatedTableConfigValidationUtils.rulesForTesting()) {
       Class<?> owner = rule.leafOwner();
-      java.lang.reflect.Method getter = rule.leafGetter();
+      Method getter = rule.leafGetter();
       Object defaultInstance = instantiateForDefaultLookup(owner);
       Object value = getter.invoke(defaultInstance);
       JsonNode jsonValue = JsonUtils.objectToJsonNode(value);
@@ -311,11 +320,11 @@ public class DeprecatedTableConfigValidationUtilsTest {
           + "Confirm by hand that the bean's reflective-zero-arg ctor produces the same field defaults that "
           + "Jackson would deserialize, then add the FQN to the allowlist.");
     }
-    java.lang.reflect.Constructor<?>[] ctors = owner.getDeclaredConstructors();
+    Constructor<?>[] ctors = owner.getDeclaredConstructors();
     // Sort by parameter count ascending — prefer the smallest viable constructor.
-    java.util.Arrays.sort(ctors, java.util.Comparator.comparingInt(java.lang.reflect.Constructor::getParameterCount));
+    Arrays.sort(ctors, Comparator.comparingInt(Constructor::getParameterCount));
     Exception lastFailure = null;
-    for (java.lang.reflect.Constructor<?> ctor : ctors) {
+    for (Constructor<?> ctor : ctors) {
       Object[] args = new Object[ctor.getParameterCount()];
       Class<?>[] paramTypes = ctor.getParameterTypes();
       for (int i = 0; i < args.length; i++) {
@@ -385,6 +394,22 @@ public class DeprecatedTableConfigValidationUtilsTest {
     }
   }
 
+  /// Locks the soft-launch flag at its initial value so the flip cannot land without an intentional, reviewable
+  /// edit. The PR that flips this constant MUST first land the items enumerated in [#SOFT_LAUNCH_WARNING_ONLY]'s
+  /// Javadoc — version-checked CAS on the update path, a concurrency regression test, an injected-version test
+  /// seam, and an integration test of the ERROR-path. Once those are in place, edit BOTH `SOFT_LAUNCH_WARNING_ONLY`
+  /// and this test in the same commit so the test continues to lock the post-flip value.
+  @Test
+  public void testSoftLaunchFlagDefaultsToWarningOnly() {
+    assertTrue(DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY,
+        "SOFT_LAUNCH_WARNING_ONLY must remain true until the four promotion pre-conditions in its Javadoc are met. "
+            + "Edit this test in the same commit that flips the flag, and ensure the promotion PR also adds: "
+            + "(1) version-checked CAS on PinotTableRestletResource and TableConfigsRestletResource update paths, "
+            + "(2) a concurrency regression test that exercises the read→write window, "
+            + "(3) a test seam for the older-than-current → ERROR branch in classifySeverity, "
+            + "(4) an integration test that exercises the validator's ERROR-path end-to-end through the REST stack.");
+  }
+
   /// Locks the build-time invariant that every `@DeprecatedConfig.since` value is parseable. Without this guard
   /// a typo like `@DeprecatedConfig(since = "")` would classify as ERROR (Severity.ERROR is the unparseable-
   /// since fallback in `classifySeverity`). Today, under `SOFT_LAUNCH_WARNING_ONLY = true`, an ERROR fires the
@@ -408,7 +433,7 @@ public class DeprecatedTableConfigValidationUtilsTest {
   @Test
   public void testEveryAnnotatedGetterAlsoCarriesJdkDeprecated() {
     for (DeprecatedConfigRule rule : DeprecatedTableConfigValidationUtils.rulesForTesting()) {
-      java.lang.reflect.Method getter = rule.leafGetter();
+      Method getter = rule.leafGetter();
       assertTrue(getter.isAnnotationPresent(Deprecated.class),
           "Getter " + rule.leafOwner().getSimpleName() + "#" + getter.getName()
               + " has @DeprecatedConfig but lacks @Deprecated. Both annotations are required: @DeprecatedConfig"
@@ -424,16 +449,16 @@ public class DeprecatedTableConfigValidationUtilsTest {
   /// is a `BaseJsonConfig` descendant — failing loudly the moment the invariant breaks.
   @Test
   public void testEveryNestedConfigBeanExtendsBaseJsonConfig() {
-    java.util.Set<Class<?>> visited = new java.util.HashSet<>();
-    java.util.List<String> offenders = new java.util.ArrayList<>();
-    walkConfigBeans(org.apache.pinot.spi.config.table.TableConfig.class, visited, offenders);
+    Set<Class<?>> visited = new HashSet<>();
+    List<String> offenders = new ArrayList<>();
+    walkConfigBeans(TableConfig.class, visited, offenders);
     assertTrue(offenders.isEmpty(),
         "Found getter return types reachable from TableConfig whose declaring class is NOT a BaseJsonConfig "
             + "descendant. The validator's reflective walk will silently skip @DeprecatedConfig annotations on "
             + "these classes. Offenders:\n  " + String.join("\n  ", offenders));
   }
 
-  private static void walkConfigBeans(Class<?> type, java.util.Set<Class<?>> visited, java.util.List<String> out) {
+  private static void walkConfigBeans(Class<?> type, Set<Class<?>> visited, List<String> out) {
     if (type == null || type.isPrimitive() || type == Object.class || !visited.add(type)) {
       return;
     }
@@ -441,9 +466,9 @@ public class DeprecatedTableConfigValidationUtilsTest {
         || type.getName().startsWith("com.fasterxml.jackson.")) {
       return;
     }
-    for (java.lang.reflect.Method method : type.getMethods()) {
+    for (Method method : type.getMethods()) {
       if (method.getParameterCount() != 0 || method.getDeclaringClass() == Object.class
-          || java.lang.reflect.Modifier.isStatic(method.getModifiers())
+          || Modifier.isStatic(method.getModifiers())
           || method.getReturnType() == void.class) {
         continue;
       }
@@ -453,13 +478,13 @@ public class DeprecatedTableConfigValidationUtilsTest {
         continue;
       }
       Class<?> ret = method.getReturnType();
-      if (org.apache.pinot.spi.config.BaseJsonConfig.class.isAssignableFrom(ret)
-          && ret != org.apache.pinot.spi.config.BaseJsonConfig.class) {
+      if (BaseJsonConfig.class.isAssignableFrom(ret)
+          && ret != BaseJsonConfig.class) {
         walkConfigBeans(ret, visited, out);
       } else if (ret.getPackageName().startsWith("org.apache.pinot")
-          && !org.apache.pinot.spi.config.BaseJsonConfig.class.isAssignableFrom(ret)
+          && !BaseJsonConfig.class.isAssignableFrom(ret)
           && !ret.isEnum() && !ret.isInterface() && !ret.isAnnotation() && !ret.isPrimitive()
-          && method.getAnnotation(org.apache.pinot.spi.config.DeprecatedConfig.class) != null) {
+          && method.getAnnotation(DeprecatedConfig.class) != null) {
         // The getter is annotated with @DeprecatedConfig but its return type is a Pinot type that is NOT a
         // BaseJsonConfig descendant — this is the silent-skip risk the test guards against.
         out.add(type.getSimpleName() + "#" + name + "() returns " + ret.getName()
@@ -494,7 +519,7 @@ public class DeprecatedTableConfigValidationUtilsTest {
   }
 
   /// Provides every rule discovered by the annotation walk so the parameterized test below covers the full set
-  /// 1:1. If a new {@link org.apache.pinot.spi.config.DeprecatedConfig @DeprecatedConfig} is added on a getter, this
+  /// 1:1. If a new {@link DeprecatedConfig @DeprecatedConfig} is added on a getter, this
   /// test automatically exercises it without needing a new test case.
   @DataProvider(name = "allRules")
   public Object[][] allRules() {

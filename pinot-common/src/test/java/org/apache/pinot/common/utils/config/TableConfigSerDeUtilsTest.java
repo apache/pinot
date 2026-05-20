@@ -636,4 +636,18 @@ public class TableConfigSerDeUtilsTest {
   public void testToRawJsonNodeHandlesNull() {
     assertNull(TableConfigSerDeUtils.toRawJsonNode(null));
   }
+
+  /// `ZNRecord.getSimpleFields()` is a regular `HashMap<String, String>` that permits null values. The deprecation
+  /// diff path on `PinotTableRestletResource.updateTableConfig` reads the stored ZNRecord through this method, so
+  /// a null simpleField value must not NPE inside `looksLikeJsonContainer`.
+  @Test
+  public void testToRawJsonNodeHandlesNullSimpleFieldValue() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.getSimpleFields().put("someLegacyField", null);
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    assertTrue(raw.has("someLegacyField"));
+    assertTrue(raw.get("someLegacyField").isNull());
+  }
 }
