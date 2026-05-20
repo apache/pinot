@@ -99,7 +99,11 @@ public class PlanNodeToOpChain {
     // Assign deterministic stage-scoped ids to every PlanNode reachable from the root before constructing operators,
     // so the encoder can attach plan_node_ids to each StageStatsNode without needing to mutate or re-walk the plan.
     // Both broker and server perform this same pre-walk over the same plan structure, producing matching ids.
-    assignPlanNodeIds(node, context);
+    // Skip the walk (and the per-opchain map population) when stats are not going to be sent — this is the common case
+    // in legacy mode and avoids O(depth) allocations on the hot path.
+    if (context.isSendStats()) {
+      assignPlanNodeIds(node, context);
+    }
     MyVisitor visitor = new MyVisitor(context, tracker);
     MultiStageOperator root = node.visit(visitor, context);
     visitor.record(node, root);
@@ -172,8 +176,12 @@ public class PlanNodeToOpChain {
      * Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
      * to {@code node}. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
      * PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
+     * <p>No-op when the context is not sending stats — avoids the O(depth) sub-tree walk on the legacy hot path.
      */
     void record(PlanNode node, MultiStageOperator operator) {
+      if (!_context.isSendStats()) {
+        return;
+      }
       List<PlanNode> mapping;
       ServerPlanRequestContext leafStageContext = _context.getLeafStageContext();
       if (leafStageContext != null && leafStageContext.getLeafStageBoundaryNode() == node) {

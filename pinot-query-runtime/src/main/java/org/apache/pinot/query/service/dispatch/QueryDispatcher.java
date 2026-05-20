@@ -105,6 +105,12 @@ public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /**
+   * Maximum time (ms) to wait for outstanding {@code OpChainComplete} stats messages after the broker receiving
+   * mailbox has finished (success path). The query result is already in hand at this point, so collecting stats is
+   * best-effort — a single slow opchain must not hold the client response until the full query deadline.
+   */
+  private static final long STATS_DRAIN_ON_SUCCESS_MS = 50L;
+  /**
    * Maximum time (ms) to wait for stats after a query that has already failed and fanned out cancel. A short cap is
    * used here because the query result is already determined — we collect partial stats on a best-effort basis but
    * must not make the client wait the full query timeout for a response that is already ready.
@@ -243,10 +249,10 @@ public class QueryDispatcher {
       submitWithStream(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, session);
       QueryResult brokerResult = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
 
-      // Receiving mailbox finished. Wait for stats: returns true as soon as every opchain has reported, or false
-      // when the timeout fires.
-      long remainingMs = Math.max(0, deadlineMs - System.currentTimeMillis());
-      boolean fullCoverage = session.awaitCompletion(remainingMs, TimeUnit.MILLISECONDS);
+      // Receiving mailbox finished — data is ready. Wait for stats on a best-effort basis; cap at
+      // STATS_DRAIN_ON_SUCCESS_MS so a single slow opchain cannot delay the client response.
+      long statsWaitMs = Math.min(STATS_DRAIN_ON_SUCCESS_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
+      boolean fullCoverage = session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
       if (!fullCoverage) {
         LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
             requestId);

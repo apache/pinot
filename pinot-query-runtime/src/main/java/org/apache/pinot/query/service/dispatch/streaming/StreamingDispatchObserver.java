@@ -63,7 +63,9 @@ public class StreamingDispatchObserver
    * double-drain after some opchains already reported successfully.
    *
    * <p>Accessed only from gRPC inbound callbacks ({@code onNext}, {@code onError}, {@code onCompleted}), which gRPC
-   * serializes per stream — no additional synchronization is needed.
+   * serializes per stream — no additional synchronization is needed. {@link #cancel} is the one method on this class
+   * that may be called from a different thread (via {@link StreamingQuerySession#fanOutCancel}), but it only touches
+   * {@link #_outbound} (which is {@code volatile}) and never reads or writes this field.
    */
   private int _opChainsReportedForThisServer = 0;
 
@@ -154,6 +156,12 @@ public class StreamingDispatchObserver
 
   // --- StreamingServerHandle -------------------------------------------------
 
+  /**
+   * Sends a cancel message on the outbound stream. May be called from any thread — in particular from the
+   * {@link StreamingQuerySession#fanOutCancel} path, which runs on whichever thread first observes a peer error and
+   * iterates {@code _openStreams}. Thread-safety is achieved solely via the {@code volatile} read of
+   * {@link #_outbound}; this method must not access any other mutable state of this instance.
+   */
   @Override
   public void cancel(long requestId) {
     StreamObserver<Worker.BrokerToServer> outbound = _outbound;

@@ -55,7 +55,6 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +85,19 @@ import org.slf4j.LoggerFactory;
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Fork(1)
+// jvmArgsPrepend is baked into the generated JMH test class so that `java -jar benchmarks.jar` works without
+// any extra flags. The --add-opens entries are required because the embedded Pinot cluster uses Jersey/Glassfish
+// which reflectively accesses JDK internals locked down by the module system in JDK 17+.
+@Fork(value = 1, jvmArgsPrepend = {
+    "-ea",
+    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+    "--add-opens=java.base/java.io=ALL-UNNAMED",
+    "--add-opens=java.base/java.util=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED"
+})
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
 @Threads(4)
@@ -301,10 +312,8 @@ public class BenchmarkStreamStatsMSQE extends BaseClusterIntegrationTest {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder()
+    new Runner(new OptionsBuilder()
         .include(BenchmarkStreamStatsMSQE.class.getSimpleName())
-        // -ea activates FunctionUtils.isAssertEnabled() so that sleep(1) actually sleeps.
-        .jvmArgsAppend("-ea");
-    new Runner(opt.build()).run();
+        .build()).run();
   }
 }

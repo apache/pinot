@@ -146,7 +146,56 @@ public class MultiStageStatsTreeDecoderTest {
     MultiStageStatsTreeDecoder.decode(proto);
   }
 
+  /**
+   * A chain exactly at the depth limit (MAX_OPERATOR_TREE_DEPTH nodes → leaf at decode-depth
+   * MAX_OPERATOR_TREE_DEPTH - 1) must decode successfully.
+   */
+  @Test
+  public void testDecodeAtDepthLimitSucceeds()
+      throws Exception {
+    // MAX_OPERATOR_TREE_DEPTH nodes: root at decode-depth 0, leaf at decode-depth MAX_OPERATOR_TREE_DEPTH-1 (<limit).
+    Worker.StageStatsNode chain = buildChain(MultiStageStatsTreeDecoder.MAX_OPERATOR_TREE_DEPTH);
+    MultiStageStatsTreeDecoder.decodeNode(chain);
+  }
+
+  /**
+   * A chain one node beyond the depth limit (MAX_OPERATOR_TREE_DEPTH + 1 nodes → leaf at decode-depth
+   * MAX_OPERATOR_TREE_DEPTH) must be rejected with DecodeFailedException.
+   */
+  @Test(expectedExceptions = MultiStageStatsTreeDecoder.DecodeFailedException.class)
+  public void testDecodeExceedsDepthLimitThrows()
+      throws Exception {
+    // MAX_OPERATOR_TREE_DEPTH + 1 nodes: leaf at decode-depth MAX_OPERATOR_TREE_DEPTH (>= limit) → throws.
+    Worker.StageStatsNode chain = buildChain(MultiStageStatsTreeDecoder.MAX_OPERATOR_TREE_DEPTH + 1);
+    MultiStageStatsTreeDecoder.decodeNode(chain);
+  }
+
   // ---- helpers ----
+
+  /**
+   * Builds a linear chain of {@code size} nodes: root wraps a child, which wraps a child, ... down to a single leaf.
+   * The chain has {@code size} nodes total; the leaf is at decode-depth {@code size - 1} when decoded recursively
+   * from the root (depth 0). Each node carries a valid (empty) serialized StatMap so deserialization succeeds.
+   */
+  private static Worker.StageStatsNode buildChain(int size)
+      throws IOException {
+    ByteString emptyReceiveStat = serialize(new StatMap<>(BaseMailboxReceiveOperator.StatKey.class));
+    ByteString emptySendStat = serialize(new StatMap<>(MailboxSendOperator.StatKey.class));
+    // Start with the innermost leaf.
+    Worker.StageStatsNode node = Worker.StageStatsNode.newBuilder()
+        .setOperatorTypeId(MultiStageOperator.Type.MAILBOX_RECEIVE.getId())
+        .setStatMap(emptyReceiveStat)
+        .build();
+    // Wrap it size-1 times to produce a chain of the requested length.
+    for (int i = 1; i < size; i++) {
+      node = Worker.StageStatsNode.newBuilder()
+          .setOperatorTypeId(MultiStageOperator.Type.MAILBOX_SEND.getId())
+          .setStatMap(emptySendStat)
+          .addChildren(node)
+          .build();
+    }
+    return node;
+  }
 
   private static StageStatsTreeNode leafNode(MultiStageOperator.Type type, StatMap<?> statMap) {
     return new StageStatsTreeNode(type, List.of(), statMap, List.of());

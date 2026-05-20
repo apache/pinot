@@ -38,6 +38,13 @@ import org.apache.pinot.query.runtime.operator.OperatorTypeRegistry;
  * <p>Pairs with {@link MultiStageStatsTreeEncoder} on the server side.
  */
 public final class MultiStageStatsTreeDecoder {
+  /**
+   * Maximum allowed operator-tree depth. A plan this deep would require an extraordinary number of nested operators
+   * and almost certainly indicates a malformed or adversarial payload; cap and fail with {@link DecodeFailedException}
+   * rather than risking a stack overflow on the Netty event-loop thread.
+   */
+  static final int MAX_OPERATOR_TREE_DEPTH = 64;
+
   private MultiStageStatsTreeDecoder() {
   }
 
@@ -61,6 +68,15 @@ public final class MultiStageStatsTreeDecoder {
    */
   public static StageStatsTreeNode decodeNode(Worker.StageStatsNode node)
       throws DecodeFailedException {
+    return decodeNode(node, 0);
+  }
+
+  private static StageStatsTreeNode decodeNode(Worker.StageStatsNode node, int depth)
+      throws DecodeFailedException {
+    if (depth >= MAX_OPERATOR_TREE_DEPTH) {
+      throw new DecodeFailedException(
+          "Operator tree depth exceeded limit of " + MAX_OPERATOR_TREE_DEPTH + " — payload may be malformed");
+    }
     OperatorTypeDescriptor type = OperatorTypeRegistry.fromId(node.getOperatorTypeId());
     if (type == null) {
       throw new DecodeFailedException("Unknown operator type id: " + node.getOperatorTypeId());
@@ -73,7 +89,7 @@ public final class MultiStageStatsTreeDecoder {
     }
     List<StageStatsTreeNode> children = new ArrayList<>(node.getChildrenCount());
     for (Worker.StageStatsNode child : node.getChildrenList()) {
-      children.add(decodeNode(child));
+      children.add(decodeNode(child, depth + 1));
     }
     return new StageStatsTreeNode(type, node.getPlanNodeIdsList(), statMap, children);
   }
