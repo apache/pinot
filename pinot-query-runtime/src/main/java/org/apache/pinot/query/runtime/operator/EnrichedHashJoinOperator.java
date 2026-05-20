@@ -277,7 +277,10 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     ArrayList<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
-      Object key = _leftKeySelector.getKey(leftRow);
+      // Normalize the key for table-specific lookup semantics (e.g. UuidLookupTable expects a UuidKey, not the
+      // raw ByteArray from the row). Mirrors HashJoinOperator. Also store the normalized key in
+      // _matchedRightRows so buildNonMatchRightRows can read it back with the same shape.
+      Object key = _rightTable.normalizeKey(_leftKeySelector.getKey(leftRow));
       Object[] rightRow = (Object[]) _rightTable.lookup(key);
       if (rightRow == null) {
         handleUnmatchedLeftRow(leftRow, rows);
@@ -307,7 +310,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
-      Object key = _leftKeySelector.getKey(leftRow);
+      // See buildJoinedDataBlockUniqueKeys for why the key must be normalized.
+      Object key = _rightTable.normalizeKey(_leftKeySelector.getKey(leftRow));
       List<Object[]> rightRows = (List<Object[]>) _rightTable.lookup(key);
       if (rightRows == null) {
         handleUnmatchedLeftRow(leftRow, rows);
@@ -348,8 +352,9 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
-      Object key = _leftKeySelector.getKey(leftRow);
-      // ANTI-JOIN only checks non-existence of the key
+      // ANTI-JOIN only checks non-existence of the key. Normalize so UuidLookupTable (and any future custom
+      // lookup table whose normalization is not identity) can answer correctly.
+      Object key = _rightTable.normalizeKey(_leftKeySelector.getKey(leftRow));
       if (!_rightTable.containsKey(key)) {
         filterProjectLimit(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
       }
@@ -364,8 +369,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     List<Object[]> rows = new ArrayList<>(leftRows.size());
 
     for (Object[] leftRow : leftRows) {
-      Object key = _leftKeySelector.getKey(leftRow);
-      // SEMI-JOIN only checks existence of the key
+      // SEMI-JOIN only checks existence of the key (normalized — see ANTI-JOIN above).
+      Object key = _rightTable.normalizeKey(_leftKeySelector.getKey(leftRow));
       if (_rightTable.containsKey(key)) {
         filterProjectLimit(leftRow, null, rows, _leftColumnSize, _leftColumnSize);
       }
