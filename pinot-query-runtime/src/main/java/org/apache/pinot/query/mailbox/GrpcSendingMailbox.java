@@ -60,6 +60,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * gRPC implementation of the {@link SendingMailbox}. The gRPC stream is created on the first call to {@link #send}.
+ *
+ * <p>Thread-safety: {@code _readyLock} serializes every call to {@code _contentObserver.onNext} / {@code onCompleted}.
+ * The underlying {@link ClientCallStreamObserver} is not thread-safe, and the sender, cancel, and EOS paths can run
+ * concurrently. Acquire {@code _readyLock} around any new outbound call site you add.
  */
 public class GrpcSendingMailbox implements SendingMailbox {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
@@ -131,11 +135,17 @@ public class GrpcSendingMailbox implements SendingMailbox {
     // QUERY_CANCELLATION on the receiver side.
     if (sendInternal(block, serializedStats, /* bypassReady */ true)) {
       LOGGER.debug("Completing mailbox: {}", _id);
-      // Set _senderSideClosed BEFORE calling onCompleted() so that a concurrent cancel() racing in the narrow
-      // window between onCompleted() returning and the flag being written sees isTerminated() == true and does
-      // not attempt to call onNext() on an already half-closed stream, which would throw IllegalStateException.
-      _senderSideClosed = true;
-      _contentObserver.onCompleted();
+      // _readyLock serializes outbound observer calls. Holding it across the flag write + onCompleted() makes the
+      // half-close atomic with respect to any racing sendContent() / cancel(), so two threads cannot call onNext()
+      // / onCompleted() on the same non-thread-safe ClientCallStreamObserver. Setting _senderSideClosed before
+      // onCompleted() also means a sendContent() that observes isTerminated() under the lock will skip its onNext().
+      _readyLock.lock();
+      try {
+        _senderSideClosed = true;
+        _contentObserver.onCompleted();
+      } finally {
+        _readyLock.unlock();
+      }
     } else {
       LOGGER.warn("Trying to send EOS to the already terminated mailbox: {}", _id);
     }
@@ -235,6 +245,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // mailbox is registered per the dispatch plan and is blocked on this stream.
       _contentObserver = getContentObserver();
     }
+    // Acquire _readyLock so the error EOS + onCompleted() is one atomic outbound. ReentrantLock: the inner
+    // sendContent()'s acquisition nests safely.
+    _readyLock.lock();
     try {
       String msg = t != null ? t.getMessage() : "Unknown";
       // NOTE: DO NOT use onError() because it will terminate the stream, and receiver might not get the callback
@@ -245,6 +258,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
     } catch (Exception e) {
       // Exception can be thrown if the stream is already closed, so we simply ignore it
       LOGGER.debug("Caught exception cancelling mailbox: {}", _id, e);
+    } finally {
+      _readyLock.unlock();
     }
   }
 
@@ -330,21 +345,26 @@ public class GrpcSendingMailbox implements SendingMailbox {
       // (bypass path). Either way, skip the send.
       return;
     }
-    // Narrow-window race mitigation: a concurrent cancel() may have run between awaitReady() returning true and
-    // here, setting _senderSideClosed and pushing its own error EOS. If we proceed, both threads would call
-    // onNext() on the same non-thread-safe ClientCallStreamObserver. Re-checking after the gate reduces (but
-    // does not fully eliminate) that window; fully eliminating it would require serializing all onNext() calls
-    // under _readyLock, which is more invasive. The bypass path (cancel/close) must push through regardless,
-    // so this guard only applies when bypassReady == false.
-    if (!bypassReady && isTerminated()) {
-      return;
+    // _readyLock is the serialization point for outbound observer calls. Hold it across the isTerminated() re-check
+    // and the onNext() so the data path cannot race with cancel() / send(Eos) onto the same non-thread-safe
+    // ClientCallStreamObserver. awaitReady() is intentionally outside the lock: its slow path already acquires
+    // _readyLock to wait on _readyCond, and acquiring before calling it would force the fast `isReady() == true`
+    // path to take and release the lock for no benefit. By the time awaitReady() returns true, the slow-path
+    // lock release happens-before this acquisition, so the visibility we need is in place.
+    _readyLock.lock();
+    try {
+      if (!bypassReady && isTerminated()) {
+        return;
+      }
+      MailboxContent content = MailboxContent.newBuilder()
+          .setMailboxId(_id)
+          .setPayload(byteString)
+          .setWaitForMore(waitForMore)
+          .build();
+      _contentObserver.onNext(content);
+    } finally {
+      _readyLock.unlock();
     }
-    MailboxContent content = MailboxContent.newBuilder()
-        .setMailboxId(_id)
-        .setPayload(byteString)
-        .setWaitForMore(waitForMore)
-        .build();
-    _contentObserver.onNext(content);
   }
 
   /// Blocks the calling (query-runner) thread until the gRPC client outbound is ready to accept another chunk, the
