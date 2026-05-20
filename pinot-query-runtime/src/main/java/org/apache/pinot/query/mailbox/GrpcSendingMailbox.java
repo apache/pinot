@@ -96,11 +96,6 @@ public class GrpcSendingMailbox implements SendingMailbox {
   private volatile ClientCallStreamObserver<MailboxContent> _contentObserver;
 
   public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
-      StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize) {
-    this(id, channelManager, hostname, port, deadlineMs, statMap, maxInboundMessageSize, true);
-  }
-
-  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxInboundMessageSize, boolean backpressureEnabled) {
     _id = id;
     _channelManager = channelManager;

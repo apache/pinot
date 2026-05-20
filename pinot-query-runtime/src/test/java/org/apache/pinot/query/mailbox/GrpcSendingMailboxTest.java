@@ -58,7 +58,7 @@ public class GrpcSendingMailboxTest {
   public void sendDataThrowsWhenQueryTerminated() {
     ChannelManager channelManager = Mockito.mock(ChannelManager.class);
     GrpcSendingMailbox mailbox = new GrpcSendingMailbox("test-mailbox", channelManager, "localhost", 0, Long.MAX_VALUE,
-        new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024);
+        new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, true);
     RowHeapDataBlock block = new RowHeapDataBlock(Collections.singletonList(new Object[]{"val"}),
         new DataSchema(new String[]{"foo"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
 
