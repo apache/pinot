@@ -138,8 +138,23 @@ public class DistinctCountCPCSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    FieldSpec.DataType dataType = blockValSet.getValueType();
+    FieldSpec.DataType storedType = dataType.getStoredType();
+
+    // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized CPC Sketch state. Update
+    // the sketch with the canonical UUID string so DISTINCTCOUNTCPC(uuidCol) matches
+    // DISTINCTCOUNTCPC(CAST(uuidCol AS STRING)).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
+      for (int i = 0; i < length; i++) {
+        cpcSketch.update(uuidStringValues[i]);
+      }
+      getAccumulator(aggregationResultHolder).apply(cpcSketch);
+      return;
+    }
+
     // Treat BYTES value as serialized CPC Sketch
-    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -209,8 +224,19 @@ public class DistinctCountCPCSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
+
+    // UUID columns: update with canonical UUID strings (see aggregate() for rationale).
+    if (dataType == DataType.UUID) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(uuidStringValues[i]);
+      }
+      return;
+    }
+
     // Treat BYTES value as serialized CPC Sketch
-    DataType storedType = blockValSet.getValueType().getStoredType();
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
@@ -280,9 +306,20 @@ public class DistinctCountCPCSketchAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    // Treat BYTES value as serialized CPC Sketch
-    DataType storedType = blockValSet.getValueType().getStoredType();
+    DataType dataType = blockValSet.getValueType();
+    DataType storedType = dataType.getStoredType();
     boolean singleValue = blockValSet.isSingleValue();
+
+    // UUID columns: update with canonical UUID strings (see aggregate() for rationale).
+    if (dataType == DataType.UUID && singleValue) {
+      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          getCpcSketch(groupByResultHolder, groupKey).update(uuidStringValues[i]);
+        }
+      }
+      return;
+    }
 
     if (singleValue && storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
