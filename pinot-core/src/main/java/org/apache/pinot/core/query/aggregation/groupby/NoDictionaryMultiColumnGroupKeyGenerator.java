@@ -420,6 +420,17 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
                 keys[j][i] = mvKeys;
               }
               break;
+            case UUID:
+              byte[][][] uuidValues = blockValSet.getBytesValuesMV();
+              for (int j = 0; j < numDocs; j++) {
+                int mvSize = uuidValues[j].length;
+                int[] mvKeys = new int[mvSize];
+                for (int k = 0; k < mvSize; k++) {
+                  mvKeys[k] = onTheFlyDictionary.put(UuidKey.fromBytes(uuidValues[j][k]));
+                }
+                keys[j][i] = mvKeys;
+              }
+              break;
             default:
               throw new IllegalArgumentException(
                   "Illegal data type for no-dictionary key generator: " + _dataTypes[i]);
