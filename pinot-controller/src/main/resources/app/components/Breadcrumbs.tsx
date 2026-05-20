@@ -59,6 +59,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/minion-task-manager': 'Minion Task Manager',
   '/tables': 'Tables',
   '/logical-tables': 'Logical Tables',
+  '/materialized-views': 'Materialized Views',
   '/query': 'Query Console',
   '/cluster': 'Cluster Manager',
   '/zookeeper': 'Zookeeper Browser',

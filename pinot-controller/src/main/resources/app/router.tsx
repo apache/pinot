@@ -37,6 +37,8 @@ import SchemaPageDetails from './pages/SchemaPageDetails';
 import LoginPage from './pages/LoginPage';
 import UserPage from "./pages/UserPage";
 import LogicalTableDetails from './pages/LogicalTableDetails';
+import MaterializedViewListingPage from './pages/MaterializedViewListingPage';
+import MaterializedViewDetails from './pages/MaterializedViewDetails';
 
 export default [
   // TODO: make async
@@ -50,6 +52,8 @@ export default [
   { path: '/minions', Component: InstanceListingPage },
   { path: '/tables', Component: TablesListingPage },
   { path: '/logical-tables/:logicalTableName', Component: LogicalTableDetails },
+  { path: '/materialized-views', Component: MaterializedViewListingPage },
+  { path: '/materialized-views/:materializedViewTableName', Component: MaterializedViewDetails },
   { path: '/minion-task-manager', Component: MinionTaskManager },
   { path: '/task-queue/:taskType', Component: TaskQueue },
   { path: '/task-queue/:taskType/tables/:queueTableName', Component: TaskQueueTable },
