@@ -118,6 +118,7 @@ import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
@@ -154,6 +155,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
+import org.apache.pinot.controller.helix.core.lineage.SegmentsInLineageException;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
@@ -1073,6 +1075,15 @@ public class PinotHelixResourceManager {
   /**
    * Delete a list of segments from ideal state and remove them from the local storage.
    *
+   * <p>Pre-checks the table's segment lineage znode and rejects the whole batch with a failure response if any
+   * target segment participates in a live lineage entry (signalled internally via {@link SegmentsInLineageException}).
+   * If we don't do this and a segment is deleted while it is being replaced, it could lead to the deleted data
+   * resurfacing with the replaced segment. To prevent that, we will block segment deletion if its part of the FROM
+   * list in an IN_PROGRESS / COMPLETED Segment Lineage entry.
+   *
+   * <p>Cleanup paths that already coordinated with the lineage lifecycle must call
+   * {@link #deleteSegmentsForLineageCleanup} instead.
+   *
    * @param tableNameWithType Table name with type suffix
    * @param segmentNames List of names of segment to be deleted
    * @param retentionPeriod The retention period of the deleted segments.
@@ -1080,6 +1091,23 @@ public class PinotHelixResourceManager {
    */
   public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, retentionPeriod, false);
+  }
+
+  /**
+   * Lineage-aware delete path that skips the cross-check against the live lineage entries. Reserved for callers
+   * that have already coordinated with the lineage lifecycle: proactive cleanup in {@code startReplaceSegments},
+   * post-revert cleanup in {@code revertReplaceSegments}, and {@code RetentionManager}'s lineage-cleanup pass.
+   * External call sites (REST handlers, retention based on table config, minion task generators, push-failure
+   * cleanup) must continue to use the public {@link #deleteSegments} overloads.
+   */
+  public PinotResourceManagerResponse deleteSegmentsForLineageCleanup(String tableNameWithType,
+      List<String> segmentNames) {
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, null, true);
+  }
+
+  private PinotResourceManagerResponse deleteSegmentsInternal(String tableNameWithType, List<String> segmentNames,
+      @Nullable String retentionPeriod, boolean bypassLineageCheck) {
     if (segmentNames.isEmpty()) {
       return PinotResourceManagerResponse.success("No segments to delete");
     }
@@ -1087,6 +1115,10 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+      if (!bypassLineageCheck && isLineageExclusiveDeleteEnabled()) {
+        // Reject the whole batch if any target segment participates in a live lineage entry.
+        rejectIfTargetsLineageLockedSegments(tableNameWithType, segmentNames);
+      }
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
       if (retentionPeriod != null) {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
@@ -1096,10 +1128,45 @@ public class PinotHelixResourceManager {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
+    } catch (SegmentsInLineageException e) {
+      LOGGER.warn("Refusing to delete segments from table: {}. {}", tableNameWithType, e.getMessage());
+      return PinotResourceManagerResponse.failure(e.getMessage());
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);
       return PinotResourceManagerResponse.failure(e.getMessage());
     }
+  }
+
+  /**
+   * Reads the current segment lineage znode (if any) and throws {@link SegmentsInLineageException} when the
+   * delete batch intersects the lineage-locked set.
+   */
+  private void rejectIfTargetsLineageLockedSegments(String tableNameWithType, List<String> segmentNames) {
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    if (segmentLineage == null) {
+      return;
+    }
+    Set<String> blocked = SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage);
+    if (blocked.isEmpty()) {
+      return;
+    }
+    List<String> blockingTargets = new ArrayList<>();
+    for (String segment : segmentNames) {
+      if (blocked.contains(segment)) {
+        blockingTargets.add(segment);
+      }
+    }
+    if (blockingTargets.isEmpty()) {
+      return;
+    }
+    if (_controllerMetrics != null) {
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.LINEAGE_BLOCKED_DELETE_COUNT, 1L);
+    }
+    throw new SegmentsInLineageException(tableNameWithType, blockingTargets);
+  }
+
+  private boolean isLineageExclusiveDeleteEnabled() {
+    return _controllerConf == null || _controllerConf.isLineageExclusiveDeleteEnabled();
   }
 
   /**
@@ -4587,7 +4654,7 @@ public class PinotHelixResourceManager {
     // is safe to physically delete segments.
     if (!segmentsToCleanUp.isEmpty()) {
       LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
-      deleteSegments(tableNameWithType, segmentsToCleanUp);
+      deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToCleanUp);
     }
 
     // Only successful attempt can reach here
@@ -4640,6 +4707,24 @@ public class PinotHelixResourceManager {
         }
 
         Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
+        // Re-validate that every segmentsFrom is still present in IdealState.
+        // If a segment was deleted concurrently while it was added in the LineageEntry,
+        // the lineage entry is now corrupt and should be reverted.
+        List<String> missingSegmentsFrom = new ArrayList<>();
+        for (String segment : lineageEntry.getSegmentsFrom()) {
+          if (!segmentsForTable.contains(segment)) {
+            missingSegmentsFrom.add(segment);
+          }
+        }
+        if (!missingSegmentsFrom.isEmpty()) {
+          String errorMsg = "Cannot complete segment replacement: segments from 'segmentsFrom' no longer exist in "
+              + "IdealState (likely deleted by a concurrent request). Recover by calling revertReplaceSegments with "
+              + "forceRevert=true. (tableNameWithType=" + tableNameWithType + ", segmentLineageEntryId="
+              + segmentLineageEntryId + ", missingSegmentsFrom=" + missingSegmentsFrom + ")";
+          LOGGER.error(errorMsg);
+          throw new RuntimeException(errorMsg);
+        }
+
         List<String> segmentsTo = lineageEntry.getSegmentsTo();
         if (endReplaceSegmentsRequest != null && !endReplaceSegmentsRequest.getSegmentsTo().isEmpty()) {
           Set<String> segmentsToInSet = new HashSet<>(segmentsTo);
@@ -4823,7 +4908,7 @@ public class PinotHelixResourceManager {
 
           // Invoke the proactive clean-up for segments that we no longer needs
           if (!segmentsTo.isEmpty()) {
-            deleteSegments(tableNameWithType, segmentsTo);
+            deleteSegmentsForLineageCleanup(tableNameWithType, segmentsTo);
           }
           return true;
         } else {
