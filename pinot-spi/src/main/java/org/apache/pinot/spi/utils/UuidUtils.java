@@ -29,7 +29,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>UUID values are externally represented as canonical lowercase RFC 4122 strings and internally represented as
  * fixed-width 16-byte values.
  */
-public final class UuidUtils {
+public class UuidUtils {
   public static final int UUID_NUM_BYTES = 16;
   private static final byte[] NULL_UUID_BYTES = new byte[UUID_NUM_BYTES];
 
