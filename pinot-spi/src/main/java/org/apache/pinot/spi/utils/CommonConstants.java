@@ -2167,92 +2167,84 @@ public class CommonConstants {
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
-    /**
-     * Whether the sender side of every {@code GrpcSendingMailbox} respects gRPC client-side flow control by waiting
-     * on {@code ClientCallStreamObserver.isReady()} before pushing each chunk.
-     *
-     * <p>Default {@code true}. Set to {@code false} to restore the pre-1.6 behaviour where the sender pushes
-     * unconditionally; useful as a production kill-switch if the gate causes an unexpected regression, and as an
-     * A/B knob for benchmarks (see {@code BenchmarkGrpcMailboxSend}).
-     *
-     * <p>Disabling this flag is what re-introduces the {@code OutOfDirectMemoryError} failure mode the gate exists
-     * to prevent. It is here as a safety valve, not as a recommended setting.
-     */
+    /// Whether the sender side of every `GrpcSendingMailbox` respects gRPC client-side flow control by waiting
+    /// on [io.grpc.stub.ClientCallStreamObserver#isReady] before pushing each chunk.
+    ///
+    /// Default `true`. Set to `false` to restore the pre-1.6 behaviour where the sender pushes
+    /// unconditionally; useful as a production kill-switch if the gate causes an unexpected regression, and as
+    /// an A/B knob for benchmarks (see `BenchmarkGrpcMailboxSend`).
+    ///
+    /// Disabling this flag is what re-introduces the `OutOfDirectMemoryError` failure mode the gate exists
+    /// to prevent. It is here as a safety valve, not as a recommended setting.
     public static final String KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED =
         "pinot.query.runner.grpc.sender.backpressure.enabled";
     public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = true;
 
-    /**
-     * Per-stream HTTP/2 flow control window, in bytes. The receiver advertises this value to the sender as
-     * the number of bytes it will accept before requiring a `WINDOW_UPDATE` frame. Wider windows let the
-     * sender push a whole `MseBlock` without {@link io.grpc.stub.ClientCallStreamObserver#isReady} flipping
-     * mid-block. Applied via `NettyServerBuilder.flowControlWindow` in `GrpcMailboxServer`.
-     *
-     * <p>This is per HTTP/2 stream, so total inbound buffering at the receiver scales as
-     * {@code value × #concurrent streams to this server}. Concretely:
-     * {@code Peak receiver direct memory ≈ flowControlWindow × #concurrent_incoming_streams.}
-     *
-     * <p>This value is the <b>per-stalled-stream receiver-side direct-memory exposure</b>, not just a
-     * throughput knob: when an inbound stream's receiver application queue stalls (e.g. the downstream
-     * operator is slow to drain via {@code MailboxContentObserver.onNext}), the wire can still buffer
-     * up to {@code flowControlWindow} bytes of data on that stream before the HTTP/2 peer stops sending.
-     *
-     * <p>This is a direct-memory bound, not just a throughput knob: operators must size it against
-     * {@code -XX:MaxDirectMemorySize} given the expected concurrent inbound stream count.
-     */
+    /// Per-stream HTTP/2 flow control window, in bytes. The receiver advertises this value to the sender as
+    /// the number of bytes it will accept before requiring a `WINDOW_UPDATE` frame. Wider windows let the
+    /// sender push a whole `MseBlock` without [io.grpc.stub.ClientCallStreamObserver#isReady] flipping
+    /// mid-block. Applied via `NettyServerBuilder.flowControlWindow` in `GrpcMailboxServer`.
+    ///
+    /// This is per HTTP/2 stream, so total inbound buffering at the receiver scales as
+    /// `value × #concurrent streams to this server`. Concretely:
+    /// `Peak receiver direct memory ≈ flowControlWindow × #concurrent_incoming_streams.`
+    ///
+    /// This value is the **per-stalled-stream receiver-side direct-memory exposure**, not just a throughput
+    /// knob: when an inbound stream's receiver application queue stalls (e.g. the downstream operator is slow
+    /// to drain via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]), the wire can
+    /// still buffer up to `flowControlWindow` bytes of data on that stream before the HTTP/2 peer stops
+    /// sending.
+    ///
+    /// This is a direct-memory bound, not just a throughput knob: operators must size it against
+    /// `-XX:MaxDirectMemorySize` given the expected concurrent inbound stream count.
     public static final String KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES =
         "pinot.query.runner.grpc.flow.control.window.bytes";
     public static final int DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES = 64 * 1024 * 1024;
 
-    /**
-     * Netty per-channel WriteQueue high watermark, in bytes. Applied via
-     * `ChannelOption.WRITE_BUFFER_WATER_MARK` on the sender's `NettyChannelBuilder`. When the channel's
-     * outbound queue exceeds this value, `Channel.isWritable()` flips to `false` and gRPC's
-     * `ClientCallStreamObserver.isReady()` returns `false` until the queue drops below the low watermark.
-     *
-     * <p>This is a per-channel (per `host:port`) setting, shared across all streams to that peer. The
-     * sender's direct-memory footprint is therefore bounded by {@code value × #peers}, not by
-     * {@code value × #streams}. Concretely:
-     * {@code Peak sender direct memory ≈ writeBufferHighWaterMark × #peers (one channel per peer, shared
-     * across streams to that peer).}
-     *
-     * <p>This is a direct-memory bound, not just a throughput knob: operators must size it against
-     * {@code -XX:MaxDirectMemorySize} given the expected per-query peer fan-out and the number of
-     * concurrent queries. Pairs with {@link #KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES}.
-     */
+    /// Netty per-channel WriteQueue high watermark, in bytes. Applied via
+    /// `ChannelOption.WRITE_BUFFER_WATER_MARK` on the sender's `NettyChannelBuilder`. When the channel's
+    /// outbound queue exceeds this value, `Channel.isWritable()` flips to `false` and gRPC's
+    /// [io.grpc.stub.ClientCallStreamObserver#isReady] returns `false` until the queue drops below the low
+    /// watermark.
+    ///
+    /// This is a per-channel (per `host:port`) setting, shared across all streams to that peer. The
+    /// sender's direct-memory footprint is therefore bounded by `value × #peers`, not by
+    /// `value × #streams`. Concretely:
+    /// `Peak sender direct memory ≈ writeBufferHighWaterMark × #peers (one channel per peer, shared across
+    /// streams to that peer).`
+    ///
+    /// This is a direct-memory bound, not just a throughput knob: operators must size it against
+    /// `-XX:MaxDirectMemorySize` given the expected per-query peer fan-out and the number of concurrent
+    /// queries. Pairs with [#KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES].
     public static final String KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES =
         "pinot.query.runner.grpc.write.buffer.high.water.mark.bytes";
     public static final int DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES = 64 * 1024 * 1024;
 
-    /**
-     * Netty per-channel WriteQueue low watermark, in bytes. Once the WriteQueue has exceeded the high
-     * watermark (see {@link #KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES} and the
-     * {@code writeBufferHighWaterMark × #peers} direct-memory formula documented there), it must drop
-     * below this value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of
-     * the high watermark.
-     *
-     * <p>The gap {@code (high − low)} is the drain hysteresis the channel must clear before becoming
-     * writable again: setting `low` too close to `high` makes the channel flap writable/unwritable on
-     * every small drain; setting it too low forces the sender to wait longer between writable windows.
-     * The low watermark itself does not change the peak direct-memory bound — that is set by the high
-     * watermark — but it controls how aggressively the channel reopens once back-pressure has engaged.
-     */
+    /// Netty per-channel WriteQueue low watermark, in bytes. Once the WriteQueue has exceeded the high
+    /// watermark (see [#KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES] and the
+    /// `writeBufferHighWaterMark × #peers` direct-memory formula documented there), it must drop below this
+    /// value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of the high
+    /// watermark.
+    ///
+    /// The gap `(high − low)` is the drain hysteresis the channel must clear before becoming writable
+    /// again: setting `low` too close to `high` makes the channel flap writable/unwritable on every
+    /// small drain; setting it too low forces the sender to wait longer between writable windows. The
+    /// low watermark itself does not change the peak direct-memory bound — that is set by the high
+    /// watermark — but it controls how aggressively the channel reopens once back-pressure has engaged.
     public static final String KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES =
         "pinot.query.runner.grpc.write.buffer.low.water.mark.bytes";
     public static final int DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES = 32 * 1024 * 1024;
 
-    /**
-     * Number of inbound gRPC messages the receiver will accept in flight per stream, before requiring the
-     * application to consume one (via {@code MailboxContentObserver.onNext} returning). Implemented by
-     * disabling gRPC's default auto-inbound-flow-control on the server side and calling
-     * {@code ServerCallStreamObserver.request(int)} explicitly.
-     *
-     * <p>Larger values let the sender pipeline more messages without waiting for per-message round trips,
-     * which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
-     * is still bounded by the HTTP/2 stream window (see
-     * {@link #KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES}), so this credit count is effectively a per-stream
-     * message-count limit on top of the byte-count limit. Whichever fires first applies.
-     */
+    /// Number of inbound gRPC messages the receiver will accept in flight per stream, before requiring the
+    /// application to consume one (via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]
+    /// returning). Implemented by disabling gRPC's default auto-inbound-flow-control on the server side and
+    /// calling [io.grpc.stub.ServerCallStreamObserver#request] explicitly.
+    ///
+    /// Larger values let the sender pipeline more messages without waiting for per-message round trips,
+    /// which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
+    /// is still bounded by the HTTP/2 stream window (see [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES]), so this
+    /// credit count is effectively a per-stream message-count limit on top of the byte-count limit.
+    /// Whichever fires first applies.
     public static final String KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT =
         "pinot.query.runner.grpc.inbound.message.credit";
     public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 128;
