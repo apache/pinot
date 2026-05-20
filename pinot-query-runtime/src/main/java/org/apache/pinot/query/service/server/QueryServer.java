@@ -618,8 +618,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         try {
           builder.setStats(MultiStageStatsTreeEncoder.encode(rootOperator, stats, context));
         } catch (Throwable t) {
-          // Encoding failed (operator tree / flat list mismatch on error path is the most likely cause). Surface the
-          // error on the OpChainComplete so the broker can mark mergeFailed, but don't block stream completion.
+          // Encoding failed — no partial stats can be recovered. The encoder is all-or-nothing by design:
+          //   1. The upfront treeSize != flatSize check throws IllegalStateException before any proto node is built.
+          //   2. An IOException from serializeStatMap mid-walk leaves partial StageStatsNode builders only on the
+          //      Java call stack; they are discarded when the exception unwinds. No partially-built
+          //      MultiStageStatsTree is ever returned.
+          // In stream mode the mailbox EOS carries no stats (suppressed when SubmitWithStream is active), so the
+          // broker will receive this opchain's message with success=false and empty stats. This is strictly worse
+          // than legacy mode (which would have sent whatever partial stats were in the EOS), but it is the best
+          // the encoder's current design allows without a more invasive refactor. The broker treats a missing
+          // stats tree as an unmerged opchain and logs a warning, which preserves query correctness.
           LOGGER.warn("Failed to encode stats tree for opchain {}", opChainId, t);
           builder.setSuccess(false);
           builder.setErrorMsg(builder.getErrorMsg().isEmpty() ? "stats encode failed: " + t.getMessage()
@@ -627,15 +635,21 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         }
       }
       Worker.ServerToBroker message = Worker.ServerToBroker.newBuilder().setOpchain(builder).build();
-      synchronized (_streamLock) {
-        if (!_completed.get()) {
-          _responseObserver.onNext(message);
+      try {
+        synchronized (_streamLock) {
+          if (!_completed.get()) {
+            _responseObserver.onNext(message);
+          }
         }
-      }
-      // After all expected opchains have reported, emit ServerDone and close.
-      if (_completedOpChains.incrementAndGet() >= _expectedOpChains.get()) {
-        cleanupListener();
-        sendDoneAndComplete();
+      } finally {
+        // Increment in finally: if onNext throws a transport exception (e.g. the broker closed the stream early),
+        // we must still count this opchain as done so that sendDoneAndComplete fires when the last one finishes.
+        // Without this, a single dropped send leaves _completedOpChains short of _expectedOpChains permanently,
+        // and the broker waits on its drain latch until the timeout instead of receiving ServerDone promptly.
+        if (_completedOpChains.incrementAndGet() >= _expectedOpChains.get()) {
+          cleanupListener();
+          sendDoneAndComplete();
+        }
       }
     }
 
@@ -677,10 +691,20 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     private void sendDoneAndComplete() {
       synchronized (_streamLock) {
         if (_completed.compareAndSet(false, true)) {
-          _responseObserver.onNext(Worker.ServerToBroker.newBuilder()
-              .setDone(Worker.ServerDone.getDefaultInstance())
-              .build());
-          _responseObserver.onCompleted();
+          try {
+            _responseObserver.onNext(Worker.ServerToBroker.newBuilder()
+                .setDone(Worker.ServerDone.getDefaultInstance())
+                .build());
+          } catch (Throwable t) {
+            LOGGER.warn("Failed to send ServerDone for request {}", _requestId, t);
+          }
+          // Always attempt onCompleted even if the ServerDone send failed, so the gRPC stream is half-closed
+          // on our side and the broker can detect the clean stream end via its onCompleted callback.
+          try {
+            _responseObserver.onCompleted();
+          } catch (Throwable t) {
+            LOGGER.warn("Failed to complete response stream for request {}", _requestId, t);
+          }
         }
       }
     }
