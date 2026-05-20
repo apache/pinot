@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.lineage;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,5 +53,33 @@ public class SegmentLineageUtils {
         }
       }
     }
+  }
+
+  /**
+   * Returns the set of segments that participate in a live lineage entry and therefore must not be deleted by
+   * external callers.
+   * <ul>
+   *   <li>{@code IN_PROGRESS} entries lock both {@code segmentsFrom} and {@code segmentsTo}.</li>
+   *   <li>{@code COMPLETED} entries lock {@code segmentsFrom}</li>
+   *   <li>{@code REVERTED} entries lock nothing.</li>
+   * </ul>
+   */
+  public static Set<String> getDeleteBlockedSegments(SegmentLineage segmentLineage) {
+    Set<String> blocked = new HashSet<>();
+    for (LineageEntry lineageEntry : segmentLineage.getLineageEntries().values()) {
+      switch (lineageEntry.getState()) {
+        case IN_PROGRESS:
+          blocked.addAll(lineageEntry.getSegmentsFrom());
+          blocked.addAll(lineageEntry.getSegmentsTo());
+          break;
+        case COMPLETED:
+          blocked.addAll(lineageEntry.getSegmentsFrom());
+          break;
+        case REVERTED:
+        default:
+          break;
+      }
+    }
+    return blocked;
   }
 }

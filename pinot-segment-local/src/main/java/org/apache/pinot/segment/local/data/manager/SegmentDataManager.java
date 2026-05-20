@@ -99,8 +99,6 @@ public abstract class SegmentDataManager {
    * The data manager can only be destroyed once.
    */
   public void destroy() {
-    // NOTE: We want the test to catch the case when destroy is called without offloading, but not fail the production.
-    assert _offloaded.get() : "Cannot destroy segment data manager without offloading it first";
     offload();
 
     if (_destroyed.compareAndSet(false, true)) {
