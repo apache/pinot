@@ -117,6 +117,11 @@ public class PinotQueryRuleSets {
       JoinPushExpressionsRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.JOIN_PUSH_EXPRESSIONS).toRule(),
 
+      // swap join inputs so a dimension table is on the right (= build / broadcast / lookup side) regardless of
+      // how the user wrote the SQL. Cardinality-aware commute is future work; this rule fires on a dim-table
+      // signal that is already known at catalog construction time. See PinotJoinCommuteRule for the full predicate.
+      PinotJoinCommuteRule.instanceWithDescription(PlannerRuleNames.PINOT_JOIN_COMMUTE),
+
       // join and semi-join rules
       SemiJoinRule.ProjectToSemiJoinRule.ProjectToSemiJoinRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_TO_SEMI_JOIN).toRule(),

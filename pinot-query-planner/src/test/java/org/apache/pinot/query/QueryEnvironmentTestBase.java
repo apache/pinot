@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -295,9 +296,24 @@ public class QueryEnvironmentTestBase {
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap) {
+    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, partitionedSegmentsMap,
+        Collections.emptySet());
+  }
+
+  /// Overload that takes a set of <i>typed</i> table names (e.g. {@code dim_tbl_OFFLINE}) to be registered as
+  /// dimension tables. The mocked {@code TableConfig} returned by the {@code TableCache} for these tables will
+  /// report {@code isDimTable()=true}, so planner rules like {@code PinotJoinCommuteRule} that key off the dim
+  /// flag can be exercised end-to-end.
+  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
+      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
+      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap, Set<String> dimTables) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
-      factory.registerTable(entry.getValue(), entry.getKey());
+      if (dimTables.contains(entry.getKey())) {
+        factory.registerDimTable(entry.getValue(), entry.getKey());
+      } else {
+        factory.registerTable(entry.getValue(), entry.getKey());
+      }
     }
     for (Map.Entry<String, List<String>> entry : segmentMap1.entrySet()) {
       for (String segment : entry.getValue()) {

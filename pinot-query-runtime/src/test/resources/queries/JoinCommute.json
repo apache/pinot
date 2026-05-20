@@ -1,0 +1,207 @@
+{
+  "join_commute_dim_on_left": {
+    "comment": "Functional-correctness tests for PinotJoinCommuteRule. Every query is written with the dimension table on the LEFT of the join, the case the rule targets. Result correctness is validated against H2: each Pinot result must match H2's row set for the same SQL. Covers INNER/LEFT/RIGHT/FULL semantics; filters/projects/aggregates above the join; multi-column projection (exercises swap()'s introduced Project mapping); Project/Filter walkers in isDimShaped; Aggregate-above-dim negative (rule must NOT commute); and hint-guard negatives.",
+    "tables": {
+      "dim_tbl": {
+        "schema": [
+          {"name": "dim_id", "type": "INT"},
+          {"name": "dim_name", "type": "STRING"},
+          {"name": "dim_attr", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "alpha", 10],
+          [2, "beta", 20],
+          [3, "gamma", 30],
+          [4, "delta", 40]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["dim_id"]
+      },
+      "fact_tbl": {
+        "schema": [
+          {"name": "fact_id", "type": "INT"},
+          {"name": "dim_id", "type": "INT"},
+          {"name": "metric", "type": "INT"}
+        ],
+        "inputs": [
+          [101, 1, 100],
+          [102, 1, 200],
+          [103, 2, 150],
+          [104, 3, 300],
+          [105, 3, 250],
+          [106, 5, 500],
+          [107, 5, 600]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "INNER JOIN with dim on left. Rule commutes inputs; result must match H2.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "INNER JOIN with fact on left (already optimal). Rule must NOT commute. Result identical to dim-on-left form against H2.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {fact_tbl} JOIN {dim_tbl} ON {fact_tbl}.dim_id = {dim_tbl}.dim_id"
+      },
+      {
+        "description": "LEFT JOIN with dim on left. After commute becomes RIGHT JOIN; unmatched dim row (dim_id=4) must still appear with NULL fact columns.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} LEFT JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "RIGHT JOIN with dim on left. After commute becomes LEFT JOIN; unmatched fact rows (dim_id=5) must still appear with NULL dim columns.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.fact_id, {fact_tbl}.metric FROM {dim_tbl} RIGHT JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Filter on dim column above the join. Exercises Filter mapping through the Project introduced by swap().",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id WHERE {dim_tbl}.dim_attr >= 20"
+      },
+      {
+        "description": "Filter on fact column above the join.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id WHERE {fact_tbl}.metric >= 200"
+      },
+      {
+        "description": "Compound filter spanning both sides.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id WHERE {dim_tbl}.dim_attr >= 20 AND {fact_tbl}.metric >= 200"
+      },
+      {
+        "description": "Aggregate above the join grouped by a dim column. Verifies the swap-introduced Project preserves dim columns correctly under GROUP BY/COUNT/SUM.",
+        "sql": "SELECT {dim_tbl}.dim_name, COUNT(*) AS cnt, SUM({fact_tbl}.metric) AS total FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id GROUP BY {dim_tbl}.dim_name"
+      },
+      {
+        "description": "Aggregate above a LEFT JOIN grouped by a dim column. Unmatched dim row (id=4) must produce a group with COUNT=1 and SUM=NULL.",
+        "sql": "SELECT {dim_tbl}.dim_name, COUNT({fact_tbl}.metric) AS matched_cnt, SUM({fact_tbl}.metric) AS total FROM {dim_tbl} LEFT JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id GROUP BY {dim_tbl}.dim_name"
+      },
+      {
+        "description": "Multi-column projection drawing from both sides. Exercises row-layout reconstruction inside JoinCommuteRule.swap().",
+        "sql": "SELECT {dim_tbl}.dim_name, {dim_tbl}.dim_attr, {fact_tbl}.fact_id, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Projection subquery on dim, then JOIN fact. Exercises the Project walker in isDimShaped.",
+        "sql": "SELECT d.dim_name, {fact_tbl}.metric FROM (SELECT dim_id, dim_name FROM {dim_tbl}) d JOIN {fact_tbl} ON d.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Filter subquery on dim, then JOIN fact. Exercises the Filter walker in isDimShaped.",
+        "sql": "SELECT d.dim_name, {fact_tbl}.metric FROM (SELECT * FROM {dim_tbl} WHERE dim_attr > 10) d JOIN {fact_tbl} ON d.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Aggregate on dim (breaks dim-shape) then JOIN fact. Rule must NOT commute. Result still must match H2.",
+        "sql": "SELECT d.dim_id, d.cnt, {fact_tbl}.metric FROM (SELECT dim_id, COUNT(*) AS cnt FROM {dim_tbl} GROUP BY dim_id) d JOIN {fact_tbl} ON d.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Hint guard: join_strategy='hash' pins strategy. Rule must NOT commute. Result still correct.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='hash') */ {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Hint guard: left_distribution_type pinned. Rule must NOT commute. Result still correct.",
+        "sql": "SELECT /*+ joinOptions(left_distribution_type='HASH') */ {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Hint guard: right_distribution_type pinned. Rule must NOT commute. Result still correct.",
+        "sql": "SELECT /*+ joinOptions(right_distribution_type='BROADCAST') */ {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      },
+      {
+        "description": "Hint guard: join_strategy='dynamic_broadcast' pinned. Rule must NOT commute. Result still correct.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.metric FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id"
+      }
+    ]
+  },
+  "join_commute_lookup_hint_auto_correct": {
+    "comment": "Verifies the auto-correct branch for join_strategy='lookup' with dim on the left. Without this rule, this query would error at runtime because LookupJoinOperator requires dim on the right. With the rule, the inputs are commuted and the lookup hint is preserved, so the downstream lookup-join pass produces a working plan. Lite mode is skipped because the broker lacks DimensionTableDataManager. Same data shape as the LookupJoin.json basic case.",
+    "tables": {
+      "fact_tbl": {
+        "schema": [
+          {"name": "dim_key", "type": "INT"},
+          {"name": "metric", "type": "INT"}
+        ],
+        "inputs": [
+          [1, 100],
+          [2, 200],
+          [3, 300],
+          [1, 400],
+          [4, 500]
+        ]
+      },
+      "dim_tbl": {
+        "schema": [
+          {"name": "id", "type": "INT"},
+          {"name": "name", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "alpha"],
+          [2, "beta"],
+          [3, "gamma"]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["id"]
+      }
+    },
+    "queries": [
+      {
+        "description": "User wrote dim JOIN fact with lookup hint. Rule must commute so dim ends up on right, and LookupJoinRule then accepts the plan. Unmatched fact row (dim_key=4) is dropped by INNER join.",
+        "sql": "SELECT /*+ joinOptions(join_strategy='lookup') */ {fact_tbl}.dim_key, {dim_tbl}.name FROM {dim_tbl} JOIN {fact_tbl} ON {dim_tbl}.id = {fact_tbl}.dim_key ORDER BY {fact_tbl}.dim_key, {dim_tbl}.name",
+        "outputs": [
+          [1, "alpha"],
+          [1, "alpha"],
+          [2, "beta"],
+          [3, "gamma"]
+        ],
+        "ignoreLiteMode": true
+      }
+    ]
+  },
+  "join_commute_full_outer": {
+    "comment": "FULL OUTER JOIN coverage for PinotJoinCommuteRule. Separated from the H2-comparison case above because H2 in this build does not parse FULL OUTER JOIN. Uses explicit outputs. Same data as join_commute_dim_on_left.",
+    "tables": {
+      "dim_tbl": {
+        "schema": [
+          {"name": "dim_id", "type": "INT"},
+          {"name": "dim_name", "type": "STRING"},
+          {"name": "dim_attr", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "alpha", 10],
+          [2, "beta", 20],
+          [3, "gamma", 30],
+          [4, "delta", 40]
+        ],
+        "replicated": true,
+        "isDimTable": true,
+        "primaryKeyColumns": ["dim_id"]
+      },
+      "fact_tbl": {
+        "schema": [
+          {"name": "fact_id", "type": "INT"},
+          {"name": "dim_id", "type": "INT"},
+          {"name": "metric", "type": "INT"}
+        ],
+        "inputs": [
+          [101, 1, 100],
+          [102, 1, 200],
+          [103, 2, 150],
+          [104, 3, 300],
+          [105, 3, 250],
+          [106, 5, 500],
+          [107, 5, 600]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "FULL OUTER JOIN with dim on left. Rule commutes inputs. Unmatched dim (id=4) and unmatched fact (dim_id=5) rows both preserved with NULL columns on the opposite side.",
+        "sql": "SELECT {dim_tbl}.dim_id, {dim_tbl}.dim_name, {fact_tbl}.fact_id, {fact_tbl}.metric FROM {dim_tbl} FULL OUTER JOIN {fact_tbl} ON {dim_tbl}.dim_id = {fact_tbl}.dim_id",
+        "outputs": [
+          [1, "alpha", 101, 100],
+          [1, "alpha", 102, 200],
+          [2, "beta", 103, 150],
+          [3, "gamma", 104, 300],
+          [3, "gamma", 105, 250],
+          [4, "delta", null, null],
+          [null, null, 106, 500],
+          [null, null, 107, 600]
+        ]
+      }
+    ]
+  }
+}
