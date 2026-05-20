@@ -2189,7 +2189,11 @@ public class CommonConstants {
      * mid-block. Applied via `NettyServerBuilder.flowControlWindow` in `GrpcMailboxServer`.
      *
      * <p>This is per HTTP/2 stream, so total inbound buffering at the receiver scales as
-     * {@code value × #concurrent streams to this server}.
+     * {@code value × #concurrent streams to this server}. Concretely:
+     * {@code Peak receiver direct memory ≈ flowControlWindow × #concurrent_incoming_streams.}
+     *
+     * <p>This is a direct-memory bound, not just a throughput knob: operators must size it against
+     * {@code -XX:MaxDirectMemorySize} given the expected concurrent inbound stream count.
      */
     public static final String KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES =
         "pinot.query.runner.grpc.flow.control.window.bytes";
@@ -2203,7 +2207,13 @@ public class CommonConstants {
      *
      * <p>This is a per-channel (per `host:port`) setting, shared across all streams to that peer. The
      * sender's direct-memory footprint is therefore bounded by {@code value × #peers}, not by
-     * {@code value × #streams}. Pairs with {@link #KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES}.
+     * {@code value × #streams}. Concretely:
+     * {@code Peak sender direct memory ≈ writeBufferHighWaterMark × #peers (one channel per peer, shared
+     * across streams to that peer).}
+     *
+     * <p>This is a direct-memory bound, not just a throughput knob: operators must size it against
+     * {@code -XX:MaxDirectMemorySize} given the expected per-query peer fan-out and the number of
+     * concurrent queries. Pairs with {@link #KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES}.
      */
     public static final String KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES =
         "pinot.query.runner.grpc.write.buffer.high.water.mark.bytes";
@@ -2211,9 +2221,16 @@ public class CommonConstants {
 
     /**
      * Netty per-channel WriteQueue low watermark, in bytes. Once the WriteQueue has exceeded the high
-     * watermark (see {@link #KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES}), it must drop below this
-     * value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of the high
-     * watermark.
+     * watermark (see {@link #KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES} and the
+     * {@code writeBufferHighWaterMark × #peers} direct-memory formula documented there), it must drop
+     * below this value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of
+     * the high watermark.
+     *
+     * <p>The gap {@code (high − low)} is the drain hysteresis the channel must clear before becoming
+     * writable again: setting `low` too close to `high` makes the channel flap writable/unwritable on
+     * every small drain; setting it too low forces the sender to wait longer between writable windows.
+     * The low watermark itself does not change the peak direct-memory bound — that is set by the high
+     * watermark — but it controls how aggressively the channel reopens once back-pressure has engaged.
      */
     public static final String KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES =
         "pinot.query.runner.grpc.write.buffer.low.water.mark.bytes";
