@@ -628,13 +628,6 @@
         Maven's first-import-wins rule ensures that explicit child import takes
         precedence and the inherited ${project.version} import is never resolved.
       -->
-
-        Projects that set this root pom as their <parent> and use a different
-        version must import pinot-bom explicitly at their desired Pinot version
-        in their own <dependencyManagement> (before any inherited entries).
-        Maven's first-import-wins rule ensures that explicit child import takes
-        precedence and the inherited ${project.version} import is never resolved.
-      -->
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-bom</artifactId>
