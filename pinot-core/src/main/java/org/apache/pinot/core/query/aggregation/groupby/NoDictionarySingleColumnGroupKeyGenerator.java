@@ -402,6 +402,17 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
             groupKeys[i] = mvKeys;
           }
           break;
+        case UUID:
+          byte[][][] uuidValues = blockValSet.getBytesValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            int mvSize = uuidValues[i].length;
+            int[] mvKeys = new int[mvSize];
+            for (int j = 0; j < mvSize; j++) {
+              mvKeys[j] = getKeyForValue(UuidKey.fromBytes(uuidValues[i][j]));
+            }
+            groupKeys[i] = mvKeys;
+          }
+          break;
         default:
           throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
       }
