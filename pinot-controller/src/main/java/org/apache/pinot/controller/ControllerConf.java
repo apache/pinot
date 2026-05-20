@@ -333,6 +333,10 @@ public class ControllerConf extends PinotConfiguration {
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   public static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
+  /// If true, the controller may reject single-segment uploads with HTTP 403 when segment data end is past the table
+  /// data retention window (see {@link org.apache.pinot.controller.api.upload.SegmentValidationUtils}).
+  public static final String SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED =
+      "controller.segment.upload.rejectOutOfRetention.enabled";
   public static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   public static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
@@ -382,6 +386,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String DEFAULT_REBALANCE_PRE_CHECKER =
       "org.apache.pinot.controller.helix.core.rebalance.DefaultRebalancePreChecker";
   public static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  /// Default for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED}: disabled until explicitly enabled.
+  public static final boolean DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED = false;
   public static final int DEFAULT_MIN_NUM_CHARS_IN_IS_TO_TURN_ON_COMPRESSION = -1;
   public static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   public static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
@@ -1081,6 +1087,17 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
     setProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, segmentUploadTimeoutInMillis);
+  }
+
+  /// @return whether out-of-retention single-segment upload rejection is enabled
+  public boolean isSegmentUploadRejectOutOfRetentionEnabled() {
+    return getProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED,
+        DEFAULT_SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED);
+  }
+
+  /// @param enabled value for {@link #SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED}
+  public void setSegmentUploadRejectOutOfRetentionEnabled(boolean enabled) {
+    setProperty(SEGMENT_UPLOAD_REJECT_OUT_OF_RETENTION_ENABLED, enabled);
   }
 
   public int getRealtimeSegmentMetadataCommitNumLocks() {

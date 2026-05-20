@@ -245,4 +245,19 @@ public class ControllerConfTest {
     Assert.assertEquals(conf.getPinotTaskQueueCapacity(), 10000);
     Assert.assertEquals(conf.getPinotTaskQueueWarningThreshold(), 8000);
   }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionDefault() {
+    ControllerConf conf = new ControllerConf();
+    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+  }
+
+  @Test
+  public void testSegmentUploadRejectOutOfRetentionOverride() {
+    ControllerConf conf = new ControllerConf();
+    conf.setSegmentUploadRejectOutOfRetentionEnabled(true);
+    Assert.assertTrue(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+    conf.setSegmentUploadRejectOutOfRetentionEnabled(false);
+    Assert.assertFalse(conf.isSegmentUploadRejectOutOfRetentionEnabled());
+  }
 }

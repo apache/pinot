@@ -400,6 +400,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
         SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
       }
+      SegmentValidationUtils.rejectUploadIfOutOfRetention(segmentMetadata, tableConfig, System.currentTimeMillis(),
+          _controllerConf.isSegmentUploadRejectOutOfRetentionEnabled(), _controllerMetrics);
       long untarredSegmentSizeInBytes;
       if (uploadType == FileUploadType.METADATA && segmentSizeInBytes > 0) {
         // TODO: Include the untarred segment size when using the METADATA push rest API. Currently we can only use the
