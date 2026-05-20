@@ -153,6 +153,18 @@ public class ServerRoutingStatsManager {
     return tpe.getCompletedTaskCount();
   }
 
+  private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap(QueryType queryType) {
+    return queryType == QueryType.MSE ? _mseServerQueryStatsMap : _serverQueryStatsMap;
+  }
+
+  private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap() {
+    QueryThreadContext qtc = QueryThreadContext.getIfAvailable();
+    if (qtc == null) {
+      return getStatsMap(QueryType.SSE);
+    }
+    return getStatsMap(qtc.getExecutionContext().getQueryType());
+  }
+
   /**
    * Called just before submitting a query to a server. Updates stats corresponding to query submission.
    */
