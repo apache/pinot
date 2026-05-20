@@ -409,6 +409,17 @@ public class PinotClientRequestTest {
   }
 
   @Test
+  public void testCancelQueryWithClientIdTrue() {
+    try {
+      _pinotClientRequest.cancelQuery("anything", true, 3000, false);
+      Assert.fail("Expected WebApplicationException");
+    } catch (WebApplicationException wae) {
+      assertEquals(wae.getResponse().getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    }
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+  }
+
+  @Test
   public void testProcessTimeSeriesQueryEngineMissingQuery() {
     AsyncResponse asyncResponse = mock(AsyncResponse.class);
     Request request = mock(Request.class);
