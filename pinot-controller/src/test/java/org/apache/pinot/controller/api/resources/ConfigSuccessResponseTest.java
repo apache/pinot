@@ -59,4 +59,30 @@ public class ConfigSuccessResponseTest {
     assertTrue(response.getUnrecognizedProperties().isEmpty());
     assertTrue(response.getDeprecationWarnings().isEmpty());
   }
+
+  /// Locks the Jackson deserialization contract that downstream clients (admin SDK, integration tests, tooling)
+  /// rely on. Without `@JsonCreator`, Jackson silently falls back to the `-parameters` compiler flag for argument
+  /// names; this test fails if that fallback breaks.
+  @Test
+  public void testJsonRoundTripPreservesAllFields()
+      throws Exception {
+    ConfigSuccessResponse original = new ConfigSuccessResponse("ok", Map.of("unrecognised", "value"),
+        List.of("warning-one", "warning-two"));
+    String json = JsonUtils.objectToString(original);
+    ConfigSuccessResponse parsed = JsonUtils.stringToObject(json, ConfigSuccessResponse.class);
+    assertEquals(parsed.getStatus(), "ok");
+    assertEquals(parsed.getUnrecognizedProperties(), Map.of("unrecognised", "value"));
+    assertEquals(parsed.getDeprecationWarnings(), List.of("warning-one", "warning-two"));
+  }
+
+  /// Older controller payloads (pre-deprecationWarnings) omit the `deprecationWarnings` field entirely. Newer
+  /// clients must accept that shape — this is the rolling-upgrade direction: new client + old controller.
+  @Test
+  public void testParsingResponseWithoutDeprecationWarningsField()
+      throws Exception {
+    String json = "{\"status\":\"ok\",\"unrecognizedProperties\":{}}";
+    ConfigSuccessResponse parsed = JsonUtils.stringToObject(json, ConfigSuccessResponse.class);
+    assertEquals(parsed.getStatus(), "ok");
+    assertTrue(parsed.getDeprecationWarnings().isEmpty());
+  }
 }

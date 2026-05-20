@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +37,13 @@ public final class ConfigSuccessResponse extends SuccessResponse {
     this(status, unrecognizedProperties, List.of());
   }
 
-  public ConfigSuccessResponse(String status, Map<String, Object> unrecognizedProperties,
-      List<String> deprecationWarnings) {
+  /// Annotated with `@JsonCreator` so Jackson can deserialize this DTO without depending on the `-parameters`
+  /// compiler flag. Downstream clients (admin SDK, integration tests, tooling) deserialize controller
+  /// responses; pinning the constructor to named JSON properties keeps that contract explicit.
+  @JsonCreator
+  public ConfigSuccessResponse(@JsonProperty("status") String status,
+      @JsonProperty("unrecognizedProperties") Map<String, Object> unrecognizedProperties,
+      @JsonProperty("deprecationWarnings") List<String> deprecationWarnings) {
     super(status);
     _unrecognizedProperties = unrecognizedProperties == null ? Map.of() : unrecognizedProperties;
     _deprecationWarnings = deprecationWarnings == null ? List.of() : deprecationWarnings;

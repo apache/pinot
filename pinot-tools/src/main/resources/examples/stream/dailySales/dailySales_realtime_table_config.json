@@ -7,13 +7,7 @@
     "retentionTimeValue": "50000",
     "replication": "1"
   },
-  "tenants": {
-  },
-  "segmentAssignmentConfigMap": {
-    "COMPLETED": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
     "noDictionaryColumns": [
@@ -58,7 +52,6 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }

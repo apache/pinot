@@ -382,6 +382,14 @@ public final class DeprecatedTableConfigValidationUtils {
   /// 2. A concurrency regression test that exercises the read→write window with a stubbed ZK observer.
   /// 3. A test seam (e.g. injected currentMajorMinor or a non-final flag) that exercises this method's
   ///    older-than-current → ERROR branch end-to-end.
+  /// 4. A REST integration test that exercises the validator's ERROR-path end-to-end (currently exercised only
+  ///    via unit tests of [#throwIfErrorsOnCreate]).
+  ///
+  /// SUNSET TARGET: the flip is intended for the release AFTER 1.6.0 (i.e. ≥1.7.0). Until promotion lands, this
+  /// validator runs as a logging shim: it adds no behavioural change versus the pre-existing `@Deprecated` IDE
+  /// warning, but it surfaces deprecated keys in REST responses where operators can observe them centrally. If
+  /// the promotion PR has not landed by the 1.7.0 release cut, re-evaluate whether the validator should stay on
+  /// (and continue collecting deprecation telemetry) or be gated behind a controller config flag.
   static final boolean SOFT_LAUNCH_WARNING_ONLY = true;
 
   /// Classifies the soft-launch severity for a deprecated property. Under the [#SOFT_LAUNCH_WARNING_ONLY] policy

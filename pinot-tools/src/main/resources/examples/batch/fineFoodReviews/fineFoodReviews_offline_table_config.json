@@ -4,20 +4,19 @@
   "segmentsConfig": {
     "replication": "1"
   },
-  "tenants": {
-  },
-  "segmentAssignmentConfigMap": {
-    "OFFLINE": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "noDictionaryColumns": ["Text"],
-    "invertedIndexColumns": [
+    "noDictionaryColumns": [
+      "Text"
     ],
+    "invertedIndexColumns": [],
     "multiColumnTextIndexConfig": {
-      "columns": ["UserId", "ProductId", "Summary"]
+      "columns": [
+        "UserId",
+        "ProductId",
+        "Summary"
+      ]
     }
   },
   "ingestionConfig": {
@@ -26,8 +25,7 @@
     }
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "fieldConfigList": [
     {

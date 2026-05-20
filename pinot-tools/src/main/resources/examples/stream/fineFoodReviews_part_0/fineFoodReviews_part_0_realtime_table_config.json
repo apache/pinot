@@ -7,18 +7,18 @@
     "retentionTimeValue": "5",
     "replication": "1"
   },
-  "tenants": {
-  },
-  "segmentAssignmentConfigMap": {
-    "COMPLETED": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "noDictionaryColumns": ["Text"],
+    "noDictionaryColumns": [
+      "Text"
+    ],
     "multiColumnTextIndexConfig": {
-      "columns": ["UserId", "ProductId", "Summary"]
+      "columns": [
+        "UserId",
+        "ProductId",
+        "Summary"
+      ]
     }
   },
   "routing": {
@@ -54,8 +54,7 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "fieldConfigList": [
     {

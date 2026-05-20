@@ -6,13 +6,7 @@
     "retentionTimeValue": "1",
     "replication": "1"
   },
-  "tenants": {
-  },
-  "segmentAssignmentConfigMap": {
-    "OFFLINE": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
+  "tenants": {},
   "fieldConfigList": [
     {
       "name": "location_st_point",
@@ -37,7 +31,6 @@
     }
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }

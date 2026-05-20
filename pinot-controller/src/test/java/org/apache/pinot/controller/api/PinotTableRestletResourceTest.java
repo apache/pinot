@@ -140,18 +140,37 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
   }
 
-  private static String successfulRealtimeTableCreationResponse(String tableNameWithType) {
-    // Warning order matches the discovery walk: SegmentsValidationAndRetentionConfig.segmentPushType is visited
-    // before IndexingConfig.streamConfigs because Class.getMethods() returns segmentsConfig getters first under
-    // the current TableConfig layout.
-    return "{\"unrecognizedProperties\":{},\"deprecationWarnings\":[\"" + SEGMENT_PUSH_TYPE_DEPRECATION_WARNING
-        + "\",\"" + STREAM_CONFIGS_DEPRECATION_WARNING + "\"],\"status\":\"Table " + tableNameWithType
-        + " successfully added\"}";
+  /// Asserts that a successful realtime-table create response carries both the segmentPushType and streamConfigs
+  /// deprecation warnings, the expected status, and no unrecognized properties. The deprecation warnings are
+  /// compared as a SET because the discovery walk order is `Class.getMethods()`-dependent and not guaranteed
+  /// stable across JVM versions or future TableConfig refactors.
+  private static void assertSuccessfulRealtimeTableCreationResponse(String actualJson, String tableNameWithType) {
+    assertSuccessfulTableCreationResponse(actualJson, tableNameWithType,
+        Set.of(SEGMENT_PUSH_TYPE_DEPRECATION_WARNING, STREAM_CONFIGS_DEPRECATION_WARNING));
   }
 
-  private static String successfulOfflineTableCreationResponse(String tableNameWithType) {
-    return "{\"unrecognizedProperties\":{},\"deprecationWarnings\":[\"" + SEGMENT_PUSH_TYPE_DEPRECATION_WARNING
-        + "\"],\"status\":\"Table " + tableNameWithType + " successfully added\"}";
+  private static void assertSuccessfulOfflineTableCreationResponse(String actualJson, String tableNameWithType) {
+    assertSuccessfulTableCreationResponse(actualJson, tableNameWithType,
+        Set.of(SEGMENT_PUSH_TYPE_DEPRECATION_WARNING));
+  }
+
+  private static void assertSuccessfulTableCreationResponse(String actualJson, String tableNameWithType,
+      Set<String> expectedWarnings) {
+    JsonNode parsed;
+    try {
+      parsed = JsonUtils.stringToJsonNode(actualJson);
+    } catch (IOException e) {
+      throw new AssertionError("response is not valid JSON: " + actualJson, e);
+    }
+    assertEquals(parsed.path("status").asText(), "Table " + tableNameWithType + " successfully added",
+        "unexpected status in " + actualJson);
+    assertTrue(parsed.path("unrecognizedProperties").isObject()
+            && parsed.path("unrecognizedProperties").isEmpty(),
+        "expected empty unrecognizedProperties in " + actualJson);
+    Set<String> actualWarnings = new java.util.HashSet<>();
+    parsed.path("deprecationWarnings").forEach(n -> actualWarnings.add(n.asText()));
+    assertEquals(actualWarnings, expectedWarnings,
+        "deprecationWarnings set mismatch in " + actualJson);
   }
 
   private String updateTable(String tableName, String tableConfigJson)
@@ -482,8 +501,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
     try {
       String response = createTable(tableConfig.toJsonString());
-      assertEquals(response,
-          successfulOfflineTableCreationResponse("test_table_cron_schedule_OFFLINE"));
+      assertSuccessfulOfflineTableCreationResponse(response, "test_table_cron_schedule_OFFLINE");
     } catch (IOException e) {
       // Expected 400 Bad Request
       fail("This is a valid table config with cron schedule");
@@ -769,7 +787,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table0");
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName("table0").build();
     String creationResponse = createTable(realtimeTableConfig.toJsonString());
-    assertEquals(creationResponse, successfulRealtimeTableCreationResponse("table0_REALTIME"));
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table0_REALTIME");
 
     // Delete realtime table using REALTIME suffix.
     String deleteResponse = sendDeleteRequest(
@@ -779,8 +797,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Case 2: Create an offline table and delete it directly w/o using query param.
     TableConfig offlineTableConfig = _offlineBuilder.setTableName("table0").build();
     creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("table0_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table0_OFFLINE");
 
     // Delete offline table using OFFLINE suffix.
     deleteResponse =
@@ -791,12 +808,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table1");
     TableConfig rtConfig1 = _realtimeBuilder.setTableName("table1").build();
     creationResponse = createTable(rtConfig1.toJsonString());
-    assertEquals(creationResponse, successfulRealtimeTableCreationResponse("table1_REALTIME"));
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table1_REALTIME");
 
     TableConfig offlineConfig1 = _offlineBuilder.setTableName("table1").build();
     creationResponse = createTable(offlineConfig1.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("table1_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table1_OFFLINE");
 
     deleteResponse =
         sendDeleteRequest(StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "table1"));
@@ -806,12 +822,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table2");
     TableConfig rtConfig2 = _realtimeBuilder.setTableName("table2").build();
     creationResponse = createTable(rtConfig2.toJsonString());
-    assertEquals(creationResponse, successfulRealtimeTableCreationResponse("table2_REALTIME"));
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table2_REALTIME");
 
     TableConfig offlineConfig2 = _offlineBuilder.setTableName("table2").build();
     creationResponse = createTable(offlineConfig2.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("table2_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table2_OFFLINE");
 
     // The conflict between param type and table name suffix causes no table being deleted.
     try {
@@ -843,12 +858,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema("table3");
     TableConfig rtConfig3 = _realtimeBuilder.setTableName("table3").build();
     creationResponse = createTable(rtConfig3.toJsonString());
-    assertEquals(creationResponse, successfulRealtimeTableCreationResponse("table3_REALTIME"));
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "table3_REALTIME");
 
     TableConfig offlineConfig3 = _offlineBuilder.setTableName("table3").build();
     creationResponse = createTable(offlineConfig3.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("table3_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "table3_OFFLINE");
 
     deleteResponse = deleteTable("table3_REALTIME", "realtime");
     assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_REALTIME] deleted\"}");
@@ -912,13 +926,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig realtimeTableConfig = _realtimeBuilder.setTableName(tableName).build();
     String creationResponse = createTable(realtimeTableConfig.toJsonString());
-    assertEquals(creationResponse, successfulRealtimeTableCreationResponse("testTable_REALTIME"));
+    assertSuccessfulRealtimeTableCreationResponse(creationResponse, "testTable_REALTIME");
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
     creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("testTable_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTable_OFFLINE");
 
     // Case 1: Check table state with specifying tableType as realtime should return 1 [enabled]
     String realtimeStateResponse = sendGetRequest(
@@ -1002,10 +1015,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     ((ObjectNode) jsonNode).put("illegalKey2", internalObj);
 
     String creationResponse = createTable(jsonNode.toString());
-    assertEquals(creationResponse,
-        "{\"unrecognizedProperties\":{\"/illegalKey1\":1,\"/illegalKey2/illegalKey3\":2},\"deprecationWarnings\":[\""
-            + SEGMENT_PUSH_TYPE_DEPRECATION_WARNING + "\",\"" + STREAM_CONFIGS_DEPRECATION_WARNING
-            + "\"],\"status\":\"Table valid_table_name_extra_props_REALTIME successfully added\"}");
+    JsonNode parsedCreate = JsonUtils.stringToJsonNode(creationResponse);
+    assertEquals(parsedCreate.path("status").asText(),
+        "Table valid_table_name_extra_props_REALTIME successfully added");
+    assertEquals(parsedCreate.path("unrecognizedProperties").get("/illegalKey1").asInt(), 1);
+    assertEquals(parsedCreate.path("unrecognizedProperties").get("/illegalKey2/illegalKey3").asInt(), 2);
+    Set<String> creationWarnings = new java.util.HashSet<>();
+    parsedCreate.path("deprecationWarnings").forEach(n -> creationWarnings.add(n.asText()));
+    assertEquals(creationWarnings,
+        Set.of(SEGMENT_PUSH_TYPE_DEPRECATION_WARNING, STREAM_CONFIGS_DEPRECATION_WARNING));
 
     // update table with unrecognizedProperties
     String updateResponse =
@@ -1131,8 +1149,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig offlineTableConfig = _offlineBuilder.setTableName(tableName).build();
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("testTable_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTable_OFFLINE");
 
     // create logical table with above physical table
     String logicalTableName = "testTable_LOGICAL";
@@ -1257,7 +1274,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     String tableNameWithType = offlineTableConfig.getTableName();
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse, successfulOfflineTableCreationResponse(tableNameWithType));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, tableNameWithType);
 
     String idealStatePath = "/ControllerTest/IDEALSTATES/" + tableNameWithType;
     zookeeperClient().delete(idealStatePath);
@@ -1288,8 +1305,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Should succeed when no dangling tasks exist
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("testTableTasksValidation_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTableTasksValidation_OFFLINE");
 
     // Clean up
     deleteTable(tableName);
@@ -1354,8 +1370,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Should succeed when task config is null
     String creationResponse = createTable(offlineTableConfig.toJsonString());
-    assertEquals(creationResponse,
-        successfulOfflineTableCreationResponse("testTableTasksValidationNullConfig_OFFLINE"));
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, "testTableTasksValidationNullConfig_OFFLINE");
 
     // Clean up
     deleteTable(tableName);

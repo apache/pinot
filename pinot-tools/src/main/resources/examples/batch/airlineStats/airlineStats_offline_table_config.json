@@ -6,11 +6,6 @@
     "timeType": "DAYS",
     "replication": "1"
   },
-  "segmentAssignmentConfigMap": {
-    "OFFLINE": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
   "tenants": {},
   "fieldConfigList": [
     {

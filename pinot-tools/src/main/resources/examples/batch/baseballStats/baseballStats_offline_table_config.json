@@ -4,13 +4,7 @@
   "segmentsConfig": {
     "replication": "1"
   },
-  "segmentAssignmentConfigMap": {
-    "OFFLINE": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
-  "tenants": {
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "HEAP",
     "invertedIndexColumns": [
@@ -19,8 +13,7 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "ingestionConfig": {
     "batchIngestionConfig": {

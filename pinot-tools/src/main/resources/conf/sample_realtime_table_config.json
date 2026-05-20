@@ -8,11 +8,6 @@
     "retentionTimeValue": "5",
     "replication": "3"
   },
-  "segmentAssignmentConfigMap": {
-    "COMPLETED": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
   "tenants": {
     "broker": "brokerOne",
     "server": "serverOne"
@@ -42,7 +37,6 @@
     }
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }

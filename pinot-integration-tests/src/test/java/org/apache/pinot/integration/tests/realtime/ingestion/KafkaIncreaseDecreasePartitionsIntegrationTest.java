@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.integration.tests.realtime.ingestion;
 
+import java.io.IOException;
 import org.apache.pinot.integration.tests.BaseRealtimeClusterIntegrationTest;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
@@ -30,26 +34,34 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 public class KafkaIncreaseDecreasePartitionsIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaIncreaseDecreasePartitionsIntegrationTest.class);
 
+  private static final String KAFKA_TOPIC = "meetup";
   private static final int NUM_PARTITIONS = 1;
 
-  @Override
-  protected int getNumKafkaPartitions() {
-    return NUM_PARTITIONS + 2;
+  String createTable()
+      throws IOException {
+    Schema schema = createSchema("simpleMeetup_schema.json");
+    addSchema(schema);
+    TableConfig tableConfig = JsonUtils.inputStreamToObject(
+        getClass().getClassLoader().getResourceAsStream("simpleMeetup_realtime_table_config.json"), TableConfig.class);
+    addTableConfig(tableConfig);
+    return tableConfig.getTableName();
   }
 
   @Test
   public void testDecreasePartitions()
       throws Exception {
     LOGGER.info("Starting testDecreasePartitions");
-    String tableName = getTableName();
+    LOGGER.info("Creating Kafka topic with {} partitions", NUM_PARTITIONS + 2);
+    createKafkaTopic(KAFKA_TOPIC, NUM_PARTITIONS + 2);
+    String tableName = createTable();
     waitForNumSegmentsInDesiredStateInEV(tableName, CONSUMING, NUM_PARTITIONS + 2, TableType.REALTIME);
 
     pauseTable(tableName);
 
     LOGGER.info("Deleting Kafka topic");
-    deleteKafkaTopic(getKafkaTopic());
+    deleteKafkaTopic(KAFKA_TOPIC);
     LOGGER.info("Creating Kafka topic with {} partitions", NUM_PARTITIONS);
-    createKafkaTopic(getKafkaTopic(), NUM_PARTITIONS);
+    createKafkaTopic(KAFKA_TOPIC, NUM_PARTITIONS);
 
     resumeTable(tableName);
     waitForNumSegmentsInDesiredStateInEV(tableName, CONSUMING, NUM_PARTITIONS, TableType.REALTIME);

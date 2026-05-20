@@ -8,11 +8,6 @@
     "retentionTimeValue": "365",
     "replication": "3"
   },
-  "segmentAssignmentConfigMap": {
-    "OFFLINE": {
-      "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
-    }
-  },
   "tenants": {
     "broker": "brokerOne",
     "server": "serverOne"
@@ -25,8 +20,7 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "ingestionConfig": {
     "batchIngestionConfig": {
