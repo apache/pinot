@@ -1,0 +1,26 @@
+{
+  "tableName": "airlineStatsMv",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "tsMs",
+    "timeType": "MILLISECONDS",
+    "segmentPushType": "APPEND",
+    "replication": "1"
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "metadata": {
+    "customConfigs": {}
+  },
+  "task": {
+    "taskTypeConfigsMap": {
+      "MaterializedViewTask": {
+        "definedSQL": "SELECT DaysSinceEpoch * 86400000 AS tsMs, Carrier, SUM(ArrDelay) AS sum_ArrDelay, COUNT(*) AS flight_count, MIN(ArrDelay) AS min_ArrDelay, MAX(ArrDelay) AS max_ArrDelay, DISTINCTCOUNTRAWHLL(FlightNum) AS raw_hll_FlightNum, DISTINCTCOUNTRAWHLLPLUS(FlightNum) AS raw_hllplus_FlightNum FROM airlineStats GROUP BY DaysSinceEpoch * 86400000, Carrier",
+        "bucketTimePeriod": "1d",
+        "maxTasksPerBatch": "31"
+      }
+    }
+  }
+}

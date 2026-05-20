@@ -46,6 +46,7 @@
     <module>pinot-clients</module>
     <module>pinot-server</module>
     <module>pinot-core</module>
+    <module>pinot-materialized-view</module>
     <module>pinot-controller</module>
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
@@ -635,6 +636,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-materialized-view</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
