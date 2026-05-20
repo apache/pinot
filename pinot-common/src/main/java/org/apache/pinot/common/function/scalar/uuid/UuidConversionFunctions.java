@@ -49,9 +49,10 @@ public final class UuidConversionFunctions {
 
   /**
    * Generates a fresh random RFC 4122 version-4 UUID. Each invocation produces a new value, so this function
-   * is non-deterministic.
+   * is non-deterministic and is annotated with {@code isDeterministic = false} to prevent the broker's
+   * {@code CompileTimeFunctionsInvoker} from folding the call into a single literal that is reused for every row.
    */
-  @ScalarFunction(names = {"UUID_V4"})
+  @ScalarFunction(names = {"UUID_V4"}, isDeterministic = false)
   public static UUID uuidV4() {
     return UuidUtils.randomV4();
   }
@@ -59,9 +60,10 @@ public final class UuidConversionFunctions {
   /**
    * Generates a fresh RFC 9562 version-7 (Unix-time-based) UUID. The leading 48 bits encode the current Unix
    * time in milliseconds, making v7 UUIDs k-sortable and well-suited to time-ordered primary keys. Each
-   * invocation produces a new value, so this function is non-deterministic.
+   * invocation produces a new value, so this function is non-deterministic and is annotated with
+   * {@code isDeterministic = false} to prevent compile-time folding.
    */
-  @ScalarFunction(names = {"UUID_V7"})
+  @ScalarFunction(names = {"UUID_V7"}, isDeterministic = false)
   public static UUID uuidV7() {
     return UuidUtils.randomV7();
   }
