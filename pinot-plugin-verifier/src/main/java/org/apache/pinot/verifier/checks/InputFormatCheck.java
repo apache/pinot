@@ -42,9 +42,12 @@ public final class InputFormatCheck implements Check {
     put("pinot-protobuf", "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufRecordReader");
     put("pinot-thrift", "org.apache.pinot.plugin.inputformat.thrift.ThriftRecordReader");
     put("pinot-arrow", "org.apache.pinot.plugin.inputformat.arrow.ArrowRecordReader");
-    put("pinot-confluent-avro", "org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder");
-    put("pinot-confluent-json", "org.apache.pinot.plugin.inputformat.json.confluent.KafkaConfluentSchemaRegistryJsonMessageDecoder");
-    put("pinot-confluent-protobuf", "org.apache.pinot.plugin.inputformat.protobuf.KafkaConfluentSchemaRegistryProtoBufMessageDecoder");
+    put("pinot-confluent-avro",
+        "org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder");
+    put("pinot-confluent-json",
+        "org.apache.pinot.plugin.inputformat.json.confluent.KafkaConfluentSchemaRegistryJsonMessageDecoder");
+    put("pinot-confluent-protobuf",
+        "org.apache.pinot.plugin.inputformat.protobuf.KafkaConfluentSchemaRegistryProtoBufMessageDecoder");
   }};
 
   @Override

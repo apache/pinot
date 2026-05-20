@@ -81,7 +81,7 @@ public final class PluginVerifier {
       System.exit(2);
       return;
     }
-    if (options.help) {
+    if (options._help) {
       System.out.println(usage());
       System.exit(0);
       return;
@@ -101,10 +101,10 @@ public final class PluginVerifier {
     registry.put("metrics", new MetricsFactoryCheck());
 
     Set<String> selectedTypes;
-    if (_options.checks.contains("all")) {
+    if (_options._checks.contains("all")) {
       selectedTypes = registry.keySet();
     } else {
-      selectedTypes = _options.checks;
+      selectedTypes = _options._checks;
       for (String type : selectedTypes) {
         if (!registry.containsKey(type)) {
           System.err.println("Unknown check type: " + type);
@@ -150,7 +150,7 @@ public final class PluginVerifier {
       java.io.File f = new java.io.File(dir);
       if (f.isDirectory()) {
         count++;
-        if (_options.verbose) {
+        if (_options._verbose) {
           System.out.println("  " + dir + " exists");
         }
       } else {
@@ -162,28 +162,33 @@ public final class PluginVerifier {
 
   private static Options parseArgs(String[] args) {
     Options options = new Options();
-    for (int i = 0; i < args.length; i++) {
-      switch (args[i]) {
+    int i = 0;
+    while (i < args.length) {
+      String arg = args[i];
+      switch (arg) {
         case "--help":
         case "-h":
-          options.help = true;
+          options._help = true;
           break;
         case "--check":
-          options.checks = new LinkedHashSet<>(Arrays.asList(requireValue(args, ++i).split(",")));
+          options._checks = new LinkedHashSet<>(Arrays.asList(requireValue(args, i + 1).split(",")));
+          i++;
           break;
         case "--plugin":
-          options.singlePluginFqcn = requireValue(args, ++i);
+          options._singlePluginFqcn = requireValue(args, i + 1);
+          i++;
           break;
         case "--strict-realm":
-          options.strictRealm = true;
+          options._strictRealm = true;
           break;
         case "--verbose":
         case "-v":
-          options.verbose = true;
+          options._verbose = true;
           break;
         default:
-          throw new IllegalArgumentException("Unknown flag: " + args[i]);
+          throw new IllegalArgumentException("Unknown flag: " + arg);
       }
+      i++;
     }
     return options;
   }
@@ -213,11 +218,11 @@ public final class PluginVerifier {
 
   /** Parsed CLI options. Package-private so {@link CheckContext} can read them. */
   static final class Options {
-    Set<String> checks = new LinkedHashSet<>(List.of("all"));
-    String singlePluginFqcn;
-    boolean strictRealm;
-    boolean verbose;
-    boolean help;
+    Set<String> _checks = new LinkedHashSet<>(List.of("all"));
+    String _singlePluginFqcn;
+    boolean _strictRealm;
+    boolean _verbose;
+    boolean _help;
   }
 
   /** Holder passed to each {@link Check}. */
@@ -235,27 +240,27 @@ public final class PluginVerifier {
     }
 
     public boolean verbose() {
-      return _options.verbose;
+      return _options._verbose;
     }
 
     public boolean strictRealm() {
-      return _options.strictRealm;
+      return _options._strictRealm;
     }
 
     public boolean targets(String fqcn) {
-      return _options.singlePluginFqcn == null || _options.singlePluginFqcn.equals(fqcn);
+      return _options._singlePluginFqcn == null || _options._singlePluginFqcn.equals(fqcn);
     }
 
     /** Resolve a plugin FQCN through the configured strict / non-strict path. */
     public Object createInstance(String pluginName, String fqcn) throws Exception {
-      if (_options.strictRealm) {
+      if (_options._strictRealm) {
         return _pluginManager.createInstance(pluginName, fqcn);
       }
       return _pluginManager.createInstance(fqcn);
     }
 
     public Class<?> loadClass(String pluginName, String fqcn) throws ClassNotFoundException {
-      if (_options.strictRealm) {
+      if (_options._strictRealm) {
         return _pluginManager.loadClass(pluginName, fqcn);
       }
       return _pluginManager.loadClass(fqcn);
