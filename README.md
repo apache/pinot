@@ -195,8 +195,9 @@ Check out [Pinot documentation](https://docs.pinot.apache.org/) for a complete d
 
 ### UUID Logical Type
 
-Pinot supports a logical `UUID` type for single-value columns. In v1, Pinot stores `UUID` values using the existing
-16-byte `BYTES` representation, while schema definitions and query results use canonical lowercase RFC 4122 strings.
+Pinot supports a logical `UUID` type for both single- and multi-value columns. In v1, Pinot stores `UUID` values
+using the existing 16-byte `BYTES` representation, while schema definitions and query results use canonical
+lowercase RFC 4122 strings.
 
 Schema example:
 ```json
@@ -241,7 +242,6 @@ Migration notes:
   data into it.
 - The `UUID` type itself does not require a segment or wire format bump in v1, but migration still requires rebuild or
   reingest because schema type mutation is unsupported.
-- Multi-value UUID columns are not supported in v1.
 
 ## License
 Apache Pinot is under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
