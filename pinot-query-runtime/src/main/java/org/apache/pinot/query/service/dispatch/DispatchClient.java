@@ -28,6 +28,7 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
@@ -154,7 +155,7 @@ class DispatchClient {
    */
   public StreamingDispatchObserver submitWithStream(Worker.QueryRequest request, QueryServerInstance virtualServer,
       Deadline deadline, StreamingQuerySession session, int expectedOpChainsForThisServer,
-      java.util.function.BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
+      BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
     StreamingDispatchObserver observer = new StreamingDispatchObserver(virtualServer, session,
         expectedOpChainsForThisServer, ackCallback);
     StreamObserver<Worker.BrokerToServer> outbound = _dispatchStub.withDeadline(deadline).submitWithStream(observer);

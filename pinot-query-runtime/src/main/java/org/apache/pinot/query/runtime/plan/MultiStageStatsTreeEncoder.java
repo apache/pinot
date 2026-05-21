@@ -67,8 +67,19 @@ public final class MultiStageStatsTreeEncoder {
    * point with a custom {@code planNodeIdResolver} so they don't need to construct a full
    * {@link OpChainExecutionContext}.
    *
+   * <p><b>All-or-nothing contract:</b> this method either returns a fully-built {@link Worker.MultiStageStatsTree}
+   * or throws without returning any partial result. Callers cannot recover partial stats on failure. Specifically:
+   * <ul>
+   *   <li>The upfront {@code treeSize != flatSize} check throws {@link IllegalStateException} before any proto
+   *       node is allocated.</li>
+   *   <li>An {@link java.io.IOException} from {@link #serializeStatMap} during node traversal leaves
+   *       {@link Worker.StageStatsNode} builders only on the Java call stack; they are discarded as the exception
+   *       unwinds. No partially-built tree is reachable by the caller.</li>
+   * </ul>
+   *
    * @throws IllegalStateException if the operator tree shape does not align with the flat stats list (missing
    *     entries — typically caused by an operator that failed before emitting EOS).
+   * @throws java.io.IOException if stat-map serialization fails for any node.
    */
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       Function<MultiStageOperator, List<Integer>> planNodeIdResolver)

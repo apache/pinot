@@ -35,8 +35,9 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * {@link OpChainSchedulerService#unregisterCompletionListener(long)}) once it has received all the events it
  * expects, typically when the per-request opchain count reaches the expected total.
  *
- * <p>The listener is invoked on the gRPC opchain executor thread that ran the opchain. Implementations must not
- * block.
+ * <p>The listener is invoked on the gRPC opchain executor thread that ran the opchain. Multiple opchains from the
+ * same request can complete on different threads concurrently; the listener may therefore be called from multiple
+ * threads simultaneously (one per completing opchain). Implementations must be thread-safe and must not block.
  */
 @FunctionalInterface
 public interface OpChainCompletionListener {

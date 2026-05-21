@@ -105,17 +105,18 @@ public class QueryDispatcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryDispatcher.class);
   private static final String PINOT_BROKER_QUERY_DISPATCHER_FORMAT = "multistage-query-dispatch-%d";
   /**
-   * Maximum time (ms) to wait for outstanding {@code OpChainComplete} stats messages after the broker receiving
-   * mailbox has finished (success path). The query result is already in hand at this point, so collecting stats is
-   * best-effort — a single slow opchain must not hold the client response until the full query deadline.
+   * Maximum time (ms) to wait for outstanding {@code OpChainComplete} stats messages on both the success and error
+   * paths of a stream-mode query:
+   * <ul>
+   *   <li><b>Success path:</b> after the broker receiving mailbox has finished (data is already in hand), the broker
+   *       waits up to this long for remaining stats before returning the result to the client.</li>
+   *   <li><b>Error path:</b> after a fan-out cancel has been issued, the broker waits up to this long for partial
+   *       stats before building the error result.</li>
+   * </ul>
+   * In both cases stats collection is best-effort — a single slow opchain must not hold the client response until
+   * the full query deadline.
    */
-  private static final long STATS_DRAIN_ON_SUCCESS_MS = 50L;
-  /**
-   * Maximum time (ms) to wait for stats after a query that has already failed and fanned out cancel. A short cap is
-   * used here because the query result is already determined — we collect partial stats on a best-effort basis but
-   * must not make the client wait the full query timeout for a response that is already ready.
-   */
-  private static final long STATS_DRAIN_ON_ERROR_MS = 50L;
+  private static final long STATS_DRAIN_MS = 50L;
 
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
@@ -257,7 +258,7 @@ public class QueryDispatcher {
 
       // Receiving mailbox finished — data is ready. Wait for stats on a best-effort basis; cap at
       // STATS_DRAIN_ON_SUCCESS_MS so a single slow opchain cannot delay the client response.
-      long statsWaitMs = Math.min(STATS_DRAIN_ON_SUCCESS_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
+      long statsWaitMs = Math.min(STATS_DRAIN_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
       boolean fullCoverage = session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
       if (!fullCoverage) {
         LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
@@ -392,6 +393,21 @@ public class QueryDispatcher {
   ///
   /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and empty
   /// stats, while other exceptions are directly rethrown. Stats are not collected on the legacy cancel path.
+  ///
+  /// <b>Why {@code cancelWithStats} was removed:</b> a previous revision of this method called a synchronous
+  /// {@code cancelWithStats} RPC on every participating server (fan-out) to collect partial per-stage stats on the
+  /// error path. That approach was reverted for two reasons:
+  /// <ol>
+  ///   <li><b>Cascade risk.</b> At high QPS, every query failure triggered an extra fan-out RPC to every server that
+  ///       already handled the failed query. Servers under stress would receive a second wave of requests just as they
+  ///       were trying to recover, risking a cascading overload.</li>
+  ///   <li><b>No consumer.</b> The call site that used the returned {@code Map<Integer, StageStats.Closed>} was also
+  ///       reverted as part of the same change, leaving the RPC overhead with no benefit.</li>
+  /// </ol>
+  ///
+  /// Stats on the error path are now available only in stream mode ({@code SubmitWithStream}), where servers push
+  /// {@code OpChainComplete} messages independently and the broker collects whatever arrives before the drain
+  /// timeout (see {@link #tryRecoverWithStream}).
   private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
       throws Exception {
     if (servers.isEmpty()) {
@@ -441,7 +457,7 @@ public class QueryDispatcher {
     session.fanOutCancel();
     // Cap the wait: the query result is already determined, so we collect stats on a best-effort basis only.
     // Using the full remaining timeout here would regress error-path latency to the query deadline.
-    long statsWaitMs = Math.min(STATS_DRAIN_ON_ERROR_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
+    long statsWaitMs = Math.min(STATS_DRAIN_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
     try {
       session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {

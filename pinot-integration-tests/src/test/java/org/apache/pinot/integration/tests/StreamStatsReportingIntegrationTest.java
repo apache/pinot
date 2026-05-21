@@ -50,6 +50,13 @@ import static org.testng.Assert.assertTrue;
  *   <li>The cluster-level config ({@code pinot.broker.mse.stream.stats}) activates stream mode
  *   for all queries without a per-query option.</li>
  * </ol>
+ *
+ * <p><b>Why this class spins up its own cluster instead of using the shared suite cluster:</b>
+ * {@link #testClusterLevelConfigActivatesStreamMode} requires the broker to start with
+ * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#CONFIG_OF_STREAM_STATS} set to {@code true} (a
+ * non-default value). That configuration is applied at broker startup via {@link #overrideBrokerConf} and cannot
+ * be changed without restarting the broker. Using a shared cluster would therefore affect every other test class
+ * that shares it.
  */
 public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationTestSet {
 

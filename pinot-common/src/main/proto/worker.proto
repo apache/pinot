@@ -45,7 +45,9 @@ message CancelRequest {
 }
 
 message CancelResponse {
-  map<int32, bytes> statsByStage = 1; // stageId -> serialized MultiStageQueryStats.StageStats.Closed
+  // Deprecated: always empty since the stream-stats push feature was introduced; per-opchain stats
+  // now flow via OpChainComplete on the SubmitWithStream bidi RPC and are no longer collected on cancel.
+  map<int32, bytes> statsByStage = 1;
 }
 
 // QueryRequest is the dispatched content for all query stages to a physical worker.
