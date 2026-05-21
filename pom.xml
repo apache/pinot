@@ -63,6 +63,7 @@
     <module>pinot-timeseries</module>
     <module>pinot-udf-test</module>
     <module>pinot-sql-ddl</module>
+    <module>pinot-native</module>
   </modules>
 
   <licenses>
