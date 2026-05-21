@@ -254,5 +254,4 @@ public class QueryDispatcherTest extends QueryTestSet {
       Mockito.verify(statsManager).recordStatsUponResponseArrival(requestId, instanceId, -1L);
     }
   }
-
 }
