@@ -4206,4 +4206,59 @@ public class TableConfigUtilsTest {
     assertTrue(violations.isEmpty(),
         "Expected no violations for partial-upsert strategy and default-strategy changes, but got: " + violations);
   }
+
+  @Test
+  public void testValidateBackwardCompatibilityRejectsDeleteRecordColumnChange() {
+    UpsertConfig existingUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    existingUpsertConfig.setDeleteRecordColumn("deleted");
+    UpsertConfig newUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    newUpsertConfig.setDeleteRecordColumn("is_deleted");
+
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(existingUpsertConfig).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(newUpsertConfig).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("deleteRecordColumn"));
+
+    // Adding deleteRecordColumn where none existed
+    existingUpsertConfig.setDeleteRecordColumn(null);
+    existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(existingUpsertConfig).build();
+    violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("deleteRecordColumn"));
+
+    // Removing deleteRecordColumn
+    violations = TableConfigUtils.validateBackwardCompatibility(existingConfig, newConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("deleteRecordColumn"));
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityAllowsIdenticalUpsertConfig() {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn("deleted");
+
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertTrue(violations.isEmpty(), "Expected no violations for identical config, but got: " + violations);
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityNoViolationsForNonUpsertTables() {
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertTrue(violations.isEmpty(), "Expected no violations for non-upsert tables, but got: " + violations);
+  }
 }
