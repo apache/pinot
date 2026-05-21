@@ -126,8 +126,6 @@ public class BenchmarkJsonIndexGroupByCount {
   private IndexSegment _indexSegment;
   private SegmentContext _segmentContext;
   private QueryContext _queryContext;
-  private BaseFilterOperator _filterOperator;
-  private AggregationFunctionUtils.AggregationInfo _aggregationInfo;
   private int _expectedDistinctGroupCount;
 
   @Setup(Level.Trial)
@@ -148,13 +146,8 @@ public class BenchmarkJsonIndexGroupByCount {
     _queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
     _queryContext.setSchema(SCHEMA);
 
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
-    _filterOperator = filterPlanNode.run();
-    _aggregationInfo = AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext,
-        _queryContext.getAggregationFunctions(), _queryContext.getFilter(), _filterOperator,
-        filterPlanNode.getPredicateEvaluators());
-
-    // Cross-validate the two operators on a sanity run before measuring.
+    // Cross-validate the two operators on a sanity run before measuring. Each call constructs fresh per-invocation
+    // operator state, identical to what the @Benchmark methods do.
     int baselineGroups = numGroupsFromBaseline();
     int indexGroups = numGroupsFromIndex();
     Preconditions.checkState(baselineGroups == indexGroups,
@@ -182,14 +175,28 @@ public class BenchmarkJsonIndexGroupByCount {
   }
 
   private int numGroupsFromBaseline() {
-    GroupByOperator operator = new GroupByOperator(_queryContext, _aggregationInfo,
+    // Build fresh per-invocation state. The baseline GroupByOperator consumes its DocIdSetOperator to exhaustion on
+    // the first nextBlock call; reusing the AggregationInfo / project operator across iterations would have every
+    // subsequent invocation see an empty doc stream and return in ~1us, making the bench meaningless.
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
+    AggregationFunctionUtils.AggregationInfo aggregationInfo =
+        AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext,
+            _queryContext.getAggregationFunctions(), _queryContext.getFilter(), filterOperator,
+            filterPlanNode.getPredicateEvaluators());
+    GroupByOperator operator = new GroupByOperator(_queryContext, aggregationInfo,
         _indexSegment.getSegmentMetadata().getTotalDocs());
     return countGroups(operator);
   }
 
   private int numGroupsFromIndex() {
+    // Build fresh per-invocation state, matching the baseline path's per-invocation cost. JsonIndexGroupByOperator
+    // does not consume the filter operator across iterations (it uses cached getFilteredDocIds), but building both
+    // paths identically keeps the comparison fair.
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
     JsonIndexGroupByOperator operator = new JsonIndexGroupByOperator(_indexSegment, _segmentContext, _queryContext,
-        _filterOperator);
+        filterOperator);
     return countGroups(operator);
   }
 

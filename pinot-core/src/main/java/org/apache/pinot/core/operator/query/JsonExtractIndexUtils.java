@@ -66,7 +66,7 @@ public final class JsonExtractIndexUtils {
   }
 
   /**
-   * Parses the given expression as a 3/4-arg scalar {@code jsonExtractIndex} or {@code jsonExtractScalar} call.
+   * Parses the given expression as a 3/4-arg scalar {@code jsonExtractIndex} call.
    * Returns {@code null} when the expression has a different shape (wrong arity, non-literal args, MV result type,
    * unsupported scalar type, {@code [*]} wildcard, or malformed JSON path).
    *
@@ -161,8 +161,8 @@ public final class JsonExtractIndexUtils {
   }
 
   /**
-   * Returns {@code true} when the expression is a parseable {@code jsonExtractIndex}/{@code jsonExtractScalar}
-   * call and the referenced column has a usable JSON index covering the path.
+   * Returns {@code true} when the expression is a parseable {@code jsonExtractIndex} call and the referenced column
+   * has a usable JSON index covering the path.
    */
   public static boolean canUseJsonIndex(IndexSegment indexSegment, ExpressionContext expr) {
     ParsedJsonExtractIndex parsed = parseJsonExtractIndex(expr);
