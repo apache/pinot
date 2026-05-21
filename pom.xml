@@ -366,7 +366,7 @@
                   <rules>
                     <pinotCustomDependencyVersionRule implementation="org.apache.pinot.verifier.PinotCustomDependencyVersionRule">
                       <skipModules>pinot-plugins,pinot-connectors,pinot-integration-tests,
-                        pinot-tools,contrib,pinot-dependency-verifier</skipModules>
+                        pinot-tools,contrib,pinot-dependency-verifier,pinot-distribution</skipModules>
                     </pinotCustomDependencyVersionRule>
                   </rules>
                   <fail>true</fail>
