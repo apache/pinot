@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
@@ -88,6 +95,254 @@ public class IdealStateGroupCommitTest {
   public void tearDown() {
     _executorService.shutdown();
     TEST_INSTANCE.cleanup();
+  }
+
+  /**
+   * Regression test for the per-entry isolation fix in {@link IdealStateGroupCommit#commit}.
+   *
+   * Setup mirrors the pre-fix race condition that produced "in IdealState, no ZK metadata"
+   * orphans in production:
+   *
+   *   1. The queue already contains an entry whose updater will throw PermanentUpdaterException
+   *      (in production this is a pauseless segment whose 300s max-completion-time deadline has
+   *      passed while waiting behind a bulk IdealState update such as a retention deletion).
+   *   2. A fresh thread B calls commit() with a healthy updater. B's entry is enqueued AFTER the
+   *      stuck entry (FIFO).
+   *   3. B becomes the leader and iterates the queue in FIFO order.
+   *
+   * Pre-fix behavior (the bug): the stuck entry's updater threw, iteration stopped, B's commit()
+   * exited with that exception, and B's still-queued entry was applied by a subsequent leader.
+   * B's caller observed "my update failed" and ran cleanup (removeSegmentZKMetadataBestEffort)
+   * on its new segment metadata even though B's IdealState update later succeeded -- producing
+   * an "in IdealState, no ZK metadata" orphan.
+   *
+   * Post-fix behavior (asserted here): the stuck entry's updater throws and is isolated to that
+   * entry's owner only. The leader continues iterating, applies B's updater, and CAS-writes the
+   * result. B's commit() returns successfully with the updated IdealState. Co-batched entries
+   * are no longer collateral damage.
+   */
+  @Test
+  public void testFreshUpdaterAppliedAfterCallerThrows()
+      throws Exception {
+    String tableName = TABLE_NAME_PREFIX + "race_OFFLINE";
+    IdealState initialState = new IdealState(tableName);
+    initialState.setStateModelDefRef("OnlineOffline");
+    initialState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    initialState.setReplicas("1");
+    initialState.setNumPartitions(0);
+    TEST_INSTANCE.getHelixAdmin().addResource(TEST_INSTANCE.getHelixClusterName(), tableName, initialState);
+
+    try {
+      IdealStateGroupCommit commit = new IdealStateGroupCommit();
+
+      // Step 1: Pre-populate the queue with a stuck entry whose updater throws
+      // PermanentUpdaterException. Simulates an in-flight queued entry for a pauseless segment
+      // whose 300s deadline has expired.
+      injectStuckEntry(commit, tableName);
+
+      // Step 2: Fresh thread submits a healthy updater that adds a partition.
+      Function<IdealState, IdealState> freshUpdater = is -> {
+        is.setPartitionState("freshPartition", "instance1", "ONLINE");
+        return is;
+      };
+
+      Throwable freshException = null;
+      try {
+        commit.commit(TEST_INSTANCE.getHelixManager(), tableName, freshUpdater,
+            RetryPolicies.noDelayRetryPolicy(1), false);
+      } catch (Throwable e) {
+        freshException = e;
+      }
+
+      LOGGER.info("Fresh thread's commit() returned with exception: {}",
+          freshException == null ? "(none -- fix is in place)"
+              : freshException.getClass().getSimpleName() + ": " + freshException.getMessage());
+
+      // Claim #1 (post-fix): the fresh thread's commit() does NOT throw. The stuck entry's
+      // PermanentUpdaterException is isolated to that entry only.
+      Assert.assertNull(freshException,
+          "Fresh thread's commit() should not throw -- the co-batched stuck entry's exception "
+              + "must be isolated to its own entry. If this assertion fails, the per-entry "
+              + "isolation fix in IdealStateGroupCommit.commit() has regressed and the orphan "
+              + "race observed in the 2026-05-20 15:21 UTC incident can reoccur.");
+
+      // Step 3: Read the IdealState back from Helix and verify the fresh updater landed in a
+      // single CAS (no drainer needed -- the stuck entry was consumed inside the fresh thread's
+      // own batch).
+      IdealState finalState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), tableName);
+      Map<String, String> freshMap = finalState.getInstanceStateMap("freshPartition");
+
+      LOGGER.info("Final IdealState partitions: {}", finalState.getPartitionSet());
+      LOGGER.info("freshPartition state map:    {}", freshMap);
+
+      // Claim #2: freshUpdater's change is in IdealState (the surviving updater was applied
+      // and CAS-written in the same batch as the failed stuck entry).
+      Assert.assertNotNull(freshMap,
+          "Fresh updater's change should be present in IdealState after the per-entry isolation "
+              + "fix applies the surviving entries in the same batched CAS.");
+      Assert.assertEquals(freshMap.get("instance1"), "ONLINE");
+
+      LOGGER.info("=== FIX VERIFIED ===");
+      LOGGER.info("Fresh thread's commit() returned normally; freshPartition -> {}", freshMap);
+    } finally {
+      TEST_INSTANCE.getHelixAdmin().dropResource(TEST_INSTANCE.getHelixClusterName(), tableName);
+    }
+  }
+
+  /**
+   * Multi-thread isolation test: N stuck owners + M fresh owners on the same resource. Each
+   * stuck owner's commit() throws (their own PermanentUpdaterException); every fresh owner's
+   * commit() returns successfully; the final IdealState contains every fresh owner's partition.
+   * No reflection -- every stuck entry has a real owner thread observing the result.
+   */
+  @Test
+  public void testMultipleStuckAndFreshIsolation()
+      throws Exception {
+    String tableName = TABLE_NAME_PREFIX + "multi_OFFLINE";
+    IdealState initialState = new IdealState(tableName);
+    initialState.setStateModelDefRef("OnlineOffline");
+    initialState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    initialState.setReplicas("1");
+    initialState.setNumPartitions(0);
+    TEST_INSTANCE.getHelixAdmin().addResource(TEST_INSTANCE.getHelixClusterName(), tableName, initialState);
+
+    int stuckCount = 3;
+    int freshCount = 5;
+    IdealStateGroupCommit commit = new IdealStateGroupCommit();
+    ExecutorService pool = Executors.newFixedThreadPool(stuckCount + freshCount);
+
+    try {
+      CountDownLatch allReady = new CountDownLatch(stuckCount + freshCount);
+      CountDownLatch goSignal = new CountDownLatch(1);
+
+      List<AtomicReference<Throwable>> stuckResults = new ArrayList<>();
+      for (int i = 0; i < stuckCount; i++) {
+        AtomicReference<Throwable> result = new AtomicReference<>();
+        stuckResults.add(result);
+        final int idx = i;
+        pool.submit(() -> {
+          allReady.countDown();
+          try {
+            goSignal.await();
+          } catch (InterruptedException ignored) {
+          }
+          Function<IdealState, IdealState> stuckUpdater = is -> {
+            throw new HelixHelper.PermanentUpdaterException("stuck-" + idx);
+          };
+          try {
+            commit.commit(TEST_INSTANCE.getHelixManager(), tableName, stuckUpdater,
+                RetryPolicies.noDelayRetryPolicy(1), false);
+          } catch (Throwable t) {
+            result.set(t);
+          }
+        });
+      }
+
+      List<AtomicReference<Throwable>> freshResults = new ArrayList<>();
+      for (int i = 0; i < freshCount; i++) {
+        AtomicReference<Throwable> result = new AtomicReference<>();
+        freshResults.add(result);
+        final int idx = i;
+        pool.submit(() -> {
+          allReady.countDown();
+          try {
+            goSignal.await();
+          } catch (InterruptedException ignored) {
+          }
+          Function<IdealState, IdealState> freshUpdater = is -> {
+            is.setPartitionState("freshPart-" + idx, "instance1", "ONLINE");
+            return is;
+          };
+          try {
+            commit.commit(TEST_INSTANCE.getHelixManager(), tableName, freshUpdater,
+                RetryPolicies.noDelayRetryPolicy(1), false);
+          } catch (Throwable t) {
+            result.set(t);
+          }
+        });
+      }
+
+      Assert.assertTrue(allReady.await(10, TimeUnit.SECONDS), "Worker threads failed to start");
+      goSignal.countDown();
+      pool.shutdown();
+      Assert.assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS), "Workers did not finish");
+
+      // Every stuck owner observes its OWN PermanentUpdaterException (wrapped in RuntimeException
+      // by IdealStateGroupCommit.commit at lines 184-187).
+      for (int i = 0; i < stuckCount; i++) {
+        Throwable t = stuckResults.get(i).get();
+        Assert.assertNotNull(t, "Stuck owner " + i + " should have thrown");
+        Throwable cause = t.getCause() != null ? t.getCause() : t;
+        Assert.assertTrue(cause instanceof HelixHelper.PermanentUpdaterException,
+            "Stuck owner " + i + " expected PermanentUpdaterException, got " + cause);
+        Assert.assertEquals(cause.getMessage(), "stuck-" + i,
+            "Stuck owner " + i + " should see ITS OWN exception, not a sibling's. "
+                + "Per-entry isolation failed: got [" + cause.getMessage() + "].");
+      }
+
+      // Every fresh owner returns normally.
+      for (int i = 0; i < freshCount; i++) {
+        Throwable t = freshResults.get(i).get();
+        Assert.assertNull(t,
+            "Fresh owner " + i + " should not throw -- co-batched stuck entries must not leak. "
+                + "Got: " + (t == null ? "null" : t.toString()));
+      }
+
+      // IdealState reflects all M fresh partitions.
+      IdealState finalState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), tableName);
+      for (int i = 0; i < freshCount; i++) {
+        Map<String, String> map = finalState.getInstanceStateMap("freshPart-" + i);
+        Assert.assertNotNull(map, "freshPart-" + i + " missing from IdealState");
+        Assert.assertEquals(map.get("instance1"), "ONLINE",
+            "freshPart-" + i + " should be ONLINE in IdealState");
+      }
+
+      LOGGER.info("=== Isolation verified: {} stuck owners threw, {} fresh owners succeeded ===",
+          stuckCount, freshCount);
+    } finally {
+      if (!pool.isShutdown()) {
+        pool.shutdownNow();
+      }
+      TEST_INSTANCE.getHelixAdmin().dropResource(TEST_INSTANCE.getHelixClusterName(), tableName);
+    }
+  }
+
+  /**
+   * Uses reflection to push a stuck Entry (whose updater throws PermanentUpdaterException) into
+   * IdealStateGroupCommit's internal per-resource queue, without going through commit(). This is
+   * how we make the FIFO race deterministic in a unit test.
+   */
+  @SuppressWarnings("unchecked")
+  private static void injectStuckEntry(IdealStateGroupCommit commit, String resourceName)
+      throws Exception {
+    Class<?> queueClass =
+        Class.forName("org.apache.pinot.common.utils.helix.IdealStateGroupCommit$Queue");
+    Class<?> entryClass =
+        Class.forName("org.apache.pinot.common.utils.helix.IdealStateGroupCommit$Entry");
+
+    Field queuesField = IdealStateGroupCommit.class.getDeclaredField("_queues");
+    queuesField.setAccessible(true);
+    Object[] queues = (Object[]) queuesField.get(commit);
+
+    int bucket = (resourceName.hashCode() & Integer.MAX_VALUE) % queues.length;
+    Object queue = queues[bucket];
+
+    Field pendingField = queueClass.getDeclaredField("_pending");
+    pendingField.setAccessible(true);
+    ConcurrentLinkedQueue<Object> pending = (ConcurrentLinkedQueue<Object>) pendingField.get(queue);
+
+    Function<IdealState, IdealState> stuckUpdater = is -> {
+      throw new HelixHelper.PermanentUpdaterException(
+          "simulated exceeded max segment completion time");
+    };
+
+    Constructor<?> entryCtor = entryClass.getDeclaredConstructor(String.class, Function.class);
+    entryCtor.setAccessible(true);
+    Object stuckEntry = entryCtor.newInstance(resourceName, stuckUpdater);
+
+    pending.add(stuckEntry);
+    LOGGER.info("Injected stuck (always-throwing) entry into queue bucket {} for resource {}",
+        bucket, resourceName);
   }
 
   @Test(invocationCount = 5)

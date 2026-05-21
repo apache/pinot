@@ -137,9 +137,23 @@ public class IdealStateGroupCommit {
               }
               processed.add(ent);
               it.remove();
-              updatedIdealState = ent._updater.apply(updatedIdealState);
-              ent._updatedIdealState = updatedIdealState;
-              ent._exception = null;
+              try {
+                updatedIdealState = ent._updater.apply(updatedIdealState);
+                ent._updatedIdealState = updatedIdealState;
+                ent._exception = null;
+              } catch (HelixHelper.PermanentUpdaterException e) {
+                // Per-entry isolation: only this entry's owner sees the failure. Co-batched
+                // entries continue to be applied and CAS-written in the same write. Without
+                // this catch, the throwing entry would abort iteration mid-batch, leaving
+                // still-queued entries that a subsequent leader silently applied -- producing
+                // an "in IdealState, no ZK metadata" orphan when the caller's catch block
+                // cleaned up its new segment metadata believing its update had failed.
+                LOGGER.warn("PermanentUpdaterException for resource {}; isolating to that entry: {}",
+                    resourceName, e.getMessage(), e);
+                ent._exception = e;
+                ent._updatedIdealState = null;
+                // do NOT rethrow; do NOT update updatedIdealState; continue with the next entry
+              }
             }
             return updatedIdealState;
           }, retryPolicy, noChangeOk);
