@@ -31,15 +31,19 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.client.admin.LogicalTableAdminClient;
 import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.client.admin.TableAdminClient;
 import org.apache.pinot.client.admin.TaskAdminClient;
 import org.apache.pinot.client.admin.ZookeeperAdminClient;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
-import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -68,6 +72,7 @@ import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.apache.zookeeper.data.Stat;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -1566,6 +1571,74 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             "Expected 400-class response; got: " + e.getMessage());
         assertTrue(e.getMessage().contains("batchIngestionConfig.batchType"),
             "Error message should name the offending path; got: " + e.getMessage());
+      }
+    } finally {
+      DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();
+    }
+  }
+
+  /// Post-flip rehearsal: simulates `SOFT_LAUNCH_WARNING_ONLY=false` semantics end-to-end using a synthetic ERROR
+  /// rule. Verifies the two non-obvious post-flip cases that operators must rely on at promotion time:
+  /// 1. A PUT that re-submits an UNCHANGED legacy value on an existing table must succeed (the diff sees no
+  ///    change, so the ERROR severity does not fire). Without this, every PUT to every existing table that
+  ///    holds a legacy field becomes un-acceptable the moment the flag flips.
+  /// 2. A PUT that INTRODUCES a deprecated field on an existing table must be rejected as 400 (the diff sees a
+  ///    new write to a deprecated path).
+  @Test
+  public void testErrorSeverityRuleAllowsUnchangedLegacyValueOnUpdate()
+      throws Exception {
+    String tableName = "errorPathUpdateRehearsalTable";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+
+    // Phase 1: create the table with a non-deprecated config. No ERROR rule active yet — passes cleanly.
+    String creationResponse = createTable(_offlineBuilder.setTableName(tableName).build().toJsonString());
+    assertSuccessfulOfflineTableCreationResponse(creationResponse, tableNameWithType);
+
+    // Phase 2: stamp a "legacy" field into the stored ZNRecord directly so the diff sees a value the validator
+    // will subsequently flag as ERROR. We use ingestionConfig.batchIngestionConfig.batchType because no real
+    // annotation owns it (collision-free with the in-tree rule set).
+    ZkHelixPropertyStore<ZNRecord> propertyStore =
+        DEFAULT_INSTANCE.getControllerStarter().getHelixResourceManager().getPropertyStore();
+    Stat stat = new Stat();
+    ZNRecord storedRecord = ZKMetadataProvider.getTableConfigZNRecord(propertyStore, tableNameWithType, stat);
+    assertNotNull(storedRecord, "stored ZNRecord must exist after create");
+    JsonNode currentTableJson = TableConfigSerDeUtils.toRawJsonNode(storedRecord);
+    ObjectNode stampedTableJson = (ObjectNode) currentTableJson.deepCopy();
+    ObjectNode stampedIngestion = JsonUtils.newObjectNode();
+    ObjectNode stampedBatch = JsonUtils.newObjectNode();
+    stampedBatch.put("batchType", "s3");
+    stampedIngestion.set("batchIngestionConfig", stampedBatch);
+    stampedTableJson.set("ingestionConfig", stampedIngestion);
+    // Round-trip through TableConfig to refresh the stored ZNRecord with the new path.
+    org.apache.pinot.spi.config.table.TableConfig stampedTableConfig = JsonUtils.jsonNodeToObject(stampedTableJson,
+        org.apache.pinot.spi.config.table.TableConfig.class);
+    DEFAULT_INSTANCE.getControllerStarter().getHelixResourceManager()
+        .setExistingTableConfig(stampedTableConfig);
+
+    DeprecatedTableConfigValidationUtils.setRulesOverrideForTesting(java.util.List.of(
+        DeprecatedTableConfigValidationUtils.makeRuleForTesting(
+            java.util.List.of("ingestionConfig", "batchIngestionConfig", "batchType"),
+            "Synthetic ERROR rule for post-flip rehearsal.", "0.1.0",
+            DeprecatedTableConfigValidationUtils.Severity.ERROR)));
+    try {
+      // Case 1: PUT the same body the stored config already holds. The diff sees no change → no ERROR fired,
+      // even under post-flip ERROR severity. This is the operability guarantee the promotion PR depends on.
+      String unchangedResubmit = updateTable(tableName, stampedTableConfig.toJsonString());
+      assertTrue(unchangedResubmit.contains("updated"),
+          "Unchanged re-submission of legacy field must succeed under ERROR severity. Got: " + unchangedResubmit);
+
+      // Case 2: PUT a body that INTRODUCES a different value at the same deprecated path. The diff sees a value
+      // change → ERROR fires → 400.
+      ObjectNode changedJson = (ObjectNode) JsonUtils.objectToJsonNode(stampedTableConfig);
+      ((ObjectNode) ((ObjectNode) changedJson.get("ingestionConfig")).get("batchIngestionConfig"))
+          .put("batchType", "hdfs");
+      try {
+        updateTable(tableName, changedJson.toString());
+        fail("Expected HTTP 400 when changing a value at an ERROR-classified deprecated path");
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains("400") || e.getMessage().contains("Bad Request"),
+            "Expected 400-class response on changed value; got: " + e.getMessage());
       }
     } finally {
       DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();

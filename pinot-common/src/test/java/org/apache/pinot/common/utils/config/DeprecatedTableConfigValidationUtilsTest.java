@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.lang.reflect.Constructor;
@@ -29,9 +29,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils.DeprecatedConfigRule;
-import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils.Result;
-import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils.Severity;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils.DeprecatedConfigRule;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils.Result;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils.Severity;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.DeprecatedConfig;
 import org.apache.pinot.spi.config.table.TableConfig;

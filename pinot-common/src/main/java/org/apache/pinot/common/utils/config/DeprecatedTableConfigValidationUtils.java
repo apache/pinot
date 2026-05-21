@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -201,6 +201,14 @@ public final class DeprecatedTableConfigValidationUtils {
 
   static List<DeprecatedConfigRule> rulesForTesting() {
     return Collections.unmodifiableList(Rules.ALL);
+  }
+
+  /// Eagerly initialise the lazy `Rules.ALL` holder so the first user-facing REST request after controller
+  /// startup doesn't pay the reflective discovery cost. Returns the rule count for the caller to log. Fails
+  /// loudly: if the discovery walk throws (e.g., duplicate `@JsonProperty` across two annotated getters on the
+  /// same bean), the `ExceptionInInitializerError` surfaces at startup rather than on every REST endpoint.
+  public static int warmUp() {
+    return Rules.ALL.size();
   }
 
   /// Test seam to construct synthetic [DeprecatedConfigRule] instances. The constructor is package-private so

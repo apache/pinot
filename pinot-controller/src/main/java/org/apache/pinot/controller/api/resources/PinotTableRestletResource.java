@@ -94,6 +94,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.config.DeprecatedTableConfigValidationUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
