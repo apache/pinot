@@ -2653,12 +2653,19 @@ public class PinotHelixResourceManager {
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
       throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
     String tableNameWithType = tableConfig.getTableName();
-    // Pre-flight version check. If the caller passed an expectedVersion (CAS mode) and the current znode version
-    // is already past it, short-circuit to TableConfigVersionConflictException before reading the existing config
-    // for back-compat validation. Without this, back-compat validation runs against a fresher snapshot than the
-    // one the caller intended to overwrite — producing a misleading 400 BAD_REQUEST when the right answer is
-    // 409 CONFLICT. The CAS write below remains the source of truth (the propertyStore.set call is the only
-    // atomic CAS), this just makes the conflict path detectable earlier.
+    // In CAS mode (expectedVersion >= 0) the pre-flight read serves two purposes:
+    //   (1) Short-circuit to TableConfigVersionConflictException when a concurrent writer already bumped the
+    //       znode past expectedVersion. Without the early throw, back-compat validation would run against a
+    //       fresher snapshot and the caller could see a misleading 400 BAD_REQUEST when the right answer is
+    //       409 CONFLICT.
+    //   (2) Reuse the SAME byte-snapshot for back-compat validation. Doing two independent reads (one for the
+    //       version check, one via getTableConfig() below) opened a race window where back-compat ran against a
+    //       different stored config than the one whose version was checked. Reusing the pair below closes that
+    //       window so a single TableConfig instance drives both decisions.
+    // In non-CAS mode (expectedVersion == -1) the legacy `getTableConfig(tableNameWithType)` path is retained
+    // for back-compat with existing callers (PinotDdlRestletResource, RealtimeOffsetAutoResetKafkaHandler, etc.)
+    // that do not pre-read a version.
+    TableConfig existingTableConfig;
     if (expectedVersion >= 0) {
       ImmutablePair<TableConfig, Stat> withStat =
           ZKMetadataProvider.getTableConfigWithStat(_propertyStore, tableNameWithType);
@@ -2667,8 +2674,10 @@ public class PinotHelixResourceManager {
             "Table config for " + tableNameWithType + " was modified by a concurrent writer (expected version "
                 + expectedVersion + ", current " + withStat.getRight().getVersion() + ")");
       }
+      existingTableConfig = withStat == null ? null : withStat.getLeft();
+    } else {
+      existingTableConfig = getTableConfig(tableNameWithType);
     }
-    TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
       List<String> violations = TableConfigUtils.validateBackwardCompatibility(tableConfig, existingTableConfig);
       if (!violations.isEmpty()) {

@@ -85,4 +85,21 @@ public class ConfigSuccessResponseTest {
     assertEquals(parsed.getStatus(), "ok");
     assertTrue(parsed.getDeprecationWarnings().isEmpty());
   }
+
+  /// Future controller versions may add new wire fields. Strict-parsing older clients (with
+  /// FAIL_ON_UNKNOWN_PROPERTIES=true) must still parse the response — this is the rolling-upgrade direction:
+  /// old client + new controller emitting fields the client does not yet know about. Locked here so a future
+  /// refactor that removes `@JsonIgnoreProperties(ignoreUnknown=true)` from ConfigSuccessResponse fails this
+  /// test before it ships.
+  @Test
+  public void testStrictParserToleratesUnknownFutureField()
+      throws Exception {
+    String json = "{\"status\":\"ok\",\"unrecognizedProperties\":{},\"deprecationWarnings\":[\"w1\"],"
+        + "\"futureField\":\"some value the old client does not know about\"}";
+    com.fasterxml.jackson.databind.ObjectMapper strict = new com.fasterxml.jackson.databind.ObjectMapper()
+        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    ConfigSuccessResponse parsed = strict.readValue(json, ConfigSuccessResponse.class);
+    assertEquals(parsed.getStatus(), "ok");
+    assertEquals(parsed.getDeprecationWarnings(), List.of("w1"));
+  }
 }

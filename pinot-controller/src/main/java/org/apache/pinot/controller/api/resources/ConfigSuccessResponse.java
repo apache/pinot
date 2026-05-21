@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -28,6 +29,11 @@ import java.util.Map;
 /// Field order is fixed via [JsonPropertyOrder] so the wire shape is deterministic across Jackson versions.
 /// `unrecognizedProperties` comes first to match the pre-deprecationWarnings response layout that existing
 /// clients and integration tests assert byte-exactly.
+///
+/// `@JsonIgnoreProperties(ignoreUnknown = true)` so future controller versions can add wire fields without
+/// breaking strict-parsing older clients (rolling-upgrade direction: old client + new controller). Locked by
+/// `testStrictParserToleratesUnknownFutureField`.
+@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonPropertyOrder({"unrecognizedProperties", "deprecationWarnings", "status"})
 public final class ConfigSuccessResponse extends SuccessResponse {
   private final Map<String, Object> _unrecognizedProperties;

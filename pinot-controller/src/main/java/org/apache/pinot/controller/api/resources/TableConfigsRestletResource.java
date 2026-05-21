@@ -376,12 +376,19 @@ public class TableConfigsRestletResource {
    * then updating the offline tableConfig or creating a new one if it doesn't already exist in the cluster,
    * then updating the realtime tableConfig or creating a new one if it doesn't already exist in the cluster.
    *
-   * <p><b>Atomicity caveat (HTTP 409 CONFLICT response):</b> the offline and realtime sub-config writes are
-   * issued sequentially with independent per-sub-type CAS version checks. If the realtime CAS fails after the
-   * offline CAS has already succeeded, the offline write has ALREADY landed at v+1 — the response will be HTTP
-   * 409 but the underlying state is partially applied. Clients receiving 409 MUST re-read both sub-configs and
-   * retry the full transaction; do NOT interpret 409 as "no change applied". A future PR may collapse the two
-   * writes into a single Helix multi-write; until then this behaviour is documented contract, not a bug.
+   * <p><b>Atomicity caveat (HTTP 409 CONFLICT and 5xx responses):</b> this endpoint performs up to THREE
+   * sequential ZK writes — schema, offline sub-config (CAS), realtime sub-config (CAS) — and rolls none of them
+   * back on later failure. Implications:
+   * <ul>
+   *   <li>If the schema update succeeds and a sub-config CAS later fails (409 / 5xx), the schema has ALREADY
+   *       landed. A naive client retry that re-reads the schema sees the updated schema and may overwrite it
+   *       again as a no-op.</li>
+   *   <li>If the offline CAS succeeds and the realtime CAS fails, the offline sub-config has ALREADY landed at
+   *       v+1. The 409 response signals partial application of the intended transaction.</li>
+   * </ul>
+   * Clients receiving 409 MUST re-read schema and both sub-configs and merge their intent against the observed
+   * state — do NOT interpret 409 as "no change applied". A future PR may collapse the three writes into a single
+   * Helix multi-write; until then this behaviour is documented contract, not a bug.
    *
    * <p>The option to skip table config validation (validationTypesToSkip) and force update the table schema
    * (forceTableSchemaUpdate) are provided for testing purposes and should be used with caution.
@@ -782,10 +789,6 @@ public class TableConfigsRestletResource {
       _warnings = warnings;
       _offlineExpectedVersion = offlineExpectedVersion;
       _realtimeExpectedVersion = realtimeExpectedVersion;
-    }
-
-    List<String> warnings() {
-      return _warnings;
     }
   }
 

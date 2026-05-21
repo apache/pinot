@@ -670,14 +670,28 @@ public final class DeprecatedTableConfigValidationUtils {
       }
       if (newHasName) {
         String key = newElem.get("name").asText();
+        JsonNode firstMatch = null;
+        int matches = 0;
         for (int i = 0; i < oldNode.size(); i++) {
           JsonNode candidate = oldNode.get(i);
           if (hasTextualName(candidate) && key.equals(candidate.get("name").asText())) {
-            return candidate;
+            if (firstMatch == null) {
+              firstMatch = candidate;
+            }
+            matches++;
           }
         }
-        // newElem has a name but no old element matches by name → treat as newly introduced (return null).
-        return null;
+        if (matches > 1) {
+          // Stored array carries duplicate `name` keys — Pinot does not enforce uniqueness at the JSON layer,
+          // so this is legal but rare. First-name-wins alignment would silently misalign later duplicates with
+          // their first sibling. Log so the corruption is visible; fall back to first match to preserve the
+          // historical behaviour.
+          LOGGER.warn("Stored deprecated-config array contains {} elements with duplicate name='{}'; deprecation "
+              + "diff aligns against the first match. Resolve duplicates in the stored ZK record to silence this "
+              + "warning.", matches, key);
+        }
+        // firstMatch is null if newElem has a name but no old element matches → treat as newly introduced.
+        return firstMatch;
       }
       return positionalIdx < oldNode.size() ? oldNode.get(positionalIdx) : null;
     }

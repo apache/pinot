@@ -52,10 +52,14 @@ import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// Util class for serializing and deserializing [TableConfig] to and from [ZNRecord].
 public class TableConfigSerDeUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigSerDeUtils.class);
+
   private TableConfigSerDeUtils() {
   }
 
@@ -336,7 +340,14 @@ public class TableConfigSerDeUtils {
           root.set(key, JsonUtils.stringToJsonNode(value));
           continue;
         } catch (IOException e) {
-          // Malformed JSON container — fall through to text node so the diff still sees the original bytes.
+          // Malformed JSON container under a key that we expected to be parseable. Operators need to know — the
+          // downstream diff will treat the value as a text node instead of a structured object, which can
+          // produce spurious "path newly introduced" warnings on update. WARN-log so the corruption is visible
+          // (the table is still usable since fromZNRecord owns the deserialization path; this only affects the
+          // raw-JSON view used by the deprecation validator).
+          LOGGER.warn("Stored simpleField {} on znode {} starts with '{}'/'[' but failed to parse as JSON: {}. "
+                  + "Falling back to a text-node representation; downstream diffs may treat the path as newly "
+                  + "introduced.", key, znRecord.getId(), e.getMessage());
         }
       }
       root.put(key, value);
