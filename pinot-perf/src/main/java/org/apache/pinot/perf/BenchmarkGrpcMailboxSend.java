@@ -138,9 +138,16 @@ public class BenchmarkGrpcMailboxSend {
   @Setup
   public void setup()
       throws IOException {
+    // The GrpcMailboxServer fail-fast validation requires flowControlWindow >= maxInboundMessageSize. The narrow window
+    // axis values (65535, 1 MiB) are smaller than the 16 MiB default for max-inbound-message-size, so we also clamp the
+    // max-msg-size down to the window. Math.min keeps the 64 MiB-window cell using the production default 16 MiB
+    // max-msg-size; the two narrow-window cells pin max-msg-size down to the window so the validation passes.
     PinotConfiguration cfg = new PinotConfiguration(Map.of(
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED, _backpressureEnabled,
-        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, _flowControlWindowBytes));
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, _flowControlWindowBytes,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+            Math.min(_flowControlWindowBytes,
+                CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)));
     _senderService = new MailboxService("localhost", availablePort(), InstanceType.SERVER, cfg);
     _senderService.start();
     _receiverService = new MailboxService("localhost", availablePort(), InstanceType.SERVER, cfg);
