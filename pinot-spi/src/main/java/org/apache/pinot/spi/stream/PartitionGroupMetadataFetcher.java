@@ -43,6 +43,11 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final List<Integer> _pausedTopicIndices;
 
   private Exception _exception;
+  private final List<String> _failedTopics = new ArrayList<>();
+
+  public List<String> getFailedTopics() {
+    return Collections.unmodifiableList(_failedTopics);
+  }
 
   public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
@@ -80,6 +85,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
     _streamMetadataList.clear();
+    _failedTopics.clear();
     _exception = null;
     return _streamConfigs.size() == 1 ? fetchSingleStream() : fetchMultipleStreams();
   }
@@ -151,6 +157,13 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         LOGGER.warn("Transient Exception: Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;
         return Boolean.FALSE;
+      } catch (PermanentConsumerException e) {
+        // A confirmed-permanent failure (e.g. topic deleted from Kafka) must not block metadata
+        // fetching for the remaining healthy topics in a multi-topic table. Log, record, and
+        // continue — the caller emits a metric and healthy topics proceed normally.
+        LOGGER.warn("Permanent failure fetching StreamMetadata for topic {}, skipping in multi-topic fetch",
+            topicName, e);
+        _failedTopics.add(topicName);
       } catch (Exception e) {
         LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;
