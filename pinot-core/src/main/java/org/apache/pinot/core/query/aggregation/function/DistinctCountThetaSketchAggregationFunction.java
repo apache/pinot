@@ -1250,8 +1250,18 @@ public class DistinctCountThetaSketchAggregationFunction
     for (int i = 0; i < numExpressions; i++) {
       BlockValSet blockValSet = blockValSetMap.get(_inputExpressions.get(i));
       boolean singleValue = blockValSet.isSingleValue();
-      DataType storedType = blockValSet.getValueType().getStoredType();
+      DataType dataType = blockValSet.getValueType();
+      DataType storedType = dataType.getStoredType();
       singleValues[i] = singleValue;
+      // UUID columns are stored as 16-byte BYTES but a UUID value is a logical scalar, not a pre-serialized
+      // theta sketch. Surface UUID as STRING (canonical UUID form) so the downstream update-sketch path
+      // matches DISTINCTCOUNTTHETASKETCH(CAST(uuidCol AS STRING)). Without this branch, the function would
+      // take the serialized-sketch path below and Sketch.wrap would fail on raw 16-byte UUID content.
+      if (dataType == DataType.UUID) {
+        valueTypes[i] = DataType.STRING;
+        valueArrays[i] = singleValue ? blockValSet.getStringValuesSV() : blockValSet.getStringValuesMV();
+        continue;
+      }
       valueTypes[i] = storedType;
       if (singleValue) {
         switch (storedType) {

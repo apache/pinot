@@ -116,6 +116,19 @@ public final class SegmentProcessorAvroUtils {
         .collect(Collectors.toList());
     for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
+      // Emit UUID columns as Avro string{logicalType:uuid} (matching AvroUtils.getAvroSchemaFromPinotSchema)
+      // so the runtime byte[] → canonical-string conversion in convertGenericRowToAvroRecord lines up with
+      // the field schema. Without this branch SV UUID would fall through to BYTES (losing UUID semantics) and
+      // MV UUID would throw at this point (MV switch below has no BYTES case).
+      if (fieldSpec.getDataType() == DataType.UUID) {
+        Schema uuidSchema = LogicalTypes.uuid().addToSchema(Schema.create(Schema.Type.STRING));
+        if (fieldSpec.isSingleValueField()) {
+          fieldAssembler = fieldAssembler.name(name).type(uuidSchema).noDefault();
+        } else {
+          fieldAssembler = fieldAssembler.name(name).type().array().items(uuidSchema).noDefault();
+        }
+        continue;
+      }
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
         switch (storedType) {
