@@ -44,9 +44,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 /// Extracts a single ORC row into a [GenericRow]. Input is an [ORCRecordExtractor.Record] handle wrapping
-/// a [VectorizedRowBatch] + schema + row index. Dispatch happens in [#extractValue] (complex types —
-/// `LIST` / `MAP` / `STRUCT`) and [#extractSingleValue] (primitives); ORC values never flow through
-/// `convertSingleValue`, so widening / `Temporal` handling is done locally here.
+/// a [VectorizedRowBatch] + schema + row index.
 ///
 /// **ORC schema category → Java output type:**
 /// - `BOOLEAN` → `Boolean`

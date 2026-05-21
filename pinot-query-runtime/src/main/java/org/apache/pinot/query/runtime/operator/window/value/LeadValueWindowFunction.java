@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
@@ -64,8 +63,7 @@ public class LeadValueWindowFunction extends ValueWindowFunction {
         if (srcDataType != destDataType) {
           // Convert the default value to the same data type as the input column
           // (e.g. convert INT to LONG, FLOAT to DOUBLE, etc.
-          defaultValue = PinotDataType.getPinotDataTypeForExecution(destDataType)
-              .convert(defaultValue, PinotDataType.getPinotDataTypeForExecution(srcDataType));
+          defaultValue = destDataType.toPinotDataType().convert(defaultValue, srcDataType.toPinotDataType());
         }
       }
     }

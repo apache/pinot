@@ -87,6 +87,16 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
     return getId();
   }
 
+  /// Returns whether this index should be built for the given column at segment-creation time. Default `true`. The
+  /// segment-creator dispatch loop calls this after confirming `indexConfig.isEnabled()`; if this returns `false`,
+  /// [#createIndexCreator] is not invoked. Implementations should inspect column-shape signals on `context` (e.g.
+  /// `isSorted`, `isSingleValueField`, stored type) to filter out columns that are not candidates for this index even
+  /// when the config is enabled. Use this when the inability to build is a runtime property of the column rather than
+  /// a config issue (config-level invalidity should still throw from [#validate]).
+  default boolean shouldCreateIndex(IndexCreationContext context, C indexConfig) {
+    return true;
+  }
+
   /**
    * Returns the {@link IndexCreator} that can should be used to create an index of this type with the given context
    * and configuration.

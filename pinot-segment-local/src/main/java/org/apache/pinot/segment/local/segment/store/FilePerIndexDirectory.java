@@ -99,8 +99,20 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
-    // TODO: this leaks the removed data buffer (it's not going to be freed in close() method)
-    _indexBuffers.remove(new IndexKey(columnName, indexType));
+    IndexKey key = new IndexKey(columnName, indexType);
+    // Fetch the buffer without removing it from the map first; the mapping is removed only after close() succeeds.
+    // If close() throws, the entry stays in _indexBuffers so a subsequent directory close() can attempt to release
+    // it on a best-effort basis (this class is not thread-safe; callers must serialize access).
+    PinotDataBuffer buffer = _indexBuffers.get(key);
+    if (buffer != null) {
+      try {
+        buffer.close();
+        _indexBuffers.remove(key);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Failed to close index buffer for column: %s, indexType: %s", columnName, indexType), e);
+      }
+    }
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else if (indexType == StandardIndexes.vector()) {

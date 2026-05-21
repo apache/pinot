@@ -30,14 +30,18 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -463,6 +467,50 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       RANDOM.nextBytes(randomBytes);
       assertEquals(bytesDictionary.insertionIndexOf(BytesUtils.toHexString(randomBytes)),
           Arrays.binarySearch(_bytesValues, new ByteArray(randomBytes)));
+    }
+  }
+
+  /**
+   * Regression test for old segments (pre-1.6.0) that have a STRING column with all-empty values:
+   * the segment lacks LENGTH_OF_LONGEST_ELEMENT (introduced in 1.6.0) and has DICTIONARY_ELEMENT_SIZE=0
+   * (the longest entry length is zero when every entry is empty). The metadata loader must canonicalize
+   * the longest-element length to 0 here; otherwise it leaves the field at the UNAVAILABLE sentinel
+   * (-1), which propagates into StringDictionary.getBuffer() as `new byte[-1]` and fails query
+   * execution with NegativeArraySizeException.
+   */
+  @Test
+  public void testStringDictionaryReadOnPre16OldSegmentMetadata()
+      throws Exception {
+    String columnName = "emptyStringCol";
+    // Build a real var-length string dictionary on disk holding a single empty value.
+    try (SegmentDictionaryCreator dictCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(columnName, DataType.STRING, true), TEMP_DIR, true)) {
+      dictCreator.build(new String[]{""});
+      assertEquals(dictCreator.getNumBytesPerEntry(), 0);
+    }
+
+    // Simulate pre-1.6.0 metadata: HAS_DICTIONARY=true, DICTIONARY_ELEMENT_SIZE=0, no LENGTH_OF_LONGEST_ELEMENT.
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    config.setProperty(Column.getKeyFor(columnName, Column.COLUMN_NAME), columnName);
+    config.setProperty(Column.getKeyFor(columnName, Column.COLUMN_TYPE), FieldType.DIMENSION.name());
+    config.setProperty(Column.getKeyFor(columnName, Column.DATA_TYPE), DataType.STRING.name());
+    config.setProperty(Column.getKeyFor(columnName, Column.IS_SINGLE_VALUED), true);
+    config.setProperty(Column.getKeyFor(columnName, Column.CARDINALITY), 1);
+    config.setProperty(Column.getKeyFor(columnName, Column.HAS_DICTIONARY), true);
+    config.setProperty(Column.getKeyFor(columnName, Column.DICTIONARY_ELEMENT_SIZE), 0);
+    // LENGTH_OF_LONGEST_ELEMENT intentionally NOT set.
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, columnName);
+
+    // Reproduce the production code path: DictionaryIndexType passes metadata.getLengthOfLongestElement()
+    // as numBytesPerValue. Without the canonicalization fix this is -1, and StringDictionary.readStringValues
+    // throws NegativeArraySizeException at BaseImmutableDictionary.getBuffer().
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, columnName + V1Constants.Dict.FILE_EXTENSION));
+        StringDictionary dict = new StringDictionary(buffer, 1, metadata.getLengthOfLongestElement())) {
+      String[] outValues = new String[1];
+      dict.readStringValues(new int[]{0}, 1, outValues);
+      assertEquals(outValues[0], "");
     }
   }
 

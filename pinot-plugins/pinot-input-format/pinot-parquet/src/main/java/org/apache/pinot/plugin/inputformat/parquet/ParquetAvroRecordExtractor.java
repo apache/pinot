@@ -25,7 +25,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
 
 
 /// The type matrix is inherited from [AvroRecordExtractor]; the only override is the INT96 timestamp
-/// (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) → [java.sql.Timestamp]
+/// (which parquet-avro surfaces as `fixed(12)` with `doc = "INT96 represented as byte[12]"`) → `Timestamp`
 /// (or `Long` epoch nanos when `extractRawTimeValues` is `true`) via [ParquetUtils#convertInt96ToEpochNanos].
 public class ParquetAvroRecordExtractor extends AvroRecordExtractor {
   private static final int INT96_BYTE_SIZE = 12;

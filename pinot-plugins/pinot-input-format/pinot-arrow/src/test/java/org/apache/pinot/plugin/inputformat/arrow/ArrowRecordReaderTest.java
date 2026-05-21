@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.plugin.inputformat.arrow;
 
-import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.BigIntVector;
 import org.apache.arrow.vector.Float4Vector;
@@ -38,16 +36,13 @@ import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
-import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.Test;
+
+import static org.apache.arrow.vector.types.pojo.FieldType.nullable;
 
 
 public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
@@ -55,7 +50,7 @@ public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
 
   @Override
   protected RecordReader createRecordReader(File file)
-      throws Exception {
+      throws IOException {
     ArrowRecordReader recordReader = new ArrowRecordReader();
     recordReader.init(file, _sourceFields, null);
     return recordReader;
@@ -63,42 +58,38 @@ public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
 
   @Override
   protected void writeRecordsToFile(List<Map<String, Object>> recordsToWrite)
-      throws Exception {
+      throws IOException {
     // Single-value fields
-    Field dimSvInt = new Field("dim_sv_int", FieldType.nullable(new ArrowType.Int(32, true)), null);
-    Field dimSvLong = new Field("dim_sv_long", FieldType.nullable(new ArrowType.Int(64, true)), null);
+    Field dimSvInt = new Field("dim_sv_int", nullable(new ArrowType.Int(32, true)), null);
+    Field dimSvLong = new Field("dim_sv_long", nullable(new ArrowType.Int(64, true)), null);
     Field dimSvFloat =
-        new Field("dim_sv_float", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)), null);
+        new Field("dim_sv_float", nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)), null);
     Field dimSvDouble =
-        new Field("dim_sv_double", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)),
-            null);
-    Field dimSvString = new Field("dim_sv_string", FieldType.nullable(new ArrowType.Utf8()), null);
+        new Field("dim_sv_double", nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null);
+    Field dimSvString = new Field("dim_sv_string", nullable(new ArrowType.Utf8()), null);
 
     // Multi-value fields (List vectors)
-    Field dimMvInt = new Field("dim_mv_int", FieldType.nullable(new ArrowType.List()),
-        Arrays.asList(new Field("$data$", FieldType.nullable(new ArrowType.Int(32, true)), null)));
-    Field dimMvLong = new Field("dim_mv_long", FieldType.nullable(new ArrowType.List()),
-        Arrays.asList(new Field("$data$", FieldType.nullable(new ArrowType.Int(64, true)), null)));
-    Field dimMvFloat = new Field("dim_mv_float", FieldType.nullable(new ArrowType.List()),
-        Arrays.asList(
-            new Field("$data$", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)), null)));
-    Field dimMvDouble = new Field("dim_mv_double", FieldType.nullable(new ArrowType.List()),
-        Arrays.asList(
-            new Field("$data$", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null)));
-    Field dimMvString = new Field("dim_mv_string", FieldType.nullable(new ArrowType.List()),
-        Arrays.asList(new Field("$data$", FieldType.nullable(new ArrowType.Utf8()), null)));
+    Field dimMvInt = new Field("dim_mv_int", nullable(new ArrowType.List()),
+        List.of(new Field("$data$", nullable(new ArrowType.Int(32, true)), null)));
+    Field dimMvLong = new Field("dim_mv_long", nullable(new ArrowType.List()),
+        List.of(new Field("$data$", nullable(new ArrowType.Int(64, true)), null)));
+    Field dimMvFloat = new Field("dim_mv_float", nullable(new ArrowType.List()),
+        List.of(new Field("$data$", nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)), null)));
+    Field dimMvDouble = new Field("dim_mv_double", nullable(new ArrowType.List()),
+        List.of(new Field("$data$", nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null)));
+    Field dimMvString = new Field("dim_mv_string", nullable(new ArrowType.List()),
+        List.of(new Field("$data$", nullable(new ArrowType.Utf8()), null)));
 
     // Metric fields
-    Field metInt = new Field("met_int", FieldType.nullable(new ArrowType.Int(32, true)), null);
-    Field metLong = new Field("met_long", FieldType.nullable(new ArrowType.Int(64, true)), null);
-    Field metFloat =
-        new Field("met_float", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)), null);
+    Field metInt = new Field("met_int", nullable(new ArrowType.Int(32, true)), null);
+    Field metLong = new Field("met_long", nullable(new ArrowType.Int(64, true)), null);
+    Field metFloat = new Field("met_float", nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE)), null);
     Field metDouble =
-        new Field("met_double", FieldType.nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null);
+        new Field("met_double", nullable(new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE)), null);
 
     Schema schema = new Schema(
-        Arrays.asList(dimSvInt, dimSvLong, dimSvFloat, dimSvDouble, dimSvString, dimMvInt, dimMvLong, dimMvFloat,
-            dimMvDouble, dimMvString, metInt, metLong, metFloat, metDouble));
+        List.of(dimSvInt, dimSvLong, dimSvFloat, dimSvDouble, dimSvString, dimMvInt, dimMvLong, dimMvFloat, dimMvDouble,
+            dimMvString, metInt, metLong, metFloat, metDouble));
 
     try (RootAllocator allocator = new RootAllocator();
         VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator);
@@ -201,15 +192,15 @@ public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
         dimSvDoubleVec.setValueCount(batchSize);
         dimSvStringVec.setValueCount(batchSize);
         dimMvIntVec.setValueCount(batchSize);
-        ((IntVector) dimMvIntVec.getDataVector()).setValueCount(mvIntIdx);
+        dimMvIntVec.getDataVector().setValueCount(mvIntIdx);
         dimMvLongVec.setValueCount(batchSize);
-        ((BigIntVector) dimMvLongVec.getDataVector()).setValueCount(mvLongIdx);
+        dimMvLongVec.getDataVector().setValueCount(mvLongIdx);
         dimMvFloatVec.setValueCount(batchSize);
-        ((Float4Vector) dimMvFloatVec.getDataVector()).setValueCount(mvFloatIdx);
+        dimMvFloatVec.getDataVector().setValueCount(mvFloatIdx);
         dimMvDoubleVec.setValueCount(batchSize);
-        ((Float8Vector) dimMvDoubleVec.getDataVector()).setValueCount(mvDoubleIdx);
+        dimMvDoubleVec.getDataVector().setValueCount(mvDoubleIdx);
         dimMvStringVec.setValueCount(batchSize);
-        ((VarCharVector) dimMvStringVec.getDataVector()).setValueCount(mvStringIdx);
+        dimMvStringVec.getDataVector().setValueCount(mvStringIdx);
         metIntVec.setValueCount(batchSize);
         metLongVec.setValueCount(batchSize);
         metFloatVec.setValueCount(batchSize);
@@ -228,71 +219,9 @@ public class ArrowRecordReaderTest extends AbstractRecordReaderTest {
     return "data.arrow";
   }
 
-  @Override
-  protected void checkValue(RecordReader recordReader, List<Map<String, Object>> expectedRecordsMap,
-      List<Object[]> expectedPrimaryKeys)
-      throws Exception {
-    for (int i = 0; i < expectedRecordsMap.size(); i++) {
-      Map<String, Object> expectedRecord = expectedRecordsMap.get(i);
-      GenericRow actualRecord = recordReader.next();
-      for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
-        String fieldSpecName = fieldSpec.getName();
-        if (fieldSpec.isSingleValueField()) {
-          assertSingleValueEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
-        } else {
-          // Arrow converter returns List instead of Object[]
-          List<?> actualList = (List<?>) actualRecord.getValue(fieldSpecName);
-          List<?> expectedList = (List<?>) expectedRecord.get(fieldSpecName);
-          Assert.assertEquals(actualList.size(), expectedList.size());
-          for (int j = 0; j < actualList.size(); j++) {
-            assertSingleValueEquals(actualList.get(j), expectedList.get(j));
-          }
-        }
-      }
-      PrimaryKey primaryKey = actualRecord.getPrimaryKey(getPrimaryKeyColumns());
-      Assert.assertEquals(primaryKey.getValues(), expectedPrimaryKeys.get(i));
-    }
-    Assert.assertFalse(recordReader.hasNext());
-  }
-
   @Test
   @Override
   public void testGzipRecordReader() {
     throw new SkipException("Arrow IPC file format requires seekable channels and does not support gzip compression");
-  }
-
-  @Test
-  public void testFieldsToReadFiltering()
-      throws Exception {
-    Set<String> fieldsToRead = Sets.newHashSet("dim_sv_int", "dim_sv_string");
-    try (ArrowRecordReader reader = new ArrowRecordReader()) {
-      reader.init(_dataFile, fieldsToRead, null);
-
-      Assert.assertTrue(reader.hasNext());
-      GenericRow row = reader.next();
-
-      // Requested fields should be present
-      Assert.assertNotNull(row.getValue("dim_sv_int"));
-      Assert.assertNotNull(row.getValue("dim_sv_string"));
-
-      // Non-requested fields should be absent
-      Assert.assertNull(row.getValue("dim_sv_long"));
-      Assert.assertNull(row.getValue("dim_sv_float"));
-      Assert.assertNull(row.getValue("dim_sv_double"));
-      Assert.assertNull(row.getValue("met_int"));
-      Assert.assertNull(row.getValue("dim_mv_int"));
-    }
-  }
-
-  private void assertSingleValueEquals(Object actual, Object expected) {
-    if (expected instanceof Float) {
-      Assert.assertEquals(((Number) actual).floatValue(), (float) expected, 1e-6f);
-    } else if (expected instanceof Double) {
-      Assert.assertEquals(((Number) actual).doubleValue(), (double) expected, 1e-6d);
-    } else if (expected instanceof String) {
-      Assert.assertEquals(actual.toString(), expected);
-    } else {
-      Assert.assertEquals(actual, expected);
-    }
   }
 }

@@ -89,6 +89,11 @@ public interface IndexCreator extends Closeable {
     add(value, dictId);
   }
 
+  default void addBigDecimal(BigDecimal value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
   default void addString(String value, int dictId)
       throws IOException {
     add(value, dictId);

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -146,6 +147,15 @@ public interface CombinedInvertedIndexCreator
   }
 
   @Override
+  default void addBigDecimal(BigDecimal value, int dictId) {
+    if (dictId >= 0) {
+      add(dictId);
+    } else {
+      throw new RuntimeException("BigDecimal not supported for range index");
+    }
+  }
+
+  @Override
   default void addString(String value, int dictId) {
     if (dictId >= 0) {
       add(dictId);
@@ -196,6 +206,15 @@ public interface CombinedInvertedIndexCreator
       add(dictIds, dictIds.length);
     } else {
       add(values, values.length);
+    }
+  }
+
+  @Override
+  default void addBigDecimalMV(BigDecimal[] values, @Nullable int[] dictIds) {
+    if (dictIds != null) {
+      add(dictIds, dictIds.length);
+    } else {
+      throw new RuntimeException("BigDecimal MV not supported for range index");
     }
   }
 

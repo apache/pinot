@@ -20,11 +20,15 @@ package org.apache.pinot.plugin.inputformat.clplog;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -41,33 +45,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A record extractor for log events. For configuration options, see {@link CLPLogRecordExtractorConfig}. This is an
- * experimental feature.
- * <p></p>
- * The goal of this record extractor is to allow us to encode the fields specified in
- * {@link CLPLogRecordExtractorConfig} using CLP. CLP is a compressor designed to encode unstructured log messages in a
- * way that makes them more compressible. It does this by decomposing a message into three fields:
- * <ul>
- *   <li>the message's static text, called a log type;</li>
- *   <li>repetitive variable values, called dictionary variables; and</li>
- *   <li>non-repetitive variable values (called encoded variables since we encode them specially if possible).</li>
- * </ul>
- * For instance, if the field "message" is encoded, then the extractor will output:
- * <ul>
- *   <li>message_logtype</li>
- *   <li>message_dictionaryVars</li>
- *   <li>message_encodedVars</li>
- * </ul>
- * All remaining fields are processed in the same way as they are in
- * {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}. Specifically:
- * <ul>
- *   <li>If the caller passed a set of fields to {@code init}, then only those fields are extracted from each
- *   record and any remaining fields are dropped.</li>
- *   <li>Otherwise, all fields are extracted from each record.</li>
- * </ul>
- * This class' implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}.
- */
+/// Record extractor for log events. Experimental. For configuration options see [CLPLogRecordExtractorConfig].
+///
+/// Each field configured for CLP encoding is split into three sibling fields — `_logtype`,
+/// `_dictionaryVars`, `_encodedVars`. All other fields are extracted as plain JSON values.
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
   // The maximum number of variables that can be stored in a cell (row of a single column).
   private static final int MAX_VARIABLES_PER_CELL = ForwardIndexType.MAX_MULTI_VALUES_PER_ROW;
@@ -139,10 +120,7 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
         if (clpEncodedFieldNames.contains(key)) {
           encodeFieldWithClp(key, value, to);
         } else {
-          if (value != null) {
-            value = convert(value);
-          }
-          to.putValue(key, value);
+          to.putValue(key, value != null ? convert(value) : null);
         }
       }
       return to;
@@ -151,10 +129,7 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     // Handle un-encoded fields
     for (String fieldName : _fields) {
       Object value = from.get(fieldName);
-      if (value != null) {
-        value = convert(value);
-      }
-      to.putValue(fieldName, value);
+      to.putValue(fieldName, value != null ? convert(value) : null);
     }
 
     // Handle encoded fields
@@ -163,6 +138,47 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
       encodeFieldWithClp(fieldName, value, to);
     }
     return to;
+  }
+
+  /// Walks a non-null Jackson-parsed value and produces the contract shape: `BigDecimal` for `BigInteger`
+  /// (oversized ints), `Object[]` for JSON arrays, `Map<String, Object>` for JSON objects, pass-through for
+  /// the other Jackson scalar types.
+  private static Object convert(Object value) {
+    // BigInteger widens (Pinot has no BigInteger type)
+    if (value instanceof BigInteger) {
+      return new BigDecimal((BigInteger) value);
+    }
+    // List
+    if (value instanceof List) {
+      //noinspection unchecked
+      return convertList((List<Object>) value);
+    }
+    // Map
+    if (value instanceof Map) {
+      //noinspection unchecked
+      return convertMap((Map<String, Object>) value);
+    }
+    // Single value pass-through (Boolean / Integer / Long / Double / String)
+    return value;
+  }
+
+  private static Object[] convertList(List<Object> list) {
+    int n = list.size();
+    Object[] result = new Object[n];
+    for (int i = 0; i < n; i++) {
+      Object v = list.get(i);
+      result[i] = v != null ? convert(v) : null;
+    }
+    return result;
+  }
+
+  private static Map<String, Object> convertMap(Map<String, Object> map) {
+    Map<String, Object> result = Maps.newHashMapWithExpectedSize(map.size());
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      Object v = entry.getValue();
+      result.put(entry.getKey(), v != null ? convert(v) : null);
+    }
+    return result;
   }
 
   /**

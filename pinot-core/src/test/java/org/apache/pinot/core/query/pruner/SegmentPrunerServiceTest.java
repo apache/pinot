@@ -22,14 +22,19 @@ package org.apache.pinot.core.query.pruner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.testng.Assert;
@@ -226,18 +231,15 @@ public class SegmentPrunerServiceTest {
     return indexSegment;
   }
 
-  /**
-   * Segment with upsert-style doc id bitmaps (valid and optional queryable).
-   */
   private IndexSegment mockUpsertIndexSegment(int totalDocs,
       ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds) {
-    IndexSegment indexSegment = mock(IndexSegment.class);
-    when(indexSegment.getColumnNames()).thenReturn(new HashSet<>(Arrays.asList("col1")));
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getTotalDocs()).thenReturn(totalDocs);
-    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(indexSegment.getValidDocIds()).thenReturn(validDocIds);
-    when(indexSegment.getQueryableDocIds()).thenReturn(queryableDocIds);
-    return indexSegment;
+    ImmutableSegmentImpl segment = new ImmutableSegmentImpl(
+        mock(SegmentDirectory.class), segmentMetadata, new HashMap<>(), null);
+    PartitionUpsertMetadataManager manager = mock(PartitionUpsertMetadataManager.class);
+    when(manager.getUpsertViewManager()).thenReturn(null);
+    segment.enableUpsert(manager, validDocIds, queryableDocIds);
+    return segment;
   }
 }

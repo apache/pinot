@@ -390,8 +390,8 @@ public class DictionariesTest implements PinotBuffersAfterMethodCheckRule {
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
-    Assert.assertEquals((statsCollector.getMinValue()).toString(), "a");
-    Assert.assertEquals((statsCollector.getMaxValue()).toString(), "z");
+    Assert.assertEquals(statsCollector.getMinValue().toString(), "a");
+    Assert.assertEquals(statsCollector.getMaxValue().toString(), "z");
     Assert.assertFalse(statsCollector.isSorted());
   }
 

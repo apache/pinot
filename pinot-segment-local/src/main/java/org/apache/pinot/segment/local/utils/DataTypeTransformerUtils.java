@@ -26,7 +26,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /**
@@ -75,11 +75,11 @@ public class DataTypeTransformerUtils {
       if (destDataType == PinotDataType.JSON && values.length == 0) {
         sourceDataType = PinotDataType.JSON;
       } else {
-        sourceDataType = PinotDataType.getMultiValueType(values[0].getClass());
+        sourceDataType = PinotDataType.getMultiValueType(values[0]);
       }
     } else {
       // Single-value column
-      sourceDataType = PinotDataType.getSingleValueType(value.getClass());
+      sourceDataType = PinotDataType.getSingleValueType(value);
     }
 
     // Convert from source to destination type

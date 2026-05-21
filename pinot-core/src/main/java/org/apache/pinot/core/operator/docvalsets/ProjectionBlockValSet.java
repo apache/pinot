@@ -25,6 +25,7 @@ import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -96,6 +97,24 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public Dictionary getDictionary() {
     return _dataSource.getDictionary();
+  }
+
+  /// Returns {@code true} only when there is both a dictionary AND a dict-encoded forward index. Two cases return
+  /// {@code false} even though {@link #getDictionary()} is non-null:
+  /// <ul>
+  ///   <li>{@code EncodingType.RAW} + an explicit {@code dictionaryIndex}: the forward index throws on
+  ///   {@link ForwardIndexReader#readDictIds}.</li>
+  ///   <li>Disabled forward index (dict + inverted/range only): there is no forward index to read dict IDs from.</li>
+  /// </ul>
+  /// Callers selecting between dict-id and value paths must gate on this method, not {@code getDictionary() != null}.
+  @Override
+  public boolean isDictionaryEncoded() {
+    Dictionary dictionary = _dataSource.getDictionary();
+    if (dictionary == null) {
+      return false;
+    }
+    ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
+    return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
 
   @Override

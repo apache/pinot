@@ -79,6 +79,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
 
   public enum Mode {
     /// Sends stats only if all the cluster participants use the same known version.
+    // ALWAYS is strictly better than SAFE if all servers are already on versions >= 1.4
     SAFE {
       @Override
       public SendStatsPredicate create(HelixManager helixManager) {

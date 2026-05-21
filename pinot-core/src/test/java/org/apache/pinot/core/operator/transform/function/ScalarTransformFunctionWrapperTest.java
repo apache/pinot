@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Base64;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.function.scalar.IpAddressFunctions;
 import org.apache.pinot.common.function.scalar.StringFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -1567,6 +1569,81 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     int[] expectedValues = new int[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedValues[i] = StringFunctions.isValidASCII(_stringAlphaNumericSVValues[i]) ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  // Test-only scalar functions registered via FunctionRegistry's reflection scan (the test class is
+  // in a `.function.` package, matching the scan regex). They exist solely to exercise the
+  // `PRIMITIVE_BOOLEAN_ARRAY` and `TIMESTAMP_ARRAY` dispatch cases in
+  // ScalarTransformFunctionWrapper.getNonLiteralValues — no production scalar function in OSS Pinot
+  // currently declares a `boolean[]` or `Timestamp[]` parameter.
+
+  @ScalarFunction
+  public static int countTrueBooleans(boolean[] booleans) {
+    int count = 0;
+    for (boolean b : booleans) {
+      if (b) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  @ScalarFunction
+  public static long sumTimestampMillis(Timestamp[] timestamps) {
+    long sum = 0;
+    for (Timestamp t : timestamps) {
+      sum += t.getTime();
+    }
+    return sum;
+  }
+
+  @Test
+  public void testCountTrueBooleansTransformFunction() {
+    // Exercises the PRIMITIVE_BOOLEAN_ARRAY dispatch in getNonLiteralValues: the int MV column is
+    // read as int[][] via transformToIntValuesMV, then converted per-row to boolean[][] (intValue
+    // == 1 → true) before being passed to countTrueBooleans(boolean[]).
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("countTrueBooleans(%s)", INT_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "countTrueBooleans");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int count = 0;
+      for (int v : _intMVValues[i]) {
+        if (v == 1) {
+          count++;
+        }
+      }
+      expectedValues[i] = count;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSumTimestampMillisTransformFunction() {
+    // Exercises the TIMESTAMP_ARRAY dispatch in getNonLiteralValues: the long MV column is read as
+    // long[][] via transformToLongValuesMV, then converted per-row to Timestamp[][] (new
+    // Timestamp(long)) before being passed to sumTimestampMillis(Timestamp[]). Each Timestamp's
+    // getTime() returns the original long, so the per-row sum equals the sum of input longs.
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("sumTimestampMillis(%s)", LONG_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "sumTimestampMillis");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    long[] expectedValues = new long[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      long sum = 0;
+      for (long v : _longMVValues[i]) {
+        sum += v;
+      }
+      expectedValues[i] = sum;
     }
     testTransformFunction(transformFunction, expectedValues);
   }

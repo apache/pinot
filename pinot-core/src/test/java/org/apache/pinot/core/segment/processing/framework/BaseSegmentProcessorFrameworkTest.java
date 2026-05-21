@@ -823,8 +823,8 @@ public abstract class BaseSegmentProcessorFrameworkTest {
       SegmentMetadata metadata = new SegmentMetadataImpl(segmentDir);
       ColumnMetadata timeMetadata = metadata.getColumnMetadataFor("time");
       assertNotNull(timeMetadata, "Time column metadata should not be null");
-      long startTime = (long) timeMetadata.getMinValue();
-      long endTime = (long) timeMetadata.getMaxValue();
+      long startTime = (Long) timeMetadata.getMinValue();
+      long endTime = (Long) timeMetadata.getMaxValue();
       // Verify time range is exactly 1 day
       assertTrue(endTime - startTime <= 86400000, "Segment time range should be 1 day");
 

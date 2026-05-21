@@ -22,12 +22,18 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import java.io.File;
 import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -71,13 +77,16 @@ public class ForwardIndexCreatorFactoryTest {
   }
 
   private static IndexCreationContext newContext(File indexDir, boolean hasDictionary) {
-    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.INT, true);
-    return IndexCreationContext.builder()
-        .withIndexDir(indexDir)
-        .withFieldSpec(fieldSpec)
-        .withDictionary(hasDictionary)
-        .withCardinality(2)
-        .withTotalDocs(1)
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, DataType.INT, true);
+    ColumnMetadata metadata = Mockito.mock(ColumnMetadata.class);
+    Mockito.when(metadata.getFieldSpec()).thenReturn(fieldSpec);
+    Mockito.when(metadata.getCardinality()).thenReturn(2);
+    Mockito.when(metadata.getTotalDocs()).thenReturn(1);
+    Mockito.when(metadata.hasDictionary()).thenReturn(hasDictionary);
+    Mockito.when(metadata.getLengthOfShortestElement()).thenReturn(Integer.BYTES);
+    Mockito.when(metadata.getLengthOfLongestElement()).thenReturn(Integer.BYTES);
+    Mockito.when(metadata.isFixedLength()).thenReturn(true);
+    return new IndexCreationContext.Builder(indexDir, tableConfig, metadata).build();
   }
 }
