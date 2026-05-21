@@ -509,14 +509,14 @@ public class CommonConstants {
       public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
 
     /**
-     * Default flush threshold for the streaming group-by leaf-stage operator on MSE. When {@code > 0}, the broker
-     * injects this value as the {@link Request.QueryOptionKey#STREAMING_GROUP_BY_FLUSH_THRESHOLD} query option for
-     * MSE queries that do not already specify it, opting the cluster into the streaming group-by behavior by default.
-     * Setting the query option explicitly (including to {@code 0} to disable) always wins over the broker default.
+     * Default flush threshold for the streaming group-by leaf-stage operator on MSE. When positive, the broker
+     * injects this value as the `streamingGroupByFlushThreshold` query option for MSE queries that do not already
+     * specify it, opting the cluster into the streaming group-by behavior by default. Setting the query option
+     * explicitly (including to `0` to disable) always wins over the broker default.
      */
     public static final String CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD =
         "pinot.broker.mse.streaming.group.by.flush.threshold";
-    public static final int DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD = 0;
+    public static final int DEFAULT_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD = -1;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";

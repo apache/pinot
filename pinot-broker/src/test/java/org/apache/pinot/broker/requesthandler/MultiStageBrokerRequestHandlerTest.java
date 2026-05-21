@@ -147,7 +147,7 @@ public class MultiStageBrokerRequestHandlerTest {
   @Test
   public void testApplyBrokerDefaultQueryOptionsNoInjectionWhenConfigUnset()
       throws Exception {
-    // With the broker config unset (default 0), no option is injected.
+    // With the broker config unset (default -1), no option is injected.
     MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold(null);
 
     Map<String, String> queryOptions = new HashMap<>();
