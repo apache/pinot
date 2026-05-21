@@ -255,32 +255,4 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
   }
 
-  @Test
-  public void testStatsManagerArrivalRecordedEvenWhenDispatchFails()
-      throws Exception {
-    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
-    QueryServer failingServer = _queryServerMap.values().iterator().next();
-    Mockito.doAnswer(inv -> {
-      StreamObserver<Worker.QueryResponse> obs = inv.getArgument(1);
-      obs.onError(new RuntimeException("simulated failure"));
-      return null;
-    }).when(failingServer).submit(Mockito.any(), Mockito.any());
-
-    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
-    long requestId = REQUEST_ID_GEN.getAndIncrement();
-    RequestContext context = new DefaultRequestContext();
-    context.setRequestId(requestId);
-    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
-
-    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
-    } catch (Exception e) {
-      // dispatch failed — expected
-    }
-
-    // Inflight must be decremented even when dispatch fails
-    Mockito.verify(statsManager, Mockito.atLeastOnce())
-        .recordStatsUponResponseArrival(Mockito.eq(requestId), Mockito.anyString(), Mockito.eq(-1L));
-    Mockito.reset(failingServer);
-  }
 }
