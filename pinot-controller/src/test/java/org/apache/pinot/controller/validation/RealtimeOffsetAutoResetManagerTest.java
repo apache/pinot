@@ -266,7 +266,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     TableConfig secondTableConfig = createTableConfigWithValidHandlerClass(secondTableName, "secondTopic");
     when(_pinotHelixResourceManager.getTableConfig(secondTableName)).thenReturn(secondTableConfig);
 
-    // Trigger a backfill on the second table so _tableBackfillTopics gets a "secondTopic" entry
+    // Trigger a backfill on the second table so _backfillTopicsByTable gets a "secondTopic" entry
     // The TestRealtimeOffsetAutoResetHandler.cleanupCompletedBackfillJobs returns empty list,
     // so ensureCompletedBackfillJobsCleanedUp will not clean it up.
     // We need the handler to report active backfill topics via ensureBackfillJobsRunning.
@@ -287,7 +287,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     ingestionConfig.getStreamIngestionConfig().setRealtimeOffsetAutoResetHandlerClass(TEST_HANDLER_CLASS_NAME);
     when(_llcRealtimeSegmentManager.isTopicConsumptionPaused(secondTableName, 1)).thenReturn(false);
 
-    // Run processTable on second table with no trigger to populate _tableBackfillTopics via ensureBackfillJobsRunning
+    // Run processTable on second table with no trigger to populate _backfillTopicsByTable via ensureBackfillJobsRunning
     RealtimeOffsetAutoResetManager.Context noTriggerCtx = _realtimeOffsetAutoResetManager.preprocess(new Properties());
     _realtimeOffsetAutoResetManager.processTable(secondTableName, noTriggerCtx);
 
@@ -305,12 +305,10 @@ public class RealtimeOffsetAutoResetManagerTest {
 
   @Test
   public void testInFlightCollisionAtThresholdAutopauses() {
-    // threshold=1 means: the 1st collision triggers auto-pause
+    // threshold=1: on the 2nd trigger for the same partition, auto-pause fires
     _controllerConf.setProperty(
         ControllerConf.ControllerPeriodicTasksConf.MAX_BACKFILL_COLLISIONS_BEFORE_AUTO_PAUSE, "1");
 
-    // Set up a table config that has an active backfill topic (isBackfillTopic=true, not paused)
-    // so that _tableBackfillTopics contains TOPIC_NAME after the first processTable call.
     Map<String, String> mainStreamMap = new HashMap<>();
     mainStreamMap.put("streamType", "kafka");
     mainStreamMap.put("stream.kafka.topic.name", TOPIC_NAME);
@@ -318,14 +316,7 @@ public class RealtimeOffsetAutoResetManagerTest {
     mainStreamMap.put("realtime.segment.offsetAutoReset.timeSecThreshold", "1800");
     mainStreamMap.put("stream.kafka.decoder.class.name", "testDecoder");
 
-    Map<String, String> backfillStreamMap = new HashMap<>();
-    backfillStreamMap.put("streamType", "kafka");
-    backfillStreamMap.put("stream.kafka.topic.name", TOPIC_NAME + "-backfill");
-    backfillStreamMap.put("stream.kafka.consumer.type", "simple");
-    backfillStreamMap.put("realtime.segment.isBackfillTopic", "true");
-    backfillStreamMap.put("stream.kafka.decoder.class.name", "testDecoder");
-
-    List<Map<String, String>> maps = Arrays.asList(mainStreamMap, backfillStreamMap);
+    List<Map<String, String>> maps = Collections.singletonList(mainStreamMap);
     IngestionConfig ingestionConfig = new IngestionConfig();
     StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(maps);
     streamIngestionConfig.setRealtimeOffsetAutoResetHandlerClass(TEST_HANDLER_CLASS_NAME);
@@ -334,27 +325,29 @@ public class RealtimeOffsetAutoResetManagerTest {
     tableConfig.setIngestionConfig(ingestionConfig);
 
     when(_pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
-    // backfill topic at index 1 is not paused → will be added to _tableBackfillTopics
-    when(_llcRealtimeSegmentManager.isTopicConsumptionPaused(REALTIME_TABLE_NAME, 1)).thenReturn(false);
-
-    // First processTable (no trigger) — populates _tableBackfillTopics with TOPIC_NAME via ensureBackfillJobsRunning
-    RealtimeOffsetAutoResetManager.Context noTriggerCtx = _realtimeOffsetAutoResetManager.preprocess(new Properties());
-    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, noTriggerCtx);
-
-    // Second processTable with trigger — collision #1, at threshold=1 → should auto-pause and skip
     try {
       doNothing().when(_pinotHelixResourceManager).updateTableConfig(tableConfig);
     } catch (Exception ignored) {
     }
-    RealtimeOffsetAutoResetManager.Context triggerCtx = _realtimeOffsetAutoResetManager.preprocess(_properties);
-    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, triggerCtx);
+
+    // First trigger — succeeds, sets _partitionsInFlightCount[partition]=1
+    RealtimeOffsetAutoResetManager.Context firstCtx = _realtimeOffsetAutoResetManager.preprocess(_properties);
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, firstCtx);
 
     TestRealtimeOffsetAutoResetHandler handler =
         (TestRealtimeOffsetAutoResetHandler) _realtimeOffsetAutoResetManager.getTableHandler(REALTIME_TABLE_NAME);
     Assert.assertNotNull(handler);
+    Assert.assertTrue(handler._triggedBackfillJob, "first trigger should succeed");
+
+    // Reset flag to detect whether second trigger fires
+    handler._triggedBackfillJob = false;
+
+    // Second trigger for the same partition — collision #1 >= threshold=1 → auto-pause, skip trigger
+    RealtimeOffsetAutoResetManager.Context secondCtx = _realtimeOffsetAutoResetManager.preprocess(_properties);
+    _realtimeOffsetAutoResetManager.processTable(REALTIME_TABLE_NAME, secondCtx);
+
     Assert.assertFalse(handler._triggedBackfillJob,
         "collision at threshold should skip the backfill trigger");
-    // Verify pause flag set on the main topic's stream config map
     Assert.assertEquals(mainStreamMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_PAUSE), "true",
         "pause flag should be set on the main topic stream config");
   }
