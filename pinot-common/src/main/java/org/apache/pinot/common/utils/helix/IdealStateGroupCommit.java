@@ -174,9 +174,10 @@ public class IdealStateGroupCommit {
           // metadata" orphan. We set the cancellation flag (O(1)) instead of calling
           // ConcurrentLinkedQueue.remove (O(n)); the next leader's iteration check skips and
           // removes any cancelled entry. If our entry was iterated (already in `processed`),
-          // the flag is harmless.
+          // the flag is harmless. We don't add `entry` to `processed` because nothing reads
+          // its _exception or waits on its _sent: the owner thread IS this thread, and it's
+          // about to exit commit() via the throw below.
           entry._cancelled = true;
-          processed.add(entry);
           // If there is an exception, set the exception for all processed entries
           for (Entry ent : processed) {
             ent._exception = e;
