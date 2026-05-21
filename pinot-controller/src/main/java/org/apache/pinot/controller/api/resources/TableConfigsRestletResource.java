@@ -52,6 +52,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -87,6 +88,7 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,7 +240,7 @@ public class TableConfigsRestletResource {
     List<String> deprecationWarnings;
     try {
       deprecationWarnings = validateNoDeprecatedConfigs(tableConfigs, JsonUtils.stringToJsonNode(tableConfigsStr),
-          databaseName);
+          databaseName)._warnings;
       validateConfig(tableConfigs, databaseName, typesToSkip);
       tableConfigs.setTableName(rawTableName);
     } catch (ControllerApplicationException e) {
@@ -396,7 +398,7 @@ public class TableConfigsRestletResource {
     tableName = DatabaseUtils.translateTableName(tableName, databaseName);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
-    List<String> deprecationWarnings;
+    DeprecationValidationResult deprecationResult;
 
     // Existence check runs before deprecation validation so a PUT to a missing TableConfigs reports the actual
     // problem (table does not exist) instead of a misleading "deprecated property" 400 from create-mode fallback.
@@ -411,7 +413,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      deprecationWarnings = validateNoDeprecatedConfigs(tableConfigs, JsonUtils.stringToJsonNode(tableConfigsStr),
+      deprecationResult = validateNoDeprecatedConfigs(tableConfigs, JsonUtils.stringToJsonNode(tableConfigsStr),
           databaseName);
       validateConfig(tableConfigs, databaseName, typesToSkip);
       Preconditions.checkState(
@@ -442,7 +444,11 @@ public class TableConfigsRestletResource {
       if (offlineTableConfig != null) {
         applyTuning(offlineTableConfig, schema);
         if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig, forceTableSchemaUpdate);
+          // Version-checked CAS: a concurrent writer that landed between the deprecation-diff read and this write
+          // bumps the znode version, so the CAS fails and we return 5xx — preventing a deprecated key from
+          // slipping past the diff via a racing update on the same sub-config.
+          _pinotHelixResourceManager.updateTableConfig(offlineTableConfig,
+              deprecationResult._offlineExpectedVersion, forceTableSchemaUpdate);
           LOGGER.info("Updated offline table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
@@ -452,7 +458,8 @@ public class TableConfigsRestletResource {
       if (realtimeTableConfig != null) {
         applyTuning(realtimeTableConfig, schema);
         if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig, forceTableSchemaUpdate);
+          _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig,
+              deprecationResult._realtimeExpectedVersion, forceTableSchemaUpdate);
           LOGGER.info("Updated realtime table config: {}", tableName);
         } else {
           _pinotHelixResourceManager.addTable(realtimeTableConfig);
@@ -475,7 +482,7 @@ public class TableConfigsRestletResource {
     }
 
     return new ConfigSuccessResponse("TableConfigs updated for " + tableName,
-        tableConfigsAndUnrecognizedProps.getRight(), deprecationWarnings);
+        tableConfigsAndUnrecognizedProps.getRight(), deprecationResult._warnings);
   }
 
   /**
@@ -586,7 +593,7 @@ public class TableConfigsRestletResource {
 
     List<String> deprecationWarnings;
     try {
-      deprecationWarnings = validateNoDeprecatedConfigs(tableConfigs, tableConfigsJson, databaseName);
+      deprecationWarnings = validateNoDeprecatedConfigs(tableConfigs, tableConfigsJson, databaseName)._warnings;
       validateConfig(tableConfigs, databaseName, typesToSkip);
       tableConfigs.setTableName(rawTableName);
     } catch (ControllerApplicationException e) {
@@ -690,54 +697,88 @@ public class TableConfigsRestletResource {
     }
   }
 
-  /**
-   * Validates the offline and realtime sub-configs for deprecated properties. For each sub-type, if a stored
-   * table config already exists for {@code rawTableName} the validation runs in update mode (diffing against the
-   * stored config), otherwise it runs in create mode. Aggregated warnings from all sub-types are returned so the
-   * caller can include them in the response.
-   *
-   * <p>TODO(SOFT_LAUNCH_WARNING_ONLY): the stored-config read happens without a version-checked CAS against the
-   * subsequent ZK write. Same TOCTOU pattern as {@code PinotTableRestletResource.updateTableConfig}; both must
-   * adopt version-checked writes before {@code DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY}
-   * flips to false. See the promotion pre-conditions in that constant's Javadoc.
-   */
-  private List<String> validateNoDeprecatedConfigs(TableConfigs tableConfigs, JsonNode tableConfigsJson,
-      String database) {
+  /// Validates the offline and realtime sub-configs for deprecated properties. For each sub-type, if a stored
+  /// table config already exists for `rawTableName` the validation runs in update mode (diffing against the
+  /// stored config), otherwise it runs in create mode. Aggregated warnings from all sub-types are returned along
+  /// with the ZK znode versions observed at diff time so callers can issue a version-checked CAS on the
+  /// subsequent write.
+  private DeprecationValidationResult validateNoDeprecatedConfigs(TableConfigs tableConfigs,
+      JsonNode tableConfigsJson, String database) {
     // All call sites verify tableName non-null before reaching here; assert the invariant so a future refactor
     // that moves the call earlier fails loudly instead of silently skipping the deprecation pass.
     Preconditions.checkState(tableConfigs.getTableName() != null,
         "tableName must be set before deprecation validation");
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     List<String> warnings = new ArrayList<>();
+    int offlineExpectedVersion = -1;
+    int realtimeExpectedVersion = -1;
     JsonNode offlineTableConfigJson = subConfigJson(tableConfigsJson, TableType.OFFLINE);
     if (offlineTableConfigJson != null) {
-      JsonNode existingJson = readStoredTableConfigJson(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+      ReadStoredConfigResult read =
+          readStoredTableConfigJsonWithVersion(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+      offlineExpectedVersion = read._version;
       String prefix = TableType.OFFLINE.name().toLowerCase();
-      if (existingJson == null) {
+      if (read._json == null) {
         warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnCreate(offlineTableConfigJson, prefix));
       } else {
-        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnUpdate(offlineTableConfigJson, existingJson,
+        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnUpdate(offlineTableConfigJson, read._json,
             prefix));
       }
     }
     JsonNode realtimeTableConfigJson = subConfigJson(tableConfigsJson, TableType.REALTIME);
     if (realtimeTableConfigJson != null) {
-      JsonNode existingJson = readStoredTableConfigJson(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+      ReadStoredConfigResult read =
+          readStoredTableConfigJsonWithVersion(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+      realtimeExpectedVersion = read._version;
       String prefix = TableType.REALTIME.name().toLowerCase();
-      if (existingJson == null) {
+      if (read._json == null) {
         warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnCreate(realtimeTableConfigJson, prefix));
       } else {
-        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnUpdate(realtimeTableConfigJson, existingJson,
+        warnings.addAll(DeprecatedTableConfigValidationUtils.validateOnUpdate(realtimeTableConfigJson, read._json,
             prefix));
       }
     }
-    return warnings;
+    return new DeprecationValidationResult(warnings, offlineExpectedVersion, realtimeExpectedVersion);
   }
 
-  @Nullable
-  private JsonNode readStoredTableConfigJson(String tableNameWithType) {
-    return TableConfigSerDeUtils.toRawJsonNode(
-        ZKMetadataProvider.getTableConfigZNRecord(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType));
+  /// Read result paired with the ZK znode version observed at read time. Used to thread the CAS expected-version
+  /// through to the subsequent `updateTableConfig` write.
+  private static final class ReadStoredConfigResult {
+    @Nullable
+    final JsonNode _json;
+    final int _version;
+
+    ReadStoredConfigResult(@Nullable JsonNode json, int version) {
+      _json = json;
+      _version = version;
+    }
+  }
+
+  /// Aggregated deprecation-diff result. Carries the per-sub-type ZK znode versions so the subsequent
+  /// `updateTableConfig` call can issue a version-checked CAS. A `-1` version means the sub-type did not exist at
+  /// diff time (create path), so no version check is required.
+  static final class DeprecationValidationResult {
+    final List<String> _warnings;
+    final int _offlineExpectedVersion;
+    final int _realtimeExpectedVersion;
+
+    DeprecationValidationResult(List<String> warnings, int offlineExpectedVersion, int realtimeExpectedVersion) {
+      _warnings = warnings;
+      _offlineExpectedVersion = offlineExpectedVersion;
+      _realtimeExpectedVersion = realtimeExpectedVersion;
+    }
+
+    List<String> warnings() {
+      return _warnings;
+    }
+  }
+
+  private ReadStoredConfigResult readStoredTableConfigJsonWithVersion(String tableNameWithType) {
+    Stat stat = new Stat();
+    ZNRecord stored = ZKMetadataProvider.getTableConfigZNRecord(_pinotHelixResourceManager.getPropertyStore(),
+        tableNameWithType, stat);
+    return new ReadStoredConfigResult(TableConfigSerDeUtils.toRawJsonNode(stored),
+        stored == null ? -1 : stat.getVersion());
   }
 
   @Nullable

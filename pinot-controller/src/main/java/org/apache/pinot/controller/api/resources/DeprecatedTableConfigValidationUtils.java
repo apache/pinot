@@ -386,10 +386,12 @@ public final class DeprecatedTableConfigValidationUtils {
   /// promote older deprecations to ERROR after the codebase has migrated off them. Grep-able sentinel so the
   /// follow-up promotion PR is a single-keyword change rather than a behavioural drift.
   ///
-  /// PROMOTION PRE-CONDITIONS — the follow-up PR that flips this MUST first land:
-  /// 1. A version-checked CAS on every update path that currently uses best-effort read-then-write for the
-  ///    deprecation diff. The relevant call sites are tagged with `// TODO(SOFT_LAUNCH_WARNING_ONLY)` so a
-  ///    grep at flip-time surfaces every one.
+  /// PROMOTION PRE-CONDITIONS — the follow-up PR that flips this MUST first verify:
+  /// 1. **Done in this PR**: every update path uses a version-checked CAS (PinotTableRestletResource and
+  ///    TableConfigsRestletResource both thread the ZK znode version from the diff read through to
+  ///    `PinotHelixResourceManager.updateTableConfig(tableConfig, expectedVersion, force)`). A concurrent writer
+  ///    that lands between the diff read and the write bumps the version, the CAS fails, and the update is
+  ///    rejected — preventing a deprecated key from slipping past the diff.
   /// 2. A concurrency regression test that exercises the read→write window with a stubbed ZK observer.
   /// 3. A test seam (e.g. injected currentMajorMinor or a non-final flag) that exercises this method's
   ///    older-than-current → ERROR branch end-to-end.

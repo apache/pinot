@@ -2490,9 +2490,23 @@ public class PinotHelixResourceManager {
    */
   public void updateTableConfig(TableConfig tableConfig, boolean force)
       throws IOException, TableConfigBackwardIncompatibleException {
+    updateTableConfig(tableConfig, -1, force);
+  }
+
+  /// Validate the table config and update it with a version-checked CAS write. Callers that pre-read the stored
+  /// config (e.g. the deprecation-validator diff path) can pass the version they observed so a concurrent write
+  /// fails the CAS rather than silently overwriting the other writer's changes.
+  ///
+  /// @param tableConfig the table config to update
+  /// @param expectedVersion the expected ZK znode version, or -1 to skip the version check
+  /// @param force if true, allows upsert/dedup config changes with a warning
+  /// @throws IOException if validation fails
+  /// @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+  public void updateTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
+      throws IOException, TableConfigBackwardIncompatibleException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
-    setExistingTableConfig(tableConfig, -1, force);
+    setExistingTableConfig(tableConfig, expectedVersion, force);
   }
 
   /**

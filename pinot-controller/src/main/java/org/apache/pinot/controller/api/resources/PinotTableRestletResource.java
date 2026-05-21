@@ -827,18 +827,19 @@ public class PinotTableRestletResource {
           Response.Status.NOT_FOUND);
     }
 
-    // Deprecation diff is computed against the byte-faithful stored ZNRecord. Runs outside the BAD_REQUEST catch
-    // so ZK transient failures propagate as 5xx rather than masquerading as client-side validation errors.
-    // Best-effort: read and write are not atomic, so a concurrent legal write between the read here and the write
-    // below can leave deprecated keys in the stored config without firing a deprecation error.
-    // TODO(SOFT_LAUNCH_WARNING_ONLY): when DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY is
-    // flipped to false (severity promotion), replace this best-effort read-then-write with a version-checked
-    // CAS so a deprecated key cannot slip past the diff via a concurrent update on the same table. See the
-    // promotion pre-conditions in DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY Javadoc.
+    // Deprecation diff is computed against the byte-faithful stored ZNRecord. Runs outside the BAD_REQUEST catch so
+    // ZK transient failures propagate as 5xx rather than masquerading as client-side validation errors. The read
+    // also captures the ZK znode version, which is threaded through to updateTableConfig so the subsequent write is
+    // a version-checked CAS: a concurrent writer that landed between this read and the write will bump the version
+    // and the CAS fails — preventing a deprecated key from slipping past the diff via a racing update on the same
+    // table.
+    int expectedVersion;
     try {
-      JsonNode oldTableConfigJson = TableConfigSerDeUtils.toRawJsonNode(
-          ZKMetadataProvider.getTableConfigZNRecord(_pinotHelixResourceManager.getPropertyStore(),
-              tableNameWithType));
+      Stat stat = new Stat();
+      ZNRecord storedRecord = ZKMetadataProvider.getTableConfigZNRecord(
+          _pinotHelixResourceManager.getPropertyStore(), tableNameWithType, stat);
+      expectedVersion = storedRecord == null ? -1 : stat.getVersion();
+      JsonNode oldTableConfigJson = TableConfigSerDeUtils.toRawJsonNode(storedRecord);
       deprecationWarnings = DeprecatedTableConfigValidationUtils.validateOnUpdate(
           newTableConfigJson, oldTableConfigJson, null);
     } catch (IllegalArgumentException e) {
@@ -851,7 +852,7 @@ public class PinotTableRestletResource {
     }
 
     try {
-      _pinotHelixResourceManager.updateTableConfig(tableConfig, force);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, expectedVersion, force);
     } catch (TableConfigBackwardIncompatibleException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);

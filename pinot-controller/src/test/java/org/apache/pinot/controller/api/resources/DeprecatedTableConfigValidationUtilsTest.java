@@ -342,9 +342,12 @@ public class DeprecatedTableConfigValidationUtilsTest {
 
   @Nullable
   private static Object primitiveZeroOrPlaceholder(Class<?> type) {
-    // String params may carry Preconditions.checkArgument(name != null) — supply a placeholder rather than null.
+    // String params may carry Preconditions.checkArgument(name != null) — supply the empty string rather than null
+    // or a non-default sentinel. Using "" means the test fails only when a real String getter has a non-default
+    // default; a "_test"-like sentinel would surface as a confusing "got `_test`, expected default" failure for
+    // any future String getter even when the bean's real default is also non-empty.
     if (type == String.class) {
-      return "_test";
+      return "";
     }
     if (!type.isPrimitive()) {
       return null;
