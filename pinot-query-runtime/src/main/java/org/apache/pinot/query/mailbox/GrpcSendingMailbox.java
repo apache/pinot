@@ -165,9 +165,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[GRPC SEND]== sending message " + block + " to: " + _id);
     }
-    if (_contentObserver == null) {
-      _contentObserver = getContentObserver();
-    }
+    ensureContentObserverInitialized();
     try {
       processAndSend(block, serializedStats, bypassReady);
     } catch (IOException e) {
@@ -257,12 +255,13 @@ public class GrpcSendingMailbox implements SendingMailbox {
     // cancel path on the same observer.
     wakeWaiters();
     LOGGER.debug("Cancelling mailbox: {}", _id);
-    if (_contentObserver == null) {
-      // Sender thread never created the stream (e.g. cancel arrived before the first send). Open one now so the
-      // receiver gets an explicit cancel-error EOS instead of waiting for its own deadline — the receiving
-      // mailbox is registered per the dispatch plan and is blocked on this stream.
-      _contentObserver = getContentObserver();
-    }
+    // Sender thread may never have created the stream (e.g. cancel arrived before the first send). Open one now so
+    // the receiver gets an explicit cancel-error EOS instead of waiting for its own deadline — the receiving
+    // mailbox is registered per the dispatch plan and is blocked on this stream. Lazy init is load-bearing: an eager
+    // init in the constructor would change cancel-before-first-send semantics (we would always open a stream even
+    // when send() is never called). Double-checked-lock through _readyLock so a concurrent first-send + cancel from
+    // two threads do not both call getContentObserver() and leak an orphan gRPC stream.
+    ensureContentObserverInitialized();
     // Acquire _readyLock so the error EOS + onCompleted() is one atomic outbound. ReentrantLock: the inner
     // sendContent()'s acquisition nests safely.
     _readyLock.lock();
@@ -294,7 +293,38 @@ public class GrpcSendingMailbox implements SendingMailbox {
     return _senderSideClosed || _statusObserver.isFinished();
   }
 
-  private ClientCallStreamObserver<MailboxContent> getContentObserver() {
+  /// Lazily initializes [#_contentObserver] under [#_readyLock] using the standard double-checked-locking idiom.
+  ///
+  /// Lazy init is load-bearing for cancel-before-first-send semantics: we do not want to open a gRPC stream in the
+  /// constructor because a mailbox that is cancelled before any [#send] would then leak an unused stream. Eager init
+  /// is therefore not an option.
+  ///
+  /// The unsynchronized `if (_contentObserver == null) { _contentObserver = getContentObserver(); }` pattern this
+  /// replaces was unsafe: two threads (e.g. the sender thread doing its first [#sendInternal] and an external
+  /// canceller running [#cancel]) could both observe `null`, both call [#getContentObserver], and each open a
+  /// separate gRPC stream for the same mailbox id. The loser would never see `onCompleted` and the orphan stream
+  /// would only be reclaimed by the gRPC deadline — and the cancel EOS could land on a different stream than the
+  /// data, silently losing the cancellation signal.
+  ///
+  /// `_contentObserver` is `volatile` so the fast-path check provides the happens-before edge for the eventual
+  /// observer reads in [#sendContent] / [#cancel].
+  private void ensureContentObserverInitialized() {
+    if (_contentObserver != null) {
+      return;
+    }
+    _readyLock.lock();
+    try {
+      if (_contentObserver == null) {
+        _contentObserver = getContentObserver();
+      }
+    } finally {
+      _readyLock.unlock();
+    }
+  }
+
+  // Package-private to allow regression tests for the lazy-init race to count how many times a content observer is
+  // opened for a single mailbox.
+  ClientCallStreamObserver<MailboxContent> getContentObserver() {
     Metadata metadata = new Metadata();
     metadata.put(ChannelUtils.MAILBOX_ID_METADATA_KEY, _id);
 
