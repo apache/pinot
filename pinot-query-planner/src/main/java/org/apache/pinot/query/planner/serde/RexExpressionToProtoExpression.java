@@ -132,7 +132,7 @@ public class RexExpressionToProtoExpression {
           literalBuilder.setStringArray(
               Expressions.StringArray.newBuilder().addAllValues(Arrays.asList((String[]) value)).build());
           break;
-        case UUID_ARRAY:
+        // NOTE: UUID_ARRAY's stored type is BYTES_ARRAY, so this case handles both.
         case BYTES_ARRAY: {
           ByteArray[] bytesArray = (ByteArray[]) value;
           Expressions.BytesArray.Builder builder = Expressions.BytesArray.newBuilder();

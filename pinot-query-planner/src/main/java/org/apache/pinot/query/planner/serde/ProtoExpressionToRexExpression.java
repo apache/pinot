@@ -146,7 +146,7 @@ public class ProtoExpressionToRexExpression {
         }
         return new RexExpression.Literal(dataType, values);
       }
-      case UUID_ARRAY:
+      // NOTE: UUID_ARRAY's stored type is BYTES_ARRAY, so this case handles both.
       case BYTES_ARRAY: {
         Expressions.BytesArray bytesArray = literal.getBytesArray();
         int numValues = bytesArray.getValuesCount();
