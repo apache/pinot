@@ -71,6 +71,12 @@ public class AggregationFunctionFactory {
       List<ExpressionContext> arguments = function.getArguments();
       int numArguments = arguments.size();
       ExpressionContext firstArgument = arguments.get(0);
+      // Single integration point for the native (Rust+JNI) acceleration path. See
+      // NativeAggregationRouter for eligibility rules. When disabled or ineligible,
+      // construction falls through to the standard Java factory branches below.
+      if (NativeAggregationRouter.shouldAccelerate(upperCaseFunctionName, arguments, nullHandlingEnabled)) {
+        return NativeAggregationRouter.createNative(upperCaseFunctionName, arguments, nullHandlingEnabled);
+      }
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
         if (remainingFunctionName.equals("SMARTTDIGEST")) {
