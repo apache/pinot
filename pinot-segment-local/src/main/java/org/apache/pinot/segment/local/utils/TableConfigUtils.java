@@ -24,10 +24,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -242,10 +241,16 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
-    return typesToSkip == null ? Collections.emptySet()
-        : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
-            .collect(Collectors.toSet());
+  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
+    if (StringUtils.isBlank(typesToSkipStr)) {
+      return Set.of();
+    }
+    String[] split = StringUtils.split(typesToSkipStr, ',');
+    Set<ValidationType> typesToSkip = Sets.newHashSetWithExpectedSize(split.length);
+    for (String type : split) {
+      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase()));
+    }
+    return typesToSkip;
   }
 
   /**
@@ -1326,47 +1331,49 @@ public final class TableConfigUtils {
     } else if (existingUpsertEnabled) {
       UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
       UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+      assert existingUpsertConfig != null && newUpsertConfig != null;
 
-    if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
-      violations.add(
-          String.format("upsertConfig.mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
-    }
-    if (existingUpsertConfig.getHashFunction() != newUpsertConfig.getHashFunction()) {
-      violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
-          newUpsertConfig.getHashFunction()));
-    }
-    if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
-      violations.add(
-          String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-              newUpsertConfig.getComparisonColumns()));
-    }
-    List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
-    if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
-      String existingTimeColumn =
-          existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-              : null;
-      String newTimeColumn =
-          newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
-      if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
+      if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
-            String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
-                newTimeColumn));
+            String.format("upsertConfig.mode (%s -> %s)", existingUpsertConfig.getMode(), newUpsertConfig.getMode()));
       }
-    }
-    if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
-      violations.add(
-          String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
-              newUpsertConfig.isDropOutOfOrderRecord()));
-    }
-    if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
-        newUpsertConfig.getOutOfOrderRecordColumn())) {
-      violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
-          existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
-    }
-    if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
-      violations.add(String.format("upsertConfig.deleteRecordColumn (%s -> %s)",
-          existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn()));
-    }
+      if (existingUpsertConfig.getHashFunction() != newUpsertConfig.getHashFunction()) {
+        violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
+            newUpsertConfig.getHashFunction()));
+      }
+      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
+        violations.add(
+            String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
+                newUpsertConfig.getComparisonColumns()));
+      }
+      List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
+      if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
+        String existingTimeColumn =
+            existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
+                : null;
+        String newTimeColumn =
+            newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
+        if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
+          violations.add(
+              String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
+                  newTimeColumn));
+        }
+      }
+      if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
+        violations.add(
+            String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
+                newUpsertConfig.isDropOutOfOrderRecord()));
+      }
+      if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
+          newUpsertConfig.getOutOfOrderRecordColumn())) {
+        violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
+            existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
+      }
+      if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
+        violations.add(
+            String.format("upsertConfig.deleteRecordColumn (%s -> %s)", existingUpsertConfig.getDeleteRecordColumn(),
+                newUpsertConfig.getDeleteRecordColumn()));
+      }
     }
   }
 
@@ -2017,7 +2024,7 @@ public final class TableConfigUtils {
       // Only set the new config if the deprecated one is set.
       Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
       if (MapUtils.isNotEmpty(streamConfigs)) {
-        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+        streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
       }
     }
 
