@@ -54,6 +54,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
+import org.apache.pinot.common.exception.TableConfigVersionConflictException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -466,6 +467,13 @@ public class TableConfigsRestletResource {
           LOGGER.info("Created realtime table config: {}", tableName);
         }
       }
+    } catch (TableConfigVersionConflictException e) {
+      // CAS lost on at least one sub-config (offline or realtime). Note: the offline write may have already
+      // landed before the realtime CAS failed — TableConfigs PUT writes each sub-type sequentially. The 409
+      // response signals that the caller should re-read both sub-configs and retry the full transaction.
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Conflict updating TableConfigs for %s: %s. Re-read both sub-configs and retry.", tableName,
+              e.getMessage()), Response.Status.CONFLICT, e);
     } catch (TableConfigBackwardIncompatibleException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,

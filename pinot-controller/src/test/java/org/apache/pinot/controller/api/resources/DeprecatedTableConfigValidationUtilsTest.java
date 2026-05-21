@@ -397,6 +397,27 @@ public class DeprecatedTableConfigValidationUtilsTest {
     }
   }
 
+  /// Eagerly forces the static `Rules.ALL` discovery walk at test time so a duplicate JsonProperty annotation
+  /// or other discovery-walk bug surfaces as a JUnit failure instead of as an `ExceptionInInitializerError`
+  /// that takes down every controller endpoint after deployment. Today, `rulesForTesting()` is the only way to
+  /// trigger the lazy-holder load, so any test class that touches the validator already serves this purpose;
+  /// this test makes the intent explicit and adds a friendly failure message pointing at the likely cause.
+  @Test
+  public void testDiscoveryWalkDoesNotThrowAtClassLoad() {
+    try {
+      DeprecatedTableConfigValidationUtils.rulesForTesting();
+    } catch (Throwable t) {
+      throw new AssertionError(
+          "DeprecatedTableConfigValidationUtils discovery walk failed at class load. The lazy holder (Rules.ALL) "
+              + "throws ExceptionInInitializerError on every subsequent reference, so a controller deploying with "
+              + "this build would 500 on every table CREATE/UPDATE/VALIDATE/TUNE/COPY endpoint. Likely causes: a "
+              + "duplicate JsonProperty name across two @DeprecatedConfig getters on the same bean, an annotation "
+              + "with an unparseable since=\"...\" value, or a nested bean cycle exceeding MAX_WALK_DEPTH. Root "
+              + "cause:",
+          t);
+    }
+  }
+
   /// Locks the soft-launch flag at its initial value so the flip cannot land without an intentional, reviewable
   /// edit. The PR that flips this constant MUST first land the items enumerated in [#SOFT_LAUNCH_WARNING_ONLY]'s
   /// Javadoc — version-checked CAS on the update path, a concurrency regression test, an injected-version test

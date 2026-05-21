@@ -99,6 +99,7 @@ import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
+import org.apache.pinot.common.exception.TableConfigVersionConflictException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
@@ -2490,7 +2491,14 @@ public class PinotHelixResourceManager {
    */
   public void updateTableConfig(TableConfig tableConfig, boolean force)
       throws IOException, TableConfigBackwardIncompatibleException {
-    updateTableConfig(tableConfig, -1, force);
+    try {
+      updateTableConfig(tableConfig, -1, force);
+    } catch (TableConfigVersionConflictException e) {
+      // -1 means "no CAS check requested" — the underlying setExistingTableConfig cannot throw this. Convert to
+      // unchecked so the legacy two-checked-exception signature is preserved for existing callers.
+      throw new IllegalStateException(
+          "Unexpected CAS conflict with expectedVersion=-1; check updateTableConfig invariants", e);
+    }
   }
 
   /// Validate the table config and update it with a version-checked CAS write. Callers that pre-read the stored
@@ -2502,8 +2510,11 @@ public class PinotHelixResourceManager {
   /// @param force if true, allows upsert/dedup config changes with a warning
   /// @throws IOException if validation fails
   /// @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+  /// @throws TableConfigVersionConflictException if expectedVersion is set and a concurrent writer bumped the
+  ///         znode version between the caller's read and this write. Callers SHOULD surface this as HTTP 409
+  ///         CONFLICT so the client can re-read and retry.
   public void updateTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
-      throws IOException, TableConfigBackwardIncompatibleException {
+      throws IOException, TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
     setExistingTableConfig(tableConfig, expectedVersion, force);
@@ -2515,7 +2526,14 @@ public class PinotHelixResourceManager {
    */
   public void setExistingTableConfig(TableConfig tableConfig)
       throws IOException, TableConfigBackwardIncompatibleException {
-    setExistingTableConfig(tableConfig, -1);
+    try {
+      setExistingTableConfig(tableConfig, -1);
+    } catch (TableConfigVersionConflictException e) {
+      // -1 means "no version check requested" — the underlying CAS branch cannot fire. Convert to RuntimeException
+      // to preserve the legacy two-checked-exception signature for back-compat with existing callers.
+      throw new IllegalStateException(
+          "Unexpected CAS conflict with expectedVersion=-1; check setExistingTableConfig invariants", e);
+    }
   }
 
   /**
@@ -2615,7 +2633,7 @@ public class PinotHelixResourceManager {
    * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion)
-      throws TableConfigBackwardIncompatibleException {
+      throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
     setExistingTableConfig(tableConfig, expectedVersion, false);
   }
 
@@ -2626,9 +2644,13 @@ public class PinotHelixResourceManager {
    * @param expectedVersion the expected version (-1 to ignore version check)
    * @param force if true, allows upsert/dedup config changes with a warning
    * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
+   * @throws TableConfigVersionConflictException if expectedVersion is set (non-negative) and the CAS write fails
+   *         because a concurrent writer bumped the znode version. Callers SHOULD surface this as HTTP 409 so the
+   *         client can re-read and retry. Differentiated from a generic ZK error so callers do not have to parse
+   *         exception messages.
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
-      throws TableConfigBackwardIncompatibleException {
+      throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
     String tableNameWithType = tableConfig.getTableName();
     TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
@@ -2649,6 +2671,14 @@ public class PinotHelixResourceManager {
     }
 
     if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
+      // Disambiguate CAS-conflict (concurrent writer bumped the znode version) from a generic ZK failure so
+      // callers can return HTTP 409 with retry guidance instead of a 500. expectedVersion < 0 means "no version
+      // check requested" — any failure in that mode is treated as a generic ZK error.
+      if (expectedVersion >= 0) {
+        throw new TableConfigVersionConflictException(
+            "Table config for " + tableNameWithType + " was modified by a concurrent writer (expected version "
+                + expectedVersion + ")");
+      }
       throw new RuntimeException(
           "Failed to update table config in Zookeeper for table: " + tableNameWithType + " with" + " expected version: "
               + expectedVersion);

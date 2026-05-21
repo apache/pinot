@@ -79,6 +79,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableConfigBackwardIncompatibleException;
+import org.apache.pinot.common.exception.TableConfigVersionConflictException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -853,6 +854,12 @@ public class PinotTableRestletResource {
 
     try {
       _pinotHelixResourceManager.updateTableConfig(tableConfig, expectedVersion, force);
+    } catch (TableConfigVersionConflictException e) {
+      // CAS lost: a concurrent writer landed between our deprecation-diff read and this write. Return 409 so the
+      // client can re-read and retry rather than burning a 5xx error metric.
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Conflict updating %s: %s. Re-read the current config and retry.", tableName, e.getMessage()),
+          Response.Status.CONFLICT, e);
     } catch (TableConfigBackwardIncompatibleException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
