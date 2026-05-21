@@ -1107,6 +1107,7 @@ public class CalciteSqlCompilerTest {
     PinotQuery pinotQuery = compileToPinotQuery("SELECT -col1 FROM myTable");
     Expression expr = pinotQuery.getSelectList().get(0);
     Assert.assertEquals(expr.getFunctionCall().getOperator(), "negate");
+    Assert.assertEquals(expr.getFunctionCall().getOperandsSize(), 1);
     Assert.assertEquals(expr.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
 
     // unary minus in WHERE
