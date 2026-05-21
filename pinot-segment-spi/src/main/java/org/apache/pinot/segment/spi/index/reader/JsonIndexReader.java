@@ -101,4 +101,17 @@ public interface JsonIndexReader extends IndexReader {
   default boolean isPathIndexed(String jsonPath) {
     return true;
   }
+
+  /**
+   * Returns the number of distinct values seen at the given JSON path across all documents in the segment, or a
+   * non-negative upper bound that the caller can use as a cardinality estimate. The OSS immutable implementation
+   * answers this in O(log N) via the sorted dictionary range; the default implementation materializes the value set
+   * to preserve correctness for third-party readers and is intentionally slow on high-cardinality paths.
+   *
+   * <p>Callers use this to decide whether a dictionary-scan execution plan is cheaper than the row-by-row scan
+   * baseline. A path that does not appear in the index returns 0.
+   */
+  default long getDistinctValueCountForPath(String jsonPath) {
+    return getMatchingDistinctValues(jsonPath, null).size();
+  }
 }

@@ -677,6 +677,26 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
+  public long getDistinctValueCountForPath(String jsonPathKey) {
+    if (jsonPathKey.startsWith("$")) {
+      jsonPathKey = jsonPathKey.substring(1);
+    } else {
+      jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
+    }
+    _readLock.lock();
+    try {
+      Pair<String, LazyBitmap> result = getKeyAndFlattenedDocIds(jsonPathKey);
+      // Array-index paths require posting-list intersection — defer to the materializing default.
+      if (result.getRight() != null) {
+        return MutableJsonIndex.super.getDistinctValueCountForPath(jsonPathKey);
+      }
+      return getMatchingKeysMap(result.getLeft()).size();
+    } finally {
+      _readLock.unlock();
+    }
+  }
+
+  @Override
   public String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
     String[][] result = new String[length][];
     List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
