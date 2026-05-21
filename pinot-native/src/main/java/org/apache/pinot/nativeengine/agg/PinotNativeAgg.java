@@ -30,7 +30,6 @@ package org.apache.pinot.nativeengine.agg;
  * <p>Thread safety: all kernels are stateless and safe to call concurrently from any thread.
  */
 public final class PinotNativeAgg {
-
   private static final boolean AVAILABLE;
 
   static {

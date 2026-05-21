@@ -23,8 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -212,43 +210,116 @@ public class NativeSumAggregationFunctionTest {
     }
 
     @Nullable
-    @Override public RoaringBitmap getNullBitmap() { return null; }
-    @Override public DataType getValueType() { return _type; }
-    @Override public boolean isSingleValue() { return true; }
+    @Override
+    public RoaringBitmap getNullBitmap() {
+      return null;
+    }
+
+    @Override
+    public DataType getValueType() {
+      return _type;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return true;
+    }
+
     @Nullable
-    @Override public Dictionary getDictionary() { return null; }
-    @Override public int[] getDictionaryIdsSV() { throw new UnsupportedOperationException(); }
-    @Override public int[] getIntValuesSV() {
+    @Override
+    public Dictionary getDictionary() {
+      return null;
+    }
+
+    @Override
+    public int[] getDictionaryIdsSV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int[] getIntValuesSV() {
       if (_intValues == null) {
         throw new UnsupportedOperationException("no int values configured");
       }
       return _intValues;
     }
-    @Override public long[] getLongValuesSV() {
+
+    @Override
+    public long[] getLongValuesSV() {
       if (_longValues == null) {
         throw new UnsupportedOperationException("no long values configured");
       }
       return _longValues;
     }
-    @Override public float[] getFloatValuesSV() { throw new UnsupportedOperationException(); }
-    @Override public double[] getDoubleValuesSV() { throw new UnsupportedOperationException(); }
-    @Override public BigDecimal[] getBigDecimalValuesSV() { throw new UnsupportedOperationException(); }
-    @Override public String[] getStringValuesSV() { throw new UnsupportedOperationException(); }
-    @Override public byte[][] getBytesValuesSV() { throw new UnsupportedOperationException(); }
-    @Override public int[][] getDictionaryIdsMV() { throw new UnsupportedOperationException(); }
-    @Override public int[][] getIntValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public long[][] getLongValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public float[][] getFloatValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public double[][] getDoubleValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public BigDecimal[][] getBigDecimalValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public String[][] getStringValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public byte[][][] getBytesValuesMV() { throw new UnsupportedOperationException(); }
-    @Override public int[] getNumMVEntries() { throw new UnsupportedOperationException(); }
 
-    /** Java's {@code SumAggregationFunction.aggregateSV} reads {@link List} arguments
-     * — we never go through that path, but include the helper anyway for completeness. */
-    public List<?> getValuesAsList() {
-      return Collections.emptyList();
+    @Override
+    public float[] getFloatValuesSV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public double[] getDoubleValuesSV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public BigDecimal[] getBigDecimalValuesSV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String[] getStringValuesSV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public byte[][] getBytesValuesSV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int[][] getDictionaryIdsMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int[][] getIntValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public long[][] getLongValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public float[][] getFloatValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public double[][] getDoubleValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public BigDecimal[][] getBigDecimalValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String[][] getStringValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public byte[][][] getBytesValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int[] getNumMVEntries() {
+      throw new UnsupportedOperationException();
     }
   }
 }
