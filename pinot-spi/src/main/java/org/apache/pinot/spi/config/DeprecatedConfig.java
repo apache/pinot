@@ -45,5 +45,11 @@ public @interface DeprecatedConfig {
   /// The Pinot release in which this property was deprecated, e.g. `"1.6.0"`. Used to decide whether a violation is
   /// reported as a warning (current major.minor) or an error (older). Format: `MAJOR.MINOR` or `MAJOR.MINOR.PATCH`
   /// with an optional `-SNAPSHOT` qualifier; only the leading major.minor pair is compared.
+  ///
+  /// **Strict format**: unparseable values are classified as `ERROR` by the controller's reflective validator. Under
+  /// the soft-launch policy the ERROR fires the throw branch in `validateOnCreate`/`validateOnUpdate` and the REST
+  /// endpoint returns 400 BAD_REQUEST. A typo on a single annotation therefore breaks every PUT/POST that touches
+  /// the affected table-config path. The controller test `testEveryRuleHasParseableSince` locks this at build time
+  /// for in-tree annotations; external annotators should ensure their own coverage exists.
   String since();
 }

@@ -262,6 +262,17 @@ public final class DeprecatedTableConfigValidationUtils {
     return BaseJsonConfig.class.isAssignableFrom(rawClass) && rawClass != BaseJsonConfig.class;
   }
 
+  /// **`@JsonIgnore` getters are intentionally NOT filtered out.** The validator's job is to detect deprecated
+  /// JSON *input* keys (which are still accepted by the bean's `@JsonCreator` / setters even when the matching
+  /// output getter is `@JsonIgnore`-d). For example, `FieldConfig.getIndexType()` is `@JsonIgnore` because we no
+  /// longer want it to round-trip back into JSON, but the constructor still accepts an `indexType` argument so
+  /// legacy configs continue to parse. Filtering by `@JsonIgnore` here would silently disable the rule for that
+  /// legacy input — exactly the case the validator exists to flag.
+  ///
+  /// Implicit contract for future `@DeprecatedConfig` annotations on `@JsonIgnore` getters: the bean MUST accept
+  /// the corresponding JSON property name via a `@JsonCreator` parameter or setter for the rule to fire on
+  /// real-world input. There is no build-time assertion of this invariant yet; if you add such an annotation,
+  /// also add a test exercising a real JSON input that uses the deprecated key.
   private static boolean isJsonAccessor(Method method) {
     if (method.getParameterCount() != 0 || method.getDeclaringClass() == Object.class
         || Modifier.isStatic(method.getModifiers())) {
