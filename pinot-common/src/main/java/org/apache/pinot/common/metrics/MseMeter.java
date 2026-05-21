@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.common.metrics;
 
-import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Meters for the multi-stage engine, emitted via {@link MseMetrics} as {@code pinot.mse.*} when
- * the cluster is configured for {@link MseMetricsMode#MSE} or {@link MseMetricsMode#DUAL}.
- *
- * <p>Each entry carries the corresponding {@link ServerMeter} so {@link MseMetricsMode#SERVER} and
- * {@link MseMetricsMode#DUAL} can forward to the existing {@code pinot.server.*} series.
- */
+/// Meters for the multi-stage engine, emitted via [MseMetrics] as `pinot.mse.*` when the cluster
+/// is configured for [MseMetricsMode#MSE] or [MseMetricsMode#DUAL].
+///
+/// Each entry optionally carries a [ServerMeter] counterpart. When present,
+/// [MseMetricsMode#SERVER] and [MseMetricsMode#DUAL] forward emissions to the existing
+/// `pinot.server.*` series. Entries with no counterpart (MSE-native metrics added after the
+/// migration) are emitted only under MSE / DUAL modes and silently dropped in SERVER mode.
 public enum MseMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true, ServerMeter.MSE_QUERIES),
   OPCHAINS_STARTED("opchains", true, ServerMeter.MSE_OPCHAINS_STARTED),
@@ -49,13 +49,17 @@ public enum MseMeter implements AbstractMetrics.Meter {
   private final String _meterName;
   private final String _unit;
   private final boolean _global;
+  @Nullable
   private final ServerMeter _serverMeter;
 
-  MseMeter(String unit, boolean global, ServerMeter serverMeter) {
+  MseMeter(String unit, boolean global) {
+    this(unit, global, null);
+  }
+
+  MseMeter(String unit, boolean global, @Nullable ServerMeter serverMeter) {
     _unit = unit;
     _global = global;
-    // Every MseMeter must have a ServerMeter counterpart so SERVER and DUAL modes can forward.
-    _serverMeter = Objects.requireNonNull(serverMeter, "serverMeter");
+    _serverMeter = serverMeter;
     _meterName = Utils.toCamelCase(name().toLowerCase());
   }
 
@@ -74,7 +78,9 @@ public enum MseMeter implements AbstractMetrics.Meter {
     return _global;
   }
 
-  /** Existing {@link ServerMeter} this entry forwards to in SERVER / DUAL mode. */
+  /// Existing [ServerMeter] this entry forwards to in SERVER / DUAL mode, or `null` for
+  /// MSE-native meters with no legacy `pinot.server.*` series.
+  @Nullable
   public ServerMeter getServerMeter() {
     return _serverMeter;
   }

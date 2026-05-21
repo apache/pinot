@@ -18,32 +18,36 @@
  */
 package org.apache.pinot.common.metrics;
 
-import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
 
 
-/**
- * Timers for the multi-stage engine, emitted via {@link MseMetrics} as {@code pinot.mse.*} when
- * the cluster is configured for {@link MseMetricsMode#MSE} or {@link MseMetricsMode#DUAL}.
- *
- * <p>Each entry carries the corresponding {@link ServerTimer} so {@link MseMetricsMode#SERVER} and
- * {@link MseMetricsMode#DUAL} can forward to the existing {@code pinot.server.*} series.
- */
+/// Timers for the multi-stage engine, emitted via [MseMetrics] as `pinot.mse.*` when the cluster
+/// is configured for [MseMetricsMode#MSE] or [MseMetricsMode#DUAL].
+///
+/// Each entry optionally carries a [ServerTimer] counterpart. When present,
+/// [MseMetricsMode#SERVER] and [MseMetricsMode#DUAL] forward emissions to the existing
+/// `pinot.server.*` series. Entries with no counterpart (MSE-native timers added after the
+/// migration) are emitted only under MSE / DUAL modes and silently dropped in SERVER mode.
 public enum MseTimer implements AbstractMetrics.Timer {
-  HASH_JOIN_BUILD_TABLE_CPU_TIME_MS("millis", true, ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS),
-  SERIALIZATION_CPU_TIME_MS("millis", true, ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS),
-  DESERIALIZATION_CPU_TIME_MS("millis", true, ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS),
-  RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS("millis", true, ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS),
-  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true, ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS);
+  HASH_JOIN_BUILD_TABLE_CPU_TIME_MS(true, ServerTimer.HASH_JOIN_BUILD_TABLE_CPU_TIME_MS),
+  SERIALIZATION_CPU_TIME_MS(true, ServerTimer.MULTI_STAGE_SERIALIZATION_CPU_TIME_MS),
+  DESERIALIZATION_CPU_TIME_MS(true, ServerTimer.MULTI_STAGE_DESERIALIZATION_CPU_TIME_MS),
+  RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS(true, ServerTimer.RECEIVE_DOWNSTREAM_WAIT_CPU_TIME_MS),
+  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS(true, ServerTimer.RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS);
 
   private final String _timerName;
   private final boolean _global;
+  @Nullable
   private final ServerTimer _serverTimer;
 
-  MseTimer(String unit, boolean global, ServerTimer serverTimer) {
+  MseTimer(boolean global) {
+    this(global, null);
+  }
+
+  MseTimer(boolean global, @Nullable ServerTimer serverTimer) {
     _global = global;
-    // Every MseTimer must have a ServerTimer counterpart so SERVER and DUAL modes can forward.
-    _serverTimer = Objects.requireNonNull(serverTimer, "serverTimer");
+    _serverTimer = serverTimer;
     _timerName = Utils.toCamelCase(name().toLowerCase());
   }
 
@@ -57,7 +61,9 @@ public enum MseTimer implements AbstractMetrics.Timer {
     return _global;
   }
 
-  /** Existing {@link ServerTimer} this entry forwards to in SERVER / DUAL mode. */
+  /// Existing [ServerTimer] this entry forwards to in SERVER / DUAL mode, or `null` for
+  /// MSE-native timers with no legacy `pinot.server.*` series.
+  @Nullable
   public ServerTimer getServerTimer() {
     return _serverTimer;
   }

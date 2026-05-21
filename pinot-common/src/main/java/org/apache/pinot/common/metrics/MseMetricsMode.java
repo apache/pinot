@@ -18,24 +18,19 @@
  */
 package org.apache.pinot.common.metrics;
 
-/**
- * Selects how {@link MseMetrics} emits multi-stage engine metrics.
- *
- * <ul>
- *   <li>{@link #SERVER} (default): forward to {@link ServerMetrics} only (existing
- *       {@code pinot.server.*} series).</li>
- *   <li>{@link #MSE}: emit to a dedicated {@code pinot.mse.*} registry only.</li>
- *   <li>{@link #DUAL}: emit to both, for dashboard migration windows.</li>
- * </ul>
- *
- * Read at startup from cluster config; mode changes require restart.
- *
- * <p>Migration path: SERVER is the default to preserve {@code pinot.server.*} dashboards. Operators
- * migrating to the {@code pinot.mse.*} surface should flip to DUAL for an overlap window, point
- * dashboards/alerts at {@code pinot.mse.*}, then flip to MSE. SERVER mode (and the
- * {@link MseMeter#getServerMeter()} / {@link MseTimer#getServerTimer()} forwarding links) is the
- * backward-compat shim and can be removed once the legacy series has no remaining consumers.
- */
+/// Selects how [MseMetrics] emits multi-stage engine metrics.
+///
+/// - [#SERVER] (default): forward to [ServerMetrics] only (existing `pinot.server.*` series).
+/// - [#MSE]: emit to a dedicated `pinot.mse.*` registry only.
+/// - [#DUAL]: emit to both, for dashboard migration windows.
+///
+/// Read at startup from cluster config; mode changes require restart.
+///
+/// **Migration path:** SERVER is the default to preserve `pinot.server.*` dashboards. Operators
+/// migrating to the `pinot.mse.*` surface should flip to DUAL for an overlap window, point
+/// dashboards/alerts at `pinot.mse.*`, then flip to MSE. SERVER mode (and the
+/// [MseMeter#getServerMeter()] / [MseTimer#getServerTimer()] forwarding links) is the
+/// backward-compat shim and can be removed once the legacy series has no remaining consumers.
 public enum MseMetricsMode {
   SERVER,
   MSE,

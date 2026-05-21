@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.plugin.metrics.fake.FakeMetricsFactory;
 import org.apache.pinot.plugin.metrics.fake.FakeMetricsInspector;
@@ -253,6 +254,74 @@ public class MseMetricsTest {
   }
 
   @Test
+  public void serverModeMeterWithoutCounterpartReturnsNoop()
+      throws Exception {
+    ServerMetrics serverMetrics = new ServerMetrics(new FakePinotMetricsRegistry());
+    ServerMetrics.register(serverMetrics);
+    MseMetrics mseMetrics = new MseMetrics(MseMetricsMode.SERVER, new FakePinotMetricsRegistry());
+    assertTrue(MseMetrics.register(mseMetrics));
+
+    // Simulate an MSE-native meter (no ServerMeter counterpart added in a future release) by
+    // nulling the field on an existing entry for the duration of the test.
+    withNullServerCounterpart(MseMeter.QUERIES, () -> {
+      PinotMeter handle = mseMetrics.getMeteredValue(MseMeter.QUERIES);
+      assertNotNull(handle, "SERVER mode without a counterpart must still return a non-null handle");
+      handle.mark(7);
+      assertEquals(handle.count(), 0L, "Returned handle must be the noop meter — SERVER mode has no series to mark");
+    });
+  }
+
+  @Test
+  public void mseModeMeterWithoutCounterpartStillEmits()
+      throws Exception {
+    PinotMetricsRegistry mseRegistry = new FakePinotMetricsRegistry();
+    FakeMetricsInspector mseInspector = new FakeMetricsInspector(mseRegistry);
+    MseMetrics mseMetrics = new MseMetrics(MseMetricsMode.MSE, mseRegistry);
+    assertTrue(MseMetrics.register(mseMetrics));
+
+    withNullServerCounterpart(MseMeter.OPCHAINS_STARTED, () -> {
+      mseMetrics.addMeteredGlobalValue(MseMeter.OPCHAINS_STARTED, 9L);
+    });
+
+    assertEquals(mseInspector.getMeteredCount(mseInspector.lastMetric()), 9L);
+  }
+
+  @Test
+  public void dualModeMeterWithoutCounterpartOnlyEmitsToMseSide()
+      throws Exception {
+    ServerMetrics serverMetrics = new ServerMetrics(new FakePinotMetricsRegistry());
+    ServerMetrics.register(serverMetrics);
+    PinotMetricsRegistry mseRegistry = new FakePinotMetricsRegistry();
+    FakeMetricsInspector mseInspector = new FakeMetricsInspector(mseRegistry);
+    MseMetrics mseMetrics = new MseMetrics(MseMetricsMode.DUAL, mseRegistry);
+    assertTrue(MseMetrics.register(mseMetrics));
+
+    withNullServerCounterpart(MseMeter.EMITTED_ROWS, () -> {
+      mseMetrics.addMeteredGlobalValue(MseMeter.EMITTED_ROWS, 4L);
+    });
+
+    assertEquals(mseInspector.getMeteredCount(mseInspector.lastMetric()), 4L);
+    assertTrue(serverMetrics.getMetricsRegistry().allMetrics().isEmpty(),
+        "DUAL mode must not register any pinot.server.* meter when there is no counterpart");
+  }
+
+  @Test
+  public void serverModeTimerWithoutCounterpartIsDropped()
+      throws Exception {
+    ServerMetrics serverMetrics = new ServerMetrics(new FakePinotMetricsRegistry());
+    ServerMetrics.register(serverMetrics);
+    MseMetrics mseMetrics = new MseMetrics(MseMetricsMode.SERVER, new FakePinotMetricsRegistry());
+    assertTrue(MseMetrics.register(mseMetrics));
+
+    withNullServerTimerCounterpart(MseTimer.SERIALIZATION_CPU_TIME_MS, () -> {
+      mseMetrics.addTimedValue(MseTimer.SERIALIZATION_CPU_TIME_MS, 250, TimeUnit.MILLISECONDS);
+    });
+
+    assertTrue(serverMetrics.getMetricsRegistry().allMetrics().isEmpty(),
+        "SERVER mode without a timer counterpart must not register any pinot.server.* timer");
+  }
+
+  @Test
   public void registerIsCompareAndSetAgainstNoop() {
     MseMetrics first = new MseMetrics(MseMetricsMode.MSE, new FakePinotMetricsRegistry());
     assertTrue(MseMetrics.register(first));
@@ -261,5 +330,34 @@ public class MseMetricsTest {
     MseMetrics second = new MseMetrics(MseMetricsMode.DUAL, new FakePinotMetricsRegistry());
     assertFalse(MseMetrics.register(second), "Second register must fail; CAS guards against accidental swap");
     assertSame(MseMetrics.get(), first);
+  }
+
+  /// Reflection helper: temporarily null out `MseMeter._serverMeter` to simulate an MSE-native
+  /// entry, run the test body, then restore. Used to exercise the no-counterpart branches
+  /// without adding a real null-counterpart entry to the public enum.
+  private static void withNullServerCounterpart(MseMeter meter, Runnable body)
+      throws Exception {
+    Field field = MseMeter.class.getDeclaredField("_serverMeter");
+    field.setAccessible(true);
+    Object original = field.get(meter);
+    field.set(meter, null);
+    try {
+      body.run();
+    } finally {
+      field.set(meter, original);
+    }
+  }
+
+  private static void withNullServerTimerCounterpart(MseTimer timer, Runnable body)
+      throws Exception {
+    Field field = MseTimer.class.getDeclaredField("_serverTimer");
+    field.setAccessible(true);
+    Object original = field.get(timer);
+    field.set(timer, null);
+    try {
+      body.run();
+    } finally {
+      field.set(timer, original);
+    }
   }
 }
