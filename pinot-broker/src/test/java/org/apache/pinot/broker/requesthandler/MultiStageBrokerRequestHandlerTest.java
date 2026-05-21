@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
@@ -37,6 +39,8 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -107,5 +111,82 @@ public class MultiStageBrokerRequestHandlerTest {
     }
     Assert.assertNotNull(capturedResponse.get(),
         "onQueryCompletion hook must be called with the BrokerResponse from handleRequest for MSE");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsInjectsStreamingGroupByFlushThreshold()
+      throws Exception {
+    // When the broker config is set, the option is injected for queries that don't already specify it.
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold("5000");
+
+    Map<String, String> queryOptions = new HashMap<>();
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD), "5000",
+        "Broker default should be injected when query option is absent");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsPerQueryOverrideWins()
+      throws Exception {
+    // A per-query SET — including SET = 0 to disable — must take precedence over the broker default.
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold("5000");
+
+    Map<String, String> queryOptions = new HashMap<>();
+    queryOptions.put(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, "0");
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD), "0",
+        "Per-query SET = 0 must override the broker default");
+
+    queryOptions.clear();
+    queryOptions.put(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD, "100");
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertEquals(queryOptions.get(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD), "100",
+        "Per-query SET must take precedence over the broker default");
+  }
+
+  @Test
+  public void testApplyBrokerDefaultQueryOptionsNoInjectionWhenConfigUnset()
+      throws Exception {
+    // With the broker config unset (default -1), no option is injected.
+    MultiStageBrokerRequestHandler handler = newHandlerWithStreamingGroupByFlushThreshold(null);
+
+    Map<String, String> queryOptions = new HashMap<>();
+    handler.applyBrokerDefaultQueryOptions(queryOptions);
+    Assert.assertFalse(queryOptions.containsKey(QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD),
+        "No option should be injected when the broker default is unset");
+  }
+
+  private static MultiStageBrokerRequestHandler newHandlerWithStreamingGroupByFlushThreshold(
+      @Nullable String streamingGroupByFlushThreshold)
+      throws Exception {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "localhost");
+    config.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, Integer.toString(NetUtils.findOpenPort()));
+    if (streamingGroupByFlushThreshold != null) {
+      config.setProperty(CommonConstants.Broker.CONFIG_OF_MSE_STREAMING_GROUP_BY_FLUSH_THRESHOLD,
+          streamingGroupByFlushThreshold);
+    }
+    BrokerQueryEventListenerFactory.init(config);
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    return new MultiStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(),
+        mock(RoutingManager.class), new AllowAllAccessControlFactory(), queryQuotaManager,
+        mock(TableCache.class), mock(MultiStageQueryThrottler.class), mock(FailureDetector.class),
+        ThreadAccountantUtils.getNoOpAccountant(), null, mock(WorkerManager.class), mock(WorkerManager.class)) {
+      @Override
+      public void start() {
+        // Skip dispatcher.start() and Calcite warmupCompile — neither is needed for this test.
+      }
+
+      @Override
+      public void shutDown() {
+        // Match start() — no dispatcher was started, so there is nothing to shut down.
+      }
+    };
   }
 }
