@@ -35,7 +35,7 @@ public interface BloomFilterCreator extends IndexCreator {
     if (getDataType() == FieldSpec.DataType.BYTES) {
       add(BytesUtils.toHexString((byte[]) value));
     } else if (getDataType() == FieldSpec.DataType.UUID) {
-      add(UuidUtils.toString(UuidUtils.toBytes(value)));
+      add(uuidToCanonicalString(value));
     } else {
       add(value.toString());
     }
@@ -49,13 +49,22 @@ public interface BloomFilterCreator extends IndexCreator {
       }
     } else if (getDataType() == FieldSpec.DataType.UUID) {
       for (Object value : values) {
-        add(UuidUtils.toString(UuidUtils.toBytes(value)));
+        add(uuidToCanonicalString(value));
       }
     } else {
       for (Object value : values) {
         add(value.toString());
       }
     }
+  }
+
+  /// Renders a UUID value (typically a 16-byte big-endian {@code byte[]} from segment ingest) as its canonical
+  /// lowercase RFC 4122 string. Avoids the defensive byte[] copy that {@code UuidUtils.toBytes(Object)} would
+  /// perform on the {@code byte[]} branch.
+  private static String uuidToCanonicalString(Object value) {
+    return value instanceof byte[]
+        ? UuidUtils.toString((byte[]) value)
+        : UuidUtils.toString(UuidUtils.toBytes(value));
   }
   /**
    * Adds a value to the bloom filter.
