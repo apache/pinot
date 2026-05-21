@@ -495,6 +495,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     private final AtomicInteger _completedOpChains = new AtomicInteger(0);
     /// Set once we successfully parse the request id from the submit metadata. Used by cancel-via-stream.
     private volatile long _requestId = -1;
+    /// Completed once {@link #sendSubmitAck} has been called (success or error path). Guards the ack/done race:
+    /// if a trivial opchain finishes before the {@code whenComplete} callback fires, {@code onOpChainComplete}
+    /// waits for this future via {@code thenRun} instead of calling {@link #sendDoneAndComplete} immediately,
+    /// ensuring the broker always receives the {@code submit_ack} before {@code ServerDone}.
+    private final CompletableFuture<Void> _ackSentFuture = new CompletableFuture<>();
 
     SubmitWithStreamObserver(StreamObserver<Worker.ServerToBroker> responseObserver) {
       _responseObserver = responseObserver;
@@ -597,6 +602,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
                 sendDoneAndComplete();
               }
             }
+            // Signal that the ack has been sent (regardless of success/error). Any onOpChainComplete invocation
+            // that raced ahead of this whenComplete callback will be unblocked via thenRun.
+            _ackSentFuture.complete(null);
           });
     }
 
@@ -623,13 +631,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           //   2. An IOException from serializeStatMap mid-walk leaves partial StageStatsNode builders only on the
           //      Java call stack; they are discarded when the exception unwinds. No partially-built
           //      MultiStageStatsTree is ever returned.
-          // In stream mode the mailbox EOS carries no stats (suppressed when SubmitWithStream is active), so the
-          // broker will receive this opchain's message with success=false and empty stats. This is strictly worse
-          // than legacy mode (which would have sent whatever partial stats were in the EOS), but it is the best
-          // the encoder's current design allows without a more invasive refactor. The broker treats a missing
-          // stats tree as an unmerged opchain and logs a warning, which preserves query correctness.
+          // We deliberately do NOT set success=false here. The opchain computation itself succeeded (error==null
+          // at the top of this method), so we preserve success=true and send empty stats instead. Setting
+          // success=false would cause the broker to treat the opchain as a peer error and fire fanOutCancel,
+          // cancelling a completely healthy query just because stats serialization failed.
           LOGGER.warn("Failed to encode stats tree for opchain {}", opChainId, t);
-          builder.setSuccess(false);
           builder.setErrorMsg(builder.getErrorMsg().isEmpty() ? "stats encode failed: " + t.getMessage()
               : builder.getErrorMsg() + "; stats encode failed: " + t.getMessage());
         }
@@ -647,8 +653,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         // Without this, a single dropped send leaves _completedOpChains short of _expectedOpChains permanently,
         // and the broker waits on its drain latch until the timeout instead of receiving ServerDone promptly.
         if (_completedOpChains.incrementAndGet() >= _expectedOpChains.get()) {
-          cleanupListener();
-          sendDoneAndComplete();
+          // Wait for the ack to be sent before emitting ServerDone. If whenComplete already ran, thenRun fires
+          // immediately on this thread; if not (trivial-plan race), it fires on the whenComplete thread once
+          // the ack is dispatched. sendDoneAndComplete is guarded by compareAndSet so double-invocation is safe.
+          _ackSentFuture.thenRun(() -> {
+            cleanupListener();
+            sendDoneAndComplete();
+          });
         }
       }
     }

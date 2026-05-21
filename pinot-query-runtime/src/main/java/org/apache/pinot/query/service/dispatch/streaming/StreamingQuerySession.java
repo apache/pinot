@@ -187,6 +187,10 @@ public class StreamingQuerySession {
     try {
       existing.merge(incoming);
     } catch (StageStatsTreeNode.ShapeMismatchException e) {
+      // StageStatsTreeNode.merge mutates _statMap before recursing into children, so a ShapeMismatchException
+      // thrown during child recursion leaves the existing node in a partially-accumulated state. Remove it so
+      // subsequent opchains for this stage do not merge into corrupt state.
+      _stageAccumulator.remove(stageId);
       LOGGER.warn("Shape mismatch merging stage {} on request {}: {}", stageId, _requestId, e.getMessage());
       incrementLocked(_mergeFailedByStage, stageId);
     }
