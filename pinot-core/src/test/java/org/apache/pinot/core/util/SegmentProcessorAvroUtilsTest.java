@@ -94,4 +94,34 @@ public class SegmentProcessorAvroUtilsTest {
     assertEquals(emitted, Arrays.asList(canonicalA, canonicalB),
         "MV UUID byte[] elements must each be converted to canonical UUID strings");
   }
+
+  /**
+   * Regression: convertPinotSchemaToAvroSchema must emit SV UUID as {@code string{logicalType:uuid}} (not plain
+   * BYTES) and MV UUID as {@code array<string{logicalType:uuid}>}. Without the UUID branch, SV UUID would
+   * silently fall through to plain BYTES (losing UUID semantics in the output Avro file) and MV UUID would
+   * throw at schema-construction time because the MV switch has no BYTES case.
+   */
+  @Test
+  public void testConvertPinotSchemaToAvroSchemaEmitsUuidLogicalType() {
+    org.apache.pinot.spi.data.Schema pinotSchema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .setSchemaName("uuidSchema")
+        .addSingleValueDimension("uuidSv", org.apache.pinot.spi.data.FieldSpec.DataType.UUID)
+        .addMultiValueDimension("uuidMv", org.apache.pinot.spi.data.FieldSpec.DataType.UUID)
+        .build();
+
+    Schema avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchema);
+
+    Schema svFieldSchema = avroSchema.getField("uuidSv").schema();
+    assertEquals(svFieldSchema.getType(), Schema.Type.STRING, "SV UUID must be string{logicalType:uuid}");
+    assertEquals(LogicalTypes.fromSchemaIgnoreInvalid(svFieldSchema), LogicalTypes.uuid(),
+        "SV UUID must carry the uuid logical type");
+
+    Schema mvFieldSchema = avroSchema.getField("uuidMv").schema();
+    assertEquals(mvFieldSchema.getType(), Schema.Type.ARRAY, "MV UUID must be emitted as an array");
+    Schema mvElementSchema = mvFieldSchema.getElementType();
+    assertEquals(mvElementSchema.getType(), Schema.Type.STRING,
+        "MV UUID elements must be string{logicalType:uuid}");
+    assertEquals(LogicalTypes.fromSchemaIgnoreInvalid(mvElementSchema), LogicalTypes.uuid(),
+        "MV UUID elements must carry the uuid logical type");
+  }
 }

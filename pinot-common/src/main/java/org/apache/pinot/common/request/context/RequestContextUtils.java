@@ -557,6 +557,12 @@ public class RequestContextUtils {
       case "isuuid":
         validateFunctionArity("IS_UUID", operands, 1);
         return evaluateIsUuidLiteral(evaluator.apply(operands.get(0)));
+      case "uuidversion":
+        validateFunctionArity("UUID_VERSION", operands, 1);
+        return evaluateUuidVersionLiteral(evaluator.apply(operands.get(0)));
+      case "uuidtimestamp":
+        validateFunctionArity("UUID_TIMESTAMP", operands, 1);
+        return evaluateUuidTimestampLiteral(evaluator.apply(operands.get(0)));
       default:
         throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
     }
@@ -600,6 +606,22 @@ public class RequestContextUtils {
   private static EvaluatedLiteralValue evaluateUuidToStringLiteral(EvaluatedLiteralValue source) {
     Preconditions.checkArgument(source.getType() == DataType.UUID, "UUID_TO_STRING requires a UUID operand");
     return new EvaluatedLiteralValue(convertToCanonicalUuidString(source), DataType.STRING);
+  }
+
+  private static EvaluatedLiteralValue evaluateUuidVersionLiteral(EvaluatedLiteralValue source) {
+    if (source.getType() == DataType.UNKNOWN) {
+      return new EvaluatedLiteralValue(source.getStringValue(), DataType.INT);
+    }
+    int version = UuidUtils.getVersion(UuidUtils.toUUID(convertToCanonicalUuidString(source)));
+    return new EvaluatedLiteralValue(Integer.toString(version), DataType.INT);
+  }
+
+  private static EvaluatedLiteralValue evaluateUuidTimestampLiteral(EvaluatedLiteralValue source) {
+    if (source.getType() == DataType.UNKNOWN) {
+      return new EvaluatedLiteralValue(source.getStringValue(), DataType.LONG);
+    }
+    long ts = UuidUtils.getTimestampMillis(UuidUtils.toUUID(convertToCanonicalUuidString(source)));
+    return new EvaluatedLiteralValue(Long.toString(ts), DataType.LONG);
   }
 
   private static EvaluatedLiteralValue evaluateIsUuidLiteral(EvaluatedLiteralValue source) {
