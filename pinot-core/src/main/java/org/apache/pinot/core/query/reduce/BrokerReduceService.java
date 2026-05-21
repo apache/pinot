@@ -42,6 +42,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,19 +189,42 @@ public class BrokerReduceService extends BaseReduceService {
     if (brokerRequest == serverBrokerRequest) {
       queryContext = serverQueryContext;
     } else {
+      // brokerRequest and serverBrokerRequest differ when the query is either (a) a gapfill
+      // (parser wrapped the user's SELECT into an outer SELECT) or (b) an MV-rewritten query
+      // (broker rewrote serverBrokerRequest to target the MV table while the user's
+      // brokerRequest stays at the base table for result-shape derivations). Only (a) needs
+      // the gapfill post-processor; (b) just uses the user's queryContext directly. Any other
+      // mismatched (brokerRequest != serverBrokerRequest) caller is rejected to preserve the
+      // original BadQueryRequestException invariant ("Nested query is not supported without
+      // gapfill") that pre-dated MV rewrite.
       queryContext = QueryContextConverterUtils.getQueryContext(brokerRequest.getPinotQuery());
       GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
-      if (gapfillType == null) {
+      if (gapfillType != null) {
+        BaseGapfillProcessor gapfillProcessor = GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
+        gapfillProcessor.process(brokerResponseNative);
+      } else if (!isMaterializedViewRewrite(serverBrokerRequest)) {
         throw new BadQueryRequestException("Nested query is not supported without gapfill");
       }
-      BaseGapfillProcessor gapfillProcessor = GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
-      gapfillProcessor.process(brokerResponseNative);
     }
 
     if (!serverQueryContext.isExplain()) {
       updateAlias(queryContext, brokerResponseNative);
     }
     return brokerResponseNative;
+  }
+
+  /// MV rewrite signal: when the broker applies a FULL_REWRITE, it stamps the rewritten
+  /// server-side query with the [QueryOptionKey#MATERIALIZED_VIEW_REWRITE] marker.  Reading
+  /// the marker here keeps the "Nested query is not supported without gapfill" safety net
+  /// active for any other path that produces `brokerRequest != serverBrokerRequest` (federated
+  /// query, JOIN rewrite, logical-table swap) — only the MV rewrite path explicitly opts out.
+  private static boolean isMaterializedViewRewrite(BrokerRequest serverBrokerRequest) {
+    if (serverBrokerRequest.getPinotQuery() == null
+        || serverBrokerRequest.getPinotQuery().getQueryOptions() == null) {
+      return false;
+    }
+    return "true".equalsIgnoreCase(
+        serverBrokerRequest.getPinotQuery().getQueryOptions().get(QueryOptionKey.MATERIALIZED_VIEW_REWRITE));
   }
 
   public void shutDown() {

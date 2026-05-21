@@ -638,6 +638,28 @@ public class MaterializedViewAnalyzerTest {
   }
 
   @Test
+  public void testRejectsAliasCaseMismatch() {
+    // Case-sensitive cluster regression: an MV defined with `SUM(x) AS sum_x` against a schema
+    // that has the column declared as `Sum_X` must be rejected at analyzer time so the broker
+    // FULL_REWRITE re-canonicalization never has to deal with the mismatch at query time.  The
+    // existing `selectFields.contains` / `schemaColumns.contains` checks are case-sensitive,
+    // so a case-different SELECT alias fails Check 2 ("SELECT field does not match any column").
+    String sql = "SELECT DaysSinceEpoch, city, sum(amount) AS sum_amount "
+        + "FROM orders GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("Sum_Amount", FieldSpec.DataType.DOUBLE)  // case differs from SELECT alias
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+
+    // The existing `schemaColumns.contains(selectField)` check in Step 3 is case-sensitive
+    // because both sides are HashSet<String>; the analyzer fails Check 1 ("MV schema column not
+    // produced by any SELECT expression") before reaching Check 2, but either failure pin the
+    // case-sensitivity contract.
+    expectError(sql, viewSchema, "is not produced by any SELECT expression");
+  }
+
+  @Test
   public void testAggregateWithoutAlias() {
     String sql = "SELECT DaysSinceEpoch, city, count(*) FROM orders GROUP BY DaysSinceEpoch, city";
     Schema viewSchema = new Schema.SchemaBuilder()

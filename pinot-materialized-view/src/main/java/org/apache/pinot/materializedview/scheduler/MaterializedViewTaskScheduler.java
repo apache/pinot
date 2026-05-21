@@ -565,6 +565,21 @@ public class MaterializedViewTaskScheduler {
     return timeColumn;
   }
 
+  /// Resolves the raw format string for the MV table's time column, for persisting in
+  /// [MaterializedViewSplitSpec].  The broker uses this format to convert `watermarkMs` into
+  /// the MV column's native representation before attaching the `materializedViewTime < boundary`
+  /// filter on the MV branch of a split query.
+  private String resolveMaterializedViewTimeFormat(String viewTableWithType, String viewTimeColumn) {
+    Schema viewSchema = _context.getTableSchema(viewTableWithType);
+    Preconditions.checkState(viewSchema != null,
+        "Schema not found for MV table: %s", viewTableWithType);
+    DateTimeFieldSpec fieldSpec = viewSchema.getSpecForTimeColumn(viewTimeColumn);
+    Preconditions.checkState(fieldSpec != null,
+        "No DateTimeFieldSpec found for MV time column '%s' in table: %s",
+        viewTimeColumn, viewTableWithType);
+    return fieldSpec.getFormat();
+  }
+
   /// Appends a time-range WHERE clause to the SQL.  Window values are raw epoch millis since
   /// both base and MV time columns are TIMESTAMP (enforced by [MaterializedViewAnalyzer]).
   /// If a WHERE clause already exists, appends with AND; otherwise inserts before GROUP BY /
@@ -917,15 +932,16 @@ public class MaterializedViewTaskScheduler {
         : new HashMap<>();
 
     // Resolve split spec from both the source and MV tables' time columns.  The MV column
-    // is enforced TIMESTAMP by MaterializedViewAnalyzer (no format needed there); the base
-    // column may use any format, so we persist its `DateTimeFieldSpec.getFormat()` for the
-    // broker's base-side filter conversion.
+    // Both base and MV time columns may use any DateTimeFieldSpec format; persist each
+    // column's `getFormat()` so the broker's base-side and MV-side boundary literals are
+    // each converted to the right native unit at query time.
     DateTimeFieldSpec sourceTimeFieldSpec = resolveSourceTimeFieldSpec(sourceTableName);
     String sourceTimeColumn = sourceTimeFieldSpec.getName();
     String sourceTimeFormat = sourceTimeFieldSpec.getFormat();
     String viewTimeColumn = resolveMaterializedViewTimeColumn(viewTableWithType);
-    MaterializedViewSplitSpec splitSpec =
-        new MaterializedViewSplitSpec(sourceTimeColumn, sourceTimeFormat, viewTimeColumn, bucketMs);
+    String viewTimeFormat = resolveMaterializedViewTimeFormat(viewTableWithType, viewTimeColumn);
+    MaterializedViewSplitSpec splitSpec = new MaterializedViewSplitSpec(sourceTimeColumn,
+        sourceTimeFormat, viewTimeColumn, viewTimeFormat, bucketMs);
 
     long stalenessThresholdMs = parseLong(
         taskConfigs.get(MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY),

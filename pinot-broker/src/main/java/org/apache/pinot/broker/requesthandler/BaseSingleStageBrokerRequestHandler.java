@@ -38,7 +38,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -90,6 +89,7 @@ import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
 import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.routing.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
@@ -99,6 +99,12 @@ import org.apache.pinot.core.routing.TableRouteProvider;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
+import org.apache.pinot.materializedview.context.MaterializedViewContext;
+import org.apache.pinot.materializedview.handler.MaterializedViewCompileContext;
+import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
+import org.apache.pinot.materializedview.handler.MaterializedViewSplitDispatcher;
+import org.apache.pinot.materializedview.handler.MaterializedViewSplitExecutionContext;
+import org.apache.pinot.materializedview.rewrite.MaterializedViewRewritePlan;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -145,6 +151,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
+  @Nullable
+  protected final MaterializedViewHandler _materializedViewHandler;
   protected final boolean _disableGroovy;
   protected final boolean _useApproximateFunction;
   protected final int _defaultHllLog2m;
@@ -166,9 +174,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext) {
+      ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
+      @Nullable MaterializedViewHandler materializedViewHandler) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
+    _materializedViewHandler = materializedViewHandler;
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -265,14 +275,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return false;
     }
 
-    // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
-    //       details
-    String globalQueryId = getGlobalQueryId(queryId);
     List<Pair<String, String>> serverUrls = new ArrayList<>();
-    for (ServerInstance serverInstance : queryServers._servers) {
-      // TODO: how should we add the cid here? Maybe as a query param?
-      //  we can get the cid from QueryThreadContext
-      serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
+    for (Map.Entry<Long, Set<ServerInstance>> entry : queryServers.getServersByRequestId(queryId).entrySet()) {
+      // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils
+      //       for details.
+      String globalQueryId = getGlobalQueryId(entry.getKey());
+      for (ServerInstance serverInstance : entry.getValue()) {
+        // TODO: how should we add the cid here? Maybe as a query param?
+        //  we can get the cid from QueryThreadContext
+        serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
+      }
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
@@ -364,16 +376,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     final Schema _schema;
     final String _tableName;
     final String _rawTableName;
+    /// User-facing raw table name preserved across the FULL_REWRITE MV swap.  When the broker
+    /// rewrites a base-table query to target an MV, `_rawTableName` becomes the MV's raw name
+    /// (the routing target); `_userRawTableName` stays on the base table so the public-facing
+    /// `tablesQueried` response field tags the user's table.  Per-table broker metrics and
+    /// phase timings continue to use `_rawTableName` (which equals the MV name on FULL_REWRITE)
+    /// so that MV-served queries are tagged under the MV's dashboards — necessary for
+    /// per-MV throughput / quota observability.
+    final String _userRawTableName;
     final BrokerResponse _errorOrLiteralOnlyBrokerResponse;
+    final MaterializedViewContext _materializedViewContext;
+    final boolean _rlsFiltersApplied;
 
     public CompileResult(PinotQuery pinotQuery, PinotQuery serverPinotQuery, Schema schema, String tableName,
-        String rawTableName) {
+        String rawTableName, String userRawTableName, MaterializedViewContext materializedViewContext,
+        boolean rlsFiltersApplied) {
       _pinotQuery = pinotQuery;
       _serverPinotQuery = serverPinotQuery;
       _schema = schema;
       _tableName = tableName;
       _rawTableName = rawTableName;
+      _userRawTableName = userRawTableName;
       _errorOrLiteralOnlyBrokerResponse = null;
+      _materializedViewContext = materializedViewContext;
+      _rlsFiltersApplied = rlsFiltersApplied;
     }
 
     public CompileResult(BrokerResponse errorOrLiteralOnlyBrokerResponse) {
@@ -382,7 +408,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _schema = null;
       _tableName = null;
       _rawTableName = null;
+      _userRawTableName = null;
       _errorOrLiteralOnlyBrokerResponse = errorOrLiteralOnlyBrokerResponse;
+      _materializedViewContext = MaterializedViewContext.empty();
+      _rlsFiltersApplied = false;
+    }
+
+    /// Returns `true` when the query should be split into a base-table query and
+    /// a materialized view query, with results merged at reduce time.
+    boolean isMaterializedViewSplit() {
+      return _materializedViewContext.isSplitRewrite();
     }
   }
 
@@ -390,6 +425,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl, boolean queryWasLogged)
       throws Exception {
+    // The MATERIALIZED_VIEW_REWRITE query option is a broker-internal marker stamped during a
+    // committed FULL_REWRITE swap; it is read by BrokerReduceService to opt out of the "Nested
+    // query is not supported without gapfill" safety net.  A user-supplied option of the same
+    // name would otherwise let a hostile or buggy client bypass that safety net for any
+    // brokerRequest != serverBrokerRequest path the broker may grow in the future.  Strip it
+    // here so the marker is only ever present when the broker itself sets it during the
+    // FULL_REWRITE swap below.  doHandleRequest is the choke point that both the top-level
+    // handleRequest entry and the IN_SUBQUERY recursion go through, so a single strip here
+    // covers both paths.
+    if (sqlNodeAndOptions.getOptions() != null) {
+      sqlNodeAndOptions.getOptions().remove(QueryOptionKey.MATERIALIZED_VIEW_REWRITE);
+    }
     // Compile the request into PinotQuery
     long compilationStartTimeNs = System.nanoTime();
     CompileResult compileResult =
@@ -407,10 +454,21 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Schema schema = compileResult._schema;
     String tableName = compileResult._tableName;
     String rawTableName = compileResult._rawTableName;
+    // _userRawTableName preserves the base-table name across FULL_REWRITE swaps so response
+    // fields like `tablesQueried` tag the user-facing surface, not the MV the broker happened
+    // to route through.  Same value as rawTableName on the non-rewrite path.
+    String userRawTableName = compileResult._userRawTableName;
     PinotQuery pinotQuery = compileResult._pinotQuery;
     PinotQuery serverPinotQuery = compileResult._serverPinotQuery;
+    boolean rlsFiltersApplied = compileResult._rlsFiltersApplied;
     LogicalTableConfig logicalTableConfig = _tableCache.getLogicalTableConfig(rawTableName);
-    String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableName);
+    // Database is derived from the pre-rewrite user-facing tableName so that database-level
+    // query quota is charged against the database the user named — not the (possibly different)
+    // database the MV happens to live in.  Otherwise an operator could place an MV in a
+    // different database and silently bypass the base database's rate-limit.  Mirrors the
+    // per-table `quotaTableName` derivation below at line ~530.
+    String database = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(
+        compileResult._materializedViewContext.getPreRewriteTableNameOrDefault(tableName));
     long compilationEndTimeNs = System.nanoTime();
 
     // Validate that physical tables are not queried with multi-cluster routing enabled.
@@ -430,15 +488,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Accounts for resource usage of the compilation phase, since compilation for some queries can be expensive.
     QueryThreadContext.checkTerminationAndSampleUsage("Broker request compilation");
 
-    // Second-stage table-level access control
+    // Second-stage table-level access control.
+    // For FULL_REWRITE MV rewrites, the MV context holds the original base-table server query.
+    // Authorization must run against it, not the rewritten materialized view query, so that access control
+    // for the base table cannot be bypassed via an MV.
     // TODO: Modify AccessControl interface to directly take PinotQuery
+    MaterializedViewContext materializedViewContext = compileResult._materializedViewContext;
+    PinotQuery authServerPinotQuery =
+        materializedViewContext.getPreRewriteServerPinotQueryOrDefault(serverPinotQuery);
     BrokerRequest brokerRequest = CalciteSqlCompiler.convertToBrokerRequest(pinotQuery);
     BrokerRequest serverBrokerRequest =
         serverPinotQuery == pinotQuery ? brokerRequest : CalciteSqlCompiler.convertToBrokerRequest(serverPinotQuery);
+    BrokerRequest authBrokerRequest = authServerPinotQuery == serverPinotQuery ? serverBrokerRequest
+        : CalciteSqlCompiler.convertToBrokerRequest(authServerPinotQuery);
 
     TableRouteProvider routeProvider;
 
-    AtomicBoolean rlsFiltersApplied = new AtomicBoolean(false);
     if (logicalTableConfig != null) {
       Set<String> physicalTableNames = logicalTableConfig.getPhysicalTableConfigMap().keySet();
       AuthorizationResult authorizationResult =
@@ -464,7 +529,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       routeProvider = _logicalTableRouteProvider;
     } else {
-      AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, serverBrokerRequest);
+      AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity, authBrokerRequest);
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
@@ -475,32 +540,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
       }
 
-      if (_enableRowColumnLevelAuth) {
-        TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
-
-        //rewrite query
-        Map<String, String> queryOptions =
-            pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
-
-        rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
-          String combinedFilters =
-              rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
-          String rowFiltersKey = RlsUtils.buildRlsFilterKey(rawTableName);
-          queryOptions.put(rowFiltersKey, combinedFilters);
-          pinotQuery.setQueryOptions(queryOptions);
-          try {
-            CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
-            rlsFiltersApplied.set(true);
-            _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-          } catch (Exception e) {
-            LOGGER.error(
-                "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
-                RlsFiltersRewriter.class.getName(), e);
-          }
-        });
-      }
-
-      // Validate QPS quota
+      // Validate QPS quota.
+      // For FULL_REWRITE materialized view queries, tableName has been overwritten to the materialized view table name.
+      // Quota must be charged against the original base table so that base-table rate limits
+      // cannot be bypassed by routing the query through an unthrottled materialized view table.
+      String quotaTableName = materializedViewContext.getPreRewriteTableNameOrDefault(tableName);
       if (!_queryQuotaManager.acquireDatabase(database)) {
         String errorMessage =
             String.format("Request %d: %s exceeds query quota for database: %s", requestId, query, database);
@@ -508,12 +552,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
-      if (!_queryQuotaManager.acquire(tableName)) {
+      if (!_queryQuotaManager.acquire(quotaTableName)) {
         String errorMessage =
-            String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, tableName);
+            String.format("Request %d: %s exceeds query quota for table: %s", requestId, query, quotaTableName);
         LOGGER.info(errorMessage);
         requestContext.setErrorCode(QueryErrorCode.TOO_MANY_REQUESTS);
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
+        // Tag the meter against the base table (the table the quota is configured on), not the
+        // MV the broker rewrote through.  Otherwise operators chasing an "MV quota exceeded"
+        // alert find no quota configured on the MV; the actual offender is the base table.
+        _brokerMetrics.addMeteredTableValue(TableNameBuilder.extractRawTableName(quotaTableName),
+            BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
 
@@ -798,6 +846,94 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // Execute the query
     // TODO: Replace ServerStats with ServerRoutingStatsEntry.
     ServerStats serverStats = new ServerStats();
+
+    // ---------- MV Split: issue parallel base + materialized view queries and merge results ----------
+    if (compileResult.isMaterializedViewSplit()) {
+      String clientRequestId = extractClientRequestId(sqlNodeAndOptions);
+      MaterializedViewSplitDispatcher dispatcher =
+          (originalReq, baseQ, baseRoute, baseSch, viewQ, viewTable, viewSch, timeoutMs) ->
+              dispatchMaterializedViewSplit(requestId, originalReq, baseQ, baseRoute, baseSch, viewQ, viewTable,
+                  viewSch, timeoutMs, serverStats, requestContext, selectedRoutingManager, routeProvider,
+                  clientRequestId, query);
+      MaterializedViewSplitExecutionContext splitCtx = MaterializedViewSplitExecutionContext.builder()
+          .requestId(requestId)
+          .originalBrokerRequest(brokerRequest)
+          .baseServerPinotQuery(compileResult._serverPinotQuery)
+          .baseSchema(compileResult._schema)
+          .baseTableNameWithType(compileResult._tableName)
+          .materializedViewContext(materializedViewContext)
+          .baseRouteInfo(routeInfo)
+          .remainingTimeMs(remainingTimeMs)
+          .dispatcher(dispatcher)
+          .build();
+      // Execute-time MV failures (route gone mid-query, malformed time-format from a pre-V2
+      // rolling-upgrade znode, NPE inside a strategy plan) must fall back to the base-table
+      // path with a metric bump — never surface as HTTP 500.  The compile-time path has the
+      // matching wrapper at the `_materializedViewHandler.compile` call site.  Demote
+      // BROKER_RESOURCE_MISSING (an expected operational event — MV dropped mid-query) to
+      // WARN so the operator's error-log signal isn't drowned in routine MV churn.
+      BrokerResponseNative viewSplitResponse;
+      try {
+        viewSplitResponse = _materializedViewHandler.executeSplit(splitCtx);
+      } catch (QueryException qe) {
+        LOGGER.warn("Materialized view split execution skipped for request {} on table {}: {}; "
+            + "falling back to base-table query path", requestId, userRawTableName, qe.getMessage());
+        _brokerMetrics.addMeteredTableValue(userRawTableName, BrokerMeter.QUERY_REWRITE_EXCEPTIONS, 1);
+        viewSplitResponse = null;
+      } catch (Exception e) {
+        LOGGER.error("Materialized view split execution failed for request {} on table {}; "
+            + "falling back to base-table query path", requestId, userRawTableName, e);
+        _brokerMetrics.addMeteredTableValue(userRawTableName, BrokerMeter.QUERY_REWRITE_EXCEPTIONS, 1);
+        viewSplitResponse = null;
+      }
+      if (viewSplitResponse != null) {
+        viewSplitResponse.setTablesQueried(Set.of(userRawTableName));
+        _materializedViewHandler.annotateResponse(viewSplitResponse, materializedViewContext);
+        for (QueryProcessingException errorMsg : errorMsgs) {
+          viewSplitResponse.addException(errorMsg);
+        }
+        viewSplitResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
+        fillEmptyResponseSchema(pinotQuery, viewSplitResponse, schema, database, query);
+        long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
+        viewSplitResponse.setTimeUsedMs(totalTimeMs);
+        augmentStatistics(requestContext, viewSplitResponse);
+        viewSplitResponse.setRLSFiltersApplied(rlsFiltersApplied);
+        _queryLogger.logQueryCompleted(
+            new QueryLogger.QueryLogParams(requestContext, tableName, viewSplitResponse,
+                QueryLogger.QueryLogParams.QueryEngine.SINGLE_STAGE, requesterIdentity, serverStats),
+            queryWasLogged);
+        return viewSplitResponse;
+      }
+      // Fallback: the MV split dispatcher mutated `routeInfo` in place — it stored
+      // SPLIT-side broker requests (carrying `ts >= boundary` filters) via
+      // setOfflineBrokerRequest/setRealtimeBrokerRequest and overwrote its routing tables.
+      // To safely fall through to the standard non-split path below, we MUST restore the
+      // route to its pre-split state.  Easiest: re-acquire a fresh route and recompute its
+      // routing tables using the original (unmutated) base-table broker requests.  Without
+      // this, processBrokerRequest would dispatch the user's "base table" query with
+      // `ts >= boundary` baked in, silently dropping the historical half of the timeline.
+      materializedViewContext = MaterializedViewContext.empty();
+      routeInfo = routeProvider.getTableRouteInfo(tableName, _tableCache, selectedRoutingManager);
+      if (routeInfo instanceof ImplicitHybridTableRouteInfo) {
+        ((ImplicitHybridTableRouteInfo) routeInfo).setOfflineBrokerRequest(offlineBrokerRequest);
+        ((ImplicitHybridTableRouteInfo) routeInfo).setRealtimeBrokerRequest(realtimeBrokerRequest);
+      }
+      routeProvider.calculateRoutes(routeInfo, selectedRoutingManager, offlineBrokerRequest,
+          realtimeBrokerRequest, requestId);
+      // After the fallback recomputes the route, refresh the execution-server and pruned-segment
+      // locals captured pre-split.  Without this, the cancel hook (QueryServers built below)
+      // would track the pre-split server set — a cancel during fallback would target the wrong
+      // instances if rebalancing changed the route between compile and the post-split refresh.
+      // Per-table pool tags and pruned-segment counts would also reflect the stale snapshot.
+      // Note: the unavailable-segments error message in errorMsgs was assembled from the
+      // pre-split list and is left as-is; the metric for that path was already recorded at
+      // pre-split time, so re-adding the message here would double-count.
+      offlineExecutionServers = routeInfo.getOfflineExecutionServers();
+      realtimeExecutionServers = routeInfo.getRealtimeExecutionServers();
+      unavailableSegments = routeInfo.getUnavailableSegments();
+      numPrunedSegmentsTotal = routeInfo.getNumPrunedSegmentsTotal();
+    }
+
     // TODO: Handle broker specific operations for explain plan queries such as:
     //       - Alias handling
     //       - Compile time function invocation
@@ -837,7 +973,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, routeInfo,
           remainingTimeMs, serverStats, requestContext);
     }
-    brokerResponse.setTablesQueried(Set.of(rawTableName));
+    brokerResponse.setTablesQueried(Set.of(userRawTableName));
+    if (_materializedViewHandler != null) {
+      _materializedViewHandler.annotateResponse(brokerResponse, materializedViewContext);
+    }
     brokerResponse.setPools(Stream.concat(
             offlineExecutionServers != null ? offlineExecutionServers.stream() : Stream.empty(),
             realtimeExecutionServers != null ? realtimeExecutionServers.stream() : Stream.empty())
@@ -903,7 +1042,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           BrokerMetrics.getTagForPreferredPool(sqlNodeAndOptions.getOptions()), String.valueOf(pool));
     }
 
-    brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());
+    brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
 
     // Log query and stats
     _queryLogger.logQueryCompleted(
@@ -1053,9 +1192,137 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     Schema schema = _tableCache.getSchema(rawTableName);
+
+    boolean rlsFiltersApplied = false;
+    if (_enableRowColumnLevelAuth && _tableCache.getLogicalTableConfig(rawTableName) == null) {
+      try {
+        rlsFiltersApplied =
+            applyRlsFilters(requestId, query, serverPinotQuery, rawTableName, requesterIdentity,
+                accessControl);
+      } catch (Exception e) {
+        LOGGER.error("Unable to apply RLS filter with {} for request {}: {}",
+            RlsFiltersRewriter.class.getName(), requestId, query, e);
+        requestContext.setErrorCode(QueryErrorCode.QUERY_VALIDATION);
+        return new CompileResult(new BrokerResponseNative(QueryErrorCode.QUERY_VALIDATION,
+            "Unable to apply row-level security filter: " + e.getMessage()));
+      }
+    }
+
+    // Capture the user-facing raw table name BEFORE the FULL_REWRITE MV swap so the response's
+    // `tablesQueried` field and per-table metrics tag the base table, not the MV the broker
+    // happened to route through.
+    String userRawTableName = rawTableName;
+
+    // MV rewrite is per-MV-table opt-in (controlled by `rewriteEnabled` on the MV definition).
+    // The broker always runs the handler when configured; the handler/cache filters out MVs that
+    // are not eligible for rewrite (no watermark yet, rewrite disabled, staleness SLO exceeded).
+    MaterializedViewContext materializedViewContext = MaterializedViewContext.empty();
+    if (_materializedViewHandler != null) {
+      // Defense-in-depth wrapper around the MV rewrite path.  The rewrite engine deliberately
+      // propagates strategy bugs (no silent swallow), but a broken strategy must never kill the
+      // query — fall back to the base-table path and surface the failure via the meter so
+      // operators see the regression.  Any exception observed here is a contract violation
+      // inside a subsumption strategy, the projection map cache, or one of the Preconditions
+      // guards; logging at ERROR with the request id makes the bad MV identifiable.
+      try {
+        materializedViewContext = _materializedViewHandler.compile(new MaterializedViewCompileContext(
+            requestId, serverPinotQuery, tableName, rawTableName, schema, _tableCache));
+      } catch (Exception e) {
+        LOGGER.error("Materialized view rewrite failed for request {} on table {}; "
+            + "falling back to base-table query path", requestId, rawTableName, e);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_REWRITE_EXCEPTIONS, 1);
+        materializedViewContext = MaterializedViewContext.empty();
+      }
+      if (materializedViewContext.isFullRewrite()) {
+        // FULL_REWRITE replaces the base-table query with the MV-OFFLINE query. If the base table
+        // is hybrid (has both OFFLINE and REALTIME variants), the MV covers only the offline half
+        // and a FULL_REWRITE swap would silently drop every row that has been ingested through
+        // the realtime stream since the MV last refreshed.  Reject the rewrite at this layer
+        // rather than at the engine (which does not have access to the broker's table cache) so
+        // the broker emits the matching observability signal and continues against the base
+        // table unchanged.
+        String baseRawTableName = TableNameBuilder.extractRawTableName(tableName);
+        boolean baseHasRealtime = _tableCache.getTableConfig(
+            TableNameBuilder.REALTIME.tableNameWithType(baseRawTableName)) != null;
+        if (baseHasRealtime) {
+          LOGGER.warn("FULL_REWRITE skipped for request {} on hybrid base table {}: MV would drop "
+                  + "realtime data; falling back to base-table query path",
+              requestId, baseRawTableName);
+          _brokerMetrics.addMeteredTableValue(baseRawTableName, BrokerMeter.QUERY_REWRITE_EXCEPTIONS, 1);
+          materializedViewContext = MaterializedViewContext.empty();
+        }
+      }
+      if (materializedViewContext.isFullRewrite()) {
+        // Swap server-side query/table/schema to the MV. The pre-rewrite query/table is preserved
+        // inside materializedViewContext so ACL/quota/RLS authorize against the base table.
+        // pinotQuery (user-facing) stays pointing at the original so fillEmptyResponseSchema and
+        // query logging use the base table schema/name rather than the materialized view's.
+        MaterializedViewRewritePlan plan = Preconditions.checkNotNull(materializedViewContext.getPlan(),
+            "FULL_REWRITE context must carry a plan");
+        serverPinotQuery = plan.getMaterializedViewQuery();
+        // Mark the server query so BrokerReduceService can distinguish MV-rewritten queries from
+        // gapfill / future federated paths via an explicit signal instead of a structural
+        // heuristic.  Stamped on the swap rather than at plan-construction time so the marker is
+        // present iff the rewrite was committed to.
+        Map<String, String> serverQueryOptions = serverPinotQuery.getQueryOptions();
+        if (serverQueryOptions == null) {
+          serverQueryOptions = new HashMap<>();
+          serverPinotQuery.setQueryOptions(serverQueryOptions);
+        }
+        serverQueryOptions.put(QueryOptionKey.MATERIALIZED_VIEW_REWRITE, "true");
+        tableName = plan.getMaterializedViewTableNameWithType();
+        rawTableName = TableNameBuilder.extractRawTableName(tableName);
+        schema = _tableCache.getSchema(rawTableName);
+        // Re-canonicalize column identifiers against the MV table's own column name map.  The
+        // earlier updateColumnNames call (above) ran against the base table; the rewritten MV
+        // query may reference columns whose case differs from the MV schema's canonical case.
+        // Wrap in try/catch so a case-sensitive cluster with a case-different MV column name
+        // falls back to the base-table path instead of failing the query.
+        Map<String, String> mvColumnNameMap = _tableCache.getColumnNameMap(rawTableName);
+        if (mvColumnNameMap != null) {
+          try {
+            updateColumnNames(rawTableName, serverPinotQuery, ignoreCase, mvColumnNameMap);
+          } catch (Exception e) {
+            LOGGER.warn("FULL_REWRITE column re-canonicalization failed for request {} on MV {}; "
+                + "reverting to base-table query path", requestId, rawTableName, e);
+            _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_REWRITE_EXCEPTIONS, 1);
+            // Revert all four FULL_REWRITE swap targets back to the pre-rewrite values so the
+            // caller continues against the base table.  MaterializedViewContext preserves both
+            // the pre-rewrite serverPinotQuery and tableName on its FullRewriteContext.
+            serverPinotQuery = materializedViewContext.getPreRewriteServerPinotQueryOrDefault(serverPinotQuery);
+            tableName = materializedViewContext.getPreRewriteTableNameOrDefault(tableName);
+            rawTableName = TableNameBuilder.extractRawTableName(tableName);
+            schema = _tableCache.getSchema(rawTableName);
+            materializedViewContext = MaterializedViewContext.empty();
+          }
+        }
+      }
+    }
+
     _queryOptimizer.optimize(serverPinotQuery, schema);
 
-    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
+    return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName,
+        userRawTableName, materializedViewContext, rlsFiltersApplied);
+  }
+
+  private boolean applyRlsFilters(long requestId, String query, PinotQuery serverPinotQuery, String rawTableName,
+      @Nullable RequesterIdentity requesterIdentity, AccessControl accessControl) {
+    TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, rawTableName);
+    List<String> rowFilters = rlsFilters.getRLSFilters().orElse(null);
+    if (CollectionUtils.isEmpty(rowFilters)) {
+      return false;
+    }
+
+    Map<String, String> queryOptions =
+        serverPinotQuery.getQueryOptions() == null ? new HashMap<>() : serverPinotQuery.getQueryOptions();
+    String combinedFilters =
+        rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+    queryOptions.put(RlsUtils.buildRlsFilterKey(rawTableName), combinedFilters);
+    serverPinotQuery.setQueryOptions(queryOptions);
+    CalciteSqlParser.queryRewrite(serverPinotQuery, RlsFiltersRewriter.class);
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
+    LOGGER.debug("Applied RLS filters for request {} on table {}: {}", requestId, rawTableName, query);
+    return true;
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
@@ -1123,14 +1390,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
       ResultTable resultTable = EmptyResponseUtils.buildEmptyResultTable(serverQueryContext);
       brokerResponse.setResultTable(resultTable);
+      // pinotQuery and serverPinotQuery differ either when the user query is a gapfill (parser
+      // wrapped it) or when MV rewrite produced an MV-bound serverPinotQuery. Only the gapfill
+      // case requires the nested-query post-processor.
       if (pinotQuery != serverPinotQuery) {
         QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
         GapfillUtils.GapfillType gapfillType = GapfillUtils.getGapfillType(queryContext);
-        if (gapfillType == null) {
-          throw new BadQueryRequestException("Nested query is not supported without gapfill");
+        if (gapfillType != null) {
+          BaseGapfillProcessor gapfillProcessor =
+              GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
+          gapfillProcessor.process(brokerResponse);
         }
-        BaseGapfillProcessor gapfillProcessor = GapfillProcessorFactory.getGapfillProcessor(queryContext, gapfillType);
-        gapfillProcessor.process(brokerResponse);
       }
       fillEmptyResponseSchema(pinotQuery, brokerResponse, schema, database, query);
     } catch (Exception e) {
@@ -1190,12 +1460,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
   }
 
-  /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to false. */
+  /// Given a [PinotQuery], check if the WHERE clause will always evaluate to false.
   private boolean isFilterAlwaysFalse(PinotQuery pinotQuery) {
     return FALSE.equals(pinotQuery.getFilterExpression());
   }
 
-  /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to true. */
+  /// Given a [PinotQuery], check if the WHERE clause will always evaluate to true.
   private boolean isFilterAlwaysTrue(PinotQuery pinotQuery) {
     return TRUE.equals(pinotQuery.getFilterExpression());
   }
@@ -2034,9 +2304,140 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
+  /// Broker-side helper invoked by the MV handler's split-dispatcher callback. Owns the generic
+  /// route-build + scatter-gather + reduce work (hybrid offline/realtime split, always-false-filter
+  /// pruning, MV-side route, deep-copy of the reduce request to strip `SERVER_RETURN_FINAL_RESULT`).
+  /// MV-specific concerns (time-boundary computation and per-branch filter attachment) live in the
+  /// MV handler implementation, not here.
+  private BrokerResponseNative dispatchMaterializedViewSplit(long requestId,
+      BrokerRequest originalBrokerRequest, PinotQuery baseQueryWithTimeFilter, TableRouteInfo baseRouteInfo,
+      Schema baseSchema, PinotQuery viewQueryWithTimeFilter, String viewTableNameWithType, Schema viewSchema,
+      long timeoutMs, ServerStats serverStats, RequestContext requestContext, RoutingManager routingManager,
+      TableRouteProvider routeProvider, @Nullable String clientRequestId, String query) throws Exception {
+    // --- 1. Optimize and route the base-table side (handles hybrid offline/realtime split) ---
+    _queryOptimizer.optimize(baseQueryWithTimeFilter, baseSchema);
+    BrokerRequest baseBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(baseQueryWithTimeFilter);
+    ImplicitHybridTableRouteInfo hybridBaseRoute =
+        prepareBaseTableHybridRoute(baseBrokerRequest, baseRouteInfo, baseSchema);
+
+    BrokerRequest baseOfflineBrokerRequest = hybridBaseRoute.getOfflineBrokerRequest();
+    BrokerRequest baseRealtimeBrokerRequest = hybridBaseRoute.getRealtimeBrokerRequest();
+    if (baseOfflineBrokerRequest != null && isFilterAlwaysFalse(baseOfflineBrokerRequest.getPinotQuery())) {
+      baseOfflineBrokerRequest = null;
+    }
+    if (baseRealtimeBrokerRequest != null && isFilterAlwaysFalse(baseRealtimeBrokerRequest.getPinotQuery())) {
+      baseRealtimeBrokerRequest = null;
+    }
+    hybridBaseRoute.setOfflineBrokerRequest(baseOfflineBrokerRequest);
+    hybridBaseRoute.setRealtimeBrokerRequest(baseRealtimeBrokerRequest);
+    routeProvider.calculateRoutes(hybridBaseRoute, routingManager, baseOfflineBrokerRequest, baseRealtimeBrokerRequest,
+        requestId);
+
+    // --- 2. Optimize and route the MV-table side (always offline) ---
+    _queryOptimizer.optimize(viewQueryWithTimeFilter, viewSchema);
+    BrokerRequest viewBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(viewQueryWithTimeFilter);
+    TableRouteInfo viewRouteInfo = routeProvider.getTableRouteInfo(viewTableNameWithType, _tableCache, routingManager);
+    // The MV table can disappear between compile (broker MV cache) and execute (route lookup) —
+    // operator dropped it, controller mid-state-transition, etc.  Treat missing-route the same
+    // way the base path does (BROKER_RESOURCE_MISSING with a graceful message); the caller's
+    // try/catch wrapper then falls back to the base table.
+    if (!viewRouteInfo.isExists()) {
+      throw new QueryException(QueryErrorCode.BROKER_RESOURCE_MISSING,
+          "Materialized view " + viewTableNameWithType
+              + " is no longer routable (table may have been dropped after rewrite compile)");
+    }
+    // MaterializedViewTaskScheduler.generateTasks only generates for OFFLINE tables, so the MV
+    // route MUST be OFFLINE-only. Fail loud rather than silently misroute against a HYBRID/REALTIME
+    // table that operators may have created by mistake.
+    Preconditions.checkState(viewRouteInfo.isOffline(),
+        "MV split routing requires an OFFLINE materialized-view table, got route type for %s: hybrid=%s, offline=%s",
+        viewTableNameWithType, viewRouteInfo.isHybrid(), viewRouteInfo.isOffline());
+    routeProvider.calculateRoutes(viewRouteInfo, routingManager, viewBrokerRequest, null, requestId);
+
+    // --- 3. Build the reduce-time broker request (strip SERVER_RETURN_FINAL_RESULT) ---
+    // The originalBrokerRequest may carry SERVER_RETURN_FINAL_RESULT=true set by the outer
+    // doHandleRequest flow (when numServers == 1). Since processMaterializedViewSplitBrokerRequest
+    // passes this request to BrokerReduceService as the serverBrokerRequest, the reducer would
+    // build a QueryContext with isServerReturnFinalResult() == true and attempt to cast
+    // intermediate objects (e.g. HyperLogLog) to Comparable, causing a ClassCastException. Deep-copy
+    // so the mutation does not leak back to callers that hold the original reference.
+    BrokerRequest reduceBrokerRequest = originalBrokerRequest.deepCopy();
+    Map<String, String> reduceQueryOptions = reduceBrokerRequest.getPinotQuery().getQueryOptions();
+    if (reduceQueryOptions != null) {
+      reduceQueryOptions.remove(QueryOptionKey.SERVER_RETURN_FINAL_RESULT);
+      reduceQueryOptions.remove(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED);
+    }
+
+    long materializedViewRequestId = _requestIdGenerator.get();
+    if (isQueryCancellationEnabled()) {
+      onQueryStart(requestId, clientRequestId, query,
+          new QueryServers(query, requestId, hybridBaseRoute.getOfflineExecutionServers(),
+              hybridBaseRoute.getRealtimeExecutionServers(), materializedViewRequestId,
+              viewRouteInfo.getOfflineExecutionServers(), viewRouteInfo.getRealtimeExecutionServers()));
+      try {
+        return processMaterializedViewSplitBrokerRequest(requestId, materializedViewRequestId, reduceBrokerRequest,
+            hybridBaseRoute, viewRouteInfo, timeoutMs, serverStats, requestContext);
+      } finally {
+        onQueryFinish(requestId);
+        LOGGER.debug("Remove track of running MV split query: {}", requestId);
+      }
+    }
+
+    return processMaterializedViewSplitBrokerRequest(requestId, materializedViewRequestId, reduceBrokerRequest,
+        hybridBaseRoute, viewRouteInfo, timeoutMs, serverStats, requestContext);
+  }
+
   /**
-   * Helper method to attach the time boundary to the given PinotQuery.
+   * Prepares the offline/realtime broker requests for the base table route based on
+   * whether the base table is hybrid, offline-only, or realtime-only.
+   * This mirrors the logic in the main doHandleRequest flow but operates on a pre-existing
+   * routeInfo for the base table.
    */
+  private ImplicitHybridTableRouteInfo prepareBaseTableHybridRoute(BrokerRequest baseBrokerRequest,
+      TableRouteInfo baseRouteInfo, Schema schema) {
+    Preconditions.checkState(baseRouteInfo instanceof ImplicitHybridTableRouteInfo,
+        "MV split execution requires ImplicitHybridTableRouteInfo but got: %s",
+        baseRouteInfo.getClass().getSimpleName());
+    ImplicitHybridTableRouteInfo hybridRoute = (ImplicitHybridTableRouteInfo) baseRouteInfo;
+
+    String offlineTableName = baseRouteInfo.getOfflineTableName();
+    String realtimeTableName = baseRouteInfo.getRealtimeTableName();
+    TimeBoundaryInfo timeBoundaryInfo = baseRouteInfo.getTimeBoundaryInfo();
+
+    if (baseRouteInfo.isHybrid()) {
+      PinotQuery basePinotQuery = baseBrokerRequest.getPinotQuery();
+
+      PinotQuery offlinePinotQuery = basePinotQuery.deepCopy();
+      offlinePinotQuery.getDataSource().setTableName(offlineTableName);
+      if (timeBoundaryInfo != null) {
+        attachTimeBoundary(offlinePinotQuery, timeBoundaryInfo, true);
+      }
+      _queryOptimizer.optimize(offlinePinotQuery, schema);
+      BrokerRequest offlineBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(offlinePinotQuery);
+
+      PinotQuery realtimePinotQuery = basePinotQuery.deepCopy();
+      realtimePinotQuery.getDataSource().setTableName(realtimeTableName);
+      if (timeBoundaryInfo != null) {
+        attachTimeBoundary(realtimePinotQuery, timeBoundaryInfo, false);
+      }
+      _queryOptimizer.optimize(realtimePinotQuery, schema);
+      BrokerRequest realtimeBrokerRequest = CalciteSqlCompiler.convertToBrokerRequest(realtimePinotQuery);
+
+      hybridRoute.setOfflineBrokerRequest(offlineBrokerRequest);
+      hybridRoute.setRealtimeBrokerRequest(realtimeBrokerRequest);
+    } else if (baseRouteInfo.isOffline()) {
+      setTableName(baseBrokerRequest, offlineTableName);
+      hybridRoute.setOfflineBrokerRequest(baseBrokerRequest);
+    } else {
+      setTableName(baseBrokerRequest, realtimeTableName);
+      hybridRoute.setRealtimeBrokerRequest(baseBrokerRequest);
+    }
+    return hybridRoute;
+  }
+
+  /// Helper method to attach the time boundary to the given PinotQuery.
+  /// Used for standard hybrid table offline/realtime split where offline has
+  /// `ts <= boundary` and realtime has `ts > boundary`.
   private static void attachTimeBoundary(PinotQuery pinotQuery, TimeBoundaryInfo timeBoundaryInfo,
       boolean isOfflineRequest) {
     String functionName = isOfflineRequest ? FilterKind.LESS_THAN_OR_EQUAL.name() : FilterKind.GREATER_THAN.name();
@@ -2055,6 +2456,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
   }
 
+
   /**
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    * TODO: Directly take PinotQuery
@@ -2062,6 +2464,26 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs,
       ServerStats serverStats, RequestContext requestContext)
+      throws Exception;
+
+  /// Processes an MV-split query by issuing two independent scatter-gather requests - one to the
+  /// base table (for recent data beyond the MV boundary) and one to the materialized view table (for historical
+  /// data up to the boundary) - then merging all returned `DataTable`s into a single
+  /// `dataTableMap` and reducing with the original user query's `BrokerRequest`.
+  ///
+  /// Subclasses must implement this to perform the actual network I/O. The default
+  /// [SingleConnectionBrokerRequestHandler] sends both requests via the `QueryRouter`.
+  ///
+  /// @param requestId        unique request identifier
+  /// @param originalBrokerRequest the user's original query (used as the reduce key)
+  /// @param baseRoute        routing info for the base table query (`ts > boundary`)
+  /// @param materializedViewRoute          routing info for the materialized view table query
+  /// @param timeoutMs        remaining timeout in milliseconds
+  /// @param serverStats      collector for server-side stats
+  /// @param requestContext   request-level context for metrics and tracing
+  protected abstract BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+      long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+      TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
   private String getGlobalQueryId(long requestId) {
@@ -2096,16 +2518,44 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static class QueryServers {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
+    final Map<Long, Set<ServerInstance>> _serversByRequestId = new HashMap<>();
 
     QueryServers(String query, @Nullable Set<ServerInstance> offlineExecutionServers,
         @Nullable Set<ServerInstance> realtimeExecutionServers) {
       _query = query;
+      addServers(-1L, offlineExecutionServers, realtimeExecutionServers);
+    }
+
+    QueryServers(String query, long baseRequestId, @Nullable Set<ServerInstance> baseOfflineExecutionServers,
+        @Nullable Set<ServerInstance> baseRealtimeExecutionServers, long materializedViewRequestId,
+        @Nullable Set<ServerInstance> materializedViewOfflineExecutionServers,
+        @Nullable Set<ServerInstance> materializedViewRealtimeExecutionServers) {
+      _query = query;
+      addServers(baseRequestId, baseOfflineExecutionServers, baseRealtimeExecutionServers);
+      addServers(materializedViewRequestId, materializedViewOfflineExecutionServers,
+          materializedViewRealtimeExecutionServers);
+    }
+
+    private void addServers(long requestId, @Nullable Set<ServerInstance> offlineExecutionServers,
+        @Nullable Set<ServerInstance> realtimeExecutionServers) {
+      Set<ServerInstance> servers = new HashSet<>();
       if (offlineExecutionServers != null) {
-        _servers.addAll(offlineExecutionServers);
+        servers.addAll(offlineExecutionServers);
       }
       if (realtimeExecutionServers != null) {
-        _servers.addAll(realtimeExecutionServers);
+        servers.addAll(realtimeExecutionServers);
       }
+      _servers.addAll(servers);
+      if (requestId >= 0) {
+        _serversByRequestId.put(requestId, servers);
+      }
+    }
+
+    Map<Long, Set<ServerInstance>> getServersByRequestId(long defaultRequestId) {
+      if (_serversByRequestId.isEmpty()) {
+        return Map.of(defaultRequestId, _servers);
+      }
+      return _serversByRequestId;
     }
   }
 }
