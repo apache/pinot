@@ -138,6 +138,8 @@ public class PinotDispatchPlanner {
         dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot);
     if (allLeafStagesEmpty) {
       rewriteReduceStageForEmptyLeaves(fragmentMap);
+      // Drop orphan stages so EXPLAIN PLAN and stats consumers don't see unreferenced entries.
+      fragmentMap.keySet().retainAll(Set.of(0));
     }
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
         fragmentMap,

@@ -239,6 +239,27 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertAllLeafStagesEmptyRows(
         "SELECT AirlineID, COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
         List.of(), "LONG", "LONG");
+    // MIN/MAX return null on empty input (not +/-INFINITY)
+    assertAllLeafStagesEmptyRows("SELECT MIN(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "INT");
+    assertAllLeafStagesEmptyRows("SELECT MAX(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "INT");
+    // AVG returns null on empty input
+    assertAllLeafStagesEmptyRows("SELECT AVG(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "DOUBLE");
+    // Multi-aggregate row alignment
+    assertAllLeafStagesEmptyRows(
+        "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), AVG(ActualElapsedTime), COUNT(*)"
+            + " FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(Arrays.asList(null, null, null, 0L)), "INT", "INT", "DOUBLE", "LONG");
+    // HAVING with IS NULL
+    assertAllLeafStagesEmptyRows(
+        "SELECT SUM(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0 HAVING SUM(ActualElapsedTime) IS NULL",
+        List.of(Collections.singletonList(null)), "LONG");
+    // Window function over empty input
+    assertAllLeafStagesEmptyRows(
+        "SELECT SUM(ActualElapsedTime) OVER () FROM mytable WHERE DaysSinceEpoch < 0",
+        List.of(), "LONG");
   }
 
   @Test

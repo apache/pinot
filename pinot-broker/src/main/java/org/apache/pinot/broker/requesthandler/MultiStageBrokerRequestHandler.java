@@ -684,6 +684,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (allLeafStagesEmpty) {
         try {
           queryResults = QueryDispatcher.runReducer(dispatchableSubPlan, query.getOptions(), _mailboxService);
+        } catch (QueryException e) {
+          // Re-throw typed errors (auth, validation, etc.) so they propagate with their
+          // original error codes, matching the dispatch branch behavior.
+          throw e;
         } catch (Throwable t) {
           QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
           String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
