@@ -650,4 +650,41 @@ public class TableConfigSerDeUtilsTest {
     assertTrue(raw.has("someLegacyField"));
     assertTrue(raw.get("someLegacyField").isNull());
   }
+
+  /// A stored simpleField whose value looks like a JSON container (`{...}` / `[...]`) but is malformed must not
+  /// take down the read — falls back to a text node and emits a WARN log so operators see the corruption.
+  /// Downstream diffs will treat the path as text rather than structured, which is the documented contract.
+  @Test
+  public void testToRawJsonNodeFallsBackToTextOnMalformedJsonContainer() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.INDEXING_CONFIG_KEY, "{\"unclosed\": ");
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    JsonNode indexingNode = raw.get(TableConfig.INDEXING_CONFIG_KEY);
+    assertNotNull(indexingNode);
+    assertTrue(indexingNode.isTextual(),
+        "Malformed JSON container must fall back to a text node so downstream code does not NPE");
+    assertEquals(indexingNode.asText(), "{\"unclosed\": ");
+  }
+
+  /// Primitive-shaped simpleField values that happen to look like JSON primitives (`"123"`, `"true"`, `"null"`)
+  /// MUST be preserved as text — the heuristic-sniff in `looksLikeJsonContainer` only triggers on `{`/`[` first
+  /// chars, so these values bypass the JSON-parse path entirely.
+  @Test
+  public void testToRawJsonNodePreservesTextValuesThatLookLikeJsonPrimitives() {
+    ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
+    znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
+    znRecord.setSimpleField("intLikeKey", "123");
+    znRecord.setSimpleField("boolLikeKey", "true");
+    znRecord.setSimpleField("nullLikeKey", "null");
+    JsonNode raw = TableConfigSerDeUtils.toRawJsonNode(znRecord);
+    assertNotNull(raw);
+    assertEquals(raw.get("intLikeKey").asText(), "123");
+    assertTrue(raw.get("intLikeKey").isTextual(), "JSON-like primitive must stay text, not be coerced to IntNode");
+    assertEquals(raw.get("boolLikeKey").asText(), "true");
+    assertTrue(raw.get("boolLikeKey").isTextual());
+    assertEquals(raw.get("nullLikeKey").asText(), "null");
+    assertTrue(raw.get("nullLikeKey").isTextual());
+  }
 }

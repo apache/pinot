@@ -840,10 +840,20 @@ public class PinotTableRestletResource {
       Stat stat = new Stat();
       ZNRecord storedRecord = ZKMetadataProvider.getTableConfigZNRecord(
           _pinotHelixResourceManager.getPropertyStore(), tableNameWithType, stat);
-      expectedVersion = storedRecord == null ? -1 : stat.getVersion();
+      if (storedRecord == null) {
+        // Race: hasTable() above returned true, but the znode was deleted before this read. Surface a 404 so
+        // the caller learns the table is gone rather than seeing an opaque 5xx from a NullPointerException
+        // inside validateOnUpdate's @NonNull oldTableConfigJson check.
+        throw new ControllerApplicationException(LOGGER,
+            "Table " + tableNameWithType + " was deleted concurrently with this update",
+            Response.Status.NOT_FOUND);
+      }
+      expectedVersion = stat.getVersion();
       JsonNode oldTableConfigJson = TableConfigSerDeUtils.toRawJsonNode(storedRecord);
       deprecationWarnings = DeprecatedTableConfigValidationUtils.validateOnUpdate(
           newTableConfigJson, oldTableConfigJson, null);
+    } catch (ControllerApplicationException e) {
+      throw e;
     } catch (IllegalArgumentException e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);

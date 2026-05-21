@@ -1530,6 +1530,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   @AfterMethod
   public void cleanUp()
       throws IOException {
+    // Defensive: clear any deprecation-validator rule override that an ERROR-path test may have set. The
+    // override is a static volatile field consumed by every REST request through the validator; a test that
+    // fails between setRulesOverrideForTesting and clearRulesOverrideForTesting would otherwise poison every
+    // subsequent test in this class (and any other test class running in the same JVM). The owning tests
+    // already wrap their override in a try/finally; this is belt-and-braces.
+    DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();
     // Delete all tables after each test
     DEFAULT_INSTANCE.cleanup();
   }

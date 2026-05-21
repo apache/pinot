@@ -2654,14 +2654,16 @@ public class PinotHelixResourceManager {
       throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
     String tableNameWithType = tableConfig.getTableName();
     // In CAS mode (expectedVersion >= 0) the pre-flight read serves two purposes:
-    //   (1) Short-circuit to TableConfigVersionConflictException when a concurrent writer already bumped the
-    //       znode past expectedVersion. Without the early throw, back-compat validation would run against a
-    //       fresher snapshot and the caller could see a misleading 400 BAD_REQUEST when the right answer is
-    //       409 CONFLICT.
-    //   (2) Reuse the SAME byte-snapshot for back-compat validation. Doing two independent reads (one for the
-    //       version check, one via getTableConfig() below) opened a race window where back-compat ran against a
-    //       different stored config than the one whose version was checked. Reusing the pair below closes that
-    //       window so a single TableConfig instance drives both decisions.
+    //   (1) Optimisation: short-circuit to TableConfigVersionConflictException when this read already shows the
+    //       znode is past expectedVersion. The atomicity-essential CAS happens at ZKMetadataProvider.setTableConfig
+    //       below — a concurrent writer landing between this read and that write will still be caught by the
+    //       write-time CAS. The early throw avoids running back-compat validation against a snapshot we already
+    //       know is doomed to fail the CAS, and gives the caller a precise 409 rather than a misleading 400.
+    //   (2) Single-snapshot consistency: feed the SAME (existingConfig, statV) snapshot into the back-compat
+    //       validation that follows. Doing two independent reads (one here for the version, one via
+    //       getTableConfig() below) opened a window where back-compat ran against a fresher snapshot than the
+    //       caller's expectedVersion intent. Reusing the pair keeps a single TableConfig instance driving both
+    //       decisions on the in-method evaluation; the write-time CAS remains the only atomicity boundary.
     // In non-CAS mode (expectedVersion == -1) the legacy `getTableConfig(tableNameWithType)` path is retained
     // for back-compat with existing callers (PinotDdlRestletResource, RealtimeOffsetAutoResetKafkaHandler, etc.)
     // that do not pre-read a version.

@@ -56,6 +56,7 @@ import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
 public class TableConfigBuilder {
   private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
+  private static final String APPEND_SEGMENT_PUSH_TYPE = "APPEND";
   private static final String DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD = "7d";
   private static final String DEFAULT_NUM_REPLICAS = "1";
   private static final String MMAP_LOAD_MODE = "MMAP";
@@ -84,7 +85,7 @@ public class TableConfigBuilder {
   // being "APPEND" when not explicitly set continue to work. The new @DeprecatedConfig soft-launch surfaces
   // this as a warning on create/update, signalling migration to ingestionConfig.batchIngestionConfig
   // .segmentIngestionType. TODO: drop the default once the soft-launch flag flips and callers have migrated.
-  private String _segmentPushType = "APPEND";
+  private String _segmentPushType = APPEND_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
   @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
@@ -231,7 +232,7 @@ public class TableConfigBuilder {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
     } else {
-      _segmentPushType = "APPEND";
+      _segmentPushType = APPEND_SEGMENT_PUSH_TYPE;
     }
     return this;
   }
