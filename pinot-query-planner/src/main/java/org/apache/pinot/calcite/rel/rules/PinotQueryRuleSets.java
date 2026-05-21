@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.AggregateCaseToFilterRule;
 import org.apache.calcite.rel.rules.AggregateJoinTransposeRule;
 import org.apache.calcite.rel.rules.AggregateProjectMergeRule;
+import org.apache.calcite.rel.rules.AggregateProjectPullUpConstantsRule;
 import org.apache.calcite.rel.rules.AggregateRemoveRule;
 import org.apache.calcite.rel.rules.AggregateUnionAggregateRule;
 import org.apache.calcite.rel.rules.CoreRules;
@@ -31,6 +32,7 @@ import org.apache.calcite.rel.rules.FilterMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.JoinPushExpressionsRule;
+import org.apache.calcite.rel.rules.ProjectAggregateMergeRule;
 import org.apache.calcite.rel.rules.ProjectFilterTransposeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
@@ -41,7 +43,11 @@ import org.apache.calcite.rel.rules.PruneEmptyRules;
 import org.apache.calcite.rel.rules.SemiJoinRule;
 import org.apache.calcite.rel.rules.SortJoinCopyRule;
 import org.apache.calcite.rel.rules.SortJoinTransposeRule;
+import org.apache.calcite.rel.rules.SortMergeRule;
+import org.apache.calcite.rel.rules.SortProjectTransposeRule;
+import org.apache.calcite.rel.rules.SortRemoveConstantKeysRule;
 import org.apache.calcite.rel.rules.SortRemoveRule;
+import org.apache.calcite.rel.rules.UnionMergeRule;
 import org.apache.calcite.rel.rules.UnionToDistinctRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
@@ -112,6 +118,11 @@ public class PinotQueryRuleSets {
       // copy sort below join without offset and limit, disabled by default
       SortJoinCopyRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.SORT_JOIN_COPY).toRule(),
+
+      // Push Sort below Project so LIMIT applies before projection expressions are evaluated.
+      // Default-on; sits with other transpose rules.
+      SortProjectTransposeRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.SORT_PROJECT_TRANSPOSE).toRule(),
 
       // join rules
       JoinPushExpressionsRule.Config.DEFAULT
@@ -196,8 +207,28 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.FILTER_MERGE).toRule(),
       AggregateRemoveRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_REMOVE).toRule(),
+      // Drop constant columns from GROUP BY keys when the Aggregate's input can prove constancy
+      // (typically from an equality filter on the column). Reduces shuffle key width on
+      // multi-tenant queries like `WHERE tenant_id = 'X' GROUP BY tenant_id, ...`. Default-on.
+      // Use Config.ANY (matches any RelNode below the Aggregate). Config.DEFAULT requires a
+      // LogicalProject directly below the Aggregate, which never appears in Pinot's pipeline
+      // because filter pushdown consumes the Project before PRUNE_RULES runs.
+      AggregateProjectPullUpConstantsRule.Config.ANY
+          .withDescription(PlannerRuleNames.AGGREGATE_PROJECT_PULL_UP_CONSTANTS).toRule(),
       SortRemoveRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.SORT_REMOVE).toRule(),
+      // Collapse stacked Sort/LIMIT nodes (e.g. from sub-query flattening) into a single Sort. Default-on.
+      SortMergeRule.Config.LIMIT_MERGE
+          .withDescription(PlannerRuleNames.LIMIT_MERGE).toRule(),
+      // Drop constant columns from ORDER BY (e.g. WHERE x='Y' ORDER BY x, ts → ORDER BY ts). Default-on.
+      SortRemoveConstantKeysRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.SORT_REMOVE_CONSTANT_KEYS).toRule(),
+      // Flatten nested UNION ALLs into a single n-ary union (eliminates intermediate exchange stages). Default-on.
+      UnionMergeRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.UNION_MERGE).toRule(),
+      // Drop unused aggregate calls when a Project on top of the Aggregate doesn't reference them. Default-on.
+      ProjectAggregateMergeRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.PROJECT_AGGREGATE_MERGE).toRule(),
       PruneEmptyRules.CorrelateLeftEmptyRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_CORRELATE_LEFT).toRule(),
       PruneEmptyRules.CorrelateRightEmptyRuleConfig.DEFAULT

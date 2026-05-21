@@ -58,10 +58,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$1], col1=[$0], EXPR$2=[$2])",
-          "\n  PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[FINAL])",
-          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\nLogicalProject(col2=[$0], col1=[_UTF-8'a':VARCHAR CHARACTER SET \"UTF-8\"], EXPR$2=[$1])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalAggregate(group=[{1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, _UTF-8'a'))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"
@@ -180,10 +180,10 @@
         "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col1 = 'a'  GROUP BY a.col1, a.col2",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(col2=[$1], col1=[$0], EXPR$2=[$2])",
-          "\n  PinotLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)], aggType=[DIRECT])",
-          "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\nLogicalProject(col2=[$0], col1=[_UTF-8'a':VARCHAR CHARACTER SET \"UTF-8\"], EXPR$2=[$1])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, _UTF-8'a'))])",
           "\n          PinotLogicalTableScan(table=[[default, a]])",
           "\n"

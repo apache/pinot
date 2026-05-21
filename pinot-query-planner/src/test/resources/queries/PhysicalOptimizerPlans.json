@@ -13,7 +13,8 @@
           "\n        PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
-      },{
+      },
+      {
         "description": "Verify that override for lite mode leaf stage fan-out adjusted limit works.",
         "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; SET liteModeLeafStageFanOutAdjustedLimit=1000; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col1 = 'foo'",
         "output": [
@@ -795,11 +796,12 @@
           "\n  PhysicalFilter(condition=[=($3, 1)])",
           "\n    PhysicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n      PhysicalSort(sort0=[$2], dir0=[ASC])",
-          "\n        PhysicalAggregate(group=[{0, 1, 2}], aggType=[FINAL])",
-          "\n          PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n            PhysicalAggregate(group=[{0, 1, 2}], aggType=[LEAF], limit=[100000])",
-          "\n              PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n        PhysicalProject(col1=[_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"], col2=[$0], col3=[$1])",
+          "\n          PhysicalAggregate(group=[{0, 1}], aggType=[FINAL])",
+          "\n            PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n              PhysicalAggregate(group=[{1, 2}], aggType=[LEAF], limit=[100000])",
+          "\n                PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n                  PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -809,11 +811,12 @@
         "output": [
           "Execution Plan",
           "\nPhysicalSort(offset=[100], fetch=[400])",
-          "\n  PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
-          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n      PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
-          "\n        PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n          PhysicalTableScan(table=[[default, a]])",
+          "\n  PhysicalProject(col1=[_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"], col2=[$0], col3=[$1], EXPR$3=[$2])",
+          "\n    PhysicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n        PhysicalAggregate(group=[{1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
+          "\n          PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -902,11 +905,12 @@
           "Execution Plan",
           "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
           "\n  PhysicalSort(offset=[100], fetch=[400])",
-          "\n    PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT($3)], aggType=[FINAL])",
-          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
-          "\n        PhysicalAggregate(group=[{0, 1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
-          "\n          PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
-          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n    PhysicalProject(col1=[_UTF-8'foo':VARCHAR CHARACTER SET \"UTF-8\"], col2=[$0], col3=[$1], EXPR$3=[$2])",
+          "\n      PhysicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
+          "\n        PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n          PhysicalAggregate(group=[{1, 2}], agg#0=[COUNT()], aggType=[LEAF], limit=[100000])",
+          "\n            PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n              PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
