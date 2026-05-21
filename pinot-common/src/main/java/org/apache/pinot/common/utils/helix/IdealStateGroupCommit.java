@@ -73,6 +73,11 @@ public class IdealStateGroupCommit {
     IdealState _updatedIdealState = null;
     AtomicBoolean _sent = new AtomicBoolean(false);
     Throwable _exception;
+    // Set to true when the entry's owning thread (the leader of a failed batch) wants the next
+    // leader to skip this entry instead of applying it. Read in the iteration loop. Volatile so
+    // the next leader sees it without synchronization. This is the O(1) alternative to calling
+    // ConcurrentLinkedQueue.remove(entry) (which is O(n)) in the catch path.
+    volatile boolean _cancelled = false;
 
     Entry(String resourceName, Function<IdealState, IdealState> updater) {
       _resourceName = resourceName;
@@ -135,25 +140,20 @@ public class IdealStateGroupCommit {
               if (!ent._resourceName.equals(resourceName)) {
                 continue;
               }
+              if (ent._cancelled) {
+                // Cancelled by a previous failed batch's leader (its commit() catch). Skip and
+                // remove so this batch never applies an updater whose owner has already given up.
+                // Without this, the owner's catch (e.g. cleanup of a newly-created segment ZK
+                // metadata in the pauseless commit path) races against this batch's CAS write
+                // and produces an "in IdealState, no ZK metadata" orphan.
+                it.remove();
+                continue;
+              }
               processed.add(ent);
               it.remove();
-              try {
-                updatedIdealState = ent._updater.apply(updatedIdealState);
-                ent._updatedIdealState = updatedIdealState;
-                ent._exception = null;
-              } catch (HelixHelper.PermanentUpdaterException e) {
-                // Per-entry isolation: only this entry's owner sees the failure. Co-batched
-                // entries continue to be applied and CAS-written in the same write. Without
-                // this catch, the throwing entry would abort iteration mid-batch, leaving
-                // still-queued entries that a subsequent leader silently applied -- producing
-                // an "in IdealState, no ZK metadata" orphan when the caller's catch block
-                // cleaned up its new segment metadata believing its update had failed.
-                LOGGER.warn("PermanentUpdaterException for resource {}; isolating to that entry: {}",
-                    resourceName, e.getMessage(), e);
-                ent._exception = e;
-                ent._updatedIdealState = null;
-                // do NOT rethrow; do NOT update updatedIdealState; continue with the next entry
-              }
+              updatedIdealState = ent._updater.apply(updatedIdealState);
+              ent._updatedIdealState = updatedIdealState;
+              ent._exception = null;
             }
             return updatedIdealState;
           }, retryPolicy, noChangeOk);
@@ -166,6 +166,17 @@ public class IdealStateGroupCommit {
             throw ex;
           }
         } catch (Throwable e) {
+          // If this leader's own entry was never iterated by the failed batch, it's still
+          // sitting in _pending. Without cancelling it, the NEXT leader will iterate it and
+          // apply its updater -- after this thread's caller has already concluded the commit
+          // failed and run its cleanup (e.g., cleanup of a newly-created segment's ZK metadata
+          // in the pauseless commit path). That race produces an "in IdealState, no ZK
+          // metadata" orphan. We set the cancellation flag (O(1)) instead of calling
+          // ConcurrentLinkedQueue.remove (O(n)); the next leader's iteration check skips and
+          // removes any cancelled entry. If our entry was iterated (already in `processed`),
+          // the flag is harmless.
+          entry._cancelled = true;
+          processed.add(entry);
           // If there is an exception, set the exception for all processed entries
           for (Entry ent : processed) {
             ent._exception = e;
