@@ -294,8 +294,12 @@ public class SchemaUtilsTest {
   public void testValidateMultiValueFieldSpec() {
     Schema pinotSchema;
 
-    // JSON MV is rejected by Schema.validate() (called from Schema.build()), so build() itself throws.
-    assertBuildRejectsMultiValue(FieldSpec.DataType.JSON, "myJsonCol", "JSON columns cannot be multi-value");
+    // JSON MV is rejected by SchemaUtils.validate() — the multi-value compatibility check lives there
+    // (controller-side ingest validation), not in Schema.validate() (pure schema DTO validation).
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
+    checkValidationFails(pinotSchema);
 
     pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
@@ -541,21 +545,6 @@ public class SchemaUtilsTest {
       Assert.fail("Schema validation should have failed.");
     } catch (IllegalArgumentException | IllegalStateException e) {
       // expected
-    }
-  }
-
-  private void assertBuildRejectsMultiValue(FieldSpec.DataType dataType, String columnName, String expectedMessage) {
-    try {
-      new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-          .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-          .addMultiValueDimension(columnName, dataType).build();
-      Assert.fail("Schema.build() should have rejected a multi-value " + dataType + " column");
-    } catch (RuntimeException e) {
-      // Schema.build() wraps Schema.validate()'s IllegalStateException
-      Assert.assertTrue(e.getCause() instanceof IllegalStateException,
-          "Expected cause to be IllegalStateException from Schema.validate()");
-      Assert.assertTrue(e.getCause().getMessage().contains(expectedMessage),
-          "Expected message containing '" + expectedMessage + "', got: " + e.getCause().getMessage());
     }
   }
 
