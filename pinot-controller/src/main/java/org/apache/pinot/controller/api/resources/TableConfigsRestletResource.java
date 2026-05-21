@@ -371,11 +371,18 @@ public class TableConfigsRestletResource {
   }
 
   /**
-   * Updated the {@link TableConfigs} by updating the schema tableName,
+   * Updates the {@link TableConfigs} by updating the schema tableName,
    * then updating the offline tableConfig or creating a new one if it doesn't already exist in the cluster,
    * then updating the realtime tableConfig or creating a new one if it doesn't already exist in the cluster.
    *
-   * The option to skip table config validation (validationTypesToSkip) and force update the table schema
+   * <p><b>Atomicity caveat (HTTP 409 CONFLICT response):</b> the offline and realtime sub-config writes are
+   * issued sequentially with independent per-sub-type CAS version checks. If the realtime CAS fails after the
+   * offline CAS has already succeeded, the offline write has ALREADY landed at v+1 — the response will be HTTP
+   * 409 but the underlying state is partially applied. Clients receiving 409 MUST re-read both sub-configs and
+   * retry the full transaction; do NOT interpret 409 as "no change applied". A future PR may collapse the two
+   * writes into a single Helix multi-write; until then this behaviour is documented contract, not a bug.
+   *
+   * <p>The option to skip table config validation (validationTypesToSkip) and force update the table schema
    * (forceTableSchemaUpdate) are provided for testing purposes and should be used with caution.
    */
   @PUT

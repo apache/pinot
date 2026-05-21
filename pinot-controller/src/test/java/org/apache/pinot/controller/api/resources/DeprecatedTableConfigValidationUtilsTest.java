@@ -423,6 +423,19 @@ public class DeprecatedTableConfigValidationUtilsTest {
   /// Javadoc — version-checked CAS on the update path, a concurrency regression test, an injected-version test
   /// seam, and an integration test of the ERROR-path. Once those are in place, edit BOTH `SOFT_LAUNCH_WARNING_ONLY`
   /// and this test in the same commit so the test continues to lock the post-flip value.
+  ///
+  /// Promotion pre-conditions coverage map (cross-references for future maintainers):
+  /// 1. Version-checked CAS — implemented in `PinotHelixResourceManager.setExistingTableConfig(...)`. Threaded
+  ///    through `PinotTableRestletResource.updateTableConfig` and `TableConfigsRestletResource.updateConfig`.
+  /// 2. Concurrency regression test —
+  ///    `PinotHelixResourceManagerStatelessTest#testUpdateTableConfigCasConflictThrowsConflictException`.
+  ///    Exercises the T1-read / T2-write / T1-CAS-fail interleaving end-to-end.
+  /// 3. Version-injection seam — see `classifySeverity(String, String)` overload in
+  ///    `DeprecatedTableConfigValidationUtils`; tests pass an injected `currentMajorMinor` to exercise the
+  ///    older-than-current → ERROR branch.
+  /// 4. ERROR-path REST integration test —
+  ///    `PinotTableRestletResourceTest#testErrorSeverityRuleRejectsCreateAs400`. Uses the `@VisibleForTesting`
+  ///    rule-override seam to inject a synthetic ERROR rule and asserts 400.
   @Test
   public void testSoftLaunchFlagDefaultsToWarningOnly() {
     assertTrue(DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY,

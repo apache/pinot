@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -75,10 +76,12 @@ public final class DeprecatedTableConfigValidationUtils {
   /// `finally` block so a failing test does not poison subsequent tests' behaviour.
   private static volatile List<DeprecatedConfigRule> _rulesOverrideForTesting;
 
+  @VisibleForTesting
   public static void setRulesOverrideForTesting(List<DeprecatedConfigRule> rules) {
     _rulesOverrideForTesting = rules;
   }
 
+  @VisibleForTesting
   public static void clearRulesOverrideForTesting() {
     _rulesOverrideForTesting = null;
   }
@@ -204,6 +207,7 @@ public final class DeprecatedTableConfigValidationUtils {
   /// production code cannot fabricate rules outside the reflective discovery walk; tests use this to inject
   /// synthetic ERROR-severity rules into [#setRulesOverrideForTesting] for end-to-end coverage of the throw
   /// branch in [#validateOnCreate]. Path segments use `*` as a wildcard for array elements and map values.
+  @VisibleForTesting
   public static DeprecatedConfigRule makeRuleForTesting(List<String> pathSegments, String replacement, String since,
       Severity severity) {
     return new DeprecatedConfigRule(List.copyOf(pathSegments), replacement, since, severity, Object.class, null);

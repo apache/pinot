@@ -61,6 +61,7 @@ import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -2652,6 +2653,21 @@ public class PinotHelixResourceManager {
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
       throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
     String tableNameWithType = tableConfig.getTableName();
+    // Pre-flight version check. If the caller passed an expectedVersion (CAS mode) and the current znode version
+    // is already past it, short-circuit to TableConfigVersionConflictException before reading the existing config
+    // for back-compat validation. Without this, back-compat validation runs against a fresher snapshot than the
+    // one the caller intended to overwrite — producing a misleading 400 BAD_REQUEST when the right answer is
+    // 409 CONFLICT. The CAS write below remains the source of truth (the propertyStore.set call is the only
+    // atomic CAS), this just makes the conflict path detectable earlier.
+    if (expectedVersion >= 0) {
+      ImmutablePair<TableConfig, Stat> withStat =
+          ZKMetadataProvider.getTableConfigWithStat(_propertyStore, tableNameWithType);
+      if (withStat != null && withStat.getRight().getVersion() != expectedVersion) {
+        throw new TableConfigVersionConflictException(
+            "Table config for " + tableNameWithType + " was modified by a concurrent writer (expected version "
+                + expectedVersion + ", current " + withStat.getRight().getVersion() + ")");
+      }
+    }
     TableConfig existingTableConfig = getTableConfig(tableNameWithType);
     if (existingTableConfig != null) {
       List<String> violations = TableConfigUtils.validateBackwardCompatibility(tableConfig, existingTableConfig);
