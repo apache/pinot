@@ -67,6 +67,14 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-json-base</artifactId>
     </dependency>
+    <!-- pinot-json ships JSONMessageDecoder, which KafkaJSONMessageDecoder extends. pinot-kafka-base
+         declares pinot-json as provided, so it would be excluded from the transitive runtime
+         classpath; keep it here so JSONMessageDecoder is loadable at runtime. -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-json</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-parquet-base</artifactId>
