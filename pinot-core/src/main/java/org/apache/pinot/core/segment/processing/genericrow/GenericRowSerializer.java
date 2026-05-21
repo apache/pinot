@@ -148,6 +148,14 @@ public class GenericRowSerializer {
             }
             _objectBytes[i] = stringBytesArray;
             break;
+          case BYTES:
+            // Used by MV UUID (storedType=BYTES) — also supports any MV BYTES column going through the
+            // SegmentProcessorFramework. Each element is length-prefixed like SV BYTES.
+            numBytes += Integer.BYTES * numValues;
+            for (Object element : multiValue) {
+              numBytes += ((byte[]) element).length;
+            }
+            break;
           default:
             throw new IllegalStateException("Unsupported MV stored type: " + _storedTypes[i]);
         }
@@ -238,6 +246,13 @@ public class GenericRowSerializer {
             for (byte[] stringBytes : stringBytesArray) {
               byteBuffer.putInt(stringBytes.length);
               byteBuffer.put(stringBytes);
+            }
+            break;
+          case BYTES:
+            for (Object element : multiValue) {
+              byte[] elementBytes = (byte[]) element;
+              byteBuffer.putInt(elementBytes.length);
+              byteBuffer.put(elementBytes);
             }
             break;
           default:

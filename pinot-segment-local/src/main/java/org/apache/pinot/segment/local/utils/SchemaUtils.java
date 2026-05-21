@@ -161,6 +161,9 @@ public class SchemaUtils {
           .equals(FieldSpec.DataType.DOUBLE)) {
         validateDefaultIsNotNaN(fieldSpec);
       }
+      if (!fieldSpec.isSingleValueField()) {
+        validateMultiValueCompatibility(fieldSpec);
+      }
     }
     Preconditions.checkState(Collections.disjoint(transformedColumns, argumentColumns),
         "Columns: %s are a result of transformations, and cannot be used as arguments to other transform functions",
@@ -177,6 +180,16 @@ public class SchemaUtils {
     Preconditions.checkState(!fieldSpec.getDefaultNullValueString().equals("NaN"),
             "NaN as null default value is not managed yet for %s",
             fieldSpec.getName());
+  }
+
+  /**
+   * Validations for MV type columns. Kept here (rather than in {@link Schema#validate()}) so that schema
+   * construction via {@code SchemaBuilder.build()} stays a pure DTO operation and only the controller-side
+   * ingest validation rejects MV JSON columns.
+   */
+  private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
+    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
+        "JSON columns cannot be of multi-value type");
   }
 
   /**
