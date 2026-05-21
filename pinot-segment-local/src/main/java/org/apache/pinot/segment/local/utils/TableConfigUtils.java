@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -2081,52 +2080,82 @@ public final class TableConfigUtils {
       return tableConfig;
     }
     try {
-      boolean updated = false;
-      JsonNode tblCfgJson = tableConfig.toJsonNode();
-      // Apply tier specific overwrites for `tableIndexConfig`
-      JsonNode tblIdxCfgJson = tblCfgJson.get(TableConfig.INDEXING_CONFIG_KEY);
-      if (tblIdxCfgJson != null && tblIdxCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
-        JsonNode tierCfgJson = tblIdxCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
-        if (tierCfgJson != null) {
-          LOGGER.debug("Got table index config overwrites: {} for tier: {}", tierCfgJson, tier);
-          overwriteConfig(tblIdxCfgJson, tierCfgJson);
-          updated = true;
-        }
-      }
-      // Apply tier specific overwrites for `fieldConfigList`
-      JsonNode fieldCfgListJson = tblCfgJson.get(TableConfig.FIELD_CONFIG_LIST_KEY);
-      if (fieldCfgListJson != null && fieldCfgListJson.isArray()) {
-        Iterator<JsonNode> fieldCfgListItr = fieldCfgListJson.elements();
-        while (fieldCfgListItr.hasNext()) {
-          JsonNode fieldCfgJson = fieldCfgListItr.next();
-          if (!fieldCfgJson.has(TableConfig.TIER_OVERWRITES_KEY)) {
-            continue;
-          }
-          JsonNode tierCfgJson = fieldCfgJson.get(TableConfig.TIER_OVERWRITES_KEY).get(tier);
-          if (tierCfgJson != null) {
-            LOGGER.debug("Got field index config overwrites: {} for tier: {}", tierCfgJson, tier);
-            overwriteConfig(fieldCfgJson, tierCfgJson);
-            updated = true;
-          }
-        }
-      }
-      if (updated) {
-        LOGGER.debug("Got overwritten table config: {} for tier: {}", tblCfgJson, tier);
-        return JsonUtils.jsonNodeToObject(tblCfgJson, TableConfig.class);
-      } else {
-        LOGGER.debug("No table config overwrites for tier: {}", tier);
+      IndexingConfig effectiveIndexing = applyIndexingConfigTierOverride(tableConfig.getIndexingConfig(), tier);
+      List<FieldConfig> effectiveFields = applyFieldConfigListTierOverrides(tableConfig.getFieldConfigList(), tier);
+      if (effectiveIndexing == tableConfig.getIndexingConfig()
+          && effectiveFields == tableConfig.getFieldConfigList()) {
         return tableConfig;
       }
+      TableConfig overwritten = new TableConfig(tableConfig);
+      overwritten.setIndexingConfig(effectiveIndexing);
+      overwritten.setFieldConfigList(effectiveFields);
+      return overwritten;
     } catch (IOException e) {
       LOGGER.warn("Failed to overwrite table config for tier: {} for table: {}", tier, tableConfig.getTableName(), e);
       return tableConfig;
     }
   }
 
-  private static void overwriteConfig(JsonNode oldCfg, JsonNode newCfg) {
-    for (Map.Entry<String, JsonNode> cfgEntry : newCfg.properties()) {
-      ((ObjectNode) oldCfg).set(cfgEntry.getKey(), cfgEntry.getValue());
+  @Nullable
+  private static IndexingConfig applyIndexingConfigTierOverride(@Nullable IndexingConfig original, String tier)
+      throws IOException {
+    if (original == null) {
+      return null;
     }
+    JsonNode tierOverwrites = original.getTierOverwrites();
+    if (tierOverwrites == null || !tierOverwrites.has(tier)) {
+      return original;
+    }
+    JsonNode override = tierOverwrites.get(tier);
+    if (!override.isObject()) {
+      return original;
+    }
+    ObjectNode merged = (ObjectNode) JsonUtils.objectToJsonNode(original);
+    for (Map.Entry<String, JsonNode> entry : override.properties()) {
+      merged.set(entry.getKey(), entry.getValue());
+    }
+    return JsonUtils.jsonNodeToObject(merged, IndexingConfig.class);
+  }
+
+  @Nullable
+  private static List<FieldConfig> applyFieldConfigListTierOverrides(@Nullable List<FieldConfig> original, String tier)
+      throws IOException {
+    if (original == null || original.isEmpty()) {
+      return original;
+    }
+    List<FieldConfig> result = null;
+    for (int i = 0; i < original.size(); i++) {
+      FieldConfig fc = original.get(i);
+      FieldConfig effective = applyFieldConfigTierOverride(fc, tier);
+      if (effective != fc) {
+        if (result == null) {
+          result = new ArrayList<>(original);
+        }
+        result.set(i, effective);
+      }
+    }
+    return result != null ? result : original;
+  }
+
+  @Nullable
+  private static FieldConfig applyFieldConfigTierOverride(@Nullable FieldConfig original, String tier)
+      throws IOException {
+    if (original == null) {
+      return null;
+    }
+    JsonNode tierOverwrites = original.getTierOverwrites();
+    if (tierOverwrites == null || !tierOverwrites.has(tier)) {
+      return original;
+    }
+    JsonNode override = tierOverwrites.get(tier);
+    if (!override.isObject()) {
+      return original;
+    }
+    ObjectNode merged = (ObjectNode) JsonUtils.objectToJsonNode(original);
+    for (Map.Entry<String, JsonNode> entry : override.properties()) {
+      merged.set(entry.getKey(), entry.getValue());
+    }
+    return JsonUtils.jsonNodeToObject(merged, FieldConfig.class);
   }
 
   /**

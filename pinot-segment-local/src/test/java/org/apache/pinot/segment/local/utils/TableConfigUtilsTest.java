@@ -3761,6 +3761,17 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testOverwriteTableConfigForTierFastPathReturnsSameInstance() {
+    FieldConfig col1 = new FieldConfig.Builder("col1")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(Collections.singletonList(col1))
+        .build();
+    assertSame(TableConfigUtils.overwriteTableConfigForTier(tableConfig, "coldTier"), tableConfig);
+  }
+
+  @Test
   public void testGetPartitionColumnWithoutAnyConfig() {
     // without instanceAssignmentConfigMap
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
