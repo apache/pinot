@@ -68,6 +68,26 @@ public final class DeprecatedTableConfigValidationUtils {
     private static final List<DeprecatedConfigRule> ALL = discoverRules();
   }
 
+  /// Test-only override of the rule list used by [#validate]. When set, [#activeRules] returns this list instead
+  /// of [Rules#ALL]; tests use this to inject a synthetic ERROR-severity rule and exercise the throw branch of
+  /// [#validateOnCreate] / [#validateOnUpdate] end-to-end through the REST surface without flipping
+  /// [#SOFT_LAUNCH_WARNING_ONLY]. Tests MUST clear the override (via [#clearRulesOverrideForTesting]) in a
+  /// `finally` block so a failing test does not poison subsequent tests' behaviour.
+  private static volatile List<DeprecatedConfigRule> _rulesOverrideForTesting;
+
+  public static void setRulesOverrideForTesting(List<DeprecatedConfigRule> rules) {
+    _rulesOverrideForTesting = rules;
+  }
+
+  public static void clearRulesOverrideForTesting() {
+    _rulesOverrideForTesting = null;
+  }
+
+  private static List<DeprecatedConfigRule> activeRules() {
+    List<DeprecatedConfigRule> override = _rulesOverrideForTesting;
+    return override != null ? override : Rules.ALL;
+  }
+
   public enum Severity {
     WARNING, ERROR
   }
@@ -117,7 +137,7 @@ public final class DeprecatedTableConfigValidationUtils {
   /// @param rootPathPrefix optional prefix for emitted paths, matching the user-submitted JSON structure
   public static Result validate(JsonNode newTableConfigJson, @Nullable JsonNode oldTableConfigJson,
       @Nullable String rootPathPrefix) {
-    return validateWithRules(newTableConfigJson, oldTableConfigJson, rootPathPrefix, Rules.ALL);
+    return validateWithRules(newTableConfigJson, oldTableConfigJson, rootPathPrefix, activeRules());
   }
 
   /// Test seam for [#validate]. Allows unit tests to drive a synthetic rule list end-to-end, e.g. to verify
@@ -178,6 +198,15 @@ public final class DeprecatedTableConfigValidationUtils {
 
   static List<DeprecatedConfigRule> rulesForTesting() {
     return Collections.unmodifiableList(Rules.ALL);
+  }
+
+  /// Test seam to construct synthetic [DeprecatedConfigRule] instances. The constructor is package-private so
+  /// production code cannot fabricate rules outside the reflective discovery walk; tests use this to inject
+  /// synthetic ERROR-severity rules into [#setRulesOverrideForTesting] for end-to-end coverage of the throw
+  /// branch in [#validateOnCreate]. Path segments use `*` as a wildcard for array elements and map values.
+  public static DeprecatedConfigRule makeRuleForTesting(List<String> pathSegments, String replacement, String since,
+      Severity severity) {
+    return new DeprecatedConfigRule(List.copyOf(pathSegments), replacement, since, severity, Object.class, null);
   }
 
   private static List<DeprecatedConfigRule> discoverRules() {
@@ -479,7 +508,7 @@ public final class DeprecatedTableConfigValidationUtils {
     return false;
   }
 
-  static final class DeprecatedConfigRule {
+  public static final class DeprecatedConfigRule {
     private final List<String> _pathSegments;
     private final String _replacement;
     private final String _since;

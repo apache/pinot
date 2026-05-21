@@ -39,6 +39,7 @@ import org.apache.pinot.client.admin.TableAdminClient;
 import org.apache.pinot.client.admin.TaskAdminClient;
 import org.apache.pinot.client.admin.ZookeeperAdminClient;
 import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.controller.api.resources.DeprecatedTableConfigValidationUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -1526,6 +1527,49 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws IOException {
     // Delete all tables after each test
     DEFAULT_INSTANCE.cleanup();
+  }
+
+  /// End-to-end REST coverage of the validator's ERROR-path. Under SOFT_LAUNCH_WARNING_ONLY, no in-tree
+  /// annotation can produce an ERROR severity (every parseable `since` resolves to WARNING; unparseable values
+  /// are locked out by `testEveryRuleHasParseableSince`). To exercise the throw branch through the real Jersey
+  /// stack, this test injects a synthetic ERROR-severity rule via
+  /// `DeprecatedTableConfigValidationUtils.setRulesOverrideForTesting`, POSTs a table whose JSON triggers the
+  /// rule, and asserts the REST surface returns 400 with the deprecation error message. Documented as
+  /// pre-condition #4 in `DeprecatedTableConfigValidationUtils.SOFT_LAUNCH_WARNING_ONLY` Javadoc.
+  @Test
+  public void testErrorSeverityRuleRejectsCreateAs400()
+      throws Exception {
+    String tableName = "errorSeverityRuleTable";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    // Synthetic ERROR rule that fires on the literal path "ingestionConfig.batchIngestionConfig.batchType" — a
+    // location no current @DeprecatedConfig annotation owns, so this override does not collide with the real
+    // rule set.
+    DeprecatedTableConfigValidationUtils.setRulesOverrideForTesting(java.util.List.of(
+        DeprecatedTableConfigValidationUtils.makeRuleForTesting(
+            java.util.List.of("ingestionConfig", "batchIngestionConfig", "batchType"),
+            "Synthetic ERROR rule for end-to-end test coverage of validateOnCreate's throw branch.",
+            "0.1.0", DeprecatedTableConfigValidationUtils.Severity.ERROR)));
+    try {
+      ObjectNode tableConfigJson = (ObjectNode) JsonUtils.objectToJsonNode(
+          _offlineBuilder.setTableName(tableName).build());
+      ObjectNode ingestionConfig = JsonUtils.newObjectNode();
+      ObjectNode batchIngestionConfig = JsonUtils.newObjectNode();
+      batchIngestionConfig.put("batchType", "s3");
+      ingestionConfig.set("batchIngestionConfig", batchIngestionConfig);
+      tableConfigJson.set("ingestionConfig", ingestionConfig);
+
+      try {
+        createTable(tableConfigJson.toString());
+        fail("Expected HTTP 400 BAD_REQUEST when synthetic ERROR rule fires on create");
+      } catch (IOException e) {
+        assertTrue(e.getMessage().contains("400") || e.getMessage().contains("Bad Request"),
+            "Expected 400-class response; got: " + e.getMessage());
+        assertTrue(e.getMessage().contains("batchIngestionConfig.batchType"),
+            "Error message should name the offending path; got: " + e.getMessage());
+      }
+    } finally {
+      DeprecatedTableConfigValidationUtils.clearRulesOverrideForTesting();
+    }
   }
 
   @AfterClass
