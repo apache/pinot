@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.controller.api.upload;
 
+import java.util.OptionalLong;
+import javax.annotation.Nullable;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.Interval;
@@ -54,6 +60,51 @@ public class SegmentValidationUtils {
             String.format("Failed to find time interval in segment: %s for table: %s with time column: %s",
                 segmentMetadata.getName(), tableConfig.getTableName(), timeColumn), Response.Status.FORBIDDEN);
       }
+    }
+  }
+
+  /// When `controller.segment.upload.rejectOutOfRetention.enabled` is true on the controller, rejects the upload if
+  /// the segment's data end time (from segment file metadata) is past the table's `retentionTimeValue` /
+  /// `retentionTimeUnit` window, using the same boundary as the controller retention manager. **Index creation time is
+  /// not** used as a fallback here: it can reflect upstream segment timestamps (for example upsert compaction) and is a
+  /// poor proxy for the data window at upload time.
+  ///
+  /// Rejection uses HTTP 403 so callers that enable the controller flag can treat the response as a hard failure.
+  /// Clients that do not enable the flag see no behavior change.
+  ///
+  /// Controller wiring: {@link org.apache.pinot.controller.api.resources.PinotSegmentUploadDownloadRestletResource}
+  /// invokes this for single-segment upload only. METADATA batch upload (`POST /segments/batchUpload`) and
+  /// reingested-segment upload do not call it.
+  ///
+  /// For tables where the retention manager does not apply time-based retention to completed segments (offline tables
+  /// whose batch ingestion type is not `APPEND`), this method returns without evaluating retention.
+  public static void rejectUploadIfOutOfRetention(SegmentMetadata segmentMetadata, TableConfig tableConfig,
+      long currentTimeMs, boolean controllerRejectOutOfRetentionEnabled,
+      @Nullable ControllerMetrics controllerMetrics) {
+    if (!controllerRejectOutOfRetentionEnabled) {
+      return;
+    }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig == null) {
+      return;
+    }
+    if (!RetentionUtils.shouldManageTimeBasedDataRetention(tableConfig)) {
+      return;
+    }
+    OptionalLong retentionMsOpt = RetentionUtils.parseTableDataRetentionMillis(validationConfig);
+    if (retentionMsOpt.isEmpty()) {
+      return;
+    }
+    long retentionMs = retentionMsOpt.getAsLong();
+    if (RetentionUtils.isPurgeable(tableConfig.getTableName(), segmentMetadata, retentionMs, currentTimeMs, false)) {
+      if (controllerMetrics != null) {
+        controllerMetrics.addMeteredGlobalValue(ControllerMeter.OUT_OF_RETENTION_SEGMENT_UPLOAD_REJECTED, 1L);
+      }
+      throw new ControllerApplicationException(LOGGER, String.format(
+          "Segment %s of table %s is outside the retention window (%s %s); upload rejected.",
+          segmentMetadata.getName(), tableConfig.getTableName(), validationConfig.getRetentionTimeValue(),
+          validationConfig.getRetentionTimeUnit()),
+          Response.Status.FORBIDDEN);
     }
   }
 
