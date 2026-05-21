@@ -286,7 +286,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   private JsonNode assertAllLeafStagesEmptyRows(String query, List<List<Object>> expectedRows, String... expectedTypes)
       throws Exception {
-    JsonNode response = postQuery(query);
+    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
     assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
     assertEquals(response.get("numServersQueried").asInt(), 0, "Query should not dispatch to servers: " + query);
     assertEquals(response.get("numServersResponded").asInt(), 0, "Query should not dispatch to servers: " + query);
@@ -321,7 +321,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   private void assertDoesNotShortCircuitRows(String query, int expectedRowCount)
       throws Exception {
-    JsonNode response = postQuery(query);
+    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
     assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
     assertTrue(response.get("numServersQueried").asInt() > 0, "Query should dispatch to servers: " + query);
     assertEquals(response.get("resultTable").get("rows").size(), expectedRowCount,
@@ -330,7 +330,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   private void assertDoesNotShortCircuitSingleLong(String query, long expectedValue)
       throws Exception {
-    JsonNode response = postQuery(query);
+    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
     assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
     assertTrue(response.get("numServersQueried").asInt() > 0, "Query should dispatch to servers: " + query);
     JsonNode rows = response.get("resultTable").get("rows");
