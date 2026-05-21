@@ -161,6 +161,29 @@ Common migrations:
 - `tableIndexConfig.streamConfigs` -> `ingestionConfig.streamIngestionConfig.streamConfigMaps`
 - `fieldConfigList[].indexType` -> `fieldConfigList[].indexTypes`
 
+### Wire-shape changes (rolling upgrade)
+
+The same migration touches the controller's REST response shape. Several deprecated fields are no longer emitted
+when at their Java default. Old clients reading `GET /tables/{name}` or `GET /tableConfigs/{name}` MUST tolerate
+the absent fields:
+
+- `fieldConfigList[].indexType` is no longer emitted (replaced by `indexTypes`). Clients that screen-scrape for
+  `indexType` will see `null` post-upgrade — read `indexTypes` instead.
+- The following boolean getters are now annotated with `@JsonInclude(NON_DEFAULT)`; the field disappears from the
+  response when the value is `false` (the type default): `upsertConfig.enableSnapshot`, `dedupConfig.enablePreload`,
+  `indexingConfig.createInvertedIndexDuringSegmentGeneration`,
+  `instanceAssignmentConfigMap.*.replicaGroupPartitionConfig.minimizeDataMovement`.
+
+The new `deprecationWarnings` field on `ConfigSuccessResponse` and `CopyTableResponse` is annotated with
+`@JsonInclude(NON_EMPTY)` and the response classes carry `@JsonIgnoreProperties(ignoreUnknown = true)`, so:
+
+- New clients reading old controllers: succeed (no `deprecationWarnings`, treated as empty).
+- Old clients reading new controllers: succeed (unknown field is ignored).
+
+Rolling-upgrade label: this PR changes wire shape (field elision and new optional field) but no field name or
+type is changed; existing clients that parse leniently round-trip cleanly. Strict-parsing clients should set
+`FAIL_ON_UNKNOWN_PROPERTIES=false` or upgrade in lockstep with the controller.
+
 Sample REALTIME table config for create:
 
 ```json

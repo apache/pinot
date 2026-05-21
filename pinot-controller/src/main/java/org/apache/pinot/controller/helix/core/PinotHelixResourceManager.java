@@ -2492,14 +2492,7 @@ public class PinotHelixResourceManager {
    */
   public void updateTableConfig(TableConfig tableConfig, boolean force)
       throws IOException, TableConfigBackwardIncompatibleException {
-    try {
-      updateTableConfig(tableConfig, -1, force);
-    } catch (TableConfigVersionConflictException e) {
-      // -1 means "no CAS check requested" — the underlying setExistingTableConfig cannot throw this. Convert to
-      // unchecked so the legacy two-checked-exception signature is preserved for existing callers.
-      throw new IllegalStateException(
-          "Unexpected CAS conflict with expectedVersion=-1; check updateTableConfig invariants", e);
-    }
+    updateTableConfig(tableConfig, -1, force);
   }
 
   /// Validate the table config and update it with a version-checked CAS write. Callers that pre-read the stored
@@ -2511,11 +2504,12 @@ public class PinotHelixResourceManager {
   /// @param force if true, allows upsert/dedup config changes with a warning
   /// @throws IOException if validation fails
   /// @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
-  /// @throws TableConfigVersionConflictException if expectedVersion is set and a concurrent writer bumped the
-  ///         znode version between the caller's read and this write. Callers SHOULD surface this as HTTP 409
-  ///         CONFLICT so the client can re-read and retry.
+  /// @throws TableConfigVersionConflictException (unchecked) if expectedVersion is set and a concurrent writer
+  ///         bumped or deleted the znode between the caller's read and this write. Callers SHOULD surface this
+  ///         as HTTP 409 CONFLICT so the client can re-read and retry. Unchecked to preserve the prior binary
+  ///         contract of `updateTableConfig(TableConfig, boolean)` for external callers.
   public void updateTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
-      throws IOException, TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
+      throws IOException, TableConfigBackwardIncompatibleException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
     setExistingTableConfig(tableConfig, expectedVersion, force);
@@ -2527,14 +2521,7 @@ public class PinotHelixResourceManager {
    */
   public void setExistingTableConfig(TableConfig tableConfig)
       throws IOException, TableConfigBackwardIncompatibleException {
-    try {
-      setExistingTableConfig(tableConfig, -1);
-    } catch (TableConfigVersionConflictException e) {
-      // -1 means "no version check requested" — the underlying CAS branch cannot fire. Convert to RuntimeException
-      // to preserve the legacy two-checked-exception signature for back-compat with existing callers.
-      throw new IllegalStateException(
-          "Unexpected CAS conflict with expectedVersion=-1; check setExistingTableConfig invariants", e);
-    }
+    setExistingTableConfig(tableConfig, -1);
   }
 
   /**
@@ -2634,7 +2621,7 @@ public class PinotHelixResourceManager {
    * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion)
-      throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
+      throws TableConfigBackwardIncompatibleException {
     setExistingTableConfig(tableConfig, expectedVersion, false);
   }
 
@@ -2645,13 +2632,14 @@ public class PinotHelixResourceManager {
    * @param expectedVersion the expected version (-1 to ignore version check)
    * @param force if true, allows upsert/dedup config changes with a warning
    * @throws TableConfigBackwardIncompatibleException if config changes are backward incompatible and force is false
-   * @throws TableConfigVersionConflictException if expectedVersion is set (non-negative) and the CAS write fails
-   *         because a concurrent writer bumped the znode version. Callers SHOULD surface this as HTTP 409 so the
-   *         client can re-read and retry. Differentiated from a generic ZK error so callers do not have to parse
-   *         exception messages.
+   * @throws TableConfigVersionConflictException (unchecked) if expectedVersion is set (non-negative) and the CAS
+   *         write fails because a concurrent writer bumped the znode version or deleted the znode. Callers SHOULD
+   *         surface this as HTTP 409 so the client can re-read and retry. Differentiated from a generic ZK error
+   *         so REST callers do not have to parse exception messages. Unchecked to preserve binary compatibility
+   *         with pre-existing callers compiled against the prior signature.
    */
   public void setExistingTableConfig(TableConfig tableConfig, int expectedVersion, boolean force)
-      throws TableConfigBackwardIncompatibleException, TableConfigVersionConflictException {
+      throws TableConfigBackwardIncompatibleException {
     String tableNameWithType = tableConfig.getTableName();
     // In CAS mode (expectedVersion >= 0) the pre-flight read serves two purposes:
     //   (1) Optimisation: short-circuit to TableConfigVersionConflictException when this read already shows the
@@ -2671,12 +2659,21 @@ public class PinotHelixResourceManager {
     if (expectedVersion >= 0) {
       ImmutablePair<TableConfig, Stat> withStat =
           ZKMetadataProvider.getTableConfigWithStat(_propertyStore, tableNameWithType);
-      if (withStat != null && withStat.getRight().getVersion() != expectedVersion) {
+      if (withStat == null) {
+        // Concurrent-delete race: caller pre-read the znode at version `expectedVersion`, then a concurrent
+        // deleter removed it before we got here. Distinguish from a regular version-mismatch so the message
+        // says "deleted" rather than "modified". This avoids the controller silently re-creating the table at
+        // expectedVersion (Lazarus pattern) when the operator's intent was to delete it.
+        throw new TableConfigVersionConflictException(
+            "Table config for " + tableNameWithType + " was deleted concurrently (expected version "
+                + expectedVersion + "); re-create the table explicitly or abort the update");
+      }
+      if (withStat.getRight().getVersion() != expectedVersion) {
         throw new TableConfigVersionConflictException(
             "Table config for " + tableNameWithType + " was modified by a concurrent writer (expected version "
                 + expectedVersion + ", current " + withStat.getRight().getVersion() + ")");
       }
-      existingTableConfig = withStat == null ? null : withStat.getLeft();
+      existingTableConfig = withStat.getLeft();
     } else {
       existingTableConfig = getTableConfig(tableNameWithType);
     }

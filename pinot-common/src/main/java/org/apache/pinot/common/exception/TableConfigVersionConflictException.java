@@ -22,7 +22,12 @@ package org.apache.pinot.common.exception;
 /// concurrent writer updated the znode between the pre-read (used for diffing / deprecation validation) and the
 /// subsequent write. Callers SHOULD surface this as HTTP 409 CONFLICT and instruct the client to re-read and
 /// retry — the failure is recoverable and is NOT the same as a transient ZK availability error.
-public class TableConfigVersionConflictException extends Exception {
+///
+/// **Unchecked** so adding the version-checked CAS path does not break the binary contract of pre-existing
+/// public methods (`PinotHelixResourceManager.setExistingTableConfig(TableConfig, int [, boolean])`). External
+/// callers that already swallow `RuntimeException` from the CAS-failure path continue to work; new callers that
+/// want 409 semantics can catch this specific subclass.
+public class TableConfigVersionConflictException extends RuntimeException {
 
   public TableConfigVersionConflictException(String message) {
     super(message);
