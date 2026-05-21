@@ -194,6 +194,16 @@ public class SchemaUtils {
   }
 
   /**
+   * Validations for MV type columns. Kept here (rather than in {@link Schema#validate()}) so that schema
+   * construction via {@code SchemaBuilder.build()} stays a pure DTO operation and only the controller-side
+   * ingest validation rejects MV JSON columns.
+   */
+  private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
+    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
+        "JSON columns cannot be of multi-value type");
+  }
+
+  /**
    * Validates that the schema is compatible with the given table config
    */
   private static void validateCompatibilityWithTableConfig(Schema schema, TableConfig tableConfig) {

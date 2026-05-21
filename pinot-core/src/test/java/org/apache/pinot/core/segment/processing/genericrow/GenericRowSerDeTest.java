@@ -55,6 +55,7 @@ public class GenericRowSerDeTest {
         new DimensionFieldSpec("floatMV", DataType.FLOAT, false),
         new DimensionFieldSpec("doubleMV", DataType.DOUBLE, false),
         new DimensionFieldSpec("stringMV", DataType.STRING, false),
+        // MV BYTES is also the storage shape for MV UUID columns.
         new DimensionFieldSpec("bytesMV", DataType.BYTES, false),
         new DimensionFieldSpec("bigDecimalMV", DataType.BIG_DECIMAL, false),
         new DimensionFieldSpec("nullMV", DataType.LONG, false));
@@ -80,7 +81,7 @@ public class GenericRowSerDeTest {
     _row.putValue("floatMV", new Object[]{123.0f, 456.0f});
     _row.putValue("doubleMV", new Object[]{123.0, 456.0});
     _row.putValue("stringMV", new Object[]{"123", "456"});
-    _row.putValue("bytesMV", new Object[]{new byte[]{1, 2, 3}, new byte[]{4, 5}});
+    _row.putValue("bytesMV", new Object[]{new byte[]{1, 2, 3}, new byte[]{4, 5, 6, 7}, new byte[]{}});
     _row.putValue("bigDecimalMV", new Object[]{new BigDecimal("122333"), new BigDecimal("-4.5")});
     _row.putDefaultNullValue("nullMV", new Object[]{Long.MIN_VALUE});
   }
