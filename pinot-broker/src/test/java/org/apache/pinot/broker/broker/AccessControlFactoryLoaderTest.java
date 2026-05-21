@@ -29,15 +29,17 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
-/// Regression tests for {@link AccessControlFactory#loadFactory(org.apache.pinot.spi.env.PinotConfiguration,
-/// org.apache.helix.store.zk.ZkHelixPropertyStore)}. The `loadFactory` resolution is realm-aware via
-/// `PluginManager.loadClass`, so plugin-realm-resident factories work the same as in-tree ones — but the
-/// non-public-constructor contract from the historical `Class.forName(...).getDeclaredConstructor()`
-/// pattern must be preserved.
+/**
+ * Regression tests for {@link AccessControlFactory#loadFactory(org.apache.pinot.spi.env.PinotConfiguration,
+ * org.apache.helix.store.zk.ZkHelixPropertyStore)}. The loadFactory resolution is realm-aware via
+ * PluginManager.loadClass, so plugin-realm-resident factories work the same as in-tree ones — but the
+ * non-public-constructor contract from the historical Class.forName(...).getDeclaredConstructor()
+ * pattern must be preserved.
+ */
 public class AccessControlFactoryLoaderTest {
 
   @Test
-  public void loadFactory_withNullClassConfig_returnsAllowAllAccessControlFactory() {
+  public void loadFactoryWithNullClassConfigReturnsAllowAllAccessControlFactory() {
     PinotConfiguration emptyConfig = new PinotConfiguration(Collections.emptyMap());
     AccessControlFactory factory = AccessControlFactory.loadFactory(emptyConfig, null);
     assertTrue(factory instanceof AllowAllAccessControlFactory,
@@ -45,7 +47,7 @@ public class AccessControlFactoryLoaderTest {
   }
 
   @Test
-  public void loadFactory_withExplicitInTreeFqcn_resolvesViaSystemClassloader() {
+  public void loadFactoryWithExplicitInTreeFqcnResolvesViaSystemClassloader() {
     Map<String, Object> props = new HashMap<>();
     props.put(AccessControlFactory.ACCESS_CONTROL_CLASS_CONFIG, AllowAllAccessControlFactory.class.getName());
     AccessControlFactory factory = AccessControlFactory.loadFactory(new PinotConfiguration(props), null);
@@ -53,7 +55,7 @@ public class AccessControlFactoryLoaderTest {
   }
 
   @Test
-  public void loadFactory_withUnknownClass_throwsRuntimeExceptionWrappingClassNotFound() {
+  public void loadFactoryWithUnknownClassThrowsRuntimeExceptionWrappingClassNotFound() {
     Map<String, Object> props = new HashMap<>();
     props.put(AccessControlFactory.ACCESS_CONTROL_CLASS_CONFIG, "org.apache.pinot.does.not.Exist");
     try {
@@ -68,20 +70,19 @@ public class AccessControlFactoryLoaderTest {
   }
 
   /**
-   * Regression test: the historical loader used `getDeclaredConstructor()` which finds non-public no-arg
+   * Regression test: the historical loader used getDeclaredConstructor() which finds non-public no-arg
    * constructors. The realm-aware migration must preserve that contract or factories with
    * package-private / protected constructors would silently break on upgrade.
    */
   @Test
-  public void loadFactory_withPackagePrivateConstructor_succeeds() {
+  public void loadFactoryWithPackagePrivateConstructorSucceeds() {
     Map<String, Object> props = new HashMap<>();
     props.put(AccessControlFactory.ACCESS_CONTROL_CLASS_CONFIG, PackagePrivateConstructorFactory.class.getName());
     AccessControlFactory factory = AccessControlFactory.loadFactory(new PinotConfiguration(props), null);
     assertEquals(factory.getClass(), PackagePrivateConstructorFactory.class);
   }
 
-  /// Test fixture: factory whose no-arg constructor is package-private. Public class so the test in this
-  /// package can reference it as a config value, but the constructor itself is intentionally not public.
+  /** Test fixture: factory whose no-arg constructor is package-private. */
   public static class PackagePrivateConstructorFactory extends AccessControlFactory {
     PackagePrivateConstructorFactory() {
     }

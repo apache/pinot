@@ -75,7 +75,7 @@ public class PluginVerifierSmokeTest {
       PluginVerifier.Options options = parseArgsReflectively(args);
       if (options == null) {
         rc = 2;
-      } else if (options.help) {
+      } else if (options._help) {
         rc = 0;
       } else {
         rc = createAndRun(options);
