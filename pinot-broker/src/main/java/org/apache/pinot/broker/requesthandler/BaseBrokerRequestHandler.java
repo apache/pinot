@@ -70,7 +70,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,6 +152,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setBrokerId(_brokerId);
     long requestId = _requestIdGenerator.get();
     requestContext.setRequestId(requestId);
+
+    extractHttpHeaders(requestContext, httpHeaders);
 
     AccessControl accessControl = firstAuthCheck(requesterIdentity, requestContext);
 
@@ -301,7 +302,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /// First-stage access control to prevent unauthenticated requests from using up resources.
   ///
   /// This method does not check table-level access.
-  private @NonNull AccessControl firstAuthCheck(@Nullable RequesterIdentity requesterIdentity,
+  private AccessControl firstAuthCheck(@Nullable RequesterIdentity requesterIdentity,
       RequestContext requestContext) {
     AccessControl accessControl = _accessControlFactory.create();
     AuthorizationResult authorizationResult = accessControl.authorize(requesterIdentity);

@@ -906,6 +906,9 @@ public class QueryDispatcher {
     private final QueryDispatcher _dispatcher;
     @Nullable
     private final Set<QueryServerInstance> _servers;
+    /// The request ID captured at construction time (while QueryThreadContext is open) so that close() can cancel the
+    /// query even when called from a JAX-RS serialization thread that never opened a QueryThreadContext.
+    private final long _requestId;
     private boolean _closed = false;
 
     public DispatcherStreamingBrokerResponse(LazyBrokerResponse lazyBrokerResponse,
@@ -915,6 +918,7 @@ public class QueryDispatcher {
       _dispatchableSubPlan = dispatchableSubPlan;
       _dispatcher = dispatcher;
       _servers = servers;
+      _requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
     }
 
     @Override
@@ -923,7 +927,7 @@ public class QueryDispatcher {
         _closed = true;
         super.close();
         if (_dispatcher != null) {
-          _dispatcher.cancel(QueryThreadContext.get().getExecutionContext().getRequestId());
+          _dispatcher.cancel(_requestId);
         }
       }
     }
@@ -955,7 +959,7 @@ public class QueryDispatcher {
         if (_dispatcher != null) {
           // We cannot cancel with stats here because the current thread is already interrupted and we don't want to
           // wait for the cancel responses.
-          _dispatcher.cancel(QueryThreadContext.get().getExecutionContext().getRequestId());
+          _dispatcher.cancel(_requestId);
         }
         throw e;
       } catch (RuntimeException e) {
@@ -966,7 +970,7 @@ public class QueryDispatcher {
         oldResponse.addException(new QueryProcessingException(errorCode, errorMsg));
 
         if (_dispatcher != null) {
-          stats = _dispatcher.cancelWithStats(QueryThreadContext.get().getExecutionContext().getRequestId(), _servers);
+          stats = _dispatcher.cancelWithStats(_requestId, _servers);
         } else {
           stats = null;
         }
@@ -996,7 +1000,7 @@ public class QueryDispatcher {
             }
             rows.add(row);
           }
-          LOGGER.warn("Reducing data block #{} with {} rows", blockCount.get(), data.getNumRows());
+          LOGGER.debug("Reducing data block #{} with {} rows", blockCount.get(), data.getNumRows());
         }, oldResponse);
       }
       oldResponse.setResultTable(new ResultTable(dataSchema, rows));

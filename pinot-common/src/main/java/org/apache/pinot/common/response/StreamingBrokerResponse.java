@@ -418,7 +418,7 @@ public interface StreamingBrokerResponse extends AutoCloseable {
 
       statsJson.forEachEntry(json::set);
 
-      return statsJson;
+      return json;
     }
   }
 

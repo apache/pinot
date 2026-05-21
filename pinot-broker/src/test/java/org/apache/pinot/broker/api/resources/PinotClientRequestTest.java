@@ -90,6 +90,7 @@ public class PinotClientRequestTest {
       runnable.run();
       return null;
     }).when(_executor).execute(any(Runnable.class));
+    _pinotClientRequest.init();
   }
 
   @Test
@@ -131,30 +132,35 @@ public class PinotClientRequestTest {
   }
 
   @Test
-  public void testUseStreamingUsesBrokerDefaultAndQueryOptionOverride() {
+  public void testIsStreamingResponseEnabledUsesBrokerDefaultAndQueryOptionOverride() {
     SqlNodeAndOptions noQueryOption = mock(SqlNodeAndOptions.class);
     when(noQueryOption.getOptions()).thenReturn(Map.of());
+
     when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
         CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(false);
-    assertFalse(_pinotClientRequest.useStreaming(noQueryOption));
+    _pinotClientRequest.init();
+    assertFalse(_pinotClientRequest.isStreamingResponseEnabled(noQueryOption));
 
     when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
         CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(true);
-    assertTrue(_pinotClientRequest.useStreaming(noQueryOption));
+    _pinotClientRequest.init();
+    assertTrue(_pinotClientRequest.isStreamingResponseEnabled(noQueryOption));
 
     SqlNodeAndOptions forceStreamingOn = mock(SqlNodeAndOptions.class);
     when(forceStreamingOn.getOptions()).thenReturn(
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAMING_RESPONSE, "true"));
     when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
         CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(false);
-    assertTrue(_pinotClientRequest.useStreaming(forceStreamingOn));
+    _pinotClientRequest.init();
+    assertTrue(_pinotClientRequest.isStreamingResponseEnabled(forceStreamingOn));
 
     SqlNodeAndOptions forceStreamingOff = mock(SqlNodeAndOptions.class);
     when(forceStreamingOff.getOptions()).thenReturn(
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.USE_STREAMING_RESPONSE, "false"));
     when(_brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
         CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE)).thenReturn(true);
-    assertFalse(_pinotClientRequest.useStreaming(forceStreamingOff));
+    _pinotClientRequest.init();
+    assertFalse(_pinotClientRequest.isStreamingResponseEnabled(forceStreamingOff));
   }
 
   @Test

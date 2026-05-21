@@ -413,7 +413,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long timeoutMs = getTimeoutMs(options);
     Timer queryTimer = new Timer(timeoutMs, TimeUnit.MILLISECONDS);
 
-    QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0);
+    QueryThreadContext.MseWorkerInfo mseWorkerInfo = new QueryThreadContext.MseWorkerInfo(0, 0, Set.of(1), Set.of());
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, mseWorkerInfo, _threadAccountant);
         QueryEnvironment.CompiledQuery compiledQuery = compileQuery(requestId, query, sqlNodeAndOptions, requestContext,
             httpHeaders, queryTimer)) {

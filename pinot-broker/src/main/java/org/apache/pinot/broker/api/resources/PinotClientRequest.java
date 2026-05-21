@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DELETE;
@@ -141,10 +142,18 @@ public class PinotClientRequest {
   private String _instanceId;
 
   private final ObjectMapper _mapper;
+  private boolean _streamingResponseDefault;
 
   public PinotClientRequest() {
     _mapper = JsonUtils.createMapper();
     StreamingBrokerResponseJacksonSerializer.registerModule(_mapper, KeysComparator.INSTANCE);
+  }
+
+  @PostConstruct
+  public void init() {
+    _streamingResponseDefault = _brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE);
   }
 
   @GET
@@ -614,7 +623,7 @@ public class PinotClientRequest {
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
           StreamingBrokerResponse streamingBrokerResponse;
-          if (useStreaming(sqlNodeAndOptions)) {
+          if (isStreamingResponseEnabled(sqlNodeAndOptions)) {
             streamingBrokerResponse = _requestHandler.handleStreamingRequest(
                 sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext, httpHeaders);
           } else {
@@ -853,6 +862,8 @@ public class PinotClientRequest {
       } catch (Exception e) {
         LOGGER.error(RESPONSE_EXCEPTION_MARKER, "Caught exception while writing streaming response", e);
         throw new RuntimeException(e);
+      } finally {
+        streamingResponse.close();
       }
     };
   }
@@ -885,11 +896,8 @@ public class PinotClientRequest {
   }
 
   @VisibleForTesting
-  boolean useStreaming(SqlNodeAndOptions sqlNodeAndOptions) {
-    boolean defaultValue = _brokerConf.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_STREAMING_RESPONSE,
-        CommonConstants.Broker.DEFAULT_BROKER_QUERY_ENABLE_STREAMING_RESPONSE);
-    return QueryOptionsUtils.isUseStreamingResponse(sqlNodeAndOptions.getOptions(), defaultValue);
+  boolean isStreamingResponseEnabled(SqlNodeAndOptions sqlNodeAndOptions) {
+    return QueryOptionsUtils.isUseStreamingResponse(sqlNodeAndOptions.getOptions(), _streamingResponseDefault);
   }
 
   public static class KeysComparator implements Comparator<String> {

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,8 +31,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class LazyToEagerBrokerResponseAdaptorTest {
@@ -128,5 +131,35 @@ public class LazyToEagerBrokerResponseAdaptorTest {
     BrokerResponse eager = LazyToEagerBrokerResponseAdaptor.of(streaming);
     eager.setRequestId("cursor-request-id");
     assertEquals(eager.getRequestId(), "cursor-request-id");
+  }
+
+  /// Regression test: StdMetainfoDecorator.decorateMetainfoJson must return the merged {@code json} node,
+  /// not the intermediate {@code statsJson} node. Returning {@code statsJson} caused asJson() to drop all
+  /// original metainfo fields (exceptions, requestId, timeUsedMs, etc.).
+  @Test
+  public void testStdMetainfoDecoratorPreservesOriginalMetainfoFields() {
+    QueryProcessingException exception =
+        new QueryProcessingException(QueryErrorCode.QUERY_VALIDATION.getId(), "test error");
+    StreamingBrokerResponse.Metainfo base =
+        new StreamingBrokerResponse.Metainfo.Error(List.of(exception));
+
+    StreamingBrokerResponse.EarlyResponse earlyResponse = new StreamingBrokerResponse.EarlyResponse(base);
+    StreamingBrokerResponse decorated = earlyResponse.withPostMetainfo(
+        stats -> stats.merge(StreamingBrokerResponse.StdMetaField.NUM_DOCS_SCANNED, 42L));
+
+    // getMetaInfo() returns the PostDecorator-wrapped metainfo; asJson() must include BOTH
+    // the original fields from the base metainfo AND the stat fields added by the decorator.
+    ObjectNode json = decorated.getMetaInfo().asJson();
+
+    // Original metainfo field: exceptions array must be present and non-empty.
+    JsonNode exceptionsNode = json.get("exceptions");
+    assertNotNull(exceptionsNode, "exceptions field must be present in merged JSON");
+    assertTrue(exceptionsNode.isArray(), "exceptions must be an array");
+    assertFalse(exceptionsNode.isEmpty(), "exceptions array must be non-empty");
+
+    // Stat field added by the decorator must also be present.
+    JsonNode numDocsScanned = json.get("numDocsScanned");
+    assertNotNull(numDocsScanned, "numDocsScanned stat field must be present in merged JSON");
+    assertEquals(numDocsScanned.longValue(), 42L);
   }
 }
