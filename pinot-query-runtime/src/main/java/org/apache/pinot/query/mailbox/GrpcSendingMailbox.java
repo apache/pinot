@@ -501,6 +501,17 @@ public class GrpcSendingMailbox implements SendingMailbox {
   /// Wakes every waiter in [#awaitReady]. Called from the gRPC ready handler, from [MailboxStatusObserver] events,
   /// and from [#cancel] / [#close]. Must be cheap because it can fire from Netty event-loop threads.
   private void wakeWaiters() {
+    // Lock-from-event-loop pattern, intentional and load-bearing. This method can fire from a Netty channel /
+    // gRPC event-loop thread via the `setOnReadyHandler` registered in `beforeStart`, as well as from the
+    // `MailboxStatusObserver` callbacks (`onNext`, `onError`, `onCompleted`) — all of which run on gRPC
+    // executor threads. Acquiring `_readyLock` here therefore briefly blocks the event-loop thread if a sender is
+    // mid-`onNext` / `onCompleted` under the lock. That is accepted because:
+    //   (a) lock-held outbound critical sections are bounded by a single `_contentObserver.onNext` or
+    //       `onCompleted` call — the lock is never held across an `awaitReady()` wait, an I/O wait, or any other
+    //       blocking operation, so the event-loop stall is at most one observer call;
+    //   (b) the obvious alternative — defer the signal to a separate executor — adds latency to every wakeup
+    //       and an extra thread hop on the hot back-pressure unblock path, which matters in practice more than
+    //       the rare event-loop stall this design accepts.
     _readyLock.lock();
     try {
       _readyCond.signalAll();
