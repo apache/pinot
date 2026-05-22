@@ -25,7 +25,6 @@ import org.testng.annotations.Test;
 
 
 public class BrokerResponseNativeTest {
-
   @Test
   public void testEmptyResponse()
       throws IOException {
@@ -63,5 +62,27 @@ public class BrokerResponseNativeTest {
         QueryErrorCode.BROKER_RESOURCE_MISSING.getDefaultMessage());
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);
+  }
+
+  @Test
+  public void testMaterializedViewResponseFields()
+      throws IOException {
+    BrokerResponseNative expected = new BrokerResponseNative();
+    expected.setMaterializedViewQueried("orders_by_day_OFFLINE");
+
+    String brokerString = expected.toJsonString();
+    Assert.assertTrue(brokerString.contains("\"materializedViewQueried\""));
+
+    BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
+    Assert.assertEquals(actual.getMaterializedViewQueried(), expected.getMaterializedViewQueried());
+  }
+
+  @Test
+  public void testMaterializedViewQueriedAbsentWhenNull()
+      throws IOException {
+    BrokerResponseNative response = new BrokerResponseNative();
+    String json = response.toJsonString();
+    Assert.assertFalse(json.contains("materializedViewQueried"),
+        "Null materializedViewQueried should be suppressed by @JsonInclude(NON_NULL)");
   }
 }
