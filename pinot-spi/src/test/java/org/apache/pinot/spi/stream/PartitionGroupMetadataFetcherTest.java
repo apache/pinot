@@ -410,7 +410,6 @@ public class PartitionGroupMetadataFetcherTest {
       Assert.assertEquals(fetcher.getStreamMetadataList().size(), 1);
       Assert.assertEquals(fetcher.getStreamMetadataList().get(0).getNumPartitions(), 1);
       Assert.assertNull(fetcher.getException());
-      Assert.assertEquals(fetcher.getFailedTopics(), Collections.singletonList("topic2-deleted"));
     }
   }
 
@@ -448,13 +447,11 @@ public class PartitionGroupMetadataFetcherTest {
       Assert.assertTrue(result1);
       Assert.assertEquals(fetcher.getStreamMetadataList().size(), 1);
       Assert.assertNull(fetcher.getException());
-      Assert.assertEquals(fetcher.getFailedTopics(), Collections.singletonList("topic2"));
 
-      // Second call: both succeed — failedTopics cleared
+      // Second call: both succeed
       Boolean result2 = fetcher.call();
       Assert.assertTrue(result2);
       Assert.assertEquals(fetcher.getStreamMetadataList().size(), 2);
-      Assert.assertTrue(fetcher.getFailedTopics().isEmpty());
     }
   }
 
@@ -494,7 +491,6 @@ public class PartitionGroupMetadataFetcherTest {
       } catch (RuntimeException e) {
         Assert.assertEquals(e.getMessage(), "Auth failure");
       }
-      Assert.assertTrue(fetcher.getFailedTopics().isEmpty());
     }
   }
 

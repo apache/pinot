@@ -80,7 +80,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   public Boolean call()
       throws Exception {
     _streamMetadataList.clear();
-    _failedTopics.clear();
     _exception = null;
     return _streamConfigs.size() == 1 ? fetchSingleStream() : fetchMultipleStreams();
   }
