@@ -133,7 +133,29 @@ public class GrpcSendingMailbox implements SendingMailbox {
     // mid-way through pushing an error EOS would unwind [#sendInternal] with a TerminationException, leave
     // [#_senderSideClosed] false, and let [#cancel] run and overwrite the original error code with
     // QUERY_CANCELLATION on the receiver side.
-    if (sendInternal(block, serializedStats, /* bypassReady */ true)) {
+    //
+    // Race against a concurrent [#cancel]: both paths perform an early `isTerminated()` check before taking
+    // [#_readyLock], so two threads can both pass that check and enter their respective lock sections. The cancel
+    // path acquires the lock first, pushes its own error EOS payload (under `bypassReady=true`) and calls
+    // `_contentObserver.onCompleted()` — the gRPC client stream is now half-closed. When this thread then enters
+    // its own [#sendInternal] -> [#processAndSend] -> [#sendContent] under the lock, the in-lock
+    // `isTerminated()` re-check is skipped because `bypassReady=true`, so `_contentObserver.onNext()` is invoked on
+    // an already-half-closed observer and raises `IllegalStateException("call already half-closed")`. The
+    // subsequent `_contentObserver.onCompleted()` would raise the same error. We wrap the whole EOS push +
+    // half-close in a `try/catch(IllegalStateException)` and treat it as a benign duplicate close — the cancel
+    // path has already delivered an EOS, so the receiver will still get a terminal signal. Matches the
+    // defensive `catch(Exception)` in [#cancel] for the symmetric edge.
+    boolean sent;
+    try {
+      sent = sendInternal(block, serializedStats, /* bypassReady */ true);
+    } catch (IllegalStateException e) {
+      // Concurrent cancel won the race and half-closed the stream while we were pushing the EOS payload.
+      LOGGER.debug("EOS send raced with cancel on already half-closed stream for mailbox: {}", _id, e);
+      // Make sure isTerminated() observes us as closed so any downstream caller doesn't keep trying.
+      _senderSideClosed = true;
+      return;
+    }
+    if (sent) {
       LOGGER.debug("Completing mailbox: {}", _id);
       // _readyLock serializes outbound observer calls. Holding it across the flag write + onCompleted() makes the
       // half-close atomic with respect to any racing sendContent() / cancel(), so two threads cannot call onNext()
@@ -143,6 +165,11 @@ public class GrpcSendingMailbox implements SendingMailbox {
       try {
         _senderSideClosed = true;
         _contentObserver.onCompleted();
+      } catch (IllegalStateException e) {
+        // The cancel path may have raced through its own onCompleted() between our sendContent() returning and our
+        // acquiring _readyLock here (cancel takes its own lock after we release ours in sendContent's finally).
+        // Treat the duplicate half-close as benign — same shape as the cancel path's catch(Exception).
+        LOGGER.debug("EOS half-close raced with cancel on already half-closed stream for mailbox: {}", _id, e);
       } finally {
         _readyLock.unlock();
       }

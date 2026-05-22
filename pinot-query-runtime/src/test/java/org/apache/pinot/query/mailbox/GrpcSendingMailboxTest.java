@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -44,6 +45,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
@@ -166,6 +168,105 @@ public class GrpcSendingMailboxTest {
 
     int getContentObserverCalls() {
       return _getContentObserverCalls.get();
+    }
+  }
+
+  /// Regression test for the EOS-vs-cancel race that throws `IllegalStateException("call already half-closed")`.
+  ///
+  /// Before the fix, two interleavings could escape [GrpcSendingMailbox]:
+  ///  * cancel acquires `_readyLock` first, pushes its error EOS payload + `onCompleted()`, then `send(Eos)` reaches
+  ///    its outer half-close in `send(MseBlock.Eos)` and calls `_contentObserver.onCompleted()` on the now
+  ///    half-closed stream — `ClientCallStreamObserver` raises `IllegalStateException`.
+  ///  * cancel completes fully (payload + `onCompleted`) before `send(Eos)`'s `sendContent` even acquires the lock;
+  ///    `sendContent` skips its in-lock `isTerminated()` re-check because `bypassReady=true` and calls
+  ///    `_contentObserver.onNext(content)` on the half-closed stream — same `IllegalStateException`.
+  ///
+  /// The test uses a [HalfCloseEnforcingMailbox] whose observer mimics the gRPC contract: once `onCompleted()` has
+  /// been observed, subsequent `onNext()` / `onCompleted()` raise `IllegalStateException`. Two threads — one calling
+  /// `send(SuccessMseBlock)` and one calling `cancel(...)` — are released through a [CyclicBarrier] each iteration.
+  /// Across many iterations, both interleavings show up.
+  @Test
+  public void concurrentSendEosAndCancelDoesNotThrow()
+      throws Exception {
+    int iterations = 200;
+    ChannelManager channelManager = Mockito.mock(ChannelManager.class);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      for (int i = 0; i < iterations; i++) {
+        HalfCloseEnforcingMailbox mailbox = new HalfCloseEnforcingMailbox("eos-race-" + i, channelManager);
+        CyclicBarrier barrier = new CyclicBarrier(2);
+
+        Future<Throwable> senderFuture = executor.submit(() -> {
+          Throwable thrown = null;
+          try (QueryThreadContext ctx = QueryThreadContext.openForMseTest()) {
+            barrier.await();
+            mailbox.send(SuccessMseBlock.INSTANCE, List.of());
+          } catch (Throwable t) {
+            thrown = t;
+          }
+          return thrown;
+        });
+
+        Future<Throwable> cancelFuture = executor.submit(() -> {
+          Throwable thrown = null;
+          try {
+            barrier.await();
+            mailbox.cancel(new RuntimeException("eos-race-test"));
+          } catch (Throwable t) {
+            thrown = t;
+          }
+          return thrown;
+        });
+
+        Throwable senderError = senderFuture.get(10, TimeUnit.SECONDS);
+        Throwable cancelError = cancelFuture.get(10, TimeUnit.SECONDS);
+
+        Assert.assertNull(senderError, "Iteration " + i + ": send(Eos) threw "
+            + (senderError != null ? senderError.toString() : "null")
+            + ". The EOS path must swallow IllegalStateException from a racing cancel.");
+        Assert.assertNull(cancelError, "Iteration " + i + ": cancel() threw "
+            + (cancelError != null ? cancelError.toString() : "null"));
+        assertTrue(mailbox.isTerminated(),
+            "Iteration " + i + ": mailbox should be terminated after send(Eos) + cancel");
+      }
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor did not terminate in time");
+    }
+  }
+
+  /// Test subclass whose stub observer enforces the real gRPC half-close contract: once `onCompleted()` is observed,
+  /// subsequent `onNext()` / `onCompleted()` raise `IllegalStateException("call already half-closed")`. That's the
+  /// exact escape path Fix 1 prevents — without it, `send(Eos)` and `cancel` racing would propagate this exception
+  /// out of `GrpcSendingMailbox`.
+  private static final class HalfCloseEnforcingMailbox extends GrpcSendingMailbox {
+    HalfCloseEnforcingMailbox(String id, ChannelManager channelManager) {
+      // backpressureEnabled = false so awaitReady short-circuits without spinning on isReady(); we want to exercise
+      // the half-close ordering, not the back-pressure gate.
+      super(id, channelManager, "localhost", 0, Long.MAX_VALUE,
+          new StatMap<>(MailboxSendOperator.StatKey.class), 4 * 1024 * 1024, false);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    ClientCallStreamObserver<MailboxContent> getContentObserver() {
+      ClientCallStreamObserver<MailboxContent> observer = Mockito.mock(ClientCallStreamObserver.class);
+      AtomicBoolean halfClosed = new AtomicBoolean();
+      Mockito.when(observer.isReady()).thenReturn(true);
+      Mockito.doAnswer(invocation -> {
+        if (halfClosed.get()) {
+          throw new IllegalStateException("call already half-closed");
+        }
+        return null;
+      }).when(observer).onNext(Mockito.any());
+      Mockito.doAnswer(invocation -> {
+        if (!halfClosed.compareAndSet(false, true)) {
+          throw new IllegalStateException("call already half-closed");
+        }
+        return null;
+      }).when(observer).onCompleted();
+      return observer;
     }
   }
 
