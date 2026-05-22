@@ -43,11 +43,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final List<Integer> _pausedTopicIndices;
 
   private Exception _exception;
-  private final List<String> _failedTopics = new ArrayList<>();
-
-  public List<String> getFailedTopics() {
-    return Collections.unmodifiableList(_failedTopics);
-  }
 
   public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
@@ -163,7 +158,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         // continue — the caller emits a metric and healthy topics proceed normally.
         LOGGER.warn("Permanent failure fetching StreamMetadata for topic {}, skipping in multi-topic fetch",
             topicName, e);
-        _failedTopics.add(topicName);
       } catch (Exception e) {
         LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;
