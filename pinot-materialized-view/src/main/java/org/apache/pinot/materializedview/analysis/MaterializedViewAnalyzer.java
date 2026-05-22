@@ -102,6 +102,10 @@ public final class MaterializedViewAnalyzer {
   public static AnalysisResult analyze(String definedSql, TableConfig viewTableConfig, Schema viewSchema,
       Map<String, String> taskConfigs, MaterializedViewTaskGeneratorContext context) {
 
+    Preconditions.checkState(viewTableConfig.isMaterializedView(),
+        "MaterializedViewAnalyzer requires isMaterializedView=true on table: %s",
+        viewTableConfig.getTableName());
+
     // Step 4 first: cheap config checks that don't require parsing
     long bucketMs = validateTaskConfigs(viewTableConfig, taskConfigs, context);
 

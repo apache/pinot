@@ -196,6 +196,7 @@ public final class TableConfigUtils {
     }
 
     validateTaskConfig(tableConfig);
+    validateMaterializedViewInvariants(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
       validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -1300,6 +1301,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
   }
@@ -1421,6 +1423,73 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /**
+   * Validates materialized-view table identity and task-config consistency.
+   * Identity is declared only via {@link TableConfig#isMaterializedView()}; task configs alone do not
+   * make a table an MV.
+   */
+  @VisibleForTesting
+  static void validateMaterializedViewInvariants(TableConfig tableConfig) {
+    boolean isMaterializedView = tableConfig.isMaterializedView();
+    boolean hasMvTaskWithDefinedSql = tableConfig.hasMaterializedViewTaskWithDefinedSql();
+    boolean hasMvTask = tableConfig.getMaterializedViewTaskConfigs() != null;
+
+    if (isMaterializedView) {
+      Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+          "Materialized view tables must be OFFLINE, got: %s for table: %s", tableConfig.getTableType(),
+          tableConfig.getTableName());
+      Preconditions.checkState(hasMvTaskWithDefinedSql,
+          "isMaterializedView is true but MaterializedViewTask with non-empty definedSQL is required for table: %s",
+          tableConfig.getTableName());
+      Preconditions.checkState(!tableConfig.isDimTable(),
+          "A table cannot be both isDimTable and isMaterializedView: %s", tableConfig.getTableName());
+    }
+
+    if (hasMvTaskWithDefinedSql && !isMaterializedView) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but isMaterializedView is not true for table: %s. "
+              + "Set \"isMaterializedView\": true or remove MaterializedViewTask.",
+          tableConfig.getTableName()));
+    }
+
+    if (hasMvTask && !hasMvTaskWithDefinedSql) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
+          tableConfig.getTableName()));
+    }
+  }
+
+  private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    if (existingConfig.isMaterializedView() != newConfig.isMaterializedView()) {
+      violations.add(String.format("isMaterializedView (%s -> %s) cannot be changed; drop and recreate the table",
+          existingConfig.isMaterializedView(), newConfig.isMaterializedView()));
+    }
+
+    if (!existingConfig.isMaterializedView() && !newConfig.isMaterializedView()) {
+      return;
+    }
+
+    String existingDefinedSql = getDefinedSqlFromMaterializedViewTask(existingConfig);
+    String newDefinedSql = getDefinedSqlFromMaterializedViewTask(newConfig);
+    if (existingDefinedSql != null && newDefinedSql != null && !existingDefinedSql.equals(newDefinedSql)) {
+      violations.add("MaterializedViewTask.definedSQL is immutable after MV creation");
+    }
+
+    if (existingConfig.isMaterializedView() && !newConfig.hasMaterializedViewTaskWithDefinedSql()) {
+      violations.add("MaterializedViewTask with definedSQL cannot be removed from a materialized view table");
+    }
+  }
+
+  @Nullable
+  private static String getDefinedSqlFromMaterializedViewTask(TableConfig tableConfig) {
+    Map<String, String> configs = tableConfig.getMaterializedViewTaskConfigs();
+    if (configs == null) {
+      return null;
+    }
+    return configs.get(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
   }
 
   /**

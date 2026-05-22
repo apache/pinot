@@ -129,6 +129,12 @@ public class MaterializedViewTaskScheduler {
     for (TableConfig tableConfig : tableConfigs) {
       String offlineTableName = tableConfig.getTableName();
 
+      if (!tableConfig.isMaterializedView()) {
+        LOGGER.warn("Skip generating task: {} for table: {} because isMaterializedView is not set",
+            taskType, offlineTableName);
+        continue;
+      }
+
       if (tableConfig.getTableType() != TableType.OFFLINE) {
         LOGGER.warn("Skip generating task: {} for non-OFFLINE table: {}", taskType, offlineTableName);
         continue;

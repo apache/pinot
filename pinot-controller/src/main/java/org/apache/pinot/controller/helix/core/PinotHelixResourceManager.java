@@ -163,6 +163,7 @@ import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
+import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
 import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
@@ -174,7 +175,6 @@ import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
-import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -205,7 +205,6 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -5377,24 +5376,27 @@ public class PinotHelixResourceManager {
 
   private void notifyMaterializedViewConsistencyManagerForTableCreate(TableConfig tableConfig) {
     MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
-    if (mgr == null) {
+    if (mgr == null || !tableConfig.isMaterializedView()) {
       return;
     }
     try {
-      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-      if (taskConfig == null) {
+      MaterializedViewDefinitionMetadata definition =
+          MaterializedViewDefinitionMetadataUtils.fetch(_propertyStore, tableConfig.getTableName());
+      if (definition != null && definition.getBaseTables() != null && !definition.getBaseTables().isEmpty()) {
+        mgr.onMaterializedViewTableCreated(tableConfig.getTableName(), definition.getBaseTables());
         return;
       }
-      Map<String, String> materializedViewTaskConfigs =
-          taskConfig.getConfigsForTaskType(CommonConstants.MaterializedViewTask.TASK_TYPE);
+      Map<String, String> materializedViewTaskConfigs = tableConfig.getMaterializedViewTaskConfigs();
       if (materializedViewTaskConfigs == null) {
+        LOGGER.warn("MV table {} has no MaterializedViewTask config for consistency registration",
+            tableConfig.getTableName());
         return;
       }
       String definedSQL = materializedViewTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
       if (definedSQL == null || definedSQL.isEmpty()) {
         return;
       }
-      String sourceTable = CalciteSqlParser.compileToPinotQuery(definedSQL).getDataSource().getTableName();
+      String sourceTable = MaterializedViewAnalyzer.extractSourceTableName(definedSQL);
       mgr.onMaterializedViewTableCreated(tableConfig.getTableName(), Collections.singletonList(sourceTable));
     } catch (Exception e) {
       LOGGER.warn("Failed to register MV table {} with consistency manager", tableConfig.getTableName(), e);
@@ -5407,33 +5409,19 @@ public class PinotHelixResourceManager {
       return;
     }
     try {
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      if (tableConfig != null && !tableConfig.isMaterializedView()) {
+        return;
+      }
       MaterializedViewDefinitionMetadata materializedViewDefinition =
           MaterializedViewDefinitionMetadataUtils.fetch(_propertyStore, tableNameWithType);
       if (materializedViewDefinition != null && materializedViewDefinition.getBaseTables() != null
           && !materializedViewDefinition.getBaseTables().isEmpty()) {
         mgr.onMaterializedViewTableDropped(tableNameWithType, materializedViewDefinition.getBaseTables());
-        return;
+      } else if (tableConfig != null && tableConfig.isMaterializedView()) {
+        LOGGER.warn("MV table {} dropped without definition metadata; consistency reverse index may be stale",
+            tableNameWithType);
       }
-      // Fall back to reading source table from table task config
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-      if (tableConfig == null) {
-        return;
-      }
-      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-      if (taskConfig == null) {
-        return;
-      }
-      Map<String, String> materializedViewTaskConfigs =
-          taskConfig.getConfigsForTaskType(CommonConstants.MaterializedViewTask.TASK_TYPE);
-      if (materializedViewTaskConfigs == null) {
-        return;
-      }
-      String definedSQL = materializedViewTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
-      if (definedSQL == null || definedSQL.isEmpty()) {
-        return;
-      }
-      String sourceTable = CalciteSqlParser.compileToPinotQuery(definedSQL).getDataSource().getTableName();
-      mgr.onMaterializedViewTableDropped(tableNameWithType, Collections.singletonList(sourceTable));
     } catch (Exception e) {
       LOGGER.warn("Failed to unregister MV table {} from consistency manager", tableNameWithType, e);
     }

@@ -4261,4 +4261,78 @@ public class TableConfigUtilsTest {
     List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
     assertTrue(violations.isEmpty(), "Expected no violations for non-upsert tables, but got: " + violations);
   }
+
+  @Test
+  public void testValidateMaterializedViewInvariantsFlagRequiresOfflineAndTask() {
+    TableConfig mvWithoutTask = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setIsMaterializedView(true).build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validateMaterializedViewInvariants(mvWithoutTask));
+
+    TableConfig mvRealtime = new TableConfigBuilder(TableType.REALTIME).setTableName("mv_test")
+        .setIsMaterializedView(true)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap("SELECT 1")))
+        .build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validateMaterializedViewInvariants(mvRealtime));
+  }
+
+  @Test
+  public void testValidateMaterializedViewInvariantsTaskWithoutFlagRejected() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(
+            buildMaterializedViewTaskMap("SELECT city FROM orders GROUP BY city")))
+        .build();
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateMaterializedViewInvariants(tableConfig));
+  }
+
+  @Test
+  public void testValidateMaterializedViewInvariantsTaskWithoutDefinedSqlRejected() {
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.TASK_TYPE,
+        Map.of("bucketTimePeriod", "1d"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateMaterializedViewInvariants(tableConfig));
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityMaterializedViewDefinedSqlImmutable() {
+    String sql = "SELECT city FROM orders GROUP BY city";
+    TableConfig existingConfig = buildMaterializedViewTableConfig(sql);
+    TableConfig newConfig = buildMaterializedViewTableConfig("SELECT city, count(*) FROM orders GROUP BY city");
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("definedSQL is immutable"));
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityMaterializedViewFlagCannotChange() {
+    String sql = "SELECT city FROM orders GROUP BY city";
+    TableConfig existingConfig = buildMaterializedViewTableConfig(sql);
+    TableConfig newConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap(sql)))
+        .build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("isMaterializedView"));
+  }
+
+  private static Map<String, Map<String, String>> buildMaterializedViewTaskMap(String definedSql) {
+    Map<String, String> mvTaskConfig = new HashMap<>();
+    mvTaskConfig.put(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY, definedSql);
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.TASK_TYPE, mvTaskConfig);
+    return taskTypeConfigsMap;
+  }
+
+  private static TableConfig buildMaterializedViewTableConfig(String definedSql) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setIsMaterializedView(true)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap(definedSql)))
+        .build();
+  }
 }
