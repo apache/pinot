@@ -2125,9 +2125,9 @@ public final class TableConfigUtils {
     }
     List<FieldConfig> result = null;
     for (int i = 0; i < original.size(); i++) {
-      FieldConfig fc = original.get(i);
-      FieldConfig effective = applyFieldConfigTierOverride(fc, tier);
-      if (effective != fc) {
+      FieldConfig config = original.get(i);
+      FieldConfig effective = applyFieldConfigTierOverride(config, tier);
+      if (effective != config) {
         if (result == null) {
           result = new ArrayList<>(original);
         }
