@@ -447,8 +447,8 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
-      this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
-    }});
+        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
+      }});
     doReturn(System.currentTimeMillis()).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     // throws when not stopped

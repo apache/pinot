@@ -304,7 +304,7 @@ public class PinotClientRequestTest {
 
     // multi stage query
     requestJson = "{\"sql\": \"SET useMultistageEngine=true; \\n"
-      + "SELECT * FROM table1 t1 LEFT JOIN table2 t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
+        + "SELECT * FROM table1 t1 LEFT JOIN table2 t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
     response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
 
     assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());

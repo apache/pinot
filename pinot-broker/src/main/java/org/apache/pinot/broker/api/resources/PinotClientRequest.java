@@ -371,16 +371,16 @@ public class PinotClientRequest {
       String queryString = requestJson.get(Request.QUERY).asText();
       Map<String, String> queryParams = new HashMap<>();
       requestJson.properties().forEach(entry -> {
-          if (entry.getValue().isTextual()) {
-            queryParams.put(entry.getKey(), entry.getValue().asText());
-          } else {
-            queryParams.put(entry.getKey(), entry.getValue().toString());
-          }
+        if (entry.getValue().isTextual()) {
+          queryParams.put(entry.getKey(), entry.getValue().asText());
+        } else {
+          queryParams.put(entry.getKey(), entry.getValue().toString());
+        }
       });
 
       if (isExplainMode(requestJson)) {
         BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
-          queryParams);
+            queryParams);
         asyncResponse.resume(explainResponse);
         return;
       }
@@ -420,7 +420,7 @@ public class PinotClientRequest {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, Map.of(), requestContext,
-          makeHttpIdentity(requestCtx), httpHeaders);
+            makeHttpIdentity(requestCtx), httpHeaders);
         PinotBrokerTimeSeriesResponse response = PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(timeSeriesBlock);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());

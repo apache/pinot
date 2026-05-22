@@ -502,11 +502,11 @@ public class CommonConstants {
     public static final int DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM =
         Runtime.getRuntime().availableProcessors();
 
-      // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
-      // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
-      public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
-          "pinot.broker.query.ignore.missing.segments";
-      public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
+    // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
+    // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
+    public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
+        "pinot.broker.query.ignore.missing.segments";
+    public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
 
     /**
      * Default flush threshold for the streaming group-by leaf-stage operator on MSE. When positive, the broker

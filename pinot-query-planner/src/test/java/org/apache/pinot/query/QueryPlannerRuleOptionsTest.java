@@ -94,7 +94,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS);
     //@formatter:off
     assertEquals(explain,
-      "Execution Plan\n"
+        "Execution Plan\n"
           + "PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[FINAL])\n"
           + "  PinotLogicalExchange(distribution=[hash])\n"
           + "    PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[LEAF])\n"
@@ -173,7 +173,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         PlannerRuleNames.PRUNE_EMPTY_UNION);
     //@formatter:off
     assertEquals(explain,
-      "Execution Plan\n"
+        "Execution Plan\n"
           + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
           + "  PinotLogicalExchange(distribution=[hash[0]])\n"
           + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
@@ -258,7 +258,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES);
     //@formatter:off
     assertEquals(explain,
-    "Execution Plan\n"
+        "Execution Plan\n"
         + "LogicalJoin(condition=[=($0, $9)], joinType=[inner])\n"
         + "  PinotLogicalExchange(distribution=[hash[0]])\n"
         + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"

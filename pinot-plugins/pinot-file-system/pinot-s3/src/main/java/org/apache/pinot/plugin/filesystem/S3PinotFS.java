@@ -871,14 +871,14 @@ public class S3PinotFS extends BasePinotFS {
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile)
       throws IOException {
-      LOGGER.info("Copy {} to local {}", srcUri, dstFile.getAbsolutePath());
-      URI base = getBase(srcUri);
-      FileUtils.forceMkdir(dstFile.getParentFile());
-      String prefix = sanitizePath(base.relativize(srcUri).getPath());
-      GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(srcUri.getHost()).key(prefix).build();
+    LOGGER.info("Copy {} to local {}", srcUri, dstFile.getAbsolutePath());
+    URI base = getBase(srcUri);
+    FileUtils.forceMkdir(dstFile.getParentFile());
+    String prefix = sanitizePath(base.relativize(srcUri).getPath());
+    GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(srcUri.getHost()).key(prefix).build();
 
-      retryWithS3CredentialRefresh(() ->
-          _s3Client.getObject(getObjectRequest, ResponseTransformer.toFile(dstFile)));
+    retryWithS3CredentialRefresh(() ->
+        _s3Client.getObject(getObjectRequest, ResponseTransformer.toFile(dstFile)));
   }
 
   @Override

@@ -153,7 +153,7 @@ public class CancelQueryIntegrationTests extends BaseClusterIntegrationTestSet {
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testCancelByClientQueryId(boolean useMultiStageQueryEngine)
-    throws Exception {
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String clientRequestId = UUID.randomUUID().toString();
     // tricky query: use sleep with some column data to avoid Calcite from optimizing it on compile time

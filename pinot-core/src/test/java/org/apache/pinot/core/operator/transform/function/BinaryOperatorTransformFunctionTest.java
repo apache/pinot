@@ -276,7 +276,7 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
             String.format("%s(%s)", getFunctionName(), INT_SV_COLUMN)
         }, new Object[]{
         String.format("%s(%s, %s, %s)", getFunctionName(), LONG_SV_COLUMN, INT_SV_COLUMN, STRING_SV_COLUMN)
-    }
+        }
     };
   }
 }

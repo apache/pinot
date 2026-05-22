@@ -339,18 +339,18 @@ public class BaseTableDataManagerNeedRefreshTest extends BaseTableDataManagerTes
         }, {
         "withJsonIndex", getTableConfigBuilder().setJsonIndexColumns(
         List.of(JSON_INDEX_COLUMN)).build(), "json index changed: jsonField"
-    }, {
+      }, {
         "withTextIndex", getTableConfigBuilder().setFieldConfigList(List.of(
-        new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
+          new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
             null, null))).build(), "text index changed: textColumn"
-    }, {
+      }, {
         "withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(
-        new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST), null,
-            null))).build(), "fst index changed: DestCityName"
-    }, {
+          new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY,
+              List.of(FieldConfig.IndexType.FST), null, null))).build(), "fst index changed: DestCityName"
+      }, {
         "withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(
         List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build(), "range index changed: MilliSecondsSinceEpoch"
-    }
+      }
     };
   }
 

@@ -73,39 +73,39 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testGroupByMax(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 3, isBrokerResponseCompatible, (ts, val, row) ->
-      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
+        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
     );
   }
 
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testGroupByMin(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | min{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 5, isBrokerResponseCompatible, (ts, val, row) ->
-      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MIN_VALUE)
+        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MIN_VALUE)
     );
   }
 
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testGroupBySum(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | sum{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, REFERRAL_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, REFERRAL_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 2, isBrokerResponseCompatible, (ts, val, row) -> {
       String referral = row.get(REFERRAL_COLUMN);
       long expected = ts <= DATA_START_TIME_SEC ? 0L
         // If referral is true, views are MAX_VALUE, otherwise 20
-        : "1".equals(referral) ? 30 * VIEWS_MIN_VALUE : 30 * VIEWS_MAX_VALUE;
+          : "1".equals(referral) ? 30 * VIEWS_MIN_VALUE : 30 * VIEWS_MAX_VALUE;
       assertEquals(val, expected);
     });
   }
@@ -113,9 +113,9 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testGroupByTwoColumnsAndExpressionValue(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s*10\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s*10\"}"
         + " | max{%s,%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 15, isBrokerResponseCompatible, (ts, val, row) -> {
       long expected = ts <= DATA_START_TIME_SEC ? 0L : 10 * VIEWS_MAX_VALUE;
@@ -126,9 +126,9 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testGroupByThreeColumnsAndConstantValue(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
         + " | sum{%s,%s,%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 30, isBrokerResponseCompatible, (ts, val, row) -> {
       // Since there are 30 groups, each minute will have 2 rows.
@@ -140,45 +140,45 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testGroupByWithFilter(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"%s='windows'\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"%s='windows'\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"1\"}"
         + " | sum{%s,%s,%s} | transformNull{0} | keepLastValue{}",
-      DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
+        DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN, DAYS_SINCE_FIRST_TRIP_COLUMN, REFERRAL_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 10, isBrokerResponseCompatible, (ts, val, row) ->
-      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : 2L)
+        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : 2L)
     );
   }
 
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testTransformNull(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{42} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 3, isBrokerResponseCompatible, (ts, val, row) ->
-      assertEquals(val, ts <= DATA_START_TIME_SEC ? 42L : VIEWS_MAX_VALUE)
+        assertEquals(val, ts <= DATA_START_TIME_SEC ? 42L : VIEWS_MAX_VALUE)
     );
   }
 
   @Test(dataProvider = "isBrokerResponseCompatible")
   public void testTableWithoutType(boolean isBrokerResponseCompatible) {
     String query = String.format(
-      "fetch{table=\"mytable\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        "fetch{table=\"mytable\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     runGroupedTimeSeriesQuery(query, 3, isBrokerResponseCompatible, (ts, val, row) ->
-      assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
+        assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
     );
   }
 
   @Test
   public void testStartTimeEqualsEndTimeQuery() {
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
         + " | max{%s} | transformNull{0} | keepLastValue{}",
-      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_START_TIME_SEC, getHeaders());
     assertEquals(result.get("status").asText(), "success");
@@ -222,12 +222,12 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   public void testQueryWithServerExceptionsForBroker() {
     // JSON_MATCH on a column without JSON index triggers a QUERY_EXECUTION error.
     String query = String.format(
-      "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
+        "fetch{table=\"mytable_OFFLINE\",filter=\"JSON_MATCH(%s, '\\\"$.key=value\\\"')\",ts_column=\"%s\","
         + "ts_unit=\"MILLISECONDS\",value=\"%s\"} | max{%s}",
-      DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+        DEVICE_OS_COLUMN, TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
     );
     JsonNode result = postTimeseriesQuery(getBrokerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
-      getHeaders());
+        getHeaders());
     assertNotNull(result);
 
     JsonNode exceptions = result.get("exceptions");
@@ -462,7 +462,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
   public void setUp()
-    throws Exception {
+      throws Exception {
     LOGGER.info("Setting up integration test class: {}", getClass().getSimpleName());
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
@@ -492,7 +492,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
 
   @AfterClass
   public void tearDown()
-    throws Exception {
+      throws Exception {
     LOGGER.info("Tearing down integration test class: {}", getClass().getSimpleName());
     dropOfflineTable(getTableName());
     FileUtils.deleteDirectory(_tempDir);
@@ -511,14 +511,14 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   public File createAvroFile()
-    throws Exception {
+      throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     avroSchema.setFields(List.of(
-      createAvroField(TS_COLUMN, org.apache.avro.Schema.Type.LONG),
-      createAvroField(DAYS_SINCE_FIRST_TRIP_COLUMN, org.apache.avro.Schema.Type.LONG),
-      createAvroField(DEVICE_OS_COLUMN, org.apache.avro.Schema.Type.STRING),
-      createAvroField(REFERRAL_COLUMN, org.apache.avro.Schema.Type.BOOLEAN),
-      createAvroField(TOTAL_TRIPS_COLUMN, org.apache.avro.Schema.Type.LONG)
+        createAvroField(TS_COLUMN, org.apache.avro.Schema.Type.LONG),
+        createAvroField(DAYS_SINCE_FIRST_TRIP_COLUMN, org.apache.avro.Schema.Type.LONG),
+        createAvroField(DEVICE_OS_COLUMN, org.apache.avro.Schema.Type.STRING),
+        createAvroField(REFERRAL_COLUMN, org.apache.avro.Schema.Type.BOOLEAN),
+        createAvroField(TOTAL_TRIPS_COLUMN, org.apache.avro.Schema.Type.LONG)
     ));
 
     File avroFile = new File(_tempDir, "data.avro");
@@ -550,9 +550,9 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   private void addTimeSeriesConfigurations(PinotConfiguration conf) {
     conf.setProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "m3ql");
     conf.setProperty(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey("m3ql"),
-      "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
+        "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
     conf.setProperty(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
-      SimpleTimeSeriesBuilderFactory.class.getName());
+        SimpleTimeSeriesBuilderFactory.class.getName());
   }
 
   @FunctionalInterface
