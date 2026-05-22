@@ -222,43 +222,50 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testAllLeafStagesEmptyBrokerResponses()
       throws Exception {
-    assertAllLeafStagesEmptyRows("SELECT AirlineID, Carrier FROM mytable WHERE DaysSinceEpoch < 0",
+    // Query the OFFLINE table directly so broker pruning can eliminate all segments.
+    // The hybrid table's realtime consuming segment has unfinalized time boundaries in ZK
+    // metadata, so the TimeSegmentPruner conservatively keeps it (can't prove it has no
+    // matching data). Offline segments have complete metadata and are fully prunable.
+    String table = "mytable_OFFLINE";
+    assertAllLeafStagesEmptyRows("SELECT AirlineID, Carrier FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(), "LONG", "STRING");
-    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(List.<Object>of(0)), "LONG");
-    assertAllLeafStagesEmptyRows("SELECT SUM(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows("SELECT SUM(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(Collections.singletonList(null)), "LONG");
-    assertAllLeafStagesEmptyRows("SELECT COUNT(*) + 1 FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) + 1 FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(List.<Object>of(1)), "LONG");
-    assertAllLeafStagesEmptyRows("SELECT COALESCE(SUM(ActualElapsedTime), 0) FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows(
+        "SELECT COALESCE(SUM(ActualElapsedTime), 0) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(List.<Object>of(0)), "LONG");
-    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 HAVING COUNT(*) > 0",
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 HAVING COUNT(*) > 0",
         List.of(), "LONG");
-    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 LIMIT 0",
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 LIMIT 0",
         List.of(), "LONG");
     assertAllLeafStagesEmptyRows(
-        "SELECT AirlineID, COUNT(*) FROM mytable WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
+        "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
         List.of(), "LONG", "LONG");
     // MIN/MAX return null on empty input (not +/-INFINITY)
-    assertAllLeafStagesEmptyRows("SELECT MIN(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows("SELECT MIN(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(Collections.singletonList(null)), "INT");
-    assertAllLeafStagesEmptyRows("SELECT MAX(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows("SELECT MAX(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(Collections.singletonList(null)), "INT");
     // AVG returns null on empty input
-    assertAllLeafStagesEmptyRows("SELECT AVG(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0",
+    assertAllLeafStagesEmptyRows("SELECT AVG(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(Collections.singletonList(null)), "DOUBLE");
     // Multi-aggregate row alignment
     assertAllLeafStagesEmptyRows(
         "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), AVG(ActualElapsedTime), COUNT(*)"
-            + " FROM mytable WHERE DaysSinceEpoch < 0",
+            + " FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(Arrays.asList(null, null, null, 0L)), "INT", "INT", "DOUBLE", "LONG");
     // HAVING with IS NULL
     assertAllLeafStagesEmptyRows(
-        "SELECT SUM(ActualElapsedTime) FROM mytable WHERE DaysSinceEpoch < 0 HAVING SUM(ActualElapsedTime) IS NULL",
+        "SELECT SUM(ActualElapsedTime) FROM " + table
+            + " WHERE DaysSinceEpoch < 0 HAVING SUM(ActualElapsedTime) IS NULL",
         List.of(Collections.singletonList(null)), "LONG");
     // Window function over empty input
     assertAllLeafStagesEmptyRows(
-        "SELECT SUM(ActualElapsedTime) OVER () FROM mytable WHERE DaysSinceEpoch < 0",
+        "SELECT SUM(ActualElapsedTime) OVER () FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(), "LONG");
   }
 
