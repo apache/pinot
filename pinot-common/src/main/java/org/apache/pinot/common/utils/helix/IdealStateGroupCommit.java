@@ -128,7 +128,7 @@ public class IdealStateGroupCommit {
             // All pending entries have been processed, the updatedIdealState should be set.
             return entry._updatedIdealState;
           }
-          IdealState response = updateIdealState(helixManager, resourceName, idealState -> {
+          updateIdealState(helixManager, resourceName, idealState -> {
             IdealState updatedIdealState = idealState;
             if (!processed.isEmpty()) {
               queue._pending.addAll(processed);
@@ -157,14 +157,6 @@ public class IdealStateGroupCommit {
             }
             return updatedIdealState;
           }, retryPolicy, noChangeOk);
-          if (response == null) {
-            RuntimeException ex = new RuntimeException("Failed to update IdealState");
-            for (Entry ent : processed) {
-              ent._exception = ex;
-              ent._updatedIdealState = null;
-            }
-            throw ex;
-          }
         } catch (Throwable e) {
           // If this leader's own entry was never iterated by the failed batch, it's still
           // sitting in _pending. Without cancelling it, the NEXT leader will iterate it and
