@@ -49,13 +49,14 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 
 /**
- * Default rule sets for Pinot query
+ * Default rule sets for Pinot query.
  * Defaultly disabled rules are defined in
  * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
  *
- * TODO: This class started as a list of constant rule sets, but since then we have added dynamic rule generation
- *   to it as well. We should probably refactor the class to make it easier to understand, maintain and change the rules
- *   based on contextual information like query options.
+ * <p>TODO: Rule lists may be consolidated into
+ * {@link org.apache.pinot.query.planner.rules.DefaultRuleSetCustomizer} in a future refactor once
+ * the {@link org.apache.pinot.query.planner.spi.RuleSetCustomizer} SPI is the established
+ * extension point for broker rule customization.
  */
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
@@ -218,6 +219,36 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.PRUNE_EMPTY_UNION).toRule()
   );
 
+  /// Pinot specific post-logical rules used when the physical optimizer is <b>not</b> enabled.
+  /// Includes {@link PinotSortExchangeCopyRule#SORT_EXCHANGE_COPY} with the default fetch-limit
+  /// threshold. Per-query overrides are applied by {@code QueryEnvironment.getTraitProgram},
+  /// which swaps the configured rule on a per-query copy of this list.
+  public static final List<RelOptRule> POST_LOGICAL_RULES = List.of(
+      // TODO: Merge the following 2 rules into a single rule
+      // add an extra exchange for sort
+      PinotSortExchangeNodeInsertRule.INSTANCE,
+      PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY,
+
+      PinotSingleValueAggregateRemoveRule.INSTANCE,
+      PinotJoinExchangeNodeInsertRule.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
+      PinotWindowSplitRule.INSTANCE,
+      PinotWindowExchangeNodeInsertRule.INSTANCE,
+      PinotSetOpExchangeNodeInsertRule.INSTANCE,
+
+      // apply dynamic broadcast rule after exchange is inserted
+      PinotJoinToDynamicBroadcastRule.INSTANCE,
+
+      // remove exchanges when there's duplicates
+      PinotExchangeEliminationRule.INSTANCE,
+
+      // Evaluate the Literal filter nodes
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
+      PinotTableScanConverterRule.INSTANCE
+  );
+
   public static final List<RelOptRule> PINOT_POST_RULES_V2 = List.of(
       PinotTableScanConverterRule.INSTANCE,
       PinotLogicalAggregateRule.SortProjectAggregate.INSTANCE,
@@ -228,45 +259,4 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_REDUCE_EXPRESSIONS
   );
   //@formatter:on
-
-  /// Pinot specific rules that should be run AFTER all other rules
-  public static List<RelOptRule> getPinotPostRules(int sortExchangeCopyLimit) {
-
-    // copy exchanges down, this must be done after SortExchangeNodeInsertRule
-    PinotSortExchangeCopyRule sortExchangeCopyRule;
-    if (sortExchangeCopyLimit != PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY.config.getFetchLimitThreshold()) {
-      sortExchangeCopyRule = ImmutablePinotSortExchangeCopyRule.Config.builder()
-          .from(PinotSortExchangeCopyRule.Config.DEFAULT)
-          .fetchLimitThreshold(sortExchangeCopyLimit)
-          .build()
-          .toRule();
-    } else {
-      sortExchangeCopyRule = PinotSortExchangeCopyRule.SORT_EXCHANGE_COPY;
-    }
-    return List.of(
-        // TODO: Merge the following 2 rules into a single rule
-        // add an extra exchange for sort
-        PinotSortExchangeNodeInsertRule.INSTANCE,
-        sortExchangeCopyRule,
-
-        PinotSingleValueAggregateRemoveRule.INSTANCE,
-        PinotJoinExchangeNodeInsertRule.INSTANCE,
-        PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
-        PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
-        PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
-        PinotWindowSplitRule.INSTANCE,
-        PinotWindowExchangeNodeInsertRule.INSTANCE,
-        PinotSetOpExchangeNodeInsertRule.INSTANCE,
-
-        // apply dynamic broadcast rule after exchange is inserted/
-        PinotJoinToDynamicBroadcastRule.INSTANCE,
-
-        // remove exchanges when there's duplicates
-        PinotExchangeEliminationRule.INSTANCE,
-
-        // Evaluate the Literal filter nodes
-        CoreRules.FILTER_REDUCE_EXPRESSIONS,
-        PinotTableScanConverterRule.INSTANCE
-    );
-  }
 }
