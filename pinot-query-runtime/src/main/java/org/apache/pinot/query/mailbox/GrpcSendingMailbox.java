@@ -634,12 +634,19 @@ public class GrpcSendingMailbox implements SendingMailbox {
       _senderSideClosed = true;
       wakeWaiters();
 
-      // Route observer creation through ensureContentObserverInitialized() so we use the same double-checked-lock
-      // idiom as send/cancel — a raw `if (_contentObserver != null)` check-then-use here would defeat the
-      // lazy-init race fix from 04eb98577c. Even when no send has happened, opening a stream here matches
-      // cancel()'s behaviour: we want the receiver to get an explicit error EOS instead of waiting for its own
-      // deadline.
-      ensureContentObserverInitialized();
+      // Short-circuit when the sender never opened a stream. close() is the "should not happen" cleanup
+      // fallback — for query stages pruned before any data flows the mailbox is constructed, never sent on,
+      // and then closed. Pre-PR this was a silent no-op on the wire; commit aeaacc893d regressed that by
+      // routing through ensureContentObserverInitialized() to push an error EOS, which opened a fresh gRPC
+      // stream and half-closed it (three wasted round-trips, plus a new exception surface if channel open
+      // throws during shutdown). cancel() does NOT short-circuit here because it has a load-bearing reason
+      // to open the stream: there may be a receiver-side reader blocked waiting for the cancel signal. close()
+      // has no such urgency. The volatile read of _contentObserver here happens-before the lock acquire below,
+      // so no additional fence is needed.
+      ClientCallStreamObserver<MailboxContent> observer = _contentObserver;
+      if (observer == null) {
+        return;
+      }
 
       MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
       // _readyLock serialises outbound observer calls so the error EOS + onCompleted() is one atomic outbound,
@@ -649,7 +656,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
       _readyLock.lock();
       try {
         processAndSend(errorBlock, List.of(), /* bypassReady */ true);
-        _contentObserver.onCompleted();
+        observer.onCompleted();
       } catch (Exception e) {
         // Stream may already be half-closed from a racing send(Eos) / cancel that we lost to under the lock.
         // Symmetric to the defensive catch in cancel() — duplicate half-close is benign here.

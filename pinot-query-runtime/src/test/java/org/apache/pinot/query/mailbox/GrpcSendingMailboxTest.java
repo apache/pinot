@@ -144,6 +144,35 @@ public class GrpcSendingMailboxTest {
     }
   }
 
+  /// Regression test pinning the close()-on-never-sent-mailbox no-op contract.
+  ///
+  /// Before commit aeaacc893d ("Fix close() leaving the gRPC sender stream half-open") the close() path had an
+  /// `if (_contentObserver != null)` short-circuit, so a mailbox that was constructed, never had `send`/`cancel`
+  /// called on it, and then was closed was a silent no-op on the wire. aeaacc893d replaced that short-circuit
+  /// with `ensureContentObserverInitialized()`, which opened a fresh gRPC stream just to push an error EOS and
+  /// half-close — three round-trips on a stream that never needed to exist. For query stages pruned before any
+  /// data flows that is wasted I/O and a new exception surface (channel open can throw at shutdown).
+  ///
+  /// This test reproduces the regression: it constructs a [CountingGrpcSendingMailbox], skips `send`/`cancel`,
+  /// calls `close()`, and asserts the content-observer counter stayed at 0. On the regressed code the counter
+  /// goes to 1 because `ensureContentObserverInitialized()` opens a stream.
+  ///
+  /// The cancel() path intentionally keeps the eager-open behaviour — there may be a receiver-side reader blocked
+  /// on this stream waiting for the cancel signal — so this test is scoped to close() only.
+  @Test
+  public void closeOnNeverSentMailboxDoesNotOpenStream()
+      throws Exception {
+    ChannelManager channelManager = Mockito.mock(ChannelManager.class);
+    CountingGrpcSendingMailbox mailbox = new CountingGrpcSendingMailbox("close-no-op", channelManager);
+
+    mailbox.close();
+
+    assertEquals(mailbox.getContentObserverCalls(), 0,
+        "close() on a never-sent mailbox must be a silent no-op — opening a gRPC stream just to half-close it "
+            + "wastes round-trips and introduces a new exception surface at shutdown.");
+    Mockito.verifyNoInteractions(channelManager);
+  }
+
   /// Test subclass: counts how many times [#getContentObserver] is called and returns a Mockito stub that mimics a
   /// healthy stream (isReady() → true, onNext / onCompleted / cancel are no-ops). The real gRPC machinery is never
   /// touched, so the only thing that controls observer-opening is the lazy-init logic inside [GrpcSendingMailbox].
