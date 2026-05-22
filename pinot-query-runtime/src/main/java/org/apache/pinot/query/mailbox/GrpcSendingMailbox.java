@@ -623,9 +623,28 @@ public class GrpcSendingMailbox implements SendingMailbox {
       _senderSideClosed = true;
       wakeWaiters();
 
+      // Route observer creation through ensureContentObserverInitialized() so we use the same double-checked-lock
+      // idiom as send/cancel — a raw `if (_contentObserver != null)` check-then-use here would defeat the
+      // lazy-init race fix from 04eb98577c. Even when no send has happened, opening a stream here matches
+      // cancel()'s behaviour: we want the receiver to get an explicit error EOS instead of waiting for its own
+      // deadline.
+      ensureContentObserverInitialized();
+
       MseBlock errorBlock = ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, errorMsg);
-      if (_contentObserver != null) {
+      // _readyLock serialises outbound observer calls so the error EOS + onCompleted() is one atomic outbound,
+      // same shape as cancel(). Without the onCompleted() the gRPC client stream stayed half-open from the sender
+      // side until the per-call deadline fired — for long-running MSE queries that's a multi-minute allocator pin
+      // on the channel, which is exactly the leak the back-pressure work is trying to fix.
+      _readyLock.lock();
+      try {
         processAndSend(errorBlock, List.of(), /* bypassReady */ true);
+        _contentObserver.onCompleted();
+      } catch (Exception e) {
+        // Stream may already be half-closed from a racing send(Eos) / cancel that we lost to under the lock.
+        // Symmetric to the defensive catch in cancel() — duplicate half-close is benign here.
+        LOGGER.debug("Caught exception closing mailbox: {}", _id, e);
+      } finally {
+        _readyLock.unlock();
       }
     }
   }
