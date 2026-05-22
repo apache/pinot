@@ -55,13 +55,6 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
 
   private volatile ReceivingMailbox _mailbox;
 
-  /// Test-only / legacy constructor that defaults to manual inbound flow control enabled. Production
-  /// callers should go through [GrpcMailboxServer#open], which threads the config flag through.
-  public MailboxContentObserver(MailboxService mailboxService, String mailboxId,
-      ServerCallStreamObserver<MailboxStatus> responseObserver) {
-    this(mailboxService, mailboxId, responseObserver, true);
-  }
-
   public MailboxContentObserver(MailboxService mailboxService, String mailboxId,
       ServerCallStreamObserver<MailboxStatus> responseObserver, boolean manualInboundFlowControlEnabled) {
     _mailboxService = mailboxService;

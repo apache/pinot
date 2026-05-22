@@ -40,7 +40,8 @@ public class MailboxContentObserverTest {
     when(mailboxService.getReceivingMailbox(TEST_MAILBOX_ID)).thenReturn(receivingMailbox);
     @SuppressWarnings("unchecked")
     ServerCallStreamObserver<MailboxStatus> mockStatusObserver = mock(ServerCallStreamObserver.class);
-    MailboxContentObserver observer = new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver);
+    MailboxContentObserver observer =
+        new MailboxContentObserver(mailboxService, TEST_MAILBOX_ID, mockStatusObserver, true);
     verify(mailboxService, times(1)).getReceivingMailbox(TEST_MAILBOX_ID);
 
     // Now simulate receiving a mailbox content message
