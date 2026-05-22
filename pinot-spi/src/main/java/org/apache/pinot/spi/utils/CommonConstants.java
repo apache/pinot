@@ -2170,15 +2170,16 @@ public class CommonConstants {
     /// Whether the sender side of every `GrpcSendingMailbox` respects gRPC client-side flow control by waiting
     /// on [io.grpc.stub.ClientCallStreamObserver#isReady] before pushing each chunk.
     ///
-    /// Default `true`. Set to `false` to restore the pre-1.6 behaviour where the sender pushes
-    /// unconditionally; useful as a production kill-switch if the gate causes an unexpected regression, and as
-    /// an A/B knob for benchmarks (see `BenchmarkGrpcMailboxSend`).
+    /// Default `false` — the gate is **opt-in**. When `false`, the sender pushes unconditionally and the
+    /// behaviour is identical to the pre-PR-#18519 unbounded path. Set to `true` to engage the
+    /// `isReady()`-gated wait that bounds the gRPC client allocator against the `OutOfDirectMemoryError`
+    /// failure mode described in #18519. Operators who hit that OOM (slow consumer / large fan-out / skewed
+    /// shuffle) should flip this on.
     ///
-    /// Disabling this flag is what re-introduces the `OutOfDirectMemoryError` failure mode the gate exists
-    /// to prevent. It is here as a safety valve, not as a recommended setting.
+    /// Also used as an A/B knob for benchmarks (see `BenchmarkGrpcMailboxSend`).
     public static final String KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED =
         "pinot.query.runner.grpc.sender.backpressure.enabled";
-    public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = true;
+    public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = false;
 
     /// Per-stream HTTP/2 flow control window, in bytes. The receiver advertises this value to the sender as
     /// the number of bytes it will accept before requiring a `WINDOW_UPDATE` frame. Wider windows let the
@@ -2248,7 +2249,11 @@ public class CommonConstants {
     /// application to consume one (via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]
     /// returning). Implemented by disabling gRPC's default auto-inbound-flow-control on the server side and
     /// calling [io.grpc.stub.ServerCallStreamObserver#request] explicitly. Only takes effect when
-    /// [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is `true` (its default).
+    /// [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is `true` (off by default).
+    ///
+    /// Default `1`, which mirrors gRPC's auto-inbound-flow-control behaviour (one message in flight). Even
+    /// when [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is flipped on, this conservative default
+    /// keeps the in-flight window at one message until the operator explicitly widens it.
     ///
     /// Larger values let the sender pipeline more messages without waiting for per-message round trips,
     /// which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
@@ -2274,27 +2279,27 @@ public class CommonConstants {
     /// out-of-band cancel work.
     public static final String KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT =
         "pinot.query.runner.grpc.inbound.message.credit";
-    public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 128;
+    public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 1;
 
     /// Whether the receiver overrides gRPC's auto-inbound-flow-control on the mailbox stream and prefetches
     /// [#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT] messages of credit up-front, then replenishes one credit
     /// before each `onNext` does the (possibly blocking) hand-off to the application queue.
     ///
-    /// Default `true`. When `true` (default): the receiver disables gRPC's auto-inbound and prefetches
-    /// [#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT] messages of credit. This is the primary throughput knob for
-    /// small/medium MSE blocks introduced in #18519.
+    /// Default `false` — the manual-flow-control path is **opt-in**. When `false` (default), the receiver
+    /// leaves gRPC's auto-inbound in place (only 1 message in flight at a time, post-`onNext`-return credit
+    /// replenishment), which is the pre-PR-#18519 behaviour. Set to `true` to engage the manual prefetch +
+    /// pre-`offerRaw` credit replenishment introduced in #18519, which is the primary throughput knob for
+    /// small/medium MSE blocks.
     ///
-    /// When `false`: the receiver leaves gRPC's auto-inbound in place — only 1 message in flight at a
-    /// time. This is the pre-PR-#18519 behaviour, intended as a rollback knob if the wider in-flight
-    /// window causes a regression in the field. Cancel-propagation latency is bounded more tightly when
-    /// this is `false`, but the worst case (a stuck receiver dispatch thread) is still possible because
-    /// the sender's cancel travels in-band; see https://github.com/apache/pinot/issues/18541.
+    /// Cancel-propagation latency is bounded more tightly when this is `false`, but the worst case (a stuck
+    /// receiver dispatch thread) is still possible because the sender's cancel travels in-band; see
+    /// https://github.com/apache/pinot/issues/18541.
     ///
-    /// This is an independent rollback knob from [#KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED]; the two
-    /// control different sides of the mailbox path.
+    /// This is an independent opt-in from [#KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED]; the two control
+    /// different sides of the mailbox path.
     public static final String KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED =
         "pinot.query.runner.grpc.manual.inbound.flow.control.enabled";
-    public static final boolean DEFAULT_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED = true;
+    public static final boolean DEFAULT_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED = false;
 
     /**
      * Configuration for channel idle timeout in seconds.

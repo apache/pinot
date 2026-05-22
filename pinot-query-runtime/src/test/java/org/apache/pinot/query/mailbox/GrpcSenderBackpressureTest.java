@@ -36,6 +36,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -84,7 +85,13 @@ public class GrpcSenderBackpressureTest {
 
   @BeforeClass
   public void setUp() {
-    PinotConfiguration config = new PinotConfiguration(Map.of());
+    // Both back-pressure features (sender gate + manual receiver-side flow control with prefetched
+    // credit) default to off; this test exists to pin the bounded-sender behaviour they provide, so we
+    // explicitly turn both on here.
+    PinotConfiguration config = new PinotConfiguration(Map.of(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED, true,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED, true,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT, 128));
     _senderService = new MailboxService("localhost", QueryTestUtils.getAvailablePort(),
         InstanceType.SERVER, config);
     _senderService.start();

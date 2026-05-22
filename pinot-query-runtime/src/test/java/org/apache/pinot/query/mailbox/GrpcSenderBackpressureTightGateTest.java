@@ -110,12 +110,16 @@ public class GrpcSenderBackpressureTightGateTest {
     // so the application-level awaitReady gate becomes the dominant back-pressure
     // mechanism rather than the transport layer.
     // Window must be >= max-inbound-message-size; shrink both together so the application gate (rather than the
-    // window-too-small-for-a-message check in GrpcMailboxServer) is what bounds the sender.
-    PinotConfiguration config = new PinotConfiguration(Map.of(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, 65535,
-        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES, 262144,
-        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES, 131072,
-        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 65535));
+    // window-too-small-for-a-message check in GrpcMailboxServer) is what bounds the sender. The two back-pressure
+    // features default to off, so we also have to opt in to both for the gate to exist in this test.
+    PinotConfiguration config = new PinotConfiguration(Map.ofEntries(
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED, true),
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED, true),
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT, 128),
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, 65535),
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES, 262144),
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES, 131072),
+        Map.entry(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES, 65535)));
     _senderService = new MailboxService("localhost", QueryTestUtils.getAvailablePort(),
         InstanceType.SERVER, config);
     _senderService.start();

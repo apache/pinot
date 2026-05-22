@@ -142,8 +142,13 @@ public class BenchmarkGrpcMailboxSend {
     // axis values (65535, 1 MiB) are smaller than the 16 MiB default for max-inbound-message-size, so we also clamp the
     // max-msg-size down to the window. Math.min keeps the 64 MiB-window cell using the production default 16 MiB
     // max-msg-size; the two narrow-window cells pin max-msg-size down to the window so the validation passes.
+    // Manual inbound flow control defaults to off; this bench specifically measures the feature-enabled
+    // throughput across window sizes, so we explicitly opt in and set the credit to 128 (the original
+    // "as designed" value before the production default was switched to 1).
     PinotConfiguration cfg = new PinotConfiguration(Map.of(
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED, _backpressureEnabled,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED, true,
+        CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT, 128,
         CommonConstants.MultiStageQueryRunner.KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES, _flowControlWindowBytes,
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
             Math.min(_flowControlWindowBytes,
