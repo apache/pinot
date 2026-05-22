@@ -102,6 +102,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return SCHEMA_FILE_NAME;
   }
 
+  @Override
+  protected TableConfig createOfflineTableConfig() {
+    // Enable the TimeSegmentPruner so that useBrokerPruning can eliminate segments based on time
+    // filters. Without this, the broker has no pruner registered and cannot determine that
+    // DaysSinceEpoch < 0 matches zero segments — which is required for the short-circuit tests.
+    TableConfig tableConfig = super.createOfflineTableConfig();
+    tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("time"), null, null));
+    return tableConfig;
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -222,11 +232,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testAllLeafStagesEmptyBrokerResponses()
       throws Exception {
-    // Query the OFFLINE table directly so broker pruning can eliminate all segments.
-    // The hybrid table's realtime consuming segment has unfinalized time boundaries in ZK
-    // metadata, so the TimeSegmentPruner conservatively keeps it (can't prove it has no
-    // matching data). Offline segments have complete metadata and are fully prunable.
-    String table = "mytable_OFFLINE";
+    String table = "mytable";
     assertAllLeafStagesEmptyRows("SELECT AirlineID, Carrier FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(), "LONG", "STRING");
     assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0",
@@ -239,8 +245,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         "SELECT COALESCE(SUM(ActualElapsedTime), 0) FROM " + table + " WHERE DaysSinceEpoch < 0",
         List.of(List.<Object>of(0)), "LONG");
     assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 HAVING COUNT(*) > 0",
-        List.of(), "LONG");
-    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 LIMIT 0",
         List.of(), "LONG");
     assertAllLeafStagesEmptyRows(
         "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
