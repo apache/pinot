@@ -151,6 +151,15 @@ public class MailboxService {
   /// Notice we are wiring the shaded gRPC Netty allocator
   /// ([io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator]) rather than
   /// the non-shaded one.
+  ///
+  /// Only the two `MAILBOX_CLIENT_USED_*` gauges are mirrored on the client side;
+  /// the six debug-only counterparts exposed by the server (`MAILBOX_SERVER_ARENAS_*`,
+  /// `MAILBOX_SERVER_CACHE_SIZE_*`, `MAILBOX_SERVER_THREADLOCALCACHE`,
+  /// `MAILBOX_SERVER_CHUNK_SIZE`) are intentionally not mirrored here. The operational
+  /// signal that matters on the client is direct-memory pool exhaustion (the OOM that
+  /// motivated wiring these gauges in the first place); the rest are server-side
+  /// allocator-internals useful only for debugging. If you ever need to mirror the
+  /// remaining six, copy the registration block from [GrpcMailboxServer]'s constructor.
   private void registerMailboxClientGauges() {
     switch (_instanceType) {
       case BROKER: {
