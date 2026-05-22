@@ -26,23 +26,23 @@ public class ColumnJsonParserException extends JsonParseException {
      * processing JSON content in a column
      * Sub-class of {@link com.fasterxml.jackson.core.JsonParseException}.
      */
-    private final String _columnName;
+  private final String _columnName;
 
-    public ColumnJsonParserException(String columnName, JsonParseException jpe) {
-        super(jpe.getProcessor(), jpe.getOriginalMessage(), jpe.getCause());
-        _columnName = columnName;
-    }
+  public ColumnJsonParserException(String columnName, JsonParseException jpe) {
+    super(jpe.getProcessor(), jpe.getOriginalMessage(), jpe.getCause());
+    _columnName = columnName;
+  }
 
     /**
      * Default method overridden so that we can add column and location information
      */
-    @Override
+  @Override
     public String getMessage() {
-        return "Column: " + _columnName + "\n" + super.getMessage();
-    }
+    return "Column: " + _columnName + "\n" + super.getMessage();
+  }
 
-    @Override
+  @Override
     public String toString() {
-        return getClass().getName() + ": " + getMessage();
-    }
+    return getClass().getName() + ": " + getMessage();
+  }
 }

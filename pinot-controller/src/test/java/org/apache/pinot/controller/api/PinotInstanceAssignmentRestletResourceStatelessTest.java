@@ -185,9 +185,9 @@ public class PinotInstanceAssignmentRestletResourceStatelessTest extends Control
 
     // Use OFFLINE instance assignment config as the COMPLETED instance assignment config
     realtimeTableConfig.setInstanceAssignmentConfigMap(new TreeMap<String, InstanceAssignmentConfig>() {{
-      put(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig);
-      put(InstancePartitionsType.COMPLETED.toString(), offlineInstanceAssignmentConfig);
-    }});
+        put(InstancePartitionsType.CONSUMING.toString(), consumingInstanceAssignmentConfig);
+        put(InstancePartitionsType.COMPLETED.toString(), offlineInstanceAssignmentConfig);
+      }});
     _helixResourceManager.setExistingTableConfig(realtimeTableConfig);
 
     // COMPLETED instance partitions should be generated

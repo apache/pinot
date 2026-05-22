@@ -188,7 +188,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     //@formatter:off
     assertEquals(explain,
-      "Execution Plan\n"
+        "Execution Plan\n"
           + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
           + "  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
           + "    PinotLogicalExchange(distribution=[hash])\n"
@@ -302,7 +302,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     //@formatter:off
     assertEquals(explain,
-    "Execution Plan\n"
+        "Execution Plan\n"
         + "PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL])\n"
         + "  PinotLogicalExchange(distribution=[hash[0]])\n"
         + "    PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($2)], aggType=[LEAF])\n"
@@ -780,7 +780,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String[] queries =
         new String[]{"SELECT * FROM a LIMIT 10", "SELECT * FROM a OFFSET 10", "SELECT * FROM a ORDER BY col1",
             "SELECT * FROM a LIMIT 10 OFFSET 5", "SELECT * FROM a ORDER BY col1 LIMIT 10", "SELECT * FROM a ORDER BY "
-            + "col1 OFFSET 10", "SELECT * FROM a ORDER BY col1 LIMIT 10 OFFSET 5"};
+              + "col1 OFFSET 10", "SELECT * FROM a ORDER BY col1 LIMIT 10 OFFSET 5"};
 
     for (String query : queries) {
       DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
@@ -939,57 +939,57 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     //@formatter:off
     return new Object[][] {
         new Object[]{"EXPLAIN PLAN INCLUDING ALL ATTRIBUTES AS JSON FOR SELECT col1, col3 FROM a",
-              "{\n"
-            + "  \"rels\": [\n"
-            + "    {\n"
-            + "      \"id\": \"0\",\n"
-            + "      \"relOp\": \"org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan\",\n"
-            + "      \"table\": [\n"
-            + "        \"default\",\n"
-            + "        \"a\"\n"
-            + "      ],\n"
-            + "      \"inputs\": [],\n"
-            + "      \"type\": \"PinotLogicalTableScan\"\n"
-            + "    },\n"
-            + "    {\n"
-            + "      \"id\": \"1\",\n"
-            + "      \"relOp\": \"LogicalProject\",\n"
-            + "      \"fields\": [\n"
-            + "        \"col1\",\n"
-            + "        \"col3\"\n"
-            + "      ],\n"
-            + "      \"exprs\": [\n"
-            + "        {\n"
-            + "          \"input\": 0,\n"
-            + "          \"name\": \"$0\"\n"
-            + "        },\n"
-            + "        {\n"
-            + "          \"input\": 2,\n"
-            + "          \"name\": \"$2\"\n"
-            + "        }\n"
-            + "      ],\n"
-            + "      \"type\": \"LogicalProject\"\n"
-            + "    }\n"
-            + "  ]\n"
-            + "}"},
+          "{\n"
+              + "  \"rels\": [\n"
+              + "    {\n"
+              + "      \"id\": \"0\",\n"
+              + "      \"relOp\": \"org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan\",\n"
+              + "      \"table\": [\n"
+              + "        \"default\",\n"
+              + "        \"a\"\n"
+              + "      ],\n"
+              + "      \"inputs\": [],\n"
+              + "      \"type\": \"PinotLogicalTableScan\"\n"
+              + "    },\n"
+              + "    {\n"
+              + "      \"id\": \"1\",\n"
+              + "      \"relOp\": \"LogicalProject\",\n"
+              + "      \"fields\": [\n"
+              + "        \"col1\",\n"
+              + "        \"col3\"\n"
+              + "      ],\n"
+              + "      \"exprs\": [\n"
+              + "        {\n"
+              + "          \"input\": 0,\n"
+              + "          \"name\": \"$0\"\n"
+              + "        },\n"
+              + "        {\n"
+              + "          \"input\": 2,\n"
+              + "          \"name\": \"$2\"\n"
+              + "        }\n"
+              + "      ],\n"
+              + "      \"type\": \"LogicalProject\"\n"
+              + "    }\n"
+              + "  ]\n"
+              + "}"},
         new Object[]{"EXPLAIN PLAN EXCLUDING ATTRIBUTES AS DOT FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-              "Execution Plan\n"
-            + "digraph {\n"
-            + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
-            + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
-            + "\"PinotLogicalTableSca\\nn\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
-            + "}\n"
+          "Execution Plan\n"
+              + "digraph {\n"
+              + "\"PinotLogicalExchange\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+              + "\"PinotLogicalAggregat\\ne\\n\" -> \"PinotLogicalExchange\\n\" [label=\"0\"]\n"
+              + "\"PinotLogicalTableSca\\nn\\n\" -> \"PinotLogicalAggregat\\ne\\n\" [label=\"0\"]\n"
+              + "}\n"
         },
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
-              "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col3=[$2])\n"
-            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
-            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "      LogicalProject(col1=[$0])\n"
-            + "        PinotLogicalTableScan(table=[[default, a]])\n"
-            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        PinotLogicalTableScan(table=[[default, b]])\n"
+          "Execution Plan\n"
+              + "LogicalProject(col1=[$0], col3=[$2])\n"
+              + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+              + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "      LogicalProject(col1=[$0])\n"
+              + "        PinotLogicalTableScan(table=[[default, a]])\n"
+              + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+              + "      LogicalProject(col1=[$0], col3=[$2])\n"
+              + "        PinotLogicalTableScan(table=[[default, b]])\n"
         },
     };
     //@formatter:on

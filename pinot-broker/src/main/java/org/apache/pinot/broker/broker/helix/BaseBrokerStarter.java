@@ -630,23 +630,23 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       HelixManagerFactory.getZKHelixManager(_clusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
     // Register state model factory
     _participantHelixManager.getStateMachineEngine()
-      .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
-        new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
+        .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
+          new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
           _queryQuotaManager));
     // Register user-define message handler factory
     _participantHelixManager.getMessagingService()
-      .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-        new BrokerUserDefinedMessageHandlerFactory(_routingManager, _queryQuotaManager));
+        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
+          new BrokerUserDefinedMessageHandlerFactory(_routingManager, _queryQuotaManager));
     _participantHelixManager.connect();
     updateInstanceConfigAndBrokerResourceIfNeeded();
     _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
-      () -> _participantHelixManager.isConnected() ? 1L : 0L);
+        () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager.addPreConnectCallback(
-      () -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+        () -> _brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Initializing Groovy execution security
     GroovyFunctionEvaluator.configureGroovySecurity(
-      _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG,
+        _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_QUERY_STATIC_ANALYZER_CONFIG,
         _brokerConf.getProperty(CommonConstants.Groovy.GROOVY_ALL_STATIC_ANALYZER_CONFIG)));
 
     // Register the service status handler
@@ -654,7 +654,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     _isStarting = false;
     _brokerMetrics.addTimedValue(BrokerTimer.STARTUP_SUCCESS_DURATION_MS,
-      System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
+        System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
 
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(ContinuousJfrStarter.INSTANCE);
 

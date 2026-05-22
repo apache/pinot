@@ -71,9 +71,9 @@ public class MmapMemoryConfig {
 
   public static void setDefaultAdvice(String adviceString) {
     Preconditions.checkArgument(
-      EnumUtils.isValidEnum(Advice.class, adviceString),
-      "Default advice for mmap buffers must match a posix_madvise compatible option: %s",
-      adviceString
+        EnumUtils.isValidEnum(Advice.class, adviceString),
+        "Default advice for mmap buffers must match a posix_madvise compatible option: %s",
+        adviceString
     );
 
     setDefaultAdvice(Advice.valueOf(adviceString).getAdvice());

@@ -39,14 +39,14 @@ import static org.testng.Assert.assertTrue;
 
 public class PinotMinionRestletResourceTest extends ControllerTest {
 
-    private ControllerRequestURLBuilder _urlBuilder = null;
+  private ControllerRequestURLBuilder _urlBuilder = null;
 
-    @BeforeClass
+  @BeforeClass
     public void setUp()
         throws Exception {
-      DEFAULT_INSTANCE.setupSharedStateAndValidate();
-      _urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
-    }
+    DEFAULT_INSTANCE.setupSharedStateAndValidate();
+    _urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+  }
 
   @Test
   public void testMinionStatusEndpoint()

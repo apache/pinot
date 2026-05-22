@@ -340,7 +340,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
         new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
         BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(buffer, NUM_VALUES,
-        _bigDecimalByteLength)) {
+            _bigDecimalByteLength)) {
       testBigDecimalDictionary(bigDecimalDictionary);
     }
   }
