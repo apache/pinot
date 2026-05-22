@@ -33,6 +33,8 @@ import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.assertj.core.api.Assertions;
+import org.roaringbitmap.RoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -422,5 +424,119 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
 
   private <T> T getValueForKey(String blob, JsonPath path, TypeRef<T> typeRef) {
     return JSON_PARSER_CONTEXT.parse(blob).read(path, typeRef);
+  }
+
+  // === Null-handling contract for unresolved JSON paths ===
+  //
+  // The base fixture's JSON_STRING_SV_COLUMN has no '$.noField' key in any row, so the JSON-index
+  // lookup returns null for every doc. With query-level null handling ENABLED, the SV transforms
+  // must surface those rows as SQL NULL (type-default + a bit in getNullBitmap()), matching
+  // JsonIndexDistinctOperator's null-group semantics. With null handling DISABLED and no default
+  // literal, the legacy RuntimeException must be preserved.
+
+  @DataProvider(name = "unresolvedPathSvTypes")
+  public Object[][] unresolvedPathSvTypes() {
+    return new Object[][]{
+        {"INT", DataType.INT},
+        {"LONG", DataType.LONG},
+        {"FLOAT", DataType.FLOAT},
+        {"DOUBLE", DataType.DOUBLE},
+        {"BIG_DECIMAL", DataType.BIG_DECIMAL},
+        {"STRING", DataType.STRING}
+    };
+  }
+
+  @Test(dataProvider = "unresolvedPathSvTypes")
+  public void testNullHandlingEnabledEmitsNullForUnresolvedPath(String resultsType, DataType resultsDataType) {
+    String expressionStr = String.format("jsonExtractIndex(%s,'$.noField','%s')", JSON_STRING_SV_COLUMN, resultsType);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction =
+        TransformFunctionFactory.getNullHandlingEnabled(expression, _dataSourceMap);
+
+    Assert.assertTrue(transformFunction instanceof JsonExtractIndexTransformFunction);
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), resultsDataType);
+
+    switch (resultsDataType) {
+      case INT:
+        int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(intValues[i], 0);
+        }
+        break;
+      case LONG:
+        long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(longValues[i], 0L);
+        }
+        break;
+      case FLOAT:
+        float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(floatValues[i], 0f);
+        }
+        break;
+      case DOUBLE:
+        double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(doubleValues[i], 0d);
+        }
+        break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(bigDecimalValues[i].compareTo(BigDecimal.ZERO), 0);
+        }
+        break;
+      case STRING:
+        String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+        for (int i = 0; i < NUM_ROWS; i++) {
+          Assert.assertEquals(stringValues[i], "");
+        }
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported test type: " + resultsDataType);
+    }
+
+    RoaringBitmap nullBitmap = transformFunction.getNullBitmap(_projectionBlock);
+    Assert.assertNotNull(nullBitmap, "Null bitmap must be populated when all rows are unresolved");
+    Assert.assertEquals(nullBitmap.getCardinality(), NUM_ROWS,
+        "Every row should be marked null when the JSON path doesn't resolve");
+  }
+
+  @Test(dataProvider = "unresolvedPathSvTypes")
+  public void testNullHandlingDisabledStillThrowsForUnresolvedPath(String resultsType, DataType resultsDataType) {
+    String expressionStr = String.format("jsonExtractIndex(%s,'$.noField','%s')", JSON_STRING_SV_COLUMN, resultsType);
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+
+    Assert.assertTrue(transformFunction instanceof JsonExtractIndexTransformFunction);
+
+    try {
+      switch (resultsDataType) {
+        case INT:
+          transformFunction.transformToIntValuesSV(_projectionBlock);
+          break;
+        case LONG:
+          transformFunction.transformToLongValuesSV(_projectionBlock);
+          break;
+        case FLOAT:
+          transformFunction.transformToFloatValuesSV(_projectionBlock);
+          break;
+        case DOUBLE:
+          transformFunction.transformToDoubleValuesSV(_projectionBlock);
+          break;
+        case BIG_DECIMAL:
+          transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          break;
+        case STRING:
+          transformFunction.transformToStringValuesSV(_projectionBlock);
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported test type: " + resultsDataType);
+      }
+      Assert.fail("Expected RuntimeException when null handling is disabled");
+    } catch (RuntimeException e) {
+      Assertions.assertThat(e.getMessage()).contains("Illegal Json Path");
+    }
   }
 }

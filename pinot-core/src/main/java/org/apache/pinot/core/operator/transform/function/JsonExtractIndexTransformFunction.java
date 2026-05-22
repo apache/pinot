@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -53,6 +55,11 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private Map<String, RoaringBitmap> _valueToMatchingDocsMap;
   private boolean _isSingleValue;
   private String _filterJsonPath;
+  // True when null-handling is enabled AND no default literal was supplied for the SV path. In that
+  // mode, single-value transforms emit the type's null placeholder for unresolved JSON paths (instead
+  // of throwing) and surface the unresolved row through {@link #getNullBitmap}, matching the broker's
+  // null-handling contract for upstream operators such as {@code JsonIndexDistinctOperator}.
+  private boolean _emitNullOnUnresolved;
 
   @Override
   public String getName() {
@@ -60,8 +67,9 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    super.init(arguments, columnContextMap);
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
     // Check that there are exactly 3 or 4 or 5 arguments
     if (arguments.size() < 3 || arguments.size() > 5) {
       throw new IllegalArgumentException(
@@ -146,6 +154,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       _filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
     }
 
+    _emitNullOnUnresolved = _isSingleValue && _nullHandlingEnabled && _defaultValue == null;
     _resultMetadata = new TransformResultMetadata(dataType, _isSingleValue, false);
   }
 
@@ -166,6 +175,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       if (value == null) {
         if (_defaultValue != null) {
           _intValuesSV[i] = (int) _defaultValue;
+          continue;
+        }
+        if (_emitNullOnUnresolved) {
+          _intValuesSV[i] = NullValuePlaceHolder.INT;
           continue;
         }
         throw new RuntimeException(
@@ -190,6 +203,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _longValuesSV[i] = (long) _defaultValue;
           continue;
         }
+        if (_emitNullOnUnresolved) {
+          _longValuesSV[i] = NullValuePlaceHolder.LONG;
+          continue;
+        }
         throw new RuntimeException(
             String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       }
@@ -210,6 +227,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       if (value == null) {
         if (_defaultValue != null) {
           _floatValuesSV[i] = (float) _defaultValue;
+          continue;
+        }
+        if (_emitNullOnUnresolved) {
+          _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
           continue;
         }
         throw new RuntimeException(
@@ -234,6 +255,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _doubleValuesSV[i] = (double) _defaultValue;
           continue;
         }
+        if (_emitNullOnUnresolved) {
+          _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
+          continue;
+        }
         throw new RuntimeException(
             String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       }
@@ -254,6 +279,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       if (value == null) {
         if (_defaultValue != null) {
           _bigDecimalValuesSV[i] = (BigDecimal) _defaultValue;
+          continue;
+        }
+        if (_emitNullOnUnresolved) {
+          _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
           continue;
         }
         throw new RuntimeException(
@@ -278,12 +307,33 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _stringValuesSV[i] = (String) _defaultValue;
           continue;
         }
+        if (_emitNullOnUnresolved) {
+          _stringValuesSV[i] = NullValuePlaceHolder.STRING;
+          continue;
+        }
         throw new RuntimeException(
             String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       }
       _stringValuesSV[i] = value;
     }
     return _stringValuesSV;
+  }
+
+  @Override
+  @Nullable
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    if (!_emitNullOnUnresolved) {
+      return super.getNullBitmap(valueBlock);
+    }
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        getValueToMatchingDocsMap(), false);
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    for (int i = 0; i < valuesFromIndex.length; i++) {
+      if (valuesFromIndex[i] == null) {
+        nullBitmap.add(i);
+      }
+    }
+    return nullBitmap.isEmpty() ? null : nullBitmap;
   }
 
   @Override
