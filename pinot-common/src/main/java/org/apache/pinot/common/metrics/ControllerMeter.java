@@ -83,7 +83,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   AUDIT_RESPONSE_FAILURES("failures", true),
   AUDIT_REQUEST_PAYLOAD_TRUNCATED("count", true),
   // Upsert compact merge task metrics
-  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false);
+  UPSERT_COMPACT_MERGE_SEGMENT_SKIPPED_CONSENSUS_FAILURE("UpsertCompactMergeSegmentsSkipped", false),
+  // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
 
   private final String _brokerMeterName;
   private final String _unit;

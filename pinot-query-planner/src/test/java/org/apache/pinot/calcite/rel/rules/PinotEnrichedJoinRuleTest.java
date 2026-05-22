@@ -222,7 +222,7 @@ public class PinotEnrichedJoinRuleTest {
         new PinotLogicalEnrichedJoin(cluster, cluster.traitSet(), List.of(), _input, _input, joinCondition,
             Collections.emptySet(),
             JoinRelType.INNER, List.of(new PinotLogicalEnrichedJoin.FilterProjectRexNode(oldProjects, oldRowType),
-            new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), oldRowType,
+              new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), oldRowType,
             null, null, null);
 
     // new project
@@ -319,7 +319,7 @@ public class PinotEnrichedJoinRuleTest {
         new PinotLogicalEnrichedJoin(cluster, cluster.traitSet(), List.of(), _input, _input, joinCondition,
             Collections.emptySet(),
             JoinRelType.INNER, List.of(new PinotLogicalEnrichedJoin.FilterProjectRexNode(oldProjects, oldRowType),
-            new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), oldRowType,
+              new PinotLogicalEnrichedJoin.FilterProjectRexNode(prevFilterCondition)), oldRowType,
             null, null, null);
 
     RelCollation collation = RelCollations.EMPTY;

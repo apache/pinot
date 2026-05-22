@@ -27,80 +27,66 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Factory interface for creating ColumnReader instances for different data sources.
- *
- * <p>This factory provides a generic way to create column readers for various data sources
- * such as Pinot segments, Parquet files, etc. The factory handles:
- * <ul>
- *   <li>Creating column readers for existing columns</li>
- *   <li>Creating default value readers for new columns</li>
- *   <li>Data type conversions between source and target schemas</li>
- *   <li>Resource management</li>
- * </ul>
- */
+/// Factory interface for creating `ColumnReader` instances for different data sources.
+///
+/// This factory provides a generic way to create column readers for various data sources
+/// such as Pinot segments, Parquet files, etc. The factory handles:
+///
+/// - Creating column readers for existing columns
+/// - Creating default value readers for new columns
+/// - Data type conversions between source and target schemas
+/// - Resource management
 public interface ColumnReaderFactory extends Closeable, Serializable {
 
-  /**
-   * Configuration key to enable random access mode for column readers.
-   * When set to "true", implementations may cache data to support non-sequential access patterns.
-   */
+  /// Configuration key to enable random access mode for column readers.
+  /// When set to `true`, implementations may cache data to support non-sequential access patterns.
   String CONFIG_ENABLE_RANDOM_ACCESS = "enableRandomAccess";
 
-  /**
-   * Initialize the factory with the data source and target schema.
-   *
-   * @param targetSchema Target schema for the output segment
-   * @throws IOException If initialization fails
-   */
+  /// Initialize the factory with the data source and target schema.
+  ///
+  /// @param targetSchema Target schema for the output segment
+  /// @throws IOException If initialization fails
   void init(Schema targetSchema)
       throws IOException;
 
-  /**
-   * Initialize the factory with the data source, target schema, and specific target columns.
-   * @param targetSchema Target schema for the output segment
-   * @param colsToRead Set of target columns to read
-   * @throws IOException If initialization fails
-   */
+  /// Initialize the factory with the data source, target schema, and specific target columns.
+  ///
+  /// @param targetSchema Target schema for the output segment
+  /// @param colsToRead Set of target columns to read
+  /// @throws IOException If initialization fails
   void init(Schema targetSchema, Set<String> colsToRead)
       throws IOException;
 
-  /**
-   * Initialize the factory with the data source, target schema, specific columns, and configuration.
-   * @param targetSchema Target schema for the output segment
-   * @param colsToRead Set of target columns to read
-   * @param configs Configuration map for implementation-specific settings
-   * @throws IOException If initialization fails
-   */
+  /// Initialize the factory with the data source, target schema, specific columns, and configuration.
+  ///
+  /// @param targetSchema Target schema for the output segment
+  /// @param colsToRead Set of target columns to read
+  /// @param configs Configuration map for implementation-specific settings
+  /// @throws IOException If initialization fails
   default void init(Schema targetSchema, Set<String> colsToRead, Map<String, String> configs)
       throws IOException {
     init(targetSchema, colsToRead);
   }
 
-  /**
-   * Get the set of column names available in the source data.
-   *
-   * @return Set of available column names in the source
-   */
+  /// Get the set of column names available in the source data.
+  ///
+  /// @return Set of available column names in the source
   Set<String> getAvailableColumns();
 
-  /**
-   * Get a column reader for the specified column.
-   * Implementations may cache and reuse readers for efficiency.
-   *
-   * @param columnName Name of the column to read
-   *                   Can return null if column doesn't exist in the source
-   * @return ColumnReader instance for the specified column (may be cached)
-   */
-  @Nullable ColumnReader getColumnReader(String columnName);
+  /// Get a column reader for the specified column.
+  /// Implementations may cache and reuse readers for efficiency.
+  ///
+  /// @param columnName Name of the column to read.
+  ///   Can return null if column doesn't exist in the source.
+  /// @return ColumnReader instance for the specified column (may be cached)
+  @Nullable
+  ColumnReader getColumnReader(String columnName);
 
-  /**
-   * Get all column readers for the target schema.
-   * Implementations may cache and reuse instances that were created during init().
-   *
-   * @return Map of column name to ColumnReader (cached instances)
-   * @throws IOException If any column reader cannot be obtained
-   */
+  /// Get all column readers for the target schema.
+  /// Implementations may cache and reuse instances that were created during `init()`.
+  ///
+  /// @return Map of column name to ColumnReader (cached instances)
+  /// @throws IOException If any column reader cannot be obtained
   Map<String, ColumnReader> getAllColumnReaders()
       throws IOException;
 }

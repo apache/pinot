@@ -418,3 +418,14 @@ export const requestDeleteUser = (userObject: UserObject): Promise<AxiosResponse
 
 export const requestUpdateUser = (userObject: UserObject, passwordChanged: boolean): Promise<AxiosResponse<any>> =>
     baseApi.put(`/users/${userObject.username}?component=${userObject.component}&passwordChanged=${passwordChanged}`, JSON.stringify(userObject), {headers});
+
+// Materialized Views
+
+export const getMaterializedViewList = (): Promise<AxiosResponse<any>> =>
+    baseApi.get('/materializedViews');
+
+export const getMaterializedView = (viewTableName: string): Promise<AxiosResponse<any>> =>
+    baseApi.get(`/materializedViews/${viewTableName}`);
+
+export const deleteMaterializedView = (viewTableName: string): Promise<AxiosResponse<any>> =>
+    baseApi.delete(`/materializedViews/${viewTableName}`, {headers});

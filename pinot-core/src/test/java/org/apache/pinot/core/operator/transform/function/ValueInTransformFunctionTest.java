@@ -87,7 +87,7 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
     return new Object[][]{
         new Object[]{String.format("valueIn(%s,1,2,9,5)", INT_MV_COLUMN)}, new Object[]{
         String.format("valueIn(valueIn(valueIn(%s,9,6,5,3,2,1),1,2,3,5,9),1,2,9,5)", INT_MV_COLUMN)
-    }
+        }
     };
   }
 
@@ -102,9 +102,9 @@ public class ValueInTransformFunctionTest extends BaseTransformFunctionTest {
     return new Object[][]{
         new Object[]{String.format("valueIn(%s)", INT_MV_COLUMN)}, new Object[]{
         String.format("valueIn(%s, 1)", INT_SV_COLUMN)
-    }, new Object[]{
+        }, new Object[]{
         String.format("valueIn(%s, %s)", INT_MV_COLUMN, LONG_SV_COLUMN)
-    }
+        }
     };
   }
 }

@@ -59,7 +59,7 @@ public class NumberUtils {
    * @return parsed long value
    */
   public static long parseLong(CharSequence cs)
-  throws NumericException {
+      throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
@@ -76,7 +76,7 @@ public class NumberUtils {
    * @return parsed long value
    */
   public static long parseLong(CharSequence cs, int start, int end)
-  throws NumericException {
+      throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
@@ -131,7 +131,7 @@ public class NumberUtils {
    * @return parsed long value
    */
   public static long parseJsonLong(CharSequence cs)
-  throws NumericException {
+      throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }

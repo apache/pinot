@@ -96,6 +96,12 @@ public class RowBasedBlockValSet implements BlockValSet {
     return null;
   }
 
+  /// Row-based value sets never carry a dictionary; the dict-id read methods below always throw.
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
+  }
+
   @Override
   public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();

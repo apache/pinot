@@ -44,7 +44,7 @@ public interface IndexHandler {
    * Should be called only after all IndexHandlers have run.
    */
   void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
-    throws Exception;
+      throws Exception;
 
   public static class NoOp implements IndexHandler {
     public static final NoOp INSTANCE = new NoOp();

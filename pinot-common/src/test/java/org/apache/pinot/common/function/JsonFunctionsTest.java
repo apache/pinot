@@ -376,7 +376,7 @@ public class JsonFunctionsTest {
         {
             Map.of("foo", "x", "bar", Map.of("foo", "y")), "$.bar", new Object[]{
             Map.of("foo", "y")
-        }
+            }
         },
     };
   }

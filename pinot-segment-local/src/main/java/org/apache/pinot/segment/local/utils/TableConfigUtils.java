@@ -24,10 +24,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -197,6 +196,7 @@ public final class TableConfigUtils {
     }
 
     validateTaskConfig(tableConfig);
+    validateMaterializedViewInvariants(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
       validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -242,10 +242,16 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
-    return typesToSkip == null ? Collections.emptySet()
-        : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
-            .collect(Collectors.toSet());
+  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
+    if (StringUtils.isBlank(typesToSkipStr)) {
+      return Set.of();
+    }
+    String[] split = StringUtils.split(typesToSkipStr, ',');
+    Set<ValidationType> typesToSkip = Sets.newHashSetWithExpectedSize(split.length);
+    for (String type : split) {
+      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase()));
+    }
+    return typesToSkip;
   }
 
   /**
@@ -1295,6 +1301,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
   }
@@ -1326,6 +1333,7 @@ public final class TableConfigUtils {
     } else if (existingUpsertEnabled) {
       UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
       UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+      assert existingUpsertConfig != null && newUpsertConfig != null;
 
       if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
@@ -1335,34 +1343,37 @@ public final class TableConfigUtils {
         violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
             newUpsertConfig.getHashFunction()));
       }
-      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(),
-          newUpsertConfig.getComparisonColumns())) {
+      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
         violations.add(
             String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-                newUpsertConfig.getComparisonColumns()));
+              newUpsertConfig.getComparisonColumns()));
       }
       List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
       if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
         String existingTimeColumn =
             existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-                : null;
+              : null;
         String newTimeColumn =
             newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
         if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
           violations.add(
               String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
-                  newTimeColumn));
+                newTimeColumn));
         }
       }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
             String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
-                newUpsertConfig.isDropOutOfOrderRecord()));
+              newUpsertConfig.isDropOutOfOrderRecord()));
       }
       if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
           newUpsertConfig.getOutOfOrderRecordColumn())) {
         violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
+      }
+      if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
+        violations.add(String.format("upsertConfig.deleteRecordColumn (%s -> %s)",
+            existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn()));
       }
     }
   }
@@ -1412,6 +1423,73 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /**
+   * Validates materialized-view table identity and task-config consistency.
+   * Identity is declared only via {@link TableConfig#isMaterializedView()}; task configs alone do not
+   * make a table an MV.
+   */
+  @VisibleForTesting
+  static void validateMaterializedViewInvariants(TableConfig tableConfig) {
+    boolean isMaterializedView = tableConfig.isMaterializedView();
+    boolean hasMvTaskWithDefinedSql = tableConfig.hasMaterializedViewTaskWithDefinedSql();
+    boolean hasMvTask = tableConfig.getMaterializedViewTaskConfigs() != null;
+
+    if (isMaterializedView) {
+      Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+          "Materialized view tables must be OFFLINE, got: %s for table: %s", tableConfig.getTableType(),
+          tableConfig.getTableName());
+      Preconditions.checkState(hasMvTaskWithDefinedSql,
+          "isMaterializedView is true but MaterializedViewTask with non-empty definedSQL is required for table: %s",
+          tableConfig.getTableName());
+      Preconditions.checkState(!tableConfig.isDimTable(),
+          "A table cannot be both isDimTable and isMaterializedView: %s", tableConfig.getTableName());
+    }
+
+    if (hasMvTaskWithDefinedSql && !isMaterializedView) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but isMaterializedView is not true for table: %s. "
+              + "Set \"isMaterializedView\": true or remove MaterializedViewTask.",
+          tableConfig.getTableName()));
+    }
+
+    if (hasMvTask && !hasMvTaskWithDefinedSql) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
+          tableConfig.getTableName()));
+    }
+  }
+
+  private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    if (existingConfig.isMaterializedView() != newConfig.isMaterializedView()) {
+      violations.add(String.format("isMaterializedView (%s -> %s) cannot be changed; drop and recreate the table",
+          existingConfig.isMaterializedView(), newConfig.isMaterializedView()));
+    }
+
+    if (!existingConfig.isMaterializedView() && !newConfig.isMaterializedView()) {
+      return;
+    }
+
+    String existingDefinedSql = getDefinedSqlFromMaterializedViewTask(existingConfig);
+    String newDefinedSql = getDefinedSqlFromMaterializedViewTask(newConfig);
+    if (existingDefinedSql != null && newDefinedSql != null && !existingDefinedSql.equals(newDefinedSql)) {
+      violations.add("MaterializedViewTask.definedSQL is immutable after MV creation");
+    }
+
+    if (existingConfig.isMaterializedView() && !newConfig.hasMaterializedViewTaskWithDefinedSql()) {
+      violations.add("MaterializedViewTask with definedSQL cannot be removed from a materialized view table");
+    }
+  }
+
+  @Nullable
+  private static String getDefinedSqlFromMaterializedViewTask(TableConfig tableConfig) {
+    Map<String, String> configs = tableConfig.getMaterializedViewTaskConfigs();
+    if (configs == null) {
+      return null;
+    }
+    return configs.get(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
   }
 
   /**
@@ -2014,7 +2092,7 @@ public final class TableConfigUtils {
       // Only set the new config if the deprecated one is set.
       Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
       if (MapUtils.isNotEmpty(streamConfigs)) {
-        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+        streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
       }
     }
 

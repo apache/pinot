@@ -95,10 +95,10 @@ public class QuickstartRunner {
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-    int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
-    throws Exception {
+      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, AuthProvider authProvider)
+      throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, authProvider,
-      configOverrides, null, true, Map.of());
+        configOverrides, null, true, Map.of());
   }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,

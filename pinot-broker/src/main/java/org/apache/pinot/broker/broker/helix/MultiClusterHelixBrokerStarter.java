@@ -133,7 +133,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
     }
 
     LOGGER.info("[multi-cluster] Initializing spectator Helix managers for {} remote clusters",
-      _remoteZkServers.size());
+        _remoteZkServers.size());
     _remoteSpectatorHelixManager = new HashMap<>();
 
     for (Map.Entry<String, String> entry : _remoteZkServers.entrySet()) {
@@ -141,7 +141,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
       String zkServers = entry.getValue();
       try {
         HelixManager helixManager = HelixManagerFactory.getZKHelixManager(
-          clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
+            clusterName, _instanceId, InstanceType.SPECTATOR, zkServers);
         helixManager.connect();
         _remoteSpectatorHelixManager.put(clusterName, helixManager);
         LOGGER.info("[multi-cluster] Connected to remote cluster '{}' at ZK: {}", clusterName, zkServers);
@@ -154,10 +154,10 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
 
     if (_remoteSpectatorHelixManager.isEmpty()) {
       LOGGER.warn("[multi-cluster] Failed to connect to any remote clusters - "
-        + "multi-cluster will not be functional");
+          + "multi-cluster will not be functional");
     } else {
       LOGGER.info("[multi-cluster] Connected to {}/{} remote clusters: {}", _remoteSpectatorHelixManager.size(),
-        _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
+          _remoteZkServers.size(), _remoteSpectatorHelixManager.keySet());
     }
     if (!_unavailableClusters.isEmpty()) {
       LOGGER.warn("[multi-cluster] The following clusters are unavailable and will generate warnings "
@@ -367,7 +367,7 @@ public class MultiClusterHelixBrokerStarter extends BaseBrokerStarter {
   @Override
   protected MultiClusterRoutingContext getMultiClusterRoutingContext() {
     initRemoteClusterFederationProvider(_tableCache,
-      _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
+        _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE));
     return _multiClusterRoutingContext;
   }
 
