@@ -244,8 +244,14 @@ Not in Phase 1 scope. If a column uses chunk compression (LZ4/ZSTD), the native 
 
 - **i32, i64:** match Java semantics — per-value `int → double` / `long → double` conversion with straight `+=` accumulation. No Kahan compensation (Java path doesn't use it).
 - **f32, f64:** straight reduce.
-- **SIMD:** 256-bit lanes (AVX2) → 4×i64 or 8×i32 per cycle; 512-bit lanes on AVX-512 capable hosts; 128-bit NEON on ARM.
-- **POC implementation:** scalar Rust with manual 4-way unroll, relying on LLVM auto-vectorization. Explicit intrinsics in Phase 1.B.
+- **SIMD:** explicit intrinsics with runtime ISA dispatch (revised 2026-05-22 — see §15 decision log):
+  - **AVX-512DQ (x86_64):** native `vcvtqq2pd` (`_mm512_cvtepi64_pd`) for 8-wide i64→f64, 4 independent 512-bit accumulators = 32-wide ILP. Best path on supported hardware.
+  - **AVX2 (x86_64):** scalar i64→f64 conversion (no `vcvtqq2pd` until AVX-512DQ) packed into 256-bit registers + 4-wide SIMD accumulation. 4 independent 256-bit accumulators = 16-wide ILP. The conversion is the bottleneck; a Mysticial-style magic-constant bit-trick may close the gap in a follow-up.
+  - **NEON (aarch64):** native `scvtf.2d` (`vcvtq_f64_s64`) for 2-wide i64→f64, 4 independent 128-bit accumulators = 8-wide ILP.
+  - **Scalar fallback:** 4-way unrolled, used when none of the above features are detected.
+- Runtime detection via `is_x86_feature_detected!` / `is_aarch64_feature_detected!`. Detection cached by `std::arch` after first call; per-call dispatch cost is one atomic load.
+- All non-scalar implementations are `#[target_feature(enable = "...")]` `unsafe fn` and only called after the corresponding `is_*_feature_detected!` returns true.
+- Property-based equivalence tests (Rust side) assert all backends match within `max(1.0, |sum| × 1e-15)` of the scalar reference.
 - **Tail handling:** scalar loop for `length % laneWidth`.
 
 ### 6.2 MIN / MAX
@@ -557,6 +563,7 @@ Total ~15 weeks (was 12, +3 for HLL as its own phase). POC (Phase 0 + 1.A) is th
 | 2026-05-20 | No new `Native*Operator` / `Native*PlanNode` classes | Subsumed by the factory-routing decision. Standard operators are used unchanged; only the `AggregationFunction` instances differ. |
 | 2026-05-20 | POC uses materialized Java arrays via `GetPrimitiveArrayCritical`, NOT direct `PinotDataBuffer` access | Simplest possible POC interface. Direct buffer access is Phase 1.B. |
 | 2026-05-20 | JNI granularity in POC is per-function-per-block (~150µs/segment); per-block-all-functions deferred to Phase 1.D | Acceptable overhead for POC; optimization is purely additive on top of factory routing. |
+| 2026-05-22 | SUM(LONG) kernel uses explicit SIMD intrinsics with runtime ISA dispatch (NEON / AVX2 / AVX-512DQ / scalar fallback) in Phase 1.A, not deferred to 1.B | User's original Phase 1 spec called for "state of the art kernels for aggregation." The original 1.A plan (scalar Rust with LLVM autovec) was an unilateral sub-phasing decision that didn't meet the spec. Reverted: the kernel is now explicit SIMD from 1.A. Phase 1.B keeps the "broaden to INT/FLOAT/DOUBLE + zero-copy from PinotDataBuffer" scope; explicit SIMD is no longer a 1.B deliverable because it's already done for SUM(LONG). |
 
 ---
 
