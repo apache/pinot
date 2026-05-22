@@ -51,43 +51,33 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-minion-builtin-tasks</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-batch-ingestion-common</artifactId>
     </dependency>
+    <!--
+      Depend on *-base (the shared library) rather than the full plugin, so pinot-tools' Java
+      code can use the utility classes without pulling the plugin implementation classes into
+      pinot-all.jar. The plugin classes live exclusively in plugins/ and are realm-loaded at
+      runtime.
+    -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-avro</artifactId>
+      <artifactId>pinot-avro-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-confluent-avro</artifactId>
+      <artifactId>pinot-json-base</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-csv</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-protobuf</artifactId>
-    </dependency>
+    <!-- pinot-json ships JSONMessageDecoder, which KafkaJSONMessageDecoder extends. pinot-kafka-base
+         declares pinot-json as provided, so it would be excluded from the transitive runtime
+         classpath; keep it here so JSONMessageDecoder is loadable at runtime. -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-json</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-orc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-parquet</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-thrift</artifactId>
+      <artifactId>pinot-parquet-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -126,6 +116,12 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-compound-metrics</artifactId>
+    </dependency>
+
+    <!-- QuickStartBase.createKafkaAdminClient() uses AdminClient directly -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
     </dependency>
 
     <dependency>
@@ -187,6 +183,11 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-parquet</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

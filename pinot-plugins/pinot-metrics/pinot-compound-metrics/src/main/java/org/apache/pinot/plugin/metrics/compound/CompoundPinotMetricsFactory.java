@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -180,16 +179,14 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
    */
   enum Algorithm {
     /**
-     * An algorithm that returns all {@link PinotMetricsFactory} defined as {@link ServiceLoader}.
+     * An algorithm that returns all {@link PinotMetricsFactory} defined via the
+     * {@link java.util.ServiceLoader} mechanism, walking every plugin classloader known to
+     * {@link PluginManager} (system, plugin realms, and legacy plugin classloaders).
      */
     SERVICE_LOADER {
       @Override
       protected Stream<PinotMetricsFactory> streamInstances(PinotConfiguration metricsConfiguration) {
-        ArrayList<PinotMetricsFactory> result = new ArrayList<>();
-        for (PinotMetricsFactory factory : ServiceLoader.load(PinotMetricsFactory.class)) {
-          result.add(factory);
-        }
-        return result.stream();
+        return PluginManager.get().loadServices(PinotMetricsFactory.class).stream();
       }
     },
     /**

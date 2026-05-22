@@ -28,10 +28,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,14 +125,15 @@ public class IndexService {
   }
 
   /**
-   * Creates an IndexService by looking for all {@link IndexPlugin} defined as services by {@link ServiceLoader}.
+   * Creates an IndexService by looking for all {@link IndexPlugin} defined as services across every plugin classloader
+   * (system, plugin realms, and legacy plugin classloaders), via {@link PluginManager#loadServices(Class)}.
    *
    * This is the default way to create an IndexService. In case more tuning is needed,
    * {@link IndexService#IndexService(Set)}} can be used.
    */
   public static IndexService fromServiceLoader() {
     Set<IndexPlugin<?>> pluginList = new HashSet<>();
-    for (IndexPlugin indexPlugin : ServiceLoader.load(IndexPlugin.class)) {
+    for (IndexPlugin indexPlugin : PluginManager.get().loadServices(IndexPlugin.class)) {
       pluginList.add(indexPlugin);
     }
     return new IndexService(pluginList);

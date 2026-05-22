@@ -49,8 +49,10 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
   - `pinot-confluent-json`: Confluent Schema Registry JSON input support.
   - `pinot-confluent-protobuf`: Confluent Schema Registry Protobuf input support.
   - `pinot-orc`: ORC input format support.
-  - `pinot-json`: JSON input format support.
-  - `pinot-parquet`: Parquet input format support.
+  - `pinot-json-base`: shared JSON utilities and base classes (JSONRecordReader, JSONRecordExtractor).
+  - `pinot-json`: JSON plugin (JSONMessageDecoder); depends on pinot-json-base.
+  - `pinot-parquet-base`: shared Parquet utilities (ParquetUtils); depends on parquet-avro and hadoop.
+  - `pinot-parquet`: Parquet plugin (ParquetRecordReader and variants); depends on pinot-parquet-base.
   - `pinot-csv`: CSV input format support.
   - `pinot-thrift`: Thrift input format support.
   - `pinot-protobuf`: Protobuf input format support.

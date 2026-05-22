@@ -19,7 +19,7 @@
 package org.apache.pinot.core.routing.timeboundary;
 
 import java.util.Map;
-import java.util.ServiceLoader;
+import org.apache.pinot.spi.plugin.PluginManager;
 
 
 public class TimeBoundaryStrategyService {
@@ -33,7 +33,7 @@ public class TimeBoundaryStrategyService {
 
   public static TimeBoundaryStrategyService fromServiceLoader() {
     Map<String, TimeBoundaryStrategy> strategyMap = new java.util.HashMap<>();
-    for (TimeBoundaryStrategy strategy : ServiceLoader.load(TimeBoundaryStrategy.class)) {
+    for (TimeBoundaryStrategy strategy : PluginManager.get().loadServices(TimeBoundaryStrategy.class)) {
       String strategyName = strategy.getName();
       if (strategyMap.containsKey(strategyName)) {
         throw new IllegalStateException("Duplicate TimeBoundaryStrategy found: " + strategyName);

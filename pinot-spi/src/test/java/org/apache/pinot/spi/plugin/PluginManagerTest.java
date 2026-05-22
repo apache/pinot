@@ -21,8 +21,12 @@ package org.apache.pinot.spi.plugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -31,6 +35,8 @@ import javax.tools.ToolProvider;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.plugin.loadservices.LoadServicesTestSpi;
+import org.apache.pinot.spi.plugin.loadservices.LoadServicesTestSpiImpl;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -142,6 +148,13 @@ public class PluginManagerTest {
         }
 
         Assert.assertEquals(count, 10);
+
+        // Realm-walk fallback: createInstance(className) without a plugin prefix must also resolve
+        // the plugin-only class. Pre-fallback this only consulted the DEFAULT PluginClassLoader
+        // (which has no URLs and only delegates to the system classloader), so plugin-only classes
+        // would throw ClassNotFoundException.
+        RecordReader viaFallback = PluginManager.get().createInstance("TestRecordReader");
+        Assert.assertEquals(viaFallback.getClass().getName(), "TestRecordReader");
       }
     }
   }
@@ -382,6 +395,70 @@ public class PluginManagerTest {
   public void testLoadClassWithBackwardCompatibleCheckWithNull() {
     // Null should return null
     Assert.assertNull(PluginManager.loadClassWithBackwardCompatibleCheck(null));
+  }
+
+  @Test
+  public void testLoadServicesFindsImplementationsViaServiceLoader() {
+    // The test classpath ships META-INF/services/<LoadServicesTestSpi-fqcn> registering
+    // LoadServicesTestSpiImpl. loadServices must find it through the manager's classloader.
+    List<LoadServicesTestSpi> services = PluginManager.get().loadServices(LoadServicesTestSpi.class);
+    Assert.assertEquals(services.size(), 1, "Expected exactly one impl registered via META-INF/services");
+    Assert.assertTrue(services.get(0) instanceof LoadServicesTestSpiImpl);
+    Assert.assertEquals(services.get(0).name(), "loadServicesTestImpl");
+  }
+
+  @Test
+  public void testLoadServicesIsIdempotentAcrossInvocations() {
+    // Each call performs a fresh walk; results are not cached. Sanity-check that two calls
+    // back-to-back produce the same single impl. (Cross-classloader dedup of the same FQCN is
+    // an internal implementation detail of `loadServicesInto`; testing it would require
+    // building two jars that ship the same impl class, which is out of scope for this unit
+    // test — the production path is covered by the in-tree migrations.)
+    List<LoadServicesTestSpi> first = PluginManager.get().loadServices(LoadServicesTestSpi.class);
+    List<LoadServicesTestSpi> second = PluginManager.get().loadServices(LoadServicesTestSpi.class);
+    Assert.assertEquals(first.size(), 1);
+    Assert.assertEquals(second.size(), 1);
+    Assert.assertEquals(first.get(0).getClass(), second.get(0).getClass());
+  }
+
+  @Test
+  public void testLoadServicesReturnsEmptyForUnknownSpi() {
+    // For an interface no one implements, the result must be an empty list — never null,
+    // never throwing.
+    List<Runnable> services = PluginManager.get().loadServices(Runnable.class);
+    Assert.assertNotNull(services);
+    Assert.assertTrue(services.isEmpty());
+  }
+
+  // Regression: a classloader in the realm walk that throws NoClassDefFoundError (class bytecode
+  // found but transitive dep missing) must not propagate the error to the caller — the walk must
+  // continue past it and ultimately surface ClassNotFoundException.
+  @Test
+  public void testRealmWalkContinuesPastNoClassDefFoundError() throws Exception {
+    PluginManager pm = new PluginManager();
+
+    PluginClassLoader badCl = new PluginClassLoader(new URL[0], null) {
+      @Override
+      protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        throw new NoClassDefFoundError("Simulated missing transitive dep for " + name);
+      }
+    };
+    Field registryField = PluginManager.class.getDeclaredField("_registry");
+    registryField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<Plugin, PluginClassLoader> registry = (Map<Plugin, PluginClassLoader>) registryField.get(pm);
+    registry.put(new Plugin("bad-plugin"), badCl);
+
+    Method method = PluginManager.class.getDeclaredMethod("loadClassFromAnyPlugin", String.class);
+    method.setAccessible(true);
+    try {
+      method.invoke(pm, "com.example.DoesNotExist");
+      Assert.fail("Expected ClassNotFoundException");
+    } catch (InvocationTargetException ite) {
+      Throwable cause = ite.getCause();
+      Assert.assertTrue(cause instanceof ClassNotFoundException,
+          "Expected ClassNotFoundException but got " + cause.getClass().getName() + ": " + cause.getMessage());
+    }
   }
 
   @AfterClass

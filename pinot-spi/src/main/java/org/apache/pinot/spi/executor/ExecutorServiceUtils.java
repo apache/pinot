@@ -19,15 +19,12 @@
 package org.apache.pinot.spi.executor;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +41,7 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code fixed}: creates a new fixed thread pool.</li>
  * </ul>
  *
- * @see ServiceLoader
+ * @see PluginManager#loadServices(Class)
  */
 public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
@@ -54,37 +51,15 @@ public class ExecutorServiceUtils {
 
   static {
     PROVIDERS = new HashMap<>();
-    forEachExecutorThatLoads(plugin -> {
+    // loadServices already skips malformed META-INF/services entries with a warning, so we no
+    // longer need a per-iterator try/catch around hasNext/next.
+    for (ExecutorServicePlugin plugin : PluginManager.get().loadServices(ExecutorServicePlugin.class)) {
       ExecutorServiceProvider provider = plugin.provider();
       ExecutorServiceProvider old = PROVIDERS.put(plugin.id(), provider);
       if (old != null) {
         LOGGER.warn("Duplicate executor provider for id '{}': {} and {}", plugin.id(), old, provider);
       } else {
         LOGGER.info("Registered executor provider for id '{}': {}", plugin.id(), provider);
-      }
-    });
-  }
-
-  private static void forEachExecutorThatLoads(Consumer<ExecutorServicePlugin> consumer) {
-    Iterator<ExecutorServicePlugin> iterator = ServiceLoader.load(ExecutorServicePlugin.class).iterator();
-    while (hasNextOrSkip(iterator)) {
-      ExecutorServicePlugin next;
-      try {
-        next = iterator.next();
-      } catch (ServiceConfigurationError e) {
-        LOGGER.warn("Skipping executor service plugin that doesn't load", e);
-        continue;
-      }
-      consumer.accept(next);
-    }
-  }
-
-  private static boolean hasNextOrSkip(Iterator<ExecutorServicePlugin> loader) {
-    while (true) {
-      try {
-        return loader.hasNext();
-      } catch (ServiceConfigurationError e) {
-        LOGGER.warn("Skipping executor service plugin", e);
       }
     }
   }

@@ -53,6 +53,28 @@
           <target>11</target>
         </configuration>
       </plugin>
+      <!-- Driver jar: relocate bundled jackson/guava/scala so they don't leak
+           onto the embedding application's classpath. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <relocations>
+            <relocation>
+              <pattern>com.fasterxml.jackson</pattern>
+              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.google.common</pattern>
+              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.scala-lang</pattern>
+              <shadedPattern>${shade.prefix}.org.scala-lang</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
   <dependencies>

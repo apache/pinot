@@ -33,7 +33,6 @@
 
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-ts-languages</plugin.type>
   </properties>
 
   <modules>
