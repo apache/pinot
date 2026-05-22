@@ -165,6 +165,7 @@ public class MaterializedViewAnalyzerTest {
     // point to the SELECT alias 'dayBucket' — not the inherited base name.
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("dayBucket")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -654,6 +655,30 @@ public class MaterializedViewAnalyzerTest {
   // -----------------------------------------------------------------------
 
   @Test
+  public void testAnalyzeRequiresIsMaterializedViewFlag() {
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+
+    TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("mv_orders")
+        .setTimeColumnName(TIME_COLUMN)
+        .build();
+    Map<String, String> taskConfigs = buildTaskConfigs(sql);
+
+    try {
+      MaterializedViewAnalyzer.analyze(withLimit(sql), viewTableConfig, viewSchema, taskConfigs, _mockAccessor);
+      fail("Expected IllegalStateException when isMaterializedView is false");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("isMaterializedView=true"),
+          "Unexpected message: " + e.getMessage());
+    }
+  }
+
+  @Test
   public void testNonOfflineTableType() {
     String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders GROUP BY DaysSinceEpoch, city";
     Schema viewSchema = new Schema.SchemaBuilder()
@@ -664,6 +689,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig realtimeConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName(TIME_COLUMN)
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -800,6 +826,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
 
@@ -824,6 +851,7 @@ public class MaterializedViewAnalyzerTest {
     // timeColumnName points to a column that doesn't exist in the MV schema at all.
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("nonexistent_time_col")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -849,6 +877,7 @@ public class MaterializedViewAnalyzerTest {
     // timeColumnName points to a plain dimension, not a registered dateTime column.
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("city")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -878,6 +907,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName(TIME_COLUMN)
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -907,6 +937,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("day")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -978,6 +1009,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("day")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -1000,6 +1032,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("hr")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -1020,6 +1053,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("ts_ms")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -1041,6 +1075,7 @@ public class MaterializedViewAnalyzerTest {
 
     TableConfig viewTableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName("day")
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
@@ -1057,6 +1092,7 @@ public class MaterializedViewAnalyzerTest {
   private TableConfig buildMaterializedViewTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("mv_orders")
+        .setIsMaterializedView(true)
         .setTimeColumnName(TIME_COLUMN)
         .build();
   }

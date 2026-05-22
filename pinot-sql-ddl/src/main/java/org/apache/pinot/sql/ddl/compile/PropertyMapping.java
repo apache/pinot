@@ -300,6 +300,9 @@ public final class PropertyMapping {
       case "isdimtable":
         builder.setIsDimTable(parseBool(lowerKey, value));
         return true;
+      case "ismaterializedview":
+        builder.setIsMaterializedView(parseBool(lowerKey, value));
+        return true;
       case "invertedindexcolumns":
         builder.setInvertedIndexColumns(splitCsv(value));
         return true;
