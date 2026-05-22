@@ -51,6 +51,27 @@
   <name>Pinot BOM</name>
   <packaging>pom</packaging>
 
+  <build>
+    <plugins>
+      <!--
+        pinot-bom has no <parent>, so Maven cannot inherit the root pom's
+        pluginManagement entry for com.mycila:license-maven-plugin. Without
+        this explicit binding, `mvn license:check` resolves to
+        org.codehaus.mojo:license-maven-plugin which has no "check" goal.
+        We skip the check: the only file here is pom.xml, whose license
+        header is validated by the root-level Apache RAT execution.
+      -->
+      <plugin>
+        <groupId>com.mycila</groupId>
+        <artifactId>license-maven-plugin</artifactId>
+        <version>5.0.0</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
   <dependencyManagement>
     <dependencies>
       <!-- Pinot Modules -->
