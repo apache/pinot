@@ -447,100 +447,160 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     TransformFunctionFactory.get(expression, _dataSourceMap);
   }
 
-  /**
-   * Country/click scenarios where the typed JSON path does NOT resolve to a value, spanning four
-   * JSON structural shapes:
-   * <ol>
-   *   <li><b>Flat:</b> top-level scalar key missing, explicitly null, or empty doc.</li>
-   *   <li><b>Nested object:</b> {@code $.location.country} — inner key missing, parent JSON null,
-   *       or root missing parent entirely.</li>
-   *   <li><b>Array element:</b> {@code $.tags[i]} — array null, empty, or index out-of-bounds.</li>
-   *   <li><b>Array of objects:</b> {@code $.events[0].country} — inner field null, array empty,
-   *       array null, or root missing.</li>
-   * </ol>
-   * JsonPath {@code SUPPRESS_EXCEPTIONS} folds every one of these into the same Java {@code null},
-   * so all must produce SQL NULL when query-level null handling is enabled, and all must throw
-   * {@code IllegalArgumentException} when null handling is disabled and no default is set.
-   */
-  @DataProvider(name = "countryClickUnresolvedCases")
-  public static Object[][] countryClickUnresolvedCases() {
-    return new Object[][]{
-        // --- Flat / top-level scalar ---
-        {"STRING", "$.country", "{\"clicks\": 5}", "flat country missing"},
-        {"STRING", "$.country", "{\"country\": null, \"clicks\": 5}", "flat country explicit-null"},
-        {"STRING", "$.country", "{}", "flat empty doc"},
-        // --- Flat / numeric across all typed SV paths ---
-        {"INT", "$.clicks", "{\"country\": \"US\"}", "flat clicks missing (INT)"},
-        {"LONG", "$.clicks", "{\"country\": \"US\"}", "flat clicks missing (LONG)"},
-        {"FLOAT", "$.clicks", "{\"country\": \"US\"}", "flat clicks missing (FLOAT)"},
-        {"DOUBLE", "$.clicks", "{\"country\": \"US\"}", "flat clicks missing (DOUBLE)"},
-        {"BIG_DECIMAL", "$.clicks", "{\"country\": \"US\"}", "flat clicks missing (BIG_DECIMAL)"},
-        {"INT", "$.clicks", "{\"country\": \"US\", \"clicks\": null}", "flat clicks explicit-null (INT)"},
-        // --- Nested object ---
-        {"STRING", "$.location.country", "{\"location\": {\"city\": \"SF\"}}", "nested inner key missing"},
-        {"STRING", "$.location.country", "{\"location\": null}", "nested parent explicit-null"},
-        {"STRING", "$.location.country", "{\"country\": \"US\"}", "nested parent missing"},
-        // --- Array element ---
-        {"STRING", "$.tags[0]", "{\"tags\": null}", "array null parent"},
-        {"STRING", "$.tags[0]", "{\"tags\": []}", "array empty"},
-        {"STRING", "$.tags[1]", "{\"tags\": [\"red\"]}", "array index out-of-bounds"},
-        {"STRING", "$.tags[0]", "{\"country\": \"US\"}", "array parent missing"},
-        // --- Array of objects ---
-        {"STRING", "$.events[0].country", "{\"events\": [{\"country\": null}]}", "array-of-obj inner explicit-null"},
-        {"STRING", "$.events[0].country", "{\"events\": [{}]}", "array-of-obj inner key missing"},
-        {"STRING", "$.events[0].country", "{\"events\": []}", "array-of-obj empty array"},
-        {"STRING", "$.events[0].country", "{\"events\": null}", "array-of-obj null array"},
-        // --- Array of objects, numeric (INT) — confirms typed coverage at depth ---
-        {"INT", "$.events[0].clicks", "{\"events\": [{\"country\": \"US\"}]}", "array-of-obj inner numeric missing"}
-    };
-  }
+  // ====================================================================================
+  // === Country/click null-handling tests for jsonExtractScalar.                       ===
+  // ===                                                                                ===
+  // === The SV null-handling fix: with `enableNullHandling = true` and no default      ===
+  // === literal, an unresolved JSON path must surface as SQL NULL instead of throwing. ===
+  // === These tests use a country/click data model — JSON documents shaped like        ===
+  // === `{country, clicks, location, tags, events}` — to exercise the fix across four  ===
+  // === JSON structural shapes (flat scalar, nested object, array element, array of    ===
+  // === objects) and three query shapes (projection, GROUP BY, DISTINCT).              ===
+  // ====================================================================================
 
-  /**
-   * E4 behavior: 3-arg {@code jsonExtractScalar} + query-level null handling ENABLED + unresolved
-   * path. The transform must surface SQL NULL in the projection instead of throwing, so the scalar
-   * fallback agrees with index-aware operators ({@code JsonIndexDistinctOperator},
-   * {@code JsonIndexGroupByOperator}) on the null-group semantics.
-   */
-  @Test(dataProvider = "countryClickUnresolvedCases")
-  public void testCountryClickNullHandlingOnEmitsNull(String resultsType, String jsonPath, String json, String label) {
+  // ---------------- Named single-row JSON documents (used by single-row tests) ----------------
+  //
+  // Pretty-printed JSON for each constant is shown above its declaration. The string literal
+  // itself is kept compact — Jackson tolerates either form, but the comment above is what a
+  // human reads when scanning a test failure.
+
+  // { "country": "US", "clicks": 5 }
+  private static final String CC_FLAT_RESOLVED = "{\"country\": \"US\", \"clicks\": 5}";
+  // { "clicks": 5 }                                       <- country key missing
+  private static final String CC_FLAT_COUNTRY_MISSING = "{\"clicks\": 5}";
+  // { "country": null, "clicks": 5 }                      <- country explicit JSON null
+  private static final String CC_FLAT_COUNTRY_EXPLICIT_NULL = "{\"country\": null, \"clicks\": 5}";
+  // { }                                                   <- empty document
+  private static final String CC_FLAT_EMPTY = "{}";
+  // { "country": "US" }                                   <- clicks key missing
+  private static final String CC_FLAT_CLICKS_MISSING = "{\"country\": \"US\"}";
+  // { "country": "US", "clicks": null }                   <- clicks explicit JSON null
+  private static final String CC_FLAT_CLICKS_EXPLICIT_NULL = "{\"country\": \"US\", \"clicks\": null}";
+
+  // { "location": { "city": "SF", "country": "US" } }
+  private static final String CC_NESTED_RESOLVED = "{\"location\": {\"city\": \"SF\", \"country\": \"US\"}}";
+  // { "location": { "city": "SF" } }                      <- nested inner key missing
+  private static final String CC_NESTED_INNER_MISSING = "{\"location\": {\"city\": \"SF\"}}";
+  // { "location": null }                                  <- nested parent explicit JSON null
+  private static final String CC_NESTED_PARENT_EXPLICIT_NULL = "{\"location\": null}";
+  // { "country": "US" }                                   <- nested parent itself missing
+  private static final String CC_NESTED_PARENT_MISSING = "{\"country\": \"US\"}";
+
+  // { "tags": ["red", "blue", "green"] }
+  private static final String CC_ARRAY_RESOLVED = "{\"tags\": [\"red\", \"blue\", \"green\"]}";
+  // { "tags": null }                                      <- array parent explicit JSON null
+  private static final String CC_ARRAY_NULL_PARENT = "{\"tags\": null}";
+  // { "tags": [] }                                        <- empty array
+  private static final String CC_ARRAY_EMPTY = "{\"tags\": []}";
+  // { "tags": ["red"] }                                   <- array index 1 out-of-bounds
+  private static final String CC_ARRAY_SINGLE_ELEM = "{\"tags\": [\"red\"]}";
+  // { "country": "US" }                                   <- array parent itself missing
+  private static final String CC_ARRAY_PARENT_MISSING = "{\"country\": \"US\"}";
+
+  // { "events": [{"country": "US"}, {"country": "CA"}] }
+  private static final String CC_AOO_RESOLVED = "{\"events\": [{\"country\": \"US\"}, {\"country\": \"CA\"}]}";
+  // { "events": [{"country": null}] }                     <- inner explicit JSON null
+  private static final String CC_AOO_INNER_EXPLICIT_NULL = "{\"events\": [{\"country\": null}]}";
+  // { "events": [{}] }                                    <- inner key missing
+  private static final String CC_AOO_INNER_KEY_MISSING = "{\"events\": [{}]}";
+  // { "events": [] }                                      <- empty array of objects
+  private static final String CC_AOO_EMPTY_ARRAY = "{\"events\": []}";
+  // { "events": null }                                    <- null array of objects
+  private static final String CC_AOO_NULL_ARRAY = "{\"events\": null}";
+  // { "events": [{"country": "US"}] }                     <- inner numeric (clicks) missing
+  private static final String CC_AOO_INNER_NUMERIC_MISSING = "{\"events\": [{\"country\": \"US\"}]}";
+  // { "events": [{"clicks": 1}, {"clicks": 7}] }
+  private static final String CC_AOO_NUMERIC_RESOLVED = "{\"events\": [{\"clicks\": 1}, {\"clicks\": 7}]}";
+
+  // ---------------- Multi-row fixture (used by GROUP BY / DISTINCT tests) ----------------
+  //
+  // Pretty-printed JSON for each row:
+  //
+  //   Row 0 — fully populated:
+  //     { "country": "US", "clicks": 5,
+  //       "location": { "city": "SF", "country": "US" },
+  //       "tags":     ["red", "blue", "green"],
+  //       "events":   [{"country": "US"}, {"country": "CA"}] }
+  //
+  //   Row 1 — partial: location has no country; events[0].country is explicit null:
+  //     { "country": "CA", "clicks": 3,
+  //       "location": { "city": "Tor" },
+  //       "tags":     ["green"],
+  //       "events":   [{"country": null}] }
+  //
+  //   Row 2 — every field explicit JSON null:
+  //     { "country": null, "clicks": null, "location": null, "tags": null, "events": null }
+  //
+  //   Row 3 — empty document:
+  //     {}
+  //
+  // Across the four rows, every path covered by the GROUP BY / DISTINCT tests has at least one
+  // resolved value AND at least one unresolved occurrence (missing key or explicit null), so
+  // both the value groups and the null group must surface in the result.
+
+  private static final String CC_ROW_0_FULL = "{\"country\": \"US\", \"clicks\": 5,"
+      + " \"location\": {\"city\": \"SF\", \"country\": \"US\"},"
+      + " \"tags\": [\"red\", \"blue\", \"green\"],"
+      + " \"events\": [{\"country\": \"US\"}, {\"country\": \"CA\"}]}";
+
+  private static final String CC_ROW_1_PARTIAL = "{\"country\": \"CA\", \"clicks\": 3,"
+      + " \"location\": {\"city\": \"Tor\"},"
+      + " \"tags\": [\"green\"],"
+      + " \"events\": [{\"country\": null}]}";
+
+  private static final String CC_ROW_2_ALL_NULL =
+      "{\"country\": null, \"clicks\": null, \"location\": null, \"tags\": null, \"events\": null}";
+
+  private static final String CC_ROW_3_EMPTY = "{}";
+
+  private static final Object[][] COUNTRY_CLICK_FIXTURE = {
+      {CC_ROW_0_FULL},
+      {CC_ROW_1_PARTIAL},
+      {CC_ROW_2_ALL_NULL},
+      {CC_ROW_3_EMPTY}
+  };
+
+  // ---------------- Helpers ----------------
+
+  private FluentQueryTest.OnFirstInstance givenSingleRowJsonTable(boolean nullHandling, String json) {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
         .setEnableColumnBasedNullHandling(true)
         .addDimensionField("json", DataType.JSON)
         .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
-    Object[] expectedRow = new Object[]{null};
-    FluentQueryTest.withBaseDir(_baseDir)
-        .withNullHandling(true)
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    return FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(nullHandling)
         .givenTable(schema, tableConfig)
-        .onFirstInstance(new Object[]{json})
-        .whenQuery(String.format("SELECT jsonExtractScalar(json, '%s', '%s') FROM testTable", jsonPath, resultsType))
-        // TODO: Change the framework to do not duplicate segments when only one segment is used.
-        .thenResultIs(expectedRow, expectedRow);
+        .onFirstInstance(new Object[]{json});
   }
 
-  /**
-   * E3 behavior preservation: 3-arg {@code jsonExtractScalar} + query-level null handling DISABLED
-   * + unresolved path must still throw. The E4 fix is gated on {@code _nullHandlingEnabled}, so
-   * callers that haven't opted in see the legacy behavior.
-   */
-  @Test(dataProvider = "countryClickUnresolvedCases")
-  public void testCountryClickNullHandlingOffThrows(String resultsType, String jsonPath, String json, String label) {
+  private FluentQueryTest.OnFirstInstance givenCountryClickFixture(boolean nullHandling) {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("testTable")
         .setEnableColumnBasedNullHandling(true)
         .addDimensionField("json", DataType.JSON)
         .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
+    return FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(nullHandling)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(COUNTRY_CLICK_FIXTURE);
+  }
+
+  /** Asserts that the 3-arg `jsonExtractScalar(...)` query returns SQL NULL for a single-row fixture. */
+  private void assertSingleRowReturnsNull(boolean nullHandling, String json, String jsonPath, String resultsType) {
+    Object[] expectedNullRow = new Object[]{null};
+    givenSingleRowJsonTable(nullHandling, json)
+        .whenQuery(String.format("SELECT jsonExtractScalar(json, '%s', '%s') FROM testTable", jsonPath, resultsType))
+        // Segment duplication: the same row is returned twice (one per duplicated segment).
+        .thenResultIs(expectedNullRow, expectedNullRow);
+  }
+
+  /** Asserts that the 3-arg `jsonExtractScalar(...)` query throws when null handling is off. */
+  private void assertSingleRowThrowsForUnresolved(String json, String jsonPath, String resultsType, String label) {
     try {
-      FluentQueryTest.withBaseDir(_baseDir)
-          .withNullHandling(false)
-          .givenTable(schema, tableConfig)
-          .onFirstInstance(new Object[]{json})
+      givenSingleRowJsonTable(false, json)
           .whenQuery(String.format("SELECT jsonExtractScalar(json, '%s', '%s') FROM testTable", jsonPath, resultsType))
           .thenResultIs(new Object[]{"unused"});
       Assert.fail("Expected query to fail for " + label);
@@ -551,160 +611,211 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     }
   }
 
+  // ---------------- Unresolved paths: null-handling ON must surface SQL NULL ----------------
+
   /**
-   * Positive cases: when the typed JSON path resolves — including at depth through nested objects,
-   * array elements, and array-of-objects — null-handling ON must surface the resolved value
-   * as-is. The fix only changes the unresolved-row behavior; resolved paths must be untouched at
-   * every nesting depth.
+   * The SV null-handling fix. With null handling on and no default literal, an unresolved JSON
+   * path must surface as SQL NULL in the projection — matching the contract that
+   * {@code JsonIndexDistinctOperator} already provides for the DISTINCT route.
+   * <p>
+   * Example (flat, missing key):
+   * <pre>
+   *   JSON:   { "clicks": 5 }
+   *   Query:  SET enableNullHandling = true;
+   *           SELECT jsonExtractScalar(json, '$.country', 'STRING') FROM testTable
+   *   Result: NULL
+   * </pre>
+   * See {@link #unresolvedSinglePathCases()} for the full per-case matrix.
    */
-  @DataProvider(name = "countryClickResolvedCases")
-  public static Object[][] countryClickResolvedCases() {
+  @Test(dataProvider = "unresolvedSinglePathCases")
+  public void testNullHandlingOnReturnsNullForUnresolvedPath(String resultsType, String jsonPath, String json,
+      String label) {
+    assertSingleRowReturnsNull(true, json, jsonPath, resultsType);
+  }
+
+  /**
+   * Legacy behavior preservation. With null handling off and no default, the same unresolved-path
+   * cases must throw — the E4 fix is gated on {@code _nullHandlingEnabled}, so callers that
+   * haven't opted in see no behavior change.
+   * <p>
+   * Example (flat, missing key):
+   * <pre>
+   *   JSON:   { "clicks": 5 }
+   *   Query:  SELECT jsonExtractScalar(json, '$.country', 'STRING') FROM testTable
+   *   Result: throws IllegalArgumentException("Cannot resolve JSON path on some records.…")
+   * </pre>
+   */
+  @Test(dataProvider = "unresolvedSinglePathCases")
+  public void testNullHandlingOffThrowsForUnresolvedPath(String resultsType, String jsonPath, String json,
+      String label) {
+    assertSingleRowThrowsForUnresolved(json, jsonPath, resultsType, label);
+  }
+
+  /**
+   * Each row is `(resultsType, jsonPath, JSON document, structural-shape label)`. Every case is
+   * one where `jsonPath` does NOT resolve in the given JSON document — that's what makes it
+   * exercise the null-handling code path.
+   */
+  @DataProvider(name = "unresolvedSinglePathCases")
+  public static Object[][] unresolvedSinglePathCases() {
     return new Object[][]{
-        // (resultsType, jsonPath, JSON doc, expected resolved value, label)
-        {"STRING", "$.country", "{\"country\": \"US\", \"clicks\": 5}", "US", "flat string"},
-        {"INT", "$.clicks", "{\"country\": \"US\", \"clicks\": 5}", 5, "flat int"},
-        {"STRING", "$.location.country", "{\"location\": {\"city\": \"SF\", \"country\": \"US\"}}", "US",
-            "nested string"},
-        {"STRING", "$.tags[1]", "{\"tags\": [\"red\", \"blue\", \"green\"]}", "blue", "array element"},
-        {"STRING", "$.events[0].country", "{\"events\": [{\"country\": \"US\"}, {\"country\": \"CA\"}]}", "US",
-            "array-of-obj inner"},
-        {"INT", "$.events[1].clicks", "{\"events\": [{\"clicks\": 1}, {\"clicks\": 7}]}", 7,
-            "array-of-obj inner numeric"}
+        // FLAT — string path
+        {"STRING", "$.country", CC_FLAT_COUNTRY_MISSING, "flat: country key missing"},
+        {"STRING", "$.country", CC_FLAT_COUNTRY_EXPLICIT_NULL, "flat: country explicit JSON null"},
+        {"STRING", "$.country", CC_FLAT_EMPTY, "flat: empty document"},
+        // FLAT — numeric path, all 5 numeric SV types
+        {"INT", "$.clicks", CC_FLAT_CLICKS_MISSING, "flat: clicks missing (INT)"},
+        {"LONG", "$.clicks", CC_FLAT_CLICKS_MISSING, "flat: clicks missing (LONG)"},
+        {"FLOAT", "$.clicks", CC_FLAT_CLICKS_MISSING, "flat: clicks missing (FLOAT)"},
+        {"DOUBLE", "$.clicks", CC_FLAT_CLICKS_MISSING, "flat: clicks missing (DOUBLE)"},
+        {"BIG_DECIMAL", "$.clicks", CC_FLAT_CLICKS_MISSING, "flat: clicks missing (BIG_DECIMAL)"},
+        {"INT", "$.clicks", CC_FLAT_CLICKS_EXPLICIT_NULL, "flat: clicks explicit JSON null (INT)"},
+        // NESTED OBJECT
+        {"STRING", "$.location.country", CC_NESTED_INNER_MISSING, "nested: inner key missing"},
+        {"STRING", "$.location.country", CC_NESTED_PARENT_EXPLICIT_NULL, "nested: parent explicit JSON null"},
+        {"STRING", "$.location.country", CC_NESTED_PARENT_MISSING, "nested: parent key missing"},
+        // ARRAY ELEMENT
+        {"STRING", "$.tags[0]", CC_ARRAY_NULL_PARENT, "array: parent explicit JSON null"},
+        {"STRING", "$.tags[0]", CC_ARRAY_EMPTY, "array: empty array"},
+        {"STRING", "$.tags[1]", CC_ARRAY_SINGLE_ELEM, "array: index out-of-bounds"},
+        {"STRING", "$.tags[0]", CC_ARRAY_PARENT_MISSING, "array: parent key missing"},
+        // ARRAY OF OBJECTS
+        {"STRING", "$.events[0].country", CC_AOO_INNER_EXPLICIT_NULL, "array-of-obj: inner explicit JSON null"},
+        {"STRING", "$.events[0].country", CC_AOO_INNER_KEY_MISSING, "array-of-obj: inner key missing"},
+        {"STRING", "$.events[0].country", CC_AOO_EMPTY_ARRAY, "array-of-obj: empty array"},
+        {"STRING", "$.events[0].country", CC_AOO_NULL_ARRAY, "array-of-obj: null array"},
+        // ARRAY OF OBJECTS — numeric (INT) confirms typed coverage at depth
+        {"INT", "$.events[0].clicks", CC_AOO_INNER_NUMERIC_MISSING, "array-of-obj: inner numeric missing (INT)"}
     };
   }
 
-  @Test(dataProvider = "countryClickResolvedCases")
-  public void testCountryClickNullHandlingOnResolvedValuePassThrough(String resultsType, String jsonPath, String json,
+  // ---------------- Resolved paths: null-handling ON must pass values through ----------------
+
+  /**
+   * Resolved-path regression guard. The fix only changes the unresolved-row behavior; resolved
+   * paths must still produce their values verbatim at every JSON nesting depth.
+   * <p>
+   * Example (array of objects, numeric):
+   * <pre>
+   *   JSON:   { "events": [{"clicks": 1}, {"clicks": 7}] }
+   *   Query:  SET enableNullHandling = true;
+   *           SELECT jsonExtractScalar(json, '$.events[1].clicks', 'INT') FROM testTable
+   *   Result: 7
+   * </pre>
+   */
+  @Test(dataProvider = "resolvedSinglePathCases")
+  public void testNullHandlingOnPassesResolvedValueThrough(String resultsType, String jsonPath, String json,
       Object expectedValue, String label) {
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName("testTable")
-        .setEnableColumnBasedNullHandling(true)
-        .addDimensionField("json", DataType.JSON)
-        .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
     Object[] expectedRow = new Object[]{expectedValue};
-    FluentQueryTest.withBaseDir(_baseDir)
-        .withNullHandling(true)
-        .givenTable(schema, tableConfig)
-        .onFirstInstance(new Object[]{json})
+    givenSingleRowJsonTable(true, json)
         .whenQuery(String.format("SELECT jsonExtractScalar(json, '%s', '%s') FROM testTable", jsonPath, resultsType))
         .thenResultIs(expectedRow, expectedRow);
   }
 
-  /**
-   * 4-arg with SQL NULL default + null-handling ON: pre-existing {@code _defaultIsNull} path —
-   * must continue producing SQL NULL at every nesting depth (regression guard so the E4 fix
-   * doesn't disturb this case).
-   */
-  @DataProvider(name = "countryClickSqlNullDefaultCases")
-  public static Object[][] countryClickSqlNullDefaultCases() {
+  /** Each row is `(resultsType, jsonPath, JSON document, expected resolved value, label)`. */
+  @DataProvider(name = "resolvedSinglePathCases")
+  public static Object[][] resolvedSinglePathCases() {
     return new Object[][]{
-        // (jsonPath, JSON document, label)
-        {"$.country", "{\"clicks\": 5}", "flat missing key"},
-        {"$.location.country", "{\"location\": {\"city\": \"SF\"}}", "nested inner missing"},
-        {"$.location.country", "{\"location\": null}", "nested parent null"},
-        {"$.tags[0]", "{\"tags\": []}", "empty array"},
-        {"$.tags[0]", "{\"tags\": null}", "null array"},
-        {"$.events[0].country", "{\"events\": [{\"country\": null}]}", "array-of-obj inner explicit-null"},
-        {"$.events[0].country", "{}", "deep path with empty root"}
+        {"STRING", "$.country", CC_FLAT_RESOLVED, "US", "flat string"},
+        {"INT", "$.clicks", CC_FLAT_RESOLVED, 5, "flat int"},
+        {"STRING", "$.location.country", CC_NESTED_RESOLVED, "US", "nested string"},
+        {"STRING", "$.tags[1]", CC_ARRAY_RESOLVED, "blue", "array element"},
+        {"STRING", "$.events[0].country", CC_AOO_RESOLVED, "US", "array-of-obj inner string"},
+        {"INT", "$.events[1].clicks", CC_AOO_NUMERIC_RESOLVED, 7, "array-of-obj inner numeric"}
     };
   }
 
-  @Test(dataProvider = "countryClickSqlNullDefaultCases")
-  public void testCountryClickFourArgSqlNullDefaultNullHandlingOn(String jsonPath, String json, String label) {
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName("testTable")
-        .setEnableColumnBasedNullHandling(true)
-        .addDimensionField("json", DataType.JSON)
-        .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
+  // ---------------- 4-arg with SQL NULL default + null-handling ON (regression guard) ----------------
+
+  /**
+   * 4-arg `jsonExtractScalar(json, path, type, NULL)` + null handling ON. This is the pre-existing
+   * {@code _defaultIsNull} code path — must continue producing SQL NULL at every nesting depth so
+   * the E4 fix doesn't disturb it.
+   * <p>
+   * Example (nested, inner missing):
+   * <pre>
+   *   JSON:   { "location": { "city": "SF" } }
+   *   Query:  SET enableNullHandling = true;
+   *           SELECT jsonExtractScalar(json, '$.location.country', 'STRING', NULL) FROM testTable
+   *   Result: NULL
+   * </pre>
+   */
+  @Test(dataProvider = "fourArgSqlNullDefaultCases")
+  public void testFourArgSqlNullDefaultReturnsNullWithNullHandlingOn(String jsonPath, String json, String label) {
     Object[] expectedRow = new Object[]{null};
-    FluentQueryTest.withBaseDir(_baseDir)
-        .withNullHandling(true)
-        .givenTable(schema, tableConfig)
-        .onFirstInstance(new Object[]{json})
-        // 4-arg form with SQL NULL literal as the default value; null-handling enabled.
+    givenSingleRowJsonTable(true, json)
         .whenQuery(String.format("SELECT jsonExtractScalar(json, '%s', 'STRING', NULL) FROM testTable", jsonPath))
         .thenResultIs(expectedRow, expectedRow);
   }
 
-  // === Multi-row country-click fixture covering nested objects, arrays, and arrays of objects,
-  //     used to exercise GROUP BY and DISTINCT through jsonExtractScalar with mixed resolution. ===
-
-  /// Four-row mixed-resolution country-click fixture. Across the rows, each path covered by the
-  /// GROUP BY / DISTINCT tests has at least one resolved value and at least one unresolved
-  /// occurrence (missing or explicit null), so the null group / null distinct value must show up.
-  private static final Object[][] COUNTRY_CLICK_FIXTURE = new Object[][]{
-      // Row 0 — fully populated, two events.
-      {"{\"country\": \"US\", \"clicks\": 5, \"location\": {\"city\": \"SF\", \"country\": \"US\"},"
-          + " \"tags\": [\"red\", \"blue\", \"green\"], \"events\": [{\"country\": \"US\"}, {\"country\": \"CA\"}]}"},
-      // Row 1 — partial: location has no country; events[0].country is explicit null.
-      {"{\"country\": \"CA\", \"clicks\": 3, \"location\": {\"city\": \"Tor\"},"
-          + " \"tags\": [\"green\"], \"events\": [{\"country\": null}]}"},
-      // Row 2 — every field explicitly JSON null.
-      {"{\"country\": null, \"clicks\": null, \"location\": null, \"tags\": null, \"events\": null}"},
-      // Row 3 — empty doc.
-      {"{}"}
-  };
-
-  private FluentQueryTest.OnFirstInstance givenCountryClickFixture(boolean nullHandling) {
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName("testTable")
-        .setEnableColumnBasedNullHandling(true)
-        .addDimensionField("json", DataType.JSON)
-        .build();
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
-    return FluentQueryTest.withBaseDir(_baseDir)
-        .withNullHandling(nullHandling)
-        .givenTable(schema, tableConfig)
-        .onFirstInstance(COUNTRY_CLICK_FIXTURE);
-  }
-
-  /**
-   * GROUP BY across paths with mixed resolution. With null handling ON, the unresolved rows must
-   * collapse into a single null group (not throw, not split per row), and resolved values must
-   * group as usual. Segment duplication means the broker sees two copies of the fixture, so all
-   * counts are doubled — this is the framework convention, not a semantic claim about Pinot.
-   */
-  @DataProvider(name = "countryClickGroupByCases")
-  public static Object[][] countryClickGroupByCases() {
-    // Path, list of expected (value, count) rows ordered by value ASC NULLS LAST.
-    //   $.country         : row0=US, row1=CA, row2=null, row3=null              → US=1, CA=1, null=2 → ×2 segments
-    //   $.location.country: row0=US, row1=missing, row2=null parent, row3=miss   → US=1, null=3
-    //   $.tags[0]         : row0=red, row1=green, row2=null array, row3=miss     → red=1, green=1, null=2
-    //   $.events[0].country: row0=US, row1=null inner, row2=null array, row3=miss → US=1, null=3
+  /** Each row is `(jsonPath, JSON document, label)` — all rows pick a path that does NOT resolve. */
+  @DataProvider(name = "fourArgSqlNullDefaultCases")
+  public static Object[][] fourArgSqlNullDefaultCases() {
     return new Object[][]{
-        {"$.country", new Object[][]{{"CA", 2L}, {"US", 2L}, {null, 4L}}, "flat country"},
-        {"$.location.country", new Object[][]{{"US", 2L}, {null, 6L}}, "nested country"},
-        {"$.tags[0]", new Object[][]{{"green", 2L}, {"red", 2L}, {null, 4L}}, "array element"},
-        {"$.events[0].country", new Object[][]{{"US", 2L}, {null, 6L}}, "array-of-obj inner country"}
+        {"$.country", CC_FLAT_COUNTRY_MISSING, "flat: key missing"},
+        {"$.location.country", CC_NESTED_INNER_MISSING, "nested: inner missing"},
+        {"$.location.country", CC_NESTED_PARENT_EXPLICIT_NULL, "nested: parent explicit JSON null"},
+        {"$.tags[0]", CC_ARRAY_EMPTY, "array: empty"},
+        {"$.tags[0]", CC_ARRAY_NULL_PARENT, "array: null parent"},
+        {"$.events[0].country", CC_AOO_INNER_EXPLICIT_NULL, "array-of-obj: inner explicit JSON null"},
+        {"$.events[0].country", CC_FLAT_EMPTY, "deep path against empty root"}
     };
   }
 
-  @Test(dataProvider = "countryClickGroupByCases")
-  public void testCountryClickGroupByCountIncludesNullGroup(String jsonPath, Object[][] expectedRows, String label) {
+  // ---------------- GROUP BY: null-handling ON must produce a single null group ----------------
+
+  /**
+   * GROUP BY over the multi-row country/click fixture, with null handling ON. The unresolved rows
+   * (per the row breakdown in the fixture Javadoc above) must collapse into a single null group
+   * with the correct count, alongside the resolved value groups.
+   * <p>
+   * Example (flat country):
+   * <pre>
+   *   Rows (×2 for segment duplication):
+   *     Row 0: country = "US"        Row 1: country = "CA"
+   *     Row 2: country = JSON null   Row 3: country missing
+   *
+   *   Query: SELECT jsonExtractScalar(json, '$.country', 'STRING') AS v, COUNT(*)
+   *          FROM testTable GROUP BY v ORDER BY v ASC NULLS LAST
+   *
+   *   Result rows: ("CA", 2), ("US", 2), (NULL, 4)
+   * </pre>
+   * The data provider lists the expected (value, count) rows for each path covered.
+   */
+  @Test(dataProvider = "groupByCases")
+  public void testGroupByOnUnresolvedPathProducesNullGroup(String jsonPath, Object[][] expectedRows, String label) {
     String query = String.format(
         "SELECT jsonExtractScalar(json, '%s', 'STRING') AS v, COUNT(*) FROM testTable "
             + "GROUP BY v ORDER BY v ASC NULLS LAST",
         jsonPath);
-    givenCountryClickFixture(true)
-        .whenQuery(query)
-        .thenResultIs(expectedRows);
+    givenCountryClickFixture(true).whenQuery(query).thenResultIs(expectedRows);
   }
 
   /**
-   * Symmetric check: with null handling OFF, GROUP BY across mixed-resolution rows must throw
-   * (preserves legacy behavior). The broker surfaces the failure as a query error which the
-   * FluentQueryTest framework escalates to an {@link AssertionError}.
+   * Each row is `(jsonPath, expected (value, count) rows after ORDER BY v ASC NULLS LAST, label)`.
+   * Counts are ×2 the per-row count due to segment duplication (one segment becomes two).
+   */
+  @DataProvider(name = "groupByCases")
+  public static Object[][] groupByCases() {
+    return new Object[][]{
+        // $.country — row0="US", row1="CA", row2=null, row3=missing → 2 of each + 4 null
+        {"$.country", new Object[][]{{"CA", 2L}, {"US", 2L}, {null, 4L}}, "flat country"},
+        // $.location.country — row0="US", row1=missing, row2=null parent, row3=missing → 2 "US" + 6 null
+        {"$.location.country", new Object[][]{{"US", 2L}, {null, 6L}}, "nested country"},
+        // $.tags[0] — row0="red", row1="green", row2=null array, row3=missing → 2 each + 4 null
+        {"$.tags[0]", new Object[][]{{"green", 2L}, {"red", 2L}, {null, 4L}}, "array first element"},
+        // $.events[0].country — row0="US", row1=null inner, row2=null array, row3=missing → 2 "US" + 6 null
+        {"$.events[0].country", new Object[][]{{"US", 2L}, {null, 6L}}, "array-of-obj inner country"}
+    };
+  }
+
+  /**
+   * GROUP BY with null handling OFF over the same mixed-resolution fixture must throw — the
+   * broker surfaces the failure as a query error which the FluentQueryTest framework escalates
+   * to an {@link AssertionError}.
    */
   @Test
-  public void testCountryClickGroupByNullHandlingOffThrows() {
+  public void testGroupByOnUnresolvedPathThrowsWhenNullHandlingOff() {
     try {
       givenCountryClickFixture(false)
           .whenQuery("SELECT jsonExtractScalar(json, '$.country', 'STRING'), COUNT(*) FROM testTable GROUP BY 1")
@@ -715,36 +826,44 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     }
   }
 
+  // ---------------- DISTINCT: null-handling ON must include null in the distinct set ----------------
+
   /**
-   * DISTINCT across paths with mixed resolution. With null handling ON, the distinct set must
-   * include exactly one null entry alongside the resolved values — null group must not blow up
-   * across segments (segment dedup), and must not throw.
+   * SELECT DISTINCT over the multi-row country/click fixture with null handling ON. The distinct
+   * set must include exactly one null entry alongside the resolved values — null must not blow up
+   * across segments, and must not throw.
+   * <p>
+   * Example (flat country):
+   * <pre>
+   *   Query: SELECT DISTINCT jsonExtractScalar(json, '$.country', 'STRING') FROM testTable
+   *          ORDER BY jsonExtractScalar(json, '$.country', 'STRING') ASC NULLS LAST
+   *
+   *   Result rows: ("CA"), ("US"), (NULL)
+   * </pre>
+   * Pinot requires the ORDER BY expression to match a DISTINCT column literally — positional
+   * ORDER BY (e.g. `ORDER BY 1`) is rejected with
+   * "ORDER-BY columns should be included in the DISTINCT columns" — hence the explicit expression.
    */
-  @DataProvider(name = "countryClickDistinctCases")
-  public static Object[][] countryClickDistinctCases() {
+  @Test(dataProvider = "distinctCases")
+  public void testDistinctOnUnresolvedPathIncludesNull(String jsonPath, Object[][] expectedRows, String label) {
+    String expr = String.format("jsonExtractScalar(json, '%s', 'STRING')", jsonPath);
+    String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s ASC NULLS LAST", expr, expr);
+    givenCountryClickFixture(true).whenQuery(query).thenResultIs(expectedRows);
+  }
+
+  /** Each row is `(jsonPath, expected distinct values after ORDER BY v ASC NULLS LAST, label)`. */
+  @DataProvider(name = "distinctCases")
+  public static Object[][] distinctCases() {
     return new Object[][]{
         {"$.country", new Object[][]{{"CA"}, {"US"}, {null}}, "flat country"},
         {"$.location.country", new Object[][]{{"US"}, {null}}, "nested country"},
-        {"$.tags[0]", new Object[][]{{"green"}, {"red"}, {null}}, "array element"},
+        {"$.tags[0]", new Object[][]{{"green"}, {"red"}, {null}}, "array first element"},
         {"$.events[0].country", new Object[][]{{"US"}, {null}}, "array-of-obj inner country"}
     };
   }
 
-  @Test(dataProvider = "countryClickDistinctCases")
-  public void testCountryClickDistinctIncludesNull(String jsonPath, Object[][] expectedRows, String label) {
-    // Pinot requires the ORDER BY expression to match a DISTINCT column literally — positional
-    // ORDER BY (e.g. ORDER BY 1) is rejected with "ORDER-BY columns should be included in the
-    // DISTINCT columns".
-    String expr = String.format("jsonExtractScalar(json, '%s', 'STRING')", jsonPath);
-    String query = String.format(
-        "SELECT DISTINCT %s FROM testTable ORDER BY %s ASC NULLS LAST", expr, expr);
-    givenCountryClickFixture(true)
-        .whenQuery(query)
-        .thenResultIs(expectedRows);
-  }
-
   @Test
-  public void testCountryClickDistinctNullHandlingOffThrows() {
+  public void testDistinctOnUnresolvedPathThrowsWhenNullHandlingOff() {
     try {
       givenCountryClickFixture(false)
           .whenQuery("SELECT DISTINCT jsonExtractScalar(json, '$.country', 'STRING') FROM testTable")
