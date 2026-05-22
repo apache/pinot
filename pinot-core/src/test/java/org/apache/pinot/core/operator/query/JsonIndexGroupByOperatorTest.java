@@ -240,9 +240,8 @@ public class JsonIndexGroupByOperatorTest {
     when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(true);
     IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader);
 
-    assertTrue(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null), matchAll(1000)));
-    assertTrue(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX_WITH_DEFAULT, null),
-        matchAll(1000)));
+    assertTrue(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null)));
+    assertTrue(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX_WITH_DEFAULT, null)));
   }
 
   @Test
@@ -253,7 +252,7 @@ public class JsonIndexGroupByOperatorTest {
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT " + EXTRACT_INDEX + " AS k, COUNT(*), MAX(rating) FROM myTable GROUP BY k");
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext, matchAll(1000)));
+    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext));
   }
 
   @Test
@@ -264,7 +263,7 @@ public class JsonIndexGroupByOperatorTest {
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT " + EXTRACT_INDEX + " AS k, SUM(rating) FROM myTable GROUP BY k");
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext, matchAll(1000)));
+    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext));
   }
 
   @Test
@@ -276,7 +275,7 @@ public class JsonIndexGroupByOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT " + EXTRACT_INDEX + " AS k, COUNT(rating) FROM myTable GROUP BY k "
             + "OPTION(enableNullHandling=true)");
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext, matchAll(1000)));
+    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext));
   }
 
   @Test
@@ -287,7 +286,7 @@ public class JsonIndexGroupByOperatorTest {
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT " + EXTRACT_INDEX + " AS k, COUNT(*) AS c FROM myTable GROUP BY k HAVING COUNT(*) > 10");
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext, matchAll(1000)));
+    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext));
   }
 
   @Test
@@ -298,7 +297,7 @@ public class JsonIndexGroupByOperatorTest {
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT " + EXTRACT_INDEX + " AS k, env, COUNT(*) FROM myTable GROUP BY k, env");
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext, matchAll(1000)));
+    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, queryContext));
   }
 
   @Test
@@ -307,65 +306,7 @@ public class JsonIndexGroupByOperatorTest {
     when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(false);
     IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader);
 
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null), matchAll(1000)));
-  }
-
-  /// Selectivity-gate tests below. SELECTIVITY_THRESHOLD = 2.0 (placeholder until JMH bench lands).
-
-  @Test
-  public void testCanUseRejectsHighCardinalityRelativeToMatchedDocs() {
-    JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
-    when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(true);
-    // Path cardinality 1000, segment total 100 → D >> SELECTIVITY_THRESHOLD * M, bail.
-    when(jsonIndexReader.getDistinctValueCountForPath("$.instance")).thenReturn(1000L);
-    IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader, 100);
-
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null), matchAll(100)));
-  }
-
-  @Test
-  public void testCanUseAcceptsAtSelectivityBoundary() {
-    JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
-    when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(true);
-    // D = floor(SELECTIVITY_THRESHOLD * M) = 2 * 100 = 200 → exactly at the boundary, route to the index.
-    when(jsonIndexReader.getDistinctValueCountForPath("$.instance")).thenReturn(200L);
-    IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader, 100);
-
-    assertTrue(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null), matchAll(100)));
-  }
-
-  @Test
-  public void testCanUseRejectsJustAboveSelectivityBoundary() {
-    JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
-    when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(true);
-    // D = SELECTIVITY_THRESHOLD * M + 1 → just above the boundary, bail.
-    when(jsonIndexReader.getDistinctValueCountForPath("$.instance")).thenReturn(201L);
-    IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader, 100);
-
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null), matchAll(100)));
-  }
-
-  @Test
-  public void testCanUseRejectsZeroMatchingDocs() {
-    JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
-    when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(true);
-    when(jsonIndexReader.getDistinctValueCountForPath("$.instance")).thenReturn(5L);
-    IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader, 100);
-
-    // Empty WHERE bitmap → M = 0 → no docs to count; the default operator handles this trivially.
-    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null),
-        new StaticBitmapFilterOperator(100, new MutableRoaringBitmap())));
-  }
-
-  @Test
-  public void testCanUseAcceptsWhenPathHasNoValues() {
-    JsonIndexReader jsonIndexReader = mock(JsonIndexReader.class);
-    when(jsonIndexReader.isPathIndexed("$.instance")).thenReturn(true);
-    // D = 0 (path not present in the index) → still cheaper than parsing every matched doc.
-    when(jsonIndexReader.getDistinctValueCountForPath("$.instance")).thenReturn(0L);
-    IndexSegment indexSegment = buildCanUseIndexSegment(jsonIndexReader, 100);
-
-    assertTrue(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null), matchAll(100)));
+    assertFalse(JsonIndexGroupByOperator.canUse(indexSegment, groupByQuery(EXTRACT_INDEX, null)));
   }
 
   private static QueryContext groupByQuery(String groupKeyExpression, String jsonMatchFilter) {
@@ -398,24 +339,12 @@ public class JsonIndexGroupByOperatorTest {
   }
 
   private static IndexSegment buildCanUseIndexSegment(JsonIndexReader jsonIndexReader) {
-    return buildCanUseIndexSegment(jsonIndexReader, 1000);
-  }
-
-  private static IndexSegment buildCanUseIndexSegment(JsonIndexReader jsonIndexReader, int totalDocs) {
     DataSource dataSource = mock(DataSource.class);
     when(dataSource.getJsonIndex()).thenReturn(jsonIndexReader);
 
-    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getTotalDocs()).thenReturn(totalDocs);
-
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getDataSourceNullable("tags")).thenReturn(dataSource);
-    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
     return indexSegment;
-  }
-
-  private static BaseFilterOperator matchAll(int numDocs) {
-    return new MatchAllFilterOperator(numDocs);
   }
 
   private static JsonIndexGroupByOperator buildOperator(QueryContext queryContext, JsonIndexReader jsonIndexReader,

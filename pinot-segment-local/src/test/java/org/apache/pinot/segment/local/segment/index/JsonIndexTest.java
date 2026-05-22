@@ -278,67 +278,6 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
-  public void testGetDistinctValueCountForPath()
-      throws Exception {
-    // @formatter:off
-    // CHECKSTYLE:OFF
-    String[] records = new String[]{
-        "{\"name\":\"adam\","
-            + "\"addresses\":[{\"country\":\"us\"},{\"country\":\"ca\"}],"
-            + "\"skills\":[\"english\",\"programming\"]}",
-        "{\"name\":\"bob\","
-            + "\"addresses\":[{\"country\":\"ca\"},{\"country\":\"uk\"}],"
-            + "\"skills\":[\"english\",\"math\"]}",
-        "{\"name\":\"carl\","
-            + "\"addresses\":[{\"country\":\"jp\"},{\"country\":\"kr\"}],"
-            + "\"skills\":[\"japanese\"]}"
-    };
-    // CHECKSTYLE:ON
-    // @formatter:on
-    JsonIndexConfig jsonIndexConfig = getIndexConfig();
-
-    createIndex(true, jsonIndexConfig, records);
-    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
-    createIndex(false, jsonIndexConfig, records);
-    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
-
-    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
-        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
-        JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
-        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
-      for (String record : records) {
-        mutableJsonIndex.add(record);
-      }
-      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapReader, offHeapReader, mutableJsonIndex};
-      for (JsonIndexReader reader : indexReaders) {
-        String label = reader.getClass().getSimpleName();
-        // Scalar path: exercises the cheap dict-range / TreeMap-subrange fast path. Exact count.
-        assertEquals(reader.getDistinctValueCountForPath("$.name"), 3L,
-            label + " distinct count at $.name");
-        // Wildcard array path normalizes to a value-only key with no bitmap constraint, so it also takes the fast
-        // path and returns the exact count.
-        assertEquals(reader.getDistinctValueCountForPath("$.skills[*]"), 4L,
-            label + " distinct count at $.skills[*]");
-        // Array-index paths require posting-list intersection and exercise the fallback that previously returned 0
-        // for both reader implementations due to double-normalization of the path key.
-        // The SPI contract allows an upper bound (see Javadoc); collectValuesFromFlattenedDocsMap currently drops
-        // the array-index bitmap and returns the union across all indices (5 distinct countries here, not the 3 at
-        // index 0/1). We assert >= the true value so this test (a) fails on the previous 0-return bug, and (b)
-        // continues to pass if collectValuesFromFlattenedDocsMap is later tightened to the exact 3.
-        assertTrue(reader.getDistinctValueCountForPath("$.addresses[0].country") >= 3L,
-            label + " distinct count at $.addresses[0].country (upper bound)");
-        assertTrue(reader.getDistinctValueCountForPath("$.addresses[1].country") >= 3L,
-            label + " distinct count at $.addresses[1].country (upper bound)");
-        // Path absent from the index returns 0 via the fast path; this is the "trust the index, skip scan" signal
-        // used by JsonIndexGroupByOperator's selectivity gate.
-        assertEquals(reader.getDistinctValueCountForPath("$.does_not_exist"), 0L,
-            label + " distinct count at non-existent path");
-      }
-    }
-  }
-
-  @Test
   public void testLargeIndex()
       throws Exception {
     int numRecords = 123_456;

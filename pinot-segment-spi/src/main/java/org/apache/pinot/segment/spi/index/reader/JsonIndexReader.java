@@ -101,25 +101,4 @@ public interface JsonIndexReader extends IndexReader {
   default boolean isPathIndexed(String jsonPath) {
     return true;
   }
-
-  /**
-   * Returns a non-negative upper bound on the number of distinct values seen at the given JSON path across all
-   * documents in the segment. Implementations are free to return the exact count when it is cheap to compute; a
-   * looser upper bound is permitted (and required for some array-indexed paths, see below).
-   *
-   * <p>The OSS immutable implementation answers scalar / wildcard paths in O(log N) via the sorted dictionary
-   * range. Array-indexed paths (for example {@code $.items[0].name}) fall back to the materializing default and
-   * return the union of distinct values across all indices, which is a strict upper bound on the per-index count.
-   * The default implementation materializes the full value set via {@link #getMatchingDistinctValues}; it is
-   * correct but intentionally slow on high-cardinality paths.
-   *
-   * <p>Callers use this value as a cardinality estimate to decide whether a dictionary-scan execution plan is
-   * cheaper than a row-by-row scan baseline. Because the contract is an upper bound, an estimate that is too high
-   * is perf-conservative (it may pick the slower row-scan path when the dictionary scan would have won); an
-   * estimate that is too low would be unsafe, so implementations must never under-report. A path that does not
-   * appear in the index returns 0.
-   */
-  default long getDistinctValueCountForPath(String jsonPath) {
-    return getMatchingDistinctValues(jsonPath, null).size();
-  }
 }

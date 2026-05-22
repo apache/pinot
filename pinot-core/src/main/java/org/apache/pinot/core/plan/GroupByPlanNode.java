@@ -47,18 +47,14 @@ public class GroupByPlanNode implements PlanNode {
   @Override
   public Operator<GroupByResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null && _queryContext.getGroupByExpressions() != null;
-    if (_queryContext.hasFilteredAggregations()) {
-      return buildFilteredGroupByPlan();
-    }
-    // Build the filter operator once and reuse it for either the index-based fast path or the default plan.
-    // JsonIndexGroupByOperator.canUse(...) inspects the filter operator's WHERE bitmap to apply a selectivity
-    // gate (skip the index path when path cardinality is too high relative to matched-doc count).
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
-    BaseFilterOperator filterOperator = filterPlanNode.run();
-    if (JsonIndexGroupByOperator.canUse(_indexSegment, _queryContext, filterOperator)) {
+    // Prefer the index-based GROUP BY when the shape is GROUP BY jsonExtractIndex(col, path, type[, default])
+    // + COUNT(*) on a column whose JSON index covers the path. canUse() already excludes filtered aggregations
+    // and HAVING.
+    if (JsonIndexGroupByOperator.canUse(_indexSegment, _queryContext)) {
+      BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
       return new JsonIndexGroupByOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
     }
-    return buildNonFilteredGroupByPlan(filterPlanNode, filterOperator);
+    return _queryContext.hasFilteredAggregations() ? buildFilteredGroupByPlan() : buildNonFilteredGroupByPlan();
   }
 
   private FilteredGroupByOperator buildFilteredGroupByPlan() {
@@ -67,8 +63,9 @@ public class GroupByPlanNode implements PlanNode {
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
-  private GroupByOperator buildNonFilteredGroupByPlan(FilterPlanNode filterPlanNode,
-      BaseFilterOperator filterOperator) {
+  private GroupByOperator buildNonFilteredGroupByPlan() {
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
     AggregationFunctionUtils.AggregationInfo aggregationInfo =
         AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext,
             _queryContext.getAggregationFunctions(), _queryContext.getFilter(), filterOperator,

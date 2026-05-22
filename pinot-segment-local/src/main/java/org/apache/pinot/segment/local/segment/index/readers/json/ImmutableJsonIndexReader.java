@@ -814,33 +814,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return values;
   }
 
-  @Override
-  public long getDistinctValueCountForPath(String jsonPathKey) {
-    // Hold on to the caller-supplied path; fallback paths re-enter this class via getMatchingDistinctValues, which
-    // does its own normalization. Forwarding the already-normalized key would double-prefix the KEY_SEPARATOR and
-    // miss every entry.
-    String originalPathKey = jsonPathKey;
-    if (_version == BaseJsonIndexCreator.VERSION_2) {
-      if (jsonPathKey.startsWith("$")) {
-        jsonPathKey = jsonPathKey.substring(1);
-      } else {
-        jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
-      }
-    } else if (jsonPathKey.startsWith("$.")) {
-      jsonPathKey = jsonPathKey.substring(2);
-    }
-    Pair<String, ImmutableRoaringBitmap> pair = getKeyAndFlattenedDocIds(jsonPathKey);
-    // Array-index paths require posting-list intersection — fall back to materialization for correctness.
-    if (pair.getRight() != null) {
-      return JsonIndexReader.super.getDistinctValueCountForPath(originalPathKey);
-    }
-    int[] dictIds = getDictIdRangeForKey(pair.getLeft());
-    if (dictIds[0] < 0) {
-      return 0;
-    }
-    return (long) dictIds[1] - dictIds[0];
-  }
-
   /**
    * For a JSON key path, returns an int array of the range [min, max] spanning all values for the JSON key path
    */

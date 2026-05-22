@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
@@ -114,25 +113,19 @@ public class JsonIndexGroupByOperator extends BaseOperator<GroupByResultsBlock> 
   }
 
   /**
-   * Selectivity threshold for routing to the dictionary-scan operator. The index path wins when path cardinality
-   * (D = distinct values seen at the path) is small relative to matched-doc count (M). Above
-   * {@code D > SELECTIVITY_THRESHOLD * M} the dictionary scan can be slower than the row-by-row baseline, so the
-   * query falls back to {@link GroupByOperator}.
-   *
-   * <p>The current value is a conservative placeholder. The final value is being established by a JMH benchmark
-   * (see {@code BenchmarkJsonIndexGroupByCount}); update this constant once the empirical crossover lands.
-   */
-  @VisibleForTesting
-  static final double SELECTIVITY_THRESHOLD = 2.0;
-
-  /**
    * Returns {@code true} when the query is a single-group-by, single-{@code COUNT(*)} aggregation over a JSON-indexed
-   * path, with no {@code HAVING} clause and no filtered aggregations, AND the path's distinct-value cardinality is
-   * small enough that the dictionary scan is expected to beat the row-by-row scan. All other shapes fall back to
+   * path, with no {@code HAVING} clause and no filtered aggregations. All other shapes fall back to
    * {@link GroupByOperator}.
+   *
+   * <p>No cost-model gate. Bench results (see
+   * {@code BenchmarkJsonIndexGroupByCount} and the reference memo on this branch) show the dictionary scan wins on
+   * most realistic workloads, with the only loss quadrant at very-selective WHERE clauses ({@code M ≲ 1% of segment})
+   * combined with medium path cardinality ({@code D ∈ 1k..10k}), where it can be up to ~65% slower than the
+   * baseline. The wins (2-4× on loose WHEREs) dominate that worst case in aggregate, so the operator is always
+   * picked when the shape matches. Re-evaluate if production data shows the worst-case quadrant matters more than
+   * the bench suggested.
    */
-  public static boolean canUse(IndexSegment indexSegment, QueryContext queryContext,
-      BaseFilterOperator filterOperator) {
+  public static boolean canUse(IndexSegment indexSegment, QueryContext queryContext) {
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     if (groupByExpressions == null || groupByExpressions.size() != 1) {
       return false;
@@ -159,47 +152,7 @@ public class JsonIndexGroupByOperator extends BaseOperator<GroupByResultsBlock> 
     if (queryContext.hasFilteredAggregations()) {
       return false;
     }
-    return passesSelectivityGate(indexSegment, queryContext, filterOperator, groupByExpressions.get(0));
-  }
-
-  /**
-   * Compares path cardinality {@code D} against matched-doc count {@code M}; routes to the dictionary scan only when
-   * {@code D <= SELECTIVITY_THRESHOLD * M}. A null WHERE bitmap from the filter operator means "match all", in which
-   * case {@code M = totalDocs}.
-   */
-  private static boolean passesSelectivityGate(IndexSegment indexSegment, QueryContext queryContext,
-      BaseFilterOperator filterOperator, ExpressionContext groupByExpression) {
-    ParsedJsonExtractIndex parsed = JsonExtractIndexUtils.parseJsonExtractIndex(groupByExpression);
-    if (parsed == null) {
-      return false;
-    }
-    DataSource dataSource = indexSegment.getDataSourceNullable(parsed._columnName);
-    if (dataSource == null) {
-      return false;
-    }
-    JsonIndexReader reader = JsonExtractIndexUtils.getJsonIndexReader(dataSource);
-    if (reader == null) {
-      return false;
-    }
-    long d = reader.getDistinctValueCountForPath(parsed._jsonPathString);
-    if (d <= 0) {
-      // No values at this path — index path is trivially cheaper than parsing 0 docs.
-      return true;
-    }
-    long m;
-    BaseFilterOperator.FilteredDocIds filteredDocIds = filterOperator.getFilteredDocIds();
-    ImmutableRoaringBitmap whereBitmap = filteredDocIds.getDocIds();
-    if (whereBitmap == null) {
-      // Match-all (no WHERE or a trivially true predicate): every doc would be visited by the baseline.
-      m = indexSegment.getSegmentMetadata().getTotalDocs();
-    } else {
-      m = whereBitmap.getLongCardinality();
-    }
-    if (m == 0) {
-      // No matching docs — baseline does zero parses. Skip the dictionary scan too.
-      return false;
-    }
-    return d <= (long) Math.ceil(SELECTIVITY_THRESHOLD * m);
+    return true;
   }
 
   @Override

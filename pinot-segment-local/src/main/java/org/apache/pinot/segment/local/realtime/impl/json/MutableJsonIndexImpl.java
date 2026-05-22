@@ -677,36 +677,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public long getDistinctValueCountForPath(String jsonPathKey) {
-    // Hold on to the caller-supplied path; the fallback delegates to getMatchingDistinctValues, which does its own
-    // normalization. Forwarding the already-normalized key would double-prefix and miss every entry.
-    String originalPathKey = jsonPathKey;
-    if (jsonPathKey.startsWith("$")) {
-      jsonPathKey = jsonPathKey.substring(1);
-    } else {
-      jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
-    }
-    _readLock.lock();
-    try {
-      Pair<String, LazyBitmap> result = getKeyAndFlattenedDocIds(jsonPathKey);
-      // Array-index paths require posting-list intersection — defer to the materializing default. Release the read
-      // lock first because the default path re-enters this class via getMatchingFlattenedDocsMap, which acquires
-      // the read lock itself (the lock is reentrant but releasing keeps the lock-discipline obvious for readers).
-      if (result.getRight() != null) {
-        _readLock.unlock();
-        try {
-          return MutableJsonIndex.super.getDistinctValueCountForPath(originalPathKey);
-        } finally {
-          _readLock.lock();
-        }
-      }
-      return getMatchingKeysMap(result.getLeft()).size();
-    } finally {
-      _readLock.unlock();
-    }
-  }
-
-  @Override
   public String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
     String[][] result = new String[length][];
     List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
