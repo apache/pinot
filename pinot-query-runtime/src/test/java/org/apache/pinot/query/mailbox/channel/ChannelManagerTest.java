@@ -85,4 +85,26 @@ public class ChannelManagerTest {
     assertTrue(channelManager.resetConnectBackoff("failing-host", 9999));
     verify(mockChannel).resetConnectBackoff();
   }
+
+  /// Pins the fail-fast gate added in commit 1d29438dc0 ("Fail fast on invalid gRPC mailbox transport
+  /// configuration"): a non-positive `writeBufferLowWaterMarkBytes` must throw at startup rather than
+  /// surfacing later as a Netty `WriteBufferWaterMark` constructor failure on the first send.
+  @Test(expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = ".*writeBufferLowWaterMarkBytes must be positive.*")
+  public void testConstructorRejectsZeroWriteBufferLowWaterMark() {
+    new ChannelManager(null, 4_000_000, Duration.ofDays(365),
+        CommonConstants.MultiStageQueryRunner.DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES,
+        0);
+  }
+
+  /// Pins the eager `new WriteBufferWaterMark(low, high)` invariant: when `low > high`, Netty's own
+  /// constructor throws `IllegalArgumentException`. Constructing the watermark eagerly in
+  /// `ChannelManager` (added in 1d29438dc0) is what makes this surface at startup instead of on the
+  /// first send to a previously-unseen peer.
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testConstructorRejectsLowWatermarkAboveHighWatermark() {
+    new ChannelManager(null, 4_000_000, Duration.ofDays(365),
+        32 * 1024 * 1024,  // high
+        64 * 1024 * 1024); // low > high
+  }
 }
