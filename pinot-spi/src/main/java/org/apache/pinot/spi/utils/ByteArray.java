@@ -175,7 +175,8 @@ public class ByteArray implements Comparable<ByteArray>, Serializable {
             rightToIndex);
       } catch (ArrayIndexOutOfBoundsException outOfBounds) {
         throw outOfBounds;
-      } catch (Throwable ignore) {
+      } catch (Throwable t) {
+        LOGGER.debug("MethodHandle invocation for Arrays.compareUnsigned failed, falling back to manual comparison", t);
       }
     }
     return compareFallback(left, leftFromIndex, leftToIndex, right, rightFromIndex, rightToIndex);

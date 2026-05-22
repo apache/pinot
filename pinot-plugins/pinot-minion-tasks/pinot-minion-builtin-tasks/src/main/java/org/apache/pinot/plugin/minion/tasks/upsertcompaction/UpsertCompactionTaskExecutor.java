@@ -113,7 +113,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
           getSchema(tableNameWithType));
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, compactedRecordReader, InstanceType.MINION);
+      driver.init(config, compactedRecordReader);
       driver.build();
       _eventObserver.notifyProgress(pinotTaskConfig,
           "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
@@ -141,8 +141,10 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(workingDir.getPath());
     config.setSegmentName(segmentName);
+
     // Keep index creation time the same as original segment because both segments use the same raw data.
     // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
     // identify if the new pushed segment has newer data than the existing one.

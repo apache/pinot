@@ -93,7 +93,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   QUERY_WORKLOAD_COMPUTE_INSTANCE_COST_ERROR("count", true),
   QUERY_WORKLOAD_LISTENER_CHANGES_COUNT("count", true),
   QUERY_WORKLOAD_REQUEST_DROPPED("count", true),
-  QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true);
+  QUERY_WORKLOAD_HTTP_CALLBACK_DROPPED("count", true),
+  // Number of segment-delete requests rejected because the targets participate in a live segment lineage entry.
+  LINEAGE_BLOCKED_DELETE_COUNT("LineageBlockedDeleteCount", false);
 
   private final String _brokerMeterName;
   private final String _unit;

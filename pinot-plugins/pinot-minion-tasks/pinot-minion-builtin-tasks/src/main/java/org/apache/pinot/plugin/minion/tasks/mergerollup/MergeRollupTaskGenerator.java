@@ -154,6 +154,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
     String taskType = MergeRollupTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    boolean useCreationTimeFallback = MinionTaskUtils.isCreationTimeFallbackEnabled(_clusterInfoAccessor);
     for (TableConfig tableConfig : tableConfigs) {
       if (!validate(tableConfig, taskType)) {
         continue;
@@ -176,6 +177,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       }
       SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(preSelectedSegmentsBasedOnLineage, segmentLineage);
 
+      Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
+
       List<SegmentZKMetadata> preSelectedSegments = new ArrayList<>();
       for (SegmentZKMetadata segment : allSegments) {
         if (preSelectedSegmentsBasedOnLineage.contains(segment.getSegmentName()) && segment.getTotalDocs() > 0
@@ -183,6 +186,13 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
           preSelectedSegments.add(segment);
         }
       }
+      // Filter out segments past retention to avoid selecting segments that RetentionManager may delete before the
+      // task executor downloads them. Note: if early time buckets consist entirely of expired segments, the watermark
+      // will advance past them since they won't appear in preSelectedSegments. This is expected because those segments
+      // will be purged by RetentionManager regardless.
+      long currentTimeMs = System.currentTimeMillis();
+      preSelectedSegments = MinionTaskUtils.filterSegmentsPastRetention(preSelectedSegments, tableConfig, taskConfigs,
+          currentTimeMs, useCreationTimeFallback);
 
       if (preSelectedSegments.isEmpty()) {
         // Reset the watermark time if no segment found. This covers the case where the table is newly created or
@@ -206,7 +216,6 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       });
 
       // Sort merge levels based on bucket time period
-      Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
       Map<String, Map<String, String>> mergeLevelToConfigs = MergeRollupTaskUtils.getLevelToConfigMap(taskConfigs);
       List<Map.Entry<String, Map<String, String>>> sortedMergeLevelConfigs =
           new ArrayList<>(mergeLevelToConfigs.entrySet());
@@ -504,7 +513,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     // check no mis-configured aggregation function parameters
     Set<String> allowedFunctionParameterNames = ImmutableSet.of(Constants.CPCSKETCH_LGK_KEY.toLowerCase(),
         Constants.THETA_TUPLE_SKETCH_SAMPLING_PROBABILITY.toLowerCase(),
-        Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES.toLowerCase());
+        Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES.toLowerCase(),
+        Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY.toLowerCase());
     Map<String, Map<String, String>> aggregationFunctionParameters =
         MergeRollupTaskUtils.getAggregationFunctionParameters(taskConfigs);
     for (String fieldName : aggregationFunctionParameters.keySet()) {
@@ -515,10 +525,11 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       for (String functionParameterName : functionParameters.keySet()) {
         // check that function parameter name is valid
         Preconditions.checkState(allowedFunctionParameterNames.contains(functionParameterName.toLowerCase()),
-            "Aggregation function parameter name must be one of [lgK, samplingProbability, nominalEntries]!");
+            "Aggregation function parameter name must be one of " + allowedFunctionParameterNames + "!");
         // check that function parameter value is valid for nominal entries
         if (functionParameterName.equalsIgnoreCase(Constants.CPCSKETCH_LGK_KEY)
-            || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+            || functionParameterName.equalsIgnoreCase(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)
+            || functionParameterName.equalsIgnoreCase(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {
           String value = functionParameters.get(functionParameterName);
           String err = "Aggregation function parameter \"" + functionParameterName + "\" on column \"" + fieldName
               + "\" has invalid value: " + value;

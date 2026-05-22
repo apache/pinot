@@ -129,6 +129,19 @@ public class VarLengthValueReader implements ValueReader {
   }
 
   @Override
+  public int getUnpaddedByteSize(int index, int numBytesPerValue) {
+    return getByteSize(index, numBytesPerValue);
+  }
+
+  @Override
+  public int getByteSize(int index, int numBytesPerValue) {
+    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
+    int startOffset = _dataBuffer.getInt(offsetPosition);
+    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
+    return endOffset - startOffset;
+  }
+
+  @Override
   public int compareUtf8Bytes(int index, int numBytesPerValue, byte[] bytes) {
     int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
     int startOffset = _dataBuffer.getInt(offsetPosition);

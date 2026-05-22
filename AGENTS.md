@@ -66,13 +66,13 @@ repo. It is intentionally short and focused on day-to-day work.
 - pinot-batch-ingestion: batch ingestion plugin family.
   - pinot-batch-ingestion-common: shared batch ingestion APIs and utilities.
   - pinot-batch-ingestion-spark-base: shared Spark ingestion base classes.
-  - pinot-batch-ingestion-spark-2.4: Spark 2.4 ingestion implementation.
   - pinot-batch-ingestion-spark-3: Spark 3 ingestion implementation.
   - pinot-batch-ingestion-hadoop: Hadoop MapReduce ingestion implementation.
   - pinot-batch-ingestion-standalone: standalone batch ingestion implementation.
 - pinot-stream-ingestion: stream ingestion plugin family.
   - pinot-kafka-base: shared Kafka ingestion base classes.
   - pinot-kafka-3.0: Kafka 3.x ingestion implementation.
+  - pinot-kafka-4.0: Kafka 4.x ingestion implementation.
   - pinot-kinesis: AWS Kinesis ingestion implementation.
   - pinot-pulsar: Apache Pulsar ingestion implementation.
 - pinot-minion-tasks: minion task plugin family.
@@ -92,8 +92,8 @@ repo. It is intentionally short and focused on day-to-day work.
 - assembly-descriptor: Maven assembly descriptor for plugin packaging.
 
 ## Build and test
-- Build JDK: Use JDK 11+ (CI runs 11/21); code targets Java 11.
-- Runtime JRE: Broker/server/controller/minion run on Java 11+.
+- Build JDK: Use JDK 21+ for Pinot services and the default build; client and SPI artifacts still target Java 11 bytecode.
+- Runtime JRE: Broker/server/controller/minion run on Java 21+.
 - Default build: `./mvnw clean install`
 - Faster dev build: `./mvnw verify -Ppinot-fastdev`
 - Full binary/shaded build:
@@ -107,16 +107,26 @@ repo. It is intentionally short and focused on day-to-day work.
 
 ## Coding conventions and hygiene
 - Add class-level Javadoc for new classes; describe behavior and thread-safety.
-- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); code targets Java 11.
+- Use Javadoc comments with either `/** ... */` or `///` syntax (per JEP-467); service code targets Java 21 by default.
 - Keep license headers on all new source files.
 - Use `./mvnw license:format` to add headers to new files.
 - Preserve backward compatibility across mixed-version broker/server/controller.
+- Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
 
 ## Checkstyle config
 - Checkstyle rules and related config files live under `config/`.
 - Use the Maven wrapper (`./mvnw` on Unix-like systems or `mvnw.cmd` on Windows) to run `spotless:apply` to format code and `checkstyle:check` to validate style.
 - Run `./mvnw license:check` to validate license headers.
+
+## Pre-commit checks
+Before pushing a commit, always run the following checks on the affected modules and fix any failures:
+1. `./mvnw spotless:apply -pl <module>` — auto-format code.
+2. `./mvnw checkstyle:check -pl <module>` — validate style conformance.
+3. `./mvnw license:format -pl <module>` — add missing license headers to new files.
+4. `./mvnw license:check -pl <module>` — verify all files have correct license headers.
+
+Do not push until all four checks pass cleanly.
 
 ## Change guidance
 - Query changes often touch broker planning and server execution; verify both.
@@ -127,3 +137,32 @@ repo. It is intentionally short and focused on day-to-day work.
 ## Reference docs
 - `README.md` for build and quickstart details.
 - `CONTRIBUTING.md` for style, licensing, and contribution guidance.
+
+## Knowledge base (tool-neutral)
+The `kb/` directory holds AI-optimized procedures and reference material that any
+coding agent (Claude Code, Copilot, Cursor, GPT, Qwen, Gemini, etc.) can read.
+Claude Code's `.claude/skills/<name>/SKILL.md` and `.claude/agents/<name>.md`
+files are thin pointers that delegate to the kb/ procedures — non-Claude agents
+should read kb/ directly.
+
+- `kb/skills/` — operational procedures and review checklists. See
+  [`kb/skills/README.md`](kb/skills/README.md) for the index. Each file is
+  self-contained; read it and follow it when your task matches the skill name.
+  - Operations: `precommit`, `run-test`, `quickstart`, `bench-compare`,
+    `flaky-analyze`.
+  - Review (eight domains, one per file): `review-config-backcompat`,
+    `review-concurrency-state`, `review-architecture`, `review-performance`,
+    `review-correctness-nulls`, `review-testing`, `review-naming-api`,
+    `review-process-scope`.
+- `kb/agents/code-reviewer.md` — orchestrator that dispatches the eight review
+  skills in parallel, aggregates findings, and emits a consolidated severity-
+  ranked report.
+- `kb/code-review-principles.md` — Pinot-specific review principles cited by id
+  (e.g. `C2.4`, `C6.1`) from the review skills.
+- `kb/CLAUDE.md` — kb/ authoring rules (one source of truth, terse, AI-optimized).
+
+**For non-Claude agents:** when a task matches a skill name (e.g. user asks for
+a pre-commit check, a benchmark comparison, a flaky-test investigation, or a
+code review), read the corresponding `kb/skills/<name>.md` and follow its
+procedure. For a full code review, read `kb/agents/code-reviewer.md` and run the
+eight review skills as it describes.

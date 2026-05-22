@@ -198,7 +198,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       // Set the first exception's error code in the request context
       requestContext.setErrorCode(exceptions.get(0).getErrorCode());
       requestContext.setProcessingExceptions(exceptions.stream().map(QueryException::getMessage)
-        .collect(Collectors.toList()));
+          .collect(Collectors.toList()));
     }
   }
 
@@ -397,7 +397,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     AccessControl accessControl = _accessControlFactory.create();
     for (String tableName : tableNames) {
       AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, TargetType.TABLE, tableName,
-        Actions.Table.QUERY);
+          Actions.Table.QUERY);
       if (!authorizationResult.hasAccess()) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         throw new WebApplicationException("Permission denied. " + authorizationResult.getFailureMessage(),
@@ -417,7 +417,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
       BrokerResponseNative response = BrokerResponseNative.empty();
       response.setResultTable(new ResultTable(schema, Collections.singletonList(new Object[]{request.getQuery(),
-        plan})));
+          plan})));
       return response;
     } catch (URISyntaxException e) {
       throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);

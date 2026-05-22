@@ -17,8 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.controller.helix.core.rebalance;
-
 import java.util.Map;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
 
 /**
  * Default No-op TableRebalanceObserver.

@@ -65,6 +65,13 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   ADAPTIVE_SERVER_SELECTOR_TYPE("adaptiveServerSelectorType", true),
 
   /**
+   * Per-server adaptive routing stats exported as metrics.
+   */
+  ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS("adaptiveServerNumInFlightRequests", false),
+  ADAPTIVE_SERVER_LATENCY_EMA("adaptiveServerLatencyEma", false),
+  ADAPTIVE_SERVER_HYBRID_SCORE("adaptiveServerHybridScore", false),
+
+  /**
    * The queue size of ServerRoutingStatsManager main executor service.
    */
   ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),

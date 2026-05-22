@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
@@ -77,10 +75,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
     if (!tableDataManager.isUpsertEnabled()) {
       segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
-      indexSegments = new ArrayList<>(segmentDataManagers.size());
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        indexSegments.add(segmentDataManager.getSegment());
-      }
+      indexSegments = collectIndexSegments(segmentDataManagers);
     } else {
       TableUpsertMetadataManager tumm = tableDataManager.getTableUpsertMetadataManager();
       Preconditions.checkState(tumm != null,
@@ -103,14 +98,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
           }
         }
         segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
-        indexSegments = new ArrayList<>(segmentDataManagers.size());
-        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          if (segmentDataManager.hasMultiSegments()) {
-            indexSegments.addAll(segmentDataManager.getSegments());
-          } else {
-            indexSegments.add(segmentDataManager.getSegment());
-          }
-        }
+        indexSegments = collectIndexSegments(segmentDataManagers);
         if (isUsingConsistencyMode) {
           List<SegmentContext> segmentContexts =
               tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
@@ -128,6 +116,20 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
     return new SingleTableExecutionInfo(tableDataManager, segmentDataManagers, indexSegments, providedSegmentContexts,
         segmentsToQuery, optionalSegments, notAcquiredSegments);
+  }
+
+  // A SegmentDataManager may expose more than one IndexSegment (e.g. DuoSegmentDataManager during a commit window,
+  // where both the committed immutable and the still-mutable consuming segment must be queried together).
+  private static List<IndexSegment> collectIndexSegments(List<SegmentDataManager> segmentDataManagers) {
+    List<IndexSegment> indexSegments = new ArrayList<>(segmentDataManagers.size());
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      if (segmentDataManager.hasMultiSegments()) {
+        indexSegments.addAll(segmentDataManager.getSegments());
+      } else {
+        indexSegments.add(segmentDataManager.getSegment());
+      }
+    }
+    return indexSegments;
   }
 
   private SingleTableExecutionInfo(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
@@ -281,20 +283,5 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     }
     return new SelectedSegmentsInfo(indexSegments, numTotalDocs, prunerStats, numTotalSegments, numSelectedSegments,
         selectedSegmentContexts);
-  }
-
-  private List<IndexSegment> selectSegments(List<IndexSegment> indexSegments, QueryContext queryContext,
-      TimerContext timerContext, ExecutorService executorService, SegmentPrunerService segmentPrunerService,
-      SegmentPrunerStatistics prunerStats) {
-    List<IndexSegment> selectedSegments;
-    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
-        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
-      selectedSegments = Collections.emptyList();
-    } else {
-      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      selectedSegments = segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
-      segmentPruneTimer.stopAndRecord();
-    }
-    return selectedSegments;
   }
 }

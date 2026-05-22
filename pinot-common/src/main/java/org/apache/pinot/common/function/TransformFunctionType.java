@@ -169,6 +169,8 @@ public enum TransformFunctionType {
 
   // Special functions
   VALUE_IN("valueIn", ReturnTypes.ARG0, OperandTypes.variadic(SqlOperandCountRanges.from(2))),
+  FILTER_MV("filterMv", ReturnTypes.ARG0,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.CHARACTER))),
   MAP_VALUE("mapValue",
       ReturnTypes.cascade(opBinding -> positionalComponentType(opBinding, 2), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.ARRAY))),

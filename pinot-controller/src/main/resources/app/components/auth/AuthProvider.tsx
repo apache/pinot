@@ -19,7 +19,7 @@
 
 import { AuthLocalStorageKeys, AuthWorkflow } from 'Models';
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { useHistory, useLocation } from 'react-router';
+import { useHistory, useLocation } from 'react-router-dom';
 import { baseApi, getAxiosErrorInterceptor, getAxiosRequestInterceptor, getAxiosResponseInterceptor, transformApi } from '../../utils/axios-config';
 import PinotMethodUtils from '../../utils/PinotMethodUtils';
 import { AppLoadingIndicator } from '../AppLoadingIndicator';

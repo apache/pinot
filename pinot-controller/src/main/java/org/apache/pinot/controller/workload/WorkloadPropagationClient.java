@@ -397,7 +397,7 @@ public class WorkloadPropagationClient implements AutoCloseable {
         public void completed(org.apache.hc.client5.http.async.methods.SimpleHttpResponse response) {
           try {
             future.complete(new SimpleHttpResponse(response.getCode(),
-              response.getBodyText() != null ? response.getBodyText() : ""));
+                response.getBodyText() != null ? response.getBodyText() : ""));
           } catch (Exception e) {
             future.completeExceptionally(new IOException("Failed to process async response", e));
           }

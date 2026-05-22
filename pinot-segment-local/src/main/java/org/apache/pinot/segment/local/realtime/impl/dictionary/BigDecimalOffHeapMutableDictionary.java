@@ -37,6 +37,8 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
 
   private volatile BigDecimal _min = null;
   private volatile BigDecimal _max = null;
+  private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private volatile int _lengthOfLongestElement = 0;
 
   public BigDecimalOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgBigDecimalLen) {
@@ -48,7 +50,7 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
   @Override
   public int index(Object value) {
     BigDecimal bigDecimalValue = (BigDecimal) value;
-    updateMinMax(bigDecimalValue);
+    updateStats(bigDecimalValue);
     return indexValue(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
   }
 
@@ -58,10 +60,26 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
     int[] dictIds = new int[numValues];
     for (int i = 0; i < numValues; i++) {
       BigDecimal bigDecimalValue = (BigDecimal) values[i];
-      updateMinMax(bigDecimalValue);
+      updateStats(bigDecimalValue);
       dictIds[i] = indexValue(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
     }
     return dictIds;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.BIG_DECIMAL;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    BigDecimal bigDecimalValue = new BigDecimal(stringValue);
+    return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
+  }
+
+  @Override
+  public int indexOf(BigDecimal bigDecimalValue) {
+    return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
   }
 
   @Override
@@ -171,21 +189,16 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.BIG_DECIMAL;
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestElement;
   }
 
   @Override
-  public int indexOf(String stringValue) {
-    BigDecimal bigDecimalValue = new BigDecimal(stringValue);
-    return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
+  public int getLengthOfLongestElement() {
+    return _lengthOfLongestElement;
   }
 
   @Override
-  public int indexOf(BigDecimal bigDecimalValue) {
-    return getDictId(bigDecimalValue, BigDecimalUtils.serialize(bigDecimalValue));
-  }
-
   public BigDecimal get(int dictId) {
     return getBigDecimalValue(dictId);
   }
@@ -221,6 +234,11 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return _byteStore.getValueSize(dictId);
+  }
+
+  @Override
   protected void setValue(int dictId, Object value, byte[] serializedValue) {
     _byteStore.add(serializedValue);
   }
@@ -246,16 +264,25 @@ public class BigDecimalOffHeapMutableDictionary extends BaseOffHeapMutableDictio
     _byteStore.close();
   }
 
-  private void updateMinMax(BigDecimal value) {
+  private void updateStats(BigDecimal value) {
+    int byteSize = BigDecimalUtils.byteSize(value);
     if (_min == null) {
       _min = value;
       _max = value;
+      _lengthOfShortestElement = byteSize;
+      _lengthOfLongestElement = byteSize;
     } else {
       if (value.compareTo(_min) < 0) {
         _min = value;
       }
       if (value.compareTo(_max) > 0) {
         _max = value;
+      }
+      if (byteSize < _lengthOfShortestElement) {
+        _lengthOfShortestElement = byteSize;
+      }
+      if (byteSize > _lengthOfLongestElement) {
+        _lengthOfLongestElement = byteSize;
       }
     }
   }

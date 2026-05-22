@@ -183,9 +183,9 @@ public class QueryWorkloadConfigUtils {
       int[] fetchStatus = {0}; // Default to failure (0)
       try {
         WorkloadBudgetManager workloadBudgetManager = WorkloadBudgetManagerFactory.get();
-        if (workloadBudgetManager == null) {
-          LOGGER.info("WorkloadBudgetManager not initialized for instance: {}. Skipping fetching workload budgets.",
-              instanceId);
+        if (workloadBudgetManager == null || !workloadBudgetManager.isCostCollectionEnabled()) {
+          LOGGER.info("WorkloadBudgetManager not initialized or cost collection disabled for instance: {}. "
+              + "Skipping fetching workload budgets.", instanceId);
           return;
         }
         String controllerUrl = getControllerUrl(helixManager);
@@ -285,12 +285,12 @@ public class QueryWorkloadConfigUtils {
         } else {
           long enforcementCpu = enforcementProfile.getCpuCostNs();
           long enforcementMem = enforcementProfile.getMemoryCostBytes();
-           if (enforcementCpu <= 0) {
-             errors.add(prefix + ".enforcementProfile.cpuCostNs has to positive");
-           }
-           if (enforcementMem <= 0) {
-             errors.add(prefix + ".enforcementProfile.memoryCostBytes has to positive");
-           }
+          if (enforcementCpu <= 0) {
+            errors.add(prefix + ".enforcementProfile.cpuCostNs has to positive");
+          }
+          if (enforcementMem <= 0) {
+            errors.add(prefix + ".enforcementProfile.memoryCostBytes has to positive");
+          }
           // Validate PropagationScheme
           PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
           if (propagationScheme == null) {

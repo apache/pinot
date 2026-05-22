@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,12 +33,14 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongPredicate;
+import java.util.function.Supplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.client.admin.PinotAdminClient;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -50,14 +53,13 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
-import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+
 
 /**
  * PRODUCE
@@ -92,7 +94,21 @@ public class StreamOp extends BaseOp {
   private static final String NUM_SERVERS_QUERIED = "numServersQueried";
   private static final String NUM_SERVERS_RESPONEDED = "numServersResponded";
   private static final String TOTAL_DOCS = "totalDocs";
+  private static final long COUNT_QUERY_TIMEOUT_MS = 60_000L;
+  private static final long COUNT_QUERY_RETRY_INTERVAL_MS = 100L;
   private static final short KAFKA_REPLICATION_FACTOR = 1;
+  private static final Set<Integer> RETRYABLE_QUERY_ERROR_CODES = Set.of(
+      QueryErrorCode.BROKER_INSTANCE_MISSING.getId(),
+      QueryErrorCode.BROKER_RESOURCE_MISSING.getId(),
+      QueryErrorCode.BROKER_REQUEST_SEND.getId(),
+      QueryErrorCode.BROKER_SEGMENT_UNAVAILABLE.getId(),
+      QueryErrorCode.BROKER_TIMEOUT.getId(),
+      QueryErrorCode.EXECUTION_TIMEOUT.getId(),
+      QueryErrorCode.QUERY_SCHEDULING_TIMEOUT.getId(),
+      QueryErrorCode.SERVER_SHUTTING_DOWN.getId(),
+      QueryErrorCode.SERVER_NOT_RESPONDING.getId(),
+      QueryErrorCode.SERVER_SEGMENT_MISSING.getId(),
+      QueryErrorCode.SERVER_TABLE_MISSING.getId());
 
   public StreamOp() {
     super(OpType.STREAM_OP);
@@ -181,7 +197,7 @@ public class StreamOp extends BaseOp {
   }
 
   private boolean produceData() {
-    try {
+    try (PinotAdminClient adminClient = createPinotAdminClient()) {
       // get kafka topic
       Properties streamConfigMap =
           JsonUtils.fileToObject(new File(getAbsoluteFileName(_streamConfigFileName)), Properties.class);
@@ -195,7 +211,7 @@ public class StreamOp extends BaseOp {
       long existingTotalDoc = 0;
 
       // get original rows
-      existingTotalDoc = fetchExistingTotalDocs(tableName);
+      existingTotalDoc = waitForExistingTotalDocs(tableName, COUNT_QUERY_TIMEOUT_MS);
 
       // push csv data to kafka
       Properties publisherProps = new Properties();
@@ -221,9 +237,7 @@ public class StreamOp extends BaseOp {
 
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       String schemaName = TableNameBuilder.extractRawTableName(tableName);
-      String schemaString = ControllerTest
-          .sendGetRequest(ControllerRequestURLBuilder.baseUrl(ClusterDescriptor.getInstance().getControllerUrl())
-              .forSchemaGet(schemaName));
+      String schemaString = adminClient.getSchemaClient().getSchema(schemaName);
       Schema schema = JsonUtils.stringToObject(schemaString, Schema.class);
       DateTimeFormatSpec dateTimeFormatSpec = Objects.requireNonNull(
           schema.getSpecForTimeColumn(timeColumn)).getFormatSpec();
@@ -256,7 +270,7 @@ public class StreamOp extends BaseOp {
       }
 
       // verify number of rows increases as expected
-      waitForDocsLoaded(tableName, existingTotalDoc + _numRows, 60_000L);
+      waitForDocsLoaded(tableName, existingTotalDoc + _numRows, COUNT_QUERY_TIMEOUT_MS);
       LOGGER.info("Verified {} new rows in table: {}", _numRows, tableName);
       return true;
     } catch (Exception e) {
@@ -268,21 +282,27 @@ public class StreamOp extends BaseOp {
   private long fetchExistingTotalDocs(String tableName)
       throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
-    JsonNode response = Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
+    JsonNode response;
+    try {
+      response = Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
+    } catch (IOException e) {
+      throw new RetryableQueryException(String.format("Failed to query Table: %s", tableName), e);
+    }
+    return extractTotalDocs(query, response);
+  }
+
+  static long extractTotalDocs(String query, JsonNode response)
+      throws RetryableQueryException {
     if (response == null) {
-      String errorMsg = String.format("Failed to query Table: %s", tableName);
-      LOGGER.error(errorMsg);
-      throw new RuntimeException(errorMsg);
+      throw new RetryableQueryException(String.format("Failed when running query: %s; got null response", query));
     }
 
     if (response.has(EXCEPTIONS) && !response.get(EXCEPTIONS).isEmpty()) {
       String errorMsg =
           String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query, response.toPrettyString());
       JsonNode exceptions = response.get(EXCEPTIONS);
-      JsonNode errorCode = exceptions.get(ERROR_CODE);
-      if (QueryErrorCode.BROKER_INSTANCE_MISSING.getId() == errorCode.asInt()) {
-        LOGGER.warn("{}.Trying again", errorMsg);
-        return 0;
+      if (hasOnlyRetryableQueryExceptions(exceptions)) {
+        throw new RetryableQueryException(errorMsg);
       }
       LOGGER.error(errorMsg);
       throw new RuntimeException(errorMsg);
@@ -291,8 +311,7 @@ public class StreamOp extends BaseOp {
     if (response.has(NUM_SERVERS_QUERIED) && response.has(NUM_SERVERS_RESPONEDED)
         && response.get(NUM_SERVERS_QUERIED).asInt() > response.get(NUM_SERVERS_RESPONEDED).asInt()) {
       String errorMsg = String.format("Failed when running query: %s; the response contains partial results", query);
-      LOGGER.error(errorMsg);
-      throw new RuntimeException(errorMsg);
+      throw new RetryableQueryException(errorMsg);
     }
 
     if (!response.has(TOTAL_DOCS)) {
@@ -303,16 +322,90 @@ public class StreamOp extends BaseOp {
     return response.get(TOTAL_DOCS).asLong();
   }
 
-  private void waitForDocsLoaded(String tableName, long targetDocs, long timeoutMs) {
+  private long waitForExistingTotalDocs(String tableName, long timeoutMs)
+      throws Exception {
+    AtomicLong loadedDocs = new AtomicLong(-1);
+    waitForDocs(tableName, timeoutMs, existingTotalDocs -> {
+      loadedDocs.set(existingTotalDocs);
+      return true;
+    }, () -> "Failed to fetch existing documents for table: " + tableName);
+    return loadedDocs.get();
+  }
+
+  private void waitForDocsLoaded(String tableName, long targetDocs, long timeoutMs)
+      throws Exception {
     LOGGER.info("Wait Doc to load ...");
     AtomicLong loadedDocs = new AtomicLong(-1);
-    TestUtils.waitForCondition(
-        () -> {
-          long existingTotalDocs = fetchExistingTotalDocs(tableName);
-          loadedDocs.set(existingTotalDocs);
-          return existingTotalDocs == targetDocs;
-        }, 100L, timeoutMs,
-        "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead", true,
-        Duration.ofSeconds(1));
+    waitForDocs(tableName, timeoutMs, existingTotalDocs -> {
+      loadedDocs.set(existingTotalDocs);
+      return existingTotalDocs == targetDocs;
+    }, () -> "Failed to load " + targetDocs + " documents. Found " + loadedDocs.get() + " instead");
+  }
+
+  private void waitForDocs(String tableName, long timeoutMs, LongPredicate condition, Supplier<String> errorMessage)
+      throws Exception {
+    waitForDocs(tableName, timeoutMs, COUNT_QUERY_RETRY_INTERVAL_MS, condition, errorMessage,
+        () -> fetchExistingTotalDocs(tableName));
+  }
+
+  void waitForDocs(String tableName, long timeoutMs, long retryIntervalMs, LongPredicate condition,
+      Supplier<String> errorMessage, TotalDocsSupplier totalDocsSupplier)
+      throws Exception {
+    long endTimeMs = System.currentTimeMillis() + timeoutMs;
+    long nextLogTimeMs = 0;
+    RetryableQueryException lastRetryableQueryException = null;
+    while (System.currentTimeMillis() < endTimeMs) {
+      try {
+        if (condition.test(totalDocsSupplier.getAsLong())) {
+          return;
+        }
+      } catch (RetryableQueryException e) {
+        lastRetryableQueryException = e;
+        long currentTimeMs = System.currentTimeMillis();
+        if (currentTimeMs >= nextLogTimeMs) {
+          LOGGER.warn("Unable to fetch total docs for table: {}. Trying again", tableName, e);
+          nextLogTimeMs = currentTimeMs + Duration.ofSeconds(1).toMillis();
+        }
+      }
+      Thread.sleep(retryIntervalMs);
+    }
+    throw new RuntimeException(errorMessage.get(), lastRetryableQueryException);
+  }
+
+  static boolean hasOnlyRetryableQueryExceptions(JsonNode exceptions) {
+    if (exceptions.isArray()) {
+      for (JsonNode exception : exceptions) {
+        if (!isRetryableQueryException(exception)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return isRetryableQueryException(exceptions);
+  }
+
+  private static boolean isRetryableQueryException(JsonNode exception) {
+    Integer errorCode = getErrorCode(exception);
+    return errorCode != null && RETRYABLE_QUERY_ERROR_CODES.contains(errorCode);
+  }
+
+  private static Integer getErrorCode(JsonNode exception) {
+    JsonNode errorCode = exception.get(ERROR_CODE);
+    return errorCode != null ? errorCode.asInt() : null;
+  }
+
+  interface TotalDocsSupplier {
+    long getAsLong()
+        throws Exception;
+  }
+
+  static class RetryableQueryException extends Exception {
+    RetryableQueryException(String message) {
+      super(message);
+    }
+
+    RetryableQueryException(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
 }

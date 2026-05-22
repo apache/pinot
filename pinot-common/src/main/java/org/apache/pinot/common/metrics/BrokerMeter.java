@@ -36,6 +36,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter BAD_REQUEST_EXCEPTIONS = create("BAD_REQUEST_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
   public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
@@ -207,6 +208,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "NETTY_CONNECTION_BYTES_SENT", "nettyConnection", true);
   public static final BrokerMeter NETTY_CONNECTION_BYTES_RECEIVED = create(
       "NETTY_CONNECTION_BYTES_RECEIVED", "nettyConnection", true);
+  public static final BrokerMeter NETTY_CONNECTION_SEND_REQUEST_FAILURES = create(
+      "NETTY_CONNECTION_SEND_REQUEST_FAILURES", "nettyConnection", true);
 
   public static final BrokerMeter PROACTIVE_CLUSTER_CHANGE_CHECK = create(
       "PROACTIVE_CLUSTER_CHANGE_CHECK", "proactiveClusterChangeCheck", true);

@@ -44,13 +44,13 @@ public class BloomIndexTypeTest {
     return new String[][] {
         new String[] {"{}"},
         new String[] {"{\n"
-            + "  \"fpp\": 0.5\n"
-            + "}"},
+              + "  \"fpp\": 0.5\n"
+              + "}"},
         new String[] {"{\n"
-            + "  \"fpp\": 0.5,\n"
-            + "  \"maxSizeInBytes\": 1024,\n"
-            + "  \"loadOnHeap\": true"
-            + "}"}
+              + "  \"fpp\": 0.5,\n"
+              + "  \"maxSizeInBytes\": 1024,\n"
+              + "  \"loadOnHeap\": true"
+              + "}"}
     };
   }
 

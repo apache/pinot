@@ -56,9 +56,11 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -472,6 +474,44 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     } catch (DataLakeStorageException e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  public List<FileMetadata> listFilesWithMetadata(final URI fileUri, final boolean recursive,
+      final Predicate<String> pathFilter, final int maxResults)
+      throws IOException {
+    if (maxResults <= 0) {
+      LOGGER.warn("listFilesWithMetadata called with maxResults={}, returning empty list", maxResults);
+      return new ArrayList<>();
+    }
+    LOGGER.debug("listFilesWithMetadata (paginated) is called with fileUri='{}', recursive='{}', maxResults={}",
+        fileUri, recursive, maxResults);
+    final List<FileMetadata> result = new ArrayList<>();
+    try {
+      // PagedIterable fetches pages lazily; breaking out stops further API calls
+      for (final PathItem item : listPathItems(fileUri, recursive)) {
+        if (item.isDirectory()) {
+          continue;
+        }
+        final String filePath = AzurePinotFSUtil.convertAzureStylePathToUriStylePath(item.getName());
+        if (pathFilter.test(filePath)) {
+          result.add(new FileMetadata.Builder()
+              .setFilePath(filePath)
+              .setLastModifiedTime(item.getLastModified().toInstant().toEpochMilli())
+              .setLength(item.getContentLength())
+              .setIsDirectory(false)
+              .build());
+          if (result.size() >= maxResults) {
+            break;
+          }
+        }
+      }
+    } catch (DataLakeStorageException e) {
+      throw new IOException(e);
+    }
+    LOGGER.info("Listed {} files (max: {}) from URI: {}, is recursive: {}",
+        result.size(), maxResults, fileUri, recursive);
+    return result;
   }
 
   private PagedIterable<PathItem> listPathItems(URI fileUri, boolean recursive)

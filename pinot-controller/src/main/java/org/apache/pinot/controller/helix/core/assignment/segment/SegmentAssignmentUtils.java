@@ -133,13 +133,20 @@ public class SegmentAssignmentUtils {
     }
 
     // Mirror the assignment to all replica-groups
+    return getOneInstanceFromEachReplicaGroup(instancePartitions, partitionId, instanceIdWithLeastSegmentsAssigned);
+  }
+
+  public static List<String> getOneInstanceFromEachReplicaGroup(InstancePartitions instancePartitions,
+      int partitionId, int instanceId) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
-    List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
+    int numInstancesPerReplicaGroup = instancePartitions.getInstances(partitionId, 0).size();
+    instanceId %= numInstancesPerReplicaGroup;
+    List<String> instances = new ArrayList<>(numReplicaGroups);
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instancesAssigned.add(
-          instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
+      List<String> instancesInReplicaGroup = instancePartitions.getInstances(partitionId, replicaGroupId);
+      instances.add(instancesInReplicaGroup.get(instanceId));
     }
-    return instancesAssigned;
+    return instances;
   }
 
   /// Rebalances the table with non-replica-group based segment assignment strategy by uniformly spraying segment

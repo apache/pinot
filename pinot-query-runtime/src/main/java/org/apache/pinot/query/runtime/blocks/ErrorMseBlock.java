@@ -132,7 +132,7 @@ public class ErrorMseBlock implements MseBlock.Eos {
     try {
       ObjectNode root = JsonUtils.newObjectNode();
       root.put("type", "error");
-      root.put("errorMessages", JsonUtils.objectToJsonNode(_errorMessages));
+      root.set("errorMessages", JsonUtils.objectToJsonNode(_errorMessages));
       return JsonUtils.objectToString(root);
     } catch (JsonProcessingException e) {
       return "{\"type\": \"error\", \"errorMessages\": \"not serializable\"}";

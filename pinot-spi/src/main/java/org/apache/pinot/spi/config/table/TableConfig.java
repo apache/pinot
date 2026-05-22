@@ -20,6 +20,7 @@ package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.common.base.Preconditions;
@@ -36,6 +37,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -44,6 +46,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
   public static final String IS_DIM_TABLE_KEY = "isDimTable";
+  public static final String IS_MATERIALIZED_VIEW_KEY = "isMaterializedView";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -64,6 +67,8 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TUNER_CONFIG_LIST_KEY = "tunerConfigs";
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
   public static final String TABLE_SAMPLERS_KEY = "tableSamplers";
+  public static final String DESCRIPTION_KEY = "description";
+  public static final String TAGS_KEY = "tags";
 
   // Double underscore is reserved for real-time segment name delimiter
   public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
@@ -79,11 +84,23 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Indicates whether the table is a dimension table or not")
   private final boolean _dimTable;
 
+  @JsonPropertyDescription("Indicates whether the table is a materialized view or not")
+  private final boolean _materializedView;
+
   private SegmentsValidationAndRetentionConfig _validationConfig;
   private TenantConfig _tenantConfig;
   private IndexingConfig _indexingConfig;
 
   /* OPTIONAL FIELDS */
+
+  @JsonPropertyDescription("Human-readable description of the table, supports markdown")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private String _description;
+
+  @JsonPropertyDescription("Tags for categorizing and filtering the table")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @Nullable
+  private List<String> _tags;
 
   private TableCustomConfig _customConfig;
 
@@ -122,6 +139,30 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Configs for table samplers")
   private List<TableSamplerConfig> _tableSamplers;
 
+  /// Legacy constructor preserved for binary backward-compatibility on the public SPI surface.
+  /// Callers compiled against the pre-`isMaterializedView` signature still link against this entry
+  /// point; it forwards to the canonical constructor with `materializedView=false`. Prefer the
+  /// {@link TableConfigBuilder} or the canonical constructor below for new code.
+  @Deprecated
+  public TableConfig(String tableName, String tableType,
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
+      IndexingConfig indexingConfig, TableCustomConfig customConfig, @Nullable QuotaConfig quotaConfig,
+      @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable QueryConfig queryConfig,
+      @Nullable Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+      @Nullable List<FieldConfig> fieldConfigList, @Nullable UpsertConfig upsertConfig,
+      @Nullable DedupConfig dedupConfig, @Nullable DimensionTableConfig dimensionTableConfig,
+      @Nullable IngestionConfig ingestionConfig, @Nullable List<TierConfig> tierConfigsList, boolean dimTable,
+      @Nullable List<TunerConfig> tunerConfigList,
+      @Nullable Map<InstancePartitionsType, String> instancePartitionsMap,
+      @Nullable Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
+      @Nullable List<TableSamplerConfig> tableSamplers) {
+    this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
+        routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig, dedupConfig,
+        dimensionTableConfig, ingestionConfig, tierConfigsList, dimTable, tunerConfigList, instancePartitionsMap,
+        segmentAssignmentConfigMap, tableSamplers, /*materializedView=*/ false);
+  }
+
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
@@ -148,7 +189,8 @@ public class TableConfig extends BaseJsonConfig {
       Map<InstancePartitionsType, String> instancePartitionsMap,
       @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
       Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
-      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers) {
+      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers,
+      @JsonProperty(IS_MATERIALIZED_VIEW_KEY) boolean materializedView) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -176,6 +218,7 @@ public class TableConfig extends BaseJsonConfig {
     _ingestionConfig = ingestionConfig;
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
+    _materializedView = materializedView;
     _tunerConfigList = tunerConfigList;
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
@@ -201,10 +244,13 @@ public class TableConfig extends BaseJsonConfig {
     _ingestionConfig = tableConfig.getIngestionConfig();
     _tierConfigsList = tableConfig.getTierConfigsList();
     _dimTable = tableConfig.isDimTable();
+    _materializedView = tableConfig.isMaterializedView();
     _tunerConfigList = tableConfig.getTunerConfigsList();
     _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
     _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
     _tableSamplers = sanitizeAndValidateTableSamplers(tableConfig.getTableSamplers());
+    _description = tableConfig.getDescription();
+    _tags = tableConfig.getTags();
   }
 
   @JsonProperty(TABLE_NAME_KEY)
@@ -217,6 +263,26 @@ public class TableConfig extends BaseJsonConfig {
     _tableName = tableNameWithType;
   }
 
+  @JsonProperty(DESCRIPTION_KEY)
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
+
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
+
+  @JsonProperty(TAGS_KEY)
+  @Nullable
+  public List<String> getTags() {
+    return _tags;
+  }
+
+  public void setTags(@Nullable List<String> tags) {
+    _tags = tags;
+  }
+
   @JsonProperty(TABLE_TYPE_KEY)
   public TableType getTableType() {
     return _tableType;
@@ -225,6 +291,32 @@ public class TableConfig extends BaseJsonConfig {
   @JsonProperty(IS_DIM_TABLE_KEY)
   public boolean isDimTable() {
     return _dimTable;
+  }
+
+  @JsonProperty(IS_MATERIALIZED_VIEW_KEY)
+  public boolean isMaterializedView() {
+    return _materializedView;
+  }
+
+  /// Returns task configs for [CommonConstants.MaterializedViewTask#TASK_TYPE], or null if absent.
+  @JsonIgnore
+  @Nullable
+  public Map<String, String> getMaterializedViewTaskConfigs() {
+    if (_taskConfig == null) {
+      return null;
+    }
+    return _taskConfig.getConfigsForTaskType(CommonConstants.MaterializedViewTask.TASK_TYPE);
+  }
+
+  /// Whether the table has a non-empty `definedSQL` under [CommonConstants.MaterializedViewTask#TASK_TYPE].
+  @JsonIgnore
+  public boolean hasMaterializedViewTaskWithDefinedSql() {
+    Map<String, String> configs = getMaterializedViewTaskConfigs();
+    if (configs == null) {
+      return false;
+    }
+    String definedSql = configs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+    return definedSql != null && !definedSql.trim().isEmpty();
   }
 
   @JsonProperty(VALIDATION_CONFIG_KEY)

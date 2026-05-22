@@ -23,19 +23,19 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 public class RewriterResult {
-    DataSchema _dataSchema;
-    List<Object[]> _rows;
+  DataSchema _dataSchema;
+  List<Object[]> _rows;
 
-    public RewriterResult(DataSchema dataSchema, List<Object[]> rows) {
-      _dataSchema = dataSchema;
-      _rows = rows;
-    }
+  public RewriterResult(DataSchema dataSchema, List<Object[]> rows) {
+    _dataSchema = dataSchema;
+    _rows = rows;
+  }
 
-    public DataSchema getDataSchema() {
-      return _dataSchema;
-    }
+  public DataSchema getDataSchema() {
+    return _dataSchema;
+  }
 
-    public List<Object[]> getRows() {
-      return _rows;
-    }
+  public List<Object[]> getRows() {
+    return _rows;
+  }
 }

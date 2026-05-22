@@ -30,6 +30,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
+import org.apache.pinot.core.query.pruner.SegmentPrunerStatistics;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TableSegmentsContext;
@@ -79,19 +80,64 @@ public class LogicalTableExecutionInfo implements TableExecutionInfo {
         .anyMatch(tableExecutionInfo -> tableExecutionInfo.getTableDataManager() instanceof RealtimeTableDataManager);
   }
 
+  /**
+   * Returns selected segments and contexts for the logical table. Unlike single-table execution, this collects
+   * all segments from every physical table, runs segment pruning once on the combined list (cross-table prune),
+   * then resolves segment contexts per table. This allows pruners such as SelectionQuerySegmentPruner (ORDER BY +
+   * LIMIT) to prune effectively across the logical table rather than per physical table.
+   */
   @Override
   public SelectedSegmentsInfo getSelectedSegmentsInfo(QueryContext queryContext, TimerContext timerContext,
       ExecutorService executorService, SegmentPrunerService segmentPrunerService) {
-    SelectedSegmentsInfo aggregatedSelectedSegmentsInfo = new SelectedSegmentsInfo();
-
+    // Collect all segments from all physical tables (no pruning yet)
+    List<IndexSegment> allSegments = new ArrayList<>();
+    Map<IndexSegment, SingleTableExecutionInfo> segmentToTable = new HashMap<>();
+    long numTotalDocs = 0;
     for (SingleTableExecutionInfo tableExecutionInfo : _tableExecutionInfos) {
-      SelectedSegmentsInfo selectedSegmentsInfo =
-          tableExecutionInfo.getSelectedSegmentsInfo(queryContext, timerContext, executorService, segmentPrunerService);
-      aggregatedSelectedSegmentsInfo.aggregate(selectedSegmentsInfo);
+      List<IndexSegment> indexSegments = tableExecutionInfo.getIndexSegments();
+      for (IndexSegment segment : indexSegments) {
+        allSegments.add(segment);
+        segmentToTable.put(segment, tableExecutionInfo);
+        numTotalDocs += segment.getSegmentMetadata().getTotalDocs();
+      }
+    }
+    int numTotalSegments = allSegments.size();
+
+    // Constant false shortcut: skip pruning
+    SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
+    List<IndexSegment> selectedSegments =
+        selectSegments(allSegments, queryContext, timerContext, executorService, segmentPrunerService, prunerStats);
+
+    // Build segment contexts for selected segments only, preserving prune order
+    List<SegmentContext> selectedSegmentContexts = new ArrayList<>(selectedSegments.size());
+    Map<SingleTableExecutionInfo, List<IndexSegment>> tableToSelected = new HashMap<>();
+    for (IndexSegment segment : selectedSegments) {
+      tableToSelected.computeIfAbsent(segmentToTable.get(segment), k -> new ArrayList<>()).add(segment);
+    }
+    Map<IndexSegment, SegmentContext> segmentToContext = new HashMap<>();
+    for (Map.Entry<SingleTableExecutionInfo, List<IndexSegment>> entry : tableToSelected.entrySet()) {
+      SingleTableExecutionInfo tableExecutionInfo = entry.getKey();
+      List<IndexSegment> segmentsForTable = entry.getValue();
+      Map<IndexSegment, SegmentContext> providedContexts = tableExecutionInfo.getProvidedSegmentContexts();
+      if (providedContexts != null) {
+        for (IndexSegment segment : segmentsForTable) {
+          segmentToContext.put(segment, providedContexts.get(segment));
+        }
+      } else {
+        List<SegmentContext> contexts =
+            tableExecutionInfo.getSegmentContexts(segmentsForTable, queryContext.getQueryOptions());
+        for (int i = 0; i < segmentsForTable.size(); i++) {
+          segmentToContext.put(segmentsForTable.get(i), contexts.get(i));
+        }
+      }
+    }
+    for (IndexSegment segment : selectedSegments) {
+      selectedSegmentContexts.add(segmentToContext.get(segment));
     }
 
-    LOGGER.debug("Matched {} segments after pruning", aggregatedSelectedSegmentsInfo.getNumSelectedSegments());
-    return aggregatedSelectedSegmentsInfo;
+    LOGGER.debug("Matched {} segments after pruning", selectedSegments.size());
+    return new SelectedSegmentsInfo(allSegments, numTotalDocs, prunerStats, numTotalSegments, selectedSegments.size(),
+        selectedSegmentContexts);
   }
 
   @Override

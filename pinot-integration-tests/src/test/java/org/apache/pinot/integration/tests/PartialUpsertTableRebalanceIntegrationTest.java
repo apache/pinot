@@ -21,8 +21,6 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,16 +29,13 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.restlet.resources.PinotTableReloadStatusResponse;
+import org.apache.pinot.common.restlet.resources.RebalanceConfig;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.restlet.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.dto.PinotTableReloadStatusResponse;
-import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
@@ -49,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -83,12 +79,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
     startBroker();
     startServers(NUM_SERVERS);
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());
@@ -233,20 +228,31 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     pushAvroIntoKafka(_avroFiles);
     waitForAllDocsLoaded(600_000L, 300);
 
-    String statusResponse = reloadRealtimeTable(getTableName());
-    Map<String, String> statusResponseJson =
-        JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
-        });
-    String reloadResponse = statusResponseJson.get("status");
-    int jsonStartIndex = reloadResponse.indexOf("{");
-    String trimmedResponse = reloadResponse.substring(jsonStartIndex);
-    Map<String, Map<String, String>> reloadStatus =
-        JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
-        });
-    String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
-    waitForReloadToComplete(reloadJobId, 600_000L);
-    waitForAllDocsLoaded(600_000L, 300);
-    verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+    // Partial-upsert tables need PROTECTED consuming segment consistency mode for reload to force-commit
+    // consuming segments; RESTRICTED (default) skips force-commit and reload never completes.
+    try {
+      updateClusterConfig(
+          Map.of(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE,
+              ConsumingSegmentConsistencyModeListener.Mode.PROTECTED.name()));
+      Thread.sleep(5000); // Allow server to pick up cluster config from ZK
+
+      String statusResponse = reloadRealtimeTable(getTableName());
+      Map<String, String> statusResponseJson =
+          JsonUtils.stringToObject(statusResponse, new TypeReference<Map<String, String>>() {
+          });
+      String reloadResponse = statusResponseJson.get("status");
+      int jsonStartIndex = reloadResponse.indexOf("{");
+      String trimmedResponse = reloadResponse.substring(jsonStartIndex);
+      Map<String, Map<String, String>> reloadStatus =
+          JsonUtils.stringToObject(trimmedResponse, new TypeReference<Map<String, Map<String, String>>>() {
+          });
+      String reloadJobId = reloadStatus.get(REALTIME_TABLE_NAME).get("reloadJobId");
+      waitForReloadToComplete(reloadJobId, 600_000L);
+      waitForAllDocsLoaded(600_000L, 300);
+      verifyIdealState(4, NUM_SERVERS); // 4 because reload triggers commit of consuming segments
+    } finally {
+      deleteClusterConfig(CommonConstants.ConfigChangeListenerConstants.CONSUMING_SEGMENT_CONSISTENCY_MODE);
+    }
   }
 
   @AfterMethod
@@ -414,18 +420,10 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(jobId);
-        try {
-          SimpleHttpResponse httpResponse =
-              HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
-
-          ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
-              JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
-          RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
-          return status != RebalanceResult.Status.IN_PROGRESS;
-        } catch (HttpErrorStatusException | URISyntaxException e) {
-          throw new IOException(e);
-        }
+        ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = getOrCreateAdminClient()
+            .getRebalanceClient().getRebalanceStatusObject(jobId);
+        RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
+        return status != RebalanceResult.Status.IN_PROGRESS;
       } catch (Exception e) {
         return null;
       }
@@ -436,16 +434,9 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        String requestUrl = getControllerRequestURLBuilder().forSegmentReloadStatus(reloadJobId);
-        try {
-          SimpleHttpResponse httpResponse =
-              HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(requestUrl).toURI(), null));
-          PinotTableReloadStatusResponse segmentReloadStatusValue =
-              JsonUtils.stringToObject(httpResponse.getResponse(), PinotTableReloadStatusResponse.class);
-          return segmentReloadStatusValue.getSuccessCount() == segmentReloadStatusValue.getTotalSegmentCount();
-        } catch (HttpErrorStatusException | URISyntaxException e) {
-          throw new IOException(e);
-        }
+        PinotTableReloadStatusResponse segmentReloadStatusValue = getOrCreateAdminClient().getSegmentClient()
+            .getSegmentReloadStatusObject(reloadJobId);
+        return segmentReloadStatusValue.getSuccessCount() == segmentReloadStatusValue.getTotalSegmentCount();
       } catch (Exception e) {
         return null;
       }

@@ -24,6 +24,8 @@ import java.io.File;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.creator.VectorBackendType;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 
 
 public class SegmentDirectoryPaths {
@@ -99,18 +101,6 @@ public class SegmentDirectoryPaths {
     return indexFormatFile;
   }
 
-  /**
-   * Find native text index file in top-level segment index directory
-   * @param indexDir top-level segment index directory
-   * @param column text column name
-   * @return text index directory (if existst), null if index file does not exit
-   */
-  @Nullable
-  public static File findNativeTextIndexIndexFile(File indexDir, String column) {
-    String nativeIndexDirectory = column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, nativeIndexDirectory);
-  }
-
   public static File findFSTIndexIndexFile(File indexDir, String column) {
     String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
     File formatFile = findFormatFile(indexDir, luceneIndexDirectory);
@@ -142,21 +132,46 @@ public class SegmentDirectoryPaths {
   @Nullable
   @VisibleForTesting
   public static File findVectorIndexIndexFile(File segmentIndexDir, String column) {
-    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
-    File formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
-
-    // check for V99 version, if null
+    File formatFile = findHnswVectorIndexFile(segmentIndexDir, column);
     if (formatFile == null) {
-      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
-      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+      formatFile = findFlatVectorIndexFile(segmentIndexDir, column,
+          V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
     }
-
-    // check for V90 version, if null
     if (formatFile == null) {
-      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
-      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+      formatFile = findFlatVectorIndexFile(segmentIndexDir, column,
+          V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
     }
     return formatFile;
+  }
+
+  @Nullable
+  public static File findVectorIndexIndexFile(File segmentIndexDir, String column,
+      @Nullable VectorIndexConfig vectorIndexConfig) {
+    if (vectorIndexConfig == null || vectorIndexConfig.isDisabled()) {
+      return findVectorIndexIndexFile(segmentIndexDir, column);
+    }
+
+    return findVectorIndexIndexFile(segmentIndexDir, column, vectorIndexConfig.resolveBackendType());
+  }
+
+  @Nullable
+  public static File findVectorIndexIndexFile(File segmentIndexDir, String column, VectorBackendType backendType) {
+    switch (backendType) {
+      case HNSW:
+        return findHnswVectorIndexFile(segmentIndexDir, column);
+      case IVF_FLAT:
+        return findFlatVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      case IVF_PQ:
+        return findFlatVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION);
+      case IVF_ON_DISK:
+        // IVF_ON_DISK reuses the IVF_FLAT file format with FileChannel random-access reads
+        return findFlatVectorIndexFile(segmentIndexDir, column,
+            V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION);
+      default:
+        throw new IllegalStateException("Unsupported vector backend type: " + backendType);
+    }
   }
 
   /**
@@ -182,5 +197,25 @@ public class SegmentDirectoryPaths {
     }
 
     return null;
+  }
+
+  @Nullable
+  private static File findHnswVectorIndexFile(File segmentIndexDir, String column) {
+    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+    File formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    if (formatFile == null) {
+      vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(segmentIndexDir, vectorIndexDirectory);
+    }
+    return formatFile;
+  }
+
+  @Nullable
+  private static File findFlatVectorIndexFile(File segmentIndexDir, String column, String suffix) {
+    return findFormatFile(segmentIndexDir, column + suffix);
   }
 }

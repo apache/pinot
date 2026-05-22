@@ -40,6 +40,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -142,8 +143,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private Consumer<ServerInstance> _serverReenableCallback;
 
   // Global read-write lock for protecting the global data structures such as _enabledServerInstanceMap,
-  // _excludedServers, and _routableServers. Write lock must be held if any of these are modified, read lock must be
-  // held otherwise
+  // _excludedServers, and _routableServerInstanceMap. Write lock must be held if any of these are modified, read lock
+  // must be held otherwise
   private final ReadWriteLock _globalLock = new ReentrantReadWriteLock(true);
 
   // Per-table locks to allow concurrent routing builds across different tables while serializing per-table operations
@@ -160,7 +161,12 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private String _instanceConfigsPath;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  private Set<String> _routableServers;
+  /// Snapshot of `_enabledServerInstanceMap` restricted to enabled-minus-excluded servers. Replaced atomically under
+  /// `_globalLock.writeLock()` whenever routing membership changes. Serves as the single source of truth for routable
+  /// servers: its `keySet()` is passed to `InstanceSelector` for per-table selection, and callers that pick workers
+  /// outside of per-table instance selection (MSE intermediate-stage worker picking) read the map directly so that
+  /// FailureDetector-driven exclusions are honored.
+  private volatile Map<String, ServerInstance> _routableServerInstanceMap = Collections.emptyMap();
 
   // Process assignment change timestamp. Used to check if buildRouting needs to be re-run for a given table to avoid
   // race conditions with processSegmentAssignmentChange()
@@ -441,7 +447,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
         }
       }
     }
-    _routableServers = enabledServers;
+    _routableServerInstanceMap = buildRoutableServerInstanceMap(enabledServers);
     long calculateChangedServersEndTimeMs = System.currentTimeMillis();
 
     // Early terminate if there is no changed servers
@@ -460,7 +466,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          routingEntry.onInstancesChange(_routableServers, changedServers);
+          routingEntry.onInstancesChange(_routableServerInstanceMap.keySet(), changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry on instances change for table: {}",
@@ -521,23 +527,23 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       LOGGER.info("Server: {} is already excluded from routing, skipping updating the routing", instanceId);
       return;
     }
-    if (!_routableServers.contains(instanceId)) {
+    if (!_routableServerInstanceMap.containsKey(instanceId)) {
       LOGGER.info("Server: {} is not enabled, skipping updating the routing", instanceId);
       return;
     }
 
     // Update routing entry for all tables
     long startTimeMs = System.currentTimeMillis();
-    Set<String> routableServers = new HashSet<>(_routableServers);
-    routableServers.remove(instanceId);
-    _routableServers = routableServers;
+    Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
+    routableServerInstanceMap.remove(instanceId);
+    _routableServerInstanceMap = routableServerInstanceMap;
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          routingEntry.onInstancesChange(_routableServers, changedServers);
+          routingEntry.onInstancesChange(_routableServerInstanceMap.keySet(), changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
@@ -573,16 +579,20 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
     // Update routing entry for all tables
     long startTimeMs = System.currentTimeMillis();
-    Set<String> routableServers = new HashSet<>(_routableServers);
-    routableServers.add(instanceId);
-    _routableServers = routableServers;
+    // The containsKey check above was performed under the write lock, so the get here must return non-null
+    ServerInstance serverInstance = _enabledServerInstanceMap.get(instanceId);
+    Preconditions.checkState(serverInstance != null,
+        "Enabled server instance map missing entry for server: %s", instanceId);
+    Map<String, ServerInstance> routableServerInstanceMap = new HashMap<>(_routableServerInstanceMap);
+    routableServerInstanceMap.put(instanceId, serverInstance);
+    _routableServerInstanceMap = routableServerInstanceMap;
     List<String> changedServers = Collections.singletonList(instanceId);
     for (RoutingEntry routingEntry : _routingEntryMap.values()) {
       String tableNameWithType = routingEntry.getTableNameWithType();
       try {
         Object tableLock = getRoutingTableBuildLock(tableNameWithType);
         synchronized (tableLock) {
-          routingEntry.onInstancesChange(_routableServers, changedServers);
+          routingEntry.onInstancesChange(_routableServerInstanceMap.keySet(), changedServers);
         }
       } catch (Exception e) {
         LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
@@ -737,8 +747,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
           AdaptiveServerSelectorFactory.getAdaptiveServerSelector(_serverRoutingStatsManager, _pinotConfig);
       InstanceSelector instanceSelector =
           InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
-              adaptiveServerSelector, _pinotConfig, _routableServers, _enabledServerInstanceMap, idealState,
-              externalView, preSelectedOnlineSegments);
+              adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(), _enabledServerInstanceMap,
+              idealState, externalView, preSelectedOnlineSegments);
 
       // Add time boundary manager if both offline and real-time part exist for a hybrid table
       TimeBoundaryManager timeBoundaryManager = null;
@@ -848,8 +858,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
             samplerSegmentSelector.init(idealState, externalView, samplerPreSelectedOnlineSegments);
             InstanceSelector samplerInstanceSelector =
                 InstanceSelectorFactory.getInstanceSelector(tableConfig, _propertyStore, _brokerMetrics,
-                    adaptiveServerSelector, _pinotConfig, _routableServers, _enabledServerInstanceMap,
-                    idealState, externalView, samplerPreSelectedOnlineSegments);
+                    adaptiveServerSelector, _pinotConfig, _routableServerInstanceMap.keySet(),
+                    _enabledServerInstanceMap, idealState, externalView, samplerPreSelectedOnlineSegments);
             configuredSamplerInfos.put(normalizedSamplerName,
                 new SamplerInfo(sampler, samplerSegmentSelector, samplerInstanceSelector));
           } catch (Exception e) {
@@ -1170,6 +1180,30 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
     return _enabledServerInstanceMap;
+  }
+
+  @Override
+  public Map<String, ServerInstance> getRoutableServerInstanceMap() {
+    return _routableServerInstanceMap;
+  }
+
+  /// Must be called under `_globalLock.writeLock()` when rebuilding `_routableServerInstanceMap` from a freshly
+  /// computed set of routable server IDs.
+  @GuardedBy("_globalLock.writeLock()")
+  private Map<String, ServerInstance> buildRoutableServerInstanceMap(Set<String> routableServers) {
+    assert ((ReentrantReadWriteLock) _globalLock).isWriteLockedByCurrentThread()
+        : "buildRoutableServerInstanceMap must be called under _globalLock.writeLock()";
+    if (routableServers.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    Map<String, ServerInstance> map = Maps.newHashMapWithExpectedSize(routableServers.size());
+    for (String instanceId : routableServers) {
+      ServerInstance instance = _enabledServerInstanceMap.get(instanceId);
+      if (instance != null) {
+        map.put(instanceId, instance);
+      }
+    }
+    return map;
   }
 
   private String getIdealStatePath(String tableNameWithType) {

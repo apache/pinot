@@ -94,6 +94,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return _metricsRegistry;
   }
 
+  public String getMetricPrefix() {
+    return _metricPrefix;
+  }
+
   public interface QueryPhase {
     String getQueryPhaseName();
 

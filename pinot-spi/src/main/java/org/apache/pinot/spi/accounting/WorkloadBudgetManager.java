@@ -105,7 +105,7 @@ public interface WorkloadBudgetManager {
   /**
    * Internal class representing a budget with CPU and memory constraints.
    */
-   class Budget {
+  class Budget {
     private final long _initialCpuBudget;
     private final long _initialMemoryBudget;
 

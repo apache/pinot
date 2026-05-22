@@ -44,9 +44,7 @@ import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
-import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -89,7 +87,7 @@ public class TextIndexUtils {
     }
   }
 
-  static void cleanupTextIndex(File segDir, String column) {
+  public static void cleanupTextIndex(File segDir, String column) {
     // Remove the lucene index file and potentially the docId mapping file.
     File luceneIndexFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneIndexFile);
@@ -105,7 +103,7 @@ public class TextIndexUtils {
     FileUtils.deleteQuietly(luceneV9MappingFile);
 
     // Remove the native index file
-    File nativeIndexFile = new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
+    File nativeIndexFile = new File(segDir, column + Indexes.DEPRECATED_NATIVE_TEXT_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeIndexFile);
   }
 
@@ -113,26 +111,9 @@ public class TextIndexUtils {
     //@formatter:off
     return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
-        || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION).exists();
     //@formatter:on
-  }
-
-  public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
-    if (textIndexProperties == null) {
-      return false;
-    }
-    for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
-      if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
-        return entry.getValue().equalsIgnoreCase(FieldConfig.TEXT_NATIVE_FST_LITERAL);
-      }
-    }
-    return false;
-  }
-
-  public static FSTType getFSTTypeOfIndex(File indexDir, String column) {
-    return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
   }
 
   public static List<String> extractStopWordsInclude(String colName,

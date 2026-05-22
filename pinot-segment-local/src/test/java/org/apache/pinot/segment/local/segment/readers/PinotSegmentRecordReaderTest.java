@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import com.google.common.io.Files;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -52,6 +53,7 @@ public class PinotSegmentRecordReaderTest {
 
   private String _segmentOutputDir;
   private File _segmentIndexDir;
+  private File _rawNoDictSegmentIndexDir;
   private List<GenericRow> _rows;
   private RecordReader _recordReader;
 
@@ -61,11 +63,17 @@ public class PinotSegmentRecordReaderTest {
     Schema schema = createPinotSchema();
     TableConfig tableConfig = createTableConfig();
     String segmentName = "pinotSegmentRecordReaderTest";
-    _segmentOutputDir = Files.createTempDir().toString();
+    _segmentOutputDir = Files.createTempDirectory("pinot-test-").toFile().toString();
     _rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
     _recordReader = new GenericRowRecordReader(_rows);
     _segmentIndexDir =
         PinotSegmentUtil.createSegment(tableConfig, schema, segmentName, _segmentOutputDir, _recordReader);
+
+    TableConfig rawNoDictTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME)
+            .setNoDictionaryColumns(Collections.singletonList(D_SV_1)).build();
+    _rawNoDictSegmentIndexDir = PinotSegmentUtil.createSegment(rawNoDictTableConfig, schema,
+        segmentName + "_raw_no_dict", _segmentOutputDir, new GenericRowRecordReader(_rows));
   }
 
   private Schema createPinotSchema() {
@@ -125,6 +133,57 @@ public class PinotSegmentRecordReaderTest {
       GenericRow current = outputRows.get(i);
       Assert.assertTrue(((String) prev.getValue(D_SV_1)).compareTo((String) current.getValue(D_SV_1)) <= 0);
       prev = current;
+    }
+  }
+
+  @Test
+  public void testPinotSegmentRecordReaderSortedRawStringColumn()
+      throws Exception {
+    List<GenericRow> outputRows = new ArrayList<>();
+    List<String> sortOrder = new ArrayList<>();
+    sortOrder.add(D_SV_1);
+
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_rawNoDictSegmentIndexDir,
+        null, sortOrder)) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    Assert.assertEquals(outputRows.size(), _rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+
+    GenericRow prev = outputRows.get(0);
+    for (int i = 1; i < outputRows.size(); i++) {
+      GenericRow current = outputRows.get(i);
+      Assert.assertTrue(((String) prev.getValue(D_SV_1)).compareTo((String) current.getValue(D_SV_1)) <= 0);
+      prev = current;
+    }
+  }
+
+  @Test
+  public void testPinotSegmentRecordReaderForwardIndexOnly()
+      throws Exception {
+    List<GenericRow> outputRows = new ArrayList<>();
+
+    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader();
+    pinotSegmentRecordReader.init(_segmentIndexDir, null, null, false, true);
+    try (pinotSegmentRecordReader) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    Assert.assertEquals(outputRows.size(), _rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader with forwardIndexOnly is incorrect");
+    for (int i = 0; i < outputRows.size(); i++) {
+      GenericRow outputRow = outputRows.get(i);
+      GenericRow row = _rows.get(i);
+      Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
+      Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));
+      Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
+      Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
+      Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
     }
   }
 

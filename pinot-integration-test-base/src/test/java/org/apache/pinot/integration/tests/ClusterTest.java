@@ -76,6 +76,7 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -265,12 +266,20 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, serverNettyPort);
     int serverGrpcPort = NetUtils.findOpenPort(serverNettyPort + 1);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, serverGrpcPort);
+    // Assign the multi-stage query engine ports explicitly using the incremental findOpenPort pattern so that
+    // rapid back-to-back server starts in the same JVM don't collide on OS-ephemeral ports. Otherwise
+    // BaseServerStarter.init() falls back to NetUtils.findOpenPort() which probes and releases a ServerSocket(0)
+    // before the gRPC server binds, opening a window where the same port can be handed to a later caller.
+    int queryServerPort = NetUtils.findOpenPort(serverGrpcPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, queryServerPort);
+    int queryRunnerPort = NetUtils.findOpenPort(queryServerPort + 1);
+    serverConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, queryRunnerPort);
     if (_serverAdminApiPort == 0) {
       _serverAdminApiPort = serverAdminApiPort;
       _serverNettyPort = serverNettyPort;
       _serverGrpcPort = serverGrpcPort;
     }
-    _nextServerPort = serverGrpcPort + 1;
+    _nextServerPort = queryRunnerPort + 1;
 
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
@@ -472,7 +481,7 @@ public abstract class ClusterTest extends ControllerTest {
     int numSegments = segmentTarFiles.size();
     assertTrue(numSegments > 0);
 
-    URI uploadSegmentHttpURI = URI.create(getControllerRequestURLBuilder().forSegmentUpload());
+    URI uploadSegmentHttpURI = URI.create(getOrCreateAdminClient().getSegmentUploadUrl());
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       if (numSegments == 1) {
         File segmentTarFile = segmentTarFiles.get(0);
@@ -606,7 +615,7 @@ public abstract class ClusterTest extends ControllerTest {
       Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
-        String.valueOf(startTime), "end", String.valueOf(endTime));
+          String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
@@ -775,8 +784,9 @@ public abstract class ClusterTest extends ControllerTest {
         case DOUBLE_ARRAY:
           array[k] = jsonValue.get(k).asDouble();
           break;
-        case STRING_ARRAY:
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
+        case STRING_ARRAY:
         case BYTES_ARRAY:
           array[k] = jsonValue.get(k).textValue();
           break;
@@ -808,11 +818,11 @@ public abstract class ClusterTest extends ControllerTest {
       case DOUBLE:
         object = jsonValue.asDouble();
         break;
+      case BIG_DECIMAL:
+      case TIMESTAMP:
       case STRING:
       case BYTES:
-      case TIMESTAMP:
       case JSON:
-      case BIG_DECIMAL:
         object = jsonValue.textValue();
         break;
       case UNKNOWN:
@@ -846,9 +856,8 @@ public abstract class ClusterTest extends ControllerTest {
 
   public JsonNode cancelQuery(String clientQueryId)
       throws Exception {
-    URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
-    Object o = _httpClient.sendDeleteRequest(cancelURI);
-    return null; // TODO
+    String response = getOrCreateAdminClient().getQueryClient().cancelQueryByClientId(clientQueryId);
+    return JsonUtils.stringToJsonNode(response);
   }
 
   /**

@@ -42,7 +42,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
   private volatile boolean _isCostEnforcementEnabled;
 
   public DefaultWorkloadBudgetManager(PinotConfiguration config) {
-    _isCostCollectionEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
+    _isCostCollectionEnabled = config.getProperty(CommonConstants.Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION);
 
     // Return an object even if disabled. All functionalities of this class will be noops.
@@ -57,10 +57,10 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     _isCostEmissionEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_EMISSION);
     _isCostEnforcementEnabled = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
+        CommonConstants.Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
     _workloadBudgets = new ConcurrentHashMap<>();
-    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
+    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.Keys.WORKLOAD_SLEEP_TIME_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
     initSecondaryWorkloadBudget(config);
     startBudgetResetTask();
@@ -73,7 +73,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
    */
   private void initSecondaryWorkloadBudget(PinotConfiguration config) {
     double secondaryCpuPercentage = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
+        CommonConstants.Accounting.Keys.SECONDARY_WORKLOAD_CPU_PERCENTAGE,
         CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
 
     // Don't create a secondary workload if cpu percentage is non-zero.
@@ -82,7 +82,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
     }
 
     String secondaryWorkloadName = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
+        CommonConstants.Accounting.Keys.SECONDARY_WORKLOAD_NAME,
         CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
 
     // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.

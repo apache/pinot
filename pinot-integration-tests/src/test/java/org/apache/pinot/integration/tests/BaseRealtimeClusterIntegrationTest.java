@@ -48,6 +48,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
 
     // Start the Pinot cluster
     startZk();
+    // Start Kafka
+    startKafka();
     startController();
 
     HelixConfigScope scope =
@@ -62,9 +64,6 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
 
     startBroker();
     startServer();
-
-    // Start Kafka
-    startKafka();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);

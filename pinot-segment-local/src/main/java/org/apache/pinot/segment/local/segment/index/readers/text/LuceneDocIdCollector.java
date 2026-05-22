@@ -20,10 +20,12 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import java.io.IOException;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.CollectionTerminatedException;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreMode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -60,6 +62,8 @@ public class LuceneDocIdCollector implements Collector {
   public LeafCollector getLeafCollector(LeafReaderContext context) {
     return new LeafCollector() {
 
+      private int _numDocsCollected = 0;
+
       @Override
       public void setScorer(Scorable scorer)
           throws IOException {
@@ -69,6 +73,21 @@ public class LuceneDocIdCollector implements Collector {
       @Override
       public void collect(int doc)
           throws IOException {
+        try {
+          QueryThreadContext.checkTerminationAndSampleUsagePeriodically(
+              _numDocsCollected++, "LuceneDocIdCollector");
+        } catch (RuntimeException e) {
+          // Why CollectionTerminatedException: Lucene's IndexSearcher.search() specially handles this exception
+          // to gracefully stop document collection without treating it as an error. If we let the original
+          // TerminationException propagate, Lucene would wrap it and log errors unnecessarily.
+          //
+          // How termination info is preserved: When checkTerminationAndSampleUsagePeriodically() throws
+          // TerminationException (for OOM/timeout), it's already stored in QueryExecutionContext._terminateException
+          // before being thrown. After search completes, higher-level code retrieves the actual error via
+          // QueryThreadContext.getTerminateException() to include proper error details in query response.
+          throw new CollectionTerminatedException();
+        }
+
         // Compute the absolute lucene docID across
         // sub-indexes because that's how the lookup table in docIdTranslator is built
         _docIds.add(_docIdTranslator.getPinotDocId(context.docBase + doc));

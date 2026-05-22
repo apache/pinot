@@ -76,7 +76,7 @@ function build() {
   local buildId=$3
   local buildCompatibilityVerifier=$4
   local repoOption=""
-  local versionOption="-Djdk.version=11"
+  local versionOption="-Djdk.version=21"
   local maxRetry=5
 
   mkdir -p ${MVN_CACHE_DIR}

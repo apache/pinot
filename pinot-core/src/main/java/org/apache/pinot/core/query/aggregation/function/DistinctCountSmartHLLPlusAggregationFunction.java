@@ -100,7 +100,7 @@ public class DistinctCountSmartHLLPlusAggregationFunction extends BaseDistinctCo
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       if (blockValSet.isSingleValue()) {

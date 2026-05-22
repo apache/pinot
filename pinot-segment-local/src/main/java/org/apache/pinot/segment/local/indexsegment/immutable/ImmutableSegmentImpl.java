@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -41,6 +40,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.UpsertViewManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -151,26 +151,23 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return null;
   }
 
-  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap docIds) {
-    File docIdsSnapshotFile = getSnapshotFile(fileName);
-    try {
-      File tmpFile =
-          new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()), fileName + "_tmp");
-      if (tmpFile.exists()) {
-        LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
-        FileUtils.deleteQuietly(tmpFile);
-      }
-      MutableRoaringBitmap docIdsSnapshot = docIds.getMutableRoaringBitmap();
-      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(tmpFile))) {
-        docIdsSnapshot.serialize(dataOutputStream);
-      }
-      Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),
-          "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
-      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), docIdsSnapshot.getCardinality());
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while persisting docIds to snapshot file: {}, skipping",
-          docIdsSnapshotFile, e);
+  /// Persists the doc ids bitmap snapshot into the given file.
+  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap.CardinalityAndBytes docIdsSnapshot)
+      throws IOException {
+    File tmpFile =
+        new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()), fileName + "_tmp");
+    if (tmpFile.exists()) {
+      LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
+      FileUtils.deleteQuietly(tmpFile);
     }
+    try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
+      fos.write(docIdsSnapshot.getBytes());
+    }
+    File docIdsSnapshotFile = getSnapshotFile(fileName);
+    Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),
+        "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
+    LOGGER.info("Persisted {} with: {} docs for segment: {}", fileName, docIdsSnapshot.getCardinality(),
+        getSegmentName());
   }
 
   public void deleteSnapshotFile(String fileName) {
@@ -181,7 +178,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
           LOGGER.warn("Cannot delete old snapshot file: {}, skipping", snapshotFile);
           return;
         }
-        LOGGER.info("Deleted snapshot for segment: {}", getSegmentName());
+        LOGGER.info("Deleted {} for segment: {}", fileName, getSegmentName());
       } catch (Exception e) {
         LOGGER.warn("Caught exception while deleting snapshot file: {}, skipping", snapshotFile);
       }
@@ -362,6 +359,27 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   @Override
   public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
     return _queryableDocIds;
+  }
+
+  @Override
+  public boolean hasNoQueryableDocs() {
+    if (_partitionUpsertMetadataManager == null) {
+      return false;
+    }
+    UpsertViewManager viewManager = _partitionUpsertMetadataManager.getUpsertViewManager();
+    if (viewManager != null) {
+      MutableRoaringBitmap queryableDocIdsSnapshot = viewManager.getQueryableDocIdsSnapshot(this);
+      if (queryableDocIdsSnapshot != null) {
+        return queryableDocIdsSnapshot.isEmpty();
+      }
+      return false;
+    }
+    ThreadSafeMutableRoaringBitmap queryableDocIds = getQueryableDocIds();
+    if (queryableDocIds != null) {
+      return queryableDocIds.isEmpty();
+    }
+    ThreadSafeMutableRoaringBitmap validDocIds = getValidDocIds();
+    return validDocIds != null && validDocIds.isEmpty();
   }
 
   @Override

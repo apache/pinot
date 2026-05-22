@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public class WorkloadBudgetManagerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManagerFactory.class);
   private static final String REGEX_PATTERN = ".*\\.spi\\.accounting\\..*";
-  private static WorkloadBudgetManager _workloadBudgetManager;
+  private static WorkloadBudgetManager _workloadBudgetManager = null;
 
   private WorkloadBudgetManagerFactory() {
   }

@@ -26,7 +26,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
-import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
+import org.apache.pinot.segment.local.realtime.converter.stats.MutableSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,7 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final boolean _nullHandlingEnabled;
   private final boolean _enableColumnMajor;
+  private final ServerMetrics _serverMetrics;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
@@ -77,11 +79,15 @@ public class RealtimeSegmentConverter {
     } else {
       _enableColumnMajor = _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
     }
+    _serverMetrics = ServerMetrics.get();
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
+  public void build(@Nullable SegmentVersion segmentVersion)
       throws Exception {
-    SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema, true);
+    SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
+    genConfig.setInstanceType(InstanceType.SERVER);
+    genConfig.setRealtimeConversion(true);
+    genConfig.setConsumerDir(_realtimeSegmentImpl.getConsumerDir());
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
@@ -122,53 +128,57 @@ public class RealtimeSegmentConverter {
 
     if (useCompactedReader) {
       // Take a snapshot of validDocIds at the beginning of conversion to ensure consistency
-      ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = getValidDocIdSnapshot();
-      if (validDocIdsSnapshot == null) {
+      RoaringBitmap validDocIds = getValidDocIds();
+      if (validDocIds == null) {
         throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
             + "Segment may be corrupted.");
       }
+      genConfig.setMutableSegmentCompacted(true);
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
-      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
-          validDocIdsSnapshot)) {
+      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(validDocIds)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, validDocIdsSnapshot);
-        publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, validDocIds);
+        publishCompactionMetrics(preCommitRowCount, driver, compactionStartTime);
       }
     } else {
       // Use regular PinotSegmentRecordReader (existing behavior)
       try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, null);
+        // Calculate a mapping from mutable docId to immutable docId when both sorting and reusing mutable text index
+        // are enabled
+        if (sortedDocIds != null && _realtimeSegmentImpl.hasColumnWithReuseMutableTextIndex()) {
+          int numDocs = sortedDocIds.length;
+          int[] mutableToImmutableDocIdMap = new int[numDocs];
+          for (int i = 0; i < numDocs; i++) {
+            mutableToImmutableDocIdMap[sortedDocIds[i]] = i;
+          }
+          genConfig.setMutableToImmutableDocIdMap(mutableToImmutableDocIdMap);
+        }
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, sortedColumn, null);
       }
     }
 
-    if (segmentPartitionConfig != null && serverMetrics != null) {
+    if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       for (String columnName : columnPartitionMap.keySet()) {
         int numPartitions = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitions().size();
-        serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
+        _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
       }
     }
   }
 
-  private @Nullable ThreadSafeMutableRoaringBitmap getValidDocIdSnapshot() {
-    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = null;
-    if (_realtimeSegmentImpl.getValidDocIds() != null) {
-      validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap(
-          _realtimeSegmentImpl.getValidDocIds().getMutableRoaringBitmap());
-    }
-    return validDocIdsSnapshot;
+  @Nullable
+  private RoaringBitmap getValidDocIds() {
+    ThreadSafeMutableRoaringBitmap validDocIds = _realtimeSegmentImpl.getValidDocIds();
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap().toRoaringBitmap() : null;
   }
 
   /**
    * Publishes segment build metrics including common metrics (always published) and compaction-specific metrics
    * (published only when compaction is enabled)
    */
-  private void publishCompactionMetrics(@Nullable ServerMetrics serverMetrics,
-      int preCommitRowCount, SegmentIndexCreationDriverImpl driver, long buildStartTime) {
-    if (serverMetrics == null) {
-      return;
-    }
+  private void publishCompactionMetrics(int preCommitRowCount, SegmentIndexCreationDriverImpl driver,
+      long buildStartTime) {
     try {
       int postCommitRowCount = driver.getSegmentStats().getTotalDocCount();
       long buildProcessingTime = System.currentTimeMillis() - buildStartTime;
@@ -176,24 +186,23 @@ public class RealtimeSegmentConverter {
       int rowsRemoved = preCommitRowCount - postCommitRowCount;
 
       // Only publish compaction-specific metrics when compaction is actually enabled
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS, 1L);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION,
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS, 1L);
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION,
           preCommitRowCount);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION,
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION,
           postCommitRowCount);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_REMOVED, rowsRemoved);
-      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_BUILD_TIME_MS,
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_REMOVED, rowsRemoved);
+      _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_BUILD_TIME_MS,
           buildProcessingTime);
 
       // Calculate and publish compaction ratio percentage (only if we had rows to compact)
       if (preCommitRowCount > 0) {
         double compactionRatioPercent = (double) rowsRemoved / preCommitRowCount * 100.0;
-        serverMetrics.setOrUpdateTableGauge(_tableName, ServerGauge.COMMIT_TIME_COMPACTION_RATIO_PERCENT,
+        _serverMetrics.setOrUpdateTableGauge(_tableName, ServerGauge.COMMIT_TIME_COMPACTION_RATIO_PERCENT,
             (long) compactionRatioPercent);
       }
     } catch (Exception e) {
-      LOGGER.warn("Failed to publish segment build metrics for table: {}, segment: {}", _tableName,
-          _segmentName, e);
+      LOGGER.warn("Failed to publish segment build metrics for table: {}, segment: {}", _tableName, _segmentName, e);
     }
   }
 
@@ -201,28 +210,17 @@ public class RealtimeSegmentConverter {
    * Common method to build segment with the provided record reader
    */
   private void buildSegmentWithReader(SegmentIndexCreationDriverImpl driver, SegmentGeneratorConfig genConfig,
-      RecordReader recordReader, int[] sortedDocIds, boolean useCompactedReader,
-      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot)
+      RecordReader recordReader, int[] sortedDocIds, @Nullable String sortedColumn, @Nullable RoaringBitmap validDocIds)
       throws Exception {
-    RealtimeSegmentSegmentCreationDataSource dataSource;
-    if (useCompactedReader) {
-      // For compacted readers, use the constructor that takes sortedDocIds and pass the validDocIds snapshot
-      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds,
-          validDocIdsSnapshot);
-    } else {
-      // For regular readers, use the original constructor
-      dataSource =
-          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, (PinotSegmentRecordReader) recordReader);
-    }
-    // initializes reader
-    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName), InstanceType.SERVER);
+    MutableSegmentCreationDataSource dataSource =
+        new MutableSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds, sortedColumn,
+            validDocIds);
+    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName));
 
     if (!_enableColumnMajor) {
       driver.build();
     } else {
-      //buildByColumn uses validDocIds to skip invalid record while indexing each column. We pass the validDocIds
-      // only if we are using compacted reader.
-      driver.buildByColumn(_realtimeSegmentImpl, useCompactedReader ? validDocIdsSnapshot : null);
+      driver.buildByColumn(_realtimeSegmentImpl, validDocIds);
     }
   }
 

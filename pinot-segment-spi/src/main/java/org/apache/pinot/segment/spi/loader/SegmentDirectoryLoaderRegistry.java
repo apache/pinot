@@ -52,7 +52,7 @@ public class SegmentDirectoryLoaderRegistry {
           String segmentLoaderName = segmentLoaderAnnotation.name();
           SegmentDirectoryLoader segmentDirectoryLoader;
           try {
-            segmentDirectoryLoader = (SegmentDirectoryLoader) loaderClass.newInstance();
+            segmentDirectoryLoader = (SegmentDirectoryLoader) loaderClass.getDeclaredConstructor().newInstance();
             SEGMENT_DIRECTORY_LOADER_MAP.putIfAbsent(segmentLoaderName, segmentDirectoryLoader);
           } catch (Exception e) {
             LOGGER.error(

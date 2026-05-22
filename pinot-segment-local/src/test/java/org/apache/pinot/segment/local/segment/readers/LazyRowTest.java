@@ -102,8 +102,10 @@ public class LazyRowTest {
 
     ForwardIndexReader col1ForwardIndexReader = mock(ForwardIndexReader.class);
     when(col1ForwardIndexReader.isSingleValue()).thenReturn(true);
+    when(col1ForwardIndexReader.isDictionaryEncoded()).thenReturn(true);
     ForwardIndexReader col2ForwardIndexReader = mock(ForwardIndexReader.class);
     when(col2ForwardIndexReader.isSingleValue()).thenReturn(true);
+    when(col2ForwardIndexReader.isDictionaryEncoded()).thenReturn(true);
     when(_col1Datasource.getForwardIndex()).thenReturn(col1ForwardIndexReader);
     when(col2Datasource.getForwardIndex()).thenReturn(col2ForwardIndexReader);
     when(col2ForwardIndexReader.getDictId(eq(1), any())).thenReturn(1);

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.readers;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -30,6 +31,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -39,6 +41,7 @@ public class PinotSegmentColumnReader implements Closeable {
   private final Dictionary _dictionary;
   private final NullValueVectorReader _nullValueVectorReader;
   private final int[] _dictIdBuffer;
+  private final DataType _valueType;
 
   public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
     DataSource dataSource = indexSegment.getDataSource(column);
@@ -47,6 +50,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dataSource.getDictionary();
     _nullValueVectorReader = dataSource.getNullValueVector();
+    _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -62,6 +66,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dictionary;
     _nullValueVectorReader = nullValueVectorReader;
+    _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -73,10 +78,15 @@ public class PinotSegmentColumnReader implements Closeable {
     return _forwardIndexReader.isSingleValue();
   }
 
+  public DataType getValueType() {
+    return _valueType;
+  }
+
   public boolean hasDictionary() {
     return _dictionary != null;
   }
 
+  @Nullable
   public Dictionary getDictionary() {
     return _dictionary;
   }
@@ -86,14 +96,13 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public Object getValue(int docId) {
-    if (_dictionary != null) {
-      // Dictionary based
+    if (_forwardIndexReader.isDictionaryEncoded()) {
+      // Dictionary-encoded forward index
       if (_forwardIndexReader.isSingleValue()) {
         return _dictionary.get(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
       } else {
         int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
-        DataType storedType = _dictionary.getValueType();
-        switch (storedType) {
+        switch (_valueType) {
           case INT: {
             Integer[] values = new Integer[numValues];
             _dictionary.readIntValues(_dictIdBuffer, numValues, values);
@@ -114,6 +123,11 @@ public class PinotSegmentColumnReader implements Closeable {
             _dictionary.readDoubleValues(_dictIdBuffer, numValues, values);
             return values;
           }
+          case BIG_DECIMAL: {
+            BigDecimal[] values = new BigDecimal[numValues];
+            _dictionary.readBigDecimalValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
           case STRING: {
             String[] values = new String[numValues];
             _dictionary.readStringValues(_dictIdBuffer, numValues, values);
@@ -125,14 +139,13 @@ public class PinotSegmentColumnReader implements Closeable {
             return values;
           }
           default:
-            throw new IllegalStateException("Unsupported MV type: " + storedType);
+            throw new IllegalStateException("Unsupported MV dictionary column type: " + _valueType);
         }
       }
     } else {
       // Raw index based
-      DataType storedType = _forwardIndexReader.getStoredType();
       if (_forwardIndexReader.isSingleValue()) {
-        switch (storedType) {
+        switch (_valueType) {
           case INT:
             return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
           case LONG:
@@ -150,10 +163,10 @@ public class PinotSegmentColumnReader implements Closeable {
           case MAP:
             return _forwardIndexReader.getMap(docId, _forwardIndexReaderContext);
           default:
-            throw new IllegalStateException("Unsupported SV type: " + storedType);
+            throw new IllegalStateException("Unsupported SV no-dictionary column type: " + _valueType);
         }
       } else {
-        switch (storedType) {
+        switch (_valueType) {
           case INT:
             return ArrayUtils.toObject(_forwardIndexReader.getIntMV(docId, _forwardIndexReaderContext));
           case LONG:
@@ -162,12 +175,14 @@ public class PinotSegmentColumnReader implements Closeable {
             return ArrayUtils.toObject(_forwardIndexReader.getFloatMV(docId, _forwardIndexReaderContext));
           case DOUBLE:
             return ArrayUtils.toObject(_forwardIndexReader.getDoubleMV(docId, _forwardIndexReaderContext));
+          case BIG_DECIMAL:
+            return _forwardIndexReader.getBigDecimalMV(docId, _forwardIndexReaderContext);
           case STRING:
             return _forwardIndexReader.getStringMV(docId, _forwardIndexReaderContext);
           case BYTES:
             return _forwardIndexReader.getBytesMV(docId, _forwardIndexReaderContext);
           default:
-            throw new IllegalStateException("Unsupported MV type: " + storedType);
+            throw new IllegalStateException("Unsupported MV no-dictionary column type: " + _valueType);
         }
       }
     }
@@ -180,7 +195,7 @@ public class PinotSegmentColumnReader implements Closeable {
   // Single-value accessors
 
   public int getInt(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return _dictionary.getIntValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getInt(docId, _forwardIndexReaderContext);
@@ -188,7 +203,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public long getLong(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return _dictionary.getLongValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getLong(docId, _forwardIndexReaderContext);
@@ -196,7 +211,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public float getFloat(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return _dictionary.getFloatValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getFloat(docId, _forwardIndexReaderContext);
@@ -204,15 +219,23 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public double getDouble(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return _dictionary.getDoubleValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getDouble(docId, _forwardIndexReaderContext);
     }
   }
 
-  public String getString(int docId) {
+  public BigDecimal getBigDecimal(int docId) {
     if (_dictionary != null) {
+      return _dictionary.getBigDecimalValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
+    } else {
+      return _forwardIndexReader.getBigDecimal(docId, _forwardIndexReaderContext);
+    }
+  }
+
+  public String getString(int docId) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return _dictionary.getStringValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getString(docId, _forwardIndexReaderContext);
@@ -220,7 +243,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public byte[] getBytes(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       return _dictionary.getBytesValue(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
     } else {
       return _forwardIndexReader.getBytes(docId, _forwardIndexReaderContext);
@@ -230,7 +253,7 @@ public class PinotSegmentColumnReader implements Closeable {
   // Multi-value accessors
 
   public int[] getIntMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       int[] values = new int[numValues];
       _dictionary.readIntValues(_dictIdBuffer, numValues, values);
@@ -241,7 +264,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public long[] getLongMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       long[] values = new long[numValues];
       _dictionary.readLongValues(_dictIdBuffer, numValues, values);
@@ -252,7 +275,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public float[] getFloatMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       float[] values = new float[numValues];
       _dictionary.readFloatValues(_dictIdBuffer, numValues, values);
@@ -263,7 +286,7 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public double[] getDoubleMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       double[] values = new double[numValues];
       _dictionary.readDoubleValues(_dictIdBuffer, numValues, values);
@@ -273,8 +296,19 @@ public class PinotSegmentColumnReader implements Closeable {
     }
   }
 
-  public String[] getStringMV(int docId) {
+  public BigDecimal[] getBigDecimalMV(int docId) {
     if (_dictionary != null) {
+      int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
+      BigDecimal[] values = new BigDecimal[numValues];
+      _dictionary.readBigDecimalValues(_dictIdBuffer, numValues, values);
+      return values;
+    } else {
+      return _forwardIndexReader.getBigDecimalMV(docId, _forwardIndexReaderContext);
+    }
+  }
+
+  public String[] getStringMV(int docId) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       String[] values = new String[numValues];
       _dictionary.readStringValues(_dictIdBuffer, numValues, values);
@@ -285,13 +319,301 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public byte[][] getBytesMV(int docId) {
-    if (_dictionary != null) {
+    if (_forwardIndexReader.isDictionaryEncoded()) {
       int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
       byte[][] values = new byte[numValues][];
       _dictionary.readBytesValues(_dictIdBuffer, numValues, values);
       return values;
     } else {
       return _forwardIndexReader.getBytesMV(docId, _forwardIndexReaderContext);
+    }
+  }
+
+  /// Reads all values for this column. SV primitive type values are boxed; MV primitive type values are stored as
+  /// primitive arrays.
+  public Object[] readAllValues(int numDocs) {
+    Object[] values = new Object[numDocs];
+    if (_dictionary != null) {
+      if (_forwardIndexReader.isSingleValue()) {
+        for (int i = 0; i < numDocs; i++) {
+          values[i] = _dictionary.get(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+        }
+      } else {
+        switch (_valueType) {
+          case INT:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              int[] value = new int[numValues];
+              _dictionary.readIntValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              long[] value = new long[numValues];
+              _dictionary.readLongValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          case FLOAT:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              float[] value = new float[numValues];
+              _dictionary.readFloatValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          case DOUBLE:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              double[] value = new double[numValues];
+              _dictionary.readDoubleValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              BigDecimal[] value = new BigDecimal[numValues];
+              _dictionary.readBigDecimalValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              String[] value = new String[numValues];
+              _dictionary.readStringValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          case BYTES:
+            for (int i = 0; i < numDocs; i++) {
+              int numValues = _forwardIndexReader.getDictIdMV(i, _dictIdBuffer, _forwardIndexReaderContext);
+              byte[][] value = new byte[numValues][];
+              _dictionary.readBytesValues(_dictIdBuffer, numValues, value);
+              values[i] = value;
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported MV dictionary column type: " + _valueType);
+        }
+      }
+    } else {
+      if (_forwardIndexReader.isSingleValue()) {
+        switch (_valueType) {
+          case INT:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getInt(i, _forwardIndexReaderContext);
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getLong(i, _forwardIndexReaderContext);
+            }
+            break;
+          case FLOAT:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getFloat(i, _forwardIndexReaderContext);
+            }
+            break;
+          case DOUBLE:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getDouble(i, _forwardIndexReaderContext);
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getBigDecimal(i, _forwardIndexReaderContext);
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getString(i, _forwardIndexReaderContext);
+            }
+            break;
+          case BYTES:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getBytes(i, _forwardIndexReaderContext);
+            }
+            break;
+          case MAP:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getMap(i, _forwardIndexReaderContext);
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported SV no-dictionary column type: " + _valueType);
+        }
+      } else {
+        switch (_valueType) {
+          case INT:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getIntMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          case LONG:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getLongMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          case FLOAT:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getFloatMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          case DOUBLE:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getDoubleMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          case BIG_DECIMAL:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getBigDecimalMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          case STRING:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getStringMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          case BYTES:
+            for (int i = 0; i < numDocs; i++) {
+              values[i] = _forwardIndexReader.getBytesMV(i, _forwardIndexReaderContext);
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unsupported MV no-dictionary column type: " + _valueType);
+        }
+      }
+    }
+    return values;
+  }
+
+  /// Reads all values for this single-value column into a `Comparable` array in a single sequential pass.
+  /// Pre-materializing values avoids repeated forward-index access during quicksort's random-access comparisons.
+  @SuppressWarnings("rawtypes")
+  public Comparable[] readAllValuesForSorting(int numDocs) {
+    assert _forwardIndexReader.isSingleValue();
+    Comparable[] values = new Comparable[numDocs];
+    if (_dictionary != null) {
+      switch (_valueType) {
+        case INT:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _dictionary.getIntValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+          }
+          break;
+        case LONG:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _dictionary.getLongValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+          }
+          break;
+        case FLOAT:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _dictionary.getFloatValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+          }
+          break;
+        case DOUBLE:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _dictionary.getDoubleValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+          }
+          break;
+        case BIG_DECIMAL:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _dictionary.getBigDecimalValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+          }
+          break;
+        case STRING:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _dictionary.getStringValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext));
+          }
+          break;
+        case BYTES:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] =
+                new ByteArray(_dictionary.getBytesValue(_forwardIndexReader.getDictId(i, _forwardIndexReaderContext)));
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported SV dictionary column type for comparison: " + _valueType);
+      }
+    } else {
+      switch (_valueType) {
+        case INT:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _forwardIndexReader.getInt(i, _forwardIndexReaderContext);
+          }
+          break;
+        case LONG:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _forwardIndexReader.getLong(i, _forwardIndexReaderContext);
+          }
+          break;
+        case FLOAT:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _forwardIndexReader.getFloat(i, _forwardIndexReaderContext);
+          }
+          break;
+        case DOUBLE:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _forwardIndexReader.getDouble(i, _forwardIndexReaderContext);
+          }
+          break;
+        case BIG_DECIMAL:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _forwardIndexReader.getBigDecimal(i, _forwardIndexReaderContext);
+          }
+          break;
+        case STRING:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = _forwardIndexReader.getString(i, _forwardIndexReaderContext);
+          }
+          break;
+        case BYTES:
+          for (int i = 0; i < numDocs; i++) {
+            values[i] = new ByteArray(_forwardIndexReader.getBytes(i, _forwardIndexReaderContext));
+          }
+          break;
+        default:
+          throw new IllegalStateException("Unsupported SV no-dictionary column type for comparison: " + _valueType);
+      }
+    }
+    return values;
+  }
+
+  /// Compares two documents by this column's value. For dictionary-encoded columns the comparison is done via
+  /// dictionary ids; for no-dictionary columns values are read directly from the forward index and compared by type.
+  public int compare(int docId1, int docId2) {
+    assert _forwardIndexReader.isSingleValue();
+    if (_dictionary != null) {
+      return _dictionary.compare(_forwardIndexReader.getDictId(docId1, _forwardIndexReaderContext),
+          _forwardIndexReader.getDictId(docId2, _forwardIndexReaderContext));
+    }
+    switch (_valueType) {
+      case INT:
+        return Integer.compare(_forwardIndexReader.getInt(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getInt(docId2, _forwardIndexReaderContext));
+      case LONG:
+        return Long.compare(_forwardIndexReader.getLong(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getLong(docId2, _forwardIndexReaderContext));
+      case FLOAT:
+        return Float.compare(_forwardIndexReader.getFloat(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getFloat(docId2, _forwardIndexReaderContext));
+      case DOUBLE:
+        return Double.compare(_forwardIndexReader.getDouble(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getDouble(docId2, _forwardIndexReaderContext));
+      case BIG_DECIMAL:
+        return _forwardIndexReader.getBigDecimal(docId1, _forwardIndexReaderContext)
+            .compareTo(_forwardIndexReader.getBigDecimal(docId2, _forwardIndexReaderContext));
+      case STRING:
+        return _forwardIndexReader.getString(docId1, _forwardIndexReaderContext)
+            .compareTo(_forwardIndexReader.getString(docId2, _forwardIndexReaderContext));
+      case BYTES:
+        return ByteArray.compare(_forwardIndexReader.getBytes(docId1, _forwardIndexReaderContext),
+            _forwardIndexReader.getBytes(docId2, _forwardIndexReaderContext));
+      default:
+        throw new IllegalStateException("Unsupported SV no-dictionary column type for comparison: " + _valueType);
     }
   }
 

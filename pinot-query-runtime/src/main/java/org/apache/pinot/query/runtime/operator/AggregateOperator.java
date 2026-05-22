@@ -228,6 +228,9 @@ public class AggregateOperator extends MultiStageOperator {
         rows = _groupByExecutor.getResult(_groupTrimSize);
       }
 
+      // Record stat before we check for limit so we can propagate to query response
+      _statMap.merge(StatKey.NUM_GROUPS, _groupByExecutor.getNumGroups());
+
       if (rows.isEmpty()) {
         return _eosBlock;
       } else {
@@ -472,6 +475,12 @@ public class AggregateOperator extends MultiStageOperator {
     GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    NUM_GROUPS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },
     /**
      * Allocated memory in bytes for this operator or its children in the same stage.
      */

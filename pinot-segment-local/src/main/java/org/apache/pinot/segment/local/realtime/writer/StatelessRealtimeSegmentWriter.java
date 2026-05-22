@@ -49,6 +49,7 @@ import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -180,6 +181,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserializeFrom(statsHistoryFile);
 
     // Initialize mutable segment with configurations
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
         .setTableNameWithType(_tableNameWithType)
         .setSegmentName(_segmentName)
@@ -191,7 +193,10 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
         .setMemoryManager(new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentName, null))
         .setStatsHistory(statsHistory)
-        .setConsumerDir(_resourceDataDir.getAbsolutePath());
+        .setConsumerDir(_resourceDataDir.getAbsolutePath())
+        .setDropRecordOnPartitionMismatch(ingestionConfig != null
+            && ingestionConfig.getStreamIngestionConfig() != null
+            && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());
 
@@ -221,7 +226,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
     retryPolicy.attempt(() -> {
       try {
         StreamMessageDecoder streamMessageDecoder = createMessageDecoder(fieldsToRead);
-        localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder));
+        boolean isKeyBytesType = StreamDataDecoderImpl.isKeyBytesType(_schema);
+        localStreamDataDecoder.set(new StreamDataDecoderImpl(streamMessageDecoder, isKeyBytesType));
         return true;
       } catch (Exception e) {
         _logger.warn("Failed to create StreamMessageDecoder. Retrying...", e);
@@ -359,7 +365,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
               _tableConfig.getIndexingConfig().isNullHandlingEnabled());
       try {
-        converter.build(null, null);
+        converter.build(null);
       } catch (Exception e) {
         throw new RuntimeException("Failed to build segment", e);
       }
@@ -394,7 +400,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
    *  - partition group id
    */
   private void setPartitionParameters(RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder,
-      SegmentPartitionConfig segmentPartitionConfig) {
+      @Nullable SegmentPartitionConfig segmentPartitionConfig) {
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       if (columnPartitionMap.size() == 1) {
@@ -433,7 +439,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
         realtimeSegmentConfigBuilder.setPartitionColumn(partitionColumn);
         realtimeSegmentConfigBuilder.setPartitionFunction(
-            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions, null));
+            PartitionFunctionFactory.getPartitionFunction(partitionFunctionName, numPartitions,
+                columnPartitionConfig.getFunctionConfig()));
         realtimeSegmentConfigBuilder.setPartitionId(_partitionGroupId);
       } else {
         _logger.warn("Cannot partition on multiple columns: {}", columnPartitionMap.keySet());

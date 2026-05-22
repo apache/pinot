@@ -211,7 +211,13 @@ function setupKafkaBinary() {
     rm -rf "${KAFKA_HOME}"
     rm -rf "${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}"
     if [ ! -f "${KAFKA_ARCHIVE}" ]; then
-      curl -fSL "${KAFKA_DOWNLOAD_URL}" -o "${KAFKA_ARCHIVE}" 1>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
+      echo "Downloading Kafka from ${KAFKA_DOWNLOAD_URL}"
+      curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300 "${KAFKA_DOWNLOAD_URL}" -o "${KAFKA_ARCHIVE}" 1>${LOG_DIR}/kafka.download.${logCount}.log 2>&1
+      if [ $? -ne 0 ]; then
+        echo "Primary download failed, trying archive mirror: ${KAFKA_ARCHIVE_URL}"
+        rm -f "${KAFKA_ARCHIVE}"
+        curl -fSL --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300 "${KAFKA_ARCHIVE_URL}" -o "${KAFKA_ARCHIVE}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
+      fi
     fi
     tar -xzf "${KAFKA_ARCHIVE}" -C "${workingDir}" 1>>${LOG_DIR}/kafka.download.${logCount}.log 2>&1 || exit 1
     mv "${workingDir}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}" "${KAFKA_HOME}"
@@ -454,9 +460,10 @@ SERVER_NETTY_PORT=8098
 SERVER_2_NETTY_PORT=9098
 SERVER_GRPC_PORT=8090
 SERVER_2_GRPC_PORT=9090
-KAFKA_VERSION="${KAFKA_VERSION:-3.9.1}"
+KAFKA_VERSION="${KAFKA_VERSION:-3.9.2}"
  KAFKA_SCALA_VERSION="${KAFKA_SCALA_VERSION:-2.13}"
- KAFKA_DOWNLOAD_URL="${KAFKA_DOWNLOAD_URL:-https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz}"
+ KAFKA_DOWNLOAD_URL="${KAFKA_DOWNLOAD_URL:-https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz}"
+ KAFKA_ARCHIVE_URL="https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz"
  KAFKA_PORT="${KAFKA_PORT:-19092}"
  KAFKA_LISTENER="PLAINTEXT://127.0.0.1:${KAFKA_PORT}"
  KAFKA_HOME="${workingDir}/kafka"

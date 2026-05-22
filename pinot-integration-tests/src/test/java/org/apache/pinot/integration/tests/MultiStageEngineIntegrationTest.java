@@ -78,7 +78,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -464,7 +467,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplace('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -581,7 +584,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
     assertEquals(result, "hsomething, something, something and wise");
 
-    // Test occurence
+    // Test occurrence
     sqlQuery = "SELECT regexpReplaceVar('healthy, wealthy, stealthy and wise','\\w+thy', 'something', 0, 2)";
     response = postQuery(sqlQuery);
     result = response.get("resultTable").get("rows").get(0).get(0).asText();
@@ -1778,8 +1781,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testValidateQueryApiSuccessfulQueries()
       throws Exception {
     JsonNode tableConfigsNode =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    JsonNode schemaNode =
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
     List<String> successfulQueries = Arrays.asList("SELECT COUNT(*) FROM mytable",
         "SELECT DivAirportSeqIDs, COUNT(*) FROM mytable GROUP BY DivAirportSeqIDs",
         "SELECT DivAirportSeqIDs FROM mytable WHERE arrayToMV(DivAirportSeqIDs) > 0 LIMIT 10",
@@ -1827,8 +1831,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testValidateQueryApiBatchMixedResults()
       throws Exception {
     JsonNode tableConfigsNode =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    JsonNode schemaNode =
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
     List<String> mixedQueries = Arrays.asList("SELECT COUNT(*) FROM mytable", "SELECT invalidColumn FROM mytable",
         "SELECT DivAirportSeqIDs FROM mytable LIMIT 10", "SELECT * FROM nonExistentTable");
 
@@ -1874,8 +1879,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testValidateQueryApiUnsuccessfulQueries()
       throws Exception {
     JsonNode tableConfigsNode =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    JsonNode schemaNode =
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
 
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
@@ -1982,17 +1988,30 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE),
             RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, true);
 
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName("staticTableTest").setTimeColumnName("mtime")
-            .setTimeType("MILLISECONDS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5000")
-            .setDeletedSegmentsRetentionPeriod("7d").setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
-            .setNumReplicas(1).setSegmentPushType("APPEND").setBrokerTenant("DefaultTenant")
-            .setServerTenant("DefaultTenant").setLoadMode("MMAP").setAggregateMetrics(false)
-            .setOptimizeDictionary(false).setOptimizeDictionaryForMetrics(false).setNoDictionarySizeRatioThreshold(0.85)
-            .setNullHandlingEnabled(false).setSkipSegmentPreprocess(false).setOptimizeDictionaryType(false)
-            .setCreateInvertedIndexDuringSegmentGeneration(false).setColumnMajorSegmentBuilderEnabled(false)
-            .setStreamConfigs(streamConfigs).setRoutingConfig(routingConfig).setUpsertConfig(upsertConfig)
-            .setIsDimTable(false).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("staticTableTest")
+        .setTimeColumnName("mtime")
+        .setTimeType("MILLISECONDS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5000")
+        .setDeletedSegmentsRetentionPeriod("7d")
+        .setNumReplicas(1)
+        .setSegmentPushType("APPEND")
+        .setBrokerTenant("DefaultTenant")
+        .setServerTenant("DefaultTenant")
+        .setLoadMode("MMAP")
+        .setAggregateMetrics(false)
+        .setOptimizeDictionary(false)
+        .setOptimizeDictionaryForMetrics(false)
+        .setNoDictionarySizeRatioThreshold(0.85)
+        .setNullHandlingEnabled(false)
+        .setSkipSegmentPreprocess(false)
+        .setOptimizeDictionaryType(false)
+        .setColumnMajorSegmentBuilderEnabled(false)
+        .setStreamConfigs(streamConfigs)
+        .setRoutingConfig(routingConfig)
+        .setUpsertConfig(upsertConfig)
+        .setIsDimTable(false)
+        .build();
 
     List<TableConfig> tableConfigs = Collections.singletonList(tableConfig);
     List<Schema> schemas = Collections.singletonList(schema);
@@ -2031,8 +2050,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testValidateQueryApiWithIgnoreCaseOption()
       throws Exception {
     JsonNode tableConfigsNode =
-        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getTableClient().getTableConfig("mytable"));
+    JsonNode schemaNode =
+        JsonUtils.stringToJsonNode(getOrCreateAdminClient().getSchemaClient().getSchema("mytable"));
 
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
@@ -2108,6 +2128,36 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     QueryAssert.assertThat(queryResult)
         .firstException()
         .hasErrorCode(errorCode);
+  }
+
+  /// Verifies that the streaming group-by feature produces correct results when the query option
+  /// streamingGroupByFlushThreshold is set. Compares streaming results against a baseline query without the option.
+  @Test
+  public void testStreamingGroupBy()
+      throws Exception {
+    // Baseline: normal group-by query
+    String baseQuery = "SELECT AirlineID, SUM(Distance), COUNT(*) FROM mytable GROUP BY AirlineID ORDER BY AirlineID";
+    JsonNode baselineResponse = postQuery(baseQuery);
+    JsonNode baselineRows = baselineResponse.get("resultTable").get("rows");
+    assertTrue(baselineRows.size() > 0, "Baseline query should return results");
+
+    // Streaming group-by with a low flush threshold to force multiple flushes
+    String streamingQuery = "SET streamingGroupByFlushThreshold = 5; "
+        + "SELECT AirlineID, SUM(Distance), COUNT(*) FROM mytable GROUP BY AirlineID ORDER BY AirlineID";
+    JsonNode streamingResponse = postQuery(streamingQuery);
+    JsonNode streamingRows = streamingResponse.get("resultTable").get("rows");
+
+    // Results should be identical
+    assertEquals(streamingRows.size(), baselineRows.size(),
+        "Streaming group-by should return same number of groups as baseline");
+    for (int i = 0; i < baselineRows.size(); i++) {
+      assertEquals(streamingRows.get(i).get(0).asLong(), baselineRows.get(i).get(0).asLong(),
+          "AirlineID mismatch at row " + i);
+      assertEquals(streamingRows.get(i).get(1).asDouble(), baselineRows.get(i).get(1).asDouble(), 0.01,
+          "SUM(Distance) mismatch at row " + i);
+      assertEquals(streamingRows.get(i).get(2).asLong(), baselineRows.get(i).get(2).asLong(),
+          "COUNT(*) mismatch at row " + i);
+    }
   }
 
   private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,
@@ -2255,7 +2305,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
           + "there should be no children under the leaf node");
       return true;
-    }, 100, 10_000L, errorMsg, true, Duration.ofSeconds(1));
+    }, 100, 10_000L, errorMsg, Duration.ofSeconds(1));
   }
 
   @AfterClass

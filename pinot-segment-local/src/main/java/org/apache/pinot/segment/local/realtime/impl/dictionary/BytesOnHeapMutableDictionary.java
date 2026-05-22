@@ -34,17 +34,34 @@ import org.apache.pinot.spi.utils.BytesUtils;
 public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   private volatile byte[] _min = null;
   private volatile byte[] _max = null;
+  private volatile int _lengthOfShortestElement = Integer.MAX_VALUE;
+  private volatile int _lengthOfLongestElement = 0;
 
   @Override
   public int index(Object value) {
     byte[] bytesValue = (byte[]) value;
-    updateMinMax(bytesValue);
+    updateStats(bytesValue);
     return indexValue(new ByteArray(bytesValue));
   }
 
   @Override
   public int[] index(Object[] values) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.BYTES;
+  }
+
+  @Override
+  public int indexOf(String stringValue) {
+    return getDictId(BytesUtils.toByteArray(stringValue));
+  }
+
+  @Override
+  public int indexOf(ByteArray bytesValue) {
+    return getDictId(bytesValue);
   }
 
   @Override
@@ -116,18 +133,13 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
-  public DataType getValueType() {
-    return DataType.BYTES;
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestElement;
   }
 
   @Override
-  public int indexOf(String stringValue) {
-    return getDictId(BytesUtils.toByteArray(stringValue));
-  }
-
-  @Override
-  public int indexOf(ByteArray bytesValue) {
-    return getDictId(bytesValue);
+  public int getLengthOfLongestElement() {
+    return _lengthOfLongestElement;
   }
 
   @Override
@@ -176,20 +188,34 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return getByteArrayValue(dictId).length();
+  }
+
+  @Override
   public ByteArray getByteArrayValue(int dictId) {
     return (ByteArray) super.get(dictId);
   }
 
-  private void updateMinMax(byte[] value) {
+  private void updateStats(byte[] value) {
+    int length = value.length;
     if (_min == null) {
       _min = value;
       _max = value;
+      _lengthOfShortestElement = length;
+      _lengthOfLongestElement = length;
     } else {
       if (ByteArray.compare(value, _min) < 0) {
         _min = value;
       }
       if (ByteArray.compare(value, _max) > 0) {
         _max = value;
+      }
+      if (length < _lengthOfShortestElement) {
+        _lengthOfShortestElement = length;
+      }
+      if (length > _lengthOfLongestElement) {
+        _lengthOfLongestElement = length;
       }
     }
   }

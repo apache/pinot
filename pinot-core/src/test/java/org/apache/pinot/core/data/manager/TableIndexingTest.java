@@ -109,7 +109,7 @@ public class TableIndexingTest {
   private void createTestCases() {
     String[] indexTypes = {
         "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
-        "native_text_index", "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
+        "text_index", "range_index", "startree_index", "vector_index", "multi_col_text_index"
     };
 
     _testCases = new TestCase[_schemas.size() * indexTypes.length];
@@ -291,7 +291,7 @@ public class TableIndexingTest {
               ...
             } */
           // no params
-          indexes.put("bloom", JsonUtils.newObjectNode());
+          indexes.set("bloom", JsonUtils.newObjectNode());
 
           break;
         case "fst_index":
@@ -342,7 +342,7 @@ public class TableIndexingTest {
                  old:
                -> "tableIndexConfig": {  "invertedIndexColumns": ["uuid"], */
           // no params, has to be dictionary
-          indexes.put("inverted", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("inverted", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "json_index":
             /* json index (string or json column), should be no-dictionary
@@ -358,20 +358,7 @@ public class TableIndexingTest {
               ...
               } */
           // no params, should be no dictionary, only string or json
-          indexes.put("json", new ObjectNode(JsonNodeFactory.instance));
-          break;
-        case "native_text_index":
-            /* native text index
-            "fieldConfigList":[
-              {
-                 "name":"text_col_1",
-                 "encodingType":"RAW",
-                 "indexTypes": ["TEXT"],
-                 "properties":{"fstType":"native"}
-              }
-            ] */
-          indexTypes.add(FieldConfig.IndexType.TEXT);
-          properties.put("fstType", "native");
+          indexes.set("json", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "text_index":
             /* text index
@@ -500,18 +487,11 @@ public class TableIndexingTest {
         Assert.assertEquals(indexStats.get(COLUMN_WEEK_NAME).get("range_index"), 1);
         Assert.assertEquals(indexStats.get(COLUMN_MONTH_NAME).get("range_index"), 1);
       } else {
-        String expectedType;
-        if ("native_text_index".equals(indexType)) {
-          expectedType = "text_index";
-        } else {
-          expectedType = indexType;
-        }
-
         if ("startree_index".equals(indexType) && !testCase._expectedSuccess) {
           // It is possible that we successfully create the segment, but without the star-tree index
-          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 0);
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(indexType), 0);
         } else {
-          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(expectedType), 1);
+          Assert.assertEquals(indexStats.get(COLUMN_NAME).get(indexType), 1);
         }
       }
     } catch (Throwable t) {

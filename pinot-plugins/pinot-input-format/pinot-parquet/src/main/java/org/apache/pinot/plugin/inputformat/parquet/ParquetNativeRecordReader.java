@@ -65,8 +65,13 @@ public class ParquetNativeRecordReader implements RecordReader {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     _dataFilePath = new Path(parquetFile.getAbsolutePath());
     _hadoopConf = ParquetUtils.getParquetHadoopConfiguration();
+    ParquetNativeRecordExtractorConfig extractorConfig = new ParquetNativeRecordExtractorConfig();
+    if (recordReaderConfig instanceof ParquetRecordReaderConfig) {
+      extractorConfig.setExtractRawTimeValues(
+          ((ParquetRecordReaderConfig) recordReaderConfig).isExtractRawTimeValues());
+    }
     _recordExtractor = new ParquetNativeRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractorConfig);
 
     _parquetReadOptions = ParquetReadOptions.builder().withMetadataFilter(ParquetMetadataConverter.NO_FILTER).build();
 

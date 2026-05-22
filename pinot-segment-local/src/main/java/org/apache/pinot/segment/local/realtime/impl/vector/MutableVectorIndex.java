@@ -21,6 +21,10 @@ package org.apache.pinot.segment.local.realtime.impl.vector;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
@@ -30,14 +34,17 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.KnnFloatVectorQuery;
-import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.XKnnFloatVectorField;
+import org.apache.pinot.segment.local.segment.index.readers.vector.LuceneHnswRuntimeControlUtils;
 import org.apache.pinot.segment.local.segment.store.VectorIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.index.VectorIndexConfigProvider;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.reader.EfSearchAware;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -49,12 +56,15 @@ import org.slf4j.LoggerFactory;
  * Since there is no good mutable vector index implementation for topK search, we just do brute force search.
  * <p>This class is thread-safe for single writer multiple readers.
  */
-public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
+public class MutableVectorIndex implements VectorIndexReader, MutableIndex, VectorIndexConfigProvider, EfSearchAware {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableVectorIndex.class);
+  private static final RealtimeLuceneTextIndexSearcherPool SEARCHER_POOL =
+      RealtimeLuceneTextIndexSearcherPool.getInstance();
   public static final String VECTOR_INDEX_DOC_ID_COLUMN_NAME = "DocID";
   public static final long DEFAULT_COMMIT_INTERVAL_MS = 10_000L;
   public static final long DEFAULT_COMMIT_DOCS = 1000L;
   private final int _vectorDimension;
+  private final VectorIndexConfig _vectorIndexConfig;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
   private final IndexWriter _indexWriter;
   private final String _vectorColumn;
@@ -67,9 +77,13 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
   private int _nextDocId;
 
   private long _lastCommitTime;
+  private final ThreadLocal<Integer> _efSearchOverride = new ThreadLocal<>();
+  private final ThreadLocal<Boolean> _useRelativeDistanceOverride = new ThreadLocal<>();
+  private final ThreadLocal<Boolean> _useBoundedQueueOverride = new ThreadLocal<>();
 
   public MutableVectorIndex(String segmentName, String vectorColumn, VectorIndexConfig vectorIndexConfig) {
     _vectorColumn = vectorColumn;
+    _vectorIndexConfig = vectorIndexConfig;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     _segmentName = segmentName;
     _commitIntervalMs = Long.parseLong(
@@ -125,17 +139,126 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(float[] vector, int topK) {
-    MutableRoaringBitmap docIds;
+    int effectiveEfSearch = getEffectiveEfSearch();
+    boolean effectiveUseRelativeDistance = getEffectiveUseRelativeDistance();
+    boolean effectiveUseBoundedQueue = getEffectiveUseBoundedQueue();
+    // Search is executed in SEARCHER_POOL which is wrapped with contextAwareExecutorService(executor, false).
+    // This propagates QueryThreadContext for CPU/memory tracking without registering the task for cancellation,
+    // preventing Thread.interrupt() during Lucene search which could corrupt FSDirectory.
+    // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(
+        () -> executeVectorSearch(vector, topK, effectiveEfSearch, effectiveUseRelativeDistance,
+            effectiveUseBoundedQueue));
     try {
-      IndexSearcher indexSearcher = new IndexSearcher(DirectoryReader.open(_indexDirectory));
-      Query query = new KnnFloatVectorQuery(_vectorColumn, vector, topK);
-      docIds = new MutableRoaringBitmap();
+      return searchFuture.get();
+    } catch (InterruptedException e) {
+      searchFuture.cancel(false);
+      throw new RuntimeException("VECTOR_SIMILARITY query interrupted for segment " + _segmentName
+          + " column " + _vectorColumn, e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      if (cause instanceof Error) {
+        throw (Error) cause;
+      }
+      throw new RuntimeException("Failed while searching vector index for segment " + _segmentName
+          + " column " + _vectorColumn, cause);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed while searching vector index for segment " + _segmentName
+          + " column " + _vectorColumn, e);
+    }
+  }
+
+  @Override
+  public VectorIndexConfig getVectorIndexConfig() {
+    return _vectorIndexConfig;
+  }
+
+  @Override
+  public void setEfSearch(int efSearch) {
+    if (efSearch < 1) {
+      throw new IllegalArgumentException("efSearch must be >= 1, got: " + efSearch);
+    }
+    _efSearchOverride.set(efSearch);
+  }
+
+  @Override
+  public void clearEfSearch() {
+    _efSearchOverride.remove();
+  }
+
+  @Override
+  public void setUseRelativeDistance(boolean useRelativeDistance) {
+    _useRelativeDistanceOverride.set(useRelativeDistance);
+  }
+
+  @Override
+  public void clearUseRelativeDistance() {
+    _useRelativeDistanceOverride.remove();
+  }
+
+  @Override
+  public void setUseBoundedQueue(boolean useBoundedQueue) {
+    _useBoundedQueueOverride.set(useBoundedQueue);
+  }
+
+  @Override
+  public void clearUseBoundedQueue() {
+    _useBoundedQueueOverride.remove();
+  }
+
+  @Override
+  public Map<String, Object> getIndexDebugInfo() {
+    Map<String, Object> info = new LinkedHashMap<>();
+    info.put("backend", "HNSW");
+    info.put("column", _vectorColumn);
+    info.put("effectiveEfSearch", getEffectiveEfSearch());
+    info.put("effectiveHnswUseRelativeDistance", getEffectiveUseRelativeDistance());
+    info.put("effectiveHnswUseBoundedQueue", getEffectiveUseBoundedQueue());
+    info.put("supportsPreFilter", false);
+    try (DirectoryReader directoryReader = DirectoryReader.open(_indexDirectory)) {
+      info.put("numDocs", directoryReader.numDocs());
+      info.put("numDeletedDocs", directoryReader.numDeletedDocs());
+      info.put("luceneSegments", directoryReader.leaves().size());
+    } catch (IOException e) {
+      LOGGER.warn("Failed to load mutable HNSW debug stats for segment: {}, column: {}", _segmentName, _vectorColumn,
+          e);
+      info.put("numDocs", _nextDocId);
+      info.put("numDeletedDocs", 0);
+      info.put("luceneSegments", 0);
+    }
+    return info;
+  }
+
+  private MutableRoaringBitmap executeVectorSearch(float[] vector, int topK, int efSearch,
+      boolean useRelativeDistance, boolean useBoundedQueue) throws IOException {
+    try (DirectoryReader directoryReader = DirectoryReader.open(_indexDirectory)) {
+      IndexSearcher indexSearcher = new IndexSearcher(directoryReader);
+      KnnFloatVectorQuery query =
+          LuceneHnswRuntimeControlUtils.createQuery(_vectorColumn, vector, topK, efSearch,
+              useRelativeDistance, useBoundedQueue, null);
+      MutableRoaringBitmap docIds = new MutableRoaringBitmap();
       TopDocs search = indexSearcher.search(query, topK);
       Arrays.stream(search.scoreDocs).map(scoreDoc -> scoreDoc.doc).forEach(docIds::add);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+      return docIds;
     }
-    return docIds;
+  }
+
+  private int getEffectiveEfSearch() {
+    Integer efSearch = _efSearchOverride.get();
+    return efSearch != null ? efSearch : 0;
+  }
+
+  private boolean getEffectiveUseRelativeDistance() {
+    Boolean useRelativeDistance = _useRelativeDistanceOverride.get();
+    return useRelativeDistance != null ? useRelativeDistance : true;
+  }
+
+  private boolean getEffectiveUseBoundedQueue() {
+    Boolean useBoundedQueue = _useBoundedQueueOverride.get();
+    return useBoundedQueue != null ? useBoundedQueue : true;
   }
 
   @Override
@@ -143,6 +266,7 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
     try {
       _indexWriter.commit();
       _indexWriter.close();
+      _indexDirectory.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {

@@ -80,6 +80,10 @@ public abstract class QueryScheduler {
     _resourceManager = resourceManager;
   }
 
+  public ResourceManager getResourceManager() {
+    return _resourceManager;
+  }
+
   /**
    * Submit a query for execution. The query will be scheduled for execution as per the scheduling algorithm
    * @param queryRequest query to schedule for execution

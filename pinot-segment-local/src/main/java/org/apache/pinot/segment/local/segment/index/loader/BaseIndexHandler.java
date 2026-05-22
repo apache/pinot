@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -61,6 +60,8 @@ public abstract class BaseIndexHandler implements IndexHandler {
       TableConfig tableConfig, Schema schema) {
     _segmentDirectory = segmentDirectory;
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
+    Preconditions.checkState(segmentMetadata.getTotalDocs() > 0, "Got empty segment: %s in index handler",
+        segmentMetadata.getName());
     if (fieldIndexConfigs.keySet().equals(segmentMetadata.getAllColumns())) {
       _fieldIndexConfigs = fieldIndexConfigs;
     } else {
@@ -109,14 +110,9 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     LOGGER.info("Rebuilding the forward index for column: {}, is temporary: {}", columnName, isTemporaryForwardIndex);
 
-    FieldIndexConfigs fieldIndexConfig = _fieldIndexConfigs.get(columnName);
-    boolean dictionaryEnabled = fieldIndexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
-    ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(StandardIndexes.forward());
-
     InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
-        new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex, _tableConfig.getTableName(),
-            _tableConfig.getIngestionConfig() != null && _tableConfig.getIngestionConfig().isContinueOnError());
+        new InvertedIndexAndDictionaryBasedForwardIndexCreator(_segmentDirectory, segmentWriter, _tableConfig,
+            columnName, _fieldIndexConfigs.get(columnName), isTemporaryForwardIndex);
     creator.regenerateForwardIndex();
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, StandardIndexes.forward())) {

@@ -63,10 +63,6 @@ export default function AddIndexingComponent({
   const changeHandler = (fieldName, value) => {
     let newTableObj = {...tableDataObj};
     switch(fieldName){
-      case 'maxLeafRecords':
-        newTableObj.tableIndexConfig.starTreeIndexConfigs[0].maxLeafRecords = value;
-        // newTableObj.segmentsConfig.schemaName = value;
-      break;
       case 'enableStarTree':
         setShowTree(value);
       break;

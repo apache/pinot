@@ -77,20 +77,20 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   private void enableQueryWorkloadWithEnforcement(PinotConfiguration configuration, InstanceType instanceType) {
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+    configuration.setProperty(CommonConstants.Accounting.COMMON_PREFIX + "."
+        + CommonConstants.Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION, true);
+    configuration.setProperty(CommonConstants.Accounting.COMMON_PREFIX + "."
+        + CommonConstants.Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    configuration.setProperty(CommonConstants.Accounting.COMMON_PREFIX + "."
+        + CommonConstants.Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configuration.setProperty(CommonConstants.Accounting.COMMON_PREFIX + "."
+        + CommonConstants.Accounting.Keys.FACTORY_NAME,
         "org.apache.pinot.core.accounting.ResourceUsageAccountantFactory");
     // Set the sleep time to 0 to enable precise measurement and enforcement in tests
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS, 0);
-    configuration.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
+    configuration.setProperty(CommonConstants.Accounting.COMMON_PREFIX + "."
+        + CommonConstants.Accounting.Keys.WORKLOAD_SLEEP_TIME_MS, 0);
+    configuration.setProperty(CommonConstants.Accounting.COMMON_PREFIX + "."
+        + CommonConstants.Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
     if (instanceType == InstanceType.BROKER) {
       configuration.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
           true);
@@ -177,30 +177,6 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     } finally {
       cleanupWorkload(workloadName);
     }
-  }
-
-  /**
-   * Test query execution with budget configuration
-   */
-  @Test
-  public void testWorkloadEnforcement() throws Exception {
-    // Test enforcement with high budget - should succeed (no rejection)
-    EnforcementProfile enforcementProfile = new EnforcementProfile(Long.MAX_VALUE, Long.MAX_VALUE);
-    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME, Long.MAX_VALUE, Long.MAX_VALUE, null);
-    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
-    NodeConfig brokerConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
-    NodeConfig serverConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
-    String workloadName = "highBudgetWorkload";
-    QueryWorkloadConfig workloadConfig = new QueryWorkloadConfig(workloadName, List.of(brokerConfig, serverConfig));
-    testWorkloadEnforcementWithBudgets(workloadConfig, false);
-
-    // Test broker enforcement with low budgets (rejection expected)
-    enforcementProfile = new EnforcementProfile(1, 1);
-    entity = new PropagationEntity(DEFAULT_TABLE_NAME, 1L, 1L, null);
-    propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
-    brokerConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
-    workloadConfig = new QueryWorkloadConfig("lowBudgetBrokerWorkload", List.of(brokerConfig));
-    testWorkloadEnforcementWithBudgets(workloadConfig, true);
   }
 
   @Test
@@ -293,11 +269,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
    * Helper method to properly clean up a workload and wait for deletion to propagate
    */
   private void cleanupWorkload(String workloadName) throws Exception {
-    getControllerRequestClient().deleteQueryWorkloadConfig(workloadName);
+    getOrCreateAdminClient().getQueryWorkloadClient().deleteQueryWorkloadConfig(workloadName);
     // Wait for deletion to propagate - verify workload is actually removed from controller
     TestUtils.waitForCondition(aVoid -> {
       try {
-        QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig(workloadName);
+        QueryWorkloadConfig retrievedConfig =
+            getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfigObject(workloadName);
         return retrievedConfig == null;
       } catch (Exception e) {
         // Exception means workload doesn't exist, which is what we want
@@ -424,11 +401,13 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
    */
   private void updateAndValidateWorkloadConfigPropagation(QueryWorkloadConfig queryWorkloadConfig)
       throws Exception {
-    getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+    getOrCreateAdminClient().getQueryWorkloadClient()
+        .updateQueryWorkloadConfig(JsonUtils.objectToString(queryWorkloadConfig));
     String workloadName = queryWorkloadConfig.getQueryWorkloadName();
     TestUtils.waitForCondition(aVoid -> {
       try {
-        QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig(workloadName);
+        QueryWorkloadConfig retrievedConfig =
+            getOrCreateAdminClient().getQueryWorkloadClient().getQueryWorkloadConfigObject(workloadName);
         return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
       } catch (Exception e) {
         throw new RuntimeException(e);

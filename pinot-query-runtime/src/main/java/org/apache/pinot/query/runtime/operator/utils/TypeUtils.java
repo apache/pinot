@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.math.BigDecimal;
 import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 public class TypeUtils {
@@ -52,49 +53,89 @@ public class TypeUtils {
       // For AggregationFunctions that return serialized custom object, e.g. DistinctCountRawHLLAggregationFunction
       case STRING:
         return value.toString();
+      case BYTES:
+        assert value instanceof ByteArray;
+        return value;
       case INT_ARRAY:
         if (value instanceof IntArrayList) {
           // For ArrayAggregationFunction
           return ArrayListUtils.toIntArray((IntArrayList) value);
-        } else {
-          return value;
         }
+        assert value instanceof int[];
+        return value;
       case LONG_ARRAY:
         if (value instanceof LongArrayList) {
           // For FunnelCountAggregationFunction and ArrayAggregationFunction
           return ArrayListUtils.toLongArray((LongArrayList) value);
-        } else {
-          return value;
         }
+        assert value instanceof long[];
+        return value;
       case FLOAT_ARRAY:
         if (value instanceof FloatArrayList) {
           // For ArrayAggregationFunction
           return ArrayListUtils.toFloatArray((FloatArrayList) value);
-        } else if (value instanceof double[]) {
+        }
+        if (value instanceof double[]) {
           // This is due to for parsing array literal value like [0.1, 0.2, 0.3].
           // The parsed value is stored as double[] in java, however the calcite type is FLOAT_ARRAY.
-          float[] floatArray = new float[((double[]) value).length];
+          double[] doubleArray = (double[]) value;
+          float[] floatArray = new float[doubleArray.length];
           for (int i = 0; i < floatArray.length; i++) {
-            floatArray[i] = (float) ((double[]) value)[i];
+            floatArray[i] = (float) doubleArray[i];
           }
           return floatArray;
-        } else {
-          return value;
         }
+        assert value instanceof float[];
+        return value;
       case DOUBLE_ARRAY:
         if (value instanceof DoubleArrayList) {
           // For HistogramAggregationFunction and ArrayAggregationFunction
           return ArrayListUtils.toDoubleArray((DoubleArrayList) value);
-        } else {
-          return value;
         }
+        if (value instanceof BigDecimal[]) {
+          // MV BIG_DECIMAL columns are reported as DOUBLE_ARRAY at the MSE boundary for backward compatibility
+          // (see RelToPlanNodeConverter.resolveDecimal TODO); downcast to double[] here. Precision loss is
+          // accepted until the TODO is cleared in a future release.
+          BigDecimal[] bigDecimalArray = (BigDecimal[]) value;
+          double[] doubleArray = new double[bigDecimalArray.length];
+          for (int i = 0; i < bigDecimalArray.length; i++) {
+            doubleArray[i] = bigDecimalArray[i].doubleValue();
+          }
+          return doubleArray;
+        }
+        if (value instanceof ObjectArrayList) {
+          // ARRAY_AGG on BIG_DECIMAL produces ObjectArrayList<BigDecimal>; same backward-compat downcast.
+          ObjectArrayList<?> list = (ObjectArrayList<?>) value;
+          int size = list.size();
+          double[] doubleArray = new double[size];
+          for (int i = 0; i < size; i++) {
+            doubleArray[i] = ((BigDecimal) list.get(i)).doubleValue();
+          }
+          return doubleArray;
+        }
+        assert value instanceof double[];
+        return value;
+      case BIG_DECIMAL_ARRAY:
+        if (value instanceof ObjectArrayList) {
+          // For ArrayAggregationFunction
+          return ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value);
+        }
+        assert value instanceof BigDecimal[];
+        return value;
       case STRING_ARRAY:
         if (value instanceof ObjectArrayList) {
           // For ArrayAggregationFunction
           return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
-        } else {
-          return value;
         }
+        assert value instanceof String[];
+        return value;
+      case BYTES_ARRAY:
+        if (value instanceof ObjectArrayList) {
+          // For ArrayAggregationFunction
+          return ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value);
+        }
+        assert value instanceof ByteArray[];
+        return value;
       // TODO: Add more conversions
       default:
         return value;

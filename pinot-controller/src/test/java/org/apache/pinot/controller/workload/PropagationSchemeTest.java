@@ -158,7 +158,7 @@ public class PropagationSchemeTest {
     if (nodeType == NodeConfig.Type.SERVER_NODE) {
       if (override != null) {
         String partitionKey = entity.getEntity() + "_" + override.getEntity();
-         tableInstancePartitions = instancePartitions.stream()
+        tableInstancePartitions = instancePartitions.stream()
              .filter(partitions -> partitions.getInstancePartitionsName().equals(partitionKey))
              .collect(Collectors.toList());
       } else {

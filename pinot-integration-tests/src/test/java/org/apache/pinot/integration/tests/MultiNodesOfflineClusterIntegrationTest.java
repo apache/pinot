@@ -24,11 +24,12 @@ import java.util.Map;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.client.admin.InstanceAdminClient;
 import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.FailureDetector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
@@ -78,11 +79,10 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Enable thread CPU/memory tracking but not killing queries
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        ResourceUsageAccountantFactory.class.getName());
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    brokerConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    String prefix = Accounting.BROKER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Override
@@ -92,16 +92,16 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     // Enable thread CPU/memory tracking but not killing queries
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
-    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
-        ResourceUsageAccountantFactory.class.getName());
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    serverConf.setProperty(prefix + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    String prefix = Accounting.SERVER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.Keys.FACTORY_NAME, ResourceUsageAccountantFactory.class.getName());
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_CPU_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.Keys.ENABLE_THREAD_MEMORY_SAMPLING, true);
   }
 
   @Test
   public void testUpdateBrokerResource()
       throws Exception {
+    InstanceAdminClient instanceClient = getOrCreateAdminClient().getInstanceClient();
     // Add a new broker to the cluster
     BaseBrokerStarter brokerStarter = startOneBroker(NUM_BROKERS);
 
@@ -130,14 +130,14 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
     // Dropping the broker should fail because it is still in the broker resource
     try {
-      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      instanceClient.dropInstance(brokerId);
       fail("Dropping instance should fail because it is still in the broker resource");
     } catch (Exception e) {
       // Expected
     }
 
     // Untag the broker and update the broker resource so that it is removed from the broker resource
-    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+    instanceClient.updateInstanceTags(brokerId, Collections.emptyList(), true);
 
     // Check if broker is removed from all the tables in broker resource
     brokerResourceIdealState = _helixAdmin.getResourceIdealState(clusterName, Helix.BROKER_RESOURCE_INSTANCE);
@@ -156,7 +156,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
     }, 60_000L, "Failed to remove broker from broker resource ExternalView");
 
     // Dropping the broker should success now
-    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+    instanceClient.dropInstance(brokerId);
 
     // Check if broker is dropped from the cluster
     assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -29,14 +30,18 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -121,7 +126,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
 
     Set<String> stringSet = new HashSet<>();
     while (stringSet.size() < NUM_VALUES) {
-      stringSet.add(RandomStringUtils.random(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
+      stringSet.add(RandomStringUtils.secure().next(RANDOM.nextInt(MAX_STRING_LENGTH)).replace('\0', ' '));
     }
     _stringValues = stringSet.toArray(new String[NUM_VALUES]);
     Arrays.sort(_stringValues);
@@ -205,6 +210,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(intDictionary.getFloatValue(i), (float) _intValues[i]);
       assertEquals(intDictionary.getDoubleValue(i), (double) _intValues[i]);
       Assert.assertEquals(Integer.parseInt(intDictionary.getStringValue(i)), _intValues[i]);
+      assertEquals(intDictionary.getValueSize(i), Integer.BYTES);
 
       assertEquals(intDictionary.indexOf(String.valueOf(_intValues[i])), i);
 
@@ -242,6 +248,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(longDictionary.getFloatValue(i), (float) _longValues[i]);
       assertEquals(longDictionary.getDoubleValue(i), (double) _longValues[i]);
       Assert.assertEquals(Long.parseLong(longDictionary.getStringValue(i)), _longValues[i]);
+      assertEquals(longDictionary.getValueSize(i), Long.BYTES);
 
       assertEquals(longDictionary.indexOf(String.valueOf(_longValues[i])), i);
 
@@ -279,6 +286,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(floatDictionary.getFloatValue(i), _floatValues[i]);
       assertEquals(floatDictionary.getDoubleValue(i), (double) _floatValues[i]);
       Assert.assertEquals(Float.parseFloat(floatDictionary.getStringValue(i)), _floatValues[i], 0.0f);
+      assertEquals(floatDictionary.getValueSize(i), Float.BYTES);
 
       assertEquals(floatDictionary.indexOf(String.valueOf(_floatValues[i])), i);
 
@@ -316,6 +324,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(doubleDictionary.getFloatValue(i), (float) _doubleValues[i]);
       assertEquals(doubleDictionary.getDoubleValue(i), _doubleValues[i]);
       Assert.assertEquals(Double.parseDouble(doubleDictionary.getStringValue(i)), _doubleValues[i], 0.0);
+      assertEquals(doubleDictionary.getValueSize(i), Double.BYTES);
 
       assertEquals(doubleDictionary.indexOf(String.valueOf(_doubleValues[i])), i);
 
@@ -331,7 +340,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
         new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
         BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(buffer, NUM_VALUES,
-        _bigDecimalByteLength)) {
+            _bigDecimalByteLength)) {
       testBigDecimalDictionary(bigDecimalDictionary);
     }
   }
@@ -356,6 +365,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(bigDecimalDictionary.getDoubleValue(i), _bigDecimalValues[i].doubleValue());
       assertEquals(bigDecimalDictionary.getBigDecimalValue(i), _bigDecimalValues[i]);
       Assert.assertEquals(new BigDecimal(bigDecimalDictionary.getStringValue(i)), _bigDecimalValues[i]);
+      assertEquals(bigDecimalDictionary.getValueSize(i), BigDecimalUtils.byteSize(_bigDecimalValues[i]));
 
       assertEquals(bigDecimalDictionary.indexOf(String.valueOf(_bigDecimalValues[i])), i);
 
@@ -401,11 +411,12 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
     for (int i = 0; i < NUM_VALUES; i++) {
       assertEquals(stringDictionary.get(i), _stringValues[i]);
       assertEquals(stringDictionary.getStringValue(i), _stringValues[i]);
+      assertEquals(stringDictionary.getValueSize(i), Utf8.encodedLength(_stringValues[i]));
 
       assertEquals(stringDictionary.indexOf(_stringValues[i]), i);
 
       // Test String longer than MAX_STRING_LENGTH
-      String randomString = RandomStringUtils.random(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
+      String randomString = RandomStringUtils.secure().next(RANDOM.nextInt(2 * MAX_STRING_LENGTH)).replace('\0', ' ');
       assertEquals(stringDictionary.insertionIndexOf(randomString), Arrays.binarySearch(_stringValues, randomString));
     }
   }
@@ -448,6 +459,7 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       assertEquals(bytesDictionary.get(i), _bytesValues[i].getBytes());
       assertEquals(bytesDictionary.getStringValue(i), _bytesValues[i].toHexString());
       assertEquals(bytesDictionary.getBytesValue(i), _bytesValues[i].getBytes());
+      assertEquals(bytesDictionary.getValueSize(i), BYTES_LENGTH);
 
       assertEquals(bytesDictionary.indexOf(_bytesValues[i].toHexString()), i);
 
@@ -455,6 +467,50 @@ public class ImmutableDictionaryTest implements PinotBuffersAfterMethodCheckRule
       RANDOM.nextBytes(randomBytes);
       assertEquals(bytesDictionary.insertionIndexOf(BytesUtils.toHexString(randomBytes)),
           Arrays.binarySearch(_bytesValues, new ByteArray(randomBytes)));
+    }
+  }
+
+  /**
+   * Regression test for old segments (pre-1.6.0) that have a STRING column with all-empty values:
+   * the segment lacks LENGTH_OF_LONGEST_ELEMENT (introduced in 1.6.0) and has DICTIONARY_ELEMENT_SIZE=0
+   * (the longest entry length is zero when every entry is empty). The metadata loader must canonicalize
+   * the longest-element length to 0 here; otherwise it leaves the field at the UNAVAILABLE sentinel
+   * (-1), which propagates into StringDictionary.getBuffer() as `new byte[-1]` and fails query
+   * execution with NegativeArraySizeException.
+   */
+  @Test
+  public void testStringDictionaryReadOnPre16OldSegmentMetadata()
+      throws Exception {
+    String columnName = "emptyStringCol";
+    // Build a real var-length string dictionary on disk holding a single empty value.
+    try (SegmentDictionaryCreator dictCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(columnName, DataType.STRING, true), TEMP_DIR, true)) {
+      dictCreator.build(new String[]{""});
+      assertEquals(dictCreator.getNumBytesPerEntry(), 0);
+    }
+
+    // Simulate pre-1.6.0 metadata: HAS_DICTIONARY=true, DICTIONARY_ELEMENT_SIZE=0, no LENGTH_OF_LONGEST_ELEMENT.
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    config.setProperty(Column.getKeyFor(columnName, Column.COLUMN_NAME), columnName);
+    config.setProperty(Column.getKeyFor(columnName, Column.COLUMN_TYPE), FieldType.DIMENSION.name());
+    config.setProperty(Column.getKeyFor(columnName, Column.DATA_TYPE), DataType.STRING.name());
+    config.setProperty(Column.getKeyFor(columnName, Column.IS_SINGLE_VALUED), true);
+    config.setProperty(Column.getKeyFor(columnName, Column.CARDINALITY), 1);
+    config.setProperty(Column.getKeyFor(columnName, Column.HAS_DICTIONARY), true);
+    config.setProperty(Column.getKeyFor(columnName, Column.DICTIONARY_ELEMENT_SIZE), 0);
+    // LENGTH_OF_LONGEST_ELEMENT intentionally NOT set.
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, columnName);
+
+    // Reproduce the production code path: DictionaryIndexType passes metadata.getLengthOfLongestElement()
+    // as numBytesPerValue. Without the canonicalization fix this is -1, and StringDictionary.readStringValues
+    // throws NegativeArraySizeException at BaseImmutableDictionary.getBuffer().
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, columnName + V1Constants.Dict.FILE_EXTENSION));
+        StringDictionary dict = new StringDictionary(buffer, 1, metadata.getLengthOfLongestElement())) {
+      String[] outValues = new String[1];
+      dict.readStringValues(new int[]{0}, 1, outValues);
+      assertEquals(outValues[0], "");
     }
   }
 

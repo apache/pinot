@@ -19,8 +19,6 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,8 +28,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.client.admin.PinotAdminException;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -111,7 +108,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         new TableTaskConfig(
             Map.of("SegmentGenerationAndPushTask", Map.of("schedule", "0 * * ? * * *")))).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
         "JobGroupNames should have SegmentGenerationAndPushTask only");
@@ -130,7 +131,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
 
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     PinotHelixTaskResourceManager taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -186,7 +191,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
         new TableTaskConfig(Map.of(taskType, new HashMap<>()))).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
 
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     PinotHelixTaskResourceManager taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -259,8 +268,12 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         new TableTaskConfig(Map.of(taskType, new HashMap<>()))).build();
     waitForEVToDisappear(tableConfig1.getTableName());
     waitForEVToDisappear(tableConfig2.getTableName());
-    addTableConfig(tableConfig1, "TASK");
-    addTableConfig(tableConfig2, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig1.toJsonString(), "TASK");
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig2.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
 
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     PinotHelixTaskResourceManager taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
@@ -315,7 +328,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         new TableTaskConfig(
             Map.of(segmentGenerationAndPushTask, Map.of("schedule", "0 */10 * ? * * *")))).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(taskManager, jgn -> jgn.size() == 1 && jgn.contains(segmentGenerationAndPushTask),
         "JobGroupNames should have SegmentGenerationAndPushTask only");
     validateJob(segmentGenerationAndPushTask, "0 */10 * ? * * *");
@@ -405,7 +422,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         new TableTaskConfig(
             Map.of("SegmentGenerationAndPushTask", Map.of("schedule", "0 */10 * ? * * *")))).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
         "JobGroupNames should have SegmentGenerationAndPushTask only");
@@ -414,7 +435,12 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     // 2. Update table to new schedule
     tableConfig.setTaskConfig(new TableTaskConfig(
         Map.of("SegmentGenerationAndPushTask", Map.of("schedule", "0 */20 * ? * * *"))));
-    updateTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .updateTableConfig(tableConfig.getTableName(), tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
         "JobGroupNames should have SegmentGenerationAndPushTask only");
@@ -424,7 +450,12 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     tableConfig.setTaskConfig(new TableTaskConfig(
         Map.of("SegmentGenerationAndPushTask", Map.of("schedule", "0 */30 * ? * * *"),
             "MergeRollupTask", Map.of("schedule", "0 */10 * ? * * *"))));
-    updateTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .updateTableConfig(tableConfig.getTableName(), tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 2 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE) && jgn.contains(
             MinionConstants.MergeRollupTask.TASK_TYPE),
@@ -435,7 +466,12 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     // 4. Remove one task from the table
     tableConfig.setTaskConfig(
         new TableTaskConfig(Map.of("MergeRollupTask", Map.of("schedule", "0 */10 * ? * * *"))));
-    updateTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .updateTableConfig(tableConfig.getTableName(), tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.MergeRollupTask.TASK_TYPE),
         "JobGroupNames should have MergeRollupTask only");
@@ -462,7 +498,11 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
         new TableTaskConfig(
             Map.of("SegmentGenerationAndPushTask", Map.of("schedule", "0 */10 * ? * * *")))).build();
     waitForEVToDisappear(tableConfig.getTableName());
-    addTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient().createTable(tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
     waitForJobGroupNames(_controllerStarter.getTaskManager(),
         jgn -> jgn.size() == 1 && jgn.contains(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE),
         "JobGroupNames should have SegmentGenerationAndPushTask only");
@@ -483,7 +523,12 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     tableConfig.setTaskConfig(new TableTaskConfig(
         Map.of("SegmentGenerationAndPushTask", Map.of("schedule", "0 */10 * ? * * *"),
             "MergeRollupTask", Map.of("schedule", "0 */20 * ? * * *"))));
-    updateTableConfig(tableConfig, "TASK");
+    try {
+      getOrCreateAdminClient().getTableClient()
+          .updateTableConfig(tableConfig.getTableName(), tableConfig.toJsonString(), "TASK");
+    } catch (PinotAdminException e) {
+      throw new IOException(e);
+    }
 
     // Task is put into table config.
     TableConfig tableConfigAfterRestart =
@@ -567,34 +612,6 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
       }
       return true;
     }, TIMEOUT_IN_MS, 500L, "Cron expression didn't change to " + cronExpression);
-  }
-
-  private void addTableConfig(TableConfig tableConfig, String validationTypesToSkip)
-      throws IOException {
-    String createTableUriStr =
-        String.format(_controllerRequestURLBuilder.forTableCreate() + "?validationTypesToSkip=%s",
-            validationTypesToSkip);
-    try {
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPostRequest(new URI(createTableUriStr), tableConfig.toJsonString(),
-              Collections.emptyMap()));
-    } catch (HttpErrorStatusException | URISyntaxException e) {
-      throw new IOException(e);
-    }
-  }
-
-  private void updateTableConfig(TableConfig tableConfig, String validationTypesToSkip)
-      throws IOException {
-    String updateTableUriStr = String.format(
-        _controllerRequestURLBuilder.forUpdateTableConfig(tableConfig.getTableName()) + "?validationTypesToSkip=%s",
-        validationTypesToSkip);
-    try {
-      HttpClient.wrapAndThrowHttpException(
-          _httpClient.sendJsonPutRequest(new URI(updateTableUriStr), tableConfig.toJsonString(),
-              Collections.emptyMap()));
-    } catch (HttpErrorStatusException | URISyntaxException e) {
-      throw new IOException(e);
-    }
   }
 
   private BaseTaskGenerator createFakeTaskGenerator(String taskType, int maxSubTasks, int generatedTasks) {

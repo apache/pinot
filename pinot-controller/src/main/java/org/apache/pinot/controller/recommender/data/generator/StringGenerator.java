@@ -51,7 +51,7 @@ public class StringGenerator implements Generator {
     int initValueSize = lengthOfEachString - _counterLength;
     Preconditions.checkState(initValueSize >= 0,
         String.format("Cannot generate %d unique string with length %d", _cardinality, lengthOfEachString));
-    _initialValue = RandomStringUtils.randomAlphabetic(initValueSize);
+    _initialValue = RandomStringUtils.secure().nextAlphabetic(initValueSize);
     _rand = new Random(System.currentTimeMillis());
   }
 

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.math.BigDecimal;
+import java.util.Map;
 import java.util.OptionalInt;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
@@ -47,10 +49,11 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _nextDocId = 0;
   private long _numEntriesScanned = 0L;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs,
+      Map<String, String> queryOptions) {
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
-    _readerContext = _reader.createContext();
+    _readerContext = _reader.createContext(queryOptions);
     _numDocs = numDocs;
     _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
     _valueMatcher = getValueMatcher();
@@ -149,6 +152,8 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
           return new FloatMatcher();
         case DOUBLE:
           return new DoubleMatcher();
+        case BIG_DECIMAL:
+          return new BigDecimalMatcher();
         case STRING:
           return new StringMatcher();
         case BYTES:
@@ -223,6 +228,18 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesValueMatch(int docId) {
       int length = _reader.getDoubleMV(docId, _buffer, _readerContext);
+      _numEntriesScanned += length;
+      return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  private class BigDecimalMatcher implements ValueMatcher {
+
+    private final BigDecimal[] _buffer = new BigDecimal[_maxNumValuesPerMVEntry];
+
+    @Override
+    public boolean doesValueMatch(int docId) {
+      int length = _reader.getBigDecimalMV(docId, _buffer, _readerContext);
       _numEntriesScanned += length;
       return _predicateEvaluator.applyMV(_buffer, length);
     }

@@ -107,13 +107,6 @@ public abstract class BaseImmutableDictionary implements Dictionary {
   }
 
   @Override
-  public Object getSortedValues() {
-    // This method is for the stats collection phase when sealing the consuming segment, so it is not required for
-    // regular immutable dictionary within the immutable segment.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void close()
       throws IOException {
     if (_valueReader != null) {
@@ -276,6 +269,14 @@ public abstract class BaseImmutableDictionary implements Dictionary {
 
   protected byte[] getBytes(int dictId) {
     return _valueReader.getBytes(dictId, _numBytesPerValue);
+  }
+
+  protected int getUnpaddedByteSize(int dictId) {
+    return _valueReader.getUnpaddedByteSize(dictId, _numBytesPerValue);
+  }
+
+  protected int getByteSize(int dictId) {
+    return _valueReader.getByteSize(dictId, _numBytesPerValue);
   }
 
   public int get32BitsMurmur3Hash(int dictId, byte[] buffer) {

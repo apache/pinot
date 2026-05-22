@@ -24,8 +24,6 @@ import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.MultiValueVisitor;
-import org.apache.pinot.spi.data.SingleValueVisitor;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -137,16 +135,24 @@ public class NotEqualsPredicateEvaluatorFactory {
       super(predicate);
     }
 
-    /**
-     * Visits the not matching value of this predicate.
-     */
-    public abstract <R> R accept(SingleValueVisitor<R> visitor);
+    /// Visits the non-matching value of this predicate.
+    public abstract <R> R accept(Visitor<R> visitor);
 
-    /**
-     * Visits the not matching value of this predicate, which will be transformed into an array with a single value.
-     */
-    public <R> R accept(MultiValueVisitor<R> visitor) {
-      return accept(visitor.asSingleValueVisitor());
+    /// Visitor for the non-matching value of a NOT_EQ predicate, dispatched by the stored value type.
+    public interface Visitor<R> {
+      R visitInt(int nonMatchingValue);
+
+      R visitLong(long nonMatchingValue);
+
+      R visitFloat(float nonMatchingValue);
+
+      R visitDouble(double nonMatchingValue);
+
+      R visitBigDecimal(BigDecimal nonMatchingValue);
+
+      R visitString(String nonMatchingValue);
+
+      R visitBytes(byte[] nonMatchingValue);
     }
   }
 
@@ -187,7 +193,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitInt(_nonMatchingValue);
     }
   }
@@ -229,7 +235,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitLong(_nonMatchingValue);
     }
   }
@@ -271,7 +277,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitFloat(_nonMatchingValue);
     }
   }
@@ -313,7 +319,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitDouble(_nonMatchingValue);
     }
   }
@@ -342,7 +348,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBigDecimal(_nonMatchingValue);
     }
   }
@@ -371,7 +377,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitString(_nonMatchingValue);
     }
   }
@@ -400,7 +406,7 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public <R> R accept(SingleValueVisitor<R> visitor) {
+    public <R> R accept(Visitor<R> visitor) {
       return visitor.visitBytes(_nonMatchingValue);
     }
   }

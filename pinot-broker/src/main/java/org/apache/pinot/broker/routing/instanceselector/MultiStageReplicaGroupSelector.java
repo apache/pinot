@@ -125,7 +125,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * }
    */
   private Pair<Map<String, String>, Map<String, String>> assign(Set<String> segments,
-    SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
+      SegmentStates segmentStates, InstancePartitions instancePartitions, int preferredReplicaId) {
     Map<String, Integer> instanceToPartitionMap = instancePartitions.getInstanceToPartitionIdMap();
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
 
@@ -143,7 +143,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       for (SegmentInstanceCandidate candidate : candidates) {
         instanceToSegmentsMap
           .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
-          .add(segment);
+            .add(segment);
       }
     }
 
@@ -154,7 +154,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       Integer partitionId = instanceToPartitionMap.get(entry.getKey());
       partitionToRequiredSegmentsMap
         .computeIfAbsent(partitionId, k -> new HashSet<>())
-        .addAll(entry.getValue());
+          .addAll(entry.getValue());
     }
 
     // Assign segments to instances based on the partitionToRequiredSegmentsMap. This ensures that we select the
@@ -165,7 +165,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       Set<String> requiredSegments = partitionToRequiredSegmentsMap.get(partition);
       if (requiredSegments != null) {
         getSelectedInstancesForPartition(instanceToSegmentsMap, requiredSegments, partition, preferredReplicaId,
-          segmentToSelectedInstanceMap);
+            segmentToSelectedInstanceMap);
       }
     }
 
@@ -188,8 +188,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * If no replica group is found, it throws an exception.
    */
   private void getSelectedInstancesForPartition(Map<String, Set<String>> instanceToSegmentsMap,
-    Set<String> requiredSegments, int partitionId, int preferredReplicaId,
-    Map<String, String> segmentToSelectedInstanceMapSink) {
+      Set<String> requiredSegments, int partitionId, int preferredReplicaId,
+      Map<String, String> segmentToSelectedInstanceMapSink) {
     int numReplicaGroups = _instancePartitions.getNumReplicaGroups();
 
     for (int replicaGroupOffset = 0; replicaGroupOffset < numReplicaGroups; replicaGroupOffset++) {
@@ -230,7 +230,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * this method computes the segments that are optional and the segments that are not.
    */
   private Pair<Map<String, String>, Map<String, String>> computeOptionalSegments(
-    Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
+      Map<String, String> segmentToSelectedInstanceMap, SegmentStates segmentStates) {
 
     Map<String, String> segmentsToInstanceMap = new HashMap<>();
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
@@ -242,7 +242,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       // If candidates are null, we will throw an exception and log a warning.
       Preconditions.checkState(candidates != null && !candidates.isEmpty(),
-        "Failed to find servers for segment: %s", segment);
+          "Failed to find servers for segment: %s", segment);
 
       for (SegmentInstanceCandidate candidate : candidates) {
         if (selectedInstance.equals(candidate.getInstance())) {
@@ -261,21 +261,15 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     return Pair.of(segmentsToInstanceMap, optionalSegmentToInstanceMap);
   }
 
-
   @VisibleForTesting
   protected InstancePartitions getInstancePartitions() {
-    // TODO: Evaluate whether we need to provide support for COMPLETE partitions.
+    // TODO: Evaluate whether we need to provide support for COMPLETED partitions.
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(_tableNameWithType);
     Preconditions.checkNotNull(tableType);
-    InstancePartitions instancePartitions;
-    if (tableType.equals(TableType.OFFLINE)) {
-      instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-          InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType, tableType.name()));
-    } else {
-      instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
-          InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType,
-              InstancePartitionsType.CONSUMING.name()));
-    }
+    InstancePartitionsType instancePartitionsType =
+        tableType == TableType.OFFLINE ? InstancePartitionsType.OFFLINE : InstancePartitionsType.CONSUMING;
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+        InstancePartitionsUtils.getInstancePartitionsName(_tableNameWithType, instancePartitionsType));
     Preconditions.checkNotNull(instancePartitions);
     return instancePartitions;
   }

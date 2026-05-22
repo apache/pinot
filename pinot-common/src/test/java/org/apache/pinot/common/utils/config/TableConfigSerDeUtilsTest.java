@@ -48,6 +48,7 @@ import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -146,7 +147,9 @@ public class TableConfigSerDeUtilsTest {
     {
       // With SegmentAssignmentStrategyConfig
       ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig("memberId", 5);
-      TableConfig tableConfig = tableConfigBuilder.setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
+      TableConfig tableConfig = tableConfigBuilder.setSegmentAssignmentConfigMap(
+              Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(),
+                  new SegmentAssignmentConfig("ReplicaGroupSegmentAssignmentStrategy")))
           .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
           .build();
 
@@ -439,7 +442,12 @@ public class TableConfigSerDeUtilsTest {
 
   private void checkSegmentAssignmentStrategyConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    assertEquals(validationConfig.getSegmentAssignmentStrategy(), "ReplicaGroupSegmentAssignmentStrategy");
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    assertNotNull(segmentAssignmentConfigMap);
+    SegmentAssignmentConfig segmentAssignmentConfig =
+        segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
+    assertNotNull(segmentAssignmentConfig);
+    assertEquals(segmentAssignmentConfig.getAssignmentStrategy(), "ReplicaGroupSegmentAssignmentStrategy");
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = validationConfig.getReplicaGroupStrategyConfig();
     assertNotNull(replicaGroupStrategyConfig);
     assertEquals(replicaGroupStrategyConfig.getPartitionColumn(), "memberId");

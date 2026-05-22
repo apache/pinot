@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -55,7 +56,6 @@ public class UpsertUtils {
     return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
-
 
   public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
@@ -132,7 +132,6 @@ public class UpsertUtils {
       MutableRoaringBitmap validDocIds) {
     return new Iterator<>() {
       private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
-
       @Override
       public boolean hasNext() {
         return _docIdIterator.hasNext();
@@ -161,6 +160,46 @@ public class UpsertUtils {
       @Override
       public PrimaryKey next() {
         return primaryKeyReader.getPrimaryKey(_docId++);
+      }
+    };
+  }
+
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      MutableRoaringBitmap validDocIds) {
+
+    return new Iterator<>() {
+      private final PeekableIntIterator _docIdIterator = validDocIds.getIntIterator();
+
+      @Override
+      public boolean hasNext() {
+        return _docIdIterator.hasNext();
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docIdIterator.next();
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
+      }
+    };
+  }
+
+  /**
+   * Returns an iterator of docId and {@link PrimaryKey} for all the documents from the segment.
+   */
+  public static Iterator<Map.Entry<Integer, PrimaryKey>> getRecordIterator(PrimaryKeyReader primaryKeyReader,
+      int numDocs) {
+    return new Iterator<>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numDocs;
+      }
+
+      @Override
+      public Map.Entry<Integer, PrimaryKey> next() {
+        int docId = _docId++;
+        return Map.entry(docId, primaryKeyReader.getPrimaryKey(docId));
       }
     };
   }

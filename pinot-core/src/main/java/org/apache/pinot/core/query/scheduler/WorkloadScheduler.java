@@ -59,7 +59,7 @@ public class WorkloadScheduler extends QueryScheduler {
     super(config, instanceId, queryExecutor, threadAccountant, latestQueryTime, new UnboundedResourceManager(config));
     _workloadBudgetManager = WorkloadBudgetManagerFactory.get();
     _secondaryWorkloadName =
-        config.getProperty(Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME, Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
+        config.getProperty(Accounting.Keys.SECONDARY_WORKLOAD_NAME, Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
   }
 
   @Override

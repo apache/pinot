@@ -40,9 +40,9 @@ public class WindowFunctionFactory {
 
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
       Map.copyOf(new HashMap<>() {{
-        putAll(RankBasedWindowFunction.WINDOW_FUNCTION_MAP);
-        putAll(ValueWindowFunction.WINDOW_FUNCTION_MAP);
-      }});
+          putAll(RankBasedWindowFunction.WINDOW_FUNCTION_MAP);
+          putAll(ValueWindowFunction.WINDOW_FUNCTION_MAP);
+        }});
 
   public static WindowFunction constructWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, WindowFrame windowFrame) {

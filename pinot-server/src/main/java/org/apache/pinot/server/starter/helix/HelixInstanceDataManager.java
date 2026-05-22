@@ -48,6 +48,7 @@ import org.apache.pinot.common.config.provider.LogicalTableMetadataCache;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.LogicalTableContext;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
@@ -56,23 +57,21 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
-import org.apache.pinot.core.data.manager.realtime.UpsertInconsistentStateConfig;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
-import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.utils.ConsumingSegmentConsistencyModeListener;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -104,6 +103,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private HelixManager _helixManager;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
+  private BooleanSupplier _isServerReadyToConsumeData = () -> false;
   private BooleanSupplier _isServerReadyToServeQueries = () -> false;
 
   // Fixed size LRU cache for storing last N errors on the instance.
@@ -120,6 +120,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Nullable
   private ExecutorService _segmentPreloadExecutor;
+
+  @Override
+  public void setSupplierOfIsServerReadyToConsumeData(BooleanSupplier isServerReadyToConsumeData) {
+    _isServerReadyToConsumeData = isServerReadyToConsumeData;
+  }
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(BooleanSupplier isServingQueries) {
@@ -341,8 +346,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, schema, _segmentReloadSemaphore,
-            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToServeQueries,
-            _enableAsyncSegmentRefresh, _reloadJobStatusCache);
+            _segmentReloadRefreshExecutor, _segmentPreloadExecutor, _errorCache, _isServerReadyToConsumeData,
+            _isServerReadyToServeQueries, _enableAsyncSegmentRefresh, _reloadJobStatusCache);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -382,38 +387,23 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void deleteSegment(String tableNameWithType, String segmentName)
       throws Exception {
     LOGGER.info("Deleting segment: {} from table: {}", segmentName, tableNameWithType);
-    // Segment deletion is handled at instance level because table data manager might not exist. Acquire the lock here.
+    // Hold the per-segment lock around the TDM lookup so the lookup + delete is atomic vs. removeTableDataManager
+    // shutting the TDM down concurrently. The TDM's own deleteSegment re-acquires the same lock (ReentrantLock).
     Lock segmentLock = _segmentLocks.getLock(tableNameWithType, segmentName);
     segmentLock.lock();
     try {
-      // Check if the segment is still loaded, if so, offload it first.
-      // This might happen when the server disconnected from ZK and reconnected, and the segment is still loaded.
-      // TODO: Consider using table data manager to delete the segment. This will allow the table data manager to clean
-      //       up the segment data on all tiers. Note that table data manager might have not been created, and table
-      //       config might have been deleted at this point.
       TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-      if (tableDataManager != null && tableDataManager.hasSegment(segmentName)) {
-        LOGGER.warn("Segment: {} from table: {} is still loaded, offloading it first", segmentName, tableNameWithType);
-        tableDataManager.offloadSegment(segmentName);
+      if (tableDataManager != null) {
+        // The TDM owns the offload-if-loaded prelude, the on-disk dir delete, and the tier-aware
+        // segment-directory-loader cleanup.
+        tableDataManager.deleteSegment(segmentName);
+      } else {
+        // Fallback: TDM can be null if it was never instantiated, or has already been removed via deleteTable.
+        // In that case, do a path-only cleanup keyed by segment name.
+        String tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType;
+        BaseTableDataManager.deleteSegmentFilesFromDisk(tableDataDir, segmentName, _instanceDataManagerConfig);
+        LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
       }
-      // Clean up the segment data on default tier unconditionally.
-      File segmentDir = getSegmentDataDirectory(tableNameWithType, segmentName);
-      if (segmentDir.exists()) {
-        FileUtils.deleteQuietly(segmentDir);
-        LOGGER.info("Deleted segment directory {} on default tier", segmentDir);
-      }
-      // We might clean up further more with the specific segment loader. But note that table data manager might have
-      // not been created, and table config might have been deleted at this point.
-      SegmentDirectoryLoader segmentLoader = SegmentDirectoryLoaderRegistry.getSegmentDirectoryLoader(
-          _instanceDataManagerConfig.getSegmentDirectoryLoader());
-      if (segmentLoader != null) {
-        LOGGER.info("Deleting segment: {} further with segment loader: {}", segmentName,
-            _instanceDataManagerConfig.getSegmentDirectoryLoader());
-        SegmentDirectoryLoaderContext ctx = new SegmentDirectoryLoaderContext.Builder().setSegmentName(segmentName)
-            .setTableDataDir(_instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType).build();
-        segmentLoader.delete(ctx);
-      }
-      LOGGER.info("Deleted segment: {} from table: {}", segmentName, tableNameWithType);
     } finally {
       segmentLock.unlock();
     }
@@ -549,26 +539,28 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         tableNameWithType, segmentNames));
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
+      // Use cached table config for performance - properties we check (replication, upsert mode)
+      // rarely change after table creation, and cache is refreshed on reload
+      TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
+      boolean isTableTypeInconsistentDuringConsumption =
+          TableConfigUtils.isTableTypeInconsistentDuringConsumption(tableConfig);
+      ConsumingSegmentConsistencyModeListener config = ConsumingSegmentConsistencyModeListener.getInstance();
+
+      // Only restrict force commit for tables with inconsistent state configs
+      // (partial upsert or dropOutOfOrderRecord=true with replication > 1)
+      // when mode is DEFAULT (isForceCommitAllowed = false)
+      if (isTableTypeInconsistentDuringConsumption && !config.isForceCommitAllowed()) {
+        LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "
+            + "Change the config to `PROTECTED` via cluster config: {}", tableNameWithType, config.getConfigKey());
+        return;
+      }
+
       segmentNames.forEach(segName -> {
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager != null) {
           try {
             if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              // Force-committing consuming segments is enabled by default.
-              // For partial-upsert tables or upserts with out-of-order events enabled (notably when replication > 1),
-              // winner selection could incorrectly favor replicas with fewer consumed rows.
-              // This triggered unnecessary reconsumption and resulted in inconsistent upsert state.
-              // The fix restores correct segment metadata before winner selection.
-              // Force commit behavior can be toggled dynamically using the cluster config
-              // `pinot.server.upsert.force.commit.reload` without restarting servers.
-              TableConfig tableConfig = tableDataManager.getCachedTableConfigAndSchema().getLeft();
-              UpsertInconsistentStateConfig config = UpsertInconsistentStateConfig.getInstance();
-              if (config.isForceCommitReloadAllowed(tableConfig)) {
-                ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-              } else {
-                LOGGER.warn("Force commit disabled for table: {} due to inconsistent state config. "
-                    + "Control via cluster config: {}", tableNameWithType, config.getConfigKey());
-              }
+              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);

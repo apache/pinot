@@ -20,7 +20,6 @@ package org.apache.pinot.core.minion;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,10 +79,11 @@ public class SegmentPurgerTest {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(D1)).setCreateInvertedIndexDuringSegmentGeneration(true)
+        .setInvertedIndexColumns(List.of(D1))
         .build();
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(D2, FieldSpec.DataType.INT).build();
+        .addSingleValueDimension(D2, FieldSpec.DataType.INT)
+        .build();
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -102,11 +102,12 @@ public class SegmentPurgerTest {
     GenericRowRecordReader genericRowRecordReader = new GenericRowRecordReader(rows);
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
+    config.setInstanceType(InstanceType.MINION);
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, genericRowRecordReader, InstanceType.MINION);
+    driver.init(config, genericRowRecordReader);
     driver.build();
     _originalIndexDir = new File(ORIGINAL_SEGMENT_DIR, SEGMENT_NAME);
   }

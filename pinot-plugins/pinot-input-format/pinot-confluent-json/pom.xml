@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>1.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-confluent-json</artifactId>
@@ -82,6 +82,11 @@
       <artifactId>protobuf-java</artifactId>
       <scope>test</scope>
     </dependency>
+    <!--
+      VERSION OVERRIDE EXCEPTION: Confluent's kafka-json-schema-serializer transitively depends on
+      Scala 2.13, so this test dependency stays pinned to ${scala-2.13.version} even when Pinot is
+      built with -Pscala-2.12.
+    -->
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>

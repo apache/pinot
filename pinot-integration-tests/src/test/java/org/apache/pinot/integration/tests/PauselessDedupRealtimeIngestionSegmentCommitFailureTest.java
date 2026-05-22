@@ -124,7 +124,7 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
     tableConfig2.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig2.getValidationConfig().setRetentionTimeValue("100000");
     addTableConfig(tableConfig2);
-    waitForDocsLoaded(600_000L, true, tableConfig2.getTableName());
+    waitForAllDocsLoaded(tableConfig2.getTableName(), 600_000L);
 
     // create schema for pauseless table
     schema.setSchemaName(getPauselessTableName());

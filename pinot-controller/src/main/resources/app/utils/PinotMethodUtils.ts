@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import jwtDecode from "jwt-decode";
+import jwtDecode from 'jwt-decode';
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
 import {
   DataTable,
@@ -43,6 +43,7 @@ import {
   dropInstance,
   getPeriodicTaskNames,
   runPeriodicTask,
+  runPeriodicTaskWithErrors,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -59,6 +60,13 @@ import {
   getTasks,
   getTaskDebug,
   getTaskGeneratorDebug,
+  getTasksSummary,
+  getTaskCounts,
+  getTaskStates,
+  getCronSchedulerInformation,
+  deleteSingleTask,
+  getInstanceLogFiles,
+  downloadInstanceLogFile,
   updateInstanceTags,
   getClusterConfig,
   getQueryTables,
@@ -118,13 +126,17 @@ import {
   resumeConsumption,
   getPauseStatus,
   getVersions,
-  getLogicalTables
+  getLogicalTables,
+  getLogicalTable,
+  putLogicalTable,
+  deleteLogicalTable
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
-import { matchPath } from 'react-router';
+import { matchPath } from 'react-router-dom';
 import RouterData from '../router';
-const JSONbig = require('json-bigint')({'storeAsString': true})
+import JSONbigBase from 'json-bigint';
+const JSONbig = JSONbigBase({ storeAsString: true });
 
 // This method is used to display tenants listing on cluster manager home page
 // API: /tenants
@@ -1371,6 +1383,86 @@ const getScheduleJobDetail = (tableName, taskType)=>{
   })
 };
 
+// Returns a TaskSummaryResponse covering all task types across all tenants.
+// Shape: { tasks: { tenant: { taskType: TaskCount } } } depending on backend version.
+const getTasksSummaryData = (tenant?: string) => {
+  return getTasksSummary(tenant).then(response => response.data);
+};
+
+// Returns a map from task name to TaskCount {total, running, waiting, error, completed, ...}
+const getTaskCountsData = (taskType: string) => {
+  return getTaskCounts(taskType).then(response => response.data);
+};
+
+// Returns a map from task name to TaskState (NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED, ABORTED, ...).
+const getTaskStatesData = (taskType: string) => {
+  return getTaskStates(taskType).then(response => response.data);
+};
+
+// Returns null only when the controller has the scheduler disabled (404 or
+// "Task scheduler is disabled" 500). Other errors propagate so the caller can
+// distinguish "scheduler off" from "controller unreachable" / "auth failed".
+const getCronSchedulerInformationData = () => {
+  return getCronSchedulerInformation()
+    .then(response => response.data)
+    .catch((err) => {
+      const status = get(err, 'response.status');
+      const message = String(get(err, 'response.data.error') || get(err, 'response.data.message') || '');
+      if (status === 404 || (status === 500 && /scheduler is disabled/i.test(message))) {
+        return null;
+      }
+      throw err;
+    });
+};
+
+const deleteSingleTaskOp = (taskName: string, forceDelete = false) => {
+  return deleteSingleTask(taskName, forceDelete).then(response => response.data);
+};
+
+const runPeriodicTaskAction = (taskName: string, tableName?: string, tableType?: string) => {
+  return runPeriodicTaskWithErrors(taskName, tableName || undefined, tableType || undefined).then(response => response.data);
+};
+
+const getInstanceLogFilesData = (instanceName: string): Promise<string[]> => {
+  return getInstanceLogFiles(instanceName).then(response => {
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data as string[];
+    }
+    // Anything that isn't a JSON array is treated as a backend error. Returning
+    // [] here silently would render "No log files reported by minion." on the UI,
+    // which masks proxy misconfiguration or controller errors. Surface it instead.
+    const embeddedError = (data && typeof data === 'object' && 'error' in (data as Record<string, unknown>))
+      ? String((data as Record<string, unknown>).error)
+      : null;
+    throw new Error(embeddedError || 'Unexpected log-file response shape');
+  });
+};
+
+// Fetches the requested minion log file as a Blob through the authenticated axios
+// client and triggers a browser download via a temporary anchor + createObjectURL.
+// This avoids the auth header gap that a plain `<a href>` open would have hit on
+// the controller's `/loggers/instances/{name}/download` endpoint.
+const downloadInstanceLogFileToBrowser = async (instanceName: string, filePath: string): Promise<void> => {
+  const response = await downloadInstanceLogFile(instanceName, filePath);
+  const blob: Blob = response.data instanceof Blob ? response.data : new Blob([response.data]);
+  const objectUrl = window.URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    // Last path component for filename; controller serves the whole file path so
+    // we slash-strip locally for a sane saved name.
+    const nameParts = filePath.split('/');
+    a.download = nameParts[nameParts.length - 1] || 'minion.log';
+    document.body.appendChild(a);
+    a.click();
+    a.parentNode?.removeChild(a);
+  } finally {
+    // Defer revoke to next tick so the browser has time to start the download.
+    setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
+  }
+};
+
 const getUserList = ()=>{
   return requestUserList().then(response=>{
     return response.data;
@@ -1458,6 +1550,33 @@ const getPackageVersionsData = () => {
   });
 };
 
+const getLogicalTablesData = async (columnHeader: string) => {
+  const { data } = await getLogicalTables();
+  return {
+    columns: [columnHeader],
+    records: data.map((name) => [name])
+  };
+};
+
+const getLogicalTablesList = async () => {
+  return getLogicalTablesData('Logical Table Name');
+};
+
+const getLogicalTableConfig = async (tableName: string) => {
+  const { data } = await getLogicalTable(tableName);
+  return data;
+};
+
+const updateLogicalTableConfig = async (tableName: string, config: string) => {
+  const { data } = await putLogicalTable(tableName, config);
+  return data;
+};
+
+const deleteLogicalTableOp = async (tableName: string) => {
+  const { data } = await deleteLogicalTable(tableName);
+  return data;
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1513,6 +1632,14 @@ export default {
   scheduleTaskAction,
   executeTaskAction,
   getScheduleJobDetail,
+  getTasksSummaryData,
+  getTaskCountsData,
+  getTaskStatesData,
+  getCronSchedulerInformationData,
+  deleteSingleTaskOp,
+  runPeriodicTaskAction,
+  getInstanceLogFilesData,
+  downloadInstanceLogFileToBrowser,
   getMinionMetaData,
   getElapsedTime,
   getTasksList,
@@ -1558,7 +1685,11 @@ export default {
   getPauseStatusData,
   fetchServerToSegmentsCountData,
   getConsumingSegmentsInfoData,
-  getPackageVersionsData
+  getPackageVersionsData,
+  getLogicalTablesList,
+  getLogicalTableConfig,
+  updateLogicalTableConfig,
+  deleteLogicalTableOp
 };
 
 // Named exports for shared constants and utilities

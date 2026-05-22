@@ -46,6 +46,13 @@
     <module name="AnnotationUseStyle">
       <property name="elementStyle" value="ignore"/>
     </module>
+    <!-- Method annotations belong on their own line before modifiers -->
+    <module name="AnnotationLocation">
+      <property name="tokens" value="METHOD_DEF"/>
+      <property name="allowSamelineSingleParameterlessAnnotation" value="false"/>
+      <property name="allowSamelineParameterizedAnnotation" value="false"/>
+      <property name="allowSamelineMultipleAnnotations" value="false"/>
+    </module>
     <!-- Ensure @Override is present when {@inheritDoc} Javadoc tag is present -->
     <module name="MissingOverride"/>
     <!-- Package level annotations belong in package-info.java -->
@@ -140,7 +147,6 @@
                 org.apache.pinot.controller.recommender.rules.io.params.RecommenderConstants.RulesToExecute.*,
                 org.apache.pinot.controller.recommender.rules.utils.PredicateParseResult.*,
                 org.apache.pinot.client.utils.Constants.*,
-                org.apache.pinot.common.utils.PinotDataType.*,
                 org.apache.pinot.segment.local.startree.StarTreeBuilderUtils.*,
                 org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.*,
                 org.apache.pinot.segment.local.utils.GeometryType.*,
@@ -165,6 +171,7 @@
                 org.apache.pinot.spi.utils.CommonConstants.Server.*,
                 org.apache.pinot.spi.utils.CommonConstants.Server.SegmentCompletionProtocol.*,
                 org.apache.pinot.spi.utils.EqualityUtils.*,
+                org.apache.pinot.spi.utils.PinotDataType.*,
                 org.apache.pinot.tools.Quickstart.*"/>
     </module>
     <!-- Do not import 'sun' packages -->
@@ -181,6 +188,10 @@
     <!-- Disallow importing com.google.common.collect.ImmutableList (use java.util.List instead) -->
     <module name="IllegalImport">
       <property name="illegalClasses" value="com.google.common.collect.ImmutableList"/>
+    </module>
+    <!-- Disallow importing Guava Files (use java.nio.file.Files instead) -->
+    <module name="IllegalImport">
+      <property name="illegalClasses" value="com.google.common.io.Files"/>
     </module>
     <!-- Use org.testng.Assert in tests -->
     <module name="IllegalImport">
@@ -241,6 +252,14 @@
 
     <!-- WHITESPACE -->
 
+    <module name="Indentation">
+      <property name="basicOffset" value="2"/>
+      <property name="braceAdjustment" value="0"/>
+      <property name="caseIndent" value="2"/>
+      <property name="throwsIndent" value="4"/>
+      <property name="lineWrappingIndentation" value="4"/>
+      <property name="arrayInitIndent" value="2"/>
+    </module>
     <module name="GenericWhitespace"/>
     <module name="MethodParamPad"/>
     <module name="NoWhitespaceAfter">
@@ -322,5 +341,20 @@
   <module name="RegexpMultiline">
     <property name="format" value="\n\n\s*\}" />
     <property name="message" value="Blank line before closing brace" />
+  </module>
+
+  <!-- Deprecated API guards: prevent reintroduction of deprecated APIs that have been cleaned up.
+       Suppress false positives with CHECKSTYLE:OFF/ON comments (e.g. StringUtils.remove(str, char) is not deprecated). -->
+  <module name="RegexpSingleline">
+    <property name="format" value="RandomStringUtils\.random[A-Z(]"/>
+    <property name="message" value="RandomStringUtils.random*() is deprecated. Use RandomStringUtils.secure().next*() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="StringUtils\.compare\("/>
+    <property name="message" value="StringUtils.compare() is deprecated. Use Strings.CS.compare() instead."/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="StringUtils\.replace\("/>
+    <property name="message" value="StringUtils.replace() is deprecated. Use Strings.CS.replace() instead."/>
   </module>
 </module>

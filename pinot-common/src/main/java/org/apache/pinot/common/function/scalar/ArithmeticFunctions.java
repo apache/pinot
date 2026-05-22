@@ -74,55 +74,6 @@ public class ArithmeticFunctions {
     return Double.isNaN(value) ? 1 : 0;
   }
 
-  @ScalarFunction
-  public static double mod(double a, double b) {
-    return a % b;
-  }
-
-  @ScalarFunction
-  public static double moduloOrZero(double a, double b) {
-    //Same as mod but returns zero when dividing by zero or when dividing a minimal negative number by minus one.
-    return (b == 0 || (a == Long.MIN_VALUE && b == -1)) ? 0 : mod(a, b);
-  }
-
-  @ScalarFunction
-  public static double positiveModulo(double a, double b) {
-    double result = a % b;
-    return result >= 0 ? result : result + Math.abs(b);
-  }
-
-  @ScalarFunction
-  public static double negate(double a) {
-    return -a;
-  }
-
-  @ScalarFunction
-  public static double least(double a, double b) {
-    return Double.min(a, b);
-  }
-
-  @ScalarFunction
-  public static double greatest(double a, double b) {
-    return Double.max(a, b);
-  }
-
-  @Deprecated
-  @ScalarFunction
-  public static double min(double a, double b) {
-    return least(a, b);
-  }
-
-  @Deprecated
-  @ScalarFunction
-  public static double max(double a, double b) {
-    return greatest(a, b);
-  }
-
-  @ScalarFunction
-  public static double abs(double a) {
-    return Math.abs(a);
-  }
-
   @ScalarFunction(names = {"ceil", "ceiling"})
   public static double ceil(double a) {
     return Math.ceil(a);
@@ -259,5 +210,114 @@ public class ArithmeticFunctions {
   public static long byteswapLong(long a) {
     // Skip the heading 0s in the long value
     return Long.reverseBytes(a);
+  }
+
+  /** Returns the cube root of the given value. */
+  @ScalarFunction
+  public static double cbrt(double a) {
+    return Math.cbrt(a);
+  }
+
+  /** Returns 2 raised to the power of the given value. */
+  @ScalarFunction
+  public static double exp2(double a) {
+    return Math.pow(2, a);
+  }
+
+  /** Returns 10 raised to the power of the given value. */
+  @ScalarFunction
+  public static double exp10(double a) {
+    return Math.pow(10, a);
+  }
+
+  /** Returns log(1 + x), computed in a way that is accurate even when x is close to zero. */
+  @ScalarFunction
+  public static double log1p(double a) {
+    return Math.log1p(a);
+  }
+
+  /** Returns the sigmoid (logistic) function: 1 / (1 + e^(-x)). */
+  @ScalarFunction
+  public static double sigmoid(double a) {
+    return 1.0 / (1.0 + Math.exp(-a));
+  }
+
+  /** Returns the mathematical constant pi (π). */
+  @ScalarFunction
+  public static double pi() {
+    return Math.PI;
+  }
+
+  /** Returns Euler's number (e), the base of the natural logarithm. */
+  @ScalarFunction(names = {"e", "euler"})
+  public static double e() {
+    return Math.E;
+  }
+
+  /** Returns the number of set bits (popcount) in the binary representation of the given long value. */
+  @ScalarFunction
+  public static int bitCount(long a) {
+    return Long.bitCount(a);
+  }
+
+  // Precomputed factorials for 0! through 20! (21! overflows long).
+  private static final long[] FACTORIALS = new long[21];
+
+  static {
+    FACTORIALS[0] = 1;
+    for (int i = 1; i < FACTORIALS.length; i++) {
+      FACTORIALS[i] = FACTORIALS[i - 1] * i;
+    }
+  }
+
+  /**
+   * Returns the factorial of the given non-negative integer.
+   *
+   * @param n non-negative integer (0 to 20)
+   * @return n! as a long
+   * @throws IllegalArgumentException if n is negative or greater than 20
+   */
+  @ScalarFunction
+  public static long factorial(long n) {
+    if (n < 0 || n > 20) {
+      throw new IllegalArgumentException("factorial argument must be between 0 and 20, got " + n);
+    }
+    return FACTORIALS[(int) n];
+  }
+
+  /**
+   * Returns the bucket number for a value in a histogram with the given bounds and number of buckets.
+   *
+   * <p>SQL standard semantics: returns 0 if value < lo, numBuckets + 1 if value >= hi,
+   * otherwise a bucket in the range [1, numBuckets].
+   *
+   * @param value the value to bucket
+   * @param lo lower bound of the histogram (inclusive)
+   * @param hi upper bound of the histogram (exclusive)
+   * @param numBuckets number of equal-width buckets
+   * @return bucket number (0 to numBuckets + 1)
+   * @throws IllegalArgumentException if lo >= hi or numBuckets <= 0
+   */
+  @ScalarFunction(names = {"widthBucket", "width_bucket"})
+  public static int widthBucket(double value, double lo, double hi, int numBuckets) {
+    if (Double.isNaN(value) || Double.isNaN(lo) || Double.isNaN(hi)) {
+      throw new IllegalArgumentException("widthBucket does not accept NaN values");
+    }
+    if (Double.isInfinite(lo) || Double.isInfinite(hi)) {
+      throw new IllegalArgumentException("widthBucket bounds must be finite");
+    }
+    if (lo >= hi) {
+      throw new IllegalArgumentException("lo must be less than hi: lo=" + lo + ", hi=" + hi);
+    }
+    if (numBuckets <= 0) {
+      throw new IllegalArgumentException("numBuckets must be positive, got " + numBuckets);
+    }
+    if (value < lo) {
+      return 0;
+    }
+    if (value >= hi) {
+      return numBuckets + 1;
+    }
+    return (int) ((value - lo) / (hi - lo) * numBuckets) + 1;
   }
 }

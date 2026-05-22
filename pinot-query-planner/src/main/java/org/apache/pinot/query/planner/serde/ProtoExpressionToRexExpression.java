@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.proto.Expressions;
@@ -125,6 +126,15 @@ public class ProtoExpressionToRexExpression {
         }
         return new RexExpression.Literal(dataType, values);
       }
+      case BIG_DECIMAL_ARRAY: {
+        Expressions.BytesArray bytesArray = literal.getBytesArray();
+        int numValues = bytesArray.getValuesCount();
+        BigDecimal[] values = new BigDecimal[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = BigDecimalUtils.deserialize(bytesArray.getValues(i).toByteArray());
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
       case STRING_ARRAY: {
         Expressions.StringArray stringArray = literal.getStringArray();
         int numValues = stringArray.getValuesCount();
@@ -133,6 +143,15 @@ public class ProtoExpressionToRexExpression {
           for (int i = 0; i < numValues; i++) {
             values[i] = stringArray.getValues(i);
           }
+        }
+        return new RexExpression.Literal(dataType, values);
+      }
+      case BYTES_ARRAY: {
+        Expressions.BytesArray bytesArray = literal.getBytesArray();
+        int numValues = bytesArray.getValuesCount();
+        ByteArray[] values = new ByteArray[numValues];
+        for (int i = 0; i < numValues; i++) {
+          values[i] = new ByteArray(bytesArray.getValues(i).toByteArray());
         }
         return new RexExpression.Literal(dataType, values);
       }
@@ -171,6 +190,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.FLOAT_ARRAY;
       case DOUBLE_ARRAY:
         return ColumnDataType.DOUBLE_ARRAY;
+      case BIG_DECIMAL_ARRAY:
+        return ColumnDataType.BIG_DECIMAL_ARRAY;
       case BOOLEAN_ARRAY:
         return ColumnDataType.BOOLEAN_ARRAY;
       case TIMESTAMP_ARRAY:

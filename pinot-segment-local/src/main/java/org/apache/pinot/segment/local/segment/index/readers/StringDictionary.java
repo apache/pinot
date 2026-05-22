@@ -91,6 +91,11 @@ public class StringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int getValueSize(int dictId) {
+    return getUnpaddedByteSize(dictId);
+  }
+
+  @Override
   public void readIntValues(int[] dictIds, int length, int[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {

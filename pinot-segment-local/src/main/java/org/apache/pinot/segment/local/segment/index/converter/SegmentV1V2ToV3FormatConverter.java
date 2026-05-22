@@ -173,7 +173,6 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     copyLuceneTextIndexIfExists(v2Directory, v3Directory);
     copyVectorIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
-    copyNativeTextIndexIfExists(v2Directory, v3Directory);
   }
 
   private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
@@ -263,15 +262,18 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyVectorIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
-    // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
-    File[] vectorIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+    // Copy HNSW index directories (Lucene-based, stored as directories)
+    String hnswSuffix = V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION;
+    File[] hnswIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
-        return name.endsWith(suffix);
+        return name.endsWith(hnswSuffix);
       }
     });
-    for (File vectorIndexFile : vectorIndexFiles) {
+    if (hnswIndexFiles == null) {
+      hnswIndexFiles = new File[0];
+    }
+    for (File vectorIndexFile : hnswIndexFiles) {
       File[] indexFiles = vectorIndexFile.listFiles();
       File v3VectorIndexDir = new File(v3Dir, vectorIndexFile.getName());
       v3VectorIndexDir.mkdir();
@@ -280,14 +282,22 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         Files.copy(indexFile.toPath(), v3VectorIndexFile.toPath());
       }
     }
-  }
 
-  private void copyNativeTextIndexIfExists(File segmentDirectory, File v3Dir) throws IOException {
-    String suffix = V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
-    File[] textIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(suffix));
-    for (File textIndexFile : textIndexFiles) {
-      File v3TextIndexFile = new File(v3Dir, textIndexFile.getName());
-      Files.copy(textIndexFile.toPath(), v3TextIndexFile.toPath());
+    // Copy IVF_FLAT index files (single flat files, not directories)
+    String ivfFlatSuffix = V1Constants.Indexes.VECTOR_IVF_FLAT_INDEX_FILE_EXTENSION;
+    File[] ivfFlatIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfFlatSuffix));
+    if (ivfFlatIndexFiles != null) {
+      for (File ivfFlatFile : ivfFlatIndexFiles) {
+        Files.copy(ivfFlatFile.toPath(), new File(v3Dir, ivfFlatFile.getName()).toPath());
+      }
+    }
+
+    String ivfPqSuffix = V1Constants.Indexes.VECTOR_IVF_PQ_INDEX_FILE_EXTENSION;
+    File[] ivfPqIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(ivfPqSuffix));
+    if (ivfPqIndexFiles != null) {
+      for (File ivfPqFile : ivfPqIndexFiles) {
+        Files.copy(ivfPqFile.toPath(), new File(v3Dir, ivfPqFile.getName()).toPath());
+      }
     }
   }
 

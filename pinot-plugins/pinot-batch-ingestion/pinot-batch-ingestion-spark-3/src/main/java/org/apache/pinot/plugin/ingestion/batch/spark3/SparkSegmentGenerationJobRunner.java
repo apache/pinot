@@ -366,7 +366,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
       return;
     }
 
-    ArrayList<File> validPluginDirectories = new ArrayList();
+    ArrayList<File> validPluginDirectories = new ArrayList<>();
 
     for (String pluginsDirPath : pluginDirectories) {
       File pluginsDir = new File(pluginsDirPath);

@@ -59,7 +59,7 @@ public interface ResponseStore {
    * @throws Exception Thrown if an error occurs when checking if the response exists.
    */
   boolean exists(String requestId)
-    throws Exception;
+      throws Exception;
 
   /**
    * Get all request ids of responses in the ResponseStore.
@@ -78,5 +78,16 @@ public interface ResponseStore {
    * @throws Exception Exception is thrown if response cannot be deleted by response store.
    */
   boolean deleteResponse(String requestId)
+      throws Exception;
+
+  /**
+   * Delete all responses that have expired before the given timestamp. Implementations should iterate through stored
+   * responses and delete those whose expiration time is at or before {@code expiredBeforeMs}.
+   *
+   * @param expiredBeforeMs Epoch milliseconds cutoff; responses with expirationTimeMs &lt;= this value are deleted.
+   * @return The number of responses successfully deleted.
+   * @throws Exception Thrown if an unrecoverable error occurs during cleanup.
+   */
+  int deleteExpiredResponses(long expiredBeforeMs)
       throws Exception;
 }

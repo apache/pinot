@@ -185,6 +185,115 @@ public class DistinctCountAggregationFunctionTest extends AbstractAggregationFun
   }
 
   @Test
+  public void distinctCountBigDecimal() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.BIG_DECIMAL),
+            SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            "myField",
+            "1.5",
+            "2.5"
+        )
+        .andOnSecondInstance(
+            "myField",
+            "2.5",
+            "3.5"
+        )
+        .whenQuery("select DISTINCT_COUNT(myField) from testTable")
+        .thenResultIs("INTEGER", "3");
+  }
+
+  @Test
+  public void distinctCountBigDecimalGroupBy() {
+    // Schema column order is alphabetical via TreeSet, so row values must be in {grp, value} order.
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .addSingleValueDimension("value", FieldSpec.DataType.BIG_DECIMAL)
+                .addSingleValueDimension("grp", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"a", "1.5"},
+            new Object[]{"a", "2.5"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"a", "2.5"},
+            new Object[]{"b", "3.5"}
+        )
+        .whenQuery("select grp, DISTINCT_COUNT(value) from testTable group by grp order by grp")
+        .thenResultIs("STRING | INTEGER",
+            "a | 2",
+            "b | 1"
+        );
+  }
+
+  @Test
+  public void distinctCountBigDecimalMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .addMultiValueDimension("mv", FieldSpec.DataType.BIG_DECIMAL)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"1.5;2.5"},
+            new Object[]{"2.5;3.5"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"3.5;4.5"}
+        )
+        .whenQuery("select DISTINCT_COUNT(mv) from testTable")
+        .thenResultIs("INTEGER", "4");
+  }
+
+  @Test
+  public void distinctCountBigDecimalMVGroupBySV() {
+    // Schema column order is alphabetical via TreeSet, so row values must be in {grp, mv} order.
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .addMultiValueDimension("mv", FieldSpec.DataType.BIG_DECIMAL)
+                .addSingleValueDimension("grp", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"a", "1.5;2.5"},
+            new Object[]{"a", "2.5;3.5"}
+        )
+        .andOnSecondInstance(
+            new Object[]{"b", "3.5;4.5"}
+        )
+        .whenQuery("select grp, DISTINCT_COUNT(mv) from testTable group by grp order by grp")
+        .thenResultIs("STRING | INTEGER",
+            "a | 3",
+            "b | 2"
+        );
+  }
+
+  @Test
+  public void distinctCountBigDecimalMVGroupByMV() {
+    // Schema column order is alphabetical via TreeSet, so row values must be in {grp, mv} order.
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .addMultiValueDimension("mv", FieldSpec.DataType.BIG_DECIMAL)
+                .addMultiValueDimension("grp", FieldSpec.DataType.STRING)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"a;b", "1.5;2.5"},
+            new Object[]{"b;c", "2.5;3.5"}
+        )
+        .whenQuery("select grp, DISTINCT_COUNT(mv) from testTable group by grp order by grp")
+        .thenResultIs("STRING | INTEGER",
+            "a | 2",
+            "b | 3",
+            "c | 2"
+        );
+  }
+
+  @Test
   public void distinctCountMVGroupByMVWithNulls() {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(

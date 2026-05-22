@@ -195,6 +195,13 @@ public interface TableDataManager {
       throws Exception;
 
   /**
+   * Deletes a segment from this table — offloads it if currently loaded, then removes its on-disk data (the per-segment
+   * directory and any tier-specific artefacts).
+   */
+  void deleteSegment(String segmentName)
+      throws Exception;
+
+  /**
    * Reloads an existing immutable segment for the table, which can be an OFFLINE or REALTIME table.
    * A new segment may be downloaded if the local one has a different CRC; or can be forced to download if
    * {@code forceDownload} flag is true.
@@ -333,10 +340,15 @@ public interface TableDataManager {
 
   /**
    * Returns the cached latest {@link TableConfig} and {@link Schema} pair for the table. The cache is refreshed when
-   * invoking {@link #fetchIndexLoadingConfig()}, and should not be modified. We cache them as a pair to ensure they are
-   * updated at once to avoid race conditions.
+   * invoking {@link #fetchIndexLoadingConfig()} or {@link #updateCachedTableConfigAndSchema(TableConfig, Schema)}, and
+   * should not be modified. We cache them as a pair to ensure they are updated at once to avoid race conditions.
    */
   Pair<TableConfig, Schema> getCachedTableConfigAndSchema();
+
+  /**
+   * Update the table config and schema for the table in cache.
+   */
+  void updateCachedTableConfigAndSchema(TableConfig config, Schema schema);
 
   /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
