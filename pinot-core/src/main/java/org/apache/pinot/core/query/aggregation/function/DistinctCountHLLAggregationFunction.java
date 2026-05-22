@@ -116,7 +116,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
     // BitSet gives O(1) insertion with no container-switching overhead (unlike RoaringBitmap), and uses
     // dictSize/8 bytes of memory (e.g. 128 KB for a 1M-entry dictionary).
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       BitSet bitSet = getDictIdBitSet(aggregationResultHolder, dictionary);
@@ -167,7 +167,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   protected void aggregateMV(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet,
       DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a BitSet for deduplication.
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       BitSet bitSet = getDictIdBitSet(aggregationResultHolder, dictionary);
@@ -266,7 +266,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
     // RoaringBitmap is used (not BitSet) because it is sparse: memory scales with the number of distinct dict IDs
     // seen per group, not with the full dictionary size. This avoids OOM when many groups each see few distinct values
     // (contrast with the non-group-by path, which uses a single BitSet across the entire dictionary).
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -315,7 +315,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   protected void aggregateMVGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
@@ -415,7 +415,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   protected void aggregateSVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       for (int i = 0; i < length; i++) {
@@ -467,7 +467,7 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   protected void aggregateMVGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       BlockValSet blockValSet, DataType storedType) {
     // For dictionary-encoded expression, collect dictionary ids into a RoaringBitmap (see aggregateSVGroupBySV).
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       for (int i = 0; i < length; i++) {
