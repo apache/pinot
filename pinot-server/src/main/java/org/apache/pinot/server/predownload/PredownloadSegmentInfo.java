@@ -176,12 +176,10 @@ public class PredownloadSegmentInfo {
     }
   }
 
-  /**
-   * Populates local CRC and size from the segment directory on disk, avoiding mmap of index files.
-   * Reads CRC from {@code creation.meta} (8 bytes) and computes size via directory traversal.
-   * Sets {@code _localCrc} to null and {@code _localSizeBytes} to 0 if the segment or its
-   * creation.meta does not exist.
-   */
+  /// Populates local CRC and size from the segment directory on disk, avoiding mmap of index files.
+  /// Reads CRC from `creation.meta` (8 bytes) and computes size via directory traversal.
+  /// Sets `_localCrc` to null and `_localSizeBytes` to 0 if the segment or its
+  /// creation.meta does not exist.
   public void updateSegmentInfoFromLocal(File segDir) {
     if (!segDir.isDirectory()) {
       LOGGER.warn("Segment path is not a directory: {}", segDir);
@@ -189,14 +187,20 @@ public class PredownloadSegmentInfo {
     }
     File creationMeta = SegmentDirectoryPaths.findCreationMetaFile(segDir);
     if (creationMeta == null || !creationMeta.exists()) {
+      LOGGER.warn("creation.meta not found for segment: {} of table: {}", _segmentName, _tableNameWithType);
       return;
     }
     try (DataInputStream ds = new DataInputStream(new FileInputStream(creationMeta))) {
+      // creation.meta layout: [8 bytes CRC] [8 bytes creation time]
       _localCrc = String.valueOf(ds.readLong());
     } catch (IOException e) {
       LOGGER.warn("Failed to read creation.meta for segment: {} of table: {}", _segmentName, _tableNameWithType, e);
       return;
     }
-    _localSizeBytes = FileUtils.sizeOfDirectory(segDir);
+    try {
+      _localSizeBytes = FileUtils.sizeOfDirectory(segDir);
+    } catch (IllegalArgumentException e) {
+      LOGGER.warn("Failed to compute size for segment: {} of table: {}", _segmentName, _tableNameWithType, e);
+    }
   }
 }

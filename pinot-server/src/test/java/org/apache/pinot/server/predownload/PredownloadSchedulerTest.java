@@ -220,7 +220,7 @@ public class PredownloadSchedulerTest {
   public void loadSegmentsFromLocal()
       throws Exception {
     // Only segment 3 will be loaded — create a real creation.meta with matching CRC
-    File seg3Dir = Files.createTempDirectory("predownload-seg3-predownload-seg3-").toFile();
+    File seg3Dir = Files.createTempDirectory("predownload-seg3-").toFile();
     File creationMeta = new File(seg3Dir, "creation.meta");
     try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(creationMeta))) {
       dos.writeLong(CRC);
@@ -234,11 +234,14 @@ public class PredownloadSchedulerTest {
     when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(0)))).thenReturn(false);
     when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(1)))).thenReturn(false);
 
-    _predownloadScheduler.loadSegmentsFromLocal();
-    FileUtils.deleteQuietly(seg3Dir);
-    assertEquals(_predownloadScheduler._failedSegments.size(), 1);
-    assertEquals(_predownloadScheduler._failedSegments.iterator().next(),
-        _predownloadSegmentInfoList.get(0).getSegmentName());
+    try {
+      _predownloadScheduler.loadSegmentsFromLocal();
+      assertEquals(_predownloadScheduler._failedSegments.size(), 1);
+      assertEquals(_predownloadScheduler._failedSegments.iterator().next(),
+          _predownloadSegmentInfoList.get(0).getSegmentName());
+    } finally {
+      FileUtils.deleteQuietly(seg3Dir);
+    }
   }
 
   public void downloadSegments()

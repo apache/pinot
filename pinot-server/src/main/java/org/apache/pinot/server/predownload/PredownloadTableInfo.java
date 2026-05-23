@@ -51,23 +51,18 @@ public class PredownloadTableInfo {
     return _instanceDataManagerConfig;
   }
 
-  /**
-   * Checks whether the segment already exists locally with a matching CRC, and if so populates
-   * its local size. Reads CRC directly from {@code creation.meta} and size from directory
-   * traversal — no mmap of index files is performed (segment loading).
-   *
-   * <p>Note: a CRC match does not guarantee segment integrity. If the local segment directory is
-   * corrupted (e.g. truncated index files), the server startup path handles recovery:
-   * {@link org.apache.pinot.core.data.manager.BaseTableDataManager#addNewOnlineSegment} calls
-   * {@link org.apache.pinot.core.data.manager.BaseTableDataManager#tryLoadExistingSegment}, which
-   * performs a full segment load. If loading fails, it falls back to
-   * {@link org.apache.pinot.core.data.manager.BaseTableDataManager#downloadAndLoadSegment} to
-   * re-fetch the segment from deep store or peers.
-   *
-   * @param predownloadSegmentInfo SegmentInfo of segment to be checked
-   * @return true if the segment is present with matching CRC (download can be skipped),
-   *         false if it is missing or has a CRC mismatch
-   */
+  /// Checks whether the segment already exists locally with a matching CRC, and if so populates
+  /// its local size. Reads CRC directly from `creation.meta` and size from directory
+  /// traversal — no mmap of index files is performed (segment loading).
+  ///
+  /// **Note:** a CRC match does not guarantee segment integrity. If the local segment directory is
+  /// corrupted (e.g. truncated index files), the server startup path handles recovery via
+  /// `BaseTableDataManager.addNewOnlineSegment` which performs a full segment load. If loading fails, it falls
+  /// back to `downloadAndLoadSegment` to re-fetch the segment from deep store or peers.
+  ///
+  /// @param predownloadSegmentInfo SegmentInfo of segment to be checked
+  /// @return true if the segment is present with matching CRC (download can be skipped),
+  ///         false if it is missing or has a CRC mismatch
   public boolean loadSegmentFromLocal(PredownloadSegmentInfo predownloadSegmentInfo) {
     File segDir = predownloadSegmentInfo.getSegmentDataDir(this, true);
     if (!segDir.isDirectory()) {
