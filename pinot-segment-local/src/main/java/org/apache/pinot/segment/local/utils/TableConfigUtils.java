@@ -2096,12 +2096,8 @@ public final class TableConfigUtils {
     }
   }
 
-  @Nullable
-  private static IndexingConfig applyIndexingConfigTierOverride(@Nullable IndexingConfig original, String tier)
+  private static IndexingConfig applyIndexingConfigTierOverride(IndexingConfig original, String tier)
       throws IOException {
-    if (original == null) {
-      return null;
-    }
     JsonNode tierOverwrites = original.getTierOverwrites();
     if (tierOverwrites == null || !tierOverwrites.has(tier)) {
       return original;
@@ -2120,7 +2116,7 @@ public final class TableConfigUtils {
   @Nullable
   private static List<FieldConfig> applyFieldConfigListTierOverrides(@Nullable List<FieldConfig> original, String tier)
       throws IOException {
-    if (original == null || original.isEmpty()) {
+    if (CollectionUtils.isEmpty(original)) {
       return original;
     }
     List<FieldConfig> result = null;
@@ -2137,12 +2133,8 @@ public final class TableConfigUtils {
     return result != null ? result : original;
   }
 
-  @Nullable
-  private static FieldConfig applyFieldConfigTierOverride(@Nullable FieldConfig original, String tier)
+  private static FieldConfig applyFieldConfigTierOverride(FieldConfig original, String tier)
       throws IOException {
-    if (original == null) {
-      return null;
-    }
     JsonNode tierOverwrites = original.getTierOverwrites();
     if (tierOverwrites == null || !tierOverwrites.has(tier)) {
       return original;
