@@ -125,56 +125,69 @@ public class PredicateComparisonRewriterTest {
 
   @Test
   public void testFilterPredicateColumnComparisonRewrite() {
-    // Filters like 'col1 = col2' should be rewritten to 'col1 - col2 = 0'
+    // col1 = col2 should be rewritten to equals(col1, col2) = true
+    PinotQuery equalsQuery =
+        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col1 = col2");
+    PinotQuery rewrittenEquals = _predicateComparisonRewriter.rewrite(equalsQuery);
+    assertEquals(rewrittenEquals.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(
+        rewrittenEquals.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "equals");
+    assertEquals(
+        rewrittenEquals.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands()
+            .get(0).getIdentifier().getName(), "col1");
+    assertEquals(
+        rewrittenEquals.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands()
+            .get(1).getIdentifier().getName(), "col2");
+    assertTrue(
+        rewrittenEquals.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getBoolValue());
 
-    PinotQuery pinotQuery =
-        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col1 = col2 AND col3 < col4;");
-    assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), "AND");
-    assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperands().size(), 2);
+    // col3 < col4 should be rewritten to less_than(col3, col4) = true
+    PinotQuery lessThanQuery =
+        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col3 < col4");
+    PinotQuery rewrittenLt = _predicateComparisonRewriter.rewrite(lessThanQuery);
+    assertEquals(rewrittenLt.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
     assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
-        "EQUALS");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
-            .getIdentifier().getName(), "col1");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
-            .getIdentifier().getName(), "col2");
+        rewrittenLt.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "less_than");
 
-    PinotQuery rewrittenQuery = _predicateComparisonRewriter.rewrite(pinotQuery);
-    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperator(), "AND");
-    assertEquals(rewrittenQuery.getFilterExpression().getFunctionCall().getOperands().size(), 2);
+    // col1 != col2 should be rewritten to not_equals(col1, col2) = true
+    PinotQuery notEqualsQuery =
+        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col1 != col2");
+    PinotQuery rewrittenNeq = _predicateComparisonRewriter.rewrite(notEqualsQuery);
+    assertEquals(rewrittenNeq.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
     assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
-        "EQUALS");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperator(), "minus");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperands().get(1).getIdentifier().getName(), "col2");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
-            .getLiteral().getIntValue(), 0);
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperator(),
-        "LESS_THAN");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperator(), "minus");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col3");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0)
-            .getFunctionCall().getOperands().get(1).getIdentifier().getName(), "col4");
-    assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1)
-            .getLiteral().getIntValue(), 0);
+        rewrittenNeq.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "not_equals");
 
+    // Function on LHS with column on RHS
+    PinotQuery functionRhsQuery = CalciteSqlParser.compileToPinotQueryWithoutRewrites(
+        "SELECT * FROM mytable WHERE json_extract_scalar(col1, '$.f', 'STRING', 'null') = col2");
+    PinotQuery rewrittenFunc = _predicateComparisonRewriter.rewrite(functionRhsQuery);
+    assertEquals(rewrittenFunc.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(
+        rewrittenFunc.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "equals");
+
+    // col5 >= col6 should be rewritten to greater_than_or_equal(col5, col6) = true
+    PinotQuery gteQuery =
+        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col5 >= col6");
+    PinotQuery rewrittenGte = _predicateComparisonRewriter.rewrite(gteQuery);
+    assertEquals(rewrittenGte.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(
+        rewrittenGte.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "greater_than_or_equal");
+
+    // col7 > col8 should be rewritten to greater_than(col7, col8) = true
+    PinotQuery gtQuery =
+        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col7 > col8");
+    PinotQuery rewrittenGt = _predicateComparisonRewriter.rewrite(gtQuery);
+    assertEquals(rewrittenGt.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(
+        rewrittenGt.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "greater_than");
+
+    // BETWEEN with non-literal bounds should still throw (not a comparison operator)
     PinotQuery betweenQuery =
         CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col1 BETWEEN col2 AND col3");
     assertThrows(SqlCompilationException.class, () -> _predicateComparisonRewriter.rewrite(betweenQuery));

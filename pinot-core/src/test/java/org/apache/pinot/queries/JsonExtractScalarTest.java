@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -29,6 +30,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertTrue;
 
 
 public class JsonExtractScalarTest extends BaseJsonQueryTest {
@@ -189,6 +192,61 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
             {19, 0L} // when enableNullHandling is false, null is treated as 0 for LONG type
         }
     );
+  }
+
+  @Test(dataProvider = "allJsonColumns")
+  public void testJsonExtractScalarComparedToColumn(String column) {
+    // Before the fix, column-to-column comparisons were rewritten as minus(a, b) = 0,
+    // which forced numeric coercion and threw NumberFormatException on string values.
+
+    // json.name.last ("duck", "mouse", ...) never equals stringColumn ("daffy duck", "mickey mouse", ...)
+    // so this should return 0 rows — but the key assertion is that it doesn't throw.
+    BrokerResponseNative noMatchResponse = getBrokerResponseForOptimizedQuery(
+        "SELECT intColumn FROM testTable "
+            + "WHERE json_extract_scalar(" + column + ", '$.name.last', 'STRING', '') = stringColumn "
+            + "LIMIT 10",
+        SCHEMA);
+    assertTrue(noMatchResponse.getExceptions() == null || noMatchResponse.getExceptions().isEmpty(),
+        "Query should not throw for string column-to-column comparison, got: " + noMatchResponse.getExceptions());
+    assertTrue(noMatchResponse.getResultTable().getRows().isEmpty());
+
+    // Same expression on both sides — every row matches, so LIMIT 3 should return 3 rows.
+    checkResult(
+        "SELECT intColumn FROM testTable "
+            + "WHERE json_extract_scalar(" + column + ", '$.name.last', 'STRING', '') "
+            + "= json_extract_scalar(" + column + ", '$.name.last', 'STRING', '') "
+            + "LIMIT 3",
+        new Object[][]{{1}, {2}, {3}});
+
+    // Also verify != works (all rows should satisfy since last name != full name)
+    BrokerResponseNative neqResponse = getBrokerResponseForOptimizedQuery(
+        "SELECT intColumn FROM testTable "
+            + "WHERE json_extract_scalar(" + column + ", '$.name.last', 'STRING', '') != stringColumn "
+            + "ORDER BY intColumn LIMIT 3",
+        SCHEMA);
+    assertTrue(neqResponse.getExceptions() == null || neqResponse.getExceptions().isEmpty(),
+        "Query should not throw for != column comparison, got: " + neqResponse.getExceptions());
+    assertTrue(neqResponse.getResultTable().getRows().size() == 3);
+
+    // Numeric: json.id (101, 111, 121, ...) never equals intColumn (1, 2, 3, ...)
+    BrokerResponseNative numericResponse = getBrokerResponseForOptimizedQuery(
+        "SELECT intColumn FROM testTable "
+            + "WHERE json_extract_scalar(" + column + ", '$.id', 'INT', '0') = intColumn "
+            + "LIMIT 10",
+        SCHEMA);
+    assertTrue(numericResponse.getExceptions() == null || numericResponse.getExceptions().isEmpty(),
+        "Query should not throw for numeric column-to-column comparison, got: " + numericResponse.getExceptions());
+    assertTrue(numericResponse.getResultTable().getRows().isEmpty());
+
+    // Numeric > comparison: intColumn (1-19) is always < json.id (101+)
+    BrokerResponseNative gtResponse = getBrokerResponseForOptimizedQuery(
+        "SELECT intColumn FROM testTable "
+            + "WHERE json_extract_scalar(" + column + ", '$.id', 'INT', '0') > intColumn "
+            + "ORDER BY intColumn LIMIT 3",
+        SCHEMA);
+    assertTrue(gtResponse.getExceptions() == null || gtResponse.getExceptions().isEmpty(),
+        "Query should not throw for > column comparison, got: " + gtResponse.getExceptions());
+    assertTrue(gtResponse.getResultTable().getRows().size() == 3);
   }
 
   @Test
