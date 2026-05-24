@@ -81,7 +81,7 @@ public class DistinctResultsBlockMerger implements ResultsBlockMerger<DistinctRe
     if (_deadlineNs != UNLIMITED_TIME_NS && System.nanoTime() >= _deadlineNs) {
       mergedBlock.setEarlyTerminationReason(EarlyTerminationReason.DISTINCT_MAX_EXECUTION_TIME);
     }
-	// Propagate lite-cap truncation flag/reason from children to merged block (OR semantics)
+    // Propagate lite-cap truncation flag/reason from children to merged block (OR semantics)
     String childLite =
         blockToMerge.getResultsMetadata().get(MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName());
     if ("true".equals(childLite)) {

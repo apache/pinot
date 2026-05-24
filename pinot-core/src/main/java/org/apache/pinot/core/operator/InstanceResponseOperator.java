@@ -107,6 +107,15 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
       instanceResponseBlock.addMetadata(
           MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
     }
+    // For ORDER BY queries under LITE_CAP: if total docs scanned exceeds the leaf cap, the cap was binding →
+    // results are truncated. ORDER BY scans all qualifying docs per segment, so numDocsScanned equals total
+    // qualifying rows on this server — a reliable server-level (not per-segment) signal with no false positives.
+    if (_queryContext.getOrderByExpressions() != null && !_queryContext.getOrderByExpressions().isEmpty()
+        && "LITE_CAP".equals(_queryContext.getQueryOptions().get("leafLimitProvenance"))
+        && baseResultsBlock.getNumDocsScanned() > _queryContext.getLimit()) {
+      instanceResponseBlock.addMetadata(MetadataKey.LITE_LEAF_CAP_TRUNCATION.getName(), "true");
+      instanceResponseBlock.addMetadata(MetadataKey.LEAF_TRUNCATION_REASON.getName(), "LITE_CAP");
+    }
     return instanceResponseBlock;
   }
 
