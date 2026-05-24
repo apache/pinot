@@ -58,6 +58,7 @@ public class SegmentPrunerFactory {
       segmentPruners.add(new EmptySegmentPruner(tableConfig));
     }
 
+    boolean requestedTimePruner = false;
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       List<String> segmentPrunerTypes = routingConfig.getSegmentPrunerTypes();
@@ -71,6 +72,7 @@ public class SegmentPrunerFactory {
             }
           }
           if (RoutingConfig.TIME_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
+            requestedTimePruner = true;
             TimeSegmentPruner timeSegmentPruner = getTimeSegmentPruner(tableConfig, propertyStore);
             if (timeSegmentPruner != null) {
               configuredSegmentPruners.add(timeSegmentPruner);
@@ -93,6 +95,20 @@ public class SegmentPrunerFactory {
             segmentPruners.add(partitionSegmentPruner);
           }
         }
+      }
+    }
+
+    /// Materialized view tables write segments per `[windowStartMs, windowEndMs)` bucket. Auto-enable
+    /// {@link TimeSegmentPruner} so time-range queries skip out-of-window segments without requiring
+    /// routing-config boilerplate. Skipped if the user already listed the time pruner type in
+    /// `routingConfig.segmentPrunerTypes` (regardless of whether it built successfully — the explicit
+    /// request is honored as-is and any misconfig is surfaced by the original warning, not duplicated
+    /// here). Silently skipped if the table has no time column / schema.
+    if (!requestedTimePruner && tableConfig.isMaterializedView()) {
+      TimeSegmentPruner timeSegmentPruner = getTimeSegmentPruner(tableConfig, propertyStore);
+      if (timeSegmentPruner != null) {
+        // Preserve the empty -> time -> partition order by inserting after any EmptySegmentPruner.
+        segmentPruners.add(needsEmptySegment ? 1 : 0, timeSegmentPruner);
       }
     }
     return segmentPruners;

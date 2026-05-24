@@ -280,6 +280,81 @@ public class SegmentPrunerTest extends ControllerTest {
   }
 
   @Test
+  public void testSegmentPrunerFactoryForMaterializedView() {
+    // MV tables write per `[windowStartMs, windowEndMs)` bucketed segments, so the factory should
+    // auto-enable TimeSegmentPruner without requiring routingConfig boilerplate.
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
+    when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
+    SegmentsValidationAndRetentionConfig validationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    when(validationConfig.getTimeColumnName()).thenReturn(TIME_COLUMN);
+    when(tableConfig.getValidationConfig()).thenReturn(validationConfig);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addDateTimeField(TIME_COLUMN, DataType.TIMESTAMP, "TIMESTAMP", "1:MILLISECONDS").build();
+    ZKMetadataProvider.setSchema(_propertyStore, schema);
+
+    // Sanity: non-MV table with no routing config -> no pruner auto-added.
+    when(tableConfig.isMaterializedView()).thenReturn(false);
+    List<SegmentPruner> segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 0);
+
+    // MV table with no routing config -> TimeSegmentPruner auto-added.
+    when(tableConfig.isMaterializedView()).thenReturn(true);
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
+
+    // MV table with routing config but no segmentPrunerTypes -> still auto-added.
+    RoutingConfig routingConfig = mock(RoutingConfig.class);
+    when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
+
+    // MV table that already configures "time" explicitly -> no double-add.
+    when(routingConfig.getSegmentPrunerTypes()).thenReturn(List.of(RoutingConfig.TIME_SEGMENT_PRUNER_TYPE));
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
+
+    // MV table that configures only the partition pruner -> time pruner auto-added, sorted before partition.
+    IndexingConfig indexingConfig = mock(IndexingConfig.class);
+    when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(PARTITION_COLUMN_1, new ColumnPartitionConfig("Modulo", 5));
+    when(indexingConfig.getSegmentPartitionConfig()).thenReturn(new SegmentPartitionConfig(columnPartitionConfigMap));
+    when(routingConfig.getSegmentPrunerTypes()).thenReturn(List.of(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE));
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 2);
+    assertTrue(segmentPruners.get(0) instanceof TimeSegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof SinglePartitionColumnSegmentPruner);
+
+    // MV table that also needs an EmptySegmentPruner (Kinesis stream): order is empty -> time.
+    when(tableConfig.getTableName()).thenReturn(REALTIME_TABLE_NAME);
+    when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
+    when(indexingConfig.getSegmentPartitionConfig()).thenReturn(null);
+    when(indexingConfig.getStreamConfigs()).thenReturn(Map.of(StreamConfigProperties.STREAM_TYPE, KINESIS_STREAM_TYPE));
+    when(routingConfig.getSegmentPrunerTypes()).thenReturn(null);
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 2);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+    assertTrue(segmentPruners.get(1) instanceof TimeSegmentPruner);
+
+    // MV table without a time column -> time pruner silently skipped (EmptySegmentPruner still added).
+    when(validationConfig.getTimeColumnName()).thenReturn(null);
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 1);
+    assertTrue(segmentPruners.get(0) instanceof EmptySegmentPruner);
+
+    // Explicit "time" request that fails to build (no time column) is honored as-is and NOT silently
+    // re-attempted by the MV branch: result has neither time pruner nor a duplicate warn-and-retry.
+    when(indexingConfig.getStreamConfigs()).thenReturn(null);
+    when(routingConfig.getSegmentPrunerTypes()).thenReturn(List.of(RoutingConfig.TIME_SEGMENT_PRUNER_TYPE));
+    segmentPruners = SegmentPrunerFactory.getSegmentPruners(tableConfig, _propertyStore);
+    assertEquals(segmentPruners.size(), 0);
+  }
+
+  @Test
   public void testPartitionAwareSegmentPruner() {
     BrokerRequest brokerRequest1 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_1);
     BrokerRequest brokerRequest2 = CalciteSqlCompiler.compileToBrokerRequest(QUERY_2);
