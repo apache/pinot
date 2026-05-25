@@ -167,8 +167,8 @@ The same migration touches the controller's REST response shape. Several depreca
 when at their Java default. Old clients reading `GET /tables/{name}` or `GET /tableConfigs/{name}` MUST tolerate
 the absent fields:
 
-- `fieldConfigList[].indexType` is no longer emitted (replaced by `indexTypes`). Clients that screen-scrape for
-  `indexType` will see `null` post-upgrade — read `indexTypes` instead.
+- `fieldConfigList[].indexType` is preserved in the response shape for back-compat, but the controller emits a
+  `deprecationWarnings` entry pointing callers to `indexTypes` instead.
 - The following boolean getters are now annotated with `@JsonInclude(NON_DEFAULT)`; the field disappears from the
   response when the value is `false` (the type default): `upsertConfig.enableSnapshot`, `dedupConfig.enablePreload`,
   `indexingConfig.createInvertedIndexDuringSegmentGeneration`,

@@ -620,7 +620,7 @@ public class TableConfigSerDeUtilsTest {
     ZNRecord znRecord = new ZNRecord("myTable_OFFLINE");
     znRecord.setSimpleField(TableConfig.TABLE_NAME_KEY, "myTable_OFFLINE");
     znRecord.setSimpleField(TableConfig.TABLE_TYPE_KEY, "OFFLINE");
-    // The fieldConfigList stored in ZK still contains the legacy 'indexType' key (written before @JsonIgnore).
+    // The fieldConfigList stored in ZK carries the legacy 'indexType' key alongside the modern 'indexTypes'.
     znRecord.setSimpleField(TableConfig.FIELD_CONFIG_LIST_KEY,
         "[{\"name\":\"c1\",\"indexType\":\"INVERTED\",\"indexTypes\":[\"INVERTED\"]}]");
 

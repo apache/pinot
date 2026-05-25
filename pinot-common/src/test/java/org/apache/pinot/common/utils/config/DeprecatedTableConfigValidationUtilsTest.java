@@ -143,8 +143,10 @@ public class DeprecatedTableConfigValidationUtilsTest {
   @Test
   public void testUpdateAllowsLegacyIndexTypeWhenStoredAsSingletonIndexTypes()
       throws Exception {
-    // FieldConfig#getIndexType is @JsonIgnore, so a create with legacy `indexType` is stored as singleton
-    // `indexTypes`. Re-submitting the same legacy payload on update must remain idempotent.
+    // Even when stored configs were written before `@DeprecatedConfig` shipped (so the legacy `indexType` key is
+    // absent and only the singleton `indexTypes` array survives in ZK), re-submitting the same legacy payload on
+    // update must remain idempotent. The validator's `isModernFieldConfigIndexTypeEquivalent` shortcut handles
+    // this old-stored / new-input shape mismatch.
     JsonNode oldJson =
         JsonUtils.stringToJsonNode("{\"fieldConfigList\":[{\"name\":\"c1\",\"indexTypes\":[\"INVERTED\"]}]}");
     JsonNode newJson =
