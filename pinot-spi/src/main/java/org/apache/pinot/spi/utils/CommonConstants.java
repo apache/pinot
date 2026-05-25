@@ -335,6 +335,13 @@ public class CommonConstants {
   public static class Broker {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
+    /**
+     * Config prefix for the broker-side MaterializedViewHandler.  Implementation class is
+     * loaded from {@code pinot.broker.materialized.view.handler.class}; other settings sit
+     * under the same prefix and are passed through to the handler's {@code init}. Default
+     * implementation: {@code DefaultMaterializedViewHandler}.
+     */
+    public static final String MATERIALIZED_VIEW_HANDLER_CONFIG_PREFIX = "pinot.broker.materialized.view.handler";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
     public static final String EVENT_LISTENER_CONFIG_PREFIX = "pinot.broker.event.listener";
     // Prefix for table sampler configs:
@@ -367,6 +374,14 @@ public class CommonConstants {
         "pinot.broker.query.log.logBeforeProcessing";
     public static final boolean DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING = true;
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
+    /**
+     * When true, the broker initializes the materialized view metadata cache and query rewrite
+     * engine.  When false (default), MV rewrite is disabled regardless of per-MV
+     * {@code rewriteEnabled} setting.
+     */
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE =
+        "pinot.broker.query.enable.materialized.view.rewrite";
+    public static final boolean DEFAULT_BROKER_QUERY_ENABLE_MATERIALIZED_VIEW_REWRITE = false;
     /// Provide broker level default for query option [Request.QueryOptionKey#REGEX_DICT_SIZE_THRESHOLD]
     public static final String CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD =
         "pinot.broker.query.regex.dict.size.threshold";
@@ -668,6 +683,14 @@ public class CommonConstants {
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
+        /**
+         * Broker-internal marker set on the rewritten server-side PinotQuery after a FULL_REWRITE
+         * materialized-view rewrite. Read by BrokerReduceService to distinguish MV-rewritten
+         * queries from gapfill / future federated paths without relying on a brittle structural
+         * heuristic (different table names on user vs. server BrokerRequest).
+         * Not a user-facing option.
+         */
+        public static final String MATERIALIZED_VIEW_REWRITE = "materializedViewRewrite";
         public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";

@@ -46,7 +46,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
     "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
     "maxExecutionTimeInDistinctReached", "timeUsedMs",
-    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
+    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
+    "numEntriesScannedInFilter",
     "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
     "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
     "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
@@ -57,7 +58,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied", "groupsTrimmed"
+    "pools", "rlsFiltersApplied", "groupsTrimmed", "materializedViewQueried"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -121,6 +122,9 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private Set<Integer> _pools = Set.of();
   private boolean _rlsFiltersApplied = false;
+
+  @Nullable
+  private String _materializedViewQueried;
 
   public BrokerResponseNative() {
   }
@@ -631,5 +635,18 @@ public class BrokerResponseNative implements BrokerResponse {
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
+  }
+
+  @JsonProperty("materializedViewQueried")
+  public void setMaterializedViewQueried(@Nullable String materializedViewQueried) {
+    _materializedViewQueried = materializedViewQueried;
+  }
+
+  @Nullable
+  @JsonProperty("materializedViewQueried")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Override
+  public String getMaterializedViewQueried() {
+    return _materializedViewQueried;
   }
 }
