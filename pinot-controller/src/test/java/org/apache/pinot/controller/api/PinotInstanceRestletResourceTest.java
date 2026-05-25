@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.client.admin.PinotAdminClient;
+import org.apache.pinot.client.admin.PinotAdminValidationException;
 import org.apache.pinot.controller.api.resources.InstanceTagUpdateRequest;
 import org.apache.pinot.controller.api.resources.OperationValidationResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
@@ -49,6 +50,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 /**
@@ -435,6 +437,117 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Cleanup
     adminClient.getInstanceClient().dropInstance(minionInstanceId);
+  }
+
+  @Test
+  public void testQueriesDisableOnServerInstance()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance serverInstance =
+        new Instance("queryroute.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(serverInstance.toJsonString());
+    String instanceId = "Server_queryroute.test.com_20000";
+    try {
+      // Queries routed by default
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+
+      // Disable query routing via toggleInstanceState
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_DISABLE");
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // Re-enable query routing via toggleInstanceState
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_ENABLE");
+      checkInstanceInfo(adminClient, instanceId, "queryroute.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+    } finally {
+      adminClient.getInstanceClient().dropInstance(instanceId);
+    }
+  }
+
+  @Test
+  public void testUpdateInstancePreservesQueriesDisabled()
+      throws Exception {
+    // Regression test: a generic PUT /instances/{name} with the request body's queriesDisabled defaulted
+    // to false must NOT clobber an operationally-set queriesDisabled=true (operator workflow:
+    //   1. operator calls QUERIES_DISABLE to remove server from broker routing,
+    //   2. some automation later updates host/tags/ports via PUT /instances/{name},
+    //   3. server must remain out of routing).
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance serverInstance =
+        new Instance("preserve.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(serverInstance.toJsonString());
+    String instanceId = "Server_preserve.test.com_20000";
+    try {
+      // Set queriesDisabled=true via the dedicated state API.
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_DISABLE");
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // PUT /instances/{name} with a request body where queriesDisabled defaults to false (legacy operator path).
+      Instance updateBody =
+          new Instance("preserve.test.com", 20000, InstanceType.SERVER, null, null, 0, 0, 0, 0, false);
+      adminClient.getInstanceClient().updateInstance(instanceId, updateBody.toJsonString());
+
+      // queriesDisabled must still be true (operational flag preserved).
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, true);
+
+      // Operator can still clear the flag via the dedicated state API.
+      adminClient.getInstanceClient().updateInstanceState(instanceId, "QUERIES_ENABLE");
+      checkInstanceInfo(adminClient, instanceId, "preserve.test.com", 20000, new String[0], null,
+          -1, -1, -1, -1, false);
+    } finally {
+      adminClient.getInstanceClient().dropInstance(instanceId);
+    }
+  }
+
+  @Test
+  public void testQueriesDisableOnNonServerInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    // Broker instance
+    Instance brokerInstance =
+        new Instance("queryroute-broker.test.com", 30000, InstanceType.BROKER, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(brokerInstance.toJsonString());
+    String brokerId = "Broker_queryroute-broker.test.com_30000";
+    try {
+      // Expect HTTP 400 BAD_REQUEST surfaced as PinotAdminValidationException; verify the message
+      // identifies the failing precondition so a future regression that throws a generic 500 fails this test.
+      PinotAdminValidationException ex = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getInstanceClient().updateInstanceState(brokerId, "QUERIES_DISABLE"));
+      assertTrue(ex.getMessage().contains("status: 400"),
+          "Expected HTTP 400 BAD_REQUEST, got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("only applies to server instances"),
+          "Expected message to mention server-only precondition, got: " + ex.getMessage());
+    } finally {
+      adminClient.getInstanceClient().dropInstance(brokerId);
+    }
+  }
+
+  @Test
+  public void testQueriesDisableOnMinionInstanceFails()
+      throws Exception {
+    PinotAdminClient adminClient = DEFAULT_INSTANCE.getOrCreateAdminClient();
+
+    Instance minionInstance =
+        new Instance("queryroute-minion.test.com", 9520, InstanceType.MINION, null, null, 0, 0, 0, 0, false);
+    adminClient.getInstanceClient().createInstance(minionInstance.toJsonString());
+    String minionId = "Minion_queryroute-minion.test.com_9520";
+    try {
+      PinotAdminValidationException ex = expectThrows(PinotAdminValidationException.class,
+          () -> adminClient.getInstanceClient().updateInstanceState(minionId, "QUERIES_DISABLE"));
+      assertTrue(ex.getMessage().contains("status: 400"),
+          "Expected HTTP 400 BAD_REQUEST, got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("only applies to server instances"),
+          "Expected message to mention server-only precondition, got: " + ex.getMessage());
+    } finally {
+      adminClient.getInstanceClient().dropInstance(minionId);
+    }
   }
 
   @AfterClass

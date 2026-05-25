@@ -282,6 +282,13 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
   }
 
   @Test(enabled = false)
+  @Override
+  public void testQueriesDisabled() {
+    // Routing-table-dependent test; the rate-limiter cluster setup keeps the table out of broker routing,
+    // making this test inapplicable here. Mirrors the testInstanceShutdown override above.
+  }
+
+  @Test(enabled = false)
   public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine) {
     // Do nothing
   }

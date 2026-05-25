@@ -132,15 +132,17 @@ public class InstanceAdminClient extends BaseServiceAdminClient {
     return response.toString();
   }
 
-  /**
-   * Enables, disables, or drains an instance via PUT with a state query parameter.
-   * DRAIN state is only applicable to minion instances.
-   *
-   * @param instanceName Name of the instance
-   * @param state State to set (enable, disable, or drop, drain)
-   * @return Success response
-   * @throws PinotAdminException If the request fails
-   */
+  /// Changes the operational state of an instance via PUT with a state query parameter.
+  ///
+  /// Supported states: `enable`, `disable`, `drain`, `queries_disable`, `queries_enable`.
+  /// - `DRAIN` is only applicable to minion instances.
+  /// - `QUERIES_DISABLE` / `QUERIES_ENABLE` are only applicable to server instances and control
+  ///   whether brokers route queries to the server.
+  ///
+  /// @param instanceName Name of the instance
+  /// @param state State to set (`enable`, `disable`, `drain`, `queries_disable`, `queries_enable`)
+  /// @return Success response
+  /// @throws PinotAdminException If the request fails
   public String updateInstanceState(String instanceName, String state)
       throws PinotAdminException {
     Map<String, String> queryParams = Map.of("state", state);
