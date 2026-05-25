@@ -44,34 +44,32 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertTrue;
 
 
-/// Guards the back-pressure kill-switch flag
-/// (`pinot.query.runner.grpc.sender.backpressure.enabled`) introduced to
-/// allow operators to opt out of gRPC sender-side flow control.
+/// Pins the off-path through `awaitReady`, which is also the production default for
+/// `pinot.query.runner.grpc.sender.backpressure.enabled` (see
+/// [org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner#DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED]).
 ///
 /// ## What this test checks
 ///
-/// When the flag is set to `false`, [GrpcSendingMailbox#awaitReady]
-/// must short-circuit immediately — i.e. the `!_backpressureEnabled` branch
-/// in the guard must fire — so the sender pushes blocks without waiting for the
-/// receiver to drain them. Under that condition a fast sender can push orders of
-/// magnitude more blocks than a slow receiver polls in the same wall-clock window.
+/// When the flag is set to `false` (the default), [GrpcSendingMailbox#awaitReady] must short-circuit
+/// immediately — i.e. the `!_backpressureEnabled` branch in the guard must fire — so the sender pushes
+/// blocks without waiting for the receiver to drain them. Under that condition a fast sender can push
+/// orders of magnitude more blocks than a slow receiver polls in the same wall-clock window.
 ///
 /// ## Regression risk
 ///
-/// If someone accidentally removes or inverts the
-/// `bypassReady || !_backpressureEnabled` short-circuit in `awaitReady`, the gate
-/// would become permanently active and this flag would have no effect. The test
-/// would then see `sendCount` track `polledCount` closely (as in the *enabled*
-/// repro test), causing the `sendCount > polledCount * 10` assertion to fail and
-/// surfacing the regression in CI.
+/// If someone accidentally removes or inverts the `bypassReady || !_backpressureEnabled` short-circuit
+/// in `awaitReady`, the gate would become permanently active and this flag would have no effect. The
+/// test would then see `sendCount` track `polledCount` closely (as in the *opt-in* companion test),
+/// causing the `sendCount > polledCount * 10` assertion to fail and surfacing the regression in CI.
 ///
-/// ## Relation to the companion test
+/// ## Relation to the companion tests
 ///
-/// [GrpcSenderBackpressureTest] verifies the *enabled* (default) path — that the
-/// gate keeps the sender in check. This test verifies the *disabled* path — that
-/// turning the gate off actually removes it. Together they pin both sides of the
-/// boolean.
-public class GrpcSenderBackpressureDisabledTest {
+/// [GrpcSenderBackpressureTest] verifies the opt-in (`enabled = true`) path with wide transport
+/// defaults — that the gate keeps the sender in check. [GrpcSenderBackpressureTightGateTest] does the
+/// same with narrow transport so the gate is the dominant back-pressure mechanism. This test verifies
+/// the off path — that turning the gate off (or leaving it at the production default) actually removes
+/// it. Together they pin both sides of the boolean.
+public class GrpcSenderBackpressureOffPathTest {
   private static final DataSchema SCHEMA = new DataSchema(
       new String[]{"payload"}, new ColumnDataType[]{ColumnDataType.STRING});
   // Same small payload as the companion test — enough to have a real serialized
@@ -162,7 +160,7 @@ public class GrpcSenderBackpressureDisabledTest {
     long polledCount = polled.get();
 
     System.out.printf(Locale.ROOT,
-        "[GrpcSenderBackpressureDisabledTest] sent=%d polled=%d ratio=%.1fx%n",
+        "[GrpcSenderBackpressureOffPathTest] sent=%d polled=%d ratio=%.1fx%n",
         sendCount, polledCount,
         polledCount == 0 ? Double.POSITIVE_INFINITY : (double) sendCount / polledCount);
 

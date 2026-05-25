@@ -88,8 +88,8 @@ import static org.testng.Assert.assertTrue;
 ///
 /// * [GrpcSenderBackpressureTest] — wide defaults, exercises gate + transport in
 ///   production-ish conditions. Loose assertion.
-/// * [GrpcSenderBackpressureDisabledTest] — wide defaults plus kill-switch off; asserts
-///   the pre-fix unbounded sender behaviour is preserved when the gate is disabled.
+/// * [GrpcSenderBackpressureOffPathTest] — wide defaults with the gate at its production
+///   default (off); asserts the pre-fix unbounded sender behaviour is preserved.
 /// * This test — narrow transport configs; asserts the application gate alone is
 ///   enough to keep the sender bounded.
 public class GrpcSenderBackpressureTightGateTest {
