@@ -308,15 +308,32 @@ public class TableConfig extends BaseJsonConfig {
     return _taskConfig.getConfigsForTaskType(CommonConstants.MaterializedViewTask.TASK_TYPE);
   }
 
-  /// Whether the table has a non-empty `definedSQL` under [CommonConstants.MaterializedViewTask#TASK_TYPE].
+  /// Whether the table has a non-empty `definedSQL` under any registered MV-style task type.
+  ///
+  /// Recognizes both the built-in OSS [CommonConstants.MaterializedViewTask#TASK_TYPE] and any
+  /// downstream task variant (e.g. StarTree's `MseMaterializedViewTask` for multi-stage MVs) by
+  /// scanning every task config for a non-empty `definedSQL` key. This keeps the
+  /// `isMaterializedView=true` invariant compatible with the wider ecosystem without OSS having to
+  /// hard-code each variant's task-type label.
   @JsonIgnore
   public boolean hasMaterializedViewTaskWithDefinedSql() {
-    Map<String, String> configs = getMaterializedViewTaskConfigs();
-    if (configs == null) {
+    if (_taskConfig == null) {
       return false;
     }
-    String definedSql = configs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
-    return definedSql != null && !definedSql.trim().isEmpty();
+    Map<String, Map<String, String>> taskTypeConfigsMap = _taskConfig.getTaskTypeConfigsMap();
+    if (taskTypeConfigsMap == null) {
+      return false;
+    }
+    for (Map<String, String> configs : taskTypeConfigsMap.values()) {
+      if (configs == null) {
+        continue;
+      }
+      String definedSql = configs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+      if (definedSql != null && !definedSql.trim().isEmpty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @JsonProperty(VALIDATION_CONFIG_KEY)
