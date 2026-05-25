@@ -65,7 +65,10 @@ public class TableConfigBuilderTest {
     JsonNode offlineJson = JsonUtils.stringToJsonNode(offlineTableConfig.toJsonString());
     Assert.assertFalse(offlineJson.path("segmentsConfig").has("minimizeDataMovement"));
     Assert.assertFalse(offlineJson.path("tableIndexConfig").has("createInvertedIndexDuringSegmentGeneration"));
-    Assert.assertFalse(offlineJson.path("fieldConfigList").get(0).has("indexType"));
+    // `fieldConfigList[].indexType` is intentionally emitted in the wire shape: stripping it via @JsonIgnore
+    // broke the deprecation diff on update (round-trip dropped `indexType`, then resubmits looked like "newly
+    // introduced"). The soft-launch warning still flags the deprecated input; the field stays on the wire.
+    Assert.assertTrue(offlineJson.path("fieldConfigList").get(0).has("indexType"));
 
     TableConfig upsertTableConfig = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
