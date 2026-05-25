@@ -494,7 +494,7 @@ public class WorkerManager {
       String partitionKey = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY);
       if (partitionKey != null) {
         assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions);
-        addLeafServersToContext(metadata, context);
+        updateContextForLeafStage(metadata, context);
         return;
       }
     }
@@ -504,14 +504,21 @@ public class WorkerManager {
     } else {
       assignWorkersToNonPartitionedLeafFragment(fragment, metadata, context);
     }
-    addLeafServersToContext(metadata, context);
+    updateContextForLeafStage(metadata, context);
   }
 
-  private void addLeafServersToContext(DispatchablePlanMetadata metadata, DispatchablePlanContext context) {
+  private void updateContextForLeafStage(DispatchablePlanMetadata metadata, DispatchablePlanContext context) {
     if (context.isUseLeafServerForIntermediateStage()) {
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = metadata.getWorkerIdToServerInstanceMap();
       assert workerIdToServerInstanceMap != null;
       context.getLeafServerInstances().addAll(workerIdToServerInstanceMap.values());
+    }
+    // Track empty leaf stage for short-circuit detection.
+    // The replicated path returns early above and is excluded: replicated leaves
+    // broadcast segments to all servers rather than populating workerIdToServerInstanceMap.
+    context.recordLeafStageAssigned();
+    if (metadata.getWorkerIdToServerInstanceMap().isEmpty()) {
+      context.recordLeafStageEmpty();
     }
   }
 
