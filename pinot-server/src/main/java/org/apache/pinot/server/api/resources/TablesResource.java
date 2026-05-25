@@ -32,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -109,11 +110,11 @@ import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -246,23 +247,16 @@ public class TablesResource {
           }
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
-            int columnLength;
-            DataType storedType = columnMetadata.getDataType().getStoredType();
-            if (storedType.isFixedWidth()) {
-              // For type of fixed width: INT, LONG, FLOAT, DOUBLE, BOOLEAN (stored as INT), TIMESTAMP (stored as LONG),
-              // set the columnLength as the fixed width.
-              columnLength = storedType.size();
-            } else if (columnMetadata.hasDictionary()) {
-              // For type of variable width (String, Bytes), if it's stored using dictionary encoding, set the
-              // columnLength as the max length in dictionary.
-              columnLength = columnMetadata.getColumnMaxLength();
-            } else {
-              // For raw STRING/BYTES column, set the columnLength as the length of the max value.
+            int columnLength = columnMetadata.getLengthOfLongestElement();
+            if (columnLength < 0) {
+              // For raw STRING/BYTES/BIG_DECIMAL column, set the columnLength as the length of the max value.
               Comparable<?> maxValue = columnMetadata.getMaxValue();
               if (maxValue instanceof String) {
                 columnLength = Utf8.encodedLength((String) maxValue);
               } else if (maxValue instanceof ByteArray) {
                 columnLength = ((ByteArray) maxValue).length();
+              } else if (maxValue instanceof BigDecimal) {
+                columnLength = BigDecimalUtils.byteSize((BigDecimal) maxValue);
               } else {
                 // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
                 columnLength = FieldSpec.DEFAULT_MAX_LENGTH;

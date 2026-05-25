@@ -39,14 +39,14 @@ import org.slf4j.LoggerFactory;
 public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BalancedNumSegmentAssignmentStrategy.class);
 
-  private int _replication;
+  protected int _replication;
 
   @Override
   public void init(HelixManager helixManager, TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig validationAndRetentionConfig = tableConfig.getValidationConfig();
     Preconditions.checkState(validationAndRetentionConfig != null, "segmentsConfig is null");
     _replication = tableConfig.getReplication();
-    LOGGER.info("Initialized BalancedNumSegmentAssignmentStrategy for table: {} with replication: {}",
+    LOGGER.info("Initialized {} for table: {} with replication: {}", this.getClass().getSimpleName(),
         tableConfig.getTableName(), _replication);
   }
 
@@ -66,7 +66,7 @@ public class BalancedNumSegmentAssignmentStrategy implements SegmentAssignmentSt
     return SegmentAssignmentUtils.rebalanceNonReplicaGroupBasedTable(currentAssignment, instances, _replication);
   }
 
-  private void validateSegmentAssignmentStrategy(InstancePartitions instancePartitions) {
+  protected void validateSegmentAssignmentStrategy(InstancePartitions instancePartitions) {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     int numPartitions = instancePartitions.getNumPartitions();
     // Non-replica-group based assignment should have numReplicaGroups and numPartitions = 1

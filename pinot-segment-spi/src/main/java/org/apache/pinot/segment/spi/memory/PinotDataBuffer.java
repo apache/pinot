@@ -346,7 +346,7 @@ public abstract class PinotDataBuffer implements DataBuffer {
       try {
         buffer.close();
       } catch (IOException e) {
-        e.printStackTrace();
+        LOGGER.error("Failed to close PinotDataBuffer", e);
       }
     }
     BUFFER_CONTEXT_MAP.clear();

@@ -3,7 +3,6 @@
   "tableType": "REALTIME",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "timeColumnName": "daysSinceEpoch",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "50000",

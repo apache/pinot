@@ -88,4 +88,26 @@ public class TrigonometricFunctions {
   public static double radians(double a) {
     return Math.toRadians(a);
   }
+
+  /** Returns the inverse hyperbolic sine of the given value. */
+  @ScalarFunction
+  public static double asinh(double a) {
+    // Use sign-separated formula to avoid -Inf + Inf cancellation for large negative values.
+    if (a >= 0) {
+      return Math.log(a + Math.sqrt(a * a + 1));
+    }
+    return -Math.log(-a + Math.sqrt(a * a + 1));
+  }
+
+  /** Returns the inverse hyperbolic cosine of the given value. Domain: a >= 1. */
+  @ScalarFunction
+  public static double acosh(double a) {
+    return Math.log(a + Math.sqrt(a * a - 1));
+  }
+
+  /** Returns the inverse hyperbolic tangent of the given value. Domain: -1 < a < 1. */
+  @ScalarFunction
+  public static double atanh(double a) {
+    return 0.5 * Math.log((1 + a) / (1 - a));
+  }
 }

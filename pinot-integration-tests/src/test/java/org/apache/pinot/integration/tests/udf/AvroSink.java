@@ -26,6 +26,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.avro.Conversions;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -33,7 +34,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -45,6 +45,23 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 /// - Internally manages the Avro objects
 /// - Defines a sink like external interface,
 public class AvroSink implements AutoCloseable {
+
+  /// `GenericData` for the Avro writer<. Registers the logical-type conversions whose post-converted Java type the
+  /// Pinot row carries, so the writer encodes them back to raw Avro form when serializing.
+  private static final GenericData GENERIC_DATA = new GenericData();
+
+  static {
+    // Decimal without scale and precision. Deserialized as BigDecimal, serialized as bytes.
+    GENERIC_DATA.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
+    // Decimal with scale and precision. Deserialized as BigDecimal, serialized as bytes.
+    GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
+    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
+    //  the corresponding data types in Pinot (ie can we read UUIDs or Instant?).
+    // UUID is deserialized as java.util.UUID, serialized as string.
+    //GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    // Instant is deserialized as java.time.Instant, serialized as long (epoch millis).
+    //GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
+  }
 
   private static final EnumMap<FieldSpec.DataType, Schema> NOT_NULL_SCALAR_MAP;
   private static final EnumMap<FieldSpec.DataType, Schema> NULL_SCALAR_MAP;
@@ -109,7 +126,7 @@ public class AvroSink implements AutoCloseable {
       throws IOException {
     _avroSchema = convertPinotSchemaToAvroSchema(schema);
 
-    GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(_avroSchema, AvroUtils.getGenericData());
+    GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(_avroSchema, GENERIC_DATA);
     _dataFileWriter = new DataFileWriter<>(datumWriter);
     _dataFileWriter.create(_avroSchema, tempFile);
   }

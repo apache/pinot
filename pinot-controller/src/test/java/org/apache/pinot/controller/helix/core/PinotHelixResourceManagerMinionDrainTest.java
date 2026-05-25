@@ -285,8 +285,8 @@ public class PinotHelixResourceManagerMinionDrainTest extends ControllerTest {
 
     // Subsequent drain attempts should throw UnsupportedOperationException (already drained)
     for (int i = 1; i < 3; i++) {
-        PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
-        assertFalse(drainResponse.isSuccessful(), "Subsequent drain operation " + (i + 1) + " should have failed");
+      PinotResourceManagerResponse drainResponse = _helixResourceManager.drainMinionInstance(minionInstanceId);
+      assertFalse(drainResponse.isSuccessful(), "Subsequent drain operation " + (i + 1) + " should have failed");
     }
 
     // Verify final state remains unchanged

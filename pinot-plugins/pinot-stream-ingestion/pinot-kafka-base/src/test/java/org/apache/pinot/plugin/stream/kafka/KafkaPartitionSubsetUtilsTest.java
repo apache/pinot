@@ -198,4 +198,114 @@ public class KafkaPartitionSubsetUtilsTest {
         "0,1,-5,2");
     KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
   }
+
+  @Test
+  public void testRangeMixedWithIndividualIds() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0-4,50,100-104");
+    List<Integer> result = KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+    Assert.assertNotNull(result);
+    Assert.assertEquals(result, List.of(0, 1, 2, 3, 4, 50, 100, 101, 102, 103, 104));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRangeStartGreaterThanEnd() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "10-5");
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRangeEmptyEnd() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "5-");
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testNegativePartitionIdNotMisreadAsRange() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "-1,0,1");
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRangeNonNumeric() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "abc-def");
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRangeNegativeStart() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "-1-5");
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test
+  public void testSingleElementRange() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS), "5-5");
+    List<Integer> result = KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+    Assert.assertNotNull(result);
+    Assert.assertEquals(result, List.of(5));
+  }
+
+  @Test
+  public void testOverlappingRangesAreDeduplicated() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0-5,3-8");
+    List<Integer> result = KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+    Assert.assertNotNull(result);
+    Assert.assertEquals(result, List.of(0, 1, 2, 3, 4, 5, 6, 7, 8));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testSingleRangeExceedsTotalMax() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0-" + KafkaPartitionSubsetUtils.MAX_TOTAL_PARTITION_IDS);
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testMultipleRangesExceedTotalMax() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0-5999,6000-11999");
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
+
+  @Test
+  public void testExactlyMaxPartitionIdsAccepted() {
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        "0-" + (KafkaPartitionSubsetUtils.MAX_TOTAL_PARTITION_IDS - 1));
+    List<Integer> result = KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+    Assert.assertNotNull(result);
+    Assert.assertEquals(result.size(), KafkaPartitionSubsetUtils.MAX_TOTAL_PARTITION_IDS);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testIndividualIdsExceedTotalMax() {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i <= KafkaPartitionSubsetUtils.MAX_TOTAL_PARTITION_IDS; i++) {
+      if (i > 0) {
+        sb.append(',');
+      }
+      sb.append(i);
+    }
+    Map<String, String> config = new HashMap<>();
+    config.put(KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.PARTITION_IDS),
+        sb.toString());
+    KafkaPartitionSubsetUtils.getPartitionIdsFromConfig(config);
+  }
 }

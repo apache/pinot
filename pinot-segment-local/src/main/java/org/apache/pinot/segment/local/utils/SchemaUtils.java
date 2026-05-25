@@ -108,8 +108,8 @@ public class SchemaUtils {
       Set<String> lowerCaseColumnNames = new HashSet<>();
       for (String column : schema.getColumnNames()) {
         Preconditions.checkState(lowerCaseColumnNames.add(column.toLowerCase()),
-          "When enable case insensitive, you can't use the same lowercase column name: %s",
-          column.toLowerCase());
+            "When enable case insensitive, you can't use the same lowercase column name: %s",
+            column.toLowerCase());
       }
     }
     Set<String> transformedColumns = new HashSet<>();
@@ -174,8 +174,6 @@ public class SchemaUtils {
   private static void validateMultiValueCompatibility(FieldSpec fieldSpec) {
     Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.JSON),
         "JSON columns cannot be of multi-value type");
-    Preconditions.checkState(!fieldSpec.getDataType().equals(FieldSpec.DataType.BIG_DECIMAL),
-        "BIG_DECIMAL columns cannot be of multi-value type");
   }
 
   /**

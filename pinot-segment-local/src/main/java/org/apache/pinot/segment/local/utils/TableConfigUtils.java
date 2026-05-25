@@ -24,10 +24,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -82,6 +81,7 @@ import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -102,6 +102,7 @@ import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationC
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -178,6 +179,7 @@ public final class TableConfigUtils {
     }
 
     validateValidationConfig(tableConfig, schema);
+    validateSegmentAssignmentConfig(tableConfig);
     validateIngestionConfig(tableConfig, schema);
     if (tableConfig.getTableType() == TableType.REALTIME) {
       validateStreamConfigMaps(tableConfig);
@@ -194,6 +196,7 @@ public final class TableConfigUtils {
     }
 
     validateTaskConfig(tableConfig);
+    validateMaterializedViewInvariants(tableConfig);
 
     if (_enforcePoolBasedAssignment) {
       validateInstancePoolsAndReplicaGroups(tableConfig);
@@ -239,10 +242,16 @@ public final class TableConfigUtils {
         "Instance pool and replica group configurations must be enabled");
   }
 
-  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkip) {
-    return typesToSkip == null ? Collections.emptySet()
-        : Arrays.stream(typesToSkip.split(",")).map(s -> ValidationType.valueOf(s.toUpperCase()))
-            .collect(Collectors.toSet());
+  public static Set<ValidationType> parseTypesToSkipString(@Nullable String typesToSkipStr) {
+    if (StringUtils.isBlank(typesToSkipStr)) {
+      return Set.of();
+    }
+    String[] split = StringUtils.split(typesToSkipStr, ',');
+    Set<ValidationType> typesToSkip = Sets.newHashSetWithExpectedSize(split.length);
+    for (String type : split) {
+      typesToSkip.add(ValidationType.valueOf(type.trim().toUpperCase()));
+    }
+    return typesToSkip;
   }
 
   /**
@@ -348,7 +357,7 @@ public final class TableConfigUtils {
    *
    * 2. For OFFLINE table
    * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
-   * - for Dimension tables checks the primary key requirement
+   * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
    *
    * 3. Checks peerDownloadSchema
    * 4. Checks time column existence if null handling for time column is enabled
@@ -386,6 +395,29 @@ public final class TableConfigUtils {
     }
 
     validateRetentionConfig(tableConfig);
+  }
+
+  private static void validateSegmentAssignmentConfig(TableConfig tableConfig) {
+    Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
+    if (segmentAssignmentConfigMap == null) {
+      return;
+    }
+    if (tableConfig.isDimTable()) {
+      SegmentAssignmentConfig segmentAssignmentConfig =
+          segmentAssignmentConfigMap.get(InstancePartitionsType.OFFLINE.toString());
+      if (segmentAssignmentConfig == null) {
+        return;
+      }
+      String segmentAssignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
+      if (segmentAssignmentStrategy != null
+          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
+        throw new IllegalStateException(
+            String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
+                tableConfig.getTableName(),
+                CommonConstants.Segment.AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY,
+                segmentAssignmentStrategy));
+      }
+    }
   }
 
   private static boolean isValidPeerDownloadScheme(String peerSegmentDownloadScheme) {
@@ -1269,6 +1301,7 @@ public final class TableConfigUtils {
     List<String> violations = new ArrayList<>();
     validateUpsertConfigUpdate(newConfig, existingConfig, violations);
     validateDedupConfigUpdate(newConfig, existingConfig, violations);
+    validateMaterializedViewConfigUpdate(newConfig, existingConfig, violations);
 
     return violations;
   }
@@ -1276,8 +1309,10 @@ public final class TableConfigUtils {
   /**
    * Validates that critical upsert configuration fields are not changed during table config update.
    * Checks: mode, hashFunction, comparisonColumns, timeColumn (when no comparison columns),
-   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn,
-   * partialUpsertStrategies, defaultPartialUpsertStrategy.
+   * deleteRecordColumn, dropOutOfOrderRecord, outOfOrderRecordColumn.
+   *
+   * <p>Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
+   * not validated here — they may be added, removed, or changed on existing tables.
    *
    * @param newConfig the new table config being applied
    * @param existingConfig the existing table config
@@ -1298,6 +1333,7 @@ public final class TableConfigUtils {
     } else if (existingUpsertEnabled) {
       UpsertConfig existingUpsertConfig = existingConfig.getUpsertConfig();
       UpsertConfig newUpsertConfig = newConfig.getUpsertConfig();
+      assert existingUpsertConfig != null && newUpsertConfig != null;
 
       if (existingUpsertConfig.getMode() != newUpsertConfig.getMode()) {
         violations.add(
@@ -1307,47 +1343,37 @@ public final class TableConfigUtils {
         violations.add(String.format("upsertConfig.hashFunction (%s -> %s)", existingUpsertConfig.getHashFunction(),
             newUpsertConfig.getHashFunction()));
       }
-      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(),
-          newUpsertConfig.getComparisonColumns())) {
+      if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
         violations.add(
             String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-                newUpsertConfig.getComparisonColumns()));
+              newUpsertConfig.getComparisonColumns()));
       }
       List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
       if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
         String existingTimeColumn =
             existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-                : null;
+              : null;
         String newTimeColumn =
             newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
         if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
           violations.add(
               String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
-                  newTimeColumn));
+                newTimeColumn));
         }
       }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
             String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
-                newUpsertConfig.isDropOutOfOrderRecord()));
+              newUpsertConfig.isDropOutOfOrderRecord()));
       }
       if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
           newUpsertConfig.getOutOfOrderRecordColumn())) {
         violations.add(String.format("upsertConfig.outOfOrderRecordColumn (%s -> %s)",
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
       }
-      if (existingUpsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-        if (!Objects.equals(existingUpsertConfig.getPartialUpsertStrategies(),
-            newUpsertConfig.getPartialUpsertStrategies())) {
-          violations.add(String.format("upsertConfig.partialUpsertStrategies (%s -> %s)",
-              existingUpsertConfig.getPartialUpsertStrategies(), newUpsertConfig.getPartialUpsertStrategies()));
-        }
-        if (existingUpsertConfig.getDefaultPartialUpsertStrategy()
-            != newUpsertConfig.getDefaultPartialUpsertStrategy()) {
-          violations.add(String.format("upsertConfig.defaultPartialUpsertStrategy (%s -> %s)",
-              existingUpsertConfig.getDefaultPartialUpsertStrategy(),
-              newUpsertConfig.getDefaultPartialUpsertStrategy()));
-        }
+      if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
+        violations.add(String.format("upsertConfig.deleteRecordColumn (%s -> %s)",
+            existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn()));
       }
     }
   }
@@ -1397,6 +1423,73 @@ public final class TableConfigUtils {
         }
       }
     }
+  }
+
+  /**
+   * Validates materialized-view table identity and task-config consistency.
+   * Identity is declared only via {@link TableConfig#isMaterializedView()}; task configs alone do not
+   * make a table an MV.
+   */
+  @VisibleForTesting
+  static void validateMaterializedViewInvariants(TableConfig tableConfig) {
+    boolean isMaterializedView = tableConfig.isMaterializedView();
+    boolean hasMvTaskWithDefinedSql = tableConfig.hasMaterializedViewTaskWithDefinedSql();
+    boolean hasMvTask = tableConfig.getMaterializedViewTaskConfigs() != null;
+
+    if (isMaterializedView) {
+      Preconditions.checkState(tableConfig.getTableType() == TableType.OFFLINE,
+          "Materialized view tables must be OFFLINE, got: %s for table: %s", tableConfig.getTableType(),
+          tableConfig.getTableName());
+      Preconditions.checkState(hasMvTaskWithDefinedSql,
+          "isMaterializedView is true but MaterializedViewTask with non-empty definedSQL is required for table: %s",
+          tableConfig.getTableName());
+      Preconditions.checkState(!tableConfig.isDimTable(),
+          "A table cannot be both isDimTable and isMaterializedView: %s", tableConfig.getTableName());
+    }
+
+    if (hasMvTaskWithDefinedSql && !isMaterializedView) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but isMaterializedView is not true for table: %s. "
+              + "Set \"isMaterializedView\": true or remove MaterializedViewTask.",
+          tableConfig.getTableName()));
+    }
+
+    if (hasMvTask && !hasMvTaskWithDefinedSql) {
+      throw new IllegalStateException(String.format(
+          "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
+          tableConfig.getTableName()));
+    }
+  }
+
+  private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
+      List<String> violations) {
+    if (existingConfig.isMaterializedView() != newConfig.isMaterializedView()) {
+      violations.add(String.format("isMaterializedView (%s -> %s) cannot be changed; drop and recreate the table",
+          existingConfig.isMaterializedView(), newConfig.isMaterializedView()));
+    }
+
+    if (!existingConfig.isMaterializedView() && !newConfig.isMaterializedView()) {
+      return;
+    }
+
+    String existingDefinedSql = getDefinedSqlFromMaterializedViewTask(existingConfig);
+    String newDefinedSql = getDefinedSqlFromMaterializedViewTask(newConfig);
+    if (existingDefinedSql != null && newDefinedSql != null && !existingDefinedSql.equals(newDefinedSql)) {
+      violations.add("MaterializedViewTask.definedSQL is immutable after MV creation");
+    }
+
+    if (existingConfig.isMaterializedView() && !newConfig.hasMaterializedViewTaskWithDefinedSql()) {
+      violations.add("MaterializedViewTask with definedSQL cannot be removed from a materialized view table");
+    }
+  }
+
+  @Nullable
+  private static String getDefinedSqlFromMaterializedViewTask(TableConfig tableConfig) {
+    Map<String, String> configs = tableConfig.getMaterializedViewTaskConfigs();
+    if (configs == null) {
+      return null;
+    }
+    return configs.get(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
   }
 
   /**
@@ -1480,8 +1573,10 @@ public final class TableConfigUtils {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
     if (CollectionUtils.isNotEmpty(fieldConfigs)) {
+      Set<String> seenColumns = new HashSet<>();
       for (FieldConfig fieldConfig : fieldConfigs) {
         String column = fieldConfig.getName();
+        Preconditions.checkState(seenColumns.add(column), "Duplicate FieldConfig for column: %s", column);
         Preconditions.checkState(schema.hasColumn(column), "Failed to find column: %s in schema", column);
 
         // Validate DELTA / DELTADELTA compression codecs compatibility
@@ -1997,7 +2092,7 @@ public final class TableConfigUtils {
       // Only set the new config if the deprecated one is set.
       Map<String, String> streamConfigs = indexingConfig.getStreamConfigs();
       if (MapUtils.isNotEmpty(streamConfigs)) {
-        streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigs));
+        streamIngestionConfig = new StreamIngestionConfig(List.of(streamConfigs));
       }
     }
 

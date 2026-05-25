@@ -358,7 +358,7 @@ public class ArrayBasedGlobalDictionaries implements GlobalDictionaries {
         values[i] = "null";
       } else {
         int origValLength = val.length();
-        values[i] = RandomStringUtils.randomAlphanumeric(origValLength);
+        values[i] = RandomStringUtils.secure().nextAlphanumeric(origValLength);
       }
     }
     Arrays.sort(values);

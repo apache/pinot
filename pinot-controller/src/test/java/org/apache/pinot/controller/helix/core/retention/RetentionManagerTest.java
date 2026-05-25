@@ -860,6 +860,109 @@ public class RetentionManagerTest {
     }
   }
 
+  @Test
+  public void testCreationTimeFallbackOnChange() {
+    ControllerConf conf = new ControllerConf();
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager =
+        new RetentionManager(mockResourceManager, mock(LeadControllerManager.class), conf, controllerMetrics,
+            brokerServiceHelper);
+
+    // Default should be false
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate cluster config change to enable
+    String configKey = ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK;
+    Map<String, String> clusterConfigs = new HashMap<>();
+    clusterConfigs.put(configKey, "true");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertTrue(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate cluster config change to disable
+    clusterConfigs.put(configKey, "false");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Invalid value should keep current value
+    clusterConfigs.put(configKey, "invalid");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Simulate config key deletion (null value) while feature is enabled — should revert to default (false)
+    clusterConfigs.put(configKey, "true");
+    retentionManager.onChange(Set.of(configKey), clusterConfigs);
+    assertTrue(retentionManager.isRetentionCreationTimeFallbackEnabled());
+
+    // Now delete the config key: changedConfigs contains the key, but clusterConfigs.get() returns null
+    Map<String, String> configsWithDeletedKey = new HashMap<>();
+    configsWithDeletedKey.put(configKey, null);
+    retentionManager.onChange(Set.of(configKey), configsWithDeletedKey);
+    assertFalse(retentionManager.isRetentionCreationTimeFallbackEnabled());
+  }
+
+  @Test
+  public void testRetentionWithInvalidEndTimeAndCreationTimeFallback() {
+    long now = System.currentTimeMillis();
+    // Creation time must exceed the table's retention period (365 days) to be purgeable
+    long fourHundredDaysAgoMs = now - TimeUnit.DAYS.toMillis(400);
+
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
+
+    // Segment with invalid end time but old creation time — should be deleted when fallback is enabled
+    SegmentZKMetadata invalidEndTimeSeg = mock(SegmentZKMetadata.class);
+    when(invalidEndTimeSeg.getSegmentName()).thenReturn("seg_invalid_endtime");
+    when(invalidEndTimeSeg.getEndTimeMs()).thenReturn(-1L);
+    when(invalidEndTimeSeg.getCreationTime()).thenReturn(fourHundredDaysAgoMs);
+    when(invalidEndTimeSeg.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentsZKMetadata.add(invalidEndTimeSeg);
+
+    // Segment with valid end time that is recent — should NOT be deleted
+    SegmentZKMetadata recentSeg = mock(SegmentZKMetadata.class);
+    when(recentSeg.getSegmentName()).thenReturn("seg_recent");
+    when(recentSeg.getEndTimeMs()).thenReturn(now);
+    when(recentSeg.getCreationTime()).thenReturn(now);
+    when(recentSeg.getStatus()).thenReturn(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentsZKMetadata.add(recentSeg);
+
+    final TableConfig tableConfig = createOfflineTableConfig();
+    List<String> expectedDeletedSegments = List.of("seg_invalid_endtime");
+
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+    setupPinotHelixResourceManager(tableConfig, expectedDeletedSegments, pinotHelixResourceManager,
+        leadControllerManager);
+
+    when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
+
+    // Test with fallback ENABLED
+    ControllerConf conf = new ControllerConf();
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    conf.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK, "true");
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager =
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
+    retentionManager.start();
+    retentionManager.run();
+
+    // Verify deleteSegments is called — setupPinotHelixResourceManager's doAnswer
+    // already asserts the correct segments via TestNG assertions
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+  }
+
   public static class FakePinotFs extends LocalPinotFS {
 
     @Override

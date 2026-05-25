@@ -1016,7 +1016,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
       // There is a race condition that the destroy() method can be called which ends up calling stop on the consumer.
-      // The destroy() method does not wait for the thread to terminate (and reasonably so, we dont want to wait
+      // The destroy() method does not wait for the thread to terminate (and reasonably so, we don't want to wait
       // forever).
       // Since the _shouldStop variable is set to true only in stop() method, we know that the metric will be destroyed,
       // so it is ok not to mark it non-consuming, as the main thread will clean up this metric in destroy() method

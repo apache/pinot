@@ -29,9 +29,9 @@ import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 
 /*

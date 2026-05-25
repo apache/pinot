@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.IOException;
-import org.apache.pinot.segment.spi.partition.ModuloPartitionFunction;
+import org.apache.pinot.common.partition.function.ModuloPartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -57,7 +57,7 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
   public void testRecordsMatchingPartitionAreIndexed()
       throws IOException {
     _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, PARTITION_COLUMN,
-        new ModuloPartitionFunction(NUM_PARTITIONS), MAIN_PARTITION_ID, true);
+        new ModuloPartitionFunction(NUM_PARTITIONS, null), MAIN_PARTITION_ID, true);
 
     // memberId values 0, 4, 8 all map to partition 0
     indexRow(_segment, 0, 100);
@@ -71,7 +71,7 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
   public void testRecordsMismatchingPartitionAreDropped()
       throws IOException {
     _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, PARTITION_COLUMN,
-        new ModuloPartitionFunction(NUM_PARTITIONS), MAIN_PARTITION_ID, true);
+        new ModuloPartitionFunction(NUM_PARTITIONS, null), MAIN_PARTITION_ID, true);
 
     // memberId values 1, 2, 3 map to partitions 1, 2, 3 — all mismatches
     indexRow(_segment, 1, 200);
@@ -85,7 +85,7 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
   public void testMixedPartitionsOnlyIndexMatchingRecords()
       throws IOException {
     _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, PARTITION_COLUMN,
-        new ModuloPartitionFunction(NUM_PARTITIONS), MAIN_PARTITION_ID, true);
+        new ModuloPartitionFunction(NUM_PARTITIONS, null), MAIN_PARTITION_ID, true);
 
     indexRow(_segment, 0, 100);  // partition 0 — indexed
     indexRow(_segment, 1, 101);  // partition 1 — dropped
@@ -99,7 +99,7 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
   public void testConfigDisabledIndexesAllRecordsRegardlessOfPartition()
       throws IOException {
     _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, PARTITION_COLUMN,
-        new ModuloPartitionFunction(NUM_PARTITIONS), MAIN_PARTITION_ID, false);
+        new ModuloPartitionFunction(NUM_PARTITIONS, null), MAIN_PARTITION_ID, false);
 
     indexRow(_segment, 0, 100);  // partition 0
     indexRow(_segment, 1, 101);  // partition 1
@@ -113,7 +113,7 @@ public class MutableSegmentImplDropRecordOnPartitionMismatchTest {
   public void testNullPartitionColumnValueThrowsException()
       throws IOException {
     _segment = MutableSegmentImplTestUtils.createMutableSegmentImpl(SCHEMA, PARTITION_COLUMN,
-        new ModuloPartitionFunction(NUM_PARTITIONS), MAIN_PARTITION_ID, true);
+        new ModuloPartitionFunction(NUM_PARTITIONS, null), MAIN_PARTITION_ID, true);
 
     GenericRow row = new GenericRow();
     row.putValue(PARTITION_COLUMN, null);

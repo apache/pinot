@@ -65,7 +65,8 @@ public class ExtraInstanceConfig {
           protocol = CommonConstants.HTTP_PROTOCOL;
           port = _proxy.getPort();
         }
-      } catch (Exception ignored) {
+      } catch (Exception ex) {
+        // Failed to parse port as integer, URL will not be constructed
       }
     }
     if (port != null) {

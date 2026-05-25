@@ -33,7 +33,7 @@ public class PinotAggregateReduceFunctionsRule extends AggregateReduceFunctionsR
       new PinotAggregateReduceFunctionsRule(Config.DEFAULT);
 
   public static PinotAggregateReduceFunctionsRule instanceWithDescription(String description) {
-      return new PinotAggregateReduceFunctionsRule((Config) Config.DEFAULT.withDescription(description));
+    return new PinotAggregateReduceFunctionsRule((Config) Config.DEFAULT.withDescription(description));
   }
 
   private PinotAggregateReduceFunctionsRule(Config config) {

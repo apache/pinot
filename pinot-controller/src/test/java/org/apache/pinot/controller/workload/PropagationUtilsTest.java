@@ -42,181 +42,180 @@ import org.testng.annotations.Test;
 
 public class PropagationUtilsTest {
 
-    private PinotHelixResourceManager _pinotHelixResourceManager;
+  private PinotHelixResourceManager _pinotHelixResourceManager;
 
-    @BeforeClass
+  @BeforeClass
     public void setUp() {
-        _pinotHelixResourceManager = Mockito.mock(PinotHelixResourceManager.class);
-    }
+    _pinotHelixResourceManager = Mockito.mock(PinotHelixResourceManager.class);
+  }
 
-    @Test
+  @Test
     public void getTableToHelixTagsTest() {
         // Create a list of table configurations
-        List<TableConfig> tableConfigs = new ArrayList<>();
-        tableConfigs.add(createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE));
-        tableConfigs.add(createTableConfig("table2", "serverTag2", "brokerTenant2", TableType.REALTIME));
+    List<TableConfig> tableConfigs = new ArrayList<>();
+    tableConfigs.add(createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE));
+    tableConfigs.add(createTableConfig("table2", "serverTag2", "brokerTenant2", TableType.REALTIME));
         // Mock the behavior of getAllTableConfigs to return the list of table configurations
-        Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
+    Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
         // Call the method to get table to Helix tags
-        Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags
+    Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags
                 = PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
         // Verify the results
-        Map<String, Map<NodeConfig.Type, Set<String>>> expectedTags = new HashMap<>();
-        expectedTags.put("table1_OFFLINE", new HashMap<>() {{
+    Map<String, Map<NodeConfig.Type, Set<String>>> expectedTags = new HashMap<>();
+    expectedTags.put("table1_OFFLINE", new HashMap<>() {{
             put(NodeConfig.Type.SERVER_NODE, Set.of("serverTag1_OFFLINE"));
             put(NodeConfig.Type.BROKER_NODE, Set.of("brokerTenant1_BROKER"));
-        }});
-        expectedTags.put("table2_REALTIME", new HashMap<>() {{
+      }});
+    expectedTags.put("table2_REALTIME", new HashMap<>() {{
             put(NodeConfig.Type.SERVER_NODE, Set.of("serverTag2_REALTIME"));
             put(NodeConfig.Type.BROKER_NODE, Set.of("brokerTenant2_BROKER"));
-        }});
+      }});
 
-        Assert.assertEquals(tableToHelixTags.size(), expectedTags.size(),
+    Assert.assertEquals(tableToHelixTags.size(), expectedTags.size(),
                 "Expected size of table to helix tags mapping does not match");
-        for (Map.Entry<String, Map<NodeConfig.Type, Set<String>>> tableEntry : expectedTags.entrySet()) {
-            String tableName = tableEntry.getKey();
-            Map<NodeConfig.Type, Set<String>> expectedNodeTags = tableEntry.getValue();
+    for (Map.Entry<String, Map<NodeConfig.Type, Set<String>>> tableEntry : expectedTags.entrySet()) {
+      String tableName = tableEntry.getKey();
+      Map<NodeConfig.Type, Set<String>> expectedNodeTags = tableEntry.getValue();
             // For each node type in the expected map, assert the tag exists
-            for (Map.Entry<NodeConfig.Type, Set<String>> entry : expectedNodeTags.entrySet()) {
-                NodeConfig.Type nodeType = entry.getKey();
-                Set<String> expectedTag = entry.getValue();
-                Assert.assertEquals(tableToHelixTags.get(tableName).get(nodeType), expectedTag,
+      for (Map.Entry<NodeConfig.Type, Set<String>> entry : expectedNodeTags.entrySet()) {
+        NodeConfig.Type nodeType = entry.getKey();
+        Set<String> expectedTag = entry.getValue();
+        Assert.assertEquals(tableToHelixTags.get(tableName).get(nodeType), expectedTag,
                         "Expected " + expectedTag + " for " + tableName + " with node type " + nodeType
                                 + " but found " + tableToHelixTags.get(tableName).get(nodeType));
-            }
-        }
+      }
     }
+  }
 
-    @Test
+  @Test
     public void getHelixTagsForTableTest() {
         // Mock the behavior of getHelixTagsForTable to return a set of helix tags
-        TableConfig tableConfig = createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE);
-        TableConfig tableConfig2 = createTableConfig("table1", "serverTag2", "brokerTenant2", TableType.REALTIME);
-        Mockito.when(_pinotHelixResourceManager.getTableConfig("table1_OFFLINE")).thenReturn(tableConfig);
-        Mockito.when(_pinotHelixResourceManager.getTableConfig("table1_REALTIME")).thenReturn(tableConfig2);
+    TableConfig tableConfig = createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE);
+    TableConfig tableConfig2 = createTableConfig("table1", "serverTag2", "brokerTenant2", TableType.REALTIME);
+    Mockito.when(_pinotHelixResourceManager.getTableConfig("table1_OFFLINE")).thenReturn(tableConfig);
+    Mockito.when(_pinotHelixResourceManager.getTableConfig("table1_REALTIME")).thenReturn(tableConfig2);
 
         // Define the expected helix tags for the table
-        Map<String, Set<String>> expected = new HashMap<>();
-        expected.put("table1_OFFLINE", Set.of("serverTag1_OFFLINE", "brokerTenant1_BROKER"));
-        expected.put("table1_REALTIME", Set.of("serverTag2_REALTIME", "brokerTenant2_BROKER"));
+    Map<String, Set<String>> expected = new HashMap<>();
+    expected.put("table1_OFFLINE", Set.of("serverTag1_OFFLINE", "brokerTenant1_BROKER"));
+    expected.put("table1_REALTIME", Set.of("serverTag2_REALTIME", "brokerTenant2_BROKER"));
 
-        for (Map.Entry<String, Set<String>> entry : expected.entrySet()) {
-            String tableName = entry.getKey();
-            Set<String> expectedHelixTags = entry.getValue();
+    for (Map.Entry<String, Set<String>> entry : expected.entrySet()) {
+      String tableName = entry.getKey();
+      Set<String> expectedHelixTags = entry.getValue();
             // Call the method to get helix tags for the table
-            List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
+      List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
                     tableName);
             // Verify the results
-            for (String helixTag : expectedHelixTags) {
-                Assert.assertTrue(helixTags.contains(helixTag),
+      for (String helixTag : expectedHelixTags) {
+        Assert.assertTrue(helixTags.contains(helixTag),
                         "Expected helix tag " + helixTag + " for table " + tableName + " but found " + helixTags);
-            }
-        }
+      }
     }
+  }
 
-    @Test
+  @Test
     public void getHelixTagToInstancesTest() {
         // Create a list of instance configurations
-        List<InstanceConfig> instanceConfigs = List.of(
+    List<InstanceConfig> instanceConfigs = List.of(
                 createInstanceConfig("instance1", List.of("serverTag1_OFFLINE")),
                 createInstanceConfig("instance2", List.of("serverTag1_OFFLINE")),
                 createInstanceConfig("instance3", List.of("brokerTenant1_BROKER")),
                 createInstanceConfig("instance4", List.of("brokerTenant1_BROKER"))
         );
-        Mockito.when(_pinotHelixResourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
+    Mockito.when(_pinotHelixResourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
         // Call the method to get Helix tag to instances mapping
-        Map<String, Set<String>> helixTagToInstances
+    Map<String, Set<String>> helixTagToInstances
                 = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
         // Verify the results
-        Map<String, Set<String>> expected = new HashMap<>();
-        expected.put("serverTag1_OFFLINE", Set.of("instance1", "instance2"));
-        expected.put("brokerTenant1_BROKER", Set.of("instance3", "instance4"));
+    Map<String, Set<String>> expected = new HashMap<>();
+    expected.put("serverTag1_OFFLINE", Set.of("instance1", "instance2"));
+    expected.put("brokerTenant1_BROKER", Set.of("instance3", "instance4"));
 
-        Assert.assertEquals(helixTagToInstances.size(), expected.size(),
+    Assert.assertEquals(helixTagToInstances.size(), expected.size(),
                 "Expected size of helix tag to instances mapping does not match");
-        for (Map.Entry<String, Set<String>> entry : expected.entrySet()) {
-            String helixTag = entry.getKey();
-            Set<String> expectedInstances = entry.getValue();
-            Assert.assertTrue(helixTagToInstances.containsKey(helixTag),
+    for (Map.Entry<String, Set<String>> entry : expected.entrySet()) {
+      String helixTag = entry.getKey();
+      Set<String> expectedInstances = entry.getValue();
+      Assert.assertTrue(helixTagToInstances.containsKey(helixTag),
                     "Expected helix tag " + helixTag + " but not found in the mapping");
-            for (String instance : expectedInstances) {
-                Assert.assertTrue(helixTagToInstances.get(helixTag).contains(instance),
+      for (String instance : expectedInstances) {
+        Assert.assertTrue(helixTagToInstances.get(helixTag).contains(instance),
                         "Expected instance " + instance + " for helix tag " + helixTag + " but found "
                                 + helixTagToInstances.get(helixTag));
-            }
-        }
+      }
     }
+  }
 
-    @Test
+  @Test
     public void getQueryWorkloadConfigsForTagsTest() {
         // Create a list of query workload configurations
-        PropagationEntity entity1 = new PropagationEntity("table1", 100L, 100L, null);
-        PropagationEntity entity2 = new PropagationEntity("table2", 100L, 100L, null);
-        QueryWorkloadConfig workloadConfig1 = createQueryWorkloadConfig("workload1",
+    PropagationEntity entity1 = new PropagationEntity("table1", 100L, 100L, null);
+    PropagationEntity entity2 = new PropagationEntity("table2", 100L, 100L, null);
+    QueryWorkloadConfig workloadConfig1 = createQueryWorkloadConfig("workload1",
             new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity1, entity2)),
             new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity1, entity2)));
-        PropagationEntity entity3 = new PropagationEntity("serverTag1", 100L, 100L, null);
-        PropagationEntity entity4 = new PropagationEntity("brokerTenant1_BROKER", 100L, 100L, null);
-        QueryWorkloadConfig workloadConfig2 = createQueryWorkloadConfig("workload2",
+    PropagationEntity entity3 = new PropagationEntity("serverTag1", 100L, 100L, null);
+    PropagationEntity entity4 = new PropagationEntity("brokerTenant1_BROKER", 100L, 100L, null);
+    QueryWorkloadConfig workloadConfig2 = createQueryWorkloadConfig("workload2",
             new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity3)),
             new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity4)));
-        PropagationEntity entity5 = new PropagationEntity("serverTag2_REALTIME", 100L, 100L, null);
-        PropagationEntity entity6 = new PropagationEntity("brokerTenant2", 100L, 100L, null);
+    PropagationEntity entity5 = new PropagationEntity("serverTag2_REALTIME", 100L, 100L, null);
+    PropagationEntity entity6 = new PropagationEntity("brokerTenant2", 100L, 100L, null);
         // Create a third workload config with different tags
-        QueryWorkloadConfig workloadConfig3 = createQueryWorkloadConfig("workload3",
+    QueryWorkloadConfig workloadConfig3 = createQueryWorkloadConfig("workload3",
             new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity5)),
             new PropagationScheme(PropagationScheme.Type.TENANT, List.of(entity6)));
-        List<QueryWorkloadConfig> queryWorkloadConfigs = List.of(workloadConfig1, workloadConfig2, workloadConfig3);
+    List<QueryWorkloadConfig> queryWorkloadConfigs = List.of(workloadConfig1, workloadConfig2, workloadConfig3);
         // Create TableConfig for the workload
-        List<TableConfig> tableConfigs = List.of(
+    List<TableConfig> tableConfigs = List.of(
                 createTableConfig("table1", "serverTag1", "brokerTenant1", TableType.OFFLINE),
                 createTableConfig("table2", "serverTag2", "brokerTenant2", TableType.REALTIME)
         );
         // Mock the behavior of getAllTableConfigs to return the list of table configurations
-        Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
+    Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
 
-        List<String> helixTags = List.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
+    List<String> helixTags = List.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
                 "serverTag2_REALTIME", "brokerTenant2_BROKER");
-        Set<QueryWorkloadConfig> workloadConfigsForTags =
+    Set<QueryWorkloadConfig> workloadConfigsForTags =
                 PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags,
                         queryWorkloadConfigs);
         // Verify the results
-        Set<QueryWorkloadConfig> expectedWorkloadConfigs = Set.of(workloadConfig1, workloadConfig2, workloadConfig3);
-        Assert.assertEquals(workloadConfigsForTags.size(), expectedWorkloadConfigs.size(),
+    Set<QueryWorkloadConfig> expectedWorkloadConfigs = Set.of(workloadConfig1, workloadConfig2, workloadConfig3);
+    Assert.assertEquals(workloadConfigsForTags.size(), expectedWorkloadConfigs.size(),
                 "Expected size of workload configs for tags does not match");
-        for (QueryWorkloadConfig workloadConfig : workloadConfigsForTags) {
-            Assert.assertTrue(expectedWorkloadConfigs.contains(workloadConfig),
+    for (QueryWorkloadConfig workloadConfig : workloadConfigsForTags) {
+      Assert.assertTrue(expectedWorkloadConfigs.contains(workloadConfig),
                     "Expected workload config " + workloadConfig.getQueryWorkloadName()
                             + " but not found in the expected set");
-        }
     }
+  }
 
-    public TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
-        return new TableConfigBuilder(type)
+  public TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
+    return new TableConfigBuilder(type)
             .setTableName(tableName)
-            .setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
             .setNumReplicas(1)
             .setBrokerTenant(brokerTenant)
             .setServerTenant(serverTag)
             .setLoadMode("HEAP")
             .setSegmentVersion(null)
             .build();
-    }
+  }
 
-    private InstanceConfig createInstanceConfig(String instanceName, List<String> helixTags) {
-        InstanceConfig instanceConfig = new InstanceConfig(instanceName);
-        for (String helixTag : helixTags) {
-            instanceConfig.addTag(helixTag);
-        }
-        return instanceConfig;
+  private InstanceConfig createInstanceConfig(String instanceName, List<String> helixTags) {
+    InstanceConfig instanceConfig = new InstanceConfig(instanceName);
+    for (String helixTag : helixTags) {
+      instanceConfig.addTag(helixTag);
     }
+    return instanceConfig;
+  }
 
-    private QueryWorkloadConfig createQueryWorkloadConfig(String name, PropagationScheme serverScheme,
+  private QueryWorkloadConfig createQueryWorkloadConfig(String name, PropagationScheme serverScheme,
                                                           PropagationScheme brokerScheme) {
-        EnforcementProfile enforcementProfile = new EnforcementProfile(10, 10);
-        return new QueryWorkloadConfig(name, List.of(
+    EnforcementProfile enforcementProfile = new EnforcementProfile(10, 10);
+    return new QueryWorkloadConfig(name, List.of(
            new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, serverScheme),
            new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, brokerScheme)
       ));
-    }
+  }
 }

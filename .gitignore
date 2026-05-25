@@ -45,6 +45,8 @@ yarn-error.log*
 
 #quickstart files
 quickstart*
+!.claude/skills/quickstart/
+!kb/skills/quickstart.md
 
 #build symlink directory
 build
@@ -126,3 +128,4 @@ hf_cache/
 # Python
 __pycache__/
 *.py[cod]
+.bench-compare/

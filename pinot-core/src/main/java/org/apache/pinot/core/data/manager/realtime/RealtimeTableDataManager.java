@@ -137,6 +137,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   protected Cache<String, StreamMetadataProvider> _streamMetadataProviderCache;
 
+  private final BooleanSupplier _isServerReadyToConsumeData;
   private final BooleanSupplier _isServerReadyToServeQueries;
 
   // Object to track ingestion delay for all partitions
@@ -151,7 +152,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToServeQueries) {
+    this(segmentBuildSemaphore, () -> true, isServerReadyToServeQueries);
+  }
+
+  /**
+   * @param isServerReadyToConsumeData returns {@code false} when consuming-segment ingestion should be held off
+   *     (e.g. while the server is still draining startup-time work). Each consuming segment checks this gate at the
+   *     entry of its consumer thread; once the gate clears, it is not consulted again for that segment.
+   */
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore, BooleanSupplier isServerReadyToConsumeData,
+      BooleanSupplier isServerReadyToServeQueries) {
     _segmentBuildSemaphore = segmentBuildSemaphore;
+    _isServerReadyToConsumeData = isServerReadyToConsumeData;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
   }
 
@@ -221,8 +233,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _streamMetadataProviderCache = getStreamMetadataProviderCache();
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
+    BooleanSupplier readyForDedupOrPartialUpsert;
     if (isDedupEnabled() || isPartialUpsertEnabled()) {
-      _isTableReadyToConsumeData = new BooleanSupplier() {
+      readyForDedupOrPartialUpsert = new BooleanSupplier() {
         volatile boolean _allSegmentsLoaded;
         long _lastCheckTimeMs;
 
@@ -247,8 +260,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }
       };
     } else {
-      _isTableReadyToConsumeData = () -> true;
+      readyForDedupOrPartialUpsert = () -> true;
     }
+    _isTableReadyToConsumeData = () -> readyForDedupOrPartialUpsert.getAsBoolean()
+        && _isServerReadyToConsumeData.getAsBoolean();
   }
 
   @VisibleForTesting

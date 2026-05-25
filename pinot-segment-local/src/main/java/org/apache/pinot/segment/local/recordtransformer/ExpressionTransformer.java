@@ -197,8 +197,12 @@ public class ExpressionTransformer implements RecordTransformer {
           _throttledLogger.warn("Caught exception while evaluation transform function for column: " + column, e);
           record.markIncomplete();
         }
-      } else if (existingValue.getClass().isArray() || existingValue instanceof Collection
-          || existingValue instanceof Map) {
+      } else if ((existingValue.getClass().isArray() && !(existingValue instanceof byte[]))
+          || existingValue instanceof Collection || existingValue instanceof Map) {
+        // BYTES single-value columns are intentionally excluded from this branch. `byte[]` is logically a scalar
+        // and is preserved like other scalar types; without the exclusion, a transform yielding null (e.g. when
+        // the source field is absent) would clobber the existing `byte[]` value. Multi-value BYTES (`byte[][]`)
+        // is still treated as a nested array.
         try {
           Object transformedValue = transformFunctionEvaluator.evaluate(record);
           if (transformedValue == null && _implicitMapTransformColumns.contains(column)) {

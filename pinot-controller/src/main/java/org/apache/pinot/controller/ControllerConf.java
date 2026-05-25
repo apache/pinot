@@ -176,6 +176,13 @@ public class ControllerConf extends PinotConfiguration {
     public static final String ENABLE_DISTRIBUTED_LOCKING = "controller.task.enableDistributedLocking";
     public static final boolean DEFAULT_ENABLE_DISTRIBUTED_LOCKING = false;
 
+    // Cluster-level default for PinotTaskManager concurrent task scheduling. When true, scheduleTasks
+    // uses per-table JVM locks (plus the distributed ZK lock if enabled) instead of a global
+    // controller-wide synchronized lock, allowing task generation for different tables to run in
+    // parallel. Can be overridden per table via TableTaskConfig.concurrentSchedulingEnabled.
+    public static final String CONCURRENT_SCHEDULING_ENABLED = "controller.task.concurrentSchedulingEnabled";
+    public static final boolean DEFAULT_CONCURRENT_SCHEDULING_ENABLED = false;
+
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
 
     public static final String SEGMENT_RELOCATOR_REASSIGN_INSTANCES = "controller.segment.relocator.reassignInstances";
@@ -251,12 +258,19 @@ public class ControllerConf extends PinotConfiguration {
     // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
     public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
         "controller.retentionManager.untrackedSegmentDeletionEnabled";
+    public static final boolean DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION = false;
     public static final String UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS =
         "controller.retentionManager.untrackedSegmentsRetentionTimeInDays";
     public static final int DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS = 3;
     public static final String AGED_SEGMENTS_DELETION_BATCH_SIZE =
         "controller.retentionManager.agedSegmentsDeletionBatchSize";
     public static final int DEFAULT_AGED_SEGMENTS_DELETION_BATCH_SIZE = 1000;
+
+    // When enabled, the retention manager will fall back to using segment creation time for retention decisions
+    // when the segment end time is invalid (e.g., time column populated with 0).
+    public static final String ENABLE_RETENTION_CREATION_TIME_FALLBACK =
+        "controller.retentionManager.enableCreationTimeFallback";
+    public static final boolean DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK = false;
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -346,6 +360,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
       "controller.enable.hybrid.table.retention.strategy";
+  // When true (default), segment deletion refuses to remove segments that participate in a live segment lineage
+  // entry (IN_PROGRESS, or COMPLETED.segmentsFrom).
+  public static final String LINEAGE_EXCLUSIVE_DELETE_ENABLED = "controller.lineage.exclusive.delete.enabled";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
@@ -381,6 +398,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final boolean DEFAULT_RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP = false;
   public static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
   public static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
+  public static final boolean DEFAULT_LINEAGE_EXCLUSIVE_DELETE_ENABLED = true;
   public static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   public static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
@@ -1127,6 +1145,10 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY);
   }
 
+  public boolean isLineageExclusiveDeleteEnabled() {
+    return getProperty(LINEAGE_EXCLUSIVE_DELETE_ENABLED, DEFAULT_LINEAGE_EXCLUSIVE_DELETE_ENABLED);
+  }
+
   public int getSegmentLevelValidationIntervalInSeconds() {
     String period = getProperty(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD,
         ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD);
@@ -1217,7 +1239,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public boolean getUntrackedSegmentDeletionEnabled() {
-    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, false);
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION,
+        ControllerPeriodicTasksConf.DEFAULT_ENABLE_UNTRACKED_SEGMENT_DELETION);
   }
 
   public int getUntrackedSegmentsRetentionTimeInDays() {
@@ -1227,6 +1250,11 @@ public class ControllerConf extends PinotConfiguration {
 
   public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {
     setProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, untrackedSegmentDeletionEnabled);
+  }
+
+  public boolean isRetentionCreationTimeFallbackEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.ENABLE_RETENTION_CREATION_TIME_FALLBACK,
+        ControllerPeriodicTasksConf.DEFAULT_ENABLE_RETENTION_CREATION_TIME_FALLBACK);
   }
 
   public int getAgedSegmentsDeletionBatchSize() {
@@ -1249,6 +1277,11 @@ public class ControllerConf extends PinotConfiguration {
   public boolean isPinotTaskManagerDistributedLockingEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DISTRIBUTED_LOCKING,
         ControllerPeriodicTasksConf.DEFAULT_ENABLE_DISTRIBUTED_LOCKING);
+  }
+
+  public boolean isPinotTaskManagerConcurrentSchedulingEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.CONCURRENT_SCHEDULING_ENABLED,
+        ControllerPeriodicTasksConf.DEFAULT_CONCURRENT_SCHEDULING_ENABLED);
   }
 
   public long getPinotTaskExpireTimeInMs() {

@@ -199,7 +199,7 @@ public class ExecutionStatsAggregator {
       if (tableType == TableType.OFFLINE) {
         _offlineResponseSerMemAllocatedBytes += Long.parseLong(responseSerMemAlocatedBytesStr);
       } else {
-         _realtimeResponseSerMemAllocatedBytes += Long.parseLong(responseSerMemAlocatedBytesStr);
+        _realtimeResponseSerMemAllocatedBytes += Long.parseLong(responseSerMemAlocatedBytesStr);
       }
     }
     _offlineTotalMemAllocatedBytes =

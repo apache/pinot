@@ -38,6 +38,10 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-materialized-view</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-query-planner</artifactId>
     </dependency>
     <dependency>
@@ -55,6 +59,10 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-planner</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-sql-ddl</artifactId>
     </dependency>
 
     <dependency>
@@ -163,7 +171,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration combine.children="override">
+        <configuration>
           <suiteXmlFiles>
             <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
             <suiteXmlFile>testng-stateless.xml</suiteXmlFile>

@@ -25,13 +25,11 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
-  private final PinotDataBuffer _dataBuffer;
   // Cached bitmap to avoid re-deserializing from the underlying buffer on every call.
-  // ImmutableRoaringBitmap is thread-safe once constructed, so a volatile field is sufficient.
-  private volatile ImmutableRoaringBitmap _nullBitmap;
+  private final ImmutableRoaringBitmap _nullBitmap;
 
   public NullValueVectorReaderImpl(PinotDataBuffer dataBuffer) {
-    _dataBuffer = dataBuffer;
+    _nullBitmap = new ImmutableRoaringBitmap(dataBuffer.toDirectByteBuffer(0, (int) dataBuffer.size()));
   }
 
   public boolean isNull(int docId) {
@@ -40,11 +38,6 @@ public class NullValueVectorReaderImpl implements NullValueVectorReader {
 
   @Override
   public ImmutableRoaringBitmap getNullBitmap() {
-    ImmutableRoaringBitmap nullBitmap = _nullBitmap;
-    if (nullBitmap == null) {
-      nullBitmap = new ImmutableRoaringBitmap(_dataBuffer.toDirectByteBuffer(0, (int) _dataBuffer.size()));
-      _nullBitmap = nullBitmap;
-    }
-    return nullBitmap;
+    return _nullBitmap;
   }
 }

@@ -24,40 +24,33 @@ This is a docker image of [Apache Pinot](https://github.com/apache/pinot).
 
 ## How to build a docker image
 
-There is a docker build script which will build a given Git repo/branch and tag the image.
+There is a docker build script which will build a given Git ref and tag the image. The script always
+builds from `https://github.com/apache/pinot.git`.
 
 Usage:
 
 ```SHELL
-./docker-build.sh [Docker Tag] [Git Branch] [Pinot Git URL] [Kafka Version] [Java Version] [JDK Version] [OpenJDK Image ]
+./docker-build.sh [Docker Tag] [Git Ref] [Kafka Version] [Java Version]
 ```
-
-This script will check out Pinot Repo `[Pinot Git URL]` on branch `[Git Branch]` and build the docker image for that.
 
 The docker image is tagged as `[Docker Tag]`.
 
 `Docker Tag`: Name and tag your docker image. Default is `pinot:latest`.
 
-`Git Branch`: The Pinot branch to build. Default is `master`.
+`Git Ref`: The Pinot branch, tag, or commit SHA to build. Default is `master`.
 
-`Pinot Git URL`: The Pinot Git Repo to build, users can set it to their own fork. Please note that, the URL is `https://` based, not `git://`. Default is the Apache Repo: `https://github.com/apache/pinot.git`.
+`Kafka Version`: The Kafka version to build Pinot with. Default is `3.0`.
 
-`Kafka Version`: The Kafka Version to build pinot with. Default is `2.0`
+`Java Version`: The Java build and runtime image version. Default is `21`.
 
-`Java Version`: The Java Build and Runtime image version. Default is `11`
-
-`JDK Version`: The JDK parameter to build pinot, set as part of maven build option: `-Djdk.version=${JDK_VERSION}`. Default is `11`
-
-`OpenJDK Image`: Base image to use for Pinot build and runtime. Default is `openjdk`.
-
-* Example of building and tagging a snapshot on your own fork:
+* Example of building and tagging a snapshot:
 ```SHELL
-./docker-build.sh pinot_fork:snapshot-5.2 snapshot-5.2 https://github.com/your_own_fork/pinot.git
+./docker-build.sh pinot:snapshot-5.2 snapshot-5.2
 ```
 
 * Example of building a release version:
 ```SHELL
-./docker-build.sh pinot:release-0.1.0 release-0.1.0 https://github.com/apache/pinot.git
+./docker-build.sh pinot:release-0.1.0 release-0.1.0
 ```
 
 ### Build image for arm64
@@ -66,13 +59,13 @@ On Apple Silicon (M1/M2) or any arm64 host, pass `--platform linux/arm64`:
 
 ```SHELL
 docker build -t pinot:latest --platform linux/arm64 --no-cache --network=host \
-  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=11 -f Dockerfile .
+  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=21 -f Dockerfile .
 ```
 
 On an x86 machine with QEMU installed, add `--platform linux/arm64` the same way:
 ```SHELL
 docker build -t pinot:latest --platform linux/arm64 --no-cache \
-  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=11 -f Dockerfile .
+  --build-arg PINOT_GIT_REF=master --build-arg JDK_VERSION=21 -f Dockerfile .
 ```
 
 ## How to publish a docker image

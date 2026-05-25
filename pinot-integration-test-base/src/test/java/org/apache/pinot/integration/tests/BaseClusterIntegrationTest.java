@@ -641,7 +641,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
     if (_pinotConnection == null) {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory()
-        .withConnectionProperties(getPinotConnectionProperties());
+          .withConnectionProperties(getPinotConnectionProperties());
       factory.setHeaders(getPinotClientTransportHeaders());
       _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
           factory.buildTransport());

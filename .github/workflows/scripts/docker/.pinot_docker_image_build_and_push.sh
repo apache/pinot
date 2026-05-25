@@ -27,6 +27,12 @@ fi
 if [ -z "${BUILD_PLATFORM}" ]; then
   BUILD_PLATFORM="linux/arm64,linux/amd64"
 fi
+if [ -z "${JDK_VERSION}" ]; then
+  JDK_VERSION="21"
+fi
+if [ -z "${PINOT_BASE_IMAGE_TAG}" ]; then
+  PINOT_BASE_IMAGE_TAG="${JDK_VERSION}-amazoncorretto"
+fi
 
 # Get pinot commit id.
 # Use clone + checkout instead of clone -b so that commit SHAs work in
@@ -59,11 +65,14 @@ done
 
 cd ${DOCKER_FILE_BASE_DIR}
 
+echo "Building Pinot Docker image with JDK ${JDK_VERSION} and base image tag ${PINOT_BASE_IMAGE_TAG}"
 docker buildx build \
     --no-cache \
     --platform=${BUILD_PLATFORM} \
     --file Dockerfile \
     --build-arg PINOT_GIT_REF=${PINOT_GIT_REF} \
+    --build-arg JDK_VERSION=${JDK_VERSION} \
+    --build-arg PINOT_BASE_IMAGE_TAG=${PINOT_BASE_IMAGE_TAG} \
     ${DOCKER_BUILD_TAGS} \
     --push \
     .

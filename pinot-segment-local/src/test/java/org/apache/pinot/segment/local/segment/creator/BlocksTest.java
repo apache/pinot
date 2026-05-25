@@ -25,7 +25,7 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.util.TestUtils;
@@ -54,7 +54,7 @@ public class BlocksTest {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 
     final SegmentGeneratorConfig config = SegmentTestUtils
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,

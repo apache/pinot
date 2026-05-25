@@ -234,7 +234,7 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
         new PinotJoinConditionPushRule(JoinConditionPushRuleConfig.DEFAULT);
 
     public static PinotJoinConditionPushRule instanceWithDescription(String description) {
-        return new PinotJoinConditionPushRule(
+      return new PinotJoinConditionPushRule(
             (JoinConditionPushRuleConfig) JoinConditionPushRuleConfig.DEFAULT.withDescription(description));
     }
 

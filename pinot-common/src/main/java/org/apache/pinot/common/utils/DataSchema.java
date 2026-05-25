@@ -50,6 +50,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.PinotDataType;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -290,16 +291,16 @@ public class DataSchema {
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
       }
     },
-    MAP(NullValuePlaceHolder.MAP) {
-      @Override
-      public RelDataType toType(RelDataTypeFactory typeFactory) {
-        return typeFactory.createSqlType(SqlTypeName.MAP);
-      }
-    },
     BYTES(NullValuePlaceHolder.INTERNAL_BYTES) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      }
+    },
+    MAP(NullValuePlaceHolder.MAP) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.MAP);
       }
     },
     OBJECT(null) {
@@ -332,6 +333,12 @@ public class DataSchema {
         return typeFactory.createArrayType(DOUBLE.toType(typeFactory), -1);
       }
     },
+    BIG_DECIMAL_ARRAY(NullValuePlaceHolder.BIG_DECIMAL_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(BIG_DECIMAL.toType(typeFactory), -1);
+      }
+    },
     BOOLEAN_ARRAY(INT_ARRAY, NullValuePlaceHolder.INT_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -350,7 +357,7 @@ public class DataSchema {
         return typeFactory.createArrayType(STRING.toType(typeFactory), -1);
       }
     },
-    BYTES_ARRAY(NullValuePlaceHolder.BYTES_ARRAY) {
+    BYTES_ARRAY(NullValuePlaceHolder.INTERNAL_BYTES_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createArrayType(BYTES.toType(typeFactory), -1);
@@ -366,10 +373,10 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> NUMERIC_TYPES = EnumSet.of(INT, LONG, FLOAT, DOUBLE, BIG_DECIMAL);
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES =
-        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
-            BYTES_ARRAY);
+        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
+            STRING_ARRAY, BYTES_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
-        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
+        EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, BIG_DECIMAL_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
 
     // stored data type.
@@ -440,6 +447,7 @@ public class DataSchema {
         case DOUBLE_ARRAY:
           return DataType.DOUBLE;
         case BIG_DECIMAL:
+        case BIG_DECIMAL_ARRAY:
           return DataType.BIG_DECIMAL;
         case BOOLEAN:
         case BOOLEAN_ARRAY:
@@ -530,6 +538,7 @@ public class DataSchema {
      *   <li>BYTES: ByteArray -> byte[]</li>
      *   <li>BOOLEAN_ARRAY: int[] -> boolean[]</li>
      *   <li>TIMESTAMP_ARRAY: long[] -> Timestamp[]</li>
+     *   <li>BYTES_ARRAY: ByteArray[] -> byte[][]</li>
      * </ul>
      */
     public Object toExternal(Object value) {
@@ -544,6 +553,8 @@ public class DataSchema {
           return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray((long[]) value);
+        case BYTES_ARRAY:
+          return toBytesArray(value);
         default:
           return value;
       }
@@ -582,14 +593,16 @@ public class DataSchema {
           return toFloatArray(value);
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
-        case STRING_ARRAY:
-          return toStringArray(value);
+        case BIG_DECIMAL_ARRAY:
+          return toBigDecimalArray(value);
         case BOOLEAN_ARRAY:
           return toBooleanArray(toIntArray(value));
         case TIMESTAMP_ARRAY:
           return toTimestampArray(toLongArray(value));
+        case STRING_ARRAY:
+          return toStringArray(value);
         case BYTES_ARRAY:
-          return (byte[][]) value;
+          return toBytesArray(value);
         case UNKNOWN: // fall through
         case OBJECT:
           return (Serializable) value;
@@ -611,6 +624,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
+        case BIG_DECIMAL_ARRAY:
+          return formatBigDecimalArray((BigDecimal[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((Timestamp[]) value);
         case BYTES_ARRAY:
@@ -654,14 +669,16 @@ public class DataSchema {
           return (float[]) value;
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
-        case STRING_ARRAY:
-          return (String[]) value;
+        case BIG_DECIMAL_ARRAY:
+          return formatBigDecimalArray((BigDecimal[]) value);
         case BOOLEAN_ARRAY:
           return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((long[]) value);
+        case STRING_ARRAY:
+          return (String[]) value;
         case BYTES_ARRAY:
-          return (byte[][]) value;
+          return formatBytesArray((ByteArray[]) value);
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
@@ -685,6 +702,23 @@ public class DataSchema {
         return ArrayListUtils.toIntArray((IntArrayList) value);
       }
       throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
+    }
+
+    private static long[] toLongArray(Object value) {
+      if (value instanceof long[]) {
+        return (long[]) value;
+      } else if (value instanceof LongArrayList) {
+        // For FunnelCountAggregationFunction and ArrayAggregationFunction
+        return ArrayListUtils.toLongArray((LongArrayList) value);
+      } else {
+        int[] intValues = (int[]) value;
+        int length = intValues.length;
+        long[] longValues = new long[length];
+        for (int i = 0; i < length; i++) {
+          longValues[i] = intValues[i];
+        }
+        return longValues;
+      }
     }
 
     private static float[] toFloatArray(Object value) {
@@ -730,31 +764,23 @@ public class DataSchema {
       }
     }
 
-    private static long[] toLongArray(Object value) {
-      if (value instanceof long[]) {
-        return (long[]) value;
-      } else if (value instanceof LongArrayList) {
-        // For FunnelCountAggregationFunction and ArrayAggregationFunction
-        return ArrayListUtils.toLongArray((LongArrayList) value);
-      } else {
-        int[] intValues = (int[]) value;
-        int length = intValues.length;
-        long[] longValues = new long[length];
-        for (int i = 0; i < length; i++) {
-          longValues[i] = intValues[i];
-        }
-        return longValues;
-      }
-    }
-
-    private static String[] toStringArray(Object value) {
-      if (value instanceof String[]) {
-        return (String[]) value;
+    private static BigDecimal[] toBigDecimalArray(Object value) {
+      if (value instanceof BigDecimal[]) {
+        return (BigDecimal[]) value;
       } else if (value instanceof ObjectArrayList) {
         // For ArrayAggregationFunction
-        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
+        return ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value);
       }
-      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to BigDecimal[]", value));
+    }
+
+    private static String[] formatBigDecimalArray(BigDecimal[] bigDecimalArray) {
+      int length = bigDecimalArray.length;
+      String[] formattedBigDecimalArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedBigDecimalArray[i] = bigDecimalArray[i].toPlainString();
+      }
+      return formattedBigDecimalArray;
     }
 
     private static boolean[] toBooleanArray(int[] intArray) {
@@ -811,11 +837,52 @@ public class DataSchema {
       return formattedTimestampArray;
     }
 
-    private static String[] formatBytesArray(byte[][] byteArray) {
+    private static String[] toStringArray(Object value) {
+      if (value instanceof String[]) {
+        return (String[]) value;
+      } else if (value instanceof ObjectArrayList) {
+        // For ArrayAggregationFunction
+        return ArrayListUtils.toStringArray((ObjectArrayList<String>) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
+    }
+
+    private static byte[][] toBytesArray(Object value) {
+      if (value instanceof ByteArray[]) {
+        ByteArray[] wrapped = (ByteArray[]) value;
+        byte[][] raw = new byte[wrapped.length][];
+        for (int i = 0; i < wrapped.length; i++) {
+          raw[i] = wrapped[i].getBytes();
+        }
+        return raw;
+      }
+      if (value instanceof ObjectArrayList) {
+        // For ArrayAggregationFunction
+        ObjectArrayList<ByteArray> list = (ObjectArrayList<ByteArray>) value;
+        int size = list.size();
+        byte[][] raw = new byte[size][];
+        for (int i = 0; i < size; i++) {
+          raw[i] = list.get(i).getBytes();
+        }
+        return raw;
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to byte[][]", value));
+    }
+
+    private static String[] formatBytesArray(byte[][] bytesArray) {
+      int length = bytesArray.length;
+      String[] formattedBytesArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedBytesArray[i] = BytesUtils.toHexString(bytesArray[i]);
+      }
+      return formattedBytesArray;
+    }
+
+    private static String[] formatBytesArray(ByteArray[] byteArray) {
       int length = byteArray.length;
       String[] formattedBytesArray = new String[length];
       for (int i = 0; i < length; i++) {
-        formattedBytesArray[i] = BytesUtils.toHexString(byteArray[i]);
+        formattedBytesArray[i] = byteArray[i].toHexString();
       }
       return formattedBytesArray;
     }
@@ -865,6 +932,8 @@ public class DataSchema {
           return FLOAT_ARRAY;
         case DOUBLE:
           return DOUBLE_ARRAY;
+        case BIG_DECIMAL:
+          return BIG_DECIMAL_ARRAY;
         case BOOLEAN:
           return BOOLEAN_ARRAY;
         case TIMESTAMP:
@@ -875,6 +944,57 @@ public class DataSchema {
           return BYTES_ARRAY;
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
+      }
+    }
+
+    /// Returns the [PinotDataType] for this [ColumnDataType] for query execution purpose. Returns primitive array
+    /// type for multi-valued types.
+    public PinotDataType toPinotDataType() {
+      switch (this) {
+        case INT:
+          return PinotDataType.INTEGER;
+        case LONG:
+          return PinotDataType.LONG;
+        case FLOAT:
+          return PinotDataType.FLOAT;
+        case DOUBLE:
+          return PinotDataType.DOUBLE;
+        case BIG_DECIMAL:
+          return PinotDataType.BIG_DECIMAL;
+        case BOOLEAN:
+          return PinotDataType.BOOLEAN;
+        case TIMESTAMP:
+          return PinotDataType.TIMESTAMP;
+        case STRING:
+          return PinotDataType.STRING;
+        case JSON:
+          return PinotDataType.JSON;
+        case BYTES:
+          return PinotDataType.BYTES;
+        case MAP:
+          return PinotDataType.MAP;
+        case OBJECT:
+          return PinotDataType.OBJECT;
+        case INT_ARRAY:
+          return PinotDataType.PRIMITIVE_INT_ARRAY;
+        case LONG_ARRAY:
+          return PinotDataType.PRIMITIVE_LONG_ARRAY;
+        case FLOAT_ARRAY:
+          return PinotDataType.PRIMITIVE_FLOAT_ARRAY;
+        case DOUBLE_ARRAY:
+          return PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
+        case BIG_DECIMAL_ARRAY:
+          return PinotDataType.BIG_DECIMAL_ARRAY;
+        case BOOLEAN_ARRAY:
+          return PinotDataType.PRIMITIVE_BOOLEAN_ARRAY;
+        case TIMESTAMP_ARRAY:
+          return PinotDataType.TIMESTAMP_ARRAY;
+        case STRING_ARRAY:
+          return PinotDataType.STRING_ARRAY;
+        case BYTES_ARRAY:
+          return PinotDataType.BYTES_ARRAY;
+        default:
+          throw new IllegalStateException("Cannot convert ColumnDataType: " + this + " to PinotDataType");
       }
     }
 

@@ -39,6 +39,11 @@ import static org.testng.Assert.*;
 
 public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtimeIngestionTest {
   private final static int FORCE_COMMIT_REBALANCE_TIMEOUT_MS = 600_000;
+  // startOneServer() does not register the starter in _serverStarters, so its size doesn't advance across parameterized
+  // invocations. Track our own counter so each invocation gets a unique serverId range, and therefore unique on-disk
+  // data dirs (TEMP_SERVER_DIR/dataDir-<serverId>); otherwise leftover state from a prior invocation pushes segment
+  // transitions into ERROR and rebalance hangs.
+  private int _nextExtraServerId = 1;
 
   @Override
   protected String getFailurePoint() {
@@ -115,7 +120,8 @@ public class TableRebalancePauselessIntegrationTest extends BasePauselessRealtim
     final String tenantA = tableConfig.getTenantConfig().getServer();
     final String tenantB = tenantA + "_new";
 
-    final int baseServerIndex = _serverStarters.size();
+    final int baseServerIndex = _nextExtraServerId;
+    _nextExtraServerId += 4;
     BaseServerStarter serverStarter0 = startOneServer(baseServerIndex);
     BaseServerStarter serverStarter1 = startOneServer(baseServerIndex + 1);
     createServerTenant(tenantA, 0, 2);

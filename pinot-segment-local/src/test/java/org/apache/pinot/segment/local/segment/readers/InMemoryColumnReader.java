@@ -168,6 +168,11 @@ public class InMemoryColumnReader implements ColumnReader {
   }
 
   @Override
+  public BigDecimal[] nextBigDecimalMV() {
+    return (BigDecimal[]) next();
+  }
+
+  @Override
   public String[] nextStringMV() {
     return (String[]) next();
   }
@@ -255,6 +260,11 @@ public class InMemoryColumnReader implements ColumnReader {
   @Override
   public MultiValueResult<double[]> getDoubleMV(int docId) {
     return MultiValueResult.of((double[]) _values[docId], null);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId) {
+    return (BigDecimal[]) _values[docId];
   }
 
   @Override

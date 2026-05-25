@@ -33,6 +33,10 @@ on:
         description: "The docker image name, default to 'apachepinot/pinot'."
         default: "apachepinot/pinot"
         required: true
+      jdkVersion:
+        description: "The JDK version to use for the Pinot build and runtime image."
+        default: "21"
+        required: true
       tags:
         description: "Tags to push of the image, comma separated, e.g. tag1,tag2,tag3"
         default: ""
@@ -51,12 +55,13 @@ jobs:
       uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Build and push the Docker image
       env:
         DOCKER_FILE_BASE_DIR: "docker/images/pinot"
         DOCKER_IMAGE_NAME: ${{ github.event.inputs.dockerImageName }}
         BUILD_PLATFORM: ${{ github.event.inputs.platform }}
         PINOT_GIT_REF: ${{ github.event.inputs.commit }}
+        JDK_VERSION: ${{ github.event.inputs.jdkVersion }}
         TAGS: ${{ github.event.inputs.tags }}
       run: .github/workflows/scripts/docker/.pinot_docker_image_build_and_push.sh

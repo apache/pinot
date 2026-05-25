@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.readers;
 
-import com.google.common.io.Files;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
@@ -60,7 +60,7 @@ public class MultiplePinotSegmentRecordReaderTest {
       throws Exception {
     Schema schema = createPinotSchema();
     TableConfig tableConfig = createTableConfig();
-    _segmentOutputDir = Files.createTempDir().toString();
+    _segmentOutputDir = Files.createTempDirectory("pinot-test-").toFile().toString();
     _rowsList = new ArrayList<>(NUM_SEGMENTS);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigDecimal;
 import javax.annotation.Nullable;
 
 
@@ -88,6 +89,11 @@ public interface IndexCreator extends Closeable {
     add(value, dictId);
   }
 
+  default void addBigDecimal(BigDecimal value, int dictId)
+      throws IOException {
+    add(value, dictId);
+  }
+
   default void addString(String value, int dictId)
       throws IOException {
     add(value, dictId);
@@ -135,6 +141,11 @@ public interface IndexCreator extends Closeable {
       boxedValues[i] = values[i];
     }
     add(boxedValues, dictIds);
+  }
+
+  default void addBigDecimalMV(BigDecimal[] values, @Nullable int[] dictIds)
+      throws IOException {
+    add(values, dictIds);
   }
 
   default void addStringMV(String[] values, @Nullable int[] dictIds)

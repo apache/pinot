@@ -195,8 +195,12 @@ public class AggregationFunctionUtils {
         return FloatArrayList.wrap(dataTable.getFloatArray(rowId, colId));
       case DOUBLE_ARRAY:
         return DoubleArrayList.wrap(dataTable.getDoubleArray(rowId, colId));
+      case BIG_DECIMAL_ARRAY:
+        return ObjectArrayList.wrap(dataTable.getBigDecimalArray(rowId, colId));
       case STRING_ARRAY:
         return ObjectArrayList.wrap(dataTable.getStringArray(rowId, colId));
+      case BYTES_ARRAY:
+        return ObjectArrayList.wrap(dataTable.getBytesArray(rowId, colId));
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
     }
@@ -236,6 +240,8 @@ public class AggregationFunctionUtils {
         return dataTable.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataTable.getDoubleArray(rowId, colId);
+      case BIG_DECIMAL_ARRAY:
+        return dataTable.getBigDecimalArray(rowId, colId);
       case BOOLEAN_ARRAY: {
         int[] intValues = dataTable.getIntArray(rowId, colId);
         int numValues = intValues.length;
@@ -256,6 +262,8 @@ public class AggregationFunctionUtils {
       }
       case STRING_ARRAY:
         return dataTable.getStringArray(rowId, colId);
+      case BYTES_ARRAY:
+        return dataTable.getBytesArray(rowId, colId);
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
     }

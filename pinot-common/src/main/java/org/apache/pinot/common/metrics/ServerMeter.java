@@ -115,6 +115,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   READINESS_CHECK_OK_CALLS("readinessCheck", true),
   READINESS_CHECK_BAD_CALLS("readinessCheck", true),
   QUERIES_KILLED("query", true),
+  QUERIES_KILLED_SCAN("queriesKilledScan", true),
+  QUERIES_KILLED_SCAN_DRY_RUN("queriesKilledScanDryRun", true),
+  QUERIES_KILLED_SCAN_ERROR("queriesKilledScanError", true),
   QUERIES_THROTTLED("query", true),
   HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
   HEAP_PANIC_LEVEL_EXCEEDED("count", true),
@@ -272,7 +275,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   MSE_MEMORY_ALLOCATED_BYTES("bytes", true),
   /// Total number of rows emitted by multi-stage execution.
   /// This is equal to the sum of the emittedRows reported by the root of all the opchains executed in the server.
-  MSE_EMITTED_ROWS("rows", true);
+  MSE_EMITTED_ROWS("rows", true),
+
+  /// Number of MSE queries received by this server.
+  /// This metric is incremented once per query, even if the server is acting as a leaf, intermediate, or both.
+  MSE_QUERIES("queries", true,
+      "Number of MSE queries received by this server");
 
   private final String _meterName;
   private final String _unit;

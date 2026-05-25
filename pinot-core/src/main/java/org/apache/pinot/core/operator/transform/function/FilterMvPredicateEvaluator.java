@@ -23,6 +23,7 @@ import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -75,7 +76,7 @@ public final class FilterMvPredicateEvaluator {
           throw new IllegalArgumentException(
               "filterMv only supports predicates on placeholder '" + VALUE_PLACEHOLDER + "' without functions");
         }
-        if (!StringUtils.equalsIgnoreCase(lhs.getIdentifier(), VALUE_PLACEHOLDER)) {
+        if (!Strings.CI.equals(lhs.getIdentifier(), VALUE_PLACEHOLDER)) {
           throw new IllegalArgumentException(
               "filterMv predicate must reference placeholder '" + VALUE_PLACEHOLDER + "', but found '"
                   + lhs.getIdentifier() + "'");
@@ -106,7 +107,7 @@ public final class FilterMvPredicateEvaluator {
               "filterMv does not support predicate type: " + predicate.getType());
         }
         PredicateEvaluator evaluator =
-            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dictionary, dataType);
+            PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dictionary, dataType, null);
         if (evaluator.isAlwaysTrue()) {
           return EvalNode.constant(true);
         }

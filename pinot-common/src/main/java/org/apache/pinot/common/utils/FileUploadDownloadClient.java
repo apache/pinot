@@ -751,8 +751,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @throws HttpErrorStatusException
    */
   public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, List<Header> headers,
-    String tableName, TableType tableType)
-    throws IOException, HttpErrorStatusException {
+      String tableName, TableType tableType)
+      throws IOException, HttpErrorStatusException {
     // Add table name and type request parameters
     NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
     NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());

@@ -89,7 +89,8 @@ public class PinotMetricUtils {
           LOGGER.info("Trying to init PinotMetricsFactory: {} and MetricsFactory: {}", clazz, annotation);
           if (annotation.enabled()) {
             try {
-              PinotMetricsFactory pinotMetricsFactory = (PinotMetricsFactory) clazz.newInstance();
+              PinotMetricsFactory pinotMetricsFactory =
+                  (PinotMetricsFactory) clazz.getDeclaredConstructor().newInstance();
               pinotMetricsFactory.init(metricsConfiguration);
               registerMetricsFactory(pinotMetricsFactory);
             } catch (Exception e) {

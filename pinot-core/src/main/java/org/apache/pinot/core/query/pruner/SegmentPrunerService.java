@@ -28,7 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -157,6 +156,6 @@ public class SegmentPrunerService {
       return true;
     }
     // Check if the segment has 0 queryable docIds while skipUpsert=false
-    return !skipUpsert && UpsertUtils.hasNoQueryableDocs(segment);
+    return !skipUpsert && segment.hasNoQueryableDocs();
   }
 }

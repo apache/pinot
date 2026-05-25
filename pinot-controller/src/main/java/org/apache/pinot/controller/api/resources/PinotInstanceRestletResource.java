@@ -121,8 +121,8 @@ public class PinotInstanceRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all live instances")
   @ApiResponses(value = {
-          @ApiResponse(code = 200, message = "Success"),
-          @ApiResponse(code = 500, message = "Internal error")
+    @ApiResponse(code = 200, message = "Success"),
+    @ApiResponse(code = 500, message = "Internal error")
   })
   public Instances getAllLiveInstances() {
     return new Instances(_pinotHelixResourceManager.getAllLiveInstances());
@@ -165,7 +165,7 @@ public class PinotInstanceRestletResource {
     boolean shutdownInProgress = instanceConfig.getRecord().getBooleanField(
         CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
     response.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, shutdownInProgress);
-    response.put("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
+    response.set("systemResourceInfo", JsonUtils.objectToJsonNode(getSystemResourceInfo(instanceConfig)));
     return response.toString();
   }
 

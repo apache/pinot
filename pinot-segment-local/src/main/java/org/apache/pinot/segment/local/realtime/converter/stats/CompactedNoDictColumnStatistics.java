@@ -34,6 +34,7 @@ import org.roaringbitmap.RoaringBitmap;
 /// When commit-time compaction is enabled, only valid (non-deleted) documents should be considered.
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatistics {
+  private final int _totalDocs;
   private final Comparable _minValue;
   private final Comparable _maxValue;
   private final int _minElementLength;
@@ -49,10 +50,11 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
     super(dataSource, sortedDocIds, isSortedColumn);
     Preconditions.checkState(!validDocIds.isEmpty(), "Use EmptyColumnStatistics for empty column: %s",
         _fieldSpec.getName());
+    _totalDocs = validDocIds.getCardinality();
 
-    DataType valueType = _forwardIndex.getStoredType();
+    DataType storedType = _forwardIndex.getStoredType();
     boolean isSingleValue = _forwardIndex.isSingleValue();
-    boolean isVariableWidth = !valueType.isFixedWidth();
+    boolean isVariableWidth = !storedType.isFixedWidth();
 
     // Single pass over valid documents to collect stats.
     // For SV columns, sort order is tracked inline: when sortedDocIds is provided, iterate in that order; when null,
@@ -62,9 +64,9 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
     Comparable minValue = null;
     Comparable maxValue = null;
     // For fixed-width types element length is constant; for variable-width it is tracked per entry
-    int minElementLength = isVariableWidth ? Integer.MAX_VALUE : valueType.size();
-    int maxElementLength = isVariableWidth ? 0 : valueType.size();
-    boolean isAscii = valueType == DataType.STRING;
+    int minElementLength = isVariableWidth ? Integer.MAX_VALUE : storedType.size();
+    int maxElementLength = isVariableWidth ? 0 : storedType.size();
+    boolean isAscii = storedType == DataType.STRING;
     boolean isSorted = !_isSortedColumn;
     Comparable prevValue = null;
     int totalEntries = 0;
@@ -79,7 +81,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
             continue;
           }
           totalEntries++;
-          Comparable value = readValue(docId, valueType);
+          Comparable value = readValue(docId, storedType);
           if (minValue == null || value.compareTo(minValue) < 0) {
             minValue = value;
           }
@@ -93,7 +95,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
             prevValue = value;
           }
           if (isVariableWidth) {
-            int length = getElementLength(value, valueType);
+            int length = getElementLength(value, storedType);
             minElementLength = Math.min(minElementLength, length);
             maxElementLength = Math.max(maxElementLength, length);
             if (isAscii) {
@@ -106,7 +108,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
         while (iterator.hasNext()) {
           int docId = iterator.next();
           totalEntries++;
-          Comparable value = readValue(docId, valueType);
+          Comparable value = readValue(docId, storedType);
           if (minValue == null || value.compareTo(minValue) < 0) {
             minValue = value;
           }
@@ -120,7 +122,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
             prevValue = value;
           }
           if (isVariableWidth) {
-            int length = getElementLength(value, valueType);
+            int length = getElementLength(value, storedType);
             minElementLength = Math.min(minElementLength, length);
             maxElementLength = Math.max(maxElementLength, length);
             if (isAscii) {
@@ -130,7 +132,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
         }
       }
     } else {
-      switch (valueType) {
+      switch (storedType) {
         case INT: {
           int minInt = Integer.MAX_VALUE;
           int maxInt = Integer.MIN_VALUE;
@@ -282,7 +284,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
           break;
         }
         default:
-          throw new IllegalStateException("Unsupported value type: " + valueType);
+          throw new IllegalStateException("Unsupported stored type: " + storedType);
       }
     }
 
@@ -298,7 +300,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
     } else if (isVariableWidth) {
       _maxRowLength = maxRowLength;
     } else {
-      _maxRowLength = maxMultiValues * valueType.size();
+      _maxRowLength = maxMultiValues * storedType.size();
     }
 
     if (_isSortedColumn) {
@@ -311,12 +313,17 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
   }
 
   @Override
-  public Comparable getMinValue() {
+  public int getTotalDocs() {
+    return _totalDocs;
+  }
+
+  @Override
+  public Comparable<?> getMinValue() {
     return _minValue;
   }
 
   @Override
-  public Comparable getMaxValue() {
+  public Comparable<?> getMaxValue() {
     return _maxValue;
   }
 
@@ -355,8 +362,8 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
     return _maxRowLength;
   }
 
-  private Comparable readValue(int docId, DataType valueType) {
-    switch (valueType) {
+  private Comparable readValue(int docId, DataType storedType) {
+    switch (storedType) {
       case INT:
         return _forwardIndex.getInt(docId);
       case LONG:
@@ -372,12 +379,12 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
       case BYTES:
         return new ByteArray(_forwardIndex.getBytes(docId));
       default:
-        throw new IllegalStateException("Unsupported value type: " + valueType);
+        throw new IllegalStateException("Unsupported stored type: " + storedType);
     }
   }
 
-  private static int getElementLength(Comparable value, DataType valueType) {
-    switch (valueType) {
+  private static int getElementLength(Comparable value, DataType storedType) {
+    switch (storedType) {
       case BIG_DECIMAL:
         return BigDecimalUtils.byteSize((BigDecimal) value);
       case STRING:
@@ -385,7 +392,7 @@ public class CompactedNoDictColumnStatistics extends MutableNoDictColumnStatisti
       case BYTES:
         return ((ByteArray) value).length();
       default:
-        throw new IllegalStateException("Unsupported variable-width value type: " + valueType);
+        throw new IllegalStateException("Unsupported variable-width stored type: " + storedType);
     }
   }
 }

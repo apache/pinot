@@ -90,12 +90,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
   private static final String LONG_MV_COLUMN = "longMVColumn";
   private static final String FLOAT_MV_COLUMN = "floatMVColumn";
   private static final String DOUBLE_MV_COLUMN = "doubleMVColumn";
+  private static final String BIG_DECIMAL_MV_COLUMN = "bigDecimalMVColumn";
   private static final String STRING_MV_COLUMN = "stringMVColumn";
+  private static final String BYTES_MV_COLUMN = "bytesMVColumn";
   private static final String RAW_INT_MV_COLUMN = "rawIntMVColumn";
   private static final String RAW_LONG_MV_COLUMN = "rawLongMVColumn";
   private static final String RAW_FLOAT_MV_COLUMN = "rawFloatMVColumn";
   private static final String RAW_DOUBLE_MV_COLUMN = "rawDoubleMVColumn";
+  private static final String RAW_BIG_DECIMAL_MV_COLUMN = "rawBigDecimalMVColumn";
   private static final String RAW_STRING_MV_COLUMN = "rawStringMVColumn";
+  private static final String RAW_BYTES_MV_COLUMN = "rawBytesMVColumn";
 
   //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
@@ -117,12 +121,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .addMultiValueDimension(LONG_MV_COLUMN, DataType.LONG)
       .addMultiValueDimension(FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(BIG_DECIMAL_MV_COLUMN, DataType.BIG_DECIMAL)
       .addMultiValueDimension(STRING_MV_COLUMN, DataType.STRING)
+      .addMultiValueDimension(BYTES_MV_COLUMN, DataType.BYTES)
       .addMultiValueDimension(RAW_INT_MV_COLUMN, DataType.INT)
       .addMultiValueDimension(RAW_LONG_MV_COLUMN, DataType.LONG)
       .addMultiValueDimension(RAW_FLOAT_MV_COLUMN, DataType.FLOAT)
       .addMultiValueDimension(RAW_DOUBLE_MV_COLUMN, DataType.DOUBLE)
+      .addMultiValueDimension(RAW_BIG_DECIMAL_MV_COLUMN, DataType.BIG_DECIMAL)
       .addMultiValueDimension(RAW_STRING_MV_COLUMN, DataType.STRING)
+      .addMultiValueDimension(RAW_BYTES_MV_COLUMN, DataType.BYTES)
       .build();
   //@formatter:on
 
@@ -130,7 +138,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       .setNoDictionaryColumns(
           Arrays.asList(RAW_INT_COLUMN, RAW_LONG_COLUMN, RAW_FLOAT_COLUMN, RAW_DOUBLE_COLUMN, RAW_BIG_DECIMAL_COLUMN,
               RAW_STRING_COLUMN, RAW_BYTES_COLUMN, RAW_INT_MV_COLUMN, RAW_LONG_MV_COLUMN, RAW_FLOAT_MV_COLUMN,
-              RAW_DOUBLE_MV_COLUMN, RAW_STRING_MV_COLUMN))
+              RAW_DOUBLE_MV_COLUMN, RAW_BIG_DECIMAL_MV_COLUMN, RAW_STRING_MV_COLUMN, RAW_BYTES_MV_COLUMN))
       .build();
 
   private IndexSegment _indexSegment;
@@ -197,16 +205,26 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       record.putValue(RAW_STRING_COLUMN, value);
       record.putValue(RAW_BYTES_COLUMN, Integer.toString(value).getBytes(UTF_8));
       Integer[] mvValue = new Integer[]{value, value + NUM_UNIQUE_RECORDS_PER_SEGMENT};
+      BigDecimal[] bigDecimalMVValue =
+          new BigDecimal[]{BigDecimal.valueOf(value), BigDecimal.valueOf(value + NUM_UNIQUE_RECORDS_PER_SEGMENT)};
+      byte[][] bytesMVValue = new byte[][]{
+          StringUtils.leftPad(Integer.toString(value), 4).getBytes(UTF_8),
+          StringUtils.leftPad(Integer.toString(value + NUM_UNIQUE_RECORDS_PER_SEGMENT), 4).getBytes(UTF_8)
+      };
       record.putValue(INT_MV_COLUMN, mvValue);
       record.putValue(LONG_MV_COLUMN, mvValue);
       record.putValue(FLOAT_MV_COLUMN, mvValue);
       record.putValue(DOUBLE_MV_COLUMN, mvValue);
+      record.putValue(BIG_DECIMAL_MV_COLUMN, bigDecimalMVValue);
       record.putValue(STRING_MV_COLUMN, mvValue);
+      record.putValue(BYTES_MV_COLUMN, bytesMVValue);
       record.putValue(RAW_INT_MV_COLUMN, mvValue);
       record.putValue(RAW_LONG_MV_COLUMN, mvValue);
       record.putValue(RAW_FLOAT_MV_COLUMN, mvValue);
       record.putValue(RAW_DOUBLE_MV_COLUMN, mvValue);
+      record.putValue(RAW_BIG_DECIMAL_MV_COLUMN, bigDecimalMVValue);
       record.putValue(RAW_STRING_MV_COLUMN, mvValue);
+      record.putValue(RAW_BYTES_MV_COLUMN, bytesMVValue);
       uniqueRecords.add(record);
     }
 
@@ -253,7 +271,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(intMVColumn) FROM testTable",
           "SELECT DISTINCT(longMVColumn) FROM testTable",
           "SELECT DISTINCT(floatMVColumn) FROM testTable",
-          "SELECT DISTINCT(doubleMVColumn) FROM testTable"
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable",
+          "SELECT DISTINCT(bigDecimalMVColumn) FROM testTable"
       );
       //@formatter:on
       // Query should be solved with dictionary, so it should return the 10 smallest values
@@ -325,7 +344,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       //@formatter:off
       List<String> queries = Arrays.asList(
           "SELECT DISTINCT(bytesColumn) FROM testTable",
-          "SELECT DISTINCT(rawBytesColumn) FROM testTable"
+          "SELECT DISTINCT(rawBytesColumn) FROM testTable",
+          "SELECT DISTINCT(bytesMVColumn) FROM testTable"
       );
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();
@@ -351,7 +371,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(rawIntMVColumn) FROM testTable",
           "SELECT DISTINCT(rawLongMVColumn) FROM testTable",
           "SELECT DISTINCT(rawFloatMVColumn) FROM testTable",
-          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable"
+          "SELECT DISTINCT(rawDoubleMVColumn) FROM testTable",
+          "SELECT DISTINCT(rawBigDecimalMVColumn) FROM testTable"
       );
       //@formatter:on
       // We define a specific result set here since the data read from raw is in the order added
@@ -382,6 +403,23 @@ public class DistinctQueriesTest extends BaseQueriesTest {
         assertEquals(values.length, 1);
         assertTrue(values[0] instanceof String);
         actualValues.add(Integer.parseInt((String) values[0]));
+      }
+      assertEquals(actualValues, expectedValues);
+    }
+    {
+      // Raw MV bytes column
+      //@formatter:off
+      String query = "SELECT DISTINCT(rawBytesMVColumn) FROM testTable";
+      //@formatter:on
+      // We define a specific result set here since the data read from raw is in the order added
+      Set<Integer> expectedValues = new HashSet<>(Arrays.asList(0, 1, 2, 3, 4, 100, 101, 102, 103, 104));
+      DistinctTable distinctTable = getDistinctTableInnerSegment(query);
+      assertEquals(distinctTable.size(), 10);
+      Set<Integer> actualValues = new HashSet<>();
+      for (Object[] values : distinctTable.getRows()) {
+        assertEquals(values.length, 1);
+        assertTrue(values[0] instanceof ByteArray);
+        actualValues.add(Integer.parseInt(new String(((ByteArray) values[0]).getBytes(), UTF_8).trim()));
       }
       assertEquals(actualValues, expectedValues);
     }
@@ -431,7 +469,8 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           "SELECT DISTINCT(intMVColumn) FROM testTable ORDER BY intMVColumn",
           "SELECT DISTINCT(longMVColumn) FROM testTable ORDER BY longMVColumn",
           "SELECT DISTINCT(floatMVColumn) FROM testTable ORDER BY floatMVColumn",
-          "SELECT DISTINCT(doubleMVColumn) FROM testTable ORDER BY doubleMVColumn"
+          "SELECT DISTINCT(doubleMVColumn) FROM testTable ORDER BY doubleMVColumn",
+          "SELECT DISTINCT(bigDecimalMVColumn) FROM testTable ORDER BY bigDecimalMVColumn"
       );
       //@formatter:on
       Set<Integer> expectedValues = new HashSet<>();

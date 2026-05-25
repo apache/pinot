@@ -27,6 +27,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.math.BigDecimal;
 import java.util.Set;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -160,6 +161,10 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           ObjectSerDeUtils.DOUBLE_SET_SER_DE.serialize((DoubleSet) set));
     }
     Object sampleValue = set.iterator().next();
+    if (sampleValue instanceof BigDecimal) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BigDecimalSet.getValue(),
+          ObjectSerDeUtils.BIG_DECIMAL_SET_SER_DE.serialize((Set<BigDecimal>) set));
+    }
     if (sampleValue instanceof String) {
       return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringSet.getValue(),
           ObjectSerDeUtils.STRING_SET_SER_DE.serialize((Set<String>) set));
@@ -194,7 +199,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
    */
   protected void svAggregate(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
@@ -246,6 +251,16 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           }
         });
         break;
+      case BIG_DECIMAL:
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = (ObjectOpenHashSet<BigDecimal>) valueSet;
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            bigDecimalSet.add(bigDecimalValues[i]);
+          }
+        });
+        break;
       case STRING:
         ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
         String[] stringValues = blockValSet.getStringValuesSV();
@@ -278,7 +293,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
    */
   protected void mvAggregate(BlockValSet blockValSet, int length, AggregationResultHolder aggregationResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
@@ -342,6 +357,18 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           }
         });
         break;
+      case BIG_DECIMAL:
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = (ObjectOpenHashSet<BigDecimal>) valueSet;
+        BigDecimal[][] bigDecimalValues = blockValSet.getBigDecimalValuesMV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (BigDecimal value : bigDecimalValues[i]) {
+              bigDecimalSet.add(value);
+            }
+          }
+        });
+        break;
       case STRING:
         ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
         String[][] stringValues = blockValSet.getStringValuesMV();
@@ -352,6 +379,18 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
             for (String value : stringValues[i]) {
               //noinspection UseBulkOperation
               stringSet.add(value);
+            }
+          }
+        });
+        break;
+      case BYTES:
+        ObjectOpenHashSet<ByteArray> bytesSet = (ObjectOpenHashSet<ByteArray>) valueSet;
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (byte[] value : bytesValues[i]) {
+              bytesSet.add(new ByteArray(value));
             }
           }
         });
@@ -368,7 +407,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregateGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
 
@@ -420,6 +459,16 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           }
         });
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ((ObjectOpenHashSet<BigDecimal>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BIG_DECIMAL))
+                .add(bigDecimalValues[i]);
+          }
+        });
+        break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
 
@@ -452,7 +501,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void mvAggregateGroupBySV(BlockValSet blockValSet, int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
       forEachNotNull(length, blockValSet, (from, to) -> {
@@ -517,6 +566,19 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           }
         });
         break;
+      case BIG_DECIMAL:
+        BigDecimal[][] bigDecimalValues = blockValSet.getBigDecimalValuesMV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ObjectOpenHashSet<BigDecimal> bigDecimalSet = (ObjectOpenHashSet<BigDecimal>) getValueSet(
+                groupByResultHolder, groupKeyArray[i], DataType.BIG_DECIMAL);
+            for (BigDecimal value : bigDecimalValues[i]) {
+              bigDecimalSet.add(value);
+            }
+          }
+        });
+        break;
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
 
@@ -528,6 +590,19 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
             for (String value : stringValues[i]) {
               //noinspection UseBulkOperation
               stringSet.add(value);
+            }
+          }
+        });
+        break;
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ObjectOpenHashSet<ByteArray> bytesSet =
+                (ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES);
+            for (byte[] value : bytesValues[i]) {
+              bytesSet.add(new ByteArray(value));
             }
           }
         });
@@ -544,7 +619,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregateGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[] dictIds = blockValSet.getDictionaryIdsSV();
 
@@ -595,6 +670,15 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           }
         });
         break;
+      case BIG_DECIMAL:
+        BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], bigDecimalValues[i]);
+          }
+        });
+        break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
 
@@ -625,7 +709,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void mvAggregateGroupByMV(BlockValSet blockValSet, int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder) {
     // For dictionary-encoded expression, store dictionary ids into the bitmap
-    Dictionary dictionary = blockValSet.getDictionary();
+    Dictionary dictionary = blockValSet.isDictionaryEncoded() ? blockValSet.getDictionary() : null;
     if (dictionary != null) {
       int[][] dictIds = blockValSet.getDictionaryIdsMV();
 
@@ -699,6 +783,21 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           }
         });
         break;
+      case BIG_DECIMAL:
+        BigDecimal[][] bigDecimalValues = blockValSet.getBigDecimalValuesMV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              ObjectOpenHashSet<BigDecimal> bigDecimalSet =
+                  (ObjectOpenHashSet<BigDecimal>) getValueSet(groupByResultHolder, groupKey, DataType.BIG_DECIMAL);
+              for (BigDecimal value : bigDecimalValues[i]) {
+                bigDecimalSet.add(value);
+              }
+            }
+          }
+        });
+        break;
       case STRING:
         String[][] stringValues = blockValSet.getStringValuesMV();
 
@@ -711,6 +810,21 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
               for (String value : stringValues[i]) {
                 //noinspection UseBulkOperation
                 stringSet.add(value);
+              }
+            }
+          }
+        });
+        break;
+      case BYTES:
+        byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            for (int groupKey : groupKeysArray[i]) {
+              ObjectOpenHashSet<ByteArray> bytesSet =
+                  (ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKey, DataType.BYTES);
+              for (byte[] value : bytesValues[i]) {
+                bytesSet.add(new ByteArray(value));
               }
             }
           }
@@ -747,6 +861,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         return new FloatOpenHashSet();
       case DOUBLE:
         return new DoubleOpenHashSet();
+      case BIG_DECIMAL:
       case STRING:
       case BYTES:
         return new ObjectOpenHashSet();
@@ -827,6 +942,15 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   }
 
   /**
+   * Helper method to set BIG_DECIMAL value for the given group keys into the result holder.
+   */
+  private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, BigDecimal value) {
+    for (int groupKey : groupKeys) {
+      ((ObjectOpenHashSet<BigDecimal>) getValueSet(groupByResultHolder, groupKey, DataType.BIG_DECIMAL)).add(value);
+    }
+  }
+
+  /**
    * Helper method to set STRING value for the given group keys into the result holder.
    */
   private static void setValueForGroupKeys(GroupByResultHolder groupByResultHolder, int[] groupKeys, String value) {
@@ -878,6 +1002,12 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
           doubleSet.add(dictionary.getDoubleValue(iterator.next()));
         }
         return doubleSet;
+      case BIG_DECIMAL:
+        ObjectOpenHashSet<BigDecimal> bigDecimalSet = new ObjectOpenHashSet<>(numValues);
+        while (iterator.hasNext()) {
+          bigDecimalSet.add(dictionary.getBigDecimalValue(iterator.next()));
+        }
+        return bigDecimalSet;
       case STRING:
         ObjectOpenHashSet<String> stringSet = new ObjectOpenHashSet<>(numValues);
         while (iterator.hasNext()) {

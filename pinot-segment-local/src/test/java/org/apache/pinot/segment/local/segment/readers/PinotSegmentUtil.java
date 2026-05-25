@@ -114,7 +114,7 @@ public class PinotSegmentUtil {
         case DOUBLE:
           return Math.abs(random.nextDouble());
         case STRING:
-          return RandomStringUtils.randomAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
+          return RandomStringUtils.secure().nextAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
         default:
           throw new IllegalStateException("Unsupported data type: " + storedType);
       }

@@ -43,6 +43,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -446,9 +447,9 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap<>() {{
-      this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
-    }});
-    when(columnMetadata.getMaxValue()).thenReturn(System.currentTimeMillis());
+        this.put(DEDUP_TIME_COLUMN_NAME, columnMetadata);
+      }});
+    doReturn(System.currentTimeMillis()).when(columnMetadata).getMaxValue();
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     // throws when not stopped
     assertThrows(RuntimeException.class, () -> metadataManager.addSegment(segment));

@@ -180,6 +180,17 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public int getBigDecimalMV(int docId, BigDecimal[] valueBuffer,
+      VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeBigDecimalArray(context.getValue(docId), valueBuffer);
+  }
+
+  @Override
+  public BigDecimal[] getBigDecimalMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeBigDecimalArray(context.getValue(docId));
+  }
+
+  @Override
   public int getStringMV(int docId, String[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
     return ArraySerDeUtils.deserializeStringArray(context.getValue(docId), valueBuffer);
   }

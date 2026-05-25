@@ -37,4 +37,9 @@ public interface SettableValue<T> {
    * @param valueSupplier the value supplier to set.
    */
   void setValueSupplier(Supplier<T> valueSupplier);
+
+  /**
+   * Returns the current value produced by either the set value or the value supplier.
+   */
+  T getValue();
 }

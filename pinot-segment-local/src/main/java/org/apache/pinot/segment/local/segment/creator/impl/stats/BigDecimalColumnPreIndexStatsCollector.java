@@ -32,6 +32,7 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   private ObjectOpenHashSet<BigDecimal> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
+  private int _maxRowLength = 0;
   private BigDecimal[] _sortedValues;
   private boolean _sealed = false;
 
@@ -42,9 +43,23 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
 
     if (entry instanceof Object[]) {
-      throw new UnsupportedOperationException();
+      Object[] values = (Object[]) entry;
+      int rowLength = 0;
+      for (Object obj : values) {
+        BigDecimal value = (BigDecimal) obj;
+        int length = BigDecimalUtils.byteSize(value);
+        if (_values.add(value)) {
+          _minLength = Math.min(_minLength, length);
+          _maxLength = Math.max(_maxLength, length);
+        }
+        rowLength += length;
+      }
+      _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
+      _maxRowLength = Math.max(_maxRowLength, rowLength);
+      updateTotalNumberOfEntries(values);
     } else {
       BigDecimal value = (BigDecimal) entry;
       int length = BigDecimalUtils.byteSize(value);
@@ -55,6 +70,7 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
         }
         _minLength = Math.min(_minLength, length);
         _maxLength = Math.max(_maxLength, length);
+        _maxRowLength = _maxLength;
       }
       _totalNumberOfEntries++;
     }
@@ -96,7 +112,7 @@ public class BigDecimalColumnPreIndexStatsCollector extends AbstractColumnStatis
 
   @Override
   public int getMaxRowLengthInBytes() {
-    return _maxLength;
+    return _maxRowLength;
   }
 
   @Override

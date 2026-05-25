@@ -60,6 +60,7 @@ public class DispatchablePlanContext {
 
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap = new HashMap<>();
   private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap = new HashMap<>();
+  private long _numSegmentsPrunedByBroker;
 
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
@@ -128,6 +129,14 @@ public class DispatchablePlanContext {
 
   public Map<Integer, PlanNode> getDispatchablePlanStageRootMap() {
     return _dispatchablePlanStageRootMap;
+  }
+
+  public long getNumSegmentsPrunedByBroker() {
+    return _numSegmentsPrunedByBroker;
+  }
+
+  public void addNumSegmentsPrunedByBroker(long count) {
+    _numSegmentsPrunedByBroker += count;
   }
 
   public Map<Integer, DispatchablePlanFragment> constructDispatchablePlanFragmentMap(PlanFragment subPlanRoot) {

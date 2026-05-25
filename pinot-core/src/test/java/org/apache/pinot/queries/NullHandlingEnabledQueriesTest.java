@@ -497,9 +497,9 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     return new Object[][]{
         {FieldSpec.DataType.STRING, "a"}, {
         FieldSpec.DataType.BIG_DECIMAL, 1
-    }, {
+      }, {
         FieldSpec.DataType.BYTES, "a string".getBytes()
-    }
+      }
     };
   }
 
@@ -665,7 +665,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     return new Object[][]{
         {FieldSpec.DataType.STRING, "a"}, {
         FieldSpec.DataType.BYTES, "a string".getBytes()
-    }
+      }
     };
   }
 

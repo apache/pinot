@@ -650,8 +650,8 @@ public class HashJoinOperatorTest {
     DataSchema resultSchema = new DataSchema(
             new String[]{"int_col1", "string_col1", "double_col1", "int_col2", "string_col2", "double_col2"},
             new ColumnDataType[]{
-                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE,
-                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE
+              ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE,
+              ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE
             });
 
     // Composite key join on columns 1 and 2 (string_col and double_col)
@@ -696,8 +696,8 @@ public class HashJoinOperatorTest {
     DataSchema resultSchema = new DataSchema(
             new String[]{"int_col1", "string_col1", "double_col1", "int_col2", "string_col2", "double_col2"},
             new ColumnDataType[]{
-                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE,
-                    ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE
+              ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE,
+              ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.DOUBLE
             });
 
     // Composite key join on columns 1 and 2 (string_col and double_col)

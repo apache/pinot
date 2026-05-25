@@ -20,7 +20,6 @@
     "replication": "1",
     "retentionTimeUnit": "",
     "retentionTimeValue": "",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "segmentPushFrequency": "daily",
     "segmentPushType": "APPEND",
     "timeColumnName": "HoursSinceEpoch",

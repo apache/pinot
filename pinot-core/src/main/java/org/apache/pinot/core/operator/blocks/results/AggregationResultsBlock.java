@@ -194,17 +194,17 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       case LONG:
         dataTableBuilder.setColumn(index, (long) result);
         break;
-      case DOUBLE:
-        dataTableBuilder.setColumn(index, (double) result);
-        break;
-      case STRING:
-        dataTableBuilder.setColumn(index, result.toString());
-        break;
       case FLOAT:
         dataTableBuilder.setColumn(index, (float) result);
         break;
+      case DOUBLE:
+        dataTableBuilder.setColumn(index, (double) result);
+        break;
       case BIG_DECIMAL:
         dataTableBuilder.setColumn(index, (BigDecimal) result);
+        break;
+      case STRING:
+        dataTableBuilder.setColumn(index, result.toString());
         break;
       case BYTES:
         dataTableBuilder.setColumn(index, (ByteArray) result);
@@ -252,8 +252,14 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       case DOUBLE_ARRAY:
         dataTableBuilder.setColumn(index, ArrayListUtils.toDoubleArray((DoubleArrayList) result));
         break;
+      case BIG_DECIMAL_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) result));
+        break;
       case STRING_ARRAY:
         dataTableBuilder.setColumn(index, ArrayListUtils.toStringArray((ObjectArrayList<String>) result));
+        break;
+      case BYTES_ARRAY:
+        dataTableBuilder.setColumn(index, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) result));
         break;
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);

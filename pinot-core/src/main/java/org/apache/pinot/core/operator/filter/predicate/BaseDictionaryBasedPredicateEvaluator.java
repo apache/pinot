@@ -124,6 +124,11 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
   }
 
   @Override
+  public final boolean applyMV(BigDecimal[] values, int length) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public final boolean applySV(String value) {
     throw new UnsupportedOperationException();
   }

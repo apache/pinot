@@ -19,12 +19,17 @@
 package org.apache.pinot.plugin.stream.kinesis;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.RateLimiter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.ThrottledLogger;
+import java.util.function.Supplier;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -45,24 +50,31 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConsumer.class);
-  // 5 logs per minute per exception class to prevent log flooding under sustained rate limiting
-  private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
+  private static final int INITIAL_RATE_LIMIT_BACKOFF_MS = 1000;
+  private static final int MAX_RATE_LIMIT_BACKOFF_MS = 5000;
+  private static final int RATE_LIMIT_BACKOFF_JITTER_BOUND_MS = 250;
+  private static final RequestRateLimiter SHARED_REQUEST_RATE_LIMITER = new SharedKinesisRequestRateLimiter();
 
-  private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
-  private int _currentSecond = 0;
-  private int _numRequestsInCurrentSecond = 0;
+  private final RequestRateLimiter _requestRateLimiter;
 
   public KinesisConsumer(KinesisConfig config) {
     super(config);
+    _requestRateLimiter = SHARED_REQUEST_RATE_LIMITER;
     LOGGER.info("Created Kinesis consumer with topic: {}, RPS limit: {}, max records per fetch: {}",
-        config.getStreamTopicName(), config.getRpsLimit(), config.getNumMaxRecordsToFetch());
+        config.getStreamTopicName(), config.getRpsLimitPerSecond(), config.getNumMaxRecordsToFetch());
   }
 
   @VisibleForTesting
   public KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient) {
+    this(config, kinesisClient, SHARED_REQUEST_RATE_LIMITER);
+  }
+
+  @VisibleForTesting
+  KinesisConsumer(KinesisConfig config, KinesisClient kinesisClient, RequestRateLimiter requestRateLimiter) {
     super(config, kinesisClient);
+    _requestRateLimiter = requestRateLimiter;
   }
 
   /**
@@ -77,17 +89,39 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
    */
   @Override
   public synchronized KinesisMessageBatch fetchMessages(StreamPartitionMsgOffset startMsgOffset, int timeoutMs) {
-    try {
-      return getKinesisMessageBatch((KinesisPartitionGroupOffset) startMsgOffset);
-    } catch (ProvisionedThroughputExceededException pte) {
-      _throttledLogger.warn(
-          String.format("Rate limit exceeded while fetching messages from Kinesis stream, threshold=%d",
-              _config.getRpsLimit()), pte);
-      return new KinesisMessageBatch(List.of(), (KinesisPartitionGroupOffset) startMsgOffset, false, 0);
+    KinesisPartitionGroupOffset startOffset = (KinesisPartitionGroupOffset) startMsgOffset;
+    long deadlineMs = currentTimeMillis() + Math.max(timeoutMs, 0);
+    int attempts = 0;
+    KinesisRateLimitException lastRateLimitException = null;
+    while (true) {
+      if (lastRateLimitException != null && currentTimeMillis() >= deadlineMs) {
+        logRateLimitTimeout(startOffset, attempts, lastRateLimitException);
+        return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+      }
+      try {
+        return getKinesisMessageBatch(startOffset, deadlineMs);
+      } catch (KinesisRateLimitException e) {
+        lastRateLimitException = e;
+        attempts++;
+        long remainingMs = deadlineMs - currentTimeMillis();
+        if (remainingMs <= 0) {
+          logRateLimitTimeout(startOffset, attempts, e);
+          return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+        }
+        long backoffMs = Math.min(computeRateLimitBackoffMs(attempts), remainingMs);
+        LOGGER.warn("Rate limit exceeded while fetching messages from Kinesis stream: {}, shard: {}, operation: {}, "
+                + "threshold: {}, attempt: {}, backing off for {} ms. Error: {}", _config.getStreamTopicName(),
+            startOffset.getShardId(), e.getRequestType(), _config.getRpsLimitPerSecond(), attempts, backoffMs,
+            e.getCause().getMessage());
+        sleep(backoffMs);
+      } catch (KinesisRequestTimeoutException e) {
+        logRequestLimiterTimeout(startOffset, e);
+        return new KinesisMessageBatch(List.of(), startOffset, false, 0);
+      }
     }
   }
 
-  private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset) {
+  private KinesisMessageBatch getKinesisMessageBatch(KinesisPartitionGroupOffset startMsgOffset, long deadlineMs) {
     KinesisPartitionGroupOffset startOffset = startMsgOffset;
     String shardId = startOffset.getShardId();
     String startSequenceNumber = startOffset.getSequenceNumber();
@@ -102,17 +136,20 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
           GetShardIteratorRequest.builder().streamName(_config.getStreamTopicName()).shardId(shardId)
               .startingSequenceNumber(startSequenceNumber).shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER)
               .build();
-      shardIterator = _kinesisClient.getShardIterator(getShardIteratorRequest).shardIterator();
+      shardIterator = executeKinesisRequest(shardId, RequestType.GET_SHARD_ITERATOR, deadlineMs,
+          () -> _kinesisClient.getShardIterator(getShardIteratorRequest)).shardIterator();
     }
     if (shardIterator == null) {
       return new KinesisMessageBatch(List.of(), startOffset, true, 0);
     }
+    _nextStartSequenceNumber = startSequenceNumber;
+    _nextShardIterator = shardIterator;
 
     // Read records
-    rateLimitRequests();
     GetRecordsRequest getRecordRequest =
         GetRecordsRequest.builder().shardIterator(shardIterator).limit(_config.getNumMaxRecordsToFetch()).build();
-    GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordRequest);
+    GetRecordsResponse getRecordsResponse = executeKinesisRequest(shardId, RequestType.GET_RECORDS, deadlineMs,
+        () -> _kinesisClient.getRecords(getRecordRequest));
 
     List<Record> records = getRecordsResponse.records();
     List<BytesStreamMessage> messages;
@@ -125,7 +162,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
         batchSizeInBytes += bytesStreamMessage.getLength();
         messages.add(bytesStreamMessage);
       }
-      offsetOfNextBatch = (KinesisPartitionGroupOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
+      offsetOfNextBatch =
+          (KinesisPartitionGroupOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     } else {
       // TODO: Revisit whether Kinesis can return empty batch when there are available records. The consumer cna handle
       //       empty message batch, but it will treat it as fully caught up.
@@ -138,29 +176,63 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     return new KinesisMessageBatch(messages, offsetOfNextBatch, _nextShardIterator == null, batchSizeInBytes);
   }
 
-  /**
-   * Kinesis enforces a limit of 5 getRecords request per second on each shard from AWS end, beyond which we start
-   * getting {@link ProvisionedThroughputExceededException}. Rate limit the requests to avoid this.
-   */
-  private void rateLimitRequests() {
-    long currentTimeMs = System.currentTimeMillis();
-    int currentTimeSeconds = (int) TimeUnit.MILLISECONDS.toSeconds(currentTimeMs);
-    if (currentTimeSeconds == _currentSecond) {
-      if (_numRequestsInCurrentSecond == _config.getRpsLimit()) {
-        try {
-          Thread.sleep(1000 - (currentTimeMs % 1000));
-        } catch (InterruptedException e) {
-          throw new RuntimeException(e);
-        }
-        _currentSecond = (int) TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis());
-        _numRequestsInCurrentSecond = 1;
-      } else {
-        _numRequestsInCurrentSecond++;
-      }
-    } else {
-      _currentSecond = currentTimeSeconds;
-      _numRequestsInCurrentSecond = 1;
+  private <T> T executeKinesisRequest(String shardId, RequestType requestType, long deadlineMs,
+      Supplier<T> requestSupplier) {
+    long remainingMs = deadlineMs - currentTimeMillis();
+    if (remainingMs <= 0
+        || !_requestRateLimiter.tryAcquire(_config.getStreamTopicName(), shardId, requestType,
+            _config.getRpsLimitPerSecond(), remainingMs)) {
+      throw new KinesisRequestTimeoutException(requestType);
     }
+    try {
+      return requestSupplier.get();
+    } catch (ProvisionedThroughputExceededException pte) {
+      throw new KinesisRateLimitException(requestType, pte);
+    }
+  }
+
+  private long computeRateLimitBackoffMs(int attempts) {
+    long baseBackoffMs = INITIAL_RATE_LIMIT_BACKOFF_MS * (1L << Math.min(attempts - 1, 20));
+    long cappedBaseBackoffMs = Math.min(baseBackoffMs, MAX_RATE_LIMIT_BACKOFF_MS);
+    long jitterMs = getRateLimitBackoffJitterMs(RATE_LIMIT_BACKOFF_JITTER_BOUND_MS);
+    return Math.min(cappedBaseBackoffMs + jitterMs, MAX_RATE_LIMIT_BACKOFF_MS);
+  }
+
+  @VisibleForTesting
+  long currentTimeMillis() {
+    return System.currentTimeMillis();
+  }
+
+  @VisibleForTesting
+  long getRateLimitBackoffJitterMs(long maxJitterMs) {
+    return ThreadLocalRandom.current().nextLong(maxJitterMs + 1);
+  }
+
+  @VisibleForTesting
+  void sleep(long backoffMs) {
+    try {
+      Thread.sleep(backoffMs);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while backing off after Kinesis rate limit exceeded", e);
+    }
+  }
+
+  private void logRateLimitTimeout(KinesisPartitionGroupOffset startOffset, int attempts,
+      KinesisRateLimitException rateLimitException) {
+    LOGGER.warn("Rate limit exceeded while fetching messages from Kinesis stream: {}, shard: {}, operation: {}, "
+            + "threshold: {}, attempts: {}. Fetch timeout exhausted; returning empty batch at original offset. "
+            + "Error: {}",
+        _config.getStreamTopicName(), startOffset.getShardId(), rateLimitException.getRequestType(),
+        _config.getRpsLimitPerSecond(), attempts, rateLimitException.getCause().getMessage());
+  }
+
+  private void logRequestLimiterTimeout(KinesisPartitionGroupOffset startOffset,
+      KinesisRequestTimeoutException timeoutException) {
+    LOGGER.warn("Timed out waiting for Kinesis request limiter while fetching messages from stream: {}, shard: {}, "
+            + "operation: {}, threshold: {}. Fetch timeout exhausted; returning empty batch at original offset.",
+        _config.getStreamTopicName(), startOffset.getShardId(), timeoutException.getRequestType(),
+        _config.getRpsLimitPerSecond());
   }
 
   private BytesStreamMessage extractStreamMessage(Record record, String shardId) {
@@ -184,5 +256,122 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   @Override
   public void close() {
     super.close();
+  }
+
+  enum RequestType {
+    GET_RECORDS,
+    GET_SHARD_ITERATOR
+  }
+
+  @VisibleForTesting
+  interface RequestRateLimiter {
+    boolean tryAcquire(String streamName, String shardId, RequestType requestType, double rpsLimit, long timeoutMs);
+  }
+
+  private static class KinesisRateLimitException extends RuntimeException {
+    private final RequestType _requestType;
+
+    KinesisRateLimitException(RequestType requestType, ProvisionedThroughputExceededException cause) {
+      super(cause);
+      _requestType = requestType;
+    }
+
+    RequestType getRequestType() {
+      return _requestType;
+    }
+
+    @Override
+    public synchronized ProvisionedThroughputExceededException getCause() {
+      return (ProvisionedThroughputExceededException) super.getCause();
+    }
+  }
+
+  private static class KinesisRequestTimeoutException extends RuntimeException {
+    private final RequestType _requestType;
+
+    KinesisRequestTimeoutException(RequestType requestType) {
+      _requestType = requestType;
+    }
+
+    RequestType getRequestType() {
+      return _requestType;
+    }
+  }
+
+  /**
+   * Shared per-JVM request limiter for Kinesis read operations.
+   * <p>
+   * This class is thread-safe. Limiters are keyed by stream, shard, and operation so multiple consumers on the same
+   * server share a single smooth request budget for the same AWS shard operation.
+   */
+  @VisibleForTesting
+  static class SharedKinesisRequestRateLimiter implements RequestRateLimiter {
+    private static final int RATE_LIMITER_EXPIRATION_HOURS = 1;
+    private final Cache<RequestRateLimiterKey, RateLimiter> _rateLimiters;
+
+    SharedKinesisRequestRateLimiter() {
+      this(CacheBuilder.newBuilder().expireAfterAccess(RATE_LIMITER_EXPIRATION_HOURS, TimeUnit.HOURS).build());
+    }
+
+    @VisibleForTesting
+    SharedKinesisRequestRateLimiter(Cache<RequestRateLimiterKey, RateLimiter> rateLimiters) {
+      _rateLimiters = rateLimiters;
+    }
+
+    @Override
+    public boolean tryAcquire(String streamName, String shardId, RequestType requestType, double rpsLimit,
+        long timeoutMs) {
+      if (timeoutMs <= 0) {
+        return false;
+      }
+      RequestRateLimiterKey key = new RequestRateLimiterKey(streamName, shardId, requestType);
+      RateLimiter rateLimiter = _rateLimiters.asMap().computeIfAbsent(key, ignored -> RateLimiter.create(rpsLimit));
+      if (rpsLimit < rateLimiter.getRate()) {
+        rateLimiter.setRate(rpsLimit);
+      }
+      return rateLimiter.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS);
+    }
+
+    @VisibleForTesting
+    double getRateForTesting(String streamName, String shardId, RequestType requestType) {
+      RateLimiter rateLimiter =
+          _rateLimiters.getIfPresent(new RequestRateLimiterKey(streamName, shardId, requestType));
+      return rateLimiter == null ? 0.0 : rateLimiter.getRate();
+    }
+
+    @VisibleForTesting
+    long getLimiterCountForTesting() {
+      return _rateLimiters.size();
+    }
+  }
+
+  private static class RequestRateLimiterKey {
+    private final String _streamName;
+    private final String _shardId;
+    private final RequestType _requestType;
+
+    RequestRateLimiterKey(String streamName, String shardId, RequestType requestType) {
+      _streamName = streamName;
+      _shardId = shardId;
+      _requestType = requestType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof RequestRateLimiterKey)) {
+        return false;
+      }
+      RequestRateLimiterKey that = (RequestRateLimiterKey) o;
+      return _streamName.equals(that._streamName) && _shardId.equals(that._shardId)
+          && _requestType == that._requestType;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_streamName, _shardId, _requestType);
+    }
   }
 }

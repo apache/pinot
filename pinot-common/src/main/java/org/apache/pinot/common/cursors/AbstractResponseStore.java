@@ -126,6 +126,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
   protected abstract ResultTable readResultTable(String requestId, int offset, int numRows)
       throws Exception;
 
+  // Must only be reached via doDelete(), which is invoked from synchronized delete paths on this instance.
   protected abstract boolean deleteResponseImpl(String requestId)
       throws Exception;
 
@@ -230,14 +231,38 @@ public abstract class AbstractResponseStore implements ResponseStore {
     return responses;
   }
 
+  /**
+   * Deletes all responses expired at or before the given epoch ms cutoff.
+   * Iterates {@link #getAllStoredRequestIds()}, reads each entry once via {@link #readResponse(String)} to evaluate
+   * expiration and obtain {@code bytesWritten}, then deletes via {@link #deleteResponseWithKnownBytes(String, long)}
+   * so metrics are updated without a second metadata read.
+   *
+   * @return Number of responses deleted.
+   */
   @Override
-  public boolean deleteResponse(String requestId) throws Exception {
+  public int deleteExpiredResponses(long expiredBeforeMs)
+      throws Exception {
+    int deletedCount = 0;
+    for (String requestId : getAllStoredRequestIds()) {
+      try {
+        CursorResponse response = readResponse(requestId);
+        if (response.getExpirationTimeMs() <= expiredBeforeMs) {
+          if (deleteResponseWithKnownBytes(requestId, response.getBytesWritten())) {
+            deletedCount++;
+          }
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Error during expired-response cleanup for requestId={}", requestId, e);
+      }
+    }
+    return deletedCount;
+  }
+
+  @Override
+  public synchronized boolean deleteResponse(String requestId) throws Exception {
     if (!exists(requestId)) {
       return false;
     }
-
-    // Read bytesWritten for metrics tracking. The response may be deleted concurrently between exists() and
-    // readResponse() (TOCTOU race), so handle that gracefully.
     long bytesWritten = 0;
     try {
       bytesWritten = readResponse(requestId).getBytesWritten();
@@ -245,7 +270,23 @@ public abstract class AbstractResponseStore implements ResponseStore {
       LOGGER.debug("Could not read response metadata for requestId={} (may have been deleted concurrently)",
           requestId, e);
     }
+    return doDelete(requestId, bytesWritten);
+  }
 
+  /**
+   * Deletes a response using an already-known bytesWritten value, skipping a redundant readResponse() call.
+   * Use this when the caller already has the response metadata (for example from cleanup iteration).
+   */
+  protected synchronized boolean deleteResponseWithKnownBytes(String requestId, long bytesWritten)
+      throws Exception {
+    if (!exists(requestId)) {
+      return false;
+    }
+    return doDelete(requestId, bytesWritten);
+  }
+
+  // Single source of truth for deleteResponseImpl + metrics. Only called from synchronized methods.
+  private boolean doDelete(String requestId, long bytesWritten) throws Exception {
     boolean isSucceeded = deleteResponseImpl(requestId);
     if (isSucceeded && bytesWritten > 0) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);

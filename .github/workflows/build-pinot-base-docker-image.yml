@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [11, 17, 21, 25]
+        jdk_version: [21, 25]
         arch: [amd64, arm64]
         type: [build, runtime]
         include:
@@ -43,7 +43,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Build ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}-${{ matrix.arch }} Pinot Base Docker Image
         env:
           OPEN_JDK_DIST: ${{ matrix.openJdkDist }}
@@ -60,7 +60,7 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [11, 17, 21, 25]
+        jdk_version: [21, 25]
         type: [build, runtime]
     steps:
       - name: Login to DockerHub
@@ -68,7 +68,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Push ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }} Pinot Base Docker manifest
         env:
           BASE_IMAGE_TYPE: ${{ matrix.type }}
