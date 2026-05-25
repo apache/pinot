@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -44,7 +45,10 @@ import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
  */
 public class KinesisConsumer extends KinesisConnectionHandler implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KinesisConsumer.class);
+  // 5 logs per minute per exception class to prevent log flooding under sustained rate limiting
+  private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
 
+  private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
   private int _currentSecond = 0;
@@ -76,8 +80,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     try {
       return getKinesisMessageBatch((KinesisPartitionGroupOffset) startMsgOffset);
     } catch (ProvisionedThroughputExceededException pte) {
-      LOGGER.error("Rate limit exceeded while fetching messages from Kinesis stream: {} with threshold: {}",
-          pte.getMessage(), _config.getRpsLimit());
+      _throttledLogger.warn(
+          String.format("Rate limit exceeded while fetching messages from Kinesis stream, threshold=%d",
+              _config.getRpsLimit()), pte);
       return new KinesisMessageBatch(List.of(), (KinesisPartitionGroupOffset) startMsgOffset, false, 0);
     }
   }
