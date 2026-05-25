@@ -21,7 +21,10 @@ package org.apache.pinot.integration.tests.multicluster;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,8 +33,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 /**
  * Integration tests for multi-cluster routing and federation.
@@ -99,6 +104,116 @@ public class MultiClusterIntegrationTest extends BaseMultiClusterIntegrationTest
     assertEquals(count2, TABLE_SIZE_CLUSTER_2);
 
     LOGGER.info("Multi-cluster broker test passed: both clusters started and queryable");
+  }
+
+  @Test(groups = "query")
+  public void testLogicalRoutingTableEndpointLocalRouting() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    JsonNode json = fetchLogicalRoutingJson(brokerBase, getLogicalTableName(), false);
+    assertFalse(json.has("error"), "Expected routing result: " + json);
+    assertTrue(json.has(getPhysicalTable1InCluster1() + "_OFFLINE"),
+        "Local routing should include local physical table: " + json);
+  }
+
+  @Test(groups = "query")
+  public void testLogicalRoutingTableEndpointMultiClusterRouting() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    JsonNode json = fetchLogicalRoutingJson(brokerBase, getLogicalTableName(), true);
+    assertFalse(json.has("error"), "Expected routing result: " + json);
+    String phys1Key = getPhysicalTable1InCluster1() + "_OFFLINE";
+    String phys2Key = getPhysicalTable1InCluster2() + "_OFFLINE";
+    assertTrue(json.has(phys1Key), "Multi-cluster routing should include cluster 1 physical table: " + json);
+    assertTrue(json.has(phys2Key), "Multi-cluster routing should include cluster 2 physical table: " + json);
+    assertTrue(json.get(phys1Key).size() >= 1, "Cluster 1 physical table should have at least one server");
+    assertTrue(json.get(phys2Key).size() >= 1, "Cluster 2 physical table should have at least one server");
+  }
+
+  @Test(groups = "query")
+  public void testLogicalRoutingTableEndpointRejectsPhysicalTable() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    assertLogicalEndpointRejectsPhysicalTable(
+        brokerBase + "/debug/routingTable/logical/" + getPhysicalTable1InCluster1()
+            + "?enableMultiClusterRouting=false");
+  }
+
+  @Test(groups = "query")
+  public void testLogicalSqlRoutingTableEndpointLocalRouting() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    JsonNode json = fetchLogicalSqlRoutingJson(brokerBase,
+        "SELECT * FROM " + getLogicalTableName() + "_OFFLINE", false);
+    assertFalse(json.has("error"), "Expected routing result: " + json);
+    assertTrue(json.has(getPhysicalTable1InCluster1() + "_OFFLINE"),
+        "Local SQL routing should include local physical table: " + json);
+  }
+
+  @Test(groups = "query")
+  public void testLogicalSqlRoutingTableEndpointMultiClusterRouting() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    JsonNode json = fetchLogicalSqlRoutingJson(brokerBase, "SELECT * FROM " + getLogicalTableName() + "_OFFLINE", true);
+    assertFalse(json.has("error"), "Expected routing result: " + json);
+    String phys1Key = getPhysicalTable1InCluster1() + "_OFFLINE";
+    String phys2Key = getPhysicalTable1InCluster2() + "_OFFLINE";
+    assertTrue(json.has(phys1Key), "Multi-cluster SQL routing should include cluster 1 physical table: " + json);
+    assertTrue(json.has(phys2Key), "Multi-cluster SQL routing should include cluster 2 physical table: " + json);
+    assertTrue(json.get(phys1Key).size() >= 1, "Cluster 1 physical table should have at least one server");
+    assertTrue(json.get(phys2Key).size() >= 1, "Cluster 2 physical table should have at least one server");
+  }
+
+  @Test(groups = "query")
+  public void testLogicalSqlRoutingTableEndpointRejectsPhysicalTable() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    String sql = "SELECT * FROM " + getPhysicalTable1InCluster1() + "_OFFLINE";
+    assertLogicalEndpointRejectsPhysicalTable(brokerBase + "/debug/routingTable/logical/sql?query="
+        + URLEncoder.encode(sql, StandardCharsets.UTF_8) + "&enableMultiClusterRouting=false");
+  }
+
+  @Test(groups = "query")
+  public void testLogicalSqlRoutingWithPredicatePrunesSegments() throws Exception {
+    String brokerBase = "http://localhost:" + _cluster1._brokerPort;
+    String table = getLogicalTableName() + "_OFFLINE";
+    JsonNode unprunedJson = fetchLogicalSqlRoutingJson(brokerBase, "SELECT * FROM " + table, true);
+    int unprunedCount = totalSegmentCount(unprunedJson);
+
+    JsonNode prunedJson = fetchLogicalSqlRoutingJson(brokerBase,
+        "SELECT * FROM " + table + " WHERE DaysSinceEpoch = 1", true);
+    assertFalse(prunedJson.has("error"), "Pruned routing should not error: " + prunedJson);
+    assertTrue(totalSegmentCount(prunedJson) <= unprunedCount,
+        "Pruned segment count should be <= unpruned (" + unprunedCount + ")");
+  }
+
+  private JsonNode fetchLogicalRoutingJson(String brokerBase, String table, boolean multiCluster) throws Exception {
+    return JsonMapper.builder().build().readTree(ControllerTest.sendGetRequest(
+        brokerBase + "/debug/routingTable/logical/" + table + "?enableMultiClusterRouting=" + multiCluster));
+  }
+
+  private JsonNode fetchLogicalSqlRoutingJson(String brokerBase, String sql, boolean multiCluster) throws Exception {
+    String encoded = URLEncoder.encode(sql, StandardCharsets.UTF_8);
+    return JsonMapper.builder().build().readTree(ControllerTest.sendGetRequest(
+        brokerBase + "/debug/routingTable/logical/sql?query=" + encoded
+            + "&enableMultiClusterRouting=" + multiCluster));
+  }
+
+  private void assertLogicalEndpointRejectsPhysicalTable(String url) {
+    try {
+      ControllerTest.sendGetRequest(url);
+      fail("Expected HTTP 400 for non-logical table");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("400") || e.getMessage().contains("Bad Request"),
+          "Expected 400 error: " + e.getMessage());
+      assertTrue(e.getMessage().contains("not a logical table"),
+          "Expected 'not a logical table' in error: " + e.getMessage());
+    }
+  }
+
+  /** Sums the total number of segments across all physical tables in a routing response. */
+  private static int totalSegmentCount(JsonNode routingJson) {
+    int total = 0;
+    for (JsonNode servers : routingJson) {
+      for (JsonNode segments : servers) {
+        total += segments.size();
+      }
+    }
+    return total;
   }
 
   @BeforeGroups("query")

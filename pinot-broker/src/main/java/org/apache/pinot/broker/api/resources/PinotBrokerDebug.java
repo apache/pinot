@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -46,14 +47,18 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.broker.MultiClusterRoutingContextProvider;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.MultiClusterRoutingContext;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
@@ -64,8 +69,12 @@ import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -83,12 +92,19 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 // TODO: Add APIs to return the RoutingTable (with unavailable segments)
 public class PinotBrokerDebug {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerDebug.class);
 
   // Request ID is passed to the RoutingManager to rotate the selected replica-group.
   private final static AtomicLong REQUEST_ID_GENERATOR = new AtomicLong();
 
   @Inject
   private BrokerRoutingManager _routingManager;
+
+  @Inject
+  private MultiClusterRoutingContextProvider _multiClusterRoutingContextProvider;
+
+  @Inject
+  private TableCache _tableCache;
 
   @Inject
   private ServerRoutingStatsManager _serverRoutingStatsManager;
@@ -141,8 +157,8 @@ public class PinotBrokerDebug {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
-    getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
-        removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
+    getRoutingTable(tableName, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
     if (!result.isEmpty()) {
       return result;
     } else {
@@ -165,8 +181,8 @@ public class PinotBrokerDebug {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     Map<String, Map<ServerInstance, SegmentsToQuery>> result = new TreeMap<>();
-    getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
-        routingTable.getServerInstanceToSegmentsMap()));
+    getRoutingTable(tableName, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, routingTable.getServerInstanceToSegmentsMap()));
     if (!result.isEmpty()) {
       return result;
     } else {
@@ -195,6 +211,62 @@ public class PinotBrokerDebug {
         consumer.accept(realtimeTableName, routingTable);
       }
     }
+  }
+
+  /**
+   * Iterates over every physical table in the logical table's config, looking up its routing entry by physical table
+   * name. When {@code brokerRequest} is non-null it is passed through (preserving WHERE predicates for segment
+   * pruners); when null, a bare {@code SELECT *} is compiled per physical table.
+   *
+   * <p>When {@code brokerRequest} carries the logical table name in its {@code QuerySource}, that is safe: the
+   * routing-entry lookup is driven by the explicit {@code physicalTableWithType} argument to
+   * {@link RoutingManager#getRoutingTable(BrokerRequest, String, long)}, and segment pruners read only the filter
+   * expression from the request, not the table name.
+   */
+  private void getPhysicalRoutingTablesForLogical(RoutingManager routingManager, String logicalTableName,
+      @Nullable BrokerRequest brokerRequest, BiConsumer<String, RoutingTable> consumer) {
+    String rawTableName = TableNameBuilder.extractRawTableName(logicalTableName);
+    LogicalTableConfig config = _tableCache.getLogicalTableConfig(rawTableName);
+    if (config == null) {
+      throw new WebApplicationException("Logical table config not found for: " + rawTableName,
+          Response.Status.NOT_FOUND);
+    }
+    // Use a single requestId across all physical tables so replica-group selection is consistent.
+    long requestId = getRequestId();
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = config.getPhysicalTableConfigMap();
+    if (physicalTableConfigMap == null || physicalTableConfigMap.isEmpty()) {
+      throw new WebApplicationException("Logical table '" + rawTableName + "' has no physical tables configured",
+          Response.Status.NOT_FOUND);
+    }
+    for (String physicalTableWithType : physicalTableConfigMap.keySet()) {
+      BrokerRequest request = brokerRequest != null ? brokerRequest
+          : CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + physicalTableWithType);
+      RoutingTable routingTable = routingManager.getRoutingTable(request, physicalTableWithType, requestId);
+      if (routingTable != null) {
+        consumer.accept(physicalTableWithType, routingTable);
+      } else {
+        LOGGER.warn("No routing found for physical table: {}", physicalTableWithType);
+      }
+    }
+  }
+
+  // Returns the local or multi-cluster routing manager for a logical table endpoint, validating both the logical table
+  // type and (when requested) multi-cluster configuration. Throws 400 on invalid input.
+  private RoutingManager resolveRoutingManagerForLogical(boolean enableMultiClusterRouting, String tableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    if (!_tableCache.isLogicalTable(rawTableName)) {
+      throw new WebApplicationException(
+          "Table '" + rawTableName + "' is not a logical table", Response.Status.BAD_REQUEST);
+    }
+    if (!enableMultiClusterRouting) {
+      return _routingManager;
+    }
+    MultiClusterRoutingContext context = _multiClusterRoutingContextProvider.get();
+    if (context == null || context.getMultiClusterRoutingManager() == null) {
+      throw new WebApplicationException("Multi-cluster routing is not configured on this broker",
+          Response.Status.BAD_REQUEST);
+    }
+    return context.getMultiClusterRoutingManager();
   }
 
   private static Map<ServerInstance, List<String>> removeOptionalSegments(
@@ -245,6 +317,134 @@ public class PinotBrokerDebug {
     RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
     if (routingTable != null) {
       return routingTable.getServerInstanceToSegmentsMap();
+    } else {
+      throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/debug/routingTable/logical/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_ROUTING_TABLE)
+  @ApiOperation(value = "Get the routing table for a logical table, always expanding to physical tables")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request — table is not a logical table, or multi-cluster routing "
+          + "requested but not configured"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Map<ServerInstance, List<String>>> getLogicalRoutingTable(
+      @ApiParam(value = "Name of the logical table") @PathParam("tableName") String tableName,
+      @ApiParam(value = "When true, use the multi-cluster routing manager; when false (default) the local routing "
+          + "manager is used but the logical table is still expanded to its physical tables")
+      @QueryParam("enableMultiClusterRouting") boolean enableMultiClusterRouting,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    RoutingManager routingManager = resolveRoutingManagerForLogical(enableMultiClusterRouting, tableName);
+    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    getPhysicalRoutingTablesForLogical(routingManager, tableName, null, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
+    if (!result.isEmpty()) {
+      return result;
+    } else {
+      throw new WebApplicationException("Cannot find routing for logical table: " + tableName,
+          Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/debug/routingTableWithOptionalSegments/logical/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_ROUTING_TABLE)
+  @ApiOperation(value = "Get the routing table for a logical table including optional segments, always expanding "
+      + "to physical tables")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request — table is not a logical table, or multi-cluster routing "
+          + "requested but not configured"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Map<ServerInstance, SegmentsToQuery>> getLogicalRoutingTableWithOptionalSegments(
+      @ApiParam(value = "Name of the logical table") @PathParam("tableName") String tableName,
+      @ApiParam(value = "When true, use the multi-cluster routing manager; when false (default) the local routing "
+          + "manager is used but the logical table is still expanded to its physical tables")
+      @QueryParam("enableMultiClusterRouting") boolean enableMultiClusterRouting,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    RoutingManager routingManager = resolveRoutingManagerForLogical(enableMultiClusterRouting, tableName);
+    Map<String, Map<ServerInstance, SegmentsToQuery>> result = new TreeMap<>();
+    getPhysicalRoutingTablesForLogical(routingManager, tableName, null, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, routingTable.getServerInstanceToSegmentsMap()));
+    if (!result.isEmpty()) {
+      return result;
+    } else {
+      throw new WebApplicationException("Cannot find routing for logical table: " + tableName,
+          Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/debug/routingTable/logical/sql")
+  @ManualAuthorization
+  @ApiOperation(value = "Get the routing table for a logical table query, always expanding to physical tables")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request — table is not a logical table, or multi-cluster routing "
+          + "requested but not configured"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Map<ServerInstance, List<String>>> getLogicalRoutingTableForQuery(
+      @ApiParam(value = "SQL query whose FROM table must be a logical table") @QueryParam("query") String query,
+      @ApiParam(value = "When true, use the multi-cluster routing manager; when false (default) the local routing "
+          + "manager is used but the logical table is still expanded to its physical tables")
+      @QueryParam("enableMultiClusterRouting") boolean enableMultiClusterRouting,
+      @Context HttpHeaders httpHeaders) {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    checkAccessControl(brokerRequest, httpHeaders);
+    String tableName = brokerRequest.getQuerySource().getTableName();
+    RoutingManager routingManager = resolveRoutingManagerForLogical(enableMultiClusterRouting, tableName);
+    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    getPhysicalRoutingTablesForLogical(routingManager, tableName, brokerRequest, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
+    if (!result.isEmpty()) {
+      return result;
+    } else {
+      throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/debug/routingTableWithOptionalSegments/logical/sql")
+  @ManualAuthorization
+  @ApiOperation(value = "Get the routing table for a logical table query including optional segments, always "
+      + "expanding to physical tables")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 400, message = "Bad request — table is not a logical table, or multi-cluster routing "
+          + "requested but not configured"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Map<ServerInstance, SegmentsToQuery>> getLogicalRoutingTableForQueryWithOptionalSegments(
+      @ApiParam(value = "SQL query whose FROM table must be a logical table") @QueryParam("query") String query,
+      @ApiParam(value = "When true, use the multi-cluster routing manager; when false (default) the local routing "
+          + "manager is used but the logical table is still expanded to its physical tables")
+      @QueryParam("enableMultiClusterRouting") boolean enableMultiClusterRouting,
+      @Context HttpHeaders httpHeaders) {
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    checkAccessControl(brokerRequest, httpHeaders);
+    String tableName = brokerRequest.getQuerySource().getTableName();
+    RoutingManager routingManager = resolveRoutingManagerForLogical(enableMultiClusterRouting, tableName);
+    Map<String, Map<ServerInstance, SegmentsToQuery>> result = new TreeMap<>();
+    getPhysicalRoutingTablesForLogical(routingManager, tableName, brokerRequest, (tableNameWithType, routingTable) ->
+        result.put(tableNameWithType, routingTable.getServerInstanceToSegmentsMap()));
+    if (!result.isEmpty()) {
+      return result;
     } else {
       throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
     }
