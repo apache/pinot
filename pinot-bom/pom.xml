@@ -83,6 +83,15 @@
           <skip>true</skip>
         </configuration>
       </plugin>
+      <!-- enforcer:enforce has no rules without the parent; skip it. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
