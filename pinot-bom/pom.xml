@@ -69,6 +69,20 @@
           <skip>true</skip>
         </configuration>
       </plugin>
+      <!--
+        Same reason as the license plugin above: pinot-bom has no <parent>
+        so the spotless plugin is not in any of Maven's searched plugin groups.
+        `mvn spotless:check` would fail with "No plugin found for prefix 'spotless'".
+        Skip it; there are no Java source files to format here.
+      -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.46.1</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
