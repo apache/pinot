@@ -134,6 +134,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private final WorkerManager _workerManager;
   private final WorkerManager _multiClusterWorkerManager;
+  private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
@@ -189,10 +190,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _streamStatsDefault = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_STREAM_STATS,
         CommonConstants.Broker.DEFAULT_STREAM_STATS);
+    _mailboxService = new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig);
     _queryDispatcher =
-        new QueryDispatcher(new MailboxService(hostname, port, InstanceType.BROKER, config, tlsConfig), failureDetector,
-            tlsConfig, isQueryCancellationEnabled(), cancelTimeout, dispatchKeepAliveTimeMs,
-            dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault);
+        new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
+            dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -655,6 +656,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 
+    // Short-circuit: if all leaf stages are empty (all segments pruned or table has no data),
+    // run only the broker reduce stage locally. No server dispatch is attempted.
+    boolean allLeafStagesEmpty = dispatchableSubPlan.isAllLeafStagesEmpty();
     int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
@@ -673,35 +677,55 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return new BrokerResponseNative(QueryErrorCode.EXECUTION_TIMEOUT);
     }
 
-    int stageCount = dispatchableSubPlan.getQueryStageMap().size();
-    int opChainCount = dispatchableSubPlan.getQueryStageMap().values().stream()
-        .mapToInt(stage -> stage.getWorkerMetadataList().size())
-        .sum();
-
     try {
       String clientRequestId = extractClientRequestId(query.getSqlNodeAndOptions());
       onQueryStart(requestId, clientRequestId, query.getTextQuery());
       long executionStartTimeNs = System.nanoTime();
 
-      _stagesStartedMeter.mark(stageCount);
-      _opchainsStartedMeter.mark(opChainCount);
-
+      // All leaf stages empty means every segment was pruned (or the table has no data) and no
+      // server dispatch is needed. The paths differ because the normal path dispatches to servers,
+      // tracks stage/opchain meters, and must re-throw QueryException from server responses.
       QueryDispatcher.QueryResult queryResults;
-      try {
-        queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
-            query.getOptions());
-      } catch (QueryException e) {
-        throw e;
-      } catch (Throwable t) {
-        QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
-        String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
-        LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
-        requestContext.setErrorCode(queryErrorCode);
-        return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
-      } finally {
-        _stagesFinishedMeter.mark(stageCount);
-        _opchainsCompletedMeter.mark(opChainCount);
-        onQueryFinish(requestId);
+      if (allLeafStagesEmpty) {
+        try {
+          queryResults = QueryDispatcher.runReducer(dispatchableSubPlan, query.getOptions(), _mailboxService);
+        } catch (QueryException e) {
+          // Re-throw typed errors (auth, validation, etc.) so they propagate with their
+          // original error codes, matching the dispatch branch behavior.
+          throw e;
+        } catch (Throwable t) {
+          QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
+          String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
+          LOGGER.error("Caught exception reducing all-leaf-empty request {}: {}, {}", requestId, query,
+              consolidatedMessage);
+          requestContext.setErrorCode(queryErrorCode);
+          return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
+        } finally {
+          onQueryFinish(requestId);
+        }
+      } else {
+        int stageCount = dispatchableSubPlan.getQueryStageMap().size();
+        int opChainCount = dispatchableSubPlan.getQueryStageMap().values().stream()
+            .mapToInt(stage -> stage.getWorkerMetadataList().size())
+            .sum();
+        _stagesStartedMeter.mark(stageCount);
+        _opchainsStartedMeter.mark(opChainCount);
+        try {
+          queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan,
+              timer.getRemainingTimeMs(), query.getOptions());
+        } catch (QueryException e) {
+          throw e;
+        } catch (Throwable t) {
+          QueryErrorCode queryErrorCode = QueryErrorCode.QUERY_EXECUTION;
+          String consolidatedMessage = ExceptionUtils.consolidateExceptionTraces(t);
+          LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
+          requestContext.setErrorCode(queryErrorCode);
+          return new BrokerResponseNative(queryErrorCode, consolidatedMessage);
+        } finally {
+          _stagesFinishedMeter.mark(stageCount);
+          _opchainsCompletedMeter.mark(opChainCount);
+          onQueryFinish(requestId);
+        }
       }
 
       BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
@@ -731,8 +755,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // MSE cannot finish if a single queried server did not respond, so we can use the same count for
       // both the queried and responded stats. Minus one prevents the broker to be included in the count
       // (it will always be included because of the root of the query plan)
-      brokerResponse.setNumServersQueried(servers.size() - 1);
-      brokerResponse.setNumServersResponded(servers.size() - 1);
+      int numServersQueried = allLeafStagesEmpty ? 0 : servers.size() - 1;
+      brokerResponse.setNumServersQueried(numServersQueried);
+      brokerResponse.setNumServersResponded(numServersQueried);
 
       // Attach unavailable segments (unless configured to ignore missing segments)
       int numUnavailableSegments = 0;

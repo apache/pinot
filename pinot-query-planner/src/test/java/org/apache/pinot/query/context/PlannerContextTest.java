@@ -21,44 +21,30 @@ package org.apache.pinot.query.context;
 import java.util.Map;
 import org.apache.calcite.plan.Context;
 import org.apache.pinot.query.QueryEnvironment;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 
 
-/**
- * Unit tests for {@link PlannerContext} as a Calcite {@link Context}.
- *
- * <p>Verifies that Calcite rules can retrieve both {@link PlannerContext} and the backward-compatible
- * {@link QueryEnvironment.Config} via {@code unwrap()}, and that the opt/trait planners expose the
- * same context.
- */
 public class PlannerContextTest {
 
   @Test
-  public void testUnwrapReturnsSelfForPlannerContext() {
-    QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
-    PlannerContext ctx = PlannerContext.forTesting(Map.of("k", "v"), config);
-
-    Assert.assertSame(ctx.unwrap(PlannerContext.class), ctx);
-  }
-
-  @Test
-  public void testUnwrapReturnsSelfForContextInterface() {
+  public void testUnwrapReturnsSelf() {
     QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
     PlannerContext ctx = PlannerContext.forTesting(Map.of(), config);
 
-    Assert.assertSame(ctx.unwrap(Context.class), ctx);
+    assertSame(ctx.unwrap(PlannerContext.class), ctx);
+    assertSame(ctx.unwrap(Context.class), ctx);
   }
 
   @Test
-  public void testUnwrapDelegatesToEnvConfigForBackwardCompat() {
+  public void testUnwrapReturnsEnvConfig() {
     QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
     PlannerContext ctx = PlannerContext.forTesting(Map.of(), config);
 
-    Assert.assertSame(ctx.unwrap(QueryEnvironment.Config.class), config,
-        "unwrap(QueryEnvironment.Config) must return the configured envConfig for backward compatibility");
+    assertSame(ctx.unwrap(QueryEnvironment.Config.class), config);
   }
 
   @Test
@@ -66,27 +52,28 @@ public class PlannerContextTest {
     QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
     PlannerContext ctx = PlannerContext.forTesting(Map.of(), config);
 
-    Assert.assertNull(ctx.unwrap(String.class));
+    assertNull(ctx.unwrap(String.class));
   }
 
   @Test
-  public void testOptPlannerContextExposesPlannerContext() {
+  public void testPlannersExposeContextInstance() {
     QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
-    PlannerContext ctx = PlannerContext.forTesting(Map.of("opt", "true"), config);
+    PlannerContext ctx = PlannerContext.forTesting(Map.of("k", "v"), config);
 
-    PlannerContext fromPlanner = ctx.getRelOptPlanner().getContext().unwrap(PlannerContext.class);
-    Assert.assertSame(fromPlanner, ctx,
-        "opt planner context should expose PlannerContext via unwrap");
+    // Both planners must expose this PlannerContext via their context, so rules can
+    // call call.getPlanner().getContext().unwrap(PlannerContext.class) to read options.
+    assertSame(ctx.getRelOptPlanner().getContext().unwrap(PlannerContext.class), ctx);
+    assertSame(ctx.getRelTraitPlanner().getContext().unwrap(PlannerContext.class), ctx);
   }
 
   @Test
-  public void testTraitPlannerContextExposesEnvConfigForBackwardCompat() {
+  public void testOptionsAreAccessibleThroughUnwrap() {
     QueryEnvironment.Config config = mock(QueryEnvironment.Config.class);
-    PlannerContext ctx = PlannerContext.forTesting(Map.of(), config);
+    Map<String, String> options = Map.of("workerRuntime", "datafusion");
+    PlannerContext ctx = PlannerContext.forTesting(options, config);
 
-    QueryEnvironment.Config fromPlanner =
-        ctx.getRelTraitPlanner().getContext().unwrap(QueryEnvironment.Config.class);
-    Assert.assertSame(fromPlanner, config,
-        "trait planner context must still expose QueryEnvironment.Config for existing rules");
+    PlannerContext unwrapped = ctx.getRelOptPlanner().getContext().unwrap(PlannerContext.class);
+    assertSame(unwrapped, ctx);
+    assertSame(unwrapped.getOptions(), options);
   }
 }

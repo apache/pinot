@@ -46,6 +46,7 @@ public class MaterializedViewDefinitionMetadata {
   private static final String SPLIT_SOURCE_TIME_COLUMN_KEY = "splitSourceTimeColumn";
   private static final String SPLIT_SOURCE_TIME_FORMAT_KEY = "splitSourceTimeFormat";
   private static final String SPLIT_MATERIALIZED_VIEW_TIME_COLUMN_KEY = "splitMaterializedViewTimeColumn";
+  private static final String SPLIT_MATERIALIZED_VIEW_TIME_FORMAT_KEY = "splitMaterializedViewTimeFormat";
   private static final String SPLIT_BUCKET_MS_KEY = "splitBucketMs";
   private static final String STALENESS_THRESHOLD_MS_KEY = "stalenessThresholdMs";
   private static final String REWRITE_ENABLED_KEY = "rewriteEnabled";
@@ -143,6 +144,10 @@ public class MaterializedViewDefinitionMetadata {
       znRecord.setSimpleField(SPLIT_SOURCE_TIME_COLUMN_KEY, _splitSpec.getSourceTimeColumn());
       znRecord.setSimpleField(SPLIT_SOURCE_TIME_FORMAT_KEY, _splitSpec.getSourceTimeFormat());
       znRecord.setSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_COLUMN_KEY, _splitSpec.getMaterializedViewTimeColumn());
+      String viewFormat = _splitSpec.getMaterializedViewTimeFormat();
+      if (viewFormat != null) {
+        znRecord.setSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_FORMAT_KEY, viewFormat);
+      }
       znRecord.setLongField(SPLIT_BUCKET_MS_KEY, _splitSpec.getBucketMs());
     }
 
@@ -176,9 +181,10 @@ public class MaterializedViewDefinitionMetadata {
       if (sourceTimeColumn != null) {
         String sourceTimeFormat = znRecord.getSimpleField(SPLIT_SOURCE_TIME_FORMAT_KEY);
         String viewTimeColumn = znRecord.getSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_COLUMN_KEY);
+        String viewTimeFormat = znRecord.getSimpleField(SPLIT_MATERIALIZED_VIEW_TIME_FORMAT_KEY);
         long bucketMs = znRecord.getLongField(SPLIT_BUCKET_MS_KEY, 0L);
-        splitSpec =
-            new MaterializedViewSplitSpec(sourceTimeColumn, sourceTimeFormat, viewTimeColumn, bucketMs);
+        splitSpec = new MaterializedViewSplitSpec(sourceTimeColumn, sourceTimeFormat, viewTimeColumn,
+            viewTimeFormat, bucketMs);
       }
 
       long stalenessThresholdMs = znRecord.getLongField(STALENESS_THRESHOLD_MS_KEY, 0L);
@@ -205,13 +211,15 @@ public class MaterializedViewDefinitionMetadata {
     private final String _sourceTimeColumn;
     private final String _sourceTimeFormat;
     private final String _materializedViewTimeColumn;
+    private final String _materializedViewTimeFormat;
     private final long _bucketMs;
 
     public MaterializedViewSplitSpec(String sourceTimeColumn, String sourceTimeFormat,
-        String viewTimeColumn, long bucketMs) {
+        String viewTimeColumn, String viewTimeFormat, long bucketMs) {
       _sourceTimeColumn = sourceTimeColumn;
       _sourceTimeFormat = sourceTimeFormat;
       _materializedViewTimeColumn = viewTimeColumn;
+      _materializedViewTimeFormat = viewTimeFormat;
       _bucketMs = bucketMs;
     }
 
@@ -225,6 +233,10 @@ public class MaterializedViewDefinitionMetadata {
 
     public String getMaterializedViewTimeColumn() {
       return _materializedViewTimeColumn;
+    }
+
+    public String getMaterializedViewTimeFormat() {
+      return _materializedViewTimeFormat;
     }
 
     public long getBucketMs() {

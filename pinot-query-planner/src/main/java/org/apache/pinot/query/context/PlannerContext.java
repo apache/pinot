@@ -79,6 +79,32 @@ public class PlannerContext implements AutoCloseable, Context {
     _physicalPlannerContext = physicalPlannerContext;
   }
 
+  /**
+   * Test factory: creates a minimal {@link PlannerContext} without going through
+   * {@link org.apache.pinot.query.QueryEnvironment}, suitable for unit tests.
+   */
+  @VisibleForTesting
+  public static PlannerContext forTesting(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    return new PlannerContext(options, envConfig);
+  }
+
+  /**
+   * Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
+   */
+  @VisibleForTesting
+  PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
+    _planner = null;
+    _validator = null;
+    _options = options;
+    _envConfig = envConfig;
+    HepProgram emptyProgram = new HepProgramBuilder().build();
+    _relOptPlanner = new LogicalPlanner(emptyProgram, this);
+    _relTraitPlanner = new LogicalPlanner(emptyProgram, this);
+    _plannerOutput = new HashMap<>();
+    _sqlExplainFormat = null;
+    _physicalPlannerContext = null;
+  }
+
   public PlannerImpl getPlanner() {
     return _planner;
   }
@@ -101,32 +127,6 @@ public class PlannerContext implements AutoCloseable, Context {
 
   public QueryEnvironment.Config getEnvConfig() {
     return _envConfig;
-  }
-
-  /**
-   * Test factory: creates a minimal {@link PlannerContext} without going through
-   * {@link QueryEnvironment}, suitable for unit tests that verify rule gating logic.
-   */
-  @VisibleForTesting
-  public static PlannerContext forTesting(Map<String, String> options, QueryEnvironment.Config envConfig) {
-    return new PlannerContext(options, envConfig);
-  }
-
-  /**
-   * Minimal constructor for use in unit tests. Creates no-op planners backed by an empty HEP program.
-   */
-  @VisibleForTesting
-  PlannerContext(Map<String, String> options, QueryEnvironment.Config envConfig) {
-    _planner = null;
-    _validator = null;
-    _options = options;
-    _envConfig = envConfig;
-    HepProgram emptyProgram = new HepProgramBuilder().build();
-    _relOptPlanner = new LogicalPlanner(emptyProgram, this);
-    _relTraitPlanner = new LogicalPlanner(emptyProgram, this);
-    _plannerOutput = new HashMap<>();
-    _sqlExplainFormat = null;
-    _physicalPlannerContext = null;
   }
 
   /**

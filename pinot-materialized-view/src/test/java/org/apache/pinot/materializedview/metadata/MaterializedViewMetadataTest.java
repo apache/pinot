@@ -41,7 +41,7 @@ public class MaterializedViewMetadataTest {
     partitionExprMaps.put("DaysSinceEpoch", "DaysSinceEpoch");
 
     MaterializedViewSplitSpec splitSpec = new MaterializedViewSplitSpec(
-        "ts", "1:MILLISECONDS:EPOCH", "DaysSinceEpoch", 86400000L);
+        "ts", "1:MILLISECONDS:EPOCH", "DaysSinceEpoch", "1:DAYS:EPOCH", 86400000L);
 
     MaterializedViewDefinitionMetadata original = new MaterializedViewDefinitionMetadata(
         viewTableName,
@@ -63,7 +63,9 @@ public class MaterializedViewMetadataTest {
     MaterializedViewSplitSpec restoredSpec = restored.getSplitSpec();
     assertNotNull(restoredSpec);
     assertEquals(restoredSpec.getSourceTimeColumn(), "ts");
+    assertEquals(restoredSpec.getSourceTimeFormat(), "1:MILLISECONDS:EPOCH");
     assertEquals(restoredSpec.getMaterializedViewTimeColumn(), "DaysSinceEpoch");
+    assertEquals(restoredSpec.getMaterializedViewTimeFormat(), "1:DAYS:EPOCH");
     assertEquals(restoredSpec.getBucketMs(), 86400000L);
   }
 
