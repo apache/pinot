@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -507,6 +508,27 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   default byte[] getBytes(int docId, T context) {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Reads the BYTES type single-value at the given document id as a {@link ByteBuffer} view,
+   * avoiding the per-call {@code byte[]} allocation performed by {@link #getBytes(int, ForwardIndexReaderContext)}.
+   *
+   * <p><b>Lifetime contract:</b> the returned buffer is valid only until the next call on this
+   * {@code ForwardIndexReader} that uses the same {@code context}. Reader implementations that
+   * decompress chunks into a per-context scratch buffer return a slice that becomes invalid the
+   * moment the next value is decoded. Callers MUST fully consume the returned buffer before making
+   * another reader call with the same context, and MUST NOT retain the buffer across calls.
+   *
+   * <p>The default implementation falls back to {@link #getBytes(int, ForwardIndexReaderContext)}
+   * and wraps the resulting array, so it is safe to call on any reader.
+   *
+   * @param docId Document id
+   * @param context Reader context
+   * @return a {@link ByteBuffer} positioned at the start of the value with limit at its end
+   */
+  default ByteBuffer getBytesView(int docId, T context) {
+    return ByteBuffer.wrap(getBytes(docId, context));
   }
 
   /**
