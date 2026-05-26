@@ -98,11 +98,6 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   private DataType _storedType;
   private Object _defaultValue;
   private boolean _defaultIsNull;
-  // True when null-handling is enabled AND no default literal was supplied. In that mode, single-value
-  // transforms emit the type's zero/empty sentinel for unresolved JSON paths (instead of throwing) and
-  // surface the unresolved row through {@link #getNullBitmap}, matching the broker's null-handling
-  // contract for upstream operators (e.g. JsonIndexDistinctOperator).
-  private boolean _emitNullOnUnresolved;
   private TransformResultMetadata _resultMetadata;
 
   @Override
@@ -183,7 +178,6 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           );
       }
     }
-    _emitNullOnUnresolved = _nullHandlingEnabled && _defaultValue == null;
     _resultMetadata = new TransformResultMetadata(_dataType, isSingleValue, false);
   }
 
@@ -195,7 +189,14 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   @Override
   @Nullable
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    if (!_defaultIsNull && !_emitNullOnUnresolved) {
+    // Short-circuit to argument-bitmap propagation when this function isn't introducing nulls of
+    // its own. Two cases qualify:
+    //  - null handling is disabled (the SV transform either fills a default or throws), or
+    //  - a real (non-SQL-NULL) default was supplied (the SV transform writes the default for
+    //    unresolved rows).
+    // The 4-arg SQL-NULL case has _defaultIsNull=true and falls through to the per-row scan
+    // below, so unresolved rows surface as SQL NULL via the bitmap.
+    if (!_nullHandlingEnabled || (_defaultValue != null && !_defaultIsNull)) {
       return super.getNullBitmap(valueBlock);
     }
     RoaringBitmap bitmap = new RoaringBitmap();
@@ -248,7 +249,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _intValuesSV[i] = defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           // Write the null placeholder so stale data from a reused buffer can't surface.
           // getNullBitmap marks the row null; consumers should read the bitmap, not this value.
           _intValuesSV[i] = NullValuePlaceHolder.INT;
@@ -283,7 +284,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _longValuesSV[i] = defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _longValuesSV[i] = NullValuePlaceHolder.LONG;
           continue;
         }
@@ -315,7 +316,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _floatValuesSV[i] = defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
           continue;
         }
@@ -347,7 +348,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _doubleValuesSV[i] = defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
           continue;
         }
@@ -379,7 +380,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _bigDecimalValuesSV[i] = defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
           continue;
         }
@@ -411,7 +412,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _stringValuesSV[i] = defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _stringValuesSV[i] = NullValuePlaceHolder.STRING;
           continue;
         }

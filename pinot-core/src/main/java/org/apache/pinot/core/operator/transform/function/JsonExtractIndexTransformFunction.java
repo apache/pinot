@@ -55,11 +55,6 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private Map<String, RoaringBitmap> _valueToMatchingDocsMap;
   private boolean _isSingleValue;
   private String _filterJsonPath;
-  // True when null-handling is enabled AND no default literal was supplied for the SV path. In that
-  // mode, single-value transforms emit the type's null placeholder for unresolved JSON paths (instead
-  // of throwing) and surface the unresolved row through {@link #getNullBitmap}, matching the broker's
-  // null-handling contract for upstream operators such as {@code JsonIndexDistinctOperator}.
-  private boolean _emitNullOnUnresolved;
 
   @Override
   public String getName() {
@@ -154,7 +149,6 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       _filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
     }
 
-    _emitNullOnUnresolved = _isSingleValue && _nullHandlingEnabled && _defaultValue == null;
     _resultMetadata = new TransformResultMetadata(dataType, _isSingleValue, false);
   }
 
@@ -177,7 +171,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _intValuesSV[i] = (int) _defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _intValuesSV[i] = NullValuePlaceHolder.INT;
           continue;
         }
@@ -203,7 +197,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _longValuesSV[i] = (long) _defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _longValuesSV[i] = NullValuePlaceHolder.LONG;
           continue;
         }
@@ -229,7 +223,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _floatValuesSV[i] = (float) _defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
           continue;
         }
@@ -255,7 +249,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _doubleValuesSV[i] = (double) _defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
           continue;
         }
@@ -281,7 +275,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _bigDecimalValuesSV[i] = (BigDecimal) _defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
           continue;
         }
@@ -307,7 +301,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
           _stringValuesSV[i] = (String) _defaultValue;
           continue;
         }
-        if (_emitNullOnUnresolved) {
+        if (_nullHandlingEnabled) {
           _stringValuesSV[i] = NullValuePlaceHolder.STRING;
           continue;
         }
@@ -322,7 +316,12 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   @Override
   @Nullable
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    if (!_emitNullOnUnresolved) {
+    // Short-circuit to argument-bitmap propagation when this function isn't introducing nulls of
+    // its own: non-SV output, null handling disabled, or any default literal supplied (the SV
+    // transform writes it for unresolved rows). Unlike the scalar function, the parser converts a
+    // SQL-NULL literal to the typed zero ("" for STRING, throws at init for numerics), so there's
+    // no SQL-NULL-default path to fall through.
+    if (!_isSingleValue || !_nullHandlingEnabled || _defaultValue != null) {
       return super.getNullBitmap(valueBlock);
     }
     String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
