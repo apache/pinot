@@ -53,6 +53,7 @@ public class MockRoutingManagerFactory {
   private final Map<String, String> _tableNameMap;
   private final Map<String, Schema> _schemaMap;
   private final Set<String> _hybridTables;
+  private final Set<String> _dimTables;
   private final Map<String, ServerInstance> _serverInstances;
   private final Map<String, Map<String, List<ServerInstance>>> _tableSegmentServersMap;
   private final Set<String> _disabledTables;
@@ -61,6 +62,7 @@ public class MockRoutingManagerFactory {
     _tableNameMap = new HashMap<>();
     _schemaMap = new HashMap<>();
     _hybridTables = new HashSet<>();
+    _dimTables = new HashSet<>();
     _serverInstances = new HashMap<>();
     _tableSegmentServersMap = new HashMap<>();
     _disabledTables = new HashSet<>();
@@ -77,6 +79,13 @@ public class MockRoutingManagerFactory {
       registerTableNameWithType(schema, TableNameBuilder.REALTIME.tableNameWithType(tableName));
       _hybridTables.add(tableName);
     }
+  }
+
+  /// Registers a table whose mocked TableConfig returns {@code isDimTable()=true}. Used by planner tests that
+  /// need to exercise dim-table-aware rules (e.g. {@code PinotJoinCommuteRule}).
+  public void registerDimTable(Schema schema, String tableName) {
+    registerTable(schema, tableName);
+    _dimTables.add(TableNameBuilder.extractRawTableName(tableName));
   }
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {
@@ -164,7 +173,11 @@ public class MockRoutingManagerFactory {
     when(mock.getTableConfig(anyString())).thenAnswer(invocationOnMock -> {
       String tableName = invocationOnMock.getArgument(0);
       if (TableNameBuilder.getTableTypeFromTableName(tableName) != null && _tableNameMap.containsKey(tableName)) {
-        return mock(TableConfig.class);
+        TableConfig tableConfig = mock(TableConfig.class);
+        if (_dimTables.contains(TableNameBuilder.extractRawTableName(tableName))) {
+          when(tableConfig.isDimTable()).thenReturn(true);
+        }
+        return tableConfig;
       }
       return null;
     });

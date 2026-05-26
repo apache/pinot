@@ -33,6 +33,7 @@ import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -92,7 +93,29 @@ public class PinotCatalog implements Schema {
       return null;
     }
 
-    return new PinotTable(schema, _excludeVirtualColumns);
+    return new PinotTable(schema, _excludeVirtualColumns, isDimTable(tableName));
+  }
+
+  /**
+   * Returns whether the given physical table is configured as a dimension table on its OFFLINE side.
+   *
+   * <p>Pinot's dim-table machinery (segment-assignment replication, {@code DimensionTableDataManager},
+   * lookup-join eligibility) is wired up on OFFLINE tables only — see
+   * {@code DefaultTableDataManagerProvider}, which only consults {@code isDimTable()} under the OFFLINE
+   * branch, and {@code PinotTableRestletResource}, which documents "Dimension is a property (isDimTable)
+   * of an OFFLINE table." The {@code TableConfig} type itself does not enforce this (no {@code Preconditions}
+   * rejects {@code isDimTable=true} on a REALTIME config), so a misconfigured REALTIME table with the flag
+   * set would not be honored by the runtime; we intentionally do not honor it in the planner either.
+   *
+   * <p>Returns {@code false} for logical tables, missing tables, realtime-only tables, or any other lookup
+   * failure — callers should treat a {@code false} return as "not known to be an OFFLINE dim table" rather
+   * than "definitely not a dim table".
+   */
+  private boolean isDimTable(String tableName) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TableConfig tableConfig = _tableCache.getTableConfig(offlineTableName);
+    return tableConfig != null && tableConfig.isDimTable();
   }
 
   /**

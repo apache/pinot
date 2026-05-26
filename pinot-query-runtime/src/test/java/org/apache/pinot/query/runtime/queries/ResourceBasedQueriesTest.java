@@ -106,6 +106,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
     // Scan through all the test cases.
     Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap = new HashMap<>();
+    Set<String> dimTables = new HashSet<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : getTestCases().entrySet()) {
       String testCaseName = testCaseEntry.getKey();
       QueryTestCase testCase = testCaseEntry.getValue();
@@ -135,6 +136,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           addSegmentReplicated(factory1, factory2, offlineTableName, genericRows);
           if (table._isDimTable) {
             registerMockDimensionTable(offlineTableName, schema, table, genericRows);
+            // Also signal isDimTable to the planner so rules keyed on the dim flag (e.g. PinotJoinCommuteRule)
+            // can be exercised end-to-end via this test harness.
+            dimTables.add(offlineTableName);
           }
           continue;
         }
@@ -241,7 +245,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
-        partitionedSegmentsMap);
+        partitionedSegmentsMap, dimTables);
   }
 
   private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
