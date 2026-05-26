@@ -1051,8 +1051,16 @@ public class PinotHelixResourceManager {
   }
 
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
+    return getLastLLCCompletedSegments(getSegmentsZKMetadata(tableNameWithType));
+  }
+
+  /// Overload that operates on a caller-supplied list of {@link SegmentZKMetadata}, avoiding a
+  /// redundant ZK fetch when the caller already holds the list (e.g. periodic tasks that scan all
+  /// segments of a table and want to derive the last-completed LLC segment per partition without
+  /// re-reading the property store).
+  public Collection<String> getLastLLCCompletedSegments(List<? extends SegmentZKMetadata> segmentZKMetadataList) {
     Map<Integer, String> partitionIdToLastLLCCompletedSegmentMap = new HashMap<>();
-    for (SegmentZKMetadata zkMetadata : getSegmentsZKMetadata(tableNameWithType)) {
+    for (SegmentZKMetadata zkMetadata : segmentZKMetadataList) {
       if (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
         LLCSegmentName llcName = LLCSegmentName.of(zkMetadata.getSegmentName());
         if (llcName == null) {
