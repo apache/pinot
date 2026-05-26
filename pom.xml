@@ -39,6 +39,7 @@
 
   <modules>
     <module>pinot-dependency-verifier</module>
+    <module>pinot-bom</module>
     <module>pinot-spi</module>
     <module>pinot-segment-spi</module>
     <module>pinot-broker</module>
