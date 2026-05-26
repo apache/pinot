@@ -92,6 +92,21 @@
           <skip>true</skip>
         </configuration>
       </plugin>
+      <!--
+        pinot-bom has no <parent>, so org.jacoco is not in Maven's discoverable
+        plugin groups unless explicitly declared here. Without this entry,
+        `mvn jacoco:report-aggregate@report -P codecoverage` fails with
+        "No plugin found for prefix 'jacoco'". This stub registers the groupId;
+        the actual execution is configured in the root pom's codecoverage profile.
+      -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.14</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
