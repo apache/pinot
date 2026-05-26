@@ -110,6 +110,24 @@ public class OpenStructDataTypeTest {
   }
 
   @Test
+  public void openStructJsonDeserializeWithoutDefaultIsRejected() {
+    String json = "{\"name\":\"o\",\"dataType\":\"OPEN_STRUCT\",\"singleValueField\":true}";
+    try {
+      JsonUtils.stringToObject(json, ComplexFieldSpec.class);
+      org.testng.Assert.fail("Expected deserialization to fail without defaultValueFieldSpec");
+    } catch (Exception e) {
+      Throwable cause = e;
+      while (cause.getCause() != null && cause.getCause() != cause) {
+        cause = cause.getCause();
+      }
+      assertTrue(cause instanceof IllegalArgumentException,
+          "Expected IllegalArgumentException root cause, got " + cause);
+      assertTrue(cause.getMessage().contains("OPEN_STRUCT requires defaultValueFieldSpec"),
+          "Unexpected message: " + cause.getMessage());
+    }
+  }
+
+  @Test
   public void openStructEmitsSyntheticChildFieldSpecsForCompat()
       throws Exception {
     ComplexFieldSpec spec = new ComplexFieldSpec(

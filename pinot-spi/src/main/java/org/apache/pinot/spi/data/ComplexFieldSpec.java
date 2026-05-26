@@ -85,6 +85,28 @@ public final class ComplexFieldSpec extends FieldSpec {
     _defaultValueFieldSpec = defaultValueFieldSpec;
   }
 
+  /// Overrides {@link FieldSpec#setDataType} to enforce per-type invariants on the JSON
+  /// deserialization path. The 6-arg constructor enforces these directly; Jackson uses the
+  /// no-arg + setter path, where {@code setDataType} is the final hook at which all bean
+  /// properties (including {@code valueFieldSpecs}, {@code defaultValueFieldSpec}, and any
+  /// pre-{@link #setChildFieldSpecs} contents) are visible.
+  @Override
+  public void setDataType(DataType dataType) {
+    super.setDataType(dataType);
+    if (dataType == DataType.MAP) {
+      Preconditions.checkArgument(_valueFieldSpecs == null,
+          "DataType.MAP does not support valueFieldSpecs; use OPEN_STRUCT for per-key types");
+      Preconditions.checkArgument(_defaultValueFieldSpec == null,
+          "DataType.MAP does not support defaultValueFieldSpec; use OPEN_STRUCT for a default type");
+    }
+    if (dataType == DataType.OPEN_STRUCT) {
+      Preconditions.checkArgument(_defaultValueFieldSpec != null,
+          "DataType.OPEN_STRUCT requires defaultValueFieldSpec");
+      Preconditions.checkArgument(_childFieldSpecs == null || _childFieldSpecs.isEmpty(),
+          "DataType.OPEN_STRUCT does not use childFieldSpecs (KEY_FIELD/VALUE_FIELD)");
+    }
+  }
+
   public ComplexFieldSpec(String name, DataType dataType, boolean isSingleValueField,
       Map<String, FieldSpec> childFieldSpecs) {
     this(name, dataType, isSingleValueField, childFieldSpecs, null, null);

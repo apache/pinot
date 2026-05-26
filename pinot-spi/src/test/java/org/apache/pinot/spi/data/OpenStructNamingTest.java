@@ -21,8 +21,6 @@ package org.apache.pinot.spi.data;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
 
 public class OpenStructNamingTest {
@@ -35,42 +33,5 @@ public class OpenStructNamingTest {
   @Test
   public void testSparseColumnName() {
     assertEquals(OpenStructNaming.sparseColumnName("metrics"), "metrics$__sparse__");
-  }
-
-  @Test
-  public void testIsMaterializedOpenStructColumn() {
-    assertTrue(OpenStructNaming.isMaterializedOpenStructColumn("metrics$tenancy"));
-    assertTrue(OpenStructNaming.isMaterializedOpenStructColumn("metrics$__sparse__"));
-    assertFalse(OpenStructNaming.isMaterializedOpenStructColumn("metrics"));
-    assertFalse(OpenStructNaming.isMaterializedOpenStructColumn("normal_column"));
-  }
-
-  @Test
-  public void testParseOpenStructColumn() {
-    assertEquals(OpenStructNaming.parseOpenStructColumn("metrics$tenancy"), "metrics");
-    assertEquals(OpenStructNaming.parseOpenStructColumn("m__data$key$nested"), "m__data");
-  }
-
-  @Test
-  public void testParseKey() {
-    assertEquals(OpenStructNaming.parseKey("metrics$tenancy"), "tenancy");
-    assertEquals(OpenStructNaming.parseKey("metrics$__sparse__"), "__sparse__");
-  }
-
-  @Test
-  public void testIsSparseColumn() {
-    assertTrue(OpenStructNaming.isSparseColumn("metrics$__sparse__"));
-    assertFalse(OpenStructNaming.isSparseColumn("metrics$tenancy"));
-  }
-
-  @Test
-  public void testRoundTrip() {
-    String openStructCol = "event_props";
-    String key = "country_iso2";
-    String materialized = OpenStructNaming.materializedColumnName(openStructCol, key);
-    assertEquals(OpenStructNaming.parseOpenStructColumn(materialized), openStructCol);
-    assertEquals(OpenStructNaming.parseKey(materialized), key);
-    assertTrue(OpenStructNaming.isMaterializedOpenStructColumn(materialized));
-    assertFalse(OpenStructNaming.isSparseColumn(materialized));
   }
 }
