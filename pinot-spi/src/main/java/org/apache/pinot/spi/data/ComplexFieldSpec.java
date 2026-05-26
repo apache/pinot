@@ -221,7 +221,6 @@ public final class ComplexFieldSpec extends FieldSpec {
     return StringUtil.join("$$", columns);
   }
 
-  @Override
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = super.toJsonObject();
     ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
