@@ -128,7 +128,9 @@ public class FieldConfig extends BaseJsonConfig {
   // If null, there won't be any index
   // NOTE: TIMESTAMP is ignored. In order to create TIMESTAMP index, configure 'timestampConfig' instead.
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, IFST, H3, JSON, TIMESTAMP, VECTOR, RANGE
+    INVERTED, SORTED, TEXT, FST, IFST, H3, JSON, TIMESTAMP, VECTOR, RANGE,
+    /** OPEN_STRUCT index storing semi-structured entries as per-key materialized columns. */
+    OPEN_STRUCT
   }
 
   public enum CompressionCodec {
