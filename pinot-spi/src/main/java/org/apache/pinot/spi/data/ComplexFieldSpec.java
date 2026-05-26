@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.data;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -34,28 +33,25 @@ import org.apache.pinot.spi.utils.StringUtil;
 /**
  * FieldSpec for complex fields. The {@link org.apache.pinot.spi.data.FieldSpec.FieldType}
  * is COMPLEX and the inner data type represents the root data type of the field.
- * It could be STRUCT, MAP, LIST or OPEN_STRUCT.
+ * It could be STRUCT, MAP, LIST or OPEN_STRUCT. A complex field is composable with a single root
+ * type and a number of child types. Although we have multi-value primitive columns, LIST
+ * is for representing lists of both complex and primitives inside a complex field.
  *
- * Per-type usage of {@code _childFieldSpecs}:
- * <ul>
- *   <li><b>MAP</b>: exactly two reserved entries {@code key} and {@code value}, declaring
- *       the uniform key/value types of the map.</li>
- *   <li><b>STRUCT</b>: arbitrary named subfields, defining the fixed struct schema.</li>
- *   <li><b>LIST</b>: a single entry describing the element type (by convention).</li>
- *   <li><b>OPEN_STRUCT</b>: optional per-key type hints for declared keys (any names).
- *       A required {@link #_defaultValueFieldSpec} provides the fallback type for keys
- *       not present here.</li>
- * </ul>
+ * Consider a person json where the root type is STRUCT and composes of inner members:
+ *  STRUCT(
+ *          name: STRING
+ *          age: INT
+ *          salary: INT
+ *          addresses: LIST (STRUCT
+ *                              apt: INT
+ *                              street: STRING
+ *                              city: STRING
+ *                              zip: INT
+ *                          )
+ *        )
  *
- * Example STRUCT:
- * <pre>
- *   STRUCT(
- *           name: STRING
- *           age: INT
- *           salary: INT
- *           addresses: LIST(STRUCT(apt: INT, street: STRING, city: STRING, zip: INT))
- *         )
- * </pre>
+ * The fieldspec would be COMPLEX with type as STRUCT and 4 inner members
+ * to model the hierarchy
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ComplexFieldSpec extends FieldSpec {
@@ -65,18 +61,12 @@ public final class ComplexFieldSpec extends FieldSpec {
   private final Map<String, FieldSpec> _childFieldSpecs;
 
   @Nullable
-  private final FieldSpec _defaultValueFieldSpec;
+  private FieldSpec _defaultValueFieldSpec;
 
   // Default constructor required by JSON de-serializer
   public ComplexFieldSpec() {
-    this((FieldSpec) null);
-  }
-
-  @JsonCreator
-  ComplexFieldSpec(@JsonProperty("defaultValueFieldSpec") @Nullable FieldSpec defaultValueFieldSpec) {
     super();
     _childFieldSpecs = new HashMap<>();
-    _defaultValueFieldSpec = defaultValueFieldSpec;
   }
 
   public ComplexFieldSpec(String name, DataType dataType, boolean isSingleValueField,
@@ -102,22 +92,6 @@ public final class ComplexFieldSpec extends FieldSpec {
     _defaultValueFieldSpec = defaultValueFieldSpec;
   }
 
-  /// Overrides {@link FieldSpec#setDataType} to enforce per-type invariants on the JSON
-  /// deserialization path. The canonical constructor enforces these directly; Jackson uses
-  /// the no-arg + setter path, where {@code setDataType} is the final hook at which the
-  /// {@code defaultValueFieldSpec} is visible.
-  @Override
-  public void setDataType(DataType dataType) {
-    super.setDataType(dataType);
-    if (dataType == DataType.OPEN_STRUCT) {
-      Preconditions.checkArgument(_defaultValueFieldSpec != null,
-          "DataType.OPEN_STRUCT requires defaultValueFieldSpec");
-    } else {
-      Preconditions.checkArgument(_defaultValueFieldSpec == null,
-          "DataType.%s does not support defaultValueFieldSpec (OPEN_STRUCT only)", dataType);
-    }
-  }
-
   public static String[] getColumnPath(String column) {
     return column.split("\\$\\$");
   }
@@ -134,6 +108,10 @@ public final class ComplexFieldSpec extends FieldSpec {
   @Nullable
   public FieldSpec getDefaultValueFieldSpec() {
     return _defaultValueFieldSpec;
+  }
+
+  public void setDefaultValueFieldSpec(@Nullable FieldSpec defaultValueFieldSpec) {
+    _defaultValueFieldSpec = defaultValueFieldSpec;
   }
 
   @JsonIgnore

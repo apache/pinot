@@ -159,8 +159,6 @@ public final class Schema implements Serializable {
           case LIST:
             break;
           case OPEN_STRUCT:
-            // Validation is enforced in ComplexFieldSpec constructor (defaultValueFieldSpec required;
-            // childFieldSpecs/KEY_FIELD/VALUE_FIELD rejected). No additional schema-level checks here.
             break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field");
@@ -625,6 +623,10 @@ public final class Schema implements Serializable {
       String fieldName = fieldSpec.getName();
       try {
         validate(fieldType, dataType);
+        if (dataType == DataType.OPEN_STRUCT) {
+          Preconditions.checkState(((ComplexFieldSpec) fieldSpec).getDefaultValueFieldSpec() != null,
+              "OPEN_STRUCT field requires defaultValueFieldSpec");
+        }
       } catch (IllegalStateException e) {
         throw new IllegalStateException(e.getMessage() + ": " + fieldName);
       }
