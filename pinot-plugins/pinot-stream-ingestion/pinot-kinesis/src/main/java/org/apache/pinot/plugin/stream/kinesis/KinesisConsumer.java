@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -54,7 +55,9 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
   private static final int MAX_RATE_LIMIT_BACKOFF_MS = 5000;
   private static final int RATE_LIMIT_BACKOFF_JITTER_BOUND_MS = 250;
   private static final RequestRateLimiter SHARED_REQUEST_RATE_LIMITER = new SharedKinesisRequestRateLimiter();
+  private static final double RATE_LIMIT_LOG_RATE_PER_MIN = 5.0;
 
+  private final ThrottledLogger _throttledLogger = new ThrottledLogger(LOGGER, RATE_LIMIT_LOG_RATE_PER_MIN);
   private String _nextStartSequenceNumber = null;
   private String _nextShardIterator = null;
   private final RequestRateLimiter _requestRateLimiter;
@@ -109,10 +112,11 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
           return new KinesisMessageBatch(List.of(), startOffset, false, 0);
         }
         long backoffMs = Math.min(computeRateLimitBackoffMs(attempts), remainingMs);
-        LOGGER.warn("Rate limit exceeded while fetching messages from Kinesis stream: {}, shard: {}, operation: {}, "
-                + "threshold: {}, attempt: {}, backing off for {} ms. Error: {}", _config.getStreamTopicName(),
-            startOffset.getShardId(), e.getRequestType(), _config.getRpsLimitPerSecond(), attempts, backoffMs,
-            e.getCause().getMessage());
+        _throttledLogger.warn(
+            String.format("Rate limit exceeded while fetching messages from Kinesis stream: %s, shard: %s, "
+                    + "operation: %s, threshold: %s, attempt: %d, backing off for %d ms",
+                _config.getStreamTopicName(), startOffset.getShardId(), e.getRequestType(),
+                _config.getRpsLimitPerSecond(), attempts, backoffMs), e.getCause());
         sleep(backoffMs);
       } catch (KinesisRequestTimeoutException e) {
         logRequestLimiterTimeout(startOffset, e);
@@ -220,19 +224,20 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
 
   private void logRateLimitTimeout(KinesisPartitionGroupOffset startOffset, int attempts,
       KinesisRateLimitException rateLimitException) {
-    LOGGER.warn("Rate limit exceeded while fetching messages from Kinesis stream: {}, shard: {}, operation: {}, "
-            + "threshold: {}, attempts: {}. Fetch timeout exhausted; returning empty batch at original offset. "
-            + "Error: {}",
-        _config.getStreamTopicName(), startOffset.getShardId(), rateLimitException.getRequestType(),
-        _config.getRpsLimitPerSecond(), attempts, rateLimitException.getCause().getMessage());
+    _throttledLogger.warn(
+        String.format("Rate limit exceeded while fetching messages from Kinesis stream: %s, shard: %s, "
+                + "operation: %s, threshold: %s, attempts: %d. Fetch timeout exhausted; returning empty batch.",
+            _config.getStreamTopicName(), startOffset.getShardId(), rateLimitException.getRequestType(),
+            _config.getRpsLimitPerSecond(), attempts), rateLimitException.getCause());
   }
 
   private void logRequestLimiterTimeout(KinesisPartitionGroupOffset startOffset,
       KinesisRequestTimeoutException timeoutException) {
-    LOGGER.warn("Timed out waiting for Kinesis request limiter while fetching messages from stream: {}, shard: {}, "
-            + "operation: {}, threshold: {}. Fetch timeout exhausted; returning empty batch at original offset.",
-        _config.getStreamTopicName(), startOffset.getShardId(), timeoutException.getRequestType(),
-        _config.getRpsLimitPerSecond());
+    _throttledLogger.warn(
+        String.format("Timed out waiting for Kinesis request limiter while fetching messages from stream: %s, "
+                + "shard: %s, operation: %s, threshold: %s. Fetch timeout exhausted; returning empty batch.",
+            _config.getStreamTopicName(), startOffset.getShardId(), timeoutException.getRequestType(),
+            _config.getRpsLimitPerSecond()), timeoutException);
   }
 
   private BytesStreamMessage extractStreamMessage(Record record, String shardId) {
