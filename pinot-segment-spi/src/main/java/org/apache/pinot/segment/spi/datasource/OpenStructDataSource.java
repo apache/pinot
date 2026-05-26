@@ -1,0 +1,65 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.segment.spi.datasource;
+
+import java.util.Map;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
+
+
+/// DataSource for an OPEN_STRUCT column. Provides per-key DataSources that can be used for
+/// filtering, aggregation, and projection on individual keys. Distinct from `MapDataSource`,
+/// which carries fixed-typed MAP semantics (single value type per column).
+public interface OpenStructDataSource extends DataSource {
+
+  /// Returns the OPEN_STRUCT FieldSpec view.
+  ComplexFieldSpec.OpenStructFieldSpec getFieldSpec();
+
+  /// Returns the DataSource for the given key's values. The DataSource's value type is the
+  /// per-key declared type (from `_valueFieldSpecs`) when present, otherwise the default
+  /// type (from `_defaultValueFieldSpec`).
+  DataSource getDataSource(String key);
+
+  /// Returns whether this segment has per-key index data for the given key.
+  ///
+  /// - **All-dense columnar segments:** exact (O(1) lookup into the materialized key set).
+  /// - **Mixed-tier columnar segments (dense + sparse):** exact for materialized keys; for any
+  ///   non-materialized key, returns `true` whenever a sparse blob exists (conservative — the
+  ///   sparse key set is not persisted today). Cost of the conservative answer is bounded:
+  ///   queries on truly-absent keys pay one wasted `getDataSource(key)` lookup, then fall
+  ///   through to expression-filter (which returns no matches via a full scan).
+  ///
+  /// Query operators use this to choose between fast-path (per-key inverted/dictionary index)
+  /// and fallback (expression scan). When this returns `false`, callers can short-circuit:
+  /// e.g. a filter operator returns `EmptyFilterOperator` for value predicates and
+  /// `MatchAllFilterOperator` for IS_NULL. When this returns `true`, callers should
+  /// still handle absent-key DataSources gracefully (null-value bitmap marks all rows as null).
+  default boolean containsKey(String key) {
+    return true;
+  }
+
+  /// Returns DataSources for all keys present in this segment.
+  Map<String, DataSource> getDataSources();
+
+  /// Returns the DataSourceMetadata for the given key's values.
+  DataSourceMetadata getDataSourceMetadata(String key);
+
+  /// Returns the ColumnIndexContainer for the given key's values.
+  ColumnIndexContainer getIndexContainer(String key);
+}
