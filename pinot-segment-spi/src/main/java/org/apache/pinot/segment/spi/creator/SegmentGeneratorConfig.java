@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.Serializable;
@@ -40,6 +41,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -54,6 +56,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -70,6 +73,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Schema _schema;
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
   private final Map<String, Map<String, String>> _columnProperties = new HashMap<>();
+  private final Map<String, OpenStructIndexConfig> _openStructIndexConfigs = new HashMap<>();
   // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
   private final TreeMap<String, String> _customProperties = new TreeMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
@@ -180,6 +184,16 @@ public class SegmentGeneratorConfig implements Serializable {
         if (properties != null) {
           _columnProperties.put(fieldConfig.getName(), Collections.unmodifiableMap(properties));
         }
+        // Extract per-column OPEN_STRUCT index config from the FieldConfig.indexes JSON sub-node.
+        // Recognized when either the column declares IndexType.OPEN_STRUCT or the indexes JSON
+        // carries an "open_struct_index" sub-node.
+        if (fieldConfig.getIndexTypes() != null
+            && fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.OPEN_STRUCT)) {
+          OpenStructIndexConfig openStructConfig = extractOpenStructIndexConfig(fieldConfig);
+          if (openStructConfig != null) {
+            _openStructIndexConfigs.put(fieldConfig.getName(), openStructConfig);
+          }
+        }
       }
     }
 
@@ -214,6 +228,51 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public Map<String, Map<String, String>> getColumnProperties() {
     return Collections.unmodifiableMap(_columnProperties);
+  }
+
+  /**
+   * Returns the per-column {@link OpenStructIndexConfig} overrides supplied via {@link FieldConfig}
+   * for columns of type {@link FieldConfig.IndexType#OPEN_STRUCT}. The segment creator uses these to
+   * configure the OPEN_STRUCT index for each column.
+   */
+  public Map<String, OpenStructIndexConfig> getOpenStructIndexConfigs() {
+    return Collections.unmodifiableMap(_openStructIndexConfigs);
+  }
+
+  public void setOpenStructIndexConfigs(Map<String, OpenStructIndexConfig> openStructIndexConfigs) {
+    Preconditions.checkNotNull(openStructIndexConfigs);
+    _openStructIndexConfigs.clear();
+    _openStructIndexConfigs.putAll(openStructIndexConfigs);
+  }
+
+  public void setOpenStructIndexConfig(String column, OpenStructIndexConfig openStructIndexConfig) {
+    Preconditions.checkNotNull(column);
+    Preconditions.checkNotNull(openStructIndexConfig);
+    _openStructIndexConfigs.put(column, openStructIndexConfig);
+  }
+
+  /**
+   * Parses the OPEN_STRUCT sub-node from {@link FieldConfig#getIndexes()} into an
+   * {@link OpenStructIndexConfig}. Returns {@link OpenStructIndexConfig#DEFAULT} when the field
+   * config declares OPEN_STRUCT but provides no JSON overrides, or {@code null} if the JSON sub-node
+   * cannot be parsed.
+   */
+  @Nullable
+  private static OpenStructIndexConfig extractOpenStructIndexConfig(FieldConfig fieldConfig) {
+    JsonNode indexesNode = fieldConfig.getIndexes();
+    if (indexesNode == null || indexesNode.isNull() || indexesNode.isMissingNode()) {
+      return OpenStructIndexConfig.DEFAULT;
+    }
+    JsonNode openStructNode = indexesNode.get("open_struct_index");
+    if (openStructNode == null || openStructNode.isNull() || openStructNode.isMissingNode()) {
+      return OpenStructIndexConfig.DEFAULT;
+    }
+    try {
+      return JsonUtils.jsonNodeToObject(openStructNode, OpenStructIndexConfig.class);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to parse open_struct_index config for column: " + fieldConfig.getName(), e);
+    }
   }
 
   /**
