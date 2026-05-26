@@ -44,8 +44,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///
 /// **Per-key index settings** are specified via `valueFieldConfigs` — each entry is a standard
 /// [FieldConfig] (modern `indexes` format) for one materialized OPEN_STRUCT key. Keys without an
-/// entry use defaults: DICTIONARY encoding and no per-key inverted index unless
-/// `enableInvertedIndexForDense` is `true`.
+/// entry fall back to `defaultValueFieldConfig`. When neither is set, the built-in default is
+/// DICTIONARY encoding with an inverted index.
 public class OpenStructIndexConfig extends IndexConfig {
   public static final OpenStructIndexConfig DISABLED = new OpenStructIndexConfig(false);
   public static final OpenStructIndexConfig DEFAULT = new OpenStructIndexConfig(true);
@@ -55,7 +55,7 @@ public class OpenStructIndexConfig extends IndexConfig {
   public static final int DEFAULT_MAX_DENSE_KEYS = 0;
   private static final String INVERTED_INDEX_KEY = "inverted";
 
-  private final boolean _enableInvertedIndexForDense;
+  private final FieldConfig _defaultValueFieldConfig;
   private final int _maxDenseKeys;
   private final Set<String> _denseKeys;
   private final double _denseKeyMinFillRate;
@@ -65,19 +65,19 @@ public class OpenStructIndexConfig extends IndexConfig {
   private final Map<String, FieldConfig> _valueFieldConfigIndex;
 
   public OpenStructIndexConfig(boolean enabled) {
-    this(!enabled, false, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null);
+    this(!enabled, null, DEFAULT_MAX_DENSE_KEYS, null, DEFAULT_DENSE_KEY_MIN_FILL_RATE, null);
   }
 
   @JsonCreator
   public OpenStructIndexConfig(
       @JsonProperty("disabled") Boolean disabled,
-      @JsonProperty("enableInvertedIndexForDense") boolean enableInvertedIndexForDense,
+      @JsonProperty("defaultValueFieldConfig") @Nullable FieldConfig defaultValueFieldConfig,
       @JsonProperty("maxDenseKeys") int maxDenseKeys,
       @JsonProperty("denseKeys") @Nullable Set<String> denseKeys,
       @JsonProperty("denseKeyMinFillRate") @Nullable Double denseKeyMinFillRate,
       @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs) {
     super(disabled);
-    _enableInvertedIndexForDense = enableInvertedIndexForDense;
+    _defaultValueFieldConfig = defaultValueFieldConfig;
     _maxDenseKeys = maxDenseKeys;
     _denseKeys = denseKeys;
     _denseKeyMinFillRate = denseKeyMinFillRate != null ? denseKeyMinFillRate : DEFAULT_DENSE_KEY_MIN_FILL_RATE;
@@ -93,8 +93,12 @@ public class OpenStructIndexConfig extends IndexConfig {
     }
   }
 
-  public boolean isEnableInvertedIndexForDense() {
-    return _enableInvertedIndexForDense;
+  /// Fallback [FieldConfig] applied to OPEN_STRUCT keys that are materialized as dense columns
+  /// but have no entry in `valueFieldConfigs`. When this is also unset, the built-in defaults
+  /// kick in: DICTIONARY encoding and an inverted index.
+  @Nullable
+  public FieldConfig getDefaultValueFieldConfig() {
+    return _defaultValueFieldConfig;
   }
 
   /// Maximum number of OPEN_STRUCT keys to materialise as dense columns. Non-positive (default
@@ -118,8 +122,8 @@ public class OpenStructIndexConfig extends IndexConfig {
   }
 
   /// Per-key index settings. Each entry is a standard [FieldConfig] whose `name` matches an
-  /// OPEN_STRUCT key name. Keys without an entry use defaults (DICTIONARY encoding, no per-key
-  /// inverted index unless `enableInvertedIndexForDense` is `true`).
+  /// OPEN_STRUCT key name. Keys without an entry fall back to `defaultValueFieldConfig`, or to
+  /// the built-in defaults (DICTIONARY + inverted) when no default is set.
   @Nullable
   public List<FieldConfig> getValueFieldConfigs() {
     return _valueFieldConfigs;
@@ -131,18 +135,34 @@ public class OpenStructIndexConfig extends IndexConfig {
     return _valueFieldConfigIndex.get(key);
   }
 
-  /// `true` if the given key should be built with an inverted index. The global
-  /// `enableInvertedIndexForDense` flag wins if set; otherwise the per-key [FieldConfig]'s
-  /// `indexes.inverted` decides, respecting its `disabled` flag.
+  /// `true` if the given key should be built with an inverted index. Resolution order:
+  /// per-key [FieldConfig] → `defaultValueFieldConfig` → built-in default of inverted-on.
   public boolean shouldEnableInvertedIndexForKey(String key) {
-    if (_enableInvertedIndexForDense) {
-      return true;
-    }
     FieldConfig keyConfig = getValueFieldConfig(key);
-    if (keyConfig == null) {
-      return false;
+    if (keyConfig != null) {
+      return invertedFromIndexes(keyConfig, key);
     }
-    JsonNode indexes = keyConfig.getIndexes();
+    if (_defaultValueFieldConfig != null) {
+      return invertedFromIndexes(_defaultValueFieldConfig, key);
+    }
+    return true;
+  }
+
+  /// `true` if the given key should be dictionary-encoded. Resolution order: per-key
+  /// [FieldConfig] → `defaultValueFieldConfig` → built-in default of DICTIONARY.
+  public boolean shouldUseDictionaryForKey(String key) {
+    FieldConfig keyConfig = getValueFieldConfig(key);
+    if (keyConfig != null) {
+      return keyConfig.getEncodingType() != FieldConfig.EncodingType.RAW;
+    }
+    if (_defaultValueFieldConfig != null) {
+      return _defaultValueFieldConfig.getEncodingType() != FieldConfig.EncodingType.RAW;
+    }
+    return true;
+  }
+
+  private static boolean invertedFromIndexes(FieldConfig fieldConfig, String key) {
+    JsonNode indexes = fieldConfig.getIndexes();
     if (indexes == null || !indexes.isObject()) {
       return false;
     }
@@ -156,15 +176,5 @@ public class OpenStructIndexConfig extends IndexConfig {
       throw new UncheckedIOException(
           "Failed to parse inverted index config for OPEN_STRUCT key '" + key + "'", e);
     }
-  }
-
-  /// `true` if the given key should be dictionary-encoded. Defaults to `true` (dictionary) when
-  /// no per-key [FieldConfig] is set or when its `encodingType` is null/DICTIONARY.
-  public boolean shouldUseDictionaryForKey(String key) {
-    FieldConfig keyConfig = getValueFieldConfig(key);
-    if (keyConfig == null) {
-      return true;
-    }
-    return keyConfig.getEncodingType() != FieldConfig.EncodingType.RAW;
   }
 }
