@@ -811,6 +811,6 @@ public class SchemaTest {
     Assert.assertEquals(fs.getDataType(), FieldSpec.DataType.OPEN_STRUCT);
     ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
     Assert.assertEquals(cfs.getDefaultValueFieldSpec().getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertNotNull(cfs.getValueFieldSpecs());
+    Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
   }
 }

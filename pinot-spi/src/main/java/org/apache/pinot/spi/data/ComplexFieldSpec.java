@@ -34,29 +34,28 @@ import org.apache.pinot.spi.utils.StringUtil;
 /**
  * FieldSpec for complex fields. The {@link org.apache.pinot.spi.data.FieldSpec.FieldType}
  * is COMPLEX and the inner data type represents the root data type of the field.
- * It could be STRUCT, MAP, LIST or OPEN_STRUCT. A complex field is composable with a single root
- * type and a number of child types. Although we have multi-value primitive columns, LIST
- * is for representing lists of both complex and primitives inside a complex field.
+ * It could be STRUCT, MAP, LIST or OPEN_STRUCT.
  *
- * Consider a person json where the root type is STRUCT and composes of inner members:
- *  STRUCT(
- *          name: STRING
- *          age: INT
- *          salary: INT
- *          addresses: LIST (STRUCT
- *                              apt: INT
- *                              street: STRING
- *                              city: STRING
- *                              zip: INT
- *                          )
- *        )
+ * Per-type usage of {@code _childFieldSpecs}:
+ * <ul>
+ *   <li><b>MAP</b>: exactly two reserved entries {@code key} and {@code value}, declaring
+ *       the uniform key/value types of the map.</li>
+ *   <li><b>STRUCT</b>: arbitrary named subfields, defining the fixed struct schema.</li>
+ *   <li><b>LIST</b>: a single entry describing the element type (by convention).</li>
+ *   <li><b>OPEN_STRUCT</b>: optional per-key type hints for declared keys (any names).
+ *       A required {@link #_defaultValueFieldSpec} provides the fallback type for keys
+ *       not present here.</li>
+ * </ul>
  *
- * The fieldspec would be COMPLEX with type as STRUCT and 4 inner members
- * to model the hierarchy.
- *
- * For OPEN_STRUCT (semi-structured columns), per-key declared types are stored in
- * {@code valueFieldSpecs} and a fallback type for unlisted keys is stored in
- * {@code defaultValueFieldSpec}; {@code childFieldSpecs} is not used.
+ * Example STRUCT:
+ * <pre>
+ *   STRUCT(
+ *           name: STRING
+ *           age: INT
+ *           salary: INT
+ *           addresses: LIST(STRUCT(apt: INT, street: STRING, city: STRING, zip: INT))
+ *         )
+ * </pre>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ComplexFieldSpec extends FieldSpec {
@@ -66,75 +65,57 @@ public final class ComplexFieldSpec extends FieldSpec {
   private final Map<String, FieldSpec> _childFieldSpecs;
 
   @Nullable
-  private final Map<String, FieldSpec> _valueFieldSpecs;
-
-  @Nullable
   private final FieldSpec _defaultValueFieldSpec;
 
   // Default constructor required by JSON de-serializer
   public ComplexFieldSpec() {
-    this((Map<String, FieldSpec>) null, null);
+    this((FieldSpec) null);
   }
 
   @JsonCreator
-  ComplexFieldSpec(@JsonProperty("valueFieldSpecs") @Nullable Map<String, FieldSpec> valueFieldSpecs,
-      @JsonProperty("defaultValueFieldSpec") @Nullable FieldSpec defaultValueFieldSpec) {
+  ComplexFieldSpec(@JsonProperty("defaultValueFieldSpec") @Nullable FieldSpec defaultValueFieldSpec) {
     super();
     _childFieldSpecs = new HashMap<>();
-    _valueFieldSpecs = valueFieldSpecs;
     _defaultValueFieldSpec = defaultValueFieldSpec;
-  }
-
-  /// Overrides {@link FieldSpec#setDataType} to enforce per-type invariants on the JSON
-  /// deserialization path. The 6-arg constructor enforces these directly; Jackson uses the
-  /// no-arg + setter path, where {@code setDataType} is the final hook at which all bean
-  /// properties (including {@code valueFieldSpecs}, {@code defaultValueFieldSpec}, and any
-  /// pre-{@link #setChildFieldSpecs} contents) are visible.
-  @Override
-  public void setDataType(DataType dataType) {
-    super.setDataType(dataType);
-    if (dataType == DataType.MAP) {
-      Preconditions.checkArgument(_valueFieldSpecs == null,
-          "DataType.MAP does not support valueFieldSpecs; use OPEN_STRUCT for per-key types");
-      Preconditions.checkArgument(_defaultValueFieldSpec == null,
-          "DataType.MAP does not support defaultValueFieldSpec; use OPEN_STRUCT for a default type");
-    }
-    if (dataType == DataType.OPEN_STRUCT) {
-      Preconditions.checkArgument(_defaultValueFieldSpec != null,
-          "DataType.OPEN_STRUCT requires defaultValueFieldSpec");
-      Preconditions.checkArgument(_childFieldSpecs == null || _childFieldSpecs.isEmpty(),
-          "DataType.OPEN_STRUCT does not use childFieldSpecs (KEY_FIELD/VALUE_FIELD)");
-    }
   }
 
   public ComplexFieldSpec(String name, DataType dataType, boolean isSingleValueField,
       Map<String, FieldSpec> childFieldSpecs) {
-    this(name, dataType, isSingleValueField, childFieldSpecs, null, null);
+    this(name, dataType, isSingleValueField, childFieldSpecs, null);
   }
 
   public ComplexFieldSpec(String name, DataType dataType, boolean isSingleValueField,
-      Map<String, FieldSpec> childFieldSpecs, @Nullable Map<String, FieldSpec> valueFieldSpecs,
-      @Nullable FieldSpec defaultValueFieldSpec) {
+      @Nullable Map<String, FieldSpec> childFieldSpecs, @Nullable FieldSpec defaultValueFieldSpec) {
     super(name, dataType, isSingleValueField);
     Preconditions.checkArgument(
         dataType == DataType.STRUCT || dataType == DataType.MAP
             || dataType == DataType.LIST || dataType == DataType.OPEN_STRUCT,
         "ComplexFieldSpec dataType must be STRUCT, MAP, LIST, or OPEN_STRUCT (got %s)", dataType);
-    if (dataType == DataType.MAP) {
-      Preconditions.checkArgument(valueFieldSpecs == null,
-          "DataType.MAP does not support valueFieldSpecs; use OPEN_STRUCT for per-key types");
-      Preconditions.checkArgument(defaultValueFieldSpec == null,
-          "DataType.MAP does not support defaultValueFieldSpec; use OPEN_STRUCT for a default type");
-    }
     if (dataType == DataType.OPEN_STRUCT) {
       Preconditions.checkArgument(defaultValueFieldSpec != null,
           "DataType.OPEN_STRUCT requires defaultValueFieldSpec");
-      Preconditions.checkArgument(childFieldSpecs == null || childFieldSpecs.isEmpty(),
-          "DataType.OPEN_STRUCT does not use childFieldSpecs (KEY_FIELD/VALUE_FIELD)");
+    } else {
+      Preconditions.checkArgument(defaultValueFieldSpec == null,
+          "DataType.%s does not support defaultValueFieldSpec (OPEN_STRUCT only)", dataType);
     }
     _childFieldSpecs = childFieldSpecs == null ? new HashMap<>() : new HashMap<>(childFieldSpecs);
-    _valueFieldSpecs = valueFieldSpecs;
     _defaultValueFieldSpec = defaultValueFieldSpec;
+  }
+
+  /// Overrides {@link FieldSpec#setDataType} to enforce per-type invariants on the JSON
+  /// deserialization path. The canonical constructor enforces these directly; Jackson uses
+  /// the no-arg + setter path, where {@code setDataType} is the final hook at which the
+  /// {@code defaultValueFieldSpec} is visible.
+  @Override
+  public void setDataType(DataType dataType) {
+    super.setDataType(dataType);
+    if (dataType == DataType.OPEN_STRUCT) {
+      Preconditions.checkArgument(_defaultValueFieldSpec != null,
+          "DataType.OPEN_STRUCT requires defaultValueFieldSpec");
+    } else {
+      Preconditions.checkArgument(_defaultValueFieldSpec == null,
+          "DataType.%s does not support defaultValueFieldSpec (OPEN_STRUCT only)", dataType);
+    }
   }
 
   public static String[] getColumnPath(String column) {
@@ -147,12 +128,6 @@ public final class ComplexFieldSpec extends FieldSpec {
 
   public Map<String, FieldSpec> getChildFieldSpecs() {
     return _childFieldSpecs;
-  }
-
-  @JsonProperty("valueFieldSpecs")
-  @Nullable
-  public Map<String, FieldSpec> getValueFieldSpecs() {
-    return _valueFieldSpecs;
   }
 
   @JsonProperty("defaultValueFieldSpec")
@@ -212,7 +187,8 @@ public final class ComplexFieldSpec extends FieldSpec {
 
   /**
    * View over a {@link ComplexFieldSpec} whose {@code dataType} is {@link DataType#OPEN_STRUCT}.
-   * Exposes the per-key {@code valueFieldSpecs} and the fallback {@code defaultValueFieldSpec}.
+   * Exposes the per-key declared types (from {@code childFieldSpecs}) and the required fallback
+   * {@code defaultValueFieldSpec}.
    */
   public static class OpenStructFieldSpec {
     private final String _fieldName;
@@ -223,8 +199,7 @@ public final class ComplexFieldSpec extends FieldSpec {
       Preconditions.checkArgument(complexFieldSpec.getDataType() == DataType.OPEN_STRUCT,
           "OpenStructFieldSpec view requires OPEN_STRUCT (got %s)", complexFieldSpec.getDataType());
       _fieldName = complexFieldSpec.getName();
-      _valueFieldSpecs = complexFieldSpec.getValueFieldSpecs() != null
-          ? complexFieldSpec.getValueFieldSpecs() : Map.of();
+      _valueFieldSpecs = Map.copyOf(complexFieldSpec.getChildFieldSpecs());
       _defaultValueFieldSpec = complexFieldSpec.getDefaultValueFieldSpec();
     }
 
@@ -247,8 +222,7 @@ public final class ComplexFieldSpec extends FieldSpec {
 
   public static ComplexFieldSpec fromOpenStructFieldSpec(OpenStructFieldSpec openStructFieldSpec) {
     return new ComplexFieldSpec(openStructFieldSpec.getFieldName(), DataType.OPEN_STRUCT, true,
-        null, openStructFieldSpec.getValueFieldSpecs(),
-        openStructFieldSpec.getDefaultValueFieldSpec());
+        openStructFieldSpec.getValueFieldSpecs(), openStructFieldSpec.getDefaultValueFieldSpec());
   }
 
   /**
@@ -263,35 +237,13 @@ public final class ComplexFieldSpec extends FieldSpec {
   @Override
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = super.toJsonObject();
-    if (_dataType == DataType.OPEN_STRUCT) {
-      // Emit synthetic childFieldSpecs:{key,value} as a backward-compat shim so older readers
-      // that don't know OPEN_STRUCT see a STRING/STRING MAP-shaped placeholder rather than
-      // failing schema deserialization. New readers ignore childFieldSpecs when
-      // dataType == OPEN_STRUCT and use valueFieldSpecs / defaultValueFieldSpec instead.
-      ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
-      childFieldSpecsNode.set(KEY_FIELD,
-          new DimensionFieldSpec(KEY_FIELD, DataType.STRING, true).toJsonObject());
-      childFieldSpecsNode.set(VALUE_FIELD,
-          new DimensionFieldSpec(VALUE_FIELD, DataType.STRING, true).toJsonObject());
-      jsonObject.set("childFieldSpecs", childFieldSpecsNode);
-
-      if (_valueFieldSpecs != null && !_valueFieldSpecs.isEmpty()) {
-        ObjectNode valueFieldSpecsNode = JsonUtils.newObjectNode();
-        for (Map.Entry<String, FieldSpec> entry : _valueFieldSpecs.entrySet()) {
-          valueFieldSpecsNode.set(entry.getKey(), entry.getValue().toJsonObject());
-        }
-        jsonObject.set("valueFieldSpecs", valueFieldSpecsNode);
-      }
-      if (_defaultValueFieldSpec != null) {
-        jsonObject.set("defaultValueFieldSpec", _defaultValueFieldSpec.toJsonObject());
-      }
-    } else {
-      // STRUCT / MAP / LIST — preserve master's behavior: emit childFieldSpecs unconditionally.
-      ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
-      for (Map.Entry<String, FieldSpec> entry : _childFieldSpecs.entrySet()) {
-        childFieldSpecsNode.set(entry.getKey(), entry.getValue().toJsonObject());
-      }
-      jsonObject.set("childFieldSpecs", childFieldSpecsNode);
+    ObjectNode childFieldSpecsNode = JsonUtils.newObjectNode();
+    for (Map.Entry<String, FieldSpec> entry : _childFieldSpecs.entrySet()) {
+      childFieldSpecsNode.set(entry.getKey(), entry.getValue().toJsonObject());
+    }
+    jsonObject.set("childFieldSpecs", childFieldSpecsNode);
+    if (_defaultValueFieldSpec != null) {
+      jsonObject.set("defaultValueFieldSpec", _defaultValueFieldSpec.toJsonObject());
     }
     return jsonObject;
   }
