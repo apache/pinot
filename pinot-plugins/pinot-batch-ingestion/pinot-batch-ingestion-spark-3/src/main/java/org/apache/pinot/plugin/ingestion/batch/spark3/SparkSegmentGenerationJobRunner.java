@@ -139,7 +139,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     LOGGER.info("Found {} files to create Pinot segments!", filteredFiles.size());
 
     TableConfig tableConfig =
-        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
+        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken(),
+            _spec.getTlsSpec());
     boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
 
     if (consistentPushEnabled) {
