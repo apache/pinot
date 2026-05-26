@@ -58,6 +58,12 @@ public final class ComplexFieldSpec extends FieldSpec {
   public static final String KEY_FIELD = "key";
   public static final String VALUE_FIELD = "value";
 
+  /// Default {@code defaultValueFieldSpec} used for {@link DataType#OPEN_STRUCT} columns when
+  /// the schema does not declare one explicitly. Keys with no per-key type hint are stored as
+  /// single-value STRING.
+  public static final FieldSpec DEFAULT_OPEN_STRUCT_VALUE_FIELD_SPEC =
+      new DimensionFieldSpec("default", DataType.STRING, true);
+
   private final Map<String, FieldSpec> _childFieldSpecs;
 
   @Nullable
@@ -81,10 +87,7 @@ public final class ComplexFieldSpec extends FieldSpec {
         dataType == DataType.STRUCT || dataType == DataType.MAP
             || dataType == DataType.LIST || dataType == DataType.OPEN_STRUCT,
         "ComplexFieldSpec dataType must be STRUCT, MAP, LIST, or OPEN_STRUCT (got %s)", dataType);
-    if (dataType == DataType.OPEN_STRUCT) {
-      Preconditions.checkArgument(defaultValueFieldSpec != null,
-          "DataType.OPEN_STRUCT requires defaultValueFieldSpec");
-    } else {
+    if (dataType != DataType.OPEN_STRUCT) {
       Preconditions.checkArgument(defaultValueFieldSpec == null,
           "DataType.%s does not support defaultValueFieldSpec (OPEN_STRUCT only)", dataType);
     }
@@ -104,10 +107,16 @@ public final class ComplexFieldSpec extends FieldSpec {
     return _childFieldSpecs;
   }
 
+  /// Returns the {@code defaultValueFieldSpec} for OPEN_STRUCT columns, falling back to
+  /// {@link #DEFAULT_OPEN_STRUCT_VALUE_FIELD_SPEC} (single-value STRING) when the schema did
+  /// not declare one. Returns {@code null} for non-OPEN_STRUCT data types.
   @JsonProperty("defaultValueFieldSpec")
   @Nullable
   public FieldSpec getDefaultValueFieldSpec() {
-    return _defaultValueFieldSpec;
+    if (_defaultValueFieldSpec != null) {
+      return _defaultValueFieldSpec;
+    }
+    return _dataType == DataType.OPEN_STRUCT ? DEFAULT_OPEN_STRUCT_VALUE_FIELD_SPEC : null;
   }
 
   public void setDefaultValueFieldSpec(@Nullable FieldSpec defaultValueFieldSpec) {

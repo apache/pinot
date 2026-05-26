@@ -623,10 +623,6 @@ public final class Schema implements Serializable {
       String fieldName = fieldSpec.getName();
       try {
         validate(fieldType, dataType);
-        if (dataType == DataType.OPEN_STRUCT) {
-          Preconditions.checkState(((ComplexFieldSpec) fieldSpec).getDefaultValueFieldSpec() != null,
-              "OPEN_STRUCT field requires defaultValueFieldSpec");
-        }
       } catch (IllegalStateException e) {
         throw new IllegalStateException(e.getMessage() + ": " + fieldName);
       }

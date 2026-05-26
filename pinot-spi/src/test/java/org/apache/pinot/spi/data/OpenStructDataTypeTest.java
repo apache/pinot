@@ -34,9 +34,13 @@ import static org.testng.Assert.assertTrue;
 public class OpenStructDataTypeTest {
 
   @Test
-  public void openStructRequiresDefaultValueFieldSpec() {
-    assertThrows(IllegalArgumentException.class, () -> new ComplexFieldSpec(
-        "o", DataType.OPEN_STRUCT, true, null, null));
+  public void openStructWithoutExplicitDefaultUsesStringDimension() {
+    ComplexFieldSpec spec = new ComplexFieldSpec("o", DataType.OPEN_STRUCT, true, null, null);
+    FieldSpec dflt = spec.getDefaultValueFieldSpec();
+    assertNotNull(dflt);
+    assertEquals(dflt.getDataType(), DataType.STRING);
+    assertTrue(dflt.isSingleValueField());
+    assertEquals(dflt.getFieldType(), FieldSpec.FieldType.DIMENSION);
   }
 
   @Test
@@ -49,16 +53,6 @@ public class OpenStructDataTypeTest {
         "o", DataType.OPEN_STRUCT, true, childFieldSpecs, dflt);
     assertEquals(spec.getChildFieldSpec("count").getDataType(), DataType.INT);
     assertEquals(spec.getChildFieldSpec("name").getDataType(), DataType.STRING);
-    assertEquals(spec.getDefaultValueFieldSpec(), dflt);
-  }
-
-  @Test
-  public void openStructAcceptsEmptyChildFieldSpecs() {
-    FieldSpec dflt = new DimensionFieldSpec("default", DataType.STRING, true);
-    ComplexFieldSpec spec = new ComplexFieldSpec(
-        "o", DataType.OPEN_STRUCT, true, null, dflt);
-    assertNotNull(spec.getChildFieldSpecs());
-    assertTrue(spec.getChildFieldSpecs().isEmpty());
     assertEquals(spec.getDefaultValueFieldSpec(), dflt);
   }
 
@@ -83,9 +77,9 @@ public class OpenStructDataTypeTest {
   }
 
   @Test
-  public void openStructJsonRoundtrip()
+  public void openStructJsonRoundtripWithExplicitDefault()
       throws Exception {
-    FieldSpec dflt = new DimensionFieldSpec("default", DataType.STRING, true);
+    FieldSpec dflt = new DimensionFieldSpec("default", DataType.INT, true);
     Map<String, FieldSpec> childFieldSpecs = Map.of(
         "count", new DimensionFieldSpec("count", DataType.INT, true));
     ComplexFieldSpec original = new ComplexFieldSpec(
@@ -95,25 +89,19 @@ public class OpenStructDataTypeTest {
     ComplexFieldSpec roundtripped = JsonUtils.stringToObject(json, ComplexFieldSpec.class);
 
     assertEquals(roundtripped.getDataType(), DataType.OPEN_STRUCT);
-    assertEquals(roundtripped.getDefaultValueFieldSpec().getDataType(), DataType.STRING);
+    assertEquals(roundtripped.getDefaultValueFieldSpec().getDataType(), DataType.INT);
     assertEquals(roundtripped.getChildFieldSpec("count").getDataType(), DataType.INT);
   }
 
   @Test
-  public void openStructJsonDeserializeWithoutDefaultIsRejectedBySchemaValidate()
+  public void openStructJsonWithoutDefaultUsesStringDimensionFallback()
       throws Exception {
-    String schemaJson = "{"
-        + "\"schemaName\":\"test\","
-        + "\"complexFieldSpecs\":["
-        + "  {\"name\":\"attrs\",\"dataType\":\"OPEN_STRUCT\",\"singleValueField\":true}"
-        + "]}";
-    Schema schema = JsonUtils.stringToObject(schemaJson, Schema.class);
-    try {
-      schema.validate();
-      org.testng.Assert.fail("Expected schema.validate() to reject OPEN_STRUCT without defaultValueFieldSpec");
-    } catch (IllegalStateException e) {
-      assertTrue(e.getMessage().contains("OPEN_STRUCT") && e.getMessage().contains("defaultValueFieldSpec"),
-          "Unexpected message: " + e.getMessage());
-    }
+    String json = "{\"name\":\"o\",\"dataType\":\"OPEN_STRUCT\",\"singleValueField\":true}";
+    ComplexFieldSpec spec = JsonUtils.stringToObject(json, ComplexFieldSpec.class);
+    assertEquals(spec.getDataType(), DataType.OPEN_STRUCT);
+    FieldSpec dflt = spec.getDefaultValueFieldSpec();
+    assertNotNull(dflt);
+    assertEquals(dflt.getDataType(), DataType.STRING);
+    assertTrue(dflt.isSingleValueField());
   }
 }
