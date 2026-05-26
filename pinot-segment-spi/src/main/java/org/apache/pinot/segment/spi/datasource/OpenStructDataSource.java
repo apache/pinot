@@ -36,23 +36,23 @@ public interface OpenStructDataSource extends DataSource {
   /// type (from `_defaultValueFieldSpec`).
   DataSource getDataSource(String key);
 
-  /// Returns whether this segment has per-key index data for the given key.
+  /// Returns whether the given key has a materialized per-key index in this segment. Exact,
+  /// O(1) lookup into the materialized key set.
   ///
-  /// - **All-dense columnar segments:** exact (O(1) lookup into the materialized key set).
-  /// - **Mixed-tier columnar segments (dense + sparse):** exact for materialized keys; for any
-  ///   non-materialized key, returns `true` whenever a sparse blob exists (conservative — the
-  ///   sparse key set is not persisted today). Cost of the conservative answer is bounded:
-  ///   queries on truly-absent keys pay one wasted `getDataSource(key)` lookup, then fall
-  ///   through to expression-filter (which returns no matches via a full scan).
+  /// Query operators use this to choose between the fast path (per-key inverted/dictionary
+  /// index) and the fallback (expression scan over the sparse blob).
   ///
-  /// Query operators use this to choose between fast-path (per-key inverted/dictionary index)
-  /// and fallback (expression scan). When this returns `false`, callers can short-circuit:
-  /// e.g. a filter operator returns `EmptyFilterOperator` for value predicates and
-  /// `MatchAllFilterOperator` for IS_NULL. When this returns `true`, callers should
-  /// still handle absent-key DataSources gracefully (null-value bitmap marks all rows as null).
-  default boolean containsKey(String key) {
-    return true;
-  }
+  /// A `false` return is only a definitive "absent" when [#isFullyMaterialized()] is also
+  /// `true`; otherwise the key may still exist in the sparse blob.
+  boolean isMaterialized(String key);
+
+  /// Returns whether every key in this segment is materialized — i.e., there is no sparse
+  /// blob and the materialized key set is exhaustive.
+  ///
+  /// When `true`, a `false` return from [#isMaterialized(String)] is a definitive "absent"
+  /// and callers can short-circuit (e.g. a filter operator returns `EmptyFilterOperator`
+  /// for value predicates and `MatchAllFilterOperator` for IS_NULL).
+  boolean isFullyMaterialized();
 
   /// Returns DataSources for all keys present in this segment.
   Map<String, DataSource> getDataSources();
