@@ -106,6 +106,10 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
 
+  // MailboxService gRPC client (outbound to peer mailboxes) memory metrics
+  MAILBOX_CLIENT_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_CLIENT_USED_HEAP_MEMORY("bytes", true),
+
   /// Exports the max amount of direct memory that can be allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.maxDirectMemory()
   ///

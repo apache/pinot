@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.base.Preconditions;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator;
 import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.channel.WriteBufferWaterMark;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +64,7 @@ public class ChannelManager {
   private final PooledByteBufAllocator _bufAllocator;
   @Nullable
   private final SslContext _clientSslContext;
+  private final WriteBufferWaterMark _writeBufferWaterMark;
 
   /**
    * Constructs a {@code ChannelManager}.
@@ -69,11 +72,26 @@ public class ChannelManager {
    * @param clientSslContext optional cached client {@link SslContext} to reuse across channels
    * @param maxInboundMessageSize maximum inbound message size for gRPC channels
    * @param idleTimeout idle timeout for gRPC channels; channels close after this period of inactivity
+   * @param writeBufferHighWaterMarkBytes Netty per-channel {@link WriteBufferWaterMark} high watermark. This limit is
+   *                                     per {@code (host, port)} peer and is shared across all streams multiplexed on
+   *                                     that channel.
+   * @param writeBufferLowWaterMarkBytes Netty per-channel {@link WriteBufferWaterMark} low mark. Once the channel's
+   *                                     pending write queue grows above the high watermark, the channel is marked
+   *                                     unwritable; it becomes writable again only when the queue drains below this
+   *                                     low watermark. Must satisfy {@code 0 < low ≤ high}; validated eagerly here so
+   *                                     misconfiguration surfaces at startup rather than on the first query.
    */
-  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout) {
+  public ChannelManager(@Nullable SslContext clientSslContext, int maxInboundMessageSize, Duration idleTimeout,
+      int writeBufferHighWaterMarkBytes, int writeBufferLowWaterMarkBytes) {
     _clientSslContext = clientSslContext;
     _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
+    Preconditions.checkArgument(writeBufferLowWaterMarkBytes > 0,
+        "writeBufferLowWaterMarkBytes must be positive, got: %s", writeBufferLowWaterMarkBytes);
+    // The `low <= high` (and `low >= 0`) invariant is also checked by Netty's WriteBufferWaterMark constructor; by
+    // constructing the watermark eagerly here we surface any violation at startup instead of on the first send to
+    // a previously-unseen peer.
+    _writeBufferWaterMark = new WriteBufferWaterMark(writeBufferLowWaterMarkBytes, writeBufferHighWaterMarkBytes);
     // Use direct buffers (off-heap) for better performance - matches server-side configuration
     _bufAllocator = new PooledByteBufAllocator(true);
   }
@@ -86,6 +104,7 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+                .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .sslContext(_clientSslContext);
             return decorate(channelBuilder).build();
           }
@@ -97,6 +116,7 @@ public class ChannelManager {
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(_maxInboundMessageSize)
                 .withOption(ChannelOption.ALLOCATOR, _bufAllocator)
+                .withOption(ChannelOption.WRITE_BUFFER_WATER_MARK, _writeBufferWaterMark)
                 .usePlaintext();
             return decorate(channelBuilder).build();
           });
@@ -121,5 +141,21 @@ public class ChannelManager {
 
   private NettyChannelBuilder decorate(NettyChannelBuilder builder) {
     return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
+  }
+
+  /// Bytes of direct (off-heap) memory currently pinned by the shared gRPC
+  /// client allocator. Covers every channel managed by this instance and remains
+  /// meaningful regardless of whether Netty is configured to prefer direct or
+  /// heap buffers (e.g. `-Dio.netty.noPreferDirect=true`). Consumed by
+  /// [MailboxService] to register the `MAILBOX_CLIENT_USED_DIRECT_MEMORY` gauge.
+  public long usedDirectMemoryBytes() {
+    return _bufAllocator.metric().usedDirectMemory();
+  }
+
+  /// Bytes of heap memory currently pinned by the shared gRPC client allocator.
+  /// Consumed by [MailboxService] to register the
+  /// `MAILBOX_CLIENT_USED_HEAP_MEMORY` gauge.
+  public long usedHeapMemoryBytes() {
+    return _bufAllocator.metric().usedHeapMemory();
   }
 }
