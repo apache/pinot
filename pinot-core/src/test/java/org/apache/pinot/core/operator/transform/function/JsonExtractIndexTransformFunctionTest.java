@@ -773,4 +773,84 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         }, "nestedJson.events[0].country"}
     };
   }
+
+  // ============================================================================================
+  // 4. Default-value precedence under null handling ON
+  //
+  // When a non-null default literal is supplied AND null handling is on, the SV transform's
+  // priority order is: real default > null-handling placeholder > throw. The user-supplied
+  // default surfaces for unresolved rows; the null-handling placeholder is NOT emitted, and
+  // no null bit is set in the bitmap. These tests pin that ordering across projection,
+  // DISTINCT, and GROUP BY so a future refactor can't silently swap the priority.
+  // ============================================================================================
+
+  /**
+   * Projection with NH on AND default `'foobar'`. Unresolved rows must surface as `"foobar"`,
+   * not SQL NULL.
+   * <pre>
+   *   Per-row resolution: row 0 -> "US", row 1 -> "CA", row 2 -> "foobar", row 3 -> "foobar"
+   *
+   *   Query: SET enableNullHandling = true;
+   *          SELECT jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') AS c
+   *          FROM clicks ORDER BY c ASC
+   *
+   *   Result rows (×2 for segment duplication; ASCII order: uppercase < lowercase):
+   *           "CA", "CA", "US", "US", "foobar", "foobar", "foobar", "foobar"
+   * </pre>
+   */
+  @Test
+  public void testProjectionDefaultBeatsNullHandlingPlaceholder() {
+    givenCountryClickTable(true)
+        .whenQuery("SELECT jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') AS c "
+            + "FROM clicks ORDER BY c ASC")
+        .thenResultIs(
+            new Object[]{"CA"}, new Object[]{"CA"},
+            new Object[]{"US"}, new Object[]{"US"},
+            new Object[]{"foobar"}, new Object[]{"foobar"},
+            new Object[]{"foobar"}, new Object[]{"foobar"});
+  }
+
+  /**
+   * DISTINCT with NH on AND default `'foobar'`. The distinct set must include the default value
+   * as a regular distinct entry — no separate null entry.
+   * <pre>
+   *   Query: SET enableNullHandling = true;
+   *          SELECT DISTINCT jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') FROM clicks
+   *          ORDER BY jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') ASC
+   *
+   *   Result (ASCII order: uppercase < lowercase): "CA", "US", "foobar"
+   * </pre>
+   */
+  @Test
+  public void testDistinctDefaultBeatsNullHandlingPlaceholder() {
+    String expr = "jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar')";
+    givenCountryClickTable(true)
+        .whenQuery(String.format("SELECT DISTINCT %s FROM clicks ORDER BY %s ASC", expr, expr))
+        .thenResultIs(new Object[]{"CA"}, new Object[]{"US"}, new Object[]{"foobar"});
+  }
+
+  /**
+   * GROUP BY with NH on AND default `'foobar'`. Unresolved rows count toward the default's
+   * group, not a null group — so the result has no NULL group at all.
+   * <pre>
+   *   Per-row resolution: row 0 -> "US", row 1 -> "CA", row 2 -> "foobar", row 3 -> "foobar"
+   *
+   *   Query: SET enableNullHandling = true;
+   *          SELECT jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') AS v, COUNT(*)
+   *          FROM clicks GROUP BY v ORDER BY v ASC
+   *
+   *   Result (counts ×2 for segment duplication; ASCII order: uppercase < lowercase):
+   *           ("CA", 2), ("US", 2), ("foobar", 4)
+   * </pre>
+   */
+  @Test
+  public void testGroupByDefaultBeatsNullHandlingPlaceholder() {
+    givenCountryClickTable(true)
+        .whenQuery("SELECT jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') AS v, COUNT(*) "
+            + "FROM clicks GROUP BY v ORDER BY v ASC")
+        .thenResultIs(
+            new Object[]{"CA", 2L},
+            new Object[]{"US", 2L},
+            new Object[]{"foobar", 4L});
+  }
 }
