@@ -64,7 +64,7 @@ jobs:
         timeout-minutes: 120
         run: |
           mvn clean install \
-          -pl pinot-dependency-verifier \
+          -pl pinot-bom,pinot-dependency-verifier \
           -am \
           -DskipTests
       - name: Linter Test
