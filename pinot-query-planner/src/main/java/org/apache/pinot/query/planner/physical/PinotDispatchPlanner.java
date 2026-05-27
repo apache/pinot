@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -28,9 +31,14 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.v2.PlanFragmentAndMailboxAssignment;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.validation.ArrayToMvValidationVisitor;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 public class PinotDispatchPlanner {
@@ -120,11 +128,93 @@ public class PinotDispatchPlanner {
 
   private static DispatchableSubPlan finalizeDispatchableSubPlan(PlanFragment subPlanRoot,
       DispatchablePlanContext dispatchablePlanContext) {
+    // TODO: Physical Optimizer path does not track empty leaf stages. To support short-circuit,
+    //  check if all leaf TableScanMetadata have empty workerIdToSegmentsMap.
+    boolean allLeafStagesEmpty = dispatchablePlanContext.isAllNonReplicatedLeafStagesEmpty();
+    if (allLeafStagesEmpty && hasNonEmptyReplicatedLeaf(dispatchablePlanContext.getDispatchablePlanMetadataMap())) {
+      allLeafStagesEmpty = false;
+    }
+    Map<Integer, DispatchablePlanFragment> fragmentMap =
+        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot);
+    if (allLeafStagesEmpty) {
+      rewriteReduceStageForEmptyLeaves(fragmentMap);
+      // Drop orphan stages so EXPLAIN PLAN and stats consumers don't see unreferenced entries.
+      fragmentMap.keySet().retainAll(Set.of(0));
+    }
     return new DispatchableSubPlan(dispatchablePlanContext.getResultFields(),
-        dispatchablePlanContext.constructDispatchablePlanFragmentMap(subPlanRoot),
+        fragmentMap,
         dispatchablePlanContext.getTableNames(),
         populateTableUnavailableSegments(dispatchablePlanContext.getDispatchablePlanMetadataMap()),
-        dispatchablePlanContext.getNumSegmentsPrunedByBroker());
+        dispatchablePlanContext.getNumSegmentsPrunedByBroker(),
+        allLeafStagesEmpty);
+  }
+
+  static boolean hasNonEmptyReplicatedLeaf(Map<Integer, DispatchablePlanMetadata> metadataMap) {
+    for (DispatchablePlanMetadata metadata : metadataMap.values()) {
+      Map<String, List<String>> replicatedSegments = metadata.getReplicatedSegments();
+      if (replicatedSegments == null) {
+        continue;
+      }
+      for (List<String> segments : replicatedSegments.values()) {
+        if (segments != null && !segments.isEmpty()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public static void rewriteReduceStageForEmptyLeaves(Map<Integer, DispatchablePlanFragment> fragmentMap) {
+    DispatchablePlanFragment reduceStage = fragmentMap.get(0);
+    List<WorkerMetadata> workerMetadataList = reduceStage.getWorkerMetadataList();
+    if (workerMetadataList.isEmpty()) {
+      return;
+    }
+    PlanNode inlinedRoot = inlineAllLeafStagesEmptyInputs(reduceStage.getPlanFragment().getFragmentRoot());
+    if (inlinedRoot != reduceStage.getPlanFragment().getFragmentRoot()) {
+      // Inlined nodes originally belonged to leaf stages (ID 1, 2, etc.) but now execute within
+      // the broker reduce stage (ID 0). PlanFragment's constructor asserts that the root's stageId
+      // matches the fragmentId, so we must update all node IDs before wrapping in a new fragment.
+      setStageIdRecursively(inlinedRoot, 0);
+      reduceStage = DispatchablePlanFragment.copyWithRoot(reduceStage, inlinedRoot);
+      fragmentMap.put(0, reduceStage);
+    }
+    WorkerMetadata workerMetadata = workerMetadataList.get(0);
+    reduceStage.setWorkerMetadataList(List.of(
+        new WorkerMetadata(workerMetadata.getWorkerId(), Map.of(), workerMetadata.getCustomProperties())));
+  }
+
+  private static PlanNode inlineAllLeafStagesEmptyInputs(PlanNode node) {
+    if (node instanceof TableScanNode) {
+      return new ValueNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), List.of(), List.of());
+    }
+    if (node instanceof MailboxReceiveNode) {
+      MailboxReceiveNode mailboxReceiveNode = (MailboxReceiveNode) node;
+      MailboxSendNode sender = mailboxReceiveNode.getSender();
+      List<PlanNode> senderInputs = sender.getInputs();
+      Preconditions.checkState(!senderInputs.isEmpty(),
+          "MailboxSendNode (stageId=%s) has no inputs", sender.getStageId());
+      return inlineAllLeafStagesEmptyInputs(senderInputs.get(0));
+    }
+    List<PlanNode> inputs = node.getInputs();
+    if (inputs.isEmpty()) {
+      return node;
+    }
+    boolean changed = false;
+    List<PlanNode> inlinedInputs = new ArrayList<>(inputs.size());
+    for (PlanNode input : inputs) {
+      PlanNode inlinedInput = inlineAllLeafStagesEmptyInputs(input);
+      inlinedInputs.add(inlinedInput);
+      changed |= inlinedInput != input;
+    }
+    return changed ? node.withInputs(inlinedInputs) : node;
+  }
+
+  private static void setStageIdRecursively(PlanNode node, int stageId) {
+    node.setStageId(stageId);
+    for (PlanNode input : node.getInputs()) {
+      setStageIdRecursively(input, stageId);
+    }
   }
 
   private static Map<String, Set<String>> populateTableUnavailableSegments(

@@ -39,7 +39,7 @@ public class WorkloadBudgetManagerTest {
   void setup() {
     _config = new PinotConfiguration();
     _config.setProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_COLLECTION, true);
-    _config.setProperty(Accounting.Keys.WORKLOAD_SLEEP_TIME_MS, _enforcementWindowMs);
+    _config.setProperty(Accounting.Keys.WORKLOAD_ENFORCEMENT_WINDOW_MS, _enforcementWindowMs);
     _config.setProperty(Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT, true);
   }
 

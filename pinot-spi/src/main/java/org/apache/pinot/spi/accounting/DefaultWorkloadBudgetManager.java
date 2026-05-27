@@ -60,7 +60,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
         CommonConstants.Accounting.Keys.WORKLOAD_ENABLE_COST_ENFORCEMENT,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
     _workloadBudgets = new ConcurrentHashMap<>();
-    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.Keys.WORKLOAD_SLEEP_TIME_MS,
+    _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.Keys.WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
     initSecondaryWorkloadBudget(config);
     startBudgetResetTask();

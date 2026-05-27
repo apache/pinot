@@ -114,6 +114,11 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /// Exports the total amount of direct memory allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.usedDirectMemory()
   GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+  /// Number of MV definition+runtime entries the broker currently holds in
+  /// `MaterializedViewMetadataCache`.  Operators monitor this to confirm the cache is not
+  /// growing unboundedly: a cluster with K MVs should plateau near K; sustained growth
+  /// signals a leak in the ZK listener / drop path.
+  MATERIALIZED_VIEW_CACHE_ENTRY_COUNT("materializedViewCacheEntries", true),
   // Workload config fetch status: 1 = success, 0 = failure
   WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
