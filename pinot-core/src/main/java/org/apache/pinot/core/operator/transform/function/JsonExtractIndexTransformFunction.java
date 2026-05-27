@@ -43,6 +43,12 @@ import org.roaringbitmap.RoaringBitmap;
  * implementation changed to read values from the JSON index. For large JSON blobs this can be faster than parsing
  * GBs of JSON at query time. For small JSON blobs/highly filtered input this is generally slower than the *scalar
  * implementation. The inflection point is highly dependent on the number of docs remaining post filter.
+ *
+ * <p><b>Null handling:</b> when query-level null handling is enabled (e.g. {@code SET enableNullHandling = true})
+ * and no default literal is supplied, an unresolved JSON path on a row surfaces as SQL {@code NULL} via the
+ * {@link #getNullBitmap(ValueBlock)} bitmap rather than throwing. With null handling disabled, the legacy throw
+ * is preserved. A user-supplied non-null default literal takes precedence and is written for unresolved rows
+ * regardless of null-handling state.
  */
 public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractIndex";
@@ -55,6 +61,13 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private Map<String, RoaringBitmap> _valueToMatchingDocsMap;
   private boolean _isSingleValue;
   private String _filterJsonPath;
+
+  // Cache for the per-ValueBlock SV scan result. Both the SV transforms and getNullBitmap need
+  // the same `String[]` for the same ValueBlock; without caching, we'd hit the JSON index twice
+  // per block on the null-handling path. Identity comparison is safe — the broker constructs a
+  // fresh ValueBlock per batch and never mutates a previously returned one.
+  private ValueBlock _cachedValueBlock;
+  private String[] _cachedValuesSV;
 
   @Override
   public String getName() {
@@ -162,8 +175,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -188,8 +200,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -214,8 +225,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -240,8 +250,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -266,8 +275,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initBigDecimalValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -292,8 +300,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -313,8 +320,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     return _stringValuesSV;
   }
 
-  @Override
   @Nullable
+  @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     // Short-circuit to argument-bitmap propagation when this function isn't introducing nulls of
     // its own: non-SV output, null handling disabled, or any default literal supplied (the SV
@@ -324,10 +331,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     if (!_isSingleValue || !_nullHandlingEnabled || _defaultValue != null) {
       return super.getNullBitmap(valueBlock);
     }
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
     RoaringBitmap nullBitmap = new RoaringBitmap();
-    for (int i = 0; i < valuesFromIndex.length; i++) {
+    for (int i = 0; i < numDocs; i++) {
       if (valuesFromIndex[i] == null) {
         nullBitmap.add(i);
       }
@@ -481,5 +488,18 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       }
     }
     return _valueToMatchingDocsMap;
+  }
+
+  /**
+   * Returns the JSON-index SV scan result for the given block, caching it so that the SV
+   * transform and {@link #getNullBitmap} don't each pay the cost on the null-handling path.
+   */
+  private String[] getCachedValuesFromIndex(ValueBlock valueBlock) {
+    if (valueBlock != _cachedValueBlock) {
+      _cachedValuesSV = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+          getValueToMatchingDocsMap(), false);
+      _cachedValueBlock = valueBlock;
+    }
+    return _cachedValuesSV;
   }
 }
