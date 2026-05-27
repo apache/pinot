@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.runtime.blocks.ArrowBlockConverter;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
@@ -60,6 +61,9 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     }
     if (block.isData()) {
       checkTerminationAndSampleUsage();
+      if (_context.isArrowEnabled()) {
+        block = ArrowBlockConverter.toArrowBlock((MseBlock.Data) block, _context.getArrowAllocator());
+      }
     } else {
       onEos();
     }
