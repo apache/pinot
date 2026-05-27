@@ -20,24 +20,43 @@ package org.apache.pinot.core.plan;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.BaseDictIdBasedRegexpLikePredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.upsert.UpsertUtils;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
+import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class FilterPlanNodeTest {
@@ -132,5 +151,151 @@ public class FilterPlanNodeTest {
       numDocsFiltered++;
     }
     return numDocsFiltered;
+  }
+
+  // ---- REGEXP_LIKE evaluator-selection tests ----
+
+  /// Case-insensitive REGEXP_LIKE on a column with IFST + dictionary + inverted index should build an
+  /// IFST-based evaluator (dict-id evaluator) — `InvertedIndexFilterOperator` will consume it.
+  @Test
+  public void regexpLikeUsesIFSTEvaluatorWhenIFSTAndInvertedAvailable()
+      throws Exception {
+    PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
+        /*caseInsensitive=*/true, /*hasIFST=*/true, /*hasFST=*/false,
+        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/true);
+    assertTrue(evaluator.isDictionaryBased(),
+        "IFST+dict+inverted on RAW forward: expected dict-id evaluator, got " + evaluator.getClass().getSimpleName());
+    assertTrue(evaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator,
+        "Expected IFST-based dict-id evaluator");
+  }
+
+  /// Case-insensitive REGEXP_LIKE on a column with IFST + dictionary but NO dict-consuming index
+  /// (RAW forward, no inverted, no sorted) must fall back to the raw-value evaluator. Previously
+  /// produced an IFST dict-id evaluator that crashed at scan time.
+  @Test
+  public void regexpLikeFallsBackToRawWhenIFSTPresentButNoDictConsumer()
+      throws Exception {
+    PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
+        /*caseInsensitive=*/true, /*hasIFST=*/true, /*hasFST=*/false,
+        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/false);
+    assertFalse(evaluator.isDictionaryBased(),
+        "IFST+dict but RAW forward + no inverted: expected raw-value evaluator (no dict-consuming op), got "
+            + evaluator.getClass().getSimpleName());
+  }
+
+  /// Case-sensitive REGEXP_LIKE on a column with FST + dictionary + inverted index should build an
+  /// FST-based evaluator (dict-id evaluator).
+  @Test
+  public void regexpLikeUsesFSTEvaluatorWhenFSTAndInvertedAvailable()
+      throws Exception {
+    PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
+        /*caseInsensitive=*/false, /*hasIFST=*/false, /*hasFST=*/true,
+        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/true);
+    assertTrue(evaluator.isDictionaryBased(),
+        "FST+dict+inverted on RAW forward: expected dict-id evaluator, got " + evaluator.getClass().getSimpleName());
+    assertTrue(evaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator,
+        "Expected FST-based dict-id evaluator");
+  }
+
+  /// Case-sensitive REGEXP_LIKE on a column with FST + dictionary but NO dict-consuming index falls
+  /// back to the raw-value evaluator. Symmetric with the IFST case.
+  @Test
+  public void regexpLikeFallsBackToRawWhenFSTPresentButNoDictConsumer()
+      throws Exception {
+    PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
+        /*caseInsensitive=*/false, /*hasIFST=*/false, /*hasFST=*/true,
+        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/false);
+    assertFalse(evaluator.isDictionaryBased(),
+        "FST+dict but RAW forward + no inverted: expected raw-value evaluator, got "
+            + evaluator.getClass().getSimpleName());
+  }
+
+  /// Case-insensitive REGEXP_LIKE on a column with IFST + dictionary + dict-encoded forward (no inverted)
+  /// should still use the IFST evaluator — scan with `DictIdMatcher` can consume the dict id.
+  @Test
+  public void regexpLikeUsesIFSTEvaluatorWhenIFSTAndDictEncodedForward()
+      throws Exception {
+    PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
+        /*caseInsensitive=*/true, /*hasIFST=*/true, /*hasFST=*/false,
+        /*hasDictionary=*/true, /*forwardDictEncoded=*/true, /*hasInverted=*/false);
+    assertTrue(evaluator.isDictionaryBased(),
+        "IFST+dict on DICTIONARY-encoded forward: expected dict-id evaluator (DictIdMatcher consumes it), got "
+            + evaluator.getClass().getSimpleName());
+  }
+
+  private PredicateEvaluator runRegexpLikeAndGetEvaluator(boolean caseInsensitive, boolean hasIFST, boolean hasFST,
+      boolean hasDictionary, boolean forwardDictEncoded, boolean hasInverted)
+      throws Exception {
+    String column = "col";
+    DataSource dataSource =
+        mockStringDataSource(column, hasIFST, hasFST, hasDictionary, forwardDictEncoded, hasInverted);
+    RegexpLikePredicate predicate = caseInsensitive
+        ? new RegexpLikePredicate(ExpressionContext.forIdentifier(column), "pat", "i")
+        : new RegexpLikePredicate(ExpressionContext.forIdentifier(column), "pat");
+    FilterContext filterContext = FilterContext.forPredicate(predicate);
+
+    IndexSegment segment = mock(IndexSegment.class);
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTotalDocs()).thenReturn(1);
+    when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    when(segment.getDataSource(column)).thenReturn(dataSource);
+
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(filterContext);
+    when(queryContext.isIndexUseAllowed(Mockito.any(DataSource.class), Mockito.any(FieldConfig.IndexType.class)))
+        .thenReturn(true);
+
+    SegmentContext segmentContext = new SegmentContext(segment);
+
+    FilterPlanNode planNode = new FilterPlanNode(segmentContext, queryContext);
+    try {
+      planNode.run();
+    } catch (Exception ignored) {
+      // run() may fail downstream after evaluator construction (e.g. when constructing an
+      // InvertedIndexFilterOperator with a minimal mock). We only care about which evaluator was
+      // chosen; that is captured in the planner's _predicateEvaluators list before any operator is built.
+    }
+
+    Pair<Predicate, PredicateEvaluator> pair = planNode.getPredicateEvaluators().get(0);
+    return pair.getRight();
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static DataSource mockStringDataSource(String column, boolean hasIFST, boolean hasFST,
+      boolean hasDictionary, boolean forwardDictEncoded, boolean hasInverted) {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    DataSourceMetadata metadata = Mockito.mock(DataSourceMetadata.class);
+    when(metadata.getDataType()).thenReturn(DataType.STRING);
+    when(metadata.isSorted()).thenReturn(false);
+    when(metadata.getFieldSpec()).thenReturn(new DimensionFieldSpec(column, DataType.STRING, true));
+    when(dataSource.getDataSourceMetadata()).thenReturn(metadata);
+    when(dataSource.getColumnName()).thenReturn(column);
+
+    ForwardIndexReader forwardIndex = Mockito.mock(ForwardIndexReader.class);
+    when(forwardIndex.isDictionaryEncoded()).thenReturn(forwardDictEncoded);
+    when(forwardIndex.getStoredType()).thenReturn(DataType.STRING);
+    when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
+
+    if (hasDictionary) {
+      Dictionary dictionary = Mockito.mock(Dictionary.class);
+      when(dictionary.length()).thenReturn(0);
+      when(dataSource.getDictionary()).thenReturn(dictionary);
+    } else {
+      when(dataSource.getDictionary()).thenReturn(null);
+    }
+
+    when(dataSource.getInvertedIndex()).thenReturn(hasInverted ? Mockito.mock(InvertedIndexReader.class) : null);
+    when(dataSource.getRangeIndex()).thenReturn(null);
+    when(dataSource.getIFSTIndex()).thenReturn(hasIFST ? mockTextIndexReader() : null);
+    when(dataSource.getFSTIndex()).thenReturn(hasFST ? mockTextIndexReader() : null);
+
+    return dataSource;
+  }
+
+  private static TextIndexReader mockTextIndexReader() {
+    TextIndexReader reader = Mockito.mock(TextIndexReader.class);
+    when(reader.getDictIds(Mockito.anyString()))
+        .thenReturn(org.roaringbitmap.buffer.ImmutableRoaringBitmap.bitmapOf());
+    return reader;
   }
 }

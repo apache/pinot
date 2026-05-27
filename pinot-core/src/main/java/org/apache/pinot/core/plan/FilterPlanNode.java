@@ -311,9 +311,10 @@ public class FilterPlanNode implements PlanNode {
               boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
               // IFST/FST evaluators are dict-id based and can only be consumed by sorted/inverted-index filter
               // operators. If neither is available the planner will need to fall through to ScanBasedFilterOperator
+              boolean dictUsable = PredicateEvaluatorProvider.getDictionaryUsableForFiltering(
+                  dataSource, _queryContext, predicate) != null;
               if (caseInsensitive) {
-                if (dataSource.getIFSTIndex() != null
-                    && PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource, _queryContext, predicate) != null) {
+                if (dataSource.getIFSTIndex() != null && dictUsable) {
                   predicateEvaluator =
                       IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
                           dataSource.getIFSTIndex(), dataSource.getDictionary());
@@ -322,8 +323,7 @@ public class FilterPlanNode implements PlanNode {
                       PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
                 }
               } else {
-                if (dataSource.getFSTIndex() != null && (
-                    PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource, _queryContext, predicate) != null)) {
+                if (dataSource.getFSTIndex() != null && dictUsable) {
                   predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
                       dataSource.getFSTIndex(), dataSource.getDictionary());
                 } else {
