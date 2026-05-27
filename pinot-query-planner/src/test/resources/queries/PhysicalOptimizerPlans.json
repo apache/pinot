@@ -654,6 +654,23 @@
         ]
       },
       {
+        "description": "Distinct with limit pushes limit to leaf and final aggregate by default (no hint)",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT DISTINCT col1, col2 FROM a WHERE col3 >= 0 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalSort(fetch=[10])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalSort(fetch=[10])",
+          "\n        PhysicalAggregate(group=[{0, 1}], aggType=[FINAL], limit=[10])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0, 1]])",
+          "\n            PhysicalAggregate(group=[{0, 1}], aggType=[LEAF], limit=[10])",
+          "\n              PhysicalFilter(condition=[>=($2, 0)])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "SQL hint based group by optimization with group trim enabled and offset pushes down offset + fetch",
         "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(DISTINCT col2) AS cnt FROM a WHERE a.col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10 OFFSET 5",
         "output": [

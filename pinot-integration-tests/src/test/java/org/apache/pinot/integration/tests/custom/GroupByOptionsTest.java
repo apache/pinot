@@ -390,6 +390,68 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test
+  public void testDistinctWithLimitAndOffsetReturnsFullCardinality()
+      throws Exception {
+    // Default-on leaf-limit pushdown for no-aggregate DISTINCT must still honor OFFSET. The planner pushes
+    // offset + fetch down (the sort-exchange-copy folds offset into the inner sort's fetch), so a paginated DISTINCT
+    // returns the full requested page, not fetch - offset rows. 'j' has 10 distinct values (0..9), well above n + m.
+    setUseMultiStageQueryEngine(true);
+    String table = getTableName();
+
+    // Ordered: the returned rows are the global ranks (m+1)..(m+n), i.e. the 3rd, 4th, 5th smallest distinct
+    // values => 2, 3, 4.
+    Assert.assertEquals(
+        toResultStr(postV2Query("select distinct j from " + table + " order by j limit 3 offset 2")),
+        "\"j\"[\"LONG\"]\n2\n3\n4");
+    // Control with offset 0 => 0, 1, 2.
+    Assert.assertEquals(
+        toResultStr(postV2Query("select distinct j from " + table + " order by j limit 3")),
+        "\"j\"[\"LONG\"]\n0\n1\n2");
+
+    // Unordered: the result set is arbitrary, but the cardinality must be exactly the requested page size (3), and
+    // every value must be a valid distinct 'j'. Without accounting for the offset this would undercount.
+    JsonNode rows = postV2Query("select distinct j from " + table + " limit 3 offset 2").get(RESULT_TABLE).get("rows");
+    Assert.assertEquals(rows.size(), 3, "DISTINCT with LIMIT 3 OFFSET 2 must return a full page of 3 rows");
+    for (JsonNode row : rows) {
+      long value = row.get(0).asLong();
+      Assert.assertTrue(value >= 0 && value <= 9, "unexpected distinct value: " + value);
+    }
+  }
+
+  @Test
+  public void testGroupByNoAggregateWithLimitOffsetAndTrimEquivalence()
+      throws Exception {
+    // Covers the no-aggregate GROUP BY (non-DISTINCT) path with the default-on leaf-limit pushdown, plus
+    // result-equivalence between default-on group trim and the explicit opt-out when trim is a no-op.
+    setUseMultiStageQueryEngine(true);
+    String table = getTableName();
+
+    // No-aggregate GROUP BY col with LIMIT/OFFSET must return the full requested page (same trim machinery as
+    // DISTINCT). 'j' has 10 distinct values; ordered page (m+1)..(m+n) => 2, 3, 4.
+    Assert.assertEquals(
+        toResultStr(postV2Query("select j from " + table + " group by j order by j limit 3 offset 2")),
+        "\"j\"[\"LONG\"]\n2\n3\n4");
+
+    // Unordered no-aggregate GROUP BY: cardinality must be exactly the page size (3), every value a valid 'j'.
+    JsonNode rows = postV2Query("select j from " + table + " group by j limit 3 offset 2")
+        .get(RESULT_TABLE).get("rows");
+    Assert.assertEquals(rows.size(), 3, "GROUP BY without aggregate with LIMIT 3 OFFSET 2 must return a full page");
+    for (JsonNode row : rows) {
+      long value = row.get(0).asLong();
+      Assert.assertTrue(value >= 0 && value <= 9, "unexpected group key: " + value);
+    }
+
+    // When the total number of distinct values ('i' has 4) is below the limit, leaf/final trim is a no-op, so the
+    // default-on behavior must return exactly the same rows as the explicit opt-out. Order by the key for a
+    // deterministic comparison.
+    String defaultOn = toResultStr(postV2Query("select distinct i from " + table + " order by i limit 100"));
+    String optedOut = toResultStr(postV2Query(
+        "select /*+ aggOptions(is_enable_group_trim='false') */ distinct i from " + table + " order by i limit 100"));
+    Assert.assertEquals(defaultOn, optedOut, "default-on trim must match the opt-out when total distinct < limit");
+    Assert.assertEquals(defaultOn, "\"i\"[\"INT\"]\n0\n1\n2\n3");
+  }
+
+  @Test
   public void testOrderByByKeysAndValuesIsPushedToFinalAggregationStage()
       throws Exception {
     setUseMultiStageQueryEngine(true);
