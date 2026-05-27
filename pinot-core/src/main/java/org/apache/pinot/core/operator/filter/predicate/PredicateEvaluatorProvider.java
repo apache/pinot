@@ -136,7 +136,7 @@ public class PredicateEvaluatorProvider {
   /// only option, so the dictionary is preserved regardless of predicate type.
   @VisibleForTesting
   @Nullable
-  static Dictionary getDictionaryUsableForFiltering(DataSource dataSource, @Nullable QueryContext queryContext,
+  public static Dictionary getDictionaryUsableForFiltering(DataSource dataSource, @Nullable QueryContext queryContext,
       Predicate predicate) {
     Dictionary dictionary = dataSource.getDictionary();
     if (dictionary == null) {

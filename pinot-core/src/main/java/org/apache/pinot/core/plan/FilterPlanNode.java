@@ -312,7 +312,8 @@ public class FilterPlanNode implements PlanNode {
               // IFST/FST evaluators are dict-id based and can only be consumed by sorted/inverted-index filter
               // operators. If neither is available the planner will need to fall through to ScanBasedFilterOperator
               if (caseInsensitive) {
-                if (dataSource.getIFSTIndex() != null && canConsumeDictIdEvaluator(dataSource, _queryContext)) {
+                if (dataSource.getIFSTIndex() != null
+                    && PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource, _queryContext, predicate) != null) {
                   predicateEvaluator =
                       IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
                           dataSource.getIFSTIndex(), dataSource.getDictionary());
@@ -321,7 +322,8 @@ public class FilterPlanNode implements PlanNode {
                       PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
                 }
               } else {
-                if (dataSource.getFSTIndex() != null && canConsumeDictIdEvaluator(dataSource, _queryContext)) {
+                if (dataSource.getFSTIndex() != null && (
+                    PredicateEvaluatorProvider.getDictionaryUsableForFiltering(dataSource, _queryContext, predicate) != null)) {
                   predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
                       dataSource.getFSTIndex(), dataSource.getDictionary());
                 } else {
@@ -433,19 +435,6 @@ public class FilterPlanNode implements PlanNode {
     DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
     return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
         numDocs, true);
-  }
-
-  private static boolean canConsumeDictIdEvaluator(DataSource dataSource, QueryContext queryContext) {
-    if (dataSource.getDataSourceMetadata().isSorted() && queryContext.isIndexUseAllowed(dataSource,
-        FieldConfig.IndexType.SORTED)) {
-      return true;
-    }
-    if (dataSource.getInvertedIndex() != null && queryContext.isIndexUseAllowed(dataSource,
-        FieldConfig.IndexType.INVERTED)) {
-      return true;
-    }
-    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
-    return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
 
   /**
