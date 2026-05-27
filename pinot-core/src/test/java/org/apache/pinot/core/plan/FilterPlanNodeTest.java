@@ -211,7 +211,7 @@ public class FilterPlanNodeTest {
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
     when(segmentMetadata.getTotalDocs()).thenReturn(1);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segment.getDataSource(column)).thenReturn(dataSource);
+    when(segment.getDataSource(Mockito.eq(column), Mockito.any())).thenReturn(dataSource);
 
     QueryContext queryContext = mock(QueryContext.class);
     when(queryContext.getFilter()).thenReturn(filterContext);
