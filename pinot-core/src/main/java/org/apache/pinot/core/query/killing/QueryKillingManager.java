@@ -293,17 +293,26 @@ public class QueryKillingManager implements PinotClusterConfigChangeListener {
     }
     boolean logOnly = effectiveMode == CommonConstants.Accounting.ScanKillingMode.LOG_ONLY
         || (effectiveMode == null && config.isScanBasedKillingLogOnly());
-    long requestId = executionContext.getRequestId();
-    QueryKillReport report = queryStrategy.buildKillReport(scanCostContext, requestId, queryId, tableName,
-        configSource);
     if (logOnly) {
+      // only the first observer for this query logs the dry-run line and
+      // emits the metric; subsequent observers no-op
+      if (!executionContext.markScanKillingDryRunEmitted()) {
+        return;
+      }
+      long requestId = executionContext.getRequestId();
+      QueryKillReport report = queryStrategy.buildKillReport(scanCostContext, requestId, queryId, tableName,
+          configSource);
       LOGGER.info("Query killed in LogOnly mode: {}", report.toInternalLogMessage());
       emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, report.getTableName());
       return;
     }
-    LOGGER.warn("Query Killed in enforce mode: {}", report.toInternalLogMessage());
-    executionContext.terminate(queryStrategy.getErrorCode(), report.toCustomerMessage());
-    emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN, report.getTableName());
+    long requestId = executionContext.getRequestId();
+    QueryKillReport report = queryStrategy.buildKillReport(scanCostContext, requestId, queryId, tableName,
+        configSource);
+    if (executionContext.terminate(queryStrategy.getErrorCode(), report.toCustomerMessage())) {
+      LOGGER.warn("Query Killed in enforce mode: {}", report.toInternalLogMessage());
+      emitKillMetric(ServerMeter.QUERIES_KILLED_SCAN, report.getTableName());
+    }
   }
 
   /**

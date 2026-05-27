@@ -22,6 +22,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -42,6 +46,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -688,6 +693,207 @@ public class QueryKillingManagerTest {
     verify(_serverMetrics).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1L);
     verify(_serverMetrics, never()).addMeteredTableValue(eq("unknown"),
         eq(ServerMeter.QUERIES_KILLED_SCAN), anyLong());
+  }
+
+  // --- Dry-run emit-once guard ---
+
+  @Test
+  public void testLogOnlyEmitsExactlyOncePerQueryAcrossManyBlockChecks() {
+    // logOnly mode never terminates the query, so without a guard, every subsequent block-level
+    // termination check after the threshold is crossed re-builds a report, re-logs, and
+    // re-emits the metric. This test simulates 10,000 block checks and verifies exactly one
+    // emission — the CAS guard on QueryExecutionContext suppresses the duplicates.
+    QueryMonitorConfig config = buildConfig("logOnly", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    execCtx.setTableName("dryRunTable_REALTIME");
+    execCtx.setQueryId("q-dry-run-once");
+    execCtx.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L); // permanently over threshold
+
+    for (int i = 0; i < 10_000; i++) {
+      manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    }
+
+    // Exactly one per-table dry-run metric emission across 10k block checks
+    verify(_serverMetrics).addMeteredTableValue("dryRunTable_REALTIME",
+        ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    verify(_serverMetrics, never()).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    // logOnly never terminates
+    assertNull(execCtx.getTerminateException());
+  }
+
+  @Test
+  public void testEnforceEmitsOncePerQueryAcrossManyBlockChecks() {
+    // Sanity check: enforce mode is already guarded by getTerminateException() != null, but the
+    // dry-run CAS must not regress that. Verify enforce still emits exactly once.
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    execCtx.setTableName("enforceTable_REALTIME");
+    execCtx.setQueryId("q-enforce-once");
+    execCtx.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    for (int i = 0; i < 10_000; i++) {
+      manager.checkAndKillIfNeeded(execCtx, scanCtx);
+    }
+
+    verify(_serverMetrics).addMeteredTableValue("enforceTable_REALTIME",
+        ServerMeter.QUERIES_KILLED_SCAN, 1L);
+    assertNotNull(execCtx.getTerminateException());
+  }
+
+  @Test
+  public void testDryRunGuardIsPerQueryNotGlobal() {
+    // Two independent queries in logOnly mode should each emit once — the CAS lives on
+    // QueryExecutionContext, not on the manager or a static.
+    QueryMonitorConfig config = buildConfig("logOnly", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    QueryExecutionContext execCtxA = QueryExecutionContext.forSseTest();
+    execCtxA.setTableName("tableA_REALTIME");
+    execCtxA.setQueryId("qA");
+    execCtxA.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    QueryExecutionContext execCtxB = QueryExecutionContext.forSseTest();
+    execCtxB.setTableName("tableB_REALTIME");
+    execCtxB.setQueryId("qB");
+    execCtxB.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    for (int i = 0; i < 100; i++) {
+      manager.checkAndKillIfNeeded(execCtxA, scanCtx);
+      manager.checkAndKillIfNeeded(execCtxB, scanCtx);
+    }
+
+    verify(_serverMetrics).addMeteredTableValue("tableA_REALTIME",
+        ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    verify(_serverMetrics).addMeteredTableValue("tableB_REALTIME",
+        ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+  }
+
+  @Test
+  public void testLogOnlyConcurrentCallersEmitExactlyOnce()
+      throws InterruptedException {
+    // Production reality: BaseOperator.checkTermination() is invoked from multiple worker
+    // threads in parallel (one per segment / per block). Without an atomic CAS, two threads
+    // racing past the threshold at the same instant could both pass the "not yet emitted"
+    // check and double-emit. AtomicBoolean.compareAndSet guarantees exactly one winner; this
+    // test fails if the guard is downgraded to a plain or volatile boolean.
+    QueryMonitorConfig config = buildConfig("logOnly", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    execCtx.setTableName("concurrentLogOnly_REALTIME");
+    execCtx.setQueryId("q-concurrent-dry-run");
+    execCtx.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    int threadCount = 16;
+    int iterationsPerThread = 5_000;
+    ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+    CountDownLatch startBarrier = new CountDownLatch(1);
+    CountDownLatch doneBarrier = new CountDownLatch(threadCount);
+
+    try {
+      for (int t = 0; t < threadCount; t++) {
+        pool.submit(() -> {
+          try {
+            startBarrier.await();
+            for (int i = 0; i < iterationsPerThread; i++) {
+              manager.checkAndKillIfNeeded(execCtx, scanCtx);
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          } finally {
+            doneBarrier.countDown();
+          }
+        });
+      }
+      startBarrier.countDown();
+      assertTrue(doneBarrier.await(30, TimeUnit.SECONDS), "Workers did not complete in time");
+    } finally {
+      pool.shutdownNow();
+    }
+
+    // Even with 16 threads × 5000 iterations = 80,000 concurrent attempts, the CAS guarantees
+    // exactly one emission.
+    verify(_serverMetrics, times(1)).addMeteredTableValue("concurrentLogOnly_REALTIME",
+        ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    verify(_serverMetrics, never()).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN_DRY_RUN, 1L);
+    assertNull(execCtx.getTerminateException(), "logOnly must not terminate");
+  }
+
+  @Test
+  public void testEnforceConcurrentCallersEmitExactlyOnce()
+      throws InterruptedException {
+    // Enforce-mode duplicate-emit prevention: terminate() is internally a synchronized CAS that
+    // returns true only on the first transition. The manager gates the emit + warn log on the
+    // return value, so two threads that both observe (!isTerminated) and cross the threshold
+    // before either commits will still result in exactly one emission.
+    QueryMonitorConfig config = buildConfig("enforce", 100L, Long.MAX_VALUE);
+    AtomicReference<QueryMonitorConfig> configRef = new AtomicReference<>(config);
+    QueryKillingManager manager = new QueryKillingManager(configRef, _serverMetrics);
+    manager.rebuildStrategy();
+
+    QueryExecutionContext execCtx = QueryExecutionContext.forSseTest();
+    execCtx.setTableName("concurrentEnforce_REALTIME");
+    execCtx.setQueryId("q-concurrent-enforce");
+    execCtx.setCachedKillingStrategy(manager.resolveQueryStrategy(null));
+
+    QueryScanCostContext scanCtx = new QueryScanCostContext();
+    scanCtx.addEntriesScannedInFilter(200L);
+
+    int threadCount = 16;
+    int iterationsPerThread = 5_000;
+    ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+    CountDownLatch startBarrier = new CountDownLatch(1);
+    CountDownLatch doneBarrier = new CountDownLatch(threadCount);
+
+    try {
+      for (int t = 0; t < threadCount; t++) {
+        pool.submit(() -> {
+          try {
+            startBarrier.await();
+            for (int i = 0; i < iterationsPerThread; i++) {
+              manager.checkAndKillIfNeeded(execCtx, scanCtx);
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          } finally {
+            doneBarrier.countDown();
+          }
+        });
+      }
+      startBarrier.countDown();
+      assertTrue(doneBarrier.await(30, TimeUnit.SECONDS), "Workers did not complete in time");
+    } finally {
+      pool.shutdownNow();
+    }
+
+    verify(_serverMetrics, times(1)).addMeteredTableValue("concurrentEnforce_REALTIME",
+        ServerMeter.QUERIES_KILLED_SCAN, 1L);
+    verify(_serverMetrics, never()).addMeteredGlobalValue(ServerMeter.QUERIES_KILLED_SCAN, 1L);
+    assertNotNull(execCtx.getTerminateException());
   }
 
   /**
