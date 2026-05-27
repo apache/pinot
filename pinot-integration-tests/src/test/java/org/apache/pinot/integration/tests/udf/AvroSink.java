@@ -110,6 +110,7 @@ public class AvroSink implements AutoCloseable {
         case MAP:
         case LIST:
         case STRUCT:
+        case OPEN_STRUCT:
         case UNKNOWN:
           // Types we know we don't support in AVRO
           break;
