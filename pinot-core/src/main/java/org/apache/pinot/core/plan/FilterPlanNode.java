@@ -435,24 +435,13 @@ public class FilterPlanNode implements PlanNode {
         numDocs, true);
   }
 
-  /// Returns true if a dictionary-id based REGEXP_LIKE evaluator (e.g. IFST/FST/DictId) can be consumed at run time
-  /// either by:
-  ///   1. A sorted-index filter operator (`SortedIndexBasedFilterOperator`).
-  ///   2. An inverted-index filter operator (`InvertedIndexFilterOperator`).
-  ///   3. The scan filter operator when the forward index is dictionary-encoded (`DictIdMatcher` in
-  ///      `SVScanDocIdIterator` reads dict ids from the forward index and calls `applySV(int dictId)`).
-  ///
-  /// When false, the scan path will pick a typed raw matcher (e.g. `StringMatcher`) and call
-  /// `applySV(<rawType>)`, which a dict-id evaluator cannot service. In that case the IFST/FST evaluator should be
-  /// skipped in favor of the raw-value evaluator
-  /// (`RegexpLikePredicateEvaluatorFactory#newRawValueBasedEvaluator`).
   private static boolean canConsumeDictIdEvaluator(DataSource dataSource, QueryContext queryContext) {
-    if (dataSource.getDataSourceMetadata().isSorted()
-        && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+    if (dataSource.getDataSourceMetadata().isSorted() && queryContext.isIndexUseAllowed(dataSource,
+        FieldConfig.IndexType.SORTED)) {
       return true;
     }
-    if (dataSource.getInvertedIndex() != null
-        && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+    if (dataSource.getInvertedIndex() != null && queryContext.isIndexUseAllowed(dataSource,
+        FieldConfig.IndexType.INVERTED)) {
       return true;
     }
     ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
