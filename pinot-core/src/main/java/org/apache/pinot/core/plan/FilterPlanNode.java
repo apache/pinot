@@ -309,8 +309,13 @@ public class FilterPlanNode implements PlanNode {
               // Check if case-insensitive flag is present
               RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
               boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
+              // IFST/FST evaluators are dict-id based and can only be consumed by sorted/inverted-index filter
+              // operators. If neither is available for this segment, the planner will fall through to
+              // ScanBasedFilterOperator, which reads raw values from the forward index and cannot service a
+              // dict-id evaluator (applySV(String) throws on BaseDictionaryBasedPredicateEvaluator). In that
+              // case, route through the raw-value evaluator instead.
               if (caseInsensitive) {
-                if (dataSource.getIFSTIndex() != null) {
+                if (dataSource.getIFSTIndex() != null && canConsumeDictIdEvaluator(dataSource, _queryContext)) {
                   predicateEvaluator =
                       IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
                           dataSource.getIFSTIndex(), dataSource.getDictionary());
@@ -319,7 +324,7 @@ public class FilterPlanNode implements PlanNode {
                       PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource, _queryContext);
                 }
               } else {
-                if (dataSource.getFSTIndex() != null) {
+                if (dataSource.getFSTIndex() != null && canConsumeDictIdEvaluator(dataSource, _queryContext)) {
                   predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
                       dataSource.getFSTIndex(), dataSource.getDictionary());
                 } else {
@@ -431,6 +436,30 @@ public class FilterPlanNode implements PlanNode {
     DataSource dataSource = _indexSegment.getDataSource(column, _queryContext.getSchema());
     return constructVectorSimilarityOperator(dataSource, (VectorSimilarityPredicate) predicate, column,
         numDocs, true);
+  }
+
+  /// Returns true if a dictionary-id based REGEXP_LIKE evaluator (e.g. IFST/FST/DictId) can be consumed at run time
+  /// either by:
+  ///   1. A sorted-index filter operator (`SortedIndexBasedFilterOperator`).
+  ///   2. An inverted-index filter operator (`InvertedIndexFilterOperator`).
+  ///   3. The scan filter operator when the forward index is dictionary-encoded (`DictIdMatcher` in
+  ///      `SVScanDocIdIterator` reads dict ids from the forward index and calls `applySV(int dictId)`).
+  ///
+  /// When false, the scan path will pick a typed raw matcher (e.g. `StringMatcher`) and call
+  /// `applySV(<rawType>)`, which a dict-id evaluator cannot service. In that case the IFST/FST evaluator should be
+  /// skipped in favor of the raw-value evaluator
+  /// (`RegexpLikePredicateEvaluatorFactory#newRawValueBasedEvaluator`).
+  private static boolean canConsumeDictIdEvaluator(DataSource dataSource, QueryContext queryContext) {
+    if (dataSource.getDataSourceMetadata().isSorted()
+        && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+      return true;
+    }
+    if (dataSource.getInvertedIndex() != null
+        && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+      return true;
+    }
+    ForwardIndexReader<?> forwardIndex = dataSource.getForwardIndex();
+    return forwardIndex != null && forwardIndex.isDictionaryEncoded();
   }
 
   /**
