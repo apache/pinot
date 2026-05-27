@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -80,6 +81,9 @@ public class QueryExecutionContext {
 
   @Nullable
   private volatile Accounting.ScanKillingMode _effectiveScanKillingMode;
+
+  /// Guards single-emission of the scan-based killing dry-run log line and metric for this query
+  private final AtomicBoolean _scanKillingDryRunEmitted = new AtomicBoolean(false);
 
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {
@@ -262,5 +266,12 @@ public class QueryExecutionContext {
    */
   public void setEffectiveScanKillingMode(@Nullable Accounting.ScanKillingMode effectiveScanKillingMode) {
     _effectiveScanKillingMode = effectiveScanKillingMode;
+  }
+
+  /**
+   * Atomically marks that the scan-based killing dry-run signal has been emitted for this query
+   */
+  public boolean markScanKillingDryRunEmitted() {
+    return _scanKillingDryRunEmitted.compareAndSet(false, true);
   }
 }
