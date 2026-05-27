@@ -153,74 +153,46 @@ public class FilterPlanNodeTest {
     return numDocsFiltered;
   }
 
-  // ---- REGEXP_LIKE evaluator-selection tests ----
-
-  /// Case-insensitive REGEXP_LIKE on a column with IFST + dictionary + inverted index should build an
-  /// IFST-based evaluator (dict-id evaluator) — `InvertedIndexFilterOperator` will consume it.
   @Test
   public void regexpLikeUsesIFSTEvaluatorWhenIFSTAndInvertedAvailable()
       throws Exception {
     PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
-        /*caseInsensitive=*/true, /*hasIFST=*/true, /*hasFST=*/false,
-        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/true);
-    assertTrue(evaluator.isDictionaryBased(),
-        "IFST+dict+inverted on RAW forward: expected dict-id evaluator, got " + evaluator.getClass().getSimpleName());
-    assertTrue(evaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator,
-        "Expected IFST-based dict-id evaluator");
+        true, true, false, true, false, true);
+    assertTrue(evaluator.isDictionaryBased());
+    assertTrue(evaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator);
   }
 
-  /// Case-insensitive REGEXP_LIKE on a column with IFST + dictionary but NO dict-consuming index
-  /// (RAW forward, no inverted, no sorted) must fall back to the raw-value evaluator. Previously
-  /// produced an IFST dict-id evaluator that crashed at scan time.
   @Test
   public void regexpLikeFallsBackToRawWhenIFSTPresentButNoDictConsumer()
       throws Exception {
     PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
-        /*caseInsensitive=*/true, /*hasIFST=*/true, /*hasFST=*/false,
-        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/false);
-    assertFalse(evaluator.isDictionaryBased(),
-        "IFST+dict but RAW forward + no inverted: expected raw-value evaluator (no dict-consuming op), got "
-            + evaluator.getClass().getSimpleName());
+        true, true, false, true, false, false);
+    assertFalse(evaluator.isDictionaryBased());
   }
 
-  /// Case-sensitive REGEXP_LIKE on a column with FST + dictionary + inverted index should build an
-  /// FST-based evaluator (dict-id evaluator).
   @Test
   public void regexpLikeUsesFSTEvaluatorWhenFSTAndInvertedAvailable()
       throws Exception {
     PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
-        /*caseInsensitive=*/false, /*hasIFST=*/false, /*hasFST=*/true,
-        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/true);
-    assertTrue(evaluator.isDictionaryBased(),
-        "FST+dict+inverted on RAW forward: expected dict-id evaluator, got " + evaluator.getClass().getSimpleName());
-    assertTrue(evaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator,
-        "Expected FST-based dict-id evaluator");
+        false, false, true, true, false, true);
+    assertTrue(evaluator.isDictionaryBased());
+    assertTrue(evaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator);
   }
 
-  /// Case-sensitive REGEXP_LIKE on a column with FST + dictionary but NO dict-consuming index falls
-  /// back to the raw-value evaluator. Symmetric with the IFST case.
   @Test
   public void regexpLikeFallsBackToRawWhenFSTPresentButNoDictConsumer()
       throws Exception {
     PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
-        /*caseInsensitive=*/false, /*hasIFST=*/false, /*hasFST=*/true,
-        /*hasDictionary=*/true, /*forwardDictEncoded=*/false, /*hasInverted=*/false);
-    assertFalse(evaluator.isDictionaryBased(),
-        "FST+dict but RAW forward + no inverted: expected raw-value evaluator, got "
-            + evaluator.getClass().getSimpleName());
+        false, false, true, true, false, false);
+    assertFalse(evaluator.isDictionaryBased());
   }
 
-  /// Case-insensitive REGEXP_LIKE on a column with IFST + dictionary + dict-encoded forward (no inverted)
-  /// should still use the IFST evaluator — scan with `DictIdMatcher` can consume the dict id.
   @Test
   public void regexpLikeUsesIFSTEvaluatorWhenIFSTAndDictEncodedForward()
       throws Exception {
     PredicateEvaluator evaluator = runRegexpLikeAndGetEvaluator(
-        /*caseInsensitive=*/true, /*hasIFST=*/true, /*hasFST=*/false,
-        /*hasDictionary=*/true, /*forwardDictEncoded=*/true, /*hasInverted=*/false);
-    assertTrue(evaluator.isDictionaryBased(),
-        "IFST+dict on DICTIONARY-encoded forward: expected dict-id evaluator (DictIdMatcher consumes it), got "
-            + evaluator.getClass().getSimpleName());
+        true, true, false, true, true, false);
+    assertTrue(evaluator.isDictionaryBased());
   }
 
   private PredicateEvaluator runRegexpLikeAndGetEvaluator(boolean caseInsensitive, boolean hasIFST, boolean hasFST,
@@ -251,9 +223,6 @@ public class FilterPlanNodeTest {
     try {
       planNode.run();
     } catch (Exception ignored) {
-      // run() may fail downstream after evaluator construction (e.g. when constructing an
-      // InvertedIndexFilterOperator with a minimal mock). We only care about which evaluator was
-      // chosen; that is captured in the planner's _predicateEvaluators list before any operator is built.
     }
 
     Pair<Predicate, PredicateEvaluator> pair = planNode.getPredicateEvaluators().get(0);
