@@ -64,7 +64,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
 
   // Cache for the per-ValueBlock SV scan result. Both the SV transforms and getNullBitmap need
   // the same `String[]` for the same ValueBlock; without caching, we'd hit the JSON index twice
-  // per block on the null-handling path. Identity comparison is safe — the broker constructs a
+  // per block on the null-handling path. Identity comparison is safe — the server constructs a
   // fresh ValueBlock per batch and never mutates a previously returned one.
   private ValueBlock _cachedValueBlock;
   private String[] _cachedValuesSV;
@@ -134,22 +134,27 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       if (!(fourthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("Default value must be a literal");
       }
-
-      if (_isSingleValue) {
-        _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
-      } else {
-        try {
-          JsonNode mvArray = JsonUtils.stringToJsonNode(((LiteralTransformFunction) fourthArgument).getStringLiteral());
-          if (!mvArray.isArray()) {
+      LiteralTransformFunction literalFn = (LiteralTransformFunction) fourthArgument;
+      // SQL NULL literal as the default ⇒ behave like the 3-arg form: leave `_defaultValue` null
+      // so unresolved rows surface as SQL NULL (NH on) or throw (NH off). This mirrors the scalar
+      // function's `_defaultIsNull` handling without needing a separate flag.
+      if (!literalFn.isNull()) {
+        if (_isSingleValue) {
+          _defaultValue = dataType.convert(literalFn.getStringLiteral());
+        } else {
+          try {
+            JsonNode mvArray = JsonUtils.stringToJsonNode(literalFn.getStringLiteral());
+            if (!mvArray.isArray()) {
+              throw new IllegalArgumentException("Default value must be a valid JSON array");
+            }
+            Object[] defaultValues = new Object[mvArray.size()];
+            for (int i = 0; i < mvArray.size(); i++) {
+              defaultValues[i] = dataType.convert(mvArray.get(i).asText());
+            }
+            _defaultValue = defaultValues;
+          } catch (IOException e) {
             throw new IllegalArgumentException("Default value must be a valid JSON array");
           }
-          Object[] defaultValues = new Object[mvArray.size()];
-          for (int i = 0; i < mvArray.size(); i++) {
-            defaultValues[i] = dataType.convert(mvArray.get(i).asText());
-          }
-          _defaultValue = defaultValues;
-        } catch (IOException e) {
-          throw new IllegalArgumentException("Default value must be a valid JSON array");
         }
       }
     }
@@ -324,10 +329,10 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
     // Short-circuit to argument-bitmap propagation when this function isn't introducing nulls of
-    // its own: non-SV output, null handling disabled, or any default literal supplied (the SV
-    // transform writes it for unresolved rows). Unlike the scalar function, the parser converts a
-    // SQL-NULL literal to the typed zero ("" for STRING, throws at init for numerics), so there's
-    // no SQL-NULL-default path to fall through.
+    // its own: non-SV output, null handling disabled, or a non-null default literal supplied (the
+    // SV transform writes it for unresolved rows). The SQL NULL literal case is handled in `init`
+    // by leaving `_defaultValue` null so it falls through to the scan below — same as the 3-arg
+    // form.
     if (!_isSingleValue || !_nullHandlingEnabled || _defaultValue != null) {
       return super.getNullBitmap(valueBlock);
     }
