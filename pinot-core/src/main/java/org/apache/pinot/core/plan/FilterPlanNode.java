@@ -310,10 +310,7 @@ public class FilterPlanNode implements PlanNode {
               RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
               boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
               // IFST/FST evaluators are dict-id based and can only be consumed by sorted/inverted-index filter
-              // operators. If neither is available for this segment, the planner will fall through to
-              // ScanBasedFilterOperator, which reads raw values from the forward index and cannot service a
-              // dict-id evaluator (applySV(String) throws on BaseDictionaryBasedPredicateEvaluator). In that
-              // case, route through the raw-value evaluator instead.
+              // operators. If neither is available the planner will need to fall through to ScanBasedFilterOperator
               if (caseInsensitive) {
                 if (dataSource.getIFSTIndex() != null && canConsumeDictIdEvaluator(dataSource, _queryContext)) {
                   predicateEvaluator =
