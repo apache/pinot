@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -253,18 +254,21 @@ public class FilterPlanNodeTest {
       when(dataSource.getDictionary()).thenReturn(null);
     }
 
-    when(dataSource.getInvertedIndex()).thenReturn(hasInverted ? Mockito.mock(InvertedIndexReader.class) : null);
+    InvertedIndexReader invertedReader = hasInverted ? Mockito.mock(InvertedIndexReader.class) : null;
+    TextIndexReader ifstReader = hasIFST ? mockTextIndexReader() : null;
+    TextIndexReader fstReader = hasFST ? mockTextIndexReader() : null;
+    when(dataSource.getInvertedIndex()).thenReturn(invertedReader);
     when(dataSource.getRangeIndex()).thenReturn(null);
-    when(dataSource.getIFSTIndex()).thenReturn(hasIFST ? mockTextIndexReader() : null);
-    when(dataSource.getFSTIndex()).thenReturn(hasFST ? mockTextIndexReader() : null);
+    when(dataSource.getIFSTIndex()).thenReturn(ifstReader);
+    when(dataSource.getFSTIndex()).thenReturn(fstReader);
 
     return dataSource;
   }
 
   private static TextIndexReader mockTextIndexReader() {
     TextIndexReader reader = Mockito.mock(TextIndexReader.class);
-    when(reader.getDictIds(Mockito.anyString()))
-        .thenReturn(org.roaringbitmap.buffer.ImmutableRoaringBitmap.bitmapOf());
+    ImmutableRoaringBitmap emptyBitmap = ImmutableRoaringBitmap.bitmapOf();
+    when(reader.getDictIds(Mockito.anyString())).thenReturn(emptyBitmap);
     return reader;
   }
 }
