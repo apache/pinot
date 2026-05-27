@@ -178,6 +178,15 @@ public class PredicateComparisonRewriterTest {
         rewrittenGte.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
         "greater_than_or_equal");
 
+    // col5 <= col6 should be rewritten to less_than_or_equal(col5, col6) = true
+    PinotQuery lteQuery =
+        CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col5 <= col6");
+    PinotQuery rewrittenLte = _predicateComparisonRewriter.rewrite(lteQuery);
+    assertEquals(rewrittenLte.getFilterExpression().getFunctionCall().getOperator(), "EQUALS");
+    assertEquals(
+        rewrittenLte.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+        "less_than_or_equal");
+
     // col7 > col8 should be rewritten to greater_than(col7, col8) = true
     PinotQuery gtQuery =
         CalciteSqlParser.compileToPinotQueryWithoutRewrites("SELECT * FROM mytable WHERE col7 > col8");
