@@ -23,9 +23,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -339,6 +341,52 @@ public class GroupByOptionsTest extends CustomDataQueryClusterIntegrationTest {
             + "                    DocIdSet(maxDocs=[40000])\n"
             + "                      FilterMatchEntireSegment(numDocs=[80])\n"
     );
+  }
+
+  @Test
+  public void testGroupTrimWithOffsetReturnsFullPageOnPhysicalOptimizer()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    // On the physical-optimizer path, group trim must push down 'offset + fetch' to the leaf/final aggregate.
+    // Without it, the aggregate keeps only 'fetch' groups (there are 40 distinct (i, j) groups), so the outer
+    // OFFSET drops everything and the page comes back short. We query without ORDER BY so the runtime trims to
+    // exactly the pushed-down limit (see AggregateOperator), making the cardinality bug deterministic.
+    String physicalOpt = "SET usePhysicalOptimizer=true; ";
+
+    // No-aggregate DISTINCT path: group trim is on by default here.
+    JsonNode distinct = postV2Query(physicalOpt
+        + " select distinct i, j from " + getTableName() + " limit 5 offset 10");
+    assertFullPageOfGroups(distinct, -1);
+
+    // Hinted aggregate path with group trim enabled. Every (i, j) group has exactly 2 rows in the test data.
+    JsonNode aggregated = postV2Query(physicalOpt
+        + " select /*+ aggOptions(is_enable_group_trim='true') */ i, j, count(*) as cnt from " + getTableName()
+        + " group by i, j limit 5 offset 10");
+    assertFullPageOfGroups(aggregated, 2);
+  }
+
+  /**
+   * Asserts the result is a full page of 5 distinct, in-domain (i, j) groups. The rows are not ordered (we query
+   * without ORDER BY for deterministic trimming), so we validate the page size and group validity rather than exact
+   * values. When {@code expectedCount >= 0}, also asserts each group's COUNT(*).
+   */
+  private static void assertFullPageOfGroups(JsonNode mainNode, int expectedCount) {
+    JsonNode resultTable = mainNode.get(RESULT_TABLE);
+    Assert.assertNotNull(resultTable, toResultStr(mainNode));
+    JsonNode rows = resultTable.get("rows");
+    Assert.assertEquals(rows.size(), 5, toResultStr(mainNode));
+    Set<String> seenGroups = new HashSet<>();
+    for (JsonNode row : rows) {
+      int i = row.get(0).intValue();
+      int j = row.get(1).intValue();
+      Assert.assertTrue(i >= 0 && i < FILES_NO, "i out of range: " + i);
+      Assert.assertTrue(j >= 0 && j < 10, "j out of range: " + j);
+      Assert.assertTrue(seenGroups.add(i + "," + j), "duplicate group: (" + i + ", " + j + ")");
+      if (expectedCount >= 0) {
+        Assert.assertEquals(row.get(2).intValue(), expectedCount, toResultStr(mainNode));
+      }
+    }
   }
 
   @Test
