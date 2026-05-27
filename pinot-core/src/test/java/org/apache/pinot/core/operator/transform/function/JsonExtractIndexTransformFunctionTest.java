@@ -456,11 +456,18 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
   //   `nestedJson` — multi-level shapes (nested object, array, array of objects) with mixed
   //                  resolved / null / missing data at depth.
   //
-  // Tests are grouped by query shape in this order: projection → DISTINCT → GROUP BY. Each group
-  // has a null-handling-on case (verifies SQL NULL surfaces) and a null-handling-off case
-  // (verifies the legacy throw is preserved). Result rows are ordered by the projected expression
-  // ASC NULLS LAST so the comparison is deterministic across the framework's segment-duplication
-  // behavior (one segment becomes two, so per-row counts in GROUP BY results are ×2).
+  // Tests are grouped by query shape in this order: projection → DISTINCT → GROUP BY. Each section
+  // covers three sub-cases, in order:
+  //
+  //   .1  NH on, 3-arg                          — unresolved rows surface as SQL NULL (E4 fix)
+  //   .2  NH on, 4-arg with a non-null default   — default wins over NH placeholder
+  //   .3  NH off                                  — legacy throw preserved
+  //
+  // Unlike the scalar function, the index function has no `_defaultIsNull` path: a `NULL` literal
+  // as the 4-arg default fails at init (numeric) or silently becomes empty string (STRING) — both
+  // pre-existing quirks outside the scope of this PR. Result rows in every assertion are ordered
+  // by the projected expression ASC NULLS LAST so the comparison is deterministic across the
+  // framework's segment-duplication behavior (one segment becomes two, so per-row counts ×2).
   // ============================================================================================
 
   protected File _baseDir;
@@ -562,18 +569,15 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
   // ============================================================================================
 
   /**
-   * Projection with null handling ON. Each row's resolution depends on the column + path; the SV
-   * transform must surface SQL NULL for unresolved rows and pass resolved values through.
+   * 1.1 — NH on, 3-arg. The SV transform must surface SQL NULL for unresolved rows and pass
+   * resolved values through.
    * <pre>
    *   Example — `flatJson.country` (STRING):
    *     per-row: row 0 -> "US", row 1 -> "CA", row 2 -> NULL (explicit), row 3 -> NULL (missing)
-   *
    *     Query:  SET enableNullHandling = true;
    *             SELECT jsonExtractIndex(flatJson, '$.country', 'STRING') AS c
    *             FROM clicks ORDER BY c ASC NULLS LAST
-   *
-   *     Result rows (×2 for segment duplication):
-   *             "CA", "CA", "US", "US", NULL, NULL, NULL, NULL
+   *     Result (×2 dup): "CA", "CA", "US", "US", NULL, NULL, NULL, NULL
    * </pre>
    */
   @Test(dataProvider = "projectionCases")
@@ -586,10 +590,24 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
   }
 
   /**
-   * Null handling OFF: any unresolved row throws (legacy behavior, preserved by the fix's
-   * `_nullHandlingEnabled` gate). One representative path is enough — the throw is independent of
-   * path shape and result type. The error message for `jsonExtractIndex` differs from the scalar
-   * function's: `"Illegal Json Path: [...], for docId [...]"`.
+   * 1.2 — NH on, 4-arg with non-null default. The SV transform's priority is: real default >
+   * null-handling placeholder > throw. The user-supplied default surfaces for unresolved rows;
+   * no null bit is set in the bitmap.
+   */
+  @Test(dataProvider = "defaultPrecedenceProjectionCases")
+  public void testProjectionDefaultBeatsNullHandlingPlaceholder(String column, String jsonPath,
+      String defaultLiteral, Object[][] expectedRows, String label) {
+    String expr = String.format(
+        "jsonExtractIndex(%s, '%s', 'STRING', %s)", column, jsonPath, defaultLiteral);
+    givenCountryClickTable(true)
+        .whenQuery(String.format("SELECT %s AS c FROM clicks ORDER BY c ASC", expr))
+        .thenResultIs(expectedRows);
+  }
+
+  /**
+   * 1.3 — NH off: any unresolved row throws. One representative path; throw is path-independent.
+   * The index function's error message differs from the scalar's ("Illegal Json Path" vs "Cannot
+   * resolve JSON path").
    */
   @Test
   public void testProjectionNullHandlingOffThrows() {
@@ -603,11 +621,7 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     }
   }
 
-  /**
-   * Each row is `(column, jsonPath, resultsType, expected 8-row result, label)`. Result rows are
-   * ordered by value ASC NULLS LAST. With segment duplication, the per-row count in the fixture
-   * is ×2 in the result.
-   */
+  /** 1.1 cases — `(column, jsonPath, resultsType, expected 8-row result, label)`, ordered ASC NULLS LAST. */
   @DataProvider(name = "projectionCases")
   public static Object[][] projectionCases() {
     return new Object[][]{
@@ -629,51 +643,52 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         {"flatJson", "$.clicks", "DOUBLE", new Object[][]{
             {3d}, {3d}, {5d}, {5d}, {null}, {null}, {null}, {null}
         }, "flatJson.clicks DOUBLE"},
-        // BIG_DECIMAL is formatted as String by the broker (BigDecimal.toPlainString).
+        // BIG_DECIMAL is formatted as String by the broker.
         {"flatJson", "$.clicks", "BIG_DECIMAL", new Object[][]{
             {"3"}, {"3"}, {"5"}, {"5"}, {null}, {null}, {null}, {null}
         }, "flatJson.clicks BIG_DECIMAL"},
 
         // ----- nestedJson: multi-level shapes -----
-        // $.location.country: row0="US", row1=missing (no country key), row2=parent null, row3=missing.
         {"nestedJson", "$.location.country", "STRING", new Object[][]{
             {"US"}, {"US"}, {null}, {null}, {null}, {null}, {null}, {null}
         }, "nestedJson.location.country STRING"},
-        // $.tags[0]: row0="red", row1="green", row2=null parent, row3=missing.
         {"nestedJson", "$.tags[0]", "STRING", new Object[][]{
             {"green"}, {"green"}, {"red"}, {"red"}, {null}, {null}, {null}, {null}
         }, "nestedJson.tags[0] STRING"},
-        // $.tags[1]: row0="blue", row1=out-of-bounds (only one element), row2=null parent, row3=missing.
         {"nestedJson", "$.tags[1]", "STRING", new Object[][]{
             {"blue"}, {"blue"}, {null}, {null}, {null}, {null}, {null}, {null}
         }, "nestedJson.tags[1] STRING (OOB on row 1)"},
-        // $.events[0].country: row0="US", row1=explicit inner null, row2=null array, row3=missing.
         {"nestedJson", "$.events[0].country", "STRING", new Object[][]{
             {"US"}, {"US"}, {null}, {null}, {null}, {null}, {null}, {null}
         }, "nestedJson.events[0].country STRING"}
     };
   }
 
+  /** 1.2 cases — `(column, jsonPath, default SQL literal, expected 8-row result ASC, label)`. */
+  @DataProvider(name = "defaultPrecedenceProjectionCases")
+  public static Object[][] defaultPrecedenceProjectionCases() {
+    return new Object[][]{
+        {"flatJson", "$.country", "'foobar'", new Object[][]{
+            {"CA"}, {"CA"}, {"US"}, {"US"},
+            {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}
+        }, "flatJson.country default 'foobar'"},
+        {"nestedJson", "$.location.country", "'foobar'", new Object[][]{
+            {"US"}, {"US"},
+            {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}
+        }, "nestedJson.location.country default 'foobar'"}
+    };
+  }
+
   // ============================================================================================
   // 2. DISTINCT
+  //
+  // Pinot rejects positional `ORDER BY 1` for DISTINCT, so each DISTINCT test repeats the
+  // projected expression in ORDER BY.
   // ============================================================================================
 
   /**
-   * DISTINCT with null handling ON. The distinct set must include exactly one null entry
-   * alongside the resolved values (deduped across segments).
-   * <pre>
-   *   Example — `flatJson.country` (STRING):
-   *     Query:  SET enableNullHandling = true;
-   *             SELECT DISTINCT jsonExtractIndex(flatJson, '$.country', 'STRING') FROM clicks
-   *             ORDER BY jsonExtractIndex(flatJson, '$.country', 'STRING') ASC NULLS LAST
-   *
-   *     Result: "CA", "US", NULL
-   * </pre>
-   * For STRING DISTINCT against a JSON-indexed column, the broker actually routes the query
-   * through {@code JsonIndexDistinctOperator} (not the transform-fn path) — so this case
-   * indirectly exercises that operator. The other types fall back to the transform-fn path
-   * because the operator's parser converts the default literal in a way that fails for
-   * non-string types; that fallback is what this fix corrects.
+   * 2.1 — NH on, 3-arg. The distinct set must include exactly one null entry alongside the
+   * resolved values (deduped across segments).
    */
   @Test(dataProvider = "distinctCases")
   public void testDistinctNullHandlingOn(String column, String jsonPath, String resultsType,
@@ -683,6 +698,18 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     givenCountryClickTable(true).whenQuery(query).thenResultIs(expectedRows);
   }
 
+  /** 2.2 — NH on, 4-arg with non-null default. Default appears as a regular distinct entry (no null). */
+  @Test(dataProvider = "defaultPrecedenceDistinctCases")
+  public void testDistinctDefaultBeatsNullHandlingPlaceholder(String column, String jsonPath,
+      String defaultLiteral, Object[][] expectedRows, String label) {
+    String expr = String.format(
+        "jsonExtractIndex(%s, '%s', 'STRING', %s)", column, jsonPath, defaultLiteral);
+    givenCountryClickTable(true)
+        .whenQuery(String.format("SELECT DISTINCT %s FROM clicks ORDER BY %s ASC", expr, expr))
+        .thenResultIs(expectedRows);
+  }
+
+  /** 2.3 — NH off: DISTINCT throws on unresolved rows. */
   @Test
   public void testDistinctNullHandlingOffThrows() {
     try {
@@ -695,7 +722,7 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     }
   }
 
-  /** Each row is `(column, jsonPath, resultsType, expected distinct rows ASC NULLS LAST, label)`. */
+  /** 2.1 cases — `(column, jsonPath, resultsType, expected distinct rows ASC NULLS LAST, label)`. */
   @DataProvider(name = "distinctCases")
   public static Object[][] distinctCases() {
     return new Object[][]{
@@ -710,33 +737,51 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     };
   }
 
+  /** 2.2 cases — `(column, jsonPath, default literal, expected distinct rows ASC, label)`. */
+  @DataProvider(name = "defaultPrecedenceDistinctCases")
+  public static Object[][] defaultPrecedenceDistinctCases() {
+    return new Object[][]{
+        {"flatJson", "$.country", "'foobar'",
+            new Object[][]{{"CA"}, {"US"}, {"foobar"}}, "flatJson.country default 'foobar'"},
+        {"nestedJson", "$.location.country", "'foobar'",
+            new Object[][]{{"US"}, {"foobar"}}, "nestedJson.location.country default 'foobar'"}
+    };
+  }
+
   // ============================================================================================
   // 3. GROUP BY
   // ============================================================================================
 
   /**
-   * GROUP BY with null handling ON. Unresolved rows must collapse into a single null group with
-   * the correct count, alongside the resolved value groups.
-   * <pre>
-   *   Example — `flatJson.country` (STRING):
-   *     per-row: row 0 -> "US", row 1 -> "CA", row 2 -> NULL (explicit), row 3 -> NULL (missing)
-   *
-   *     Query:  SET enableNullHandling = true;
-   *             SELECT jsonExtractIndex(flatJson, '$.country', 'STRING') AS v, COUNT(*)
-   *             FROM clicks GROUP BY v ORDER BY v ASC NULLS LAST
-   *
-   *     Result (counts ×2 for segment duplication): ("CA", 2), ("US", 2), (NULL, 4)
-   * </pre>
+   * 3.1 — NH on, 3-arg. Unresolved rows collapse into a single null group with the correct count,
+   * alongside the resolved value groups.
    */
   @Test(dataProvider = "groupByCases")
   public void testGroupByNullHandlingOn(String column, String jsonPath, String resultsType,
       Object[][] expectedRows, String label) {
     String expr = String.format("jsonExtractIndex(%s, '%s', '%s')", column, jsonPath, resultsType);
-    String query = String.format(
-        "SELECT %s AS v, COUNT(*) FROM clicks GROUP BY v ORDER BY v ASC NULLS LAST", expr);
-    givenCountryClickTable(true).whenQuery(query).thenResultIs(expectedRows);
+    givenCountryClickTable(true)
+        .whenQuery(String.format(
+            "SELECT %s AS v, COUNT(*) FROM clicks GROUP BY v ORDER BY v ASC NULLS LAST", expr))
+        .thenResultIs(expectedRows);
   }
 
+  /**
+   * 3.2 — NH on, 4-arg with non-null default. Unresolved rows count toward the default's group;
+   * no NULL group surfaces.
+   */
+  @Test(dataProvider = "defaultPrecedenceGroupByCases")
+  public void testGroupByDefaultBeatsNullHandlingPlaceholder(String column, String jsonPath,
+      String defaultLiteral, Object[][] expectedRows, String label) {
+    String expr = String.format(
+        "jsonExtractIndex(%s, '%s', 'STRING', %s)", column, jsonPath, defaultLiteral);
+    givenCountryClickTable(true)
+        .whenQuery(String.format(
+            "SELECT %s AS v, COUNT(*) FROM clicks GROUP BY v ORDER BY v ASC", expr))
+        .thenResultIs(expectedRows);
+  }
+
+  /** 3.3 — NH off: GROUP BY throws on unresolved rows. */
   @Test
   public void testGroupByNullHandlingOffThrows() {
     try {
@@ -749,10 +794,7 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     }
   }
 
-  /**
-   * Each row is `(column, jsonPath, resultsType, expected (value, count) rows ASC NULLS LAST,
-   * label)`. Counts are ×2 the per-row count due to segment duplication.
-   */
+  /** 3.1 cases — `(column, jsonPath, resultsType, expected (value, count) rows ASC NULLS LAST, label)`. */
   @DataProvider(name = "groupByCases")
   public static Object[][] groupByCases() {
     return new Object[][]{
@@ -774,111 +816,13 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     };
   }
 
-  // ============================================================================================
-  // 4. Default-value precedence under null handling ON
-  //
-  // When a non-null default literal is supplied AND null handling is on, the SV transform's
-  // priority order is: real default > null-handling placeholder > throw. The user-supplied
-  // default surfaces for unresolved rows; the null-handling placeholder is NOT emitted, and
-  // no null bit is set in the bitmap. These tests pin that ordering across projection,
-  // DISTINCT, and GROUP BY so a future refactor can't silently swap the priority.
-  // ============================================================================================
-
-  /**
-   * Projection with NH on AND a non-null default literal. Unresolved rows must surface as the
-   * default, not SQL NULL — across both flat scalar and nested-object shapes.
-   * <pre>
-   *   Example — flatJson.country with default 'foobar':
-   *     per-row: row 0 -> "US", row 1 -> "CA", row 2 -> "foobar" (was null),
-   *              row 3 -> "foobar" (was missing)
-   *
-   *     Query: SET enableNullHandling = true;
-   *            SELECT jsonExtractIndex(flatJson, '$.country', 'STRING', 'foobar') AS c
-   *            FROM clicks ORDER BY c ASC
-   *
-   *     Result rows (×2 segment dup; ASCII order, uppercase before lowercase):
-   *             "CA", "CA", "US", "US", "foobar", "foobar", "foobar", "foobar"
-   * </pre>
-   */
-  @Test(dataProvider = "defaultPrecedenceProjectionCases")
-  public void testProjectionDefaultBeatsNullHandlingPlaceholder(String column, String jsonPath,
-      String defaultLiteral, Object[][] expectedRows, String label) {
-    String expr = String.format(
-        "jsonExtractIndex(%s, '%s', 'STRING', %s)", column, jsonPath, defaultLiteral);
-    givenCountryClickTable(true)
-        .whenQuery(String.format("SELECT %s AS c FROM clicks ORDER BY c ASC", expr))
-        .thenResultIs(expectedRows);
-  }
-
-  /**
-   * Each row: `(column, jsonPath, default SQL literal, expected 8-row result, label)`. Result
-   * rows are ordered ASC. Each per-row value in the fixture appears ×2 due to segment duplication.
-   */
-  @DataProvider(name = "defaultPrecedenceProjectionCases")
-  public static Object[][] defaultPrecedenceProjectionCases() {
-    return new Object[][]{
-        // flatJson.country: row0="US", row1="CA", row2=null, row3=missing -> 2 each, 4 'foobar'.
-        {"flatJson", "$.country", "'foobar'", new Object[][]{
-            {"CA"}, {"CA"}, {"US"}, {"US"},
-            {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}
-        }, "flatJson.country default 'foobar'"},
-        // nestedJson.location.country: row0="US", rows 1/2/3 unresolved -> 2 "US" + 6 'foobar'.
-        {"nestedJson", "$.location.country", "'foobar'", new Object[][]{
-            {"US"}, {"US"},
-            {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}, {"foobar"}
-        }, "nestedJson.location.country default 'foobar'"}
-    };
-  }
-
-  /**
-   * DISTINCT with NH on AND a non-null default literal. The distinct set includes the default
-   * value as a regular entry — no separate null entry.
-   */
-  @Test(dataProvider = "defaultPrecedenceDistinctCases")
-  public void testDistinctDefaultBeatsNullHandlingPlaceholder(String column, String jsonPath,
-      String defaultLiteral, Object[][] expectedRows, String label) {
-    String expr = String.format(
-        "jsonExtractIndex(%s, '%s', 'STRING', %s)", column, jsonPath, defaultLiteral);
-    givenCountryClickTable(true)
-        .whenQuery(String.format("SELECT DISTINCT %s FROM clicks ORDER BY %s ASC", expr, expr))
-        .thenResultIs(expectedRows);
-  }
-
-  /** Each row: `(column, jsonPath, default literal, expected distinct rows ASC, label)`. */
-  @DataProvider(name = "defaultPrecedenceDistinctCases")
-  public static Object[][] defaultPrecedenceDistinctCases() {
-    return new Object[][]{
-        {"flatJson", "$.country", "'foobar'",
-            new Object[][]{{"CA"}, {"US"}, {"foobar"}}, "flatJson.country default 'foobar'"},
-        {"nestedJson", "$.location.country", "'foobar'",
-            new Object[][]{{"US"}, {"foobar"}}, "nestedJson.location.country default 'foobar'"}
-    };
-  }
-
-  /**
-   * GROUP BY with NH on AND a non-null default literal. Unresolved rows count toward the
-   * default's group — no NULL group surfaces.
-   */
-  @Test(dataProvider = "defaultPrecedenceGroupByCases")
-  public void testGroupByDefaultBeatsNullHandlingPlaceholder(String column, String jsonPath,
-      String defaultLiteral, Object[][] expectedRows, String label) {
-    String expr = String.format(
-        "jsonExtractIndex(%s, '%s', 'STRING', %s)", column, jsonPath, defaultLiteral);
-    givenCountryClickTable(true)
-        .whenQuery(String.format(
-            "SELECT %s AS v, COUNT(*) FROM clicks GROUP BY v ORDER BY v ASC", expr))
-        .thenResultIs(expectedRows);
-  }
-
-  /** Each row: `(column, jsonPath, default literal, expected (value, count) rows ASC, label)`. */
+  /** 3.2 cases — `(column, jsonPath, default literal, expected (value, count) rows ASC, label)`. */
   @DataProvider(name = "defaultPrecedenceGroupByCases")
   public static Object[][] defaultPrecedenceGroupByCases() {
     return new Object[][]{
-        // flatJson.country: 2 "CA" + 2 "US" + 4 'foobar'.
         {"flatJson", "$.country", "'foobar'", new Object[][]{
             {"CA", 2L}, {"US", 2L}, {"foobar", 4L}
         }, "flatJson.country default 'foobar'"},
-        // nestedJson.location.country: 2 "US" + 6 'foobar'.
         {"nestedJson", "$.location.country", "'foobar'", new Object[][]{
             {"US", 2L}, {"foobar", 6L}
         }, "nestedJson.location.country default 'foobar'"}
