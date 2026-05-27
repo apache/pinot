@@ -408,7 +408,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
    * @param continueOnError whether continueOnError should be enabled or disabled
    * @throws IOException on error
    */
-  private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records, boolean continueOnError)
+  private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records,
+      boolean continueOnError)
       throws IOException {
     try (JsonIndexCreator indexCreator = createOnHeap
         ? new OnHeapJsonIndexCreator(INDEX_DIR, ON_HEAP_COLUMN_NAME, "myTable_OFFLINE", continueOnError,

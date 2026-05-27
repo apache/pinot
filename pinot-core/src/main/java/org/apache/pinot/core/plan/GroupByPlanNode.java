@@ -23,6 +23,7 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
+import org.apache.pinot.core.operator.query.JsonIndexGroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -46,6 +47,13 @@ public class GroupByPlanNode implements PlanNode {
   @Override
   public Operator<GroupByResultsBlock> run() {
     assert _queryContext.getAggregationFunctions() != null && _queryContext.getGroupByExpressions() != null;
+    // Prefer the index-based GROUP BY when the shape is GROUP BY jsonExtractIndex(col, path, type[, default])
+    // + COUNT(*) on a column whose JSON index covers the path. canUse() already excludes filtered aggregations
+    // and HAVING.
+    if (JsonIndexGroupByOperator.canUse(_indexSegment, _queryContext)) {
+      BaseFilterOperator filterOperator = new FilterPlanNode(_segmentContext, _queryContext).run();
+      return new JsonIndexGroupByOperator(_indexSegment, _segmentContext, _queryContext, filterOperator);
+    }
     return _queryContext.hasFilteredAggregations() ? buildFilteredGroupByPlan() : buildNonFilteredGroupByPlan();
   }
 
