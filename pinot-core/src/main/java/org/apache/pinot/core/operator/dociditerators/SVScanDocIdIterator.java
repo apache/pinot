@@ -18,19 +18,14 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import java.math.BigDecimal;
 import java.util.Map;
 import java.util.OptionalInt;
-import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.operator.filter.predicate.BaseDictionaryBasedPredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -45,11 +40,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
   private final ForwardIndexReaderContext _readerContext;
-  // Dictionary may exist even when the forward index is RAW (built only for secondary indexes such as INVERTED /
-  // FST / IFST / RANGE). When set together with a dictionary-based predicate evaluator, scans translate raw values
-  // to dict ids via this dictionary instead of calling applySV(<rawType>) on the evaluator (which would throw).
-  @Nullable
-  private final Dictionary _dictionary;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
   private final int[] _batch;
@@ -66,7 +56,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext(queryOptions);
-    _dictionary = dataSource.getDictionary();
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
     _cardinality = dataSource.getDataSourceMetadata().getCardinality();
@@ -74,17 +63,10 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
 
   // for testing
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs) {
-    this(predicateEvaluator, reader, numDocs, null);
-  }
-
-  // for testing
-  public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs,
-      @Nullable Dictionary dictionary) {
     _batch = new int[BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE];
     _predicateEvaluator = predicateEvaluator;
     _reader = reader;
     _readerContext = reader.createContext();
-    _dictionary = dictionary;
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
     _cardinality = -1;
@@ -184,47 +166,25 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private ValueMatcher getValueMatcher() {
     if (_reader.isDictionaryEncoded()) {
       return new DictIdMatcher();
-    }
-    // RAW forward index, but a separate dictionary exists and the predicate evaluator is dict-based. Translate raw
-    // values to dict ids on read so applySV(int dictId) can be used. This is needed because dict-based evaluators
-    // (e.g. DictIdBasedRegexpLikePredicateEvaluator, IFSTBasedRegexpPredicateEvaluator) only implement applySV(int).
-    if (_dictionary != null && _predicateEvaluator instanceof BaseDictionaryBasedPredicateEvaluator) {
+    } else {
       switch (_reader.getStoredType()) {
         case INT:
-          return new IntDictLookupMatcher();
+          return new IntMatcher();
         case LONG:
-          return new LongDictLookupMatcher();
+          return new LongMatcher();
         case FLOAT:
-          return new FloatDictLookupMatcher();
+          return new FloatMatcher();
         case DOUBLE:
-          return new DoubleDictLookupMatcher();
+          return new DoubleMatcher();
         case BIG_DECIMAL:
-          return new BigDecimalDictLookupMatcher();
+          return new BigDecimalMatcher();
         case STRING:
-          return new StringDictLookupMatcher();
+          return new StringMatcher();
         case BYTES:
-          return new BytesDictLookupMatcher();
+          return new BytesMatcher();
         default:
           throw new UnsupportedOperationException();
       }
-    }
-    switch (_reader.getStoredType()) {
-      case INT:
-        return new IntMatcher();
-      case LONG:
-        return new LongMatcher();
-      case FLOAT:
-        return new FloatMatcher();
-      case DOUBLE:
-        return new DoubleMatcher();
-      case BIG_DECIMAL:
-        return new BigDecimalMatcher();
-      case STRING:
-        return new StringMatcher();
-      case BYTES:
-        return new BytesMatcher();
-      default:
-        throw new UnsupportedOperationException();
     }
   }
 
@@ -354,65 +314,6 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     @Override
     public boolean doesValueMatch(int docId) {
       return _predicateEvaluator.applySV(_reader.getBytes(docId, _readerContext));
-    }
-  }
-
-  // ----- Dict-lookup matchers: forward index is RAW but a separate dictionary exists. -----
-
-  private class IntDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      int dictId = _dictionary.indexOf(_reader.getInt(docId, _readerContext));
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
-    }
-  }
-
-  private class LongDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      int dictId = _dictionary.indexOf(_reader.getLong(docId, _readerContext));
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
-    }
-  }
-
-  private class FloatDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      int dictId = _dictionary.indexOf(_reader.getFloat(docId, _readerContext));
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
-    }
-  }
-
-  private class DoubleDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      int dictId = _dictionary.indexOf(_reader.getDouble(docId, _readerContext));
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
-    }
-  }
-
-  private class BigDecimalDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      BigDecimal value = _reader.getBigDecimal(docId, _readerContext);
-      int dictId = _dictionary.indexOf(value);
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
-    }
-  }
-
-  private class StringDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      int dictId = _dictionary.indexOf(_reader.getString(docId, _readerContext));
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
-    }
-  }
-
-  private class BytesDictLookupMatcher implements ValueMatcher {
-    @Override
-    public boolean doesValueMatch(int docId) {
-      int dictId = _dictionary.indexOf(new ByteArray(_reader.getBytes(docId, _readerContext)));
-      return dictId >= 0 && _predicateEvaluator.applySV(dictId);
     }
   }
 
