@@ -42,10 +42,10 @@ public class QueryOptionsUtilsTest {
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
   private static final List<String> INT_KEYS = new ArrayList<>() {{
-    addAll(POSITIVE_INT_KEYS);
-    addAll(NON_NEGATIVE_INT_KEYS);
-    addAll(UNBOUNDED_INT_KEYS);
-  }};
+      addAll(POSITIVE_INT_KEYS);
+      addAll(NON_NEGATIVE_INT_KEYS);
+      addAll(UNBOUNDED_INT_KEYS);
+    }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
 

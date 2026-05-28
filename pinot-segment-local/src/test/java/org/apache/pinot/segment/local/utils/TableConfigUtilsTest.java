@@ -309,7 +309,7 @@ public class TableConfigUtilsTest {
       assertTrue(e.getMessage().contains("can only use '"
           + AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY + "' segment assignment strategy"));
     }
-}
+  }
 
   @Test
   public void validateIngestionConfig() {
@@ -912,9 +912,9 @@ public class TableConfigUtilsTest {
         streamIngestionConfigWithoutPauselessUniqueTopics);
     TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
         .setTableName(TABLE_NAME)
-            .setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
-            .build();
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+        .build();
     try {
       TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
     } catch (IllegalStateException e) {
@@ -3761,6 +3761,17 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testOverwriteTableConfigForTierFastPathReturnsSameInstance() {
+    FieldConfig col1 = new FieldConfig.Builder("col1")
+        .withEncodingType(FieldConfig.EncodingType.DICTIONARY)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(Collections.singletonList(col1))
+        .build();
+    assertSame(TableConfigUtils.overwriteTableConfigForTier(tableConfig, "coldTier"), tableConfig);
+  }
+
+  @Test
   public void testGetPartitionColumnWithoutAnyConfig() {
     // without instanceAssignmentConfigMap
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
@@ -4205,5 +4216,134 @@ public class TableConfigUtilsTest {
     List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
     assertTrue(violations.isEmpty(),
         "Expected no violations for partial-upsert strategy and default-strategy changes, but got: " + violations);
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityRejectsDeleteRecordColumnChange() {
+    UpsertConfig existingUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    existingUpsertConfig.setDeleteRecordColumn("deleted");
+    UpsertConfig newUpsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    newUpsertConfig.setDeleteRecordColumn("is_deleted");
+
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(existingUpsertConfig).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(newUpsertConfig).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("deleteRecordColumn"));
+
+    // Adding deleteRecordColumn where none existed
+    existingUpsertConfig.setDeleteRecordColumn(null);
+    existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(existingUpsertConfig).build();
+    violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("deleteRecordColumn"));
+
+    // Removing deleteRecordColumn
+    violations = TableConfigUtils.validateBackwardCompatibility(existingConfig, newConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("deleteRecordColumn"));
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityAllowsIdenticalUpsertConfig() {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn("deleted");
+
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).setUpsertConfig(upsertConfig).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertTrue(violations.isEmpty(), "Expected no violations for identical config, but got: " + violations);
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityNoViolationsForNonUpsertTables() {
+    TableConfig existingConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).build();
+    TableConfig newConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN).build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertTrue(violations.isEmpty(), "Expected no violations for non-upsert tables, but got: " + violations);
+  }
+
+  @Test
+  public void testValidateMaterializedViewInvariantsFlagRequiresOfflineAndTask() {
+    TableConfig mvWithoutTask = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setIsMaterializedView(true).build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validateMaterializedViewInvariants(mvWithoutTask));
+
+    TableConfig mvRealtime = new TableConfigBuilder(TableType.REALTIME).setTableName("mv_test")
+        .setIsMaterializedView(true)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap("SELECT 1")))
+        .build();
+    assertThrows(IllegalStateException.class, () -> TableConfigUtils.validateMaterializedViewInvariants(mvRealtime));
+  }
+
+  @Test
+  public void testValidateMaterializedViewInvariantsTaskWithoutFlagRejected() {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(
+            buildMaterializedViewTaskMap("SELECT city FROM orders GROUP BY city")))
+        .build();
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateMaterializedViewInvariants(tableConfig));
+  }
+
+  @Test
+  public void testValidateMaterializedViewInvariantsTaskWithoutDefinedSqlRejected() {
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.TASK_TYPE,
+        Map.of("bucketTimePeriod", "1d"));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(taskTypeConfigsMap))
+        .build();
+    assertThrows(IllegalStateException.class,
+        () -> TableConfigUtils.validateMaterializedViewInvariants(tableConfig));
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityMaterializedViewDefinedSqlImmutable() {
+    String sql = "SELECT city FROM orders GROUP BY city";
+    TableConfig existingConfig = buildMaterializedViewTableConfig(sql);
+    TableConfig newConfig = buildMaterializedViewTableConfig("SELECT city, count(*) FROM orders GROUP BY city");
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("definedSQL is immutable"));
+  }
+
+  @Test
+  public void testValidateBackwardCompatibilityMaterializedViewFlagCannotChange() {
+    String sql = "SELECT city FROM orders GROUP BY city";
+    TableConfig existingConfig = buildMaterializedViewTableConfig(sql);
+    TableConfig newConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap(sql)))
+        .build();
+
+    List<String> violations = TableConfigUtils.validateBackwardCompatibility(newConfig, existingConfig);
+    assertEquals(violations.size(), 1);
+    assertTrue(violations.get(0).contains("isMaterializedView"));
+  }
+
+  private static Map<String, Map<String, String>> buildMaterializedViewTaskMap(String definedSql) {
+    Map<String, String> mvTaskConfig = new HashMap<>();
+    mvTaskConfig.put(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY, definedSql);
+    Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
+    taskTypeConfigsMap.put(org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask.TASK_TYPE, mvTaskConfig);
+    return taskTypeConfigsMap;
+  }
+
+  private static TableConfig buildMaterializedViewTableConfig(String definedSql) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName("mv_test")
+        .setIsMaterializedView(true)
+        .setTaskConfig(new org.apache.pinot.spi.config.table.TableTaskConfig(buildMaterializedViewTaskMap(definedSql)))
+        .build();
   }
 }

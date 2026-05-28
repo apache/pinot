@@ -34,9 +34,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -298,10 +300,19 @@ public class PluginManager {
 
         ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
 
-        // All packages to look up in pinot realm BEFORE itself
-        Stream<String> importedPinotPackages =
-            Stream.of("org.apache.pinot.spi"); // this works like a prefix, so ALL spi classes will be accessible
-        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
+        // All packages to look up in pinot realm BEFORE itself.
+        // Acts like a prefix so all classes in (and below) the listed package are accessible.
+        // Hardcoding the list here is cheap while it stays small. A cleaner long-term approach
+        // would have each SPI module self-declare its exports in a META-INF/pinot-realm-exports
+        // resource file (one package per line) and have PluginManager discover them at init time
+        // via ClassLoader.getResources() — that would eliminate the layering violation of
+        // pinot-spi naming packages from higher-level modules such as pinot-query-planner-spi.
+        // TODO: implement the self-declaring META-INF/pinot-realm-exports mechanism.
+        Stream.of(
+            "org.apache.pinot.spi",
+            "org.apache.pinot.query.planner.spi",     // RuleSetCustomizer SPI (pinot-query-planner-spi)
+            "org.apache.calcite.plan"                 // RelOptRule, used by RuleSetCustomizer.customize
+        ).forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
         // Additional importForm as specified by the plugin configuration
         config.getImportsFromPerRealm().forEach((r, ifs) -> {
@@ -472,6 +483,32 @@ public class PluginManager {
       return _pluginsDirectories.split(";");
     }
     return null;
+  }
+
+  /// Returns the set of classloaders for all new-style plugins, in load order.
+  /// New-style plugins are those packaged with a `pinot-plugin.properties` file
+  /// and loaded into a dedicated [ClassRealm]. Legacy shaded plugins (loaded via
+  /// [PluginClassLoader]) are excluded — new SPIs should only target new-style plugins.
+  ///
+  /// Intended for `ServiceLoader` enumeration across plugin classloaders:
+  ///
+  /// ```java
+  /// for (ClassLoader cl : PluginManager.get().getPluginClassLoaders()) {
+  ///   for (MyService svc : ServiceLoader.load(MyService.class, cl)) { ... }
+  /// }
+  /// ```
+  ///
+  /// Call after all plugins have been loaded; classloaders added after this
+  /// call returns will not appear in the snapshot.
+  public synchronized Set<ClassLoader> getPluginClassLoaders() {
+    Set<ClassLoader> result = new LinkedHashSet<>();
+    for (ClassRealm realm : _classWorld.getRealms()) {
+      String id = realm.getId();
+      if (!PINOT_REALMID.equals(id) && !DEFAULT_PLUGIN_NAME.equals(id)) {
+        result.add(realm);
+      }
+    }
+    return Collections.unmodifiableSet(result);
   }
 
   public static PluginManager get() {

@@ -437,7 +437,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (validDocIds.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());
-      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
+      ThreadSafeMutableRoaringBitmap queryableDocIds =
+          (_deleteRecordColumn == null) ? null : new ThreadSafeMutableRoaringBitmap();
+      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), queryableDocIds);
       return;
     }
     if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {

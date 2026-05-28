@@ -61,14 +61,17 @@ jobs:
           WORKING_DIR: /tmp/compatibility-verifier
           TEST_SUITE: ${{ matrix.test_suite }}
           MAVEN_OPTS: >
-            -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
-            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -Xmx2G
             -XX:+IgnoreUnrecognizedVMOptions
             --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+          PINOT_MAVEN_OPTS: >
+            -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
+            -Dmaven.wagon.http.retryHandler.count=30 -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false
+            -B -ntp
         timeout-minutes: 120
         run: |
           .github/workflows/scripts/.pinot_compatibility_verifier.sh

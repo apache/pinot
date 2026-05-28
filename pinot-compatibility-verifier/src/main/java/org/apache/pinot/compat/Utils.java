@@ -51,7 +51,7 @@ public class Utils {
   }
 
   public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
-      throws Exception {
+      throws IOException {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", "groupByMode=sql;responseFormat=sql");
@@ -60,7 +60,8 @@ public class Utils {
         ControllerTest.sendPostRequest(brokerBaseApiUrl + "/query/sql", payload.toString()));
   }
 
-  public static JsonNode postMultiStageSqlQuery(String query, String brokerBaseApiUrl) throws Exception {
+  public static JsonNode postMultiStageSqlQuery(String query, String brokerBaseApiUrl)
+      throws IOException {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("sql", query);
     payload.put("queryOptions", "useMultistageEngine=true");

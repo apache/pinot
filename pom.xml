@@ -38,6 +38,7 @@
   <url>https://pinot.apache.org/</url>
 
   <modules>
+    <module>pinot-bom</module>
     <module>pinot-dependency-verifier</module>
     <module>pinot-spi</module>
     <module>pinot-segment-spi</module>
@@ -46,6 +47,7 @@
     <module>pinot-clients</module>
     <module>pinot-server</module>
     <module>pinot-core</module>
+    <module>pinot-materialized-view</module>
     <module>pinot-controller</module>
     <module>pinot-minion</module>
     <module>pinot-plugins</module>
@@ -57,6 +59,7 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
+    <module>pinot-query-planner-spi</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
@@ -164,26 +167,26 @@
     <jersey.version>2.48</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.32.5</swagger-ui.version>
+    <swagger-ui.version>5.32.6</swagger-ui.version>
     <hadoop.version>3.4.3</hadoop.version>
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
     <calcite.version>1.40.0</calcite.version>
-    <immutables.version>2.12.1</immutables.version>
+    <immutables.version>2.12.2</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.30.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.38</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-8</zstd-jni.version>
+    <zstd-jni.version>1.5.7-9</zstd-jni.version>
     <lz4-java.version>1.11.0</lz4-java.version>
     <libthrift.verion>0.23.0</libthrift.verion>
     <log4j.version>2.26.0</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.133.Final</netty.version>
+    <netty.version>4.1.134.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.4.0</h3.version>
@@ -193,19 +196,19 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.44.6</aws.sdk.version>
-    <azure.sdk.version>1.3.6</azure.sdk.version>
+    <aws.sdk.version>2.44.12</aws.sdk.version>
+    <azure.sdk.version>1.3.7</azure.sdk.version>
     <azure.msal4j.version>1.24.1</azure.msal4j.version>
     <joda-time.version>2.14.2</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <ayza.version>10.0.5</ayza.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <scala-xml.version>2.4.0</scala-xml.version>
-    <plexus-classworlds.version>2.11.0</plexus-classworlds.version>
+    <plexus-classworlds.version>2.12.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <checker-qual.version>4.1.0</checker-qual.version>
-    <groovy-all.version>2.4.21</groovy-all.version>
+    <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
     <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
@@ -265,10 +268,10 @@
     <httpcore5.version>5.4.2</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>4.34.1</protobuf.version>
+    <protobuf.version>4.35.0</protobuf.version>
     <grpc.version>1.81.0</grpc.version>
-    <google.cloud.libraries.version>26.82.0</google.cloud.libraries.version>
-    <opentelemetry.gcp.resources.version>1.56.0-alpha</opentelemetry.gcp.resources.version>
+    <google.cloud.libraries.version>26.83.0</google.cloud.libraries.version>
+    <opentelemetry.gcp.resources.version>1.57.0-alpha</opentelemetry.gcp.resources.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.49.0</google.errorprone.version>
@@ -282,8 +285,8 @@
     <scala.compat.version>2.13</scala.compat.version>
 
     <!-- For Dependency Verifier module -->
-    <enforcer-api.version>3.6.2</enforcer-api.version>
-    <maven.version>3.9.15</maven.version>
+    <enforcer-api.version>3.6.3</enforcer-api.version>
+    <maven.version>3.9.16</maven.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <plexus-utils.version>4.0.3</plexus-utils.version>
     <plexus-xml.version>3.0.2</plexus-xml.version>
@@ -293,13 +296,13 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.1.0</jline.version>
+    <jline.version>4.1.2</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.5</jettison.version>
     <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.4</dnsjava.version>
+    <dnsjava.version>3.6.5</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
-    <woodstox.version>7.1.1</woodstox.version>
+    <woodstox.version>7.2.0</woodstox.version>
     <curator.version>5.9.0</curator.version>
     <javassist.version>3.31.0-GA</javassist.version>
     <bouncycastle.version>1.84</bouncycastle.version>
@@ -307,7 +310,7 @@
     <jna.version>5.18.1</jna.version>
     <jnr-ffi.version>2.2.19</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.10</asm.version>
+    <asm.version>9.10.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.3.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
@@ -611,385 +614,26 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- Pinot Modules -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spi</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-segment-spi</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-common</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-segment-local</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-core</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-planner</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-runtime</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-controller</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-broker</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-server</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-minion</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-java-client</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-jdbc-client</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-tools</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-perf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-timeseries-spi</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-timeseries-planner</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-sql-ddl</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-timeseries-m3ql</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-udf-test</artifactId>
-        <version>${project.version}</version>
-      </dependency>
+      <!--
+        Pinot Modules — managed via pinot-bom (see pinot-bom/pom.xml).
 
-      <!-- Pinot Plug-in Modules -->
-      <!-- Batch Ingestion -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-batch-ingestion-common</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-batch-ingestion-hadoop</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-batch-ingestion-spark-base</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-batch-ingestion-spark-3</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-batch-ingestion-standalone</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Stream Ingestion -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-base</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-3.0</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-4.0</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kinesis</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-pulsar</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Input Format -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-avro-base</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-avro</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-confluent-avro</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-confluent-protobuf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-confluent-json</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-orc</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-parquet</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-json</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-csv</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-thrift</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-protobuf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-clp-log</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- File System -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-hdfs</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-s3</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-gcs</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-adls</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Environment -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-azure</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Metrics -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-yammer</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-dropwizard</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-compound-metrics</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Minion Tasks -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-minion-builtin-tasks</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Segment Writer -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-segment-writer-file-based</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <!-- Segment Uploader -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-segment-uploader-default</artifactId>
-        <version>${project.version}</version>
-      </dependency>
+        When adding a new subproject (module) to this build, declare its
+        dependencyManagement entry in pinot-bom/pom.xml, NOT here. The BOM
+        is imported below and makes the version available to all modules in
+        this reactor as well as to external consumers who import the BOM.
 
-      <!-- Pinot Connector Modules -->
+        Projects that set this root pom as their <parent> and use a different
+        version must import pinot-bom explicitly at their desired Pinot version
+        in their own <dependencyManagement> (before any inherited entries).
+        Maven's first-import-wins rule ensures that explicit child import takes
+        precedence and the inherited ${project.version} import is never resolved.
+      -->
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spark-common</artifactId>
+        <artifactId>pinot-bom</artifactId>
         <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spark-3-connector</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-flink-connector</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-
-      <!-- Pinot Test Jars -->
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spi</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-common</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-segment-local</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-core</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-planner</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-controller</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-broker</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-server</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-minion</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-integration-test-base</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-integration-tests</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-query-runtime</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-kafka-base</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
 
       <!-- Arrow dependencies for Broker GRPC ResultTable Serde protocol -->
@@ -1013,10 +657,31 @@
         <artifactId>checker-qual</artifactId>
         <version>${checker-qual.version}</version>
       </dependency>
+      <!-- Groovy 3.x publishes groovy-all as a POM aggregator that pulls in every sub-module.
+           We exclude groovy-testng/groovy-test-junit5/groovy-test because their transitive TestNG and
+           JUnit jars collide with Surefire's TestNG fork classpath and cause NoClassDefFoundError on
+           unrelated test classes. Everything else (groovy core, templates, json, xml, sql, jmx, swing,
+           ant, cli-picocli, datetime, nio, jsr223, console, etc.) is kept to preserve the runtime
+           Groovy stdlib surface user transform/filter scripts may rely on from the old 2.4.21 fat jar. -->
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
         <artifactId>groovy-all</artifactId>
-        <version>${groovy-all.version}</version>
+        <version>${groovy.version}</version>
+        <type>pom</type>
+        <exclusions>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-testng</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-test-junit5</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-test</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>

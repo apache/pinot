@@ -378,6 +378,9 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
   public static final String ENABLE_HYBRID_TABLE_RETENTION_STRATEGY =
       "controller.enable.hybrid.table.retention.strategy";
+  // When true (default), segment deletion refuses to remove segments that participate in a live segment lineage
+  // entry (IN_PROGRESS, or COMPLETED.segmentsFrom).
+  public static final String LINEAGE_EXCLUSIVE_DELETE_ENABLED = "controller.lineage.exclusive.delete.enabled";
   public static final String DIM_TABLE_MAX_SIZE = "controller.dimTable.maxSize";
 
   // Defines the kind of storage and the underlying PinotFS implementation
@@ -413,6 +416,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final boolean DEFAULT_RESOURCE_UTILIZATION_CHECKER_COLLECT_USAGE_AT_STARTUP = false;
   public static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
   public static final boolean DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY = false;
+  public static final boolean DEFAULT_LINEAGE_EXCLUSIVE_DELETE_ENABLED = true;
   public static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
   public static final String DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY =
       AutoRebalanceStrategy.class.getName();
@@ -1233,6 +1237,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isHybridTableRetentionStrategyEnabled() {
     return getProperty(ENABLE_HYBRID_TABLE_RETENTION_STRATEGY, DEFAULT_ENABLE_HYBRID_TABLE_RETENTION_STRATEGY);
+  }
+
+  public boolean isLineageExclusiveDeleteEnabled() {
+    return getProperty(LINEAGE_EXCLUSIVE_DELETE_ENABLED, DEFAULT_LINEAGE_EXCLUSIVE_DELETE_ENABLED);
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {

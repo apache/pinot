@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -51,16 +52,25 @@ public class DispatchableSubPlan {
   private final Set<String> _tableNames;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
   private final long _numSegmentsPrunedByBroker;
+  private final boolean _allLeafStagesEmpty;
 
   public DispatchableSubPlan(PairList<Integer, String> fields,
       Map<Integer, DispatchablePlanFragment> queryStageMap,
       Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap,
       long numSegmentsPrunedByBroker) {
+    this(fields, queryStageMap, tableNames, tableToUnavailableSegmentsMap, numSegmentsPrunedByBroker, false);
+  }
+
+  public DispatchableSubPlan(PairList<Integer, String> fields,
+      Map<Integer, DispatchablePlanFragment> queryStageMap,
+      Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap,
+      long numSegmentsPrunedByBroker, boolean allLeafStagesEmpty) {
     _queryResultFields = fields;
     _queryStageMap = queryStageMap;
     _tableNames = tableNames;
     _tableToUnavailableSegmentsMap = tableToUnavailableSegmentsMap;
     _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
+    _allLeafStagesEmpty = allLeafStagesEmpty;
   }
 
   /**
@@ -68,7 +78,7 @@ public class DispatchableSubPlan {
    * @return stage plan map.
    */
   public Map<Integer, DispatchablePlanFragment> getQueryStageMap() {
-    return _queryStageMap;
+    return Collections.unmodifiableMap(_queryStageMap);
   }
 
   private static Comparator<DispatchablePlanFragment> byStageIdComparator() {
@@ -129,10 +139,17 @@ public class DispatchableSubPlan {
     return _numSegmentsPrunedByBroker;
   }
 
+  public boolean isAllLeafStagesEmpty() {
+    return _allLeafStagesEmpty;
+  }
+
   /**
    * Get the estimated total number of threads that will be spawned for this query (across all stages and servers).
    */
   public int getEstimatedNumQueryThreads() {
+    if (_allLeafStagesEmpty) {
+      return 0;
+    }
     int estimatedNumQueryThreads = 0;
     // Skip broker reduce root stage
     for (DispatchablePlanFragment stage : getQueryStagesWithoutRoot()) {

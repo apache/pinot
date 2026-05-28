@@ -71,6 +71,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -85,6 +86,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
@@ -1007,8 +1009,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-      this.put(comparisonColumns.get(0), columnMetadata);
-    }});
+        this.put(comparisonColumns.get(0), columnMetadata);
+      }});
     doReturn(endTime).when(columnMetadata).getMaxValue();
     if (snapshot != null) {
       when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
@@ -1354,6 +1356,64 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       assertFalse(recordLocationMap.containsKey(HashUtils.hashPrimaryKey(makePrimaryKey(key), hashFunction)),
           String.valueOf(key));
     }
+  }
+
+  /**
+   * Regression test: when preloading an immutable segment whose validDocIds snapshot is empty and the table is
+   * configured with a deleteRecordColumn, doPreloadSegment's fast path must initialize queryableDocIds to an
+   * empty bitmap (not null). Passing null would set _queryableDocIds = null on the segment, causing subsequent
+   * doTakeSnapshot rounds to skip persisting the queryableDocIds bitmap file and leaving the on-disk snapshot
+   * frozen at its pre-restart contents.
+   */
+  @Test
+  public void testPreloadSegmentEmptyValidDocIdsWithDeleteColumn() {
+    _contextBuilder.setEnableSnapshot(true).setDeleteRecordColumn(DELETE_RECORD_COLUMN);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+
+    ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+        new MutableRoaringBitmap());
+
+    upsertMetadataManager.preloadSegment(segment);
+
+    ArgumentCaptor<ThreadSafeMutableRoaringBitmap> validDocIdsCaptor =
+        ArgumentCaptor.forClass(ThreadSafeMutableRoaringBitmap.class);
+    ArgumentCaptor<ThreadSafeMutableRoaringBitmap> queryableDocIdsCaptor =
+        ArgumentCaptor.forClass(ThreadSafeMutableRoaringBitmap.class);
+    verify(segment).enableUpsert(eq(upsertMetadataManager), validDocIdsCaptor.capture(),
+        queryableDocIdsCaptor.capture());
+    assertNotNull(validDocIdsCaptor.getValue());
+    assertTrue(validDocIdsCaptor.getValue().getMutableRoaringBitmap().isEmpty());
+    assertNotNull(queryableDocIdsCaptor.getValue(),
+        "queryableDocIds must be non-null when deleteRecordColumn is configured");
+    assertTrue(queryableDocIdsCaptor.getValue().getMutableRoaringBitmap().isEmpty());
+  }
+
+  /**
+   * Companion to {@link #testPreloadSegmentEmptyValidDocIdsWithDeleteColumn}: when deleteRecordColumn is not
+   * configured, the fast path should still pass null for queryableDocIds since queryable tracking is disabled.
+   */
+  @Test
+  public void testPreloadSegmentEmptyValidDocIdsWithoutDeleteColumn() {
+    _contextBuilder.setEnableSnapshot(true);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+
+    ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+    when(segment.getSegmentName()).thenReturn("emptyValidDocIdsSegment");
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+        new MutableRoaringBitmap());
+
+    upsertMetadataManager.preloadSegment(segment);
+
+    ArgumentCaptor<ThreadSafeMutableRoaringBitmap> queryableDocIdsCaptor =
+        ArgumentCaptor.forClass(ThreadSafeMutableRoaringBitmap.class);
+    verify(segment).enableUpsert(eq(upsertMetadataManager), any(ThreadSafeMutableRoaringBitmap.class),
+        queryableDocIdsCaptor.capture());
+    assertNull(queryableDocIdsCaptor.getValue(),
+        "queryableDocIds must be null when deleteRecordColumn is not configured");
   }
 
   @Test
@@ -1792,8 +1852,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
       when(segmentMetadata.getTotalDocs()).thenReturn(deleteFlags.length);
       when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-        this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
-      }});
+          this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
+        }});
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,

@@ -589,7 +589,7 @@ public abstract class ClusterTest extends ControllerTest {
       Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
-        String.valueOf(startTime), "end", String.valueOf(endTime));
+          String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);

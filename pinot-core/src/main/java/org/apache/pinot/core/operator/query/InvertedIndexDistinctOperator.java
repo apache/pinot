@@ -388,7 +388,7 @@ public class InvertedIndexDistinctOperator extends BaseOperator<DistinctResultsB
     int entriesExamined = 0;
     int start = iterateReverse ? dictLength - 1 : 0;
     int end = iterateReverse ? -1 : dictLength;
-      int step = iterateReverse ? -1 : 1;
+    int step = iterateReverse ? -1 : 1;
 
     for (int dictId = start; dictId != end; dictId += step) {
       QueryThreadContext.checkTerminationAndSampleUsagePeriodically(entriesExamined, EXPLAIN_NAME);

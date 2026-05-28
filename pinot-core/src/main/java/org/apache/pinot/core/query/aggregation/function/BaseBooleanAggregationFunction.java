@@ -120,12 +120,12 @@ public abstract class BaseBooleanAggregationFunction extends NullableSingleInput
 
       Integer aggResult = foldNotNull(length, blockValSet, aggregationResultHolder.getResult(),
           (acum, from, to) -> {
-        int innerBool = acum == null ? _merger.getDefaultValue() : acum;
-        for (int i = from; i < to; i++) {
-          innerBool = _merger.merge(innerBool, bools[i]);
-        }
-        return innerBool;
-      });
+          int innerBool = acum == null ? _merger.getDefaultValue() : acum;
+          for (int i = from; i < to; i++) {
+            innerBool = _merger.merge(innerBool, bools[i]);
+          }
+          return innerBool;
+        });
 
       aggregationResultHolder.setValue(aggResult);
     } else {

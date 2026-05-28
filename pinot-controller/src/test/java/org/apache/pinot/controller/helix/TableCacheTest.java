@@ -137,7 +137,7 @@ public class TableCacheTest {
     assertTrue(tableCache.registerSchemaChangeListener(schemaChangeListener));
     assertEquals(schemaChangeListener._schemaList.size(), 2);
     assertTrue(schemaChangeListener._schemaList.get(0).equals(expectedSchema)
-    || schemaChangeListener._schemaList.get(1).equals(expectedSchema));
+        || schemaChangeListener._schemaList.get(1).equals(expectedSchema));
 
     TestLogicalTableConfigChangeListener logicalTableConfigChangeListener = new TestLogicalTableConfigChangeListener();
     assertTrue(tableCache.registerLogicalTableConfigChangeListener(logicalTableConfigChangeListener));

@@ -20,6 +20,7 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -40,5 +41,13 @@ public class RlsUtils {
 
   public static String getRlsFilterForTable(Map<String, String> queryOptions, String tableName) {
     return queryOptions.get(buildRlsFilterKey(tableName));
+  }
+
+  /// `true` iff a non-empty RLS filter has been stamped for the given table in `queryOptions`.
+  /// Matches the truthiness check inside [RlsFiltersRewriter#rewrite(PinotQuery)] so callers
+  /// stamp `BrokerResponse.setRLSFiltersApplied(...)` iff the rewriter actually attached a
+  /// predicate.  Safe against a `null` `queryOptions` map.
+  public static boolean isRlsAppliedForTable(Map<String, String> queryOptions, String tableName) {
+    return queryOptions != null && !Strings.isEmpty(getRlsFilterForTable(queryOptions, tableName));
   }
 }

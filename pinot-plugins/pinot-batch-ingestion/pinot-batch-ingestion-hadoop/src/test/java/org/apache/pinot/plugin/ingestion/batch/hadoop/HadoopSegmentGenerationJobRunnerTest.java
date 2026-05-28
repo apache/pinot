@@ -69,18 +69,18 @@ public class HadoopSegmentGenerationJobRunnerTest {
     final String schemaName = "myTable";
     File schemaFile = new File(testDir, "myTable.schema");
     Schema schema = new SchemaBuilder()
-      .setSchemaName(schemaName)
-      .addSingleValueDimension("col1", DataType.STRING)
-      .addMetric("col2", DataType.INT)
-      .build();
+        .setSchemaName(schemaName)
+        .addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT)
+        .build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
     File tableConfigFile = new File(testDir, "myTable.table");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName("myTable")
-      .setNumReplicas(1)
-      .build();
+        .setTableName("myTable")
+        .setNumReplicas(1)
+        .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
 
     File stagingDir = new File(testDir, "staging");

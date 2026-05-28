@@ -66,6 +66,7 @@ public class TableConfigBuilder {
   private final TableType _tableType;
   private String _tableName;
   private boolean _isDimTable;
+  private boolean _isMaterializedView;
 
   // Segments config related
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
@@ -158,6 +159,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setIsDimTable(boolean isDimTable) {
     _isDimTable = isDimTable;
+    return this;
+  }
+
+  public TableConfigBuilder setIsMaterializedView(boolean isMaterializedView) {
+    _isMaterializedView = isMaterializedView;
     return this;
   }
 
@@ -568,7 +574,8 @@ public class TableConfigBuilder {
         new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
             _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
             _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers);
+            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap,
+            _tableSamplers, _isMaterializedView);
     tableConfig.setDescription(_description);
     tableConfig.setTags(_tags);
     return tableConfig;

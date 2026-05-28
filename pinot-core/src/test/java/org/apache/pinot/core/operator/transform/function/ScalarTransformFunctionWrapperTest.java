@@ -692,6 +692,22 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testArraySliceLongTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_slice_long(%s, 1, 3)", LONG_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "arraySliceLong");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    long[][] expectedValues = new long[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Arrays.copyOfRange(_longMVValues[i], 1, 3);
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testArrayDistinctIntTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("array_distinct_int(%s)", INT_MV_COLUMN));

@@ -66,6 +66,8 @@ public class TableConfigSerDeUtils {
 
     String tableType = simpleFields.get(TableConfig.TABLE_TYPE_KEY);
     boolean isDimTable = Boolean.parseBoolean(simpleFields.get(TableConfig.IS_DIM_TABLE_KEY));
+    boolean isMaterializedView =
+        Boolean.parseBoolean(simpleFields.get(TableConfig.IS_MATERIALIZED_VIEW_KEY));
     Preconditions.checkState(tableType != null, FIELD_MISSING_MESSAGE_TEMPLATE, TableConfig.TABLE_TYPE_KEY);
 
     String validationConfigString = simpleFields.get(TableConfig.VALIDATION_CONFIG_KEY);
@@ -198,7 +200,8 @@ public class TableConfigSerDeUtils {
         new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
             quotaConfig, taskConfig, routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList,
             upsertConfig, dedupConfig, dimensionTableConfig, ingestionConfig, tierConfigList, isDimTable,
-            tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap, tableSamplerConfigs);
+            tunerConfigList, instancePartitionsMap, segmentAssignmentConfigMap,
+            tableSamplerConfigs, isMaterializedView);
     tableConfig.setDescription(description);
     tableConfig.setTags(tags);
     return tableConfig;
@@ -216,6 +219,7 @@ public class TableConfigSerDeUtils {
     simpleFields.put(TableConfig.INDEXING_CONFIG_KEY, tableConfig.getIndexingConfig().toJsonString());
     simpleFields.put(TableConfig.CUSTOM_CONFIG_KEY, tableConfig.getCustomConfig().toJsonString());
     simpleFields.put(TableConfig.IS_DIM_TABLE_KEY, Boolean.toString(tableConfig.isDimTable()));
+    simpleFields.put(TableConfig.IS_MATERIALIZED_VIEW_KEY, Boolean.toString(tableConfig.isMaterializedView()));
 
     // Optional fields
     QuotaConfig quotaConfig = tableConfig.getQuotaConfig();

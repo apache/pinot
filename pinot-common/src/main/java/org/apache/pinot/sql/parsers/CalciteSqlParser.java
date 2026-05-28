@@ -52,6 +52,7 @@ import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -826,6 +827,14 @@ public class CalciteSqlParser {
         negated = ((SqlLikeOperator) functionNode.getOperator()).isNegated();
         canonicalName = SqlKind.LIKE.name();
         break;
+      case MINUS_PREFIX:
+        // SqlKind.MINUS_PREFIX.name() would canonicalize to "minusprefix", which has no matching entry in
+        // FunctionRegistry. Map directly to the registered NegateScalarFunction name instead.
+        canonicalName = NegateScalarFunction.FUNCTION_NAME;
+        break;
+      case PLUS_PREFIX:
+        // Unary plus is identity -- unwrap to the operand directly (no function node needed).
+        return toExpression(functionNode.getOperandList().get(0));
       case OTHER:
       case OTHER_FUNCTION:
       case DOT:

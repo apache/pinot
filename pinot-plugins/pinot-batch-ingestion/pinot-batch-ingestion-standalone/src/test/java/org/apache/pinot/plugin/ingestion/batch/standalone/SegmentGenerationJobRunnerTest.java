@@ -239,10 +239,10 @@ public class SegmentGenerationJobRunnerTest {
   private File makeSchemaFile(File testDir, String schemaName) throws IOException {
     File schemaFile = new File(testDir, "schema");
     Schema schema = new SchemaBuilder()
-      .setSchemaName(schemaName)
-      .addSingleValueDimension("col1", DataType.STRING)
-      .addMetric("col2", DataType.INT)
-      .build();
+        .setSchemaName(schemaName)
+        .addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT)
+        .build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
     return schemaFile;
   }

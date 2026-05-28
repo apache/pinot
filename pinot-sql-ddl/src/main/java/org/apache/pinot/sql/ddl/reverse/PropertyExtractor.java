@@ -332,6 +332,9 @@ public final class PropertyExtractor {
     if (config.isDimTable()) {
       props.put("isDimTable", "true");
     }
+    if (config.isMaterializedView()) {
+      props.put("isMaterializedView", "true");
+    }
     putIfPresent(props, "description", config.getDescription());
     List<String> tags = config.getTags();
     if (tags != null && !tags.isEmpty()) {
