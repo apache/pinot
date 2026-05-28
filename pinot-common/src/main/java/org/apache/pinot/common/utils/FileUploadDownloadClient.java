@@ -894,8 +894,17 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
       @Nullable TableType tableType, boolean excludeReplacedSegments, @Nullable AuthProvider authProvider)
       throws Exception {
+    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, authProvider,
+        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /// Returns table segments using an explicit socket timeout for the controller request.
+  public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
+      @Nullable TableType tableType, boolean excludeReplacedSegments, @Nullable AuthProvider authProvider,
+      int socketTimeoutMs)
+      throws Exception {
     return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, Long.MIN_VALUE,
-        Long.MAX_VALUE, false, authProvider);
+        Long.MAX_VALUE, false, authProvider, socketTimeoutMs);
   }
 
   /**
@@ -915,6 +924,15 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
       @Nullable TableType tableType, boolean excludeReplacedSegments, long startTimestamp, long endTimestamp,
       boolean excludeOverlapping, @Nullable AuthProvider authProvider)
+      throws Exception {
+    return getSegments(controllerBaseUri, rawTableName, tableType, excludeReplacedSegments, startTimestamp,
+        endTimestamp, excludeOverlapping, authProvider, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /// Returns table segments using an explicit socket timeout for the controller request.
+  public Map<String, List<String>> getSegments(URI controllerBaseUri, String rawTableName,
+      @Nullable TableType tableType, boolean excludeReplacedSegments, long startTimestamp, long endTimestamp,
+      boolean excludeOverlapping, @Nullable AuthProvider authProvider, int socketTimeoutMs)
       throws Exception {
     List<String> tableTypes;
     if (tableType == null) {
@@ -936,7 +954,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
       RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0).attempt(() -> {
         try {
           SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-              _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+              _httpClient.sendRequest(requestBuilder.build(), socketTimeoutMs));
           LOGGER.info("Response {}: {} received for GET request to URI: {}", response.getStatusCode(),
               response.getResponse(), uri);
           tableTypeToSegments.put(tableTypeToFilter,
@@ -1150,9 +1168,16 @@ public class FileUploadDownloadClient implements AutoCloseable {
   public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
       @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
+    return startReplaceSegments(uri, startReplaceSegmentsRequest, authProvider, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /// Starts the consistent-push replace protocol using an explicit socket timeout.
+  public SimpleHttpResponse startReplaceSegments(URI uri, StartReplaceSegmentsRequest startReplaceSegmentsRequest,
+      @Nullable AuthProvider authProvider, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
         getStartReplaceSegmentsRequest(uri, JsonUtils.objectToString(startReplaceSegmentsRequest), authProvider),
-        HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+        socketTimeoutMs));
   }
 
   /**
@@ -1197,8 +1222,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public SimpleHttpResponse revertReplaceSegments(URI uri, @Nullable AuthProvider authProvider)
       throws IOException, HttpErrorStatusException {
+    return revertReplaceSegments(uri, authProvider, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /// Reverts the consistent-push replace protocol using an explicit socket timeout.
+  public SimpleHttpResponse revertReplaceSegments(URI uri, @Nullable AuthProvider authProvider, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
-        getRevertReplaceSegmentRequest(uri, authProvider)));
+        getRevertReplaceSegmentRequest(uri, authProvider), socketTimeoutMs));
   }
 
   /**
