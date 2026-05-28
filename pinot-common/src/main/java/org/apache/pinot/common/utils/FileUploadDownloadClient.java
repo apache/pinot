@@ -650,7 +650,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   @Deprecated
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-      int segmentUploadRequestTimeoutMs)
+      long segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
     return uploadSegmentMetadataFiles(uri, metadataFiles, Collections.emptyList(), Collections.emptyList(),
         segmentUploadRequestTimeoutMs);
@@ -658,7 +658,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
 
   // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int segmentUploadRequestTimeoutMs)
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, long segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
     return HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(getUploadSegmentMetadataFilesRequest(uri, metadataFiles, headers, parameters),
