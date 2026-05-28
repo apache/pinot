@@ -30,6 +30,7 @@ import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -138,6 +139,16 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
       Throwable cause = ExceptionUtils.getRootCause(exception);
       assertEquals(cause.getClass().getName(), "java.util.concurrent.TimeoutException");
     }
+  }
+
+  @Test
+  public void withConnectionPropertiesRetainsConfiguredSchemeWhenSchemePropertyIsAbsent() {
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
+
+    factory.withConnectionProperties(new Properties());
+
+    assertEquals(factory.getScheme(), CommonConstants.HTTPS_PROTOCOL);
   }
 
   // Cursor-related tests
