@@ -35,7 +35,7 @@
         ]
       },
       {
-        "description": "UNION from three tables",
+        "description": "UNION from three tables (dedup aggregates are pushed into each branch by AggregateUnionTranspose)",
         "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a UNION SELECT col1, col2 FROM b UNION SELECT col1, col2 FROM c",
         "output": [
           "Execution Plan",
@@ -49,14 +49,20 @@
           "\n              PinotLogicalAggregate(group=[{0, 1}], aggType=[LEAF])",
           "\n                LogicalUnion(all=[true])",
           "\n                  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n                    LogicalProject(col1=[$0], col2=[$1])",
-          "\n                      PinotLogicalTableScan(table=[[default, a]])",
+          "\n                    PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
+          "\n                      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n                        PinotLogicalAggregate(group=[{0, 1}], aggType=[LEAF])",
+          "\n                          PinotLogicalTableScan(table=[[default, a]])",
           "\n                  PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n                    LogicalProject(col1=[$0], col2=[$1])",
-          "\n                      PinotLogicalTableScan(table=[[default, b]])",
+          "\n                    PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
+          "\n                      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n                        PinotLogicalAggregate(group=[{0, 1}], aggType=[LEAF])",
+          "\n                          PinotLogicalTableScan(table=[[default, b]])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            PinotLogicalTableScan(table=[[default, c]])",
+          "\n          PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n              PinotLogicalAggregate(group=[{0, 1}], aggType=[LEAF])",
+          "\n                PinotLogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -77,6 +83,89 @@
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
           "\n      PinotLogicalTableScan(table=[[default, c]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "GROUP BY with SUM aggregate pushed into both branches of UNION ALL by AggregateUnionTranspose",
+        "sql": "EXPLAIN PLAN FOR SELECT col2, SUM(col3) FROM (SELECT col2, col3 FROM a UNION ALL SELECT col2, col3 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])",
+          "\n      LogicalUnion(all=[true])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{1}], agg#0=[$SUM0($2)], aggType=[LEAF])",
+          "\n                PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "GROUP BY with COUNT(*) pushed into UNION ALL branches: per-branch COUNT rolls up via top-level SUM0",
+        "sql": "EXPLAIN PLAN FOR SELECT col2, COUNT(*) FROM (SELECT col2 FROM a UNION ALL SELECT col2 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])",
+          "\n      LogicalUnion(all=[true])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n                PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{1}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n                PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Aggregate hints (e.g. is_skip_leaf_stage_group_by) are preserved on both the per-branch and rolled-up aggregates produced by AggregateUnionTranspose",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, SUM(col3) FROM (SELECT col2, col3 FROM a UNION ALL SELECT col2, col3 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalUnion(all=[true])",
+          "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Disabling AggregateUnionTranspose via skipPlannerRules keeps the aggregate above the UNION ALL",
+        "sql": "SET skipPlannerRules='AggregateUnionTranspose'; EXPLAIN PLAN FOR SELECT col2, SUM(col3) FROM (SELECT col2, col3 FROM a UNION ALL SELECT col2, col3 FROM b) GROUP BY col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])",
+          "\n      LogicalUnion(all=[true])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          LogicalProject(col2=[$1], col3=[$2])",
+          "\n            PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },

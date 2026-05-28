@@ -153,9 +153,21 @@ public class PinotQueryRuleSets {
       // push aggregate functions through join, disabled by default
       AggregateJoinTransposeRule.Config.EXTENDED
           .withDescription(PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED).toRule(),
-      // aggregate union rule
+      // AggregateUnionAggregate and AggregateUnionTranspose are inverses of each other and the defaults are chosen to
+      // optimize for distributed-OLAP cost (shuffle dominates compute):
+      //   - AggregateUnionTranspose (default-on) pushes the aggregate into every UNION ALL branch, so each branch
+      //     ships pre-aggregated rows across the next exchange instead of raw rows. With low-cardinality group keys
+      //     (the common analytics case) this trades a cheap extra per-branch aggregate for a much smaller shuffle.
+      //   - AggregateUnionAggregate (default-off) does the opposite: it collapses Agg(Union(Agg(A), B)) into
+      //     Agg(Union(A, B)), which loses the pre-aggregation on A and forces raw rows through the union's exchange.
+      //     We keep it available behind `usePlannerRules` for embedded/in-memory deployments where shuffle is free,
+      //     but enabling it alongside the default-on Transpose just undoes Transpose's work (see the order below).
       AggregateUnionAggregateRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_UNION_AGGREGATE).toRule(),
+      // Registered after AggregateUnionAggregate on purpose: if both are enabled, this phase runs last so Transpose
+      // wins and any merge AggregateUnionAggregate did first gets pushed back into the branches.
+      PinotAggregateUnionTransposeRule
+          .instanceWithDescription(PlannerRuleNames.AGGREGATE_UNION_TRANSPOSE),
 
       // reduce SUM and AVG
       // TODO: Consider not reduce at all. This can now be controlled by specifying
