@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import java.math.BigDecimal;
 import java.util.Set;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlLiteral;
@@ -82,5 +83,68 @@ public class RequestUtilsTest {
     } else {
       assertEquals(tableNames, expectedSet);
     }
+  }
+
+  /**
+   * Non-integer decimal SQL literals must be encoded as {@code DOUBLE_VALUE} for backward
+   * compatibility with older servers that do not yet handle the {@code BIG_DECIMAL_VALUE} thrift
+   * field. Switch to {@code setBigDecimalValue()} in the next release once all servers are upgraded
+   * (see TODO in {@link RequestUtils#getLiteral(org.apache.calcite.sql.SqlLiteral)}).
+   */
+  @Test
+  public void testDecimalSqlLiteralUsesDoubleValueForBackwardCompatibility() {
+    SqlLiteral exactDecimal = SqlLiteral.createExactNumeric("3.14", SqlParserPos.ZERO);
+    Expression expr = RequestUtils.getLiteralExpression(exactDecimal);
+    assertEquals(expr.getType(), ExpressionType.LITERAL);
+    assertTrue(expr.getLiteral().isSetDoubleValue(),
+        "Non-integer decimal literals must be encoded as DOUBLE_VALUE for backward compatibility");
+    assertEquals(expr.getLiteral().getDoubleValue(), 3.14, 1e-9);
+  }
+
+  /**
+   * Verifies that approximate (floating-point) SQL literals (e.g. {@code 3.14E0}) are also
+   * encoded as {@code DOUBLE_VALUE}.
+   */
+  @Test
+  public void testApproxDecimalSqlLiteralUsesDoubleValue() {
+    SqlLiteral approxDecimal = SqlLiteral.createApproxNumeric("3.14E0", SqlParserPos.ZERO);
+    Expression expr = RequestUtils.getLiteralExpression(approxDecimal);
+    assertEquals(expr.getType(), ExpressionType.LITERAL);
+    assertTrue(expr.getLiteral().isSetDoubleValue(),
+        "Approximate decimal literals must be encoded as DOUBLE_VALUE");
+    assertEquals(expr.getLiteral().getDoubleValue(), 3.14, 1e-9);
+  }
+
+  /**
+   * Verifies that integer SQL literals within the {@code int} range are encoded as
+   * {@code INT_VALUE}, and those outside the range are encoded as {@code LONG_VALUE}.
+   */
+  @Test
+  public void testIntegerSqlLiteralEncoding() {
+    // Small integer → INT_VALUE
+    SqlLiteral smallInt = SqlLiteral.createExactNumeric("42", SqlParserPos.ZERO);
+    Expression smallExpr = RequestUtils.getLiteralExpression(smallInt);
+    assertTrue(smallExpr.getLiteral().isSetIntValue(), "Small integer must be INT_VALUE");
+    assertEquals(smallExpr.getLiteral().getIntValue(), 42);
+
+    // Large integer (> Integer.MAX_VALUE) → LONG_VALUE
+    SqlLiteral largeInt = SqlLiteral.createExactNumeric("9999999999", SqlParserPos.ZERO);
+    Expression largeExpr = RequestUtils.getLiteralExpression(largeInt);
+    assertTrue(largeExpr.getLiteral().isSetLongValue(), "Large integer must be LONG_VALUE");
+    assertEquals(largeExpr.getLiteral().getLongValue(), 9999999999L);
+  }
+
+  /**
+   * Verifies that the programmatic {@link RequestUtils#getLiteral(BigDecimal)} helper (used when
+   * constructing literals from Java objects, not from SQL text) correctly uses
+   * {@code BIG_DECIMAL_VALUE} to preserve full precision.
+   */
+  @Test
+  public void testGetLiteralFromBigDecimalObjectUsesBigDecimalValue() {
+    BigDecimal value = new BigDecimal("123456789.123456789");
+    Expression expr = RequestUtils.getLiteralExpression(value);
+    assertEquals(expr.getType(), ExpressionType.LITERAL);
+    assertTrue(expr.getLiteral().isSetBigDecimalValue(),
+        "getLiteral(BigDecimal) must use BIG_DECIMAL_VALUE to preserve full precision");
   }
 }
