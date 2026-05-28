@@ -21,6 +21,7 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
@@ -42,9 +44,14 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -226,9 +233,56 @@ public class QueryDispatcherTest extends QueryTestSet {
   }
 
   @Test
-  public void testStatsManagerRecordsSubmissionAndArrivalForDispatchedServers()
+  public void testStatsManagerNotCalledWhenSubmitFails()
       throws Exception {
     ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+
+    QueryServer failingQueryServer = _queryServerMap.values().iterator().next();
+    Mockito.doThrow(new RuntimeException("partial dispatch failure"))
+        .when(failingQueryServer).submit(Mockito.any(), Mockito.any());
+
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+      Assert.fail("Should have thrown");
+    } catch (Exception e) {
+      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+    }
+
+    Mockito.verifyNoInteractions(statsManager);
+    Mockito.reset(failingQueryServer);
+  }
+
+  @Test
+  public void testRealStatsManagerInflightReturnsToZero()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+
+    PinotConfiguration brokerConfig = new PinotConfiguration();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(
+        brokerConfig.subset(CommonConstants.Broker.METRICS_CONFIG_PREFIX));
+    BrokerMetrics brokerMetrics = new BrokerMetrics(
+        CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
+        metricsRegistry,
+        CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS,
+        Collections.emptyList());
+    brokerMetrics.initializeGlobalMeters();
+    BrokerMetrics.register(brokerMetrics);
+
+    ServerRoutingStatsManager statsManager = new ServerRoutingStatsManager(
+        new PinotConfiguration(properties), brokerMetrics);
+    statsManager.init();
+
     String sql = "SELECT * FROM a";
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     RequestContext context = new DefaultRequestContext();
@@ -249,9 +303,22 @@ public class QueryDispatcherTest extends QueryTestSet {
       // expected: reduce phase fails with mocked MailboxService
     }
 
-    for (String instanceId : expectedInstanceIds) {
-      Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
-      Mockito.verify(statsManager).recordStatsUponResponseArrival(requestId, instanceId, -1L);
+    // Wait for the async executor to process all stats tasks (1 submission + 1 arrival per server).
+    int expectedTasks = expectedInstanceIds.size() * 2;
+    TestUtils.waitForCondition(
+        aVoid -> statsManager.getCompletedTaskCount() >= expectedTasks,
+        10L, 5000,
+        "Timed out waiting for stats manager to process all tasks");
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      for (String instanceId : expectedInstanceIds) {
+        Integer numInFlight = statsManager.fetchNumInFlightRequestsForServer(instanceId);
+        Assert.assertNotNull(numInFlight, "Expected stats entry for " + instanceId);
+        Assert.assertEquals(numInFlight.intValue(), 0,
+            "Expected 0 in-flight requests for " + instanceId + " after submitAndReduce returns");
+      }
     }
+
+    statsManager.shutDown();
   }
 }
