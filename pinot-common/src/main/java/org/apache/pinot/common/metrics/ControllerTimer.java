@@ -38,9 +38,7 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   DEEP_STORE_SEGMENT_WRITE_TIME_MS("deepStoreSegmentWriteTimeMs", true),
   // Audit logging timers
   AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
-  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true),
-  // Log subtask running (until not completed) time
-  SUBTASK_RUNNING_TIME("subtaskRunningTime", false);
+  AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true);
 
 
   private final String _timerName;

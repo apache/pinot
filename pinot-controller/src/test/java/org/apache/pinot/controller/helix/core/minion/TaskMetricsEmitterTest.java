@@ -174,8 +174,9 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected 32 metrics: 29 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x2 tables) + SUBTASK_RUNNING_TIME timer
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 32);
+    // Expected 33 metrics: 29 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x2 tables)
+    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x2 tables)
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 33);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -260,6 +261,16 @@ public class TaskMetricsEmitterTest {
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.maxSubtaskWaitTimeMs.table2_OFFLINE.taskType1"))
         .getMetric()).value(), 0L);
+
+    // table2 has a running subtask (subtask1, 5000ms); table1 has none (0ms)
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskRunningTimeMs.table1_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.maxSubtaskRunningTimeMs.table2_OFFLINE.taskType1"))
+        .getMetric()).value(), 5000L);
   }
 
   @Test
@@ -291,9 +302,9 @@ public class TaskMetricsEmitterTest {
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    // Expected at least 21 metrics: 20 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x1 table)
-    // The actual count may vary slightly based on test execution order
-    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 21);
+    // Expected at least 22 metrics: 20 original + MAX_SUBTASK_WAIT_TIME_MS gauge (x1 table)
+    // + MAX_SUBTASK_RUNNING_TIME_MS gauge (x1 table). Count may vary based on test execution order.
+    Assert.assertTrue(metricsRegistry.allMetrics().size() >= 22);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));

@@ -25,10 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -110,6 +108,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       TaskCount taskTypeAccumulatedCount = new TaskCount();
       Map<String, TaskCount> tableAccumulatedCount = new HashMap<>();
       Map<String, Long> tableMaxWaitTimeMs = new HashMap<>();
+      Map<String, Long> tableMaxRunningTimeMs = new HashMap<>();
       try {
         // Capture the current execution timestamp for this task type collection cycle
         long currentExecutionTimestamp = System.currentTimeMillis();
@@ -151,8 +150,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
                   tableMaxWaitTimeMs.merge(tableNameWithType, subtaskWaitingTime, Math::max);
                 });
                 taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
-                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_RUNNING_TIME,
-                      subtaskRunningTime, TimeUnit.MILLISECONDS);
+                  tableMaxRunningTimeMs.merge(tableNameWithType, subtaskRunningTime, Math::max);
                 });
                 return count;
               });
@@ -211,11 +209,15 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
               ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, tablePercent);
         });
 
-        // Emit 0 for tables with no waiting subtasks so the gauge (and alert) self-resolves
-        tableAccumulatedCount.keySet().forEach(tableNameWithType ->
-            _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-                ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS,
-                tableMaxWaitTimeMs.getOrDefault(tableNameWithType, 0L)));
+        // Emit 0 for tables with no waiting/running subtasks so the gauge (and alert) self-resolves
+        tableAccumulatedCount.keySet().forEach(tableNameWithType -> {
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS,
+              tableMaxWaitTimeMs.getOrDefault(tableNameWithType, 0L));
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS,
+              tableMaxRunningTimeMs.getOrDefault(tableNameWithType, 0L));
+        });
 
         if (_preReportedTables.containsKey(taskType)) {
           Set<String> tableNameWithTypeSet = _preReportedTables.get(taskType);
@@ -293,6 +295,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS);
     });
   }
 }

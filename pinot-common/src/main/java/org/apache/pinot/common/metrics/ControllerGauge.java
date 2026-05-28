@@ -73,6 +73,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   NUM_MINION_SUBTASKS_WAITING("NumMinionSubtasksWaiting", true),
   MAX_SUBTASK_WAIT_TIME_MS("MaxSubtaskWaitTimeMs", false),
   NUM_MINION_SUBTASKS_RUNNING("NumMinionSubtasksRunning", true),
+  MAX_SUBTASK_RUNNING_TIME_MS("MaxSubtaskRunningTimeMs", false),
   NUM_MINION_SUBTASKS_ERROR("NumMinionSubtasksError", true),
   NUM_MINION_SUBTASKS_UNKNOWN("NumMinionSubtasksUnknown", true),
   NUM_MINION_SUBTASKS_DROPPED("NumMinionSubtasksDropped", true),
