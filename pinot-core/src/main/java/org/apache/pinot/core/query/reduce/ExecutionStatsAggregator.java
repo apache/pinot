@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class ExecutionStatsAggregator {
@@ -345,5 +347,108 @@ public class ExecutionStatsAggregator {
     if (strValue != null) {
       consumer.accept(Long.parseLong(strValue));
     }
+  }
+
+  /**
+   * Writes the accumulated execution stats onto the given DataTable's metadata (and exception map),
+   * so a merged-only DataTable can be re-injected into the regular reduce path with the same
+   * downstream totals as a direct reduce of the original inputs would have produced.
+   *
+   * <p>Unlike {@link #setStats(String, BrokerResponseNative, BrokerMetrics)}, this method does NOT
+   * bump broker meters or timers. The merge-only path is expected to run off the request-serving
+   * path; meter increments fire when the result is eventually re-reduced.
+   *
+   * <p>Limitations of the round-trip via DataTable metadata:
+   * <ul>
+   *   <li>CPU and memory stats round-trip as a single combined value per key
+   *       ({@link DataTable.MetadataKey#THREAD_CPU_TIME_NS}, etc.) because the wire format has no
+   *       per-tableType keys. In the standard reduce path the aggregator attributes each server's
+   *       value to offline vs realtime based on {@code routingInstance.getTableType()} and surfaces
+   *       them as separate fields on {@link BrokerResponseNative}; on a re-reduce of the merged
+   *       DataTable the whole combined value lands in one bucket — whichever tableType the caller
+   *       assigned to the synthetic server response. So the per-tableType split visible on
+   *       BrokerResponse is lost across the round-trip, even though the total is preserved.
+   *   <li>Per-server exceptions are written via {@link DataTable#addException(int, String)} which
+   *       backs a {@code Map<Integer, String>} keyed by error code; if two inputs reported the
+   *       same error code the merged DataTable carries last-write-wins for the message.
+   *   <li>Per-server trace info is JSON-encoded into a single
+   *       {@link DataTable.MetadataKey#TRACE_INFO} entry; the downstream aggregator reads it back
+   *       as one trace blob attributed to the synthetic server.
+   * </ul>
+   */
+  public void setStatsOnMergedDataTable(DataTable dataTable) {
+    Map<String, String> metadata = dataTable.getMetadata();
+
+    // Additive long stats: mirror setStats()'s pattern of unconditional writes. Accumulators are
+    // initialized to 0, so a 0 here is indistinguishable to downstream from "absent" — the
+    // downstream aggregator's Long.parseLong("0") + null-check both produce 0.
+    putLong(metadata, DataTable.MetadataKey.NUM_DOCS_SCANNED, _numDocsScanned);
+    putLong(metadata, DataTable.MetadataKey.NUM_ENTRIES_SCANNED_IN_FILTER, _numEntriesScannedInFilter);
+    putLong(metadata, DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, _numEntriesScannedPostFilter);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_QUERIED, _numSegmentsQueried);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED, _numSegmentsProcessed);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_MATCHED, _numSegmentsMatched);
+    putLong(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED, _numConsumingSegmentsQueried);
+    putLong(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED, _numConsumingSegmentsProcessed);
+    putLong(metadata, DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_MATCHED, _numConsumingSegmentsMatched);
+    putLong(metadata, DataTable.MetadataKey.TOTAL_DOCS, _numTotalDocs);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER, _numSegmentsPrunedByServer);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID, _numSegmentsPrunedInvalid);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, _numSegmentsPrunedByLimit);
+    putLong(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE, _numSegmentsPrunedByValue);
+    putLong(metadata, DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS,
+        _explainPlanNumEmptyFilterSegments);
+    putLong(metadata, DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS,
+        _explainPlanNumMatchAllFilterSegments);
+    // Collapse offline+realtime decomposition back to the combined wire-format keys.
+    putLong(metadata, DataTable.MetadataKey.THREAD_CPU_TIME_NS,
+        _offlineThreadCpuTimeNs + _realtimeThreadCpuTimeNs);
+    putLong(metadata, DataTable.MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS,
+        _offlineSystemActivitiesCpuTimeNs + _realtimeSystemActivitiesCpuTimeNs);
+    putLong(metadata, DataTable.MetadataKey.RESPONSE_SER_CPU_TIME_NS,
+        _offlineResponseSerializationCpuTimeNs + _realtimeResponseSerializationCpuTimeNs);
+    putLong(metadata, DataTable.MetadataKey.THREAD_MEM_ALLOCATED_BYTES,
+        _offlineThreadMemAllocatedBytes + _realtimeThreadMemAllocatedBytes);
+    putLong(metadata, DataTable.MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES,
+        _offlineResponseSerMemAllocatedBytes + _realtimeResponseSerMemAllocatedBytes);
+
+    // MIN_CONSUMING_FRESHNESS_TIME_MS: sentinel-guarded. Long.MAX_VALUE means "no input had a real
+    // freshness reading"; writing the sentinel would mislead downstream observability.
+    if (_minConsumingFreshnessTimeMs != Long.MAX_VALUE) {
+      metadata.put(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(),
+          Long.toString(_minConsumingFreshnessTimeMs));
+    }
+
+    // Boolean flags: OR-reduced; only write the key when true (a "false" entry is noise and the
+    // existing reduce path treats absent as false).
+    if (_groupsTrimmed) {
+      metadata.put(DataTable.MetadataKey.GROUPS_TRIMMED.getName(), "true");
+    }
+    if (_numGroupsLimitReached) {
+      metadata.put(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+    }
+    if (_numGroupsWarningLimitReached) {
+      metadata.put(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
+    }
+
+    // Exceptions: copy each accumulated exception onto the DataTable. Last-write-wins on error-code
+    // collision (wire format is Map<Integer, String>).
+    for (QueryProcessingException qpe : _processingExceptions) {
+      dataTable.addException(qpe.getErrorCode(), qpe.getMessage());
+    }
+
+    // Trace: JSON-encode the per-server map into a single TRACE_INFO metadata entry. On downstream
+    // readback the aggregator reads it as one string under the synthetic server's name.
+    if (_enableTrace && !_traceInfo.isEmpty()) {
+      try {
+        metadata.put(DataTable.MetadataKey.TRACE_INFO.getName(), JsonUtils.objectToString(_traceInfo));
+      } catch (JsonProcessingException e) {
+        throw new IllegalStateException("Failed to serialize trace info for merged DataTable", e);
+      }
+    }
+  }
+
+  private static void putLong(Map<String, String> metadata, DataTable.MetadataKey key, long value) {
+    metadata.put(key.getName(), Long.toString(value));
   }
 }

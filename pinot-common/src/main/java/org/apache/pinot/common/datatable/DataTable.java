@@ -156,11 +156,15 @@ public interface DataTable {
     WORKLOAD_NAME(40, "workloadName", MetadataValueType.STRING),
     // Needed so that we can track query id in Netty channel response.
     QUERY_ID(41, "queryId", MetadataValueType.STRING),
-    EARLY_TERMINATION_REASON(42, "earlyTerminationReason", MetadataValueType.STRING);
+    EARLY_TERMINATION_REASON(42, "earlyTerminationReason", MetadataValueType.STRING),
+    // Set on a merged-only DataTable when one or more input server DataTables were dropped during the
+    // merge (e.g., due to a schema conflict). Signals to a downstream consumer that the merge is
+    // partial; how to react (skip, retry, accept with annotation) is the consumer's policy.
+    PARTIAL_INTERMEDIATE_RESULT(43, "partialIntermediateResult", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = EARLY_TERMINATION_REASON.getId();
+    private static final int MAX_ID = PARTIAL_INTERMEDIATE_RESULT.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();
