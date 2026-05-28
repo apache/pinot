@@ -154,12 +154,23 @@ public class ServerRoutingStatsManager {
   }
 
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap(QueryType queryType) {
-    return queryType == QueryType.MSE ? _mseServerQueryStatsMap : _serverQueryStatsMap;
+    switch (queryType) {
+      case SSE:
+        return _serverQueryStatsMap;
+      case MSE:
+        return _mseServerQueryStatsMap;
+      default:
+        LOGGER.warn("Unsupported query type for adaptive server routing: {}; defaulting to SSE stats map", queryType);
+        return _serverQueryStatsMap;
+    }
   }
 
+  /// Callers are expected to run on a thread with a {@link QueryThreadContext} set.
+  /// If absent, defaults to the SSE stats map with a warning.
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> getStatsMap() {
     QueryThreadContext qtc = QueryThreadContext.getIfAvailable();
     if (qtc == null) {
+      LOGGER.warn("QueryThreadContext is null; defaulting to SSE stats map");
       return getStatsMap(QueryType.SSE);
     }
     return getStatsMap(qtc.getExecutionContext().getQueryType());
