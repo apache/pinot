@@ -53,6 +53,10 @@ import org.apache.calcite.sql.util.SqlShuttle;
  *
  * <p><b>Note:</b> This visitor maintains internal state (dynamic parameter index) that is not reset between visits.
  * A new instance should be created for each query fingerprint.</p>
+ *
+ * <p>The visitor honors {@link SqlShuttle}'s non-mutating contract: the input {@link SqlNode} tree is left
+ * unchanged and a new tree is returned. This matters because callers (the broker) compile the same SqlNode
+ * to a PinotQuery after computing the fingerprint.</p>
  */
 public class QueryFingerprintVisitor extends SqlShuttle {
   // SqlSelect operand index for hints, see {@link org.apache.calcite.sql.SqlSelect}.
@@ -117,12 +121,7 @@ public class QueryFingerprintVisitor extends SqlShuttle {
         result = visitOrderBy((SqlOrderBy) call);
         break;
       case OVER:
-        // Window functions: only visit the aggregate function (operand 0).
-        // Skip the window specification (operand 1) due to its complex structure
-        // with ORDER BY and frame clauses. This means literals in PARTITION BY,
-        // ORDER BY, and window frames are preserved rather than replaced.
-        call.setOperand(0, call.getOperandList().get(0).accept(this));
-        result = call;
+        result = visitOver(call);
         break;
       case IN:
       case NOT_IN:
@@ -134,98 +133,114 @@ public class QueryFingerprintVisitor extends SqlShuttle {
     return result;
   }
 
+  /**
+   * Rebuilds {@code original} with the supplied operands, mirroring the pattern used by Calcite's
+   * {@link SqlShuttle.CallCopyingArgHandler#result()}. This is what allows the visitor to honor the
+   * non-mutating {@link SqlShuttle} contract.
+   */
+  private static SqlNode rebuild(SqlCall original, SqlNode... newOperands) {
+    return original.getOperator().createCall(
+        original.getFunctionQuantifier(), original.getParserPosition(), newOperands);
+  }
+
   @Nullable
   private SqlNode visitCase(SqlCase sqlCase) {
-    List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode child : sqlCase.getOperandList()) {
-      if (child == null) {
-        newOperands.add(null);
-        continue;
-      }
-      newOperands.add(child.accept(this));
+    List<SqlNode> operands = sqlCase.getOperandList();
+    SqlNode[] newOperands = new SqlNode[operands.size()];
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode child = operands.get(i);
+      newOperands[i] = child != null ? child.accept(this) : null;
     }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
-      sqlCase.setOperand(i++, operand);
-    }
-    return sqlCase;
+    return rebuild(sqlCase, newOperands);
   }
 
   @Nullable
   private SqlNode visitSelect(SqlSelect select) {
-    List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode child : select.getOperandList()) {
-      newOperands.add(child != null ? child.accept(this) : null);
-    }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
-      // Preserve hints.
+    List<SqlNode> operands = select.getOperandList();
+    SqlNode[] newOperands = new SqlNode[operands.size()];
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode child = operands.get(i);
+      // Preserve hints (their literals are structural metadata, not data).
       if (i == SQLSELECT_HINTS_OPERAND_INDEX) {
-        break;
+        newOperands[i] = child;
+        continue;
       }
-      select.setOperand(i++, operand);
+      newOperands[i] = child != null ? child.accept(this) : null;
     }
-    return select;
+    return rebuild(select, newOperands);
   }
 
   @Nullable
   private SqlNode visitJoin(SqlJoin join) {
-    List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode child : join.getOperandList()) {
-      newOperands.add(child != null ? child.accept(this) : null);
-    }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
+    List<SqlNode> operands = join.getOperandList();
+    SqlNode[] newOperands = new SqlNode[operands.size()];
+    for (int i = 0; i < operands.size(); i++) {
+      SqlNode child = operands.get(i);
       // Preserve join metadata literals:
-      // natural (true/false), joinType (INNER/LEFT/RIGHT/FULL) and conditionType (ON/USING)
+      // natural (true/false), joinType (INNER/LEFT/RIGHT/FULL) and conditionType (ON/USING).
       // These are structural keywords, not data literals.
       if (i == SQLJOIN_NATURAL_OPERAND_INDEX
             || i == SQLJOIN_JOIN_TYPE_OPERAND_INDEX
             || i == SQLJOIN_CONDITION_TYPE_OPERAND_INDEX) {
-        i++;
+        newOperands[i] = child;
         continue;
       }
-      join.setOperand(i++, operand);
+      newOperands[i] = child != null ? child.accept(this) : null;
     }
-    return join;
+    return rebuild(join, newOperands);
   }
 
   @Nullable
   private SqlNode visitWith(SqlWith with) {
     List<SqlNode> newList = new ArrayList<>();
     for (SqlNode node : with.withList.getList()) {
-      newList.add(node.accept(this));
+      newList.add(node != null ? node.accept(this) : null);
     }
     SqlNode newBody = with.body.accept(this);
-    with.setOperand(0, new SqlNodeList(newList, with.withList.getParserPosition()));
-    with.setOperand(1, newBody);
-    return with;
+    return rebuild(with, new SqlNodeList(newList, with.withList.getParserPosition()), newBody);
   }
 
   /**
-   * SqlWithItem has four fields: SqlIdentifier name, SqlNodeList
-   * columnList, SqlNode query, and SqlLiteral recursive.
-   * We will visit only the columnList and query since:
-   * - name has already been visited in the SqlWith visit method.
-   * - recursive is a literal which is a property of the WITH item and not the query itself.
+   * SqlWithItem always has four operands: name, columnList, query, recursive. We only rewrite
+   * columnList and query; name and recursive are preserved as-is.
    */
   @Nullable
   private SqlNode visitWithItem(SqlWithItem withItem) {
-    if (withItem.columnList != null) {
-      for (int i = 0; i < withItem.columnList.size(); i++) {
-        SqlNode column = withItem.columnList.get(i);
-        if (column != null) {
-          withItem.columnList.set(i, column.accept(this));
-        }
+    List<SqlNode> operands = withItem.getOperandList();
+    SqlNode[] newOperands = new SqlNode[operands.size()];
+    // operand 0: name — preserved as-is
+    newOperands[0] = operands.get(0);
+    // operand 1: columnList
+    SqlNode columnListOperand = operands.get(1);
+    if (columnListOperand instanceof SqlNodeList) {
+      SqlNodeList columnList = (SqlNodeList) columnListOperand;
+      List<SqlNode> newColumns = new ArrayList<>(columnList.size());
+      for (SqlNode column : columnList.getList()) {
+        newColumns.add(column != null ? column.accept(this) : null);
       }
+      newOperands[1] = new SqlNodeList(newColumns, columnList.getParserPosition());
+    } else {
+      newOperands[1] = columnListOperand;
     }
+    // operand 2: query
+    SqlNode queryOperand = operands.get(2);
+    newOperands[2] = queryOperand != null ? queryOperand.accept(this) : null;
+    // operand 3: recursive — preserved as-is
+    newOperands[3] = operands.get(3);
+    return rebuild(withItem, newOperands);
+  }
 
-    if (withItem.query != null) {
-      SqlNode newQuery = withItem.query.accept(this);
-      withItem.query = newQuery;
-    }
-
-    return withItem;
+  /**
+   * Window functions: only visit the aggregate function (operand 0). Skip the window specification
+   * (operand 1) due to its complex structure with ORDER BY and frame clauses. Literals in PARTITION BY,
+   * ORDER BY, and window frames are preserved rather than replaced.
+   */
+  @Nullable
+  private SqlNode visitOver(SqlCall call) {
+    List<SqlNode> operands = call.getOperandList();
+    SqlNode aggFunc = operands.get(0);
+    SqlNode newAggFunc = aggFunc != null ? aggFunc.accept(this) : null;
+    return rebuild(call, newAggFunc, operands.get(1));
   }
 
   @Nullable
@@ -300,31 +315,25 @@ public class QueryFingerprintVisitor extends SqlShuttle {
       if (allDataLiterals && valueList.size() > 0) {
         SqlDynamicParam singleParam = new SqlDynamicParam(_dynamicParamIndex++, inCall.getParserPosition());
         SqlNodeList newValueList = new SqlNodeList(List.of(singleParam), valueList.getParserPosition());
-        inCall.setOperand(0, leftOperand);
-        inCall.setOperand(1, newValueList);
-        return inCall;
+        return rebuild(inCall, leftOperand, newValueList);
       }
 
       // Otherwise, visit each value in the list normally
       List<SqlNode> newValues = new ArrayList<>();
       for (SqlNode value : valueList.getList()) {
-        newValues.add(value.accept(this));
+        newValues.add(value != null ? value.accept(this) : null);
       }
-      inCall.setOperand(0, leftOperand);
-      inCall.setOperand(1, new SqlNodeList(newValues, valueList.getParserPosition()));
-      return inCall;
+      return rebuild(inCall, leftOperand, new SqlNodeList(newValues, valueList.getParserPosition()));
     }
 
     // Fallback: for subqueries or other non-SqlNodeList cases, visit all operands normally
-    List<SqlNode> newOperands = new ArrayList<>();
-    for (SqlNode operand : operands) {
-      newOperands.add(operand.accept(this));
+    SqlNode[] newOperands = new SqlNode[operands.size()];
+    newOperands[0] = leftOperand;
+    for (int i = 1; i < operands.size(); i++) {
+      SqlNode op = operands.get(i);
+      newOperands[i] = op != null ? op.accept(this) : null;
     }
-    int i = 0;
-    for (SqlNode operand : newOperands) {
-      inCall.setOperand(i++, operand);
-    }
-    return inCall;
+    return rebuild(inCall, newOperands);
   }
 
   /**
