@@ -52,8 +52,15 @@ public class QueryLogger {
   private static final String FULLY_REDACTED = "REDACTED";
 
   public enum SqlRedactionMode {
+    // Log the full SQL query text as-is.
+    // e.g. "SELECT name FROM users WHERE id = 42 AND status = 'active'"
     NONE,
+    // Replace literal values with placeholders using the query fingerprint, preserving query structure.
+    // Requires query fingerprinting to be enabled (will be auto-enabled if not configured).
+    // e.g. "SELECT name FROM users WHERE id = ? AND status = ?"
     LITERAL_VALUES,
+    // Omit the SQL text entirely from logs, replacing it with "[REDACTED]".
+    // Use when no part of the query should appear in logs.
     FULL;
 
     public static SqlRedactionMode fromString(String value) {
