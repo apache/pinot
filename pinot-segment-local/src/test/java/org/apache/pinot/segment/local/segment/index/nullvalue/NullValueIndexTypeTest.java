@@ -35,10 +35,10 @@ public class NullValueIndexTypeTest {
         // This is the semantic table, assuming a null bitmap buffer exists in the segment
         // enableColumnBasedNullHandling | table nullable | column nullable | expected index config
         new Object[]{false, false, false, IndexConfig.DISABLED}, new Object[]{
-        false, false, true, IndexConfig.DISABLED
-    }, new Object[]{false, true, false, IndexConfig.ENABLED}, new Object[]{
-        false, true, true, IndexConfig.ENABLED
-    },
+          false, false, true, IndexConfig.DISABLED
+        }, new Object[]{false, true, false, IndexConfig.ENABLED}, new Object[]{
+          false, true, true, IndexConfig.ENABLED
+        },
 
         new Object[]{true, false, false, IndexConfig.DISABLED}, new Object[]{true, false, true, IndexConfig.ENABLED},
         new Object[]{true, true, false, IndexConfig.DISABLED}, new Object[]{true, true, true, IndexConfig.ENABLED}

@@ -27,33 +27,33 @@ public class ParserUtilsTest {
   public void testRemoveExcessiveWhiteSpace() {
 
     testRemoveExcessiveWhiteSpace(
-      "SELECT * FROM mytable " + " ".repeat(20000),
-      "SELECT * FROM mytable"
+        "SELECT * FROM mytable " + " ".repeat(20000),
+        "SELECT * FROM mytable"
     );
 
     testRemoveExcessiveWhiteSpace(
-      "SELECT * FROM " + " ".repeat(20000) + " mytable",
-      "SELECT * FROM " + " ".repeat(20000) + " mytable"
+        "SELECT * FROM " + " ".repeat(20000) + " mytable",
+        "SELECT * FROM " + " ".repeat(20000) + " mytable"
     );
 
     testRemoveExcessiveWhiteSpace(
-      "SELECT * " + " ".repeat(20000) + "FROM mytable " + " ".repeat(20000),
-      "SELECT * " + " ".repeat(20000) + "FROM mytable"
+        "SELECT * " + " ".repeat(20000) + "FROM mytable " + " ".repeat(20000),
+        "SELECT * " + " ".repeat(20000) + "FROM mytable"
     );
 
     testRemoveExcessiveWhiteSpace(
-      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000),
-      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)"
+        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000),
+        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)"
     );
 
     testRemoveExcessiveWhiteSpace(
-      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b) /* comment */" + " ".repeat(20000),
-      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b) /* comment */"
+        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b) /* comment */" + " ".repeat(20000),
+        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b) /* comment */"
     );
 
     testRemoveExcessiveWhiteSpace(
-      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000) + " /* comment */",
-      "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000) + " /* comment */"
+        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000) + " /* comment */",
+        "SELECT * FROM mytable" + " ".repeat(20000) + " options(a=b)" + " ".repeat(20000) + " /* comment */"
     );
   }
 

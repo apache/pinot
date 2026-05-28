@@ -430,28 +430,28 @@ public class QueryWorkloadManager {
     //  to improve performance when messages are targeted to specific instances.
     ClusterMessagingService messagingService = _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
     List<CompletableFuture<Boolean>> futures = instanceToRefreshMessageMap.entrySet().stream()
-      .map(entry -> CompletableFuture.supplyAsync(() -> {
-        String instance = entry.getKey();
-        QueryWorkloadRefreshMessage message = entry.getValue();
-        try {
-          Criteria criteria = new Criteria();
-          criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-          criteria.setInstanceName(instance);
-          criteria.setSessionSpecific(true);
-          int numMessagesSent = MessagingServiceUtils.send(messagingService, message, criteria);
-          if (numMessagesSent > 0) {
-            LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
-            return true;
-          } else {
-            LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+        .map(entry -> CompletableFuture.supplyAsync(() -> {
+          String instance = entry.getKey();
+          QueryWorkloadRefreshMessage message = entry.getValue();
+          try {
+            Criteria criteria = new Criteria();
+            criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+            criteria.setInstanceName(instance);
+            criteria.setSessionSpecific(true);
+            int numMessagesSent = MessagingServiceUtils.send(messagingService, message, criteria);
+            if (numMessagesSent > 0) {
+              LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
+              return true;
+            } else {
+              LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+              return false;
+            }
+          } catch (Exception e) {
+            LOGGER.error("Error sending message to instance: {}", instance, e);
             return false;
           }
-        } catch (Exception e) {
-          LOGGER.error("Error sending message to instance: {}", instance, e);
-          return false;
-        }
-      }))
-      .collect(Collectors.toList());
+        }))
+        .collect(Collectors.toList());
 
     // Collect results with overall timeout of 1 minute for all tasks
     try {
@@ -459,15 +459,15 @@ public class QueryWorkloadManager {
       allFutures.get(60, TimeUnit.SECONDS); // Overall timeout for all tasks
       // Collect individual results (all should be completed by now)
       List<Boolean> results = futures.stream()
-        .map(future -> {
-          try {
-            return future.get(); // No timeout needed since allOf already completed
-          } catch (Exception e) {
-            LOGGER.warn("Error getting result for query workload refresh message", e);
-            return false;
-          }
-        })
-        .collect(Collectors.toList());
+          .map(future -> {
+            try {
+              return future.get(); // No timeout needed since allOf already completed
+            } catch (Exception e) {
+              LOGGER.warn("Error getting result for query workload refresh message", e);
+              return false;
+            }
+          })
+          .collect(Collectors.toList());
 
       long successCount = results.stream().filter(Boolean::booleanValue).count();
       LOGGER.info("Query workload refresh completed: {}/{} successful", successCount,
@@ -475,8 +475,8 @@ public class QueryWorkloadManager {
     } catch (TimeoutException e) {
       // Count completed tasks
       long completedCount = futures.stream()
-        .mapToLong(future -> future.isDone() && !future.isCancelled() ? 1 : 0)
-        .sum();
+          .mapToLong(future -> future.isDone() && !future.isCancelled() ? 1 : 0)
+          .sum();
       LOGGER.warn("Query workload refresh partial completion: {}/{} tasks finished", completedCount,
           instanceToRefreshMessageMap.size());
     } catch (Exception e) {

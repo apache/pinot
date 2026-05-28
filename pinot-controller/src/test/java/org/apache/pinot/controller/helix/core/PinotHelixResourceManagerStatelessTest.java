@@ -1741,6 +1741,53 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     deleteSchema(rawTableName);
   }
 
+  /**
+   * Happy-path coverage for {@link PinotHelixResourceManager#multiWriteZK()}: pre-creates two
+   * segment ZK metadata znodes, atomically updates both via a single multi() transaction, then
+   * reads back through the property store and asserts the mutated fields round-tripped. Verifies
+   * the dedicated multi-write ZkClient is built correctly and the ZNRecord serialization /
+   * deserialization path matches what the rest of the controller uses.
+   */
+  @Test
+  public void testMultiWriteZkSegmentMetadataUpdates()
+      throws Exception {
+    String segName1 = "multiWriteZk_seg_1";
+    String segName2 = "multiWriteZk_seg_2";
+    SegmentZKMetadata seg1 = new SegmentZKMetadata(segName1);
+    seg1.setCrc(1L);
+    seg1.setTotalDocs(10L);
+    SegmentZKMetadata seg2 = new SegmentZKMetadata(segName2);
+    seg2.setCrc(2L);
+    seg2.setTotalDocs(20L);
+    assertTrue(ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, seg1));
+    assertTrue(ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, seg2));
+
+    // Mutate both and submit as a single atomic transaction.
+    seg1.setCrc(11L);
+    seg1.setTotalDocs(110L);
+    seg2.setCrc(22L);
+    seg2.setTotalDocs(220L);
+    String path1 = ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segName1);
+    String path2 = ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segName2);
+    _helixResourceManager.multiWriteZK()
+        .set(path1, seg1.toZNRecord())
+        .set(path2, seg2.toZNRecord())
+        .execute();
+
+    SegmentZKMetadata read1 = ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName1);
+    SegmentZKMetadata read2 = ZKMetadataProvider.getSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName2);
+    assertNotNull(read1);
+    assertNotNull(read2);
+    assertEquals(read1.getCrc(), 11L);
+    assertEquals(read1.getTotalDocs(), 110L);
+    assertEquals(read2.getCrc(), 22L);
+    assertEquals(read2.getTotalDocs(), 220L);
+
+    // Cleanup
+    assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName1));
+    assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segName2));
+  }
+
   @AfterClass
   public void tearDown() {
     stopFakeInstances();

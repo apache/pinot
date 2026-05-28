@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.PlanFragment;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
@@ -50,6 +51,20 @@ public class DispatchablePlanFragment {
 
   public DispatchablePlanFragment(PlanFragment planFragment) {
     this(planFragment, new ArrayList<>(), new HashMap<>(), new HashMap<>());
+  }
+
+  /**
+   * Returns a copy of {@code original} with its plan fragment root replaced by {@code newRoot}.
+   * Worker metadata and server-instance mapping are shallow-copied so the new fragment is
+   * independent of the original.
+   */
+  public static DispatchablePlanFragment copyWithRoot(DispatchablePlanFragment original, PlanNode newRoot) {
+    int fragmentId = original.getPlanFragment().getFragmentId();
+    return new DispatchablePlanFragment(
+        new PlanFragment(fragmentId, newRoot, List.of()),
+        new ArrayList<>(original.getWorkerMetadataList()),
+        new HashMap<>(original.getServerInstanceToWorkerIdMap()),
+        new HashMap<>(original.getCustomProperties()));
   }
 
   public DispatchablePlanFragment(PlanFragment planFragment, List<WorkerMetadata> workerMetadataList,

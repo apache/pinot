@@ -1852,9 +1852,9 @@ public class TableRebalancer {
    *         all segments that fall in that category
    */
   private static Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
-  getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher) {
+      getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(
+          Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+          Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher) {
     Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
         currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap = new HashMap<>();
 

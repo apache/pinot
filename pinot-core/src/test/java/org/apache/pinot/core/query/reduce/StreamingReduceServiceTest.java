@@ -65,13 +65,13 @@ public class StreamingReduceServiceTest {
     // supposedly we can use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // here we hope to verify deeper to make sure the thrown exception is nested inside the exception
     assertTrue(verifyException(() -> {
-          StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
+      StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
               threadPoolService,
               Map.of(routingInstance, mockedResponse),
               1000,
               mock(ExecutionStatsAggregator.class));
-          return null;
-        }, cause -> cause.getMessage().contains(exceptionMessage))
+      return null;
+    }, cause -> cause.getMessage().contains(exceptionMessage))
     );
   }
 
@@ -94,13 +94,13 @@ public class StreamingReduceServiceTest {
     //We cannot use TestNG's annotation like @Test(expectedExceptions = { IOException.class }) to verify
     // because the Exception we hope to verify is nested inside the final exception.
     assertTrue(verifyException(() -> {
-          StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
+      StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
               threadPoolService,
               Map.of(routingInstance, mockedResponse),
               10,
               mock(ExecutionStatsAggregator.class));
-          return null;
-        },
+      return null;
+    },
         (cause) -> cause instanceof TimeoutException));
   }
 

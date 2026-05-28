@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +34,10 @@ import static org.testng.Assert.assertNull;
 
 
 /// Tests [ThriftRecordExtractor] — see its class Javadoc for the thrift source type → Java output type
-/// matrix. Out of scope: thrift `i8` / `binary` are not declared in `complex_types.thrift`; they follow the
-/// same `convert` contract — mirror the pattern below if added.
+/// matrix. Out of scope: thrift `i8` is not declared in `complex_types.thrift`; it follows the same
+/// `convert` contract — mirror the pattern below if added. Thrift `binary` is exercised against the
+/// extractor's static helper [ThriftRecordExtractor#convertSingleValue] (the test schemas have no `binary`
+/// field, so end-to-end coverage isn't possible).
 public class ThriftRecordExtractorTest {
 
   // === Single value — order follows the type list in the class Javadoc ===
@@ -95,12 +98,30 @@ public class ThriftRecordExtractorTest {
 
   @Test
   public void testEnumExtractedAsString() {
-    // BaseRecordExtractor.convertSingleValue falls back to toString() for unknown types; TestEnum.toString()
+    // The extractor's single-value path falls back to toString() for unknown types; TestEnum.toString()
     // returns the enum constant name.
     ComplexTypes record = baseRecord();
     record.setEnumField(TestEnum.GAMMA);
     Object result = extract(record, "enumField");
     assertEquals(result, "GAMMA");
+  }
+
+  @Test
+  public void testBinaryByteBufferExtractedAsByteArray() {
+    // Thrift surfaces `binary` as `ByteBuffer`; the extractor materializes to `byte[]`.
+    Object result = ThriftRecordExtractor.convertSingleValue(ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    assertEquals((byte[]) result, new byte[]{1, 2, 3});
+  }
+
+  @Test
+  public void testBinaryByteBufferSliceDoesNotMutateOriginal() {
+    // The extractor must read only the remaining bytes and leave the source buffer's position untouched
+    // (the underlying buffer is owned by the reader and may be reused).
+    ByteBuffer buf = ByteBuffer.wrap(new byte[]{0, 1, 2, 3, 4});
+    buf.position(2);
+    Object result = ThriftRecordExtractor.convertSingleValue(buf);
+    assertEquals((byte[]) result, new byte[]{2, 3, 4});
+    assertEquals(buf.position(), 2);
   }
 
   @Test

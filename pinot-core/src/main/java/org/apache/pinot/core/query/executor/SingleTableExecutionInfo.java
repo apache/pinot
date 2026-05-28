@@ -75,10 +75,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
     if (!tableDataManager.isUpsertEnabled()) {
       segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
-      indexSegments = new ArrayList<>(segmentDataManagers.size());
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        indexSegments.add(segmentDataManager.getSegment());
-      }
+      indexSegments = collectIndexSegments(segmentDataManagers);
     } else {
       TableUpsertMetadataManager tumm = tableDataManager.getTableUpsertMetadataManager();
       Preconditions.checkState(tumm != null,
@@ -101,14 +98,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
           }
         }
         segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
-        indexSegments = new ArrayList<>(segmentDataManagers.size());
-        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          if (segmentDataManager.hasMultiSegments()) {
-            indexSegments.addAll(segmentDataManager.getSegments());
-          } else {
-            indexSegments.add(segmentDataManager.getSegment());
-          }
-        }
+        indexSegments = collectIndexSegments(segmentDataManagers);
         if (isUsingConsistencyMode) {
           List<SegmentContext> segmentContexts =
               tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
@@ -126,6 +116,20 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
 
     return new SingleTableExecutionInfo(tableDataManager, segmentDataManagers, indexSegments, providedSegmentContexts,
         segmentsToQuery, optionalSegments, notAcquiredSegments);
+  }
+
+  // A SegmentDataManager may expose more than one IndexSegment (e.g. DuoSegmentDataManager during a commit window,
+  // where both the committed immutable and the still-mutable consuming segment must be queried together).
+  private static List<IndexSegment> collectIndexSegments(List<SegmentDataManager> segmentDataManagers) {
+    List<IndexSegment> indexSegments = new ArrayList<>(segmentDataManagers.size());
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      if (segmentDataManager.hasMultiSegments()) {
+        indexSegments.addAll(segmentDataManager.getSegments());
+      } else {
+        indexSegments.add(segmentDataManager.getSegment());
+      }
+    }
+    return indexSegments;
   }
 
   private SingleTableExecutionInfo(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,

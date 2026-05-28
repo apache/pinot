@@ -36,6 +36,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
 
   public static final BrokerMeter UNCAUGHT_GET_EXCEPTIONS = create("UNCAUGHT_GET_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter UNCAUGHT_POST_EXCEPTIONS = create("UNCAUGHT_POST_EXCEPTIONS", "exceptions", true);
+  public static final BrokerMeter BAD_REQUEST_EXCEPTIONS = create("BAD_REQUEST_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter WEB_APPLICATION_EXCEPTIONS = create("WEB_APPLICATION_EXCEPTIONS", "exceptions", true);
   public static final BrokerMeter HEALTHCHECK_BAD_CALLS = create("HEALTHCHECK_BAD_CALLS", "healthcheck", true);
   public static final BrokerMeter HEALTHCHECK_OK_CALLS = create("HEALTHCHECK_OK_CALLS", "healthcheck", true);
@@ -118,6 +119,10 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "QUERY_VALIDATION_EXCEPTIONS", "exceptions", false);
   // Query validation phase.
   public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
+  /// Materialized-view rewrite path: strategy bug or contract violation triggered the
+  /// defense-in-depth fallback to the base-table query path.  Non-zero values indicate a
+  /// strategy regression that must be investigated; the query itself still succeeded.
+  public static final BrokerMeter QUERY_REWRITE_EXCEPTIONS = create("QUERY_REWRITE_EXCEPTIONS", "exceptions", false);
   // Queries preempted by accountant
   public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
   public static final BrokerMeter QUERIES_THROTTLED = create("QUERIES_THROTTLED", "query", true);

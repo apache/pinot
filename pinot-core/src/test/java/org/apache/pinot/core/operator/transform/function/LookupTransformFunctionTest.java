@@ -168,12 +168,12 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
   @Test
   public void resultDataTypeTest() {
     HashMap<String, DataType> testCases = new HashMap<>() {{
-      put("teamName", DataType.STRING);
-      put("teamInteger", DataType.INT);
-      put("teamFloat", DataType.FLOAT);
-      put("teamLong", DataType.LONG);
-      put("teamDouble", DataType.DOUBLE);
-    }};
+        put("teamName", DataType.STRING);
+        put("teamInteger", DataType.INT);
+        put("teamFloat", DataType.FLOAT);
+        put("teamLong", DataType.LONG);
+        put("teamDouble", DataType.DOUBLE);
+      }};
 
     for (Map.Entry<String, DataType> testCase : testCases.entrySet()) {
       ExpressionContext expression = RequestContextUtils.getExpression(
@@ -295,7 +295,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedIntegerMVValues[i] = new int[]{
           (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (new PrimaryKey(
-          new Object[]{_stringSVValues[i]})).hashCode(),
+              new Object[]{_stringSVValues[i]})).hashCode(),
       };
     }
     testTransformFunctionMV(transformFunction, expectedIntegerMVValues);
@@ -309,7 +309,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedFloatMVValues[i] = new float[]{
           (float) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (float) (new PrimaryKey(
-          new Object[]{_stringSVValues[i]})).hashCode(),
+              new Object[]{_stringSVValues[i]})).hashCode(),
       };
     }
     testTransformFunctionMV(transformFunction, expectedFloatMVValues);
@@ -323,7 +323,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedLongMVValues[i] = new long[]{
           (long) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (long) (new PrimaryKey(
-          new Object[]{_stringSVValues[i]})).hashCode(),
+              new Object[]{_stringSVValues[i]})).hashCode(),
       };
     }
     testTransformFunctionMV(transformFunction, expectedLongMVValues);
@@ -337,7 +337,7 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedDoubleMVValues[i] = new double[]{
           (double) (new PrimaryKey(new Object[]{_stringSVValues[i]})).hashCode(), (double) (new PrimaryKey(
-          new Object[]{_stringSVValues[i]})).hashCode(),
+              new Object[]{_stringSVValues[i]})).hashCode(),
       };
     }
     testTransformFunctionMV(transformFunction, expectedDoubleMVValues);
@@ -347,13 +347,13 @@ public class LookupTransformFunctionTest extends BaseTransformFunctionTest {
   public void primaryKeyTypeTest() {
     // preparing simple tables for testing different primary key types (INT, STRING, LONG)
     Map<String, DataType> testTables = new HashMap<>() {{
-      put("dimTableWithIntPK_OFFLINE", DataType.INT);
-      put("dimTableWithStringPK_OFFLINE", DataType.STRING);
-      put("dimTableWithLongPK_OFFLINE", DataType.LONG);
-      put("dimTableWithFloatPK_OFFLINE", DataType.FLOAT);
-      put("dimTableWithDoublePK_OFFLINE", DataType.DOUBLE);
-      put("dimTableWithBytesPK_OFFLINE", DataType.BYTES);
-    }};
+        put("dimTableWithIntPK_OFFLINE", DataType.INT);
+        put("dimTableWithStringPK_OFFLINE", DataType.STRING);
+        put("dimTableWithLongPK_OFFLINE", DataType.LONG);
+        put("dimTableWithFloatPK_OFFLINE", DataType.FLOAT);
+        put("dimTableWithDoublePK_OFFLINE", DataType.DOUBLE);
+        put("dimTableWithBytesPK_OFFLINE", DataType.BYTES);
+      }};
     for (Map.Entry<String, DataType> table : testTables.entrySet()) {
       DimensionTableDataManager mgr = mock(DimensionTableDataManager.class);
       DimensionTableDataManager.registerDimensionTable(table.getKey(), mgr);

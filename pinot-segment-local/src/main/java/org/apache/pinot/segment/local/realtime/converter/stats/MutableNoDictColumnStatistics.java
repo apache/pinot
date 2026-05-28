@@ -37,7 +37,6 @@ import org.apache.pinot.spi.utils.ByteArray;
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
 
-@SuppressWarnings("rawtypes")
 public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStatsProvider {
   protected final DataSourceMetadata _dataSourceMetadata;
   protected final FieldSpec _fieldSpec;
@@ -64,13 +63,18 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
   }
 
   @Override
-  public Comparable getMinValue() {
-    return _dataSourceMetadata.getMinValue();
+  public int getTotalDocs() {
+    return _dataSourceMetadata.getNumDocs();
   }
 
   @Override
-  public Comparable getMaxValue() {
-    return _dataSourceMetadata.getMaxValue();
+  public Comparable<?> getMinValue() {
+    return (Comparable<?>) _dataSourceMetadata.getMinValue();
+  }
+
+  @Override
+  public Comparable<?> getMaxValue() {
+    return (Comparable<?>) _dataSourceMetadata.getMaxValue();
   }
 
   @Nullable
@@ -114,9 +118,9 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
     int numDocs = _dataSourceMetadata.getNumDocs();
 
     // Verify that values are non-decreasing when iterated in the given order
-    DataType valueType = getValueType();
+    DataType storedType = getStoredType();
     if (_sortedDocIds != null) {
-      switch (valueType) {
+      switch (storedType) {
         case INT: {
           int prev = _forwardIndex.getInt(_sortedDocIds[0]);
           for (int i = 1; i < numDocs; i++) {
@@ -195,10 +199,10 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
           return true;
         }
         default:
-          throw new IllegalStateException("Unsupported value type: " + valueType);
+          throw new IllegalStateException("Unsupported stored type: " + storedType);
       }
     } else {
-      switch (valueType) {
+      switch (storedType) {
         case INT: {
           int prev = _forwardIndex.getInt(0);
           for (int i = 1; i < numDocs; i++) {
@@ -277,7 +281,7 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
           return true;
         }
         default:
-          throw new IllegalStateException("Unsupported value type: " + valueType);
+          throw new IllegalStateException("Unsupported stored type: " + storedType);
       }
     }
   }

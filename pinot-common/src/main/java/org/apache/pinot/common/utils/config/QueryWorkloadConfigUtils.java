@@ -217,12 +217,12 @@ public class QueryWorkloadConfigUtils {
         } else {
           long enforcementCpu = enforcementProfile.getCpuCostNs();
           long enforcementMem = enforcementProfile.getMemoryCostBytes();
-           if (enforcementCpu <= 0) {
-             errors.add(prefix + ".enforcementProfile.cpuCostNs has to positive");
-           }
-           if (enforcementMem <= 0) {
-             errors.add(prefix + ".enforcementProfile.memoryCostBytes has to positive");
-           }
+          if (enforcementCpu <= 0) {
+            errors.add(prefix + ".enforcementProfile.cpuCostNs has to positive");
+          }
+          if (enforcementMem <= 0) {
+            errors.add(prefix + ".enforcementProfile.memoryCostBytes has to positive");
+          }
           // Validate PropagationScheme
           PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
           if (propagationScheme == null) {

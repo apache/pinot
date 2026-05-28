@@ -413,7 +413,7 @@ public class QueryLogger {
     POOLS("pools") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-          builder.append(params._response.getPools());
+        builder.append(params._response.getPools());
       }
     },
     RLS_FILTERS_APPLIED("rlsFiltersApplied") {

@@ -310,7 +310,7 @@ public class WindowAggregateOperatorTest {
     // Then:
     verifyResultRows(resultRows, keys,
         Map.of(1, List.of(new Object[]{1, "foo", 1L, 1L}, new Object[]{1, "foo", 1L, 1L}, new Object[]{
-                1, "numb", 3L, 2L
+          1, "numb", 3L, 2L
             }), 2, List.of(new Object[]{2, "bar", 1L, 1L}, new Object[]{2, "foo", 2L, 2L}, new Object[]{
                 2, "foo", 2L, 2L
             }, new Object[]{2, "the", 4L, 3L}), 3,

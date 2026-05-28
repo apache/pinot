@@ -733,21 +733,21 @@ public class ObjectSerDeUtils {
 
   public static final ObjectSerDe<PinotFourthMoment> PINOT_FOURTH_MOMENT_OBJECT_SER_DE
       = new ObjectSerDe<PinotFourthMoment>() {
-    @Override
+        @Override
     public byte[] serialize(PinotFourthMoment value) {
-      return value.serialize();
-    }
+          return value.serialize();
+        }
 
-    @Override
+        @Override
     public PinotFourthMoment deserialize(byte[] bytes) {
-      return PinotFourthMoment.fromBytes(bytes);
-    }
+          return PinotFourthMoment.fromBytes(bytes);
+        }
 
-    @Override
+        @Override
     public PinotFourthMoment deserialize(ByteBuffer byteBuffer) {
-      return PinotFourthMoment.fromBytes(byteBuffer);
-    }
-  };
+          return PinotFourthMoment.fromBytes(byteBuffer);
+        }
+      };
 
   public static final ObjectSerDe<HyperLogLog> HYPER_LOG_LOG_SER_DE = new ObjectSerDe<HyperLogLog>() {
 

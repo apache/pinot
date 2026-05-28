@@ -400,6 +400,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
         SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
       }
+      SegmentValidationUtils.validateUpsertSegmentPartitionMetadata(segmentMetadata, tableConfig);
       long untarredSegmentSizeInBytes;
       if (uploadType == FileUploadType.METADATA && segmentSizeInBytes > 0) {
         // TODO: Include the untarred segment size when using the METADATA push rest API. Currently we can only use the
@@ -655,6 +656,7 @@ public class PinotSegmentUploadDownloadRestletResource {
         if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
           SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
         }
+        SegmentValidationUtils.validateUpsertSegmentPartitionMetadata(segmentMetadata, tableConfig);
         // TODO: Include the un-tarred segment size when using the METADATA push rest API. Currently we can only use the
         //  tarred segment size as an approximation.
         long segmentSizeInBytes = getSegmentSizeFromFile(sourceDownloadURIStr);

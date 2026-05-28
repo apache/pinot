@@ -48,6 +48,10 @@
           <localRepositoryPath>${project.build.directory}/it-repo</localRepositoryPath>
           <extraArtifacts>
             <artifact>org.apache.pinot:pinot-spi:${project.version}:jar</artifact>
+            <!-- pinot-bom is imported by the root pom's dependencyManagement;
+                 it must be present in the isolated IT repo so that Maven can
+                 resolve pinot-spi's parent chain during the simple-assembly build. -->
+            <artifact>org.apache.pinot:pinot-bom:${project.version}:pom</artifact>
           </extraArtifacts>
           <projectsDirectory>src/it/projects</projectsDirectory>
           <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>

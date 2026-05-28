@@ -303,7 +303,8 @@ public class RangePredicateEvaluatorFactory {
       if (_dictIdSetBased) {
         return _matchingDictIdSet.contains(dictId);
       } else {
-        switch (_dictionary.getValueType()) {
+        DataType storedType = _dictionary.getValueType();
+        switch (storedType) {
           case INT:
             return _rawValueBasedEvaluator.applySV(_dictionary.getIntValue(dictId));
           case LONG:
@@ -319,7 +320,7 @@ public class RangePredicateEvaluatorFactory {
           case BYTES:
             return _rawValueBasedEvaluator.applySV(_dictionary.getBytesValue(dictId));
           default:
-            throw new IllegalStateException("Unsupported value type: " + _dictionary.getValueType());
+            throw new IllegalStateException("Unsupported stored type: " + storedType);
         }
       }
     }
