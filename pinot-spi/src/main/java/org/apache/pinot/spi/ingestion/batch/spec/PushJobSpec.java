@@ -79,6 +79,12 @@ public class PushJobSpec implements Serializable {
    */
   private boolean _preferMetadataTarGz = true;
 
+  /**
+   * Socket timeout in milliseconds for batch segment metadata upload (batchSegmentUpload=true)
+   * Defaults to 600000 ms (10 minutes), matching HttpClient.DEFAULT_SOCKET_TIMEOUT_MS
+   */
+  private long _segmentUploadTimeoutMs = 600 * 1000L;
+
   public boolean isPreferMetadataTarGz() {
     return _preferMetadataTarGz;
   }
@@ -176,5 +182,13 @@ public class PushJobSpec implements Serializable {
 
   public void setSegmentMetadataGenerationParallelism(int segmentMetadataGenerationParallelism) {
     _segmentMetadataGenerationParallelism = segmentMetadataGenerationParallelism;
+  }
+
+  public long getSegmentUploadTimeoutMs() {
+    return _segmentUploadTimeoutMs;
+  }
+
+  public void setSegmentUploadTimeoutMs(long segmentUploadTimeoutMs) {
+    _segmentUploadTimeoutMs = segmentUploadTimeoutMs;
   }
 }
