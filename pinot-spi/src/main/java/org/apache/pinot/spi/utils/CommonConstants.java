@@ -2526,13 +2526,12 @@ public class CommonConstants {
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
 
-    /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
-    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
-    /// they are not included by default but can be included by setting this flag to false (upper or lower case).
-    ///
-    /// It is expected that in 1.6.0 and later, MSE pipeline breaker stats will be included by default.
+    /// Used to indicate whether MSE pipeline breaker stats should be included in the stageStats field.
+    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. In 1.5.0 they were
+    /// not included by default but could be included by setting this flag to false (upper or lower case). Starting
+    /// from 1.6.0, they are included by default and can be excluded by setting this flag to true (upper or lower case).
     public static final String KEY_OF_SKIP_PIPELINE_BREAKER_STATS = "pinot.query.mse.skip.pipeline.breaker.stats";
-    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = true;
+    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = false;
 
     /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
     ///
