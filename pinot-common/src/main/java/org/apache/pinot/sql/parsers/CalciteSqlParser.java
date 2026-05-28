@@ -46,6 +46,7 @@ import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.SqlSetOption;
+import org.apache.calcite.sql.SqlWindow;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
@@ -803,8 +804,14 @@ public class CalciteSqlParser {
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
-        } else {
+        } else if (node instanceof SqlWindow) {
+          // Window definitions appear as operands of OVER calls. PinotQuery does not model window frames directly, but
+          // compiling them as literals keeps parsing/table-name extraction from failing on multi-stage window queries.
+          return RequestUtils.getLiteralExpression(node.toString());
+        } else if (node instanceof SqlBasicCall) {
           return compileFunctionExpression((SqlBasicCall) node);
+        } else {
+          throw new SqlCompilationException("Unsupported sql node - " + node);
         }
     }
   }
