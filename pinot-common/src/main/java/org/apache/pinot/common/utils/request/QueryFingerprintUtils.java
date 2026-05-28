@@ -21,10 +21,8 @@ package org.apache.pinot.common.utils.request;
 import com.google.common.hash.Hashing;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nullable;
-import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.dialect.AnsiSqlDialect;
-import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -47,9 +45,8 @@ public class QueryFingerprintUtils {
       return null;
     }
 
-    SqlNode clonedNode = sqlNode.accept(new DeepCopyShuttle());
     QueryFingerprintVisitor visitor = new QueryFingerprintVisitor();
-    SqlNode queryFingerprintNode = clonedNode.accept(visitor);
+    SqlNode queryFingerprintNode = sqlNode.accept(visitor);
 
     if (queryFingerprintNode == null) {
       return null;
@@ -73,12 +70,4 @@ public class QueryFingerprintUtils {
         .toString();
   }
 
-  private static class DeepCopyShuttle extends SqlShuttle {
-    @Override
-    public @Nullable SqlNode visit(SqlCall call) {
-      CallCopyingArgHandler argHandler = new CallCopyingArgHandler(call, true);
-      call.getOperator().acceptCall(this, call, false, argHandler);
-      return argHandler.result();
-    }
-  }
 }
