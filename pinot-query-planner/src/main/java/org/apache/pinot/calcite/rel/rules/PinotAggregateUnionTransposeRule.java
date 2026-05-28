@@ -48,23 +48,20 @@ import org.apache.calcite.util.mapping.MappingType;
 import org.apache.calcite.util.mapping.Mappings;
 
 
-/**
- * Pinot variant of Calcite's {@code AggregateUnionTransposeRule} that pushes an {@link Aggregate} past a non-distinct
- * {@link Union}.
- *
- * <p>Calcite's rule decides which aggregate functions are splittable by looking up the function's <i>class</i> in a
- * small allow-list. Pinot ships its own subclasses of {@link SqlAggFunction} (e.g. {@code PinotSumFunction},
- * {@code PinotMinMaxFunction}) that do not extend Calcite's {@code SqlSumAggFunction} or {@code SqlMinMaxAggFunction},
- * so the upstream rule never fires on Pinot's standard SUM/MIN/MAX. This variant matches on {@link SqlKind} instead so
- * the rule also fires for Pinot's custom aggregate functions that share the same semantics.
- *
- * <p>Must run in the logical-planning phase (alongside {@code AggregateUnionAggregateRule}) before
- * {@code LogicalAggregate} is rewritten to {@code PinotLogicalAggregate}; the operand pattern is fixed to
- * {@link LogicalAggregate} / {@link LogicalUnion}. The emitted plain {@link Aggregate} nodes are subsequently split
- * into LEAF / FINAL pairs by {@code PinotAggregateExchangeNodeInsertRule}.
- *
- * <p>This class is stateless and is safe to share across planners.
- */
+/// Pinot variant of Calcite's `AggregateUnionTransposeRule` that pushes an [Aggregate] past a non-distinct [Union].
+///
+/// Calcite's rule decides which aggregate functions are splittable by looking up the function's _class_ in a small
+/// allow-list. Pinot ships its own subclasses of [SqlAggFunction] (e.g. `PinotSumFunction`, `PinotMinMaxFunction`)
+/// that do not extend Calcite's `SqlSumAggFunction` or `SqlMinMaxAggFunction`, so the upstream rule never fires on
+/// Pinot's standard SUM/MIN/MAX. This variant matches on [SqlKind] instead so the rule also fires for Pinot's custom
+/// aggregate functions that share the same semantics.
+///
+/// Must run in the logical-planning phase (alongside `AggregateUnionAggregateRule`) before `LogicalAggregate` is
+/// rewritten to `PinotLogicalAggregate`; the operand pattern is fixed to [LogicalAggregate] / [LogicalUnion]. The
+/// emitted plain [Aggregate] nodes are subsequently split into LEAF / FINAL pairs by
+/// `PinotAggregateExchangeNodeInsertRule`.
+///
+/// This class is stateless and is safe to share across planners.
 public final class PinotAggregateUnionTransposeRule extends RelOptRule implements TransformationRule {
 
   private static final EnumSet<SqlKind> SUPPORTED_KINDS = EnumSet.of(
@@ -162,10 +159,8 @@ public final class PinotAggregateUnionTransposeRule extends RelOptRule implement
         LogicalAggregate.create(relBuilder.build(), hints, topGroupSet, topGroupSets, transformedAggCalls));
   }
 
-  /**
-   * Builds the rolled-up aggregate calls for the top aggregate, with arg indexes shifted into the new union output and
-   * COUNT replaced by SUM0 (counts roll up by summation). Returns {@code null} if any call is not splittable.
-   */
+  /// Builds the rolled-up aggregate calls for the top aggregate, with arg indexes shifted into the new union output
+  /// and COUNT replaced by SUM0 (counts roll up by summation). Returns `null` if any call is not splittable.
   private static @Nullable List<AggregateCall> transformAggCalls(Aggregate aggRel, int groupCount) {
     List<AggregateCall> origCalls = aggRel.getAggCallList();
     List<AggregateCall> newCalls = new ArrayList<>(origCalls.size());
