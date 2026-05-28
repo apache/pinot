@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -240,6 +241,19 @@ public class DataBlockCache implements AutoCloseable {
       _dataFetcher.fetchBytesValues(column, _docIds, _length, bytesValues);
     }
     return bytesValues;
+  }
+
+  /**
+   * Get BYTES values for the given single-valued column as {@link ByteBuffer} views (zero-copy when
+   * the underlying reader supports it). Not cached: the {@code DataType}-keyed value map already
+   * holds the {@code byte[][]} under the BYTES key, and the per-call outer-array allocation is
+   * negligible against the per-row payload copies the view path saves (same rationale as the
+   * murmur-hash accessors below).
+   */
+  public ByteBuffer[] getBytesValueViewsForSVColumn(String column) {
+    ByteBuffer[] views = new ByteBuffer[_length];
+    _dataFetcher.fetchBytesValueViews(column, _docIds, _length, views);
+    return views;
   }
 
   public int[] get32BitsMurmur3HashValuesForSVColumn(String column) {

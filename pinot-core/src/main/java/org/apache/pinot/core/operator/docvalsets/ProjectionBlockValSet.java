@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.docvalsets;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
@@ -179,6 +180,20 @@ public class ProjectionBlockValSet implements BlockValSet {
       recordReadValues(scope, DataType.BYTES, true);
       return _dataBlockCache.getBytesValuesForSVColumn(_column);
     }
+  }
+
+  @Override
+  public ByteBuffer[] getBytesValueViewsSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BYTES, true);
+      return _dataBlockCache.getBytesValueViewsForSVColumn(_column);
+    }
+  }
+
+  @Override
+  public boolean isBytesViewStableAcrossReads() {
+    ForwardIndexReader<?> forwardIndex = _dataSource.getForwardIndex();
+    return forwardIndex != null && forwardIndex.isBufferViewStableAcrossReads();
   }
 
   @Override

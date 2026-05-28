@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -136,6 +137,13 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     } else {
       return getBytesViewUncompressed(docId);
     }
+  }
+
+  @Override
+  public boolean isBufferViewStableAcrossReads() {
+    // PASS_THROUGH views slice the underlying mmap'd buffer (fresh slice per call, never reused);
+    // compressed views slice the per-context decompression scratch buffer (overwritten on next read).
+    return getCompressionType() == ChunkCompressionType.PASS_THROUGH;
   }
 
   @Override

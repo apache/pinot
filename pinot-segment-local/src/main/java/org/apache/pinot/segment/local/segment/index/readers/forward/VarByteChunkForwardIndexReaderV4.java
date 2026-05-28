@@ -140,6 +140,13 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public boolean isBufferViewStableAcrossReads() {
+    // PASS_THROUGH views slice the mmap'd chunk buffer (fresh per call); compressed views slice the
+    // per-context decompression scratch buffer, which is overwritten on the next chunk decode.
+    return getCompressionType() == ChunkCompressionType.PASS_THROUGH;
+  }
+
+  @Override
   public Map<String, Object> getMap(int docId, ReaderContext context) {
     return MapUtils.deserializeMap(context.getValue(docId));
   }

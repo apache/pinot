@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -132,6 +133,37 @@ public interface BlockValSet {
    * @return Array of byte[] values
    */
   byte[][] getBytesValuesSV();
+
+  /**
+   * Returns the BYTES values for a single-valued column as {@link ByteBuffer} views, avoiding the
+   * per-row {@code byte[]} allocation of {@link #getBytesValuesSV()}.
+   *
+   * <p><b>Stability:</b> the returned buffers are safe to hold across the block ONLY when
+   * {@link #isBytesViewStableAcrossReads()} returns {@code true}. The default implementation wraps
+   * the {@code byte[][]} from {@link #getBytesValuesSV()} (always stable), so it is safe but
+   * provides no allocation win. Implementations backed by a forward index override this to return
+   * zero-copy views when the underlying reader's views are stable.
+   *
+   * @return Array of {@link ByteBuffer} views, one per row
+   */
+  default ByteBuffer[] getBytesValueViewsSV() {
+    byte[][] values = getBytesValuesSV();
+    ByteBuffer[] views = new ByteBuffer[values.length];
+    for (int i = 0; i < values.length; i++) {
+      views[i] = ByteBuffer.wrap(values[i]);
+    }
+    return views;
+  }
+
+  /**
+   * Returns {@code true} if the buffers from {@link #getBytesValueViewsSV()} remain valid across the
+   * whole block (i.e. a batched caller may materialize them into an array and consume them later).
+   * Defaults to {@code false}; forward-index-backed implementations answer from the underlying
+   * reader's {@code isBufferViewStableAcrossReads()}.
+   */
+  default boolean isBytesViewStableAcrossReads() {
+    return false;
+  }
 
   default int[] get32BitsMurmur3HashValuesSV() {
     throw new UnsupportedOperationException();

@@ -532,6 +532,25 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   }
 
   /**
+   * Returns {@code true} if the {@link ByteBuffer} returned by {@link #getBytesView} remains valid
+   * after subsequent reads on the same context — i.e. it is safe for a batched caller to materialize
+   * a block of views into an array and consume them later.
+   *
+   * <p>This holds for readers whose views point at storage that is not reused between reads (e.g. an
+   * uncompressed, memory-mapped forward index, where each call returns a fresh slice of the mapped
+   * buffer). It does NOT hold for readers that decode into a per-context scratch buffer (e.g. a
+   * compressed chunk reader), where the next read overwrites the previous view.
+   *
+   * <p>Default is {@code false} (conservative): the default {@link #getBytesView} wraps a fresh
+   * {@code byte[]} which is itself stable, but unknown implementations are assumed unsafe to batch.
+   * Callers that hold views across a block read MUST gate on this flag and fall back to
+   * {@link #getBytes} when it returns {@code false}.
+   */
+  default boolean isBufferViewStableAcrossReads() {
+    return false;
+  }
+
+  /**
    * Reads the MAP type single-value at the given document id.
    *
    * @param docId Document id
