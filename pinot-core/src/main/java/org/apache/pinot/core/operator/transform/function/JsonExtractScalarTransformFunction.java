@@ -40,6 +40,7 @@ import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
@@ -54,9 +55,11 @@ import org.roaringbitmap.RoaringBitmap;
 /// - `jsonField` — single-value `STRING` or `BYTES` column / transform expression containing JSON.
 /// - `jsonPath` — JsonPath expression used to read the value.
 /// - `resultsType` — Pinot data type for the output. Append `_ARRAY` for multi-value results.
-/// - `defaultValue` (optional) — used when the path resolves to `null` or fails. Without it, unresolved
-///   SV rows throw `IllegalArgumentException`; MV rows surface as empty arrays, but null elements within
-///   a resolved array still throw.
+/// - `defaultValue` (optional) — used when the path resolves to `null` or fails. Without it, the
+///   behavior depends on query-level null handling: when enabled, unresolved SV rows surface as SQL
+///   `NULL` (typed zero/empty sentinel + a bit in [#getNullBitmap]); when disabled, unresolved SV
+///   rows throw `IllegalArgumentException`. MV rows always surface as empty arrays when the path
+///   doesn't resolve; null elements within a resolved array still throw if no default is set.
 ///
 /// **Supported `resultsType`:** `INT`, `LONG`, `FLOAT`, `DOUBLE`, `BIG_DECIMAL`, `BOOLEAN`, `TIMESTAMP`,
 /// `STRING`, `JSON`, `BYTES`, plus `_ARRAY` variants of `INT` / `LONG` / `FLOAT` / `DOUBLE` /
@@ -186,7 +189,14 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
   @Override
   @Nullable
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    if (!_defaultIsNull) {
+    // Short-circuit to argument-bitmap propagation when this function isn't introducing nulls of
+    // its own. Two cases qualify:
+    //  - null handling is disabled (the SV transform either fills a default or throws), or
+    //  - a real (non-SQL-NULL) default was supplied (the SV transform writes the default for
+    //    unresolved rows).
+    // The 4-arg SQL-NULL case has _defaultIsNull=true and falls through to the per-row scan
+    // below, so unresolved rows surface as SQL NULL via the bitmap.
+    if (!_nullHandlingEnabled || (_defaultValue != null && !_defaultIsNull)) {
       return super.getNullBitmap(valueBlock);
     }
     RoaringBitmap bitmap = new RoaringBitmap();
@@ -239,6 +249,12 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _intValuesSV[i] = defaultValue;
           continue;
         }
+        if (_nullHandlingEnabled) {
+          // Write the null placeholder so stale data from a reused buffer can't surface.
+          // getNullBitmap marks the row null; consumers should read the bitmap, not this value.
+          _intValuesSV[i] = NullValuePlaceHolder.INT;
+          continue;
+        }
         throw new IllegalArgumentException(
             "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
@@ -266,6 +282,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result == null) {
         if (_defaultValue != null) {
           _longValuesSV[i] = defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _longValuesSV[i] = NullValuePlaceHolder.LONG;
           continue;
         }
         throw new IllegalArgumentException(
@@ -296,6 +316,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _floatValuesSV[i] = defaultValue;
           continue;
         }
+        if (_nullHandlingEnabled) {
+          _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
+          continue;
+        }
         throw new IllegalArgumentException(
             "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
@@ -322,6 +346,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result == null) {
         if (_defaultValue != null) {
           _doubleValuesSV[i] = defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
           continue;
         }
         throw new IllegalArgumentException(
@@ -352,6 +380,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           _bigDecimalValuesSV[i] = defaultValue;
           continue;
         }
+        if (_nullHandlingEnabled) {
+          _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
+          continue;
+        }
         throw new IllegalArgumentException(
             "Cannot resolve JSON path on some records. Consider setting a default value.");
       }
@@ -378,6 +410,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result == null) {
         if (_defaultValue != null) {
           _stringValuesSV[i] = defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _stringValuesSV[i] = NullValuePlaceHolder.STRING;
           continue;
         }
         throw new IllegalArgumentException(

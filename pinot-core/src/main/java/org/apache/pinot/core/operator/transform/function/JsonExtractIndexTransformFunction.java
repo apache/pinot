@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
@@ -32,6 +33,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -41,6 +43,12 @@ import org.roaringbitmap.RoaringBitmap;
  * implementation changed to read values from the JSON index. For large JSON blobs this can be faster than parsing
  * GBs of JSON at query time. For small JSON blobs/highly filtered input this is generally slower than the *scalar
  * implementation. The inflection point is highly dependent on the number of docs remaining post filter.
+ *
+ * <p><b>Null handling:</b> when query-level null handling is enabled (e.g. {@code SET enableNullHandling = true})
+ * and no default literal is supplied, an unresolved JSON path on a row surfaces as SQL {@code NULL} via the
+ * {@link #getNullBitmap(ValueBlock)} bitmap rather than throwing. With null handling disabled, the legacy throw
+ * is preserved. A user-supplied non-null default literal takes precedence and is written for unresolved rows
+ * regardless of null-handling state.
  */
 public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractIndex";
@@ -54,14 +62,22 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private boolean _isSingleValue;
   private String _filterJsonPath;
 
+  // Cache for the per-ValueBlock SV scan result. Both the SV transforms and getNullBitmap need
+  // the same `String[]` for the same ValueBlock; without caching, we'd hit the JSON index twice
+  // per block on the null-handling path. Identity comparison is safe — the server constructs a
+  // fresh ValueBlock per batch and never mutates a previously returned one.
+  private ValueBlock _cachedValueBlock;
+  private String[] _cachedValuesSV;
+
   @Override
   public String getName() {
     return FUNCTION_NAME;
   }
 
   @Override
-  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    super.init(arguments, columnContextMap);
+  public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap,
+      boolean nullHandlingEnabled) {
+    super.init(arguments, columnContextMap, nullHandlingEnabled);
     // Check that there are exactly 3 or 4 or 5 arguments
     if (arguments.size() < 3 || arguments.size() > 5) {
       throw new IllegalArgumentException(
@@ -118,22 +134,27 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       if (!(fourthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("Default value must be a literal");
       }
-
-      if (_isSingleValue) {
-        _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
-      } else {
-        try {
-          JsonNode mvArray = JsonUtils.stringToJsonNode(((LiteralTransformFunction) fourthArgument).getStringLiteral());
-          if (!mvArray.isArray()) {
+      LiteralTransformFunction literalFn = (LiteralTransformFunction) fourthArgument;
+      // SQL NULL literal as the default ⇒ behave like the 3-arg form: leave `_defaultValue` null
+      // so unresolved rows surface as SQL NULL (NH on) or throw (NH off). This mirrors the scalar
+      // function's `_defaultIsNull` handling without needing a separate flag.
+      if (!literalFn.isNull()) {
+        if (_isSingleValue) {
+          _defaultValue = dataType.convert(literalFn.getStringLiteral());
+        } else {
+          try {
+            JsonNode mvArray = JsonUtils.stringToJsonNode(literalFn.getStringLiteral());
+            if (!mvArray.isArray()) {
+              throw new IllegalArgumentException("Default value must be a valid JSON array");
+            }
+            Object[] defaultValues = new Object[mvArray.size()];
+            for (int i = 0; i < mvArray.size(); i++) {
+              defaultValues[i] = dataType.convert(mvArray.get(i).asText());
+            }
+            _defaultValue = defaultValues;
+          } catch (IOException e) {
             throw new IllegalArgumentException("Default value must be a valid JSON array");
           }
-          Object[] defaultValues = new Object[mvArray.size()];
-          for (int i = 0; i < mvArray.size(); i++) {
-            defaultValues[i] = dataType.convert(mvArray.get(i).asText());
-          }
-          _defaultValue = defaultValues;
-        } catch (IOException e) {
-          throw new IllegalArgumentException("Default value must be a valid JSON array");
         }
       }
     }
@@ -159,13 +180,16 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _intValuesSV[i] = (int) _defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _intValuesSV[i] = NullValuePlaceHolder.INT;
           continue;
         }
         throw new RuntimeException(
@@ -181,13 +205,16 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _longValuesSV[i] = (long) _defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _longValuesSV[i] = NullValuePlaceHolder.LONG;
           continue;
         }
         throw new RuntimeException(
@@ -203,13 +230,16 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _floatValuesSV[i] = (float) _defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
           continue;
         }
         throw new RuntimeException(
@@ -225,13 +255,16 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _doubleValuesSV[i] = (double) _defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
           continue;
         }
         throw new RuntimeException(
@@ -247,13 +280,16 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initBigDecimalValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _bigDecimalValuesSV[i] = (BigDecimal) _defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
           continue;
         }
         throw new RuntimeException(
@@ -269,13 +305,16 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-        getValueToMatchingDocsMap(), false);
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
         if (_defaultValue != null) {
           _stringValuesSV[i] = (String) _defaultValue;
+          continue;
+        }
+        if (_nullHandlingEnabled) {
+          _stringValuesSV[i] = NullValuePlaceHolder.STRING;
           continue;
         }
         throw new RuntimeException(
@@ -284,6 +323,28 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       _stringValuesSV[i] = value;
     }
     return _stringValuesSV;
+  }
+
+  @Nullable
+  @Override
+  public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
+    // Short-circuit to argument-bitmap propagation when this function isn't introducing nulls of
+    // its own: non-SV output, null handling disabled, or a non-null default literal supplied (the
+    // SV transform writes it for unresolved rows). The SQL NULL literal case is handled in `init`
+    // by leaving `_defaultValue` null so it falls through to the scan below — same as the 3-arg
+    // form.
+    if (!_isSingleValue || !_nullHandlingEnabled || _defaultValue != null) {
+      return super.getNullBitmap(valueBlock);
+    }
+    String[] valuesFromIndex = getCachedValuesFromIndex(valueBlock);
+    int numDocs = valueBlock.getNumDocs();
+    RoaringBitmap nullBitmap = new RoaringBitmap();
+    for (int i = 0; i < numDocs; i++) {
+      if (valuesFromIndex[i] == null) {
+        nullBitmap.add(i);
+      }
+    }
+    return nullBitmap.isEmpty() ? null : nullBitmap;
   }
 
   @Override
@@ -432,5 +493,18 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       }
     }
     return _valueToMatchingDocsMap;
+  }
+
+  /**
+   * Returns the JSON-index SV scan result for the given block, caching it so that the SV
+   * transform and {@link #getNullBitmap} don't each pay the cost on the null-handling path.
+   */
+  private String[] getCachedValuesFromIndex(ValueBlock valueBlock) {
+    if (valueBlock != _cachedValueBlock) {
+      _cachedValuesSV = _jsonIndexReader.getValuesSV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+          getValueToMatchingDocsMap(), false);
+      _cachedValueBlock = valueBlock;
+    }
+    return _cachedValuesSV;
   }
 }
