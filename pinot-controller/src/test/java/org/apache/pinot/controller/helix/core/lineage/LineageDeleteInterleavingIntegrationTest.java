@@ -100,9 +100,12 @@ public class LineageDeleteInterleavingIntegrationTest {
     _resourceManager.addTable(tableConfig);
 
     TEST_INSTANCE.addDummySchema(RETENTION_RAW_TABLE_NAME);
+    // replacedSegmentsRetentionPeriod is set to 0s so the lineage-cleanup pass deletes replaced segments as soon
+    // as the entry has a timestamp strictly older than "now". This keeps the test deterministic without having to
+    // sleep through the default 1-day retention window.
     TableConfig retentionTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RETENTION_RAW_TABLE_NAME).setNumReplicas(1)
-            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").build();
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setReplacedSegmentsRetentionPeriod("0s").build();
     _resourceManager.addTable(retentionTableConfig);
 
     // RetentionManager configured with zero frequencies so we can drive processTable() directly and validate the
@@ -378,9 +381,9 @@ public class LineageDeleteInterleavingIntegrationTest {
     assertTrue(getSegments(RETENTION_OFFLINE_TABLE_NAME).contains(sExpired));
 
     // Run retention again. Now the COMPLETED entry's segmentsFrom is still lineage-locked w.r.t. time-based
-    // purge, but the lineage-cleanup pass is allowed to delete it (table is APPEND, so the replaced-segments
-    // retention window is bypassed). The cleanup must go through deleteSegmentsForLineageCleanup so it isn't
-    // self-blocked by the new check.
+    // purge, but the lineage-cleanup pass is allowed to delete it (the table's replacedSegmentsRetentionPeriod
+    // is configured to 0s, so the COMPLETED entry exits its retention window as soon as any time has elapsed).
+    // The cleanup must go through deleteSegmentsForLineageCleanup so it isn't self-blocked by the new check.
     _retentionManager.runProcessTable(RETENTION_OFFLINE_TABLE_NAME);
     // IdealState updates inside deleteSegmentsForLineageCleanup are synchronous (only the deep-store file deletion
     // is async via SegmentDeletionManager), so we can assert directly.
