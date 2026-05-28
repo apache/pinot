@@ -69,5 +69,4 @@ public class QueryFingerprintUtils {
         .hashString(input, StandardCharsets.UTF_8)
         .toString();
   }
-
 }

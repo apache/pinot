@@ -29,7 +29,7 @@ public class QueryFingerprintUtilsTest {
 
   @Test
   public void testNullQuery() throws Exception {
-    QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint((SqlNodeAndOptions) null);
+    QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(null);
     Assert.assertNull(fingerprint, "Null query should return null fingerprint");
   }
 
