@@ -929,11 +929,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
 
     assertEquals(extractOrderedDistinctValues(baselineResponse).size(), 5);
     assertEquals(extractOrderedDistinctValues(optimizedResponse).size(), 5);
-
-    // TODO: Fix LIMIT push down for MSE
-    if (!useMultiStageQueryEngine) {
-      assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asInt(), 5 * getNumAvroFiles());
-    }
+    assertEquals(optimizedResponse.get("numEntriesScannedPostFilter").asInt(), 5 * getNumAvroFiles());
   }
 
   /// Cross-path 5-arg form: filter on `$.k2`, extract `$.k1`. `getMatchingFlattenedDocsMap` applies the filter
