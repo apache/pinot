@@ -47,7 +47,12 @@ import org.slf4j.LoggerFactory;
  */
 public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
-
+  private static final int MAX_QUARTZ_THREADS_HARD_LIMIT = 20;
+  //configure a thread limit for the quartz scheduler to use
+  private static final int CONFIGURED_THREAD_COUNT = Math.min(
+      MAX_QUARTZ_THREADS_HARD_LIMIT,
+      Math.max(1, Runtime.getRuntime().availableProcessors())
+  );
   private ScheduledExecutorService _executorService;
   private Scheduler _scheduler;
   private Map<String, PeriodicTask> _periodicTasks;
@@ -96,17 +101,28 @@ public class PeriodicTaskScheduler {
       }
     }
 
-    boolean hasCronTasks = periodicTasks.stream()
-        .map(PeriodicTask::getCronExpression)
-        .anyMatch(cron -> cron != null && !cron.trim().isEmpty());
+    boolean hasCronTasks = false;
+
+    for (PeriodicTask task : periodicTasks) {
+      String cron = task.getCronExpression();
+      if (cron != null && !cron.trim().isEmpty()) {
+        if (!CronExpression.isValidExpression(cron)) {
+          throw new IllegalArgumentException(
+              String.format("Invalid CRON expression '%s' for task '%s'. "
+                      + "Halting controller startup.",
+                  cron, task.getTaskName())
+          );
+        }
+        hasCronTasks = true;
+      }
+    }
 
     if (hasCronTasks) {
       try {
-        try {
-          _scheduler = new StdSchedulerFactory().getScheduler();
-        } catch (SchedulerException e) {
-          throw new RuntimeException("Caught exception while setting up the scheduler", e);
-        }
+        int periodicTaskCount = _periodicTasks.size();
+        Properties quartzProperties = getQuartzProperties(periodicTaskCount);
+        StdSchedulerFactory customSchedulerFactory = new StdSchedulerFactory(quartzProperties);
+        _scheduler = customSchedulerFactory.getScheduler();
         _scheduler.start();
       } catch (SchedulerException e) {
         throw new RuntimeException("Failed to initialize Quartz scheduler. Halting controller startup.", e);
@@ -194,6 +210,12 @@ public class PeriodicTaskScheduler {
 
   /** Execute {@link PeriodicTask} immediately on the specified table. */
   public void scheduleNow(String periodicTaskName, Properties periodicTaskProperties) {
+    //in case the executor service hasnt been initialized its better to log a warning than
+    // throw a NPE
+    if (_executorService == null) {
+      LOGGER.warn("Cannot schedule task '{}' immediately: Scheduler is not running.", periodicTaskName);
+      return;
+    }
     // During controller deployment, each controller can have a slightly different list of periodic tasks if we add,
     // remove, or rename periodic task. To avoid this situation, we check again (besides the check at controller API
     // level) whether the periodic task exists.
@@ -222,5 +244,16 @@ public class PeriodicTaskScheduler {
             taskRequestId, periodicTask.getTaskName(), t);
       }
     }, 0, TimeUnit.SECONDS);
+  }
+
+  private static Properties getQuartzProperties(int taskCount) {
+    Properties quartzProperties = new Properties();
+    //isolating from other scheduler instances by having a different scheduler instance name
+    quartzProperties.put(StdSchedulerFactory.PROP_SCHED_INSTANCE_NAME, "ControllerPeriodicTaskScheduler");
+    //final thread count that will be used.
+    int threadCount = Math.min(taskCount, CONFIGURED_THREAD_COUNT);
+    quartzProperties.put("org.quartz.threadPool.class", "org.quartz.simpl.SimpleThreadPool");
+    quartzProperties.put("org.quartz.threadPool.threadCount", String.valueOf(threadCount));
+    return quartzProperties;
   }
 }

@@ -21,6 +21,7 @@ package org.apache.pinot.core.periodictask;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +67,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-      String cronExpression) {
+      @Nullable String cronExpression) {
     _taskName = taskName;
     _runLock = new ReentrantLock();
     _lifeCycleLock = new Object();
@@ -74,7 +75,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     boolean hasFrequencyScheduling = runFrequencyInSeconds > 0;
 
     if (hasCronScheduling && hasFrequencyScheduling) {
-      LOGGER.warn("Task '{}' is configured with both a cron expression ('{}') and a fixed execution frequency ({}s). Preferring cron scheduling.",
+      LOGGER.warn("Task '{}' is configured with both a cron expression ('{}') "
+              + "and a fixed execution frequency ({}s). Preferring cron scheduling.",
           taskName, cronExpression, runFrequencyInSeconds);
       _intervalInSeconds = 0;
       _initialDelayInSeconds = 0;

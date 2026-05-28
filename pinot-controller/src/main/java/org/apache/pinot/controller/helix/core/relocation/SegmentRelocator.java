@@ -94,8 +94,9 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       ControllerConf config, ControllerMetrics controllerMetrics, ExecutorService executorService,
       HttpClientConnectionManager connectionManager) {
     super(SegmentRelocator.class.getSimpleName(), config.getSegmentRelocatorFrequencyInSeconds(),
-        config.getSegmentRelocatorInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics, config.getSegmentRelocatorCronExpression());
+            config.getSegmentRelocatorInitialDelayInSeconds(), config.getSegmentRelocatorCronExpression(),
+        pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _tableRebalanceManager = tableRebalanceManager;
     _executorService = executorService;
     _connectionManager = connectionManager;

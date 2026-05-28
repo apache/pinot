@@ -44,8 +44,9 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
   public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics) {
     super("BrokerResourceValidationManager", config.getBrokerResourceValidationFrequencyInSeconds(),
-        config.getBrokerResourceValidationInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics, config.getBrokerResourceValidationCronExpression());
+            config.getBrokerResourceValidationInitialDelayInSeconds(),
+        config.getBrokerResourceValidationCronExpression(), pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
   }
 
   @Override

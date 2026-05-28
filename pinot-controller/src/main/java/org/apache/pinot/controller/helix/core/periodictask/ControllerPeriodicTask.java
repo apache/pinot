@@ -56,8 +56,8 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask impleme
   protected Set<String> _prevLeaderOfTables = new HashSet<>();
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-      PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
-      ControllerMetrics controllerMetrics, String cronExpression) {
+      String cronExpression, PinotHelixResourceManager pinotHelixResourceManager,
+      LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds, cronExpression);
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _leadControllerManager = leadControllerManager;

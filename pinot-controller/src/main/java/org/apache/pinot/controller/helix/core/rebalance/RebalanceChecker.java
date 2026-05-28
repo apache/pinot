@@ -63,8 +63,9 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf config, ControllerMetrics controllerMetrics) {
     super(RebalanceChecker.class.getSimpleName(), config.getRebalanceCheckerFrequencyInSeconds(),
-        config.getRebalanceCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics, config.getRebalanceCheckerCronExpression());
+            config.getRebalanceCheckerInitialDelayInSeconds(), config.getRebalanceCheckerCronExpression(),
+        pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _tableRebalanceManager = tableRebalanceManager;
   }
 

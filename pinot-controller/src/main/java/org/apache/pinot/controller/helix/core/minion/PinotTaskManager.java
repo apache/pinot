@@ -163,8 +163,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> taskManagerStatusCache, Executor executor,
       PoolingHttpClientConnectionManager connectionManager, ResourceUtilizationManager resourceUtilizationManager) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
-        controllerConf.getPinotTaskManagerInitialDelaySeconds(), helixResourceManager, leadControllerManager,
-        controllerMetrics, null);
+            controllerConf.getPinotTaskManagerInitialDelaySeconds(), null, helixResourceManager,
+        leadControllerManager, controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
     _resourceUtilizationManager = resourceUtilizationManager;
     _taskManagerStatusCache = taskManagerStatusCache;

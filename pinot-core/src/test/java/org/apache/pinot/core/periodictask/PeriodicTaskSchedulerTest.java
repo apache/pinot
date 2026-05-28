@@ -19,11 +19,24 @@
 package org.apache.pinot.core.periodictask;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.quartz.CronScheduleBuilder;
+import org.quartz.CronTrigger;
+import org.quartz.Job;
+import org.quartz.JobBuilder;
+import org.quartz.JobDetail;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobKey;
+import org.quartz.Scheduler;
+import org.quartz.TriggerBuilder;
+import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.matchers.GroupMatcher;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -269,5 +282,79 @@ public class PeriodicTaskSchedulerTest {
     assertThrows(IllegalArgumentException.class, taskScheduler::start);
 
     assertEquals(numTimesRunCalled.get(), 0, "Task should never run if the CRON expression is invalid");
+  }
+
+  /**
+   * Test that the scheduler used to schedule Pinot Minion tasks (PinotTaskManager) is not
+   * using the same quartz scheduler instance. It also tests that if we stop a Controller cron
+   * task, Minion tasks are not stopped or interfered with.
+   * @throws Exception
+   */
+  @Test
+  public void testControllerAndMinionCronSchedulerIsolation() throws Exception {
+    //quartz minion task scheduler
+    Scheduler minionScheduler = StdSchedulerFactory.getDefaultScheduler();
+    minionScheduler.start();
+
+    //quartz controller task scheduler
+    PeriodicTaskScheduler controllerPeriodicTaskScheduler = new PeriodicTaskScheduler();
+
+    try {
+      String minionJobName = "testMinionTableTask";
+      String minionGroupName = "MinionTaskGroup";
+      String controllerTaskName = "ControllerTestCronTask";
+
+      JobDetail minionJob = JobBuilder.newJob(MockMinionJob.class)
+          .withIdentity(minionJobName, minionGroupName)
+          .build();
+      CronTrigger minionTrigger = TriggerBuilder.newTrigger()
+          .withIdentity("testMinionTrigger", minionGroupName)
+          .withSchedule(CronScheduleBuilder.cronSchedule("0 0/1 * * * ?"))
+          .build();
+      minionScheduler.scheduleJob(minionJob, minionTrigger);
+
+      Assert.assertTrue(minionScheduler.checkExists(minionJob.getKey()), "Minion job should be scheduled.");
+
+      PeriodicTask controllerCronTask = new BasePeriodicTask(controllerTaskName, 0L, 0L, "0 0/5 * * * ?") {
+        @Override
+        protected void runTask(Properties periodicTaskProperties) {
+          //mocking runtime execution logic.
+        }
+      };
+      controllerPeriodicTaskScheduler.init(Collections.singletonList(controllerCronTask));
+      controllerPeriodicTaskScheduler.start();
+
+      Assert.assertFalse(minionScheduler.checkExists(JobKey.jobKey(controllerTaskName)),
+          "Regression Failure: The minion scheduler should not be "
+              + "able to see the controller's task namespace!");
+
+      int totalMinionJobs = minionScheduler.getJobKeys(GroupMatcher.anyJobGroup()).size();
+      Assert.assertEquals(totalMinionJobs, 1,
+          "The broad matcher scan on the minion scheduler should "
+              + "find exactly 1 minion job, ignoring controller tasks.");
+
+      controllerPeriodicTaskScheduler.stop();
+
+      Assert.assertTrue(minionScheduler.isStarted(),
+          "Regression Failure: Stopping the controller scheduler accidentally tore down the minion scheduler!");
+      Assert.assertFalse(minionScheduler.isShutdown(),
+          "The minion scheduler must remain active.");
+      Assert.assertTrue(minionScheduler.checkExists(minionJob.getKey()),
+          "The scheduled minion tasks should still exist in the default scheduler runtime.");
+    } finally {
+      if (!minionScheduler.isShutdown()) {
+        minionScheduler.shutdown(true);
+      }
+      controllerPeriodicTaskScheduler.stop();
+    }
+  }
+
+  /**
+   * Dummy job implementation needed to fulfill Quartz's verification layer.
+   */
+  public static class MockMinionJob implements Job {
+    @Override
+    public void execute(JobExecutionContext context) {
+    }
   }
 }
