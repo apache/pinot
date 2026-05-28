@@ -48,6 +48,7 @@ import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
+import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -382,7 +383,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
     if (lastError != null) {
       if (topicMissing) {
-        throw new RuntimeException("Topic does not exist: " + _topic);
+        throw new PermanentConsumerException(new RuntimeException("Topic does not exist: " + _topic));
       }
       if (lastError instanceof TransientConsumerException) {
         throw (TransientConsumerException) lastError;

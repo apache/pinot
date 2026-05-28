@@ -1015,6 +1015,23 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArraySliceLong(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // LONG_ARRAY_COLUMN contains [0, 1, 2, 3]; slicing [1, 3) yields [1, 2]
+    String query = String.format("SELECT array_slice_long(%s, 1, 3) FROM %s WHERE %s = 0 LIMIT 1",
+        LONG_ARRAY_COLUMN, getTableName(), INT_COLUMN);
+    JsonNode result = postQuery(query).get("resultTable");
+    assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+    JsonNode rows = result.get("rows");
+    assertEquals(rows.size(), 1);
+    JsonNode values = rows.get(0).get(0);
+    assertEquals(values.size(), 2);
+    assertEquals(values.get(0).longValue(), 1L);
+    assertEquals(values.get(1).longValue(), 2L);
+  }
+
   @Test(dataProvider = "useV1QueryEngine")
   public void testGenerateIntArray(boolean useMultiStageQueryEngine)
       throws Exception {
