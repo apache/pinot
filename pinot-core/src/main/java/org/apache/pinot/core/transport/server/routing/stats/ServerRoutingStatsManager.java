@@ -248,10 +248,18 @@ public class ServerRoutingStatsManager {
     return _serverQueryStatsMap;
   }
 
+  public Map<String, ServerRoutingStatsEntry> getServerRoutingStats(QueryType queryType) {
+    return getStatsMap(queryType);
+  }
+
   /**
    * Returns ServerRoutingStatsStr for debugging/logging.
    */
   public String getServerRoutingStatsStr() {
+    return getServerRoutingStatsStr(QueryType.SSE);
+  }
+
+  public String getServerRoutingStatsStr(QueryType queryType) {
     if (!_isEnabled) {
       return "";
     }
@@ -259,7 +267,7 @@ public class ServerRoutingStatsManager {
     StringBuilder stringBuilder =
         new StringBuilder("(Server=NumInFlightRequests,NumInFlightRequestsEMA,LatencyEMA," + "Score)");
 
-    for (Map.Entry<String, ServerRoutingStatsEntry> entry : _serverQueryStatsMap.entrySet()) {
+    for (Map.Entry<String, ServerRoutingStatsEntry> entry : getStatsMap(queryType).entrySet()) {
       String server = entry.getKey();
       Preconditions.checkState(entry.getValue() != null, "Server stats is null");
       ServerRoutingStatsEntry stats = entry.getValue();
