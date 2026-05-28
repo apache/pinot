@@ -708,6 +708,11 @@ public class CommonConstants {
          * 30 for dictCard <= 1K, 10 for dictCard <= 10K, 6 for dictCard > 10K.
          */
         public static final String INVERTED_INDEX_DISTINCT_COST_RATIO = "invertedIndexDistinctCostRatio";
+        /// When true, `JsonIndexDistinctOperator` skips missing-path handling — it does not add a 4-arg default
+        /// value, does not add null (even when `nullHandling` is enabled), and does not throw `Illegal Json Path`.
+        /// The result is purely the distinct values produced by the JSON-index lookup (filtered by the optional
+        /// 5-arg `jsonFilterExpression` and intersected with the `WHERE`-clause filter).
+        public static final String JSON_INDEX_DISTINCT_SKIP_MISSING_PATH = "jsonIndexDistinctSkipMissingPath";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String TABLE_SAMPLER = "sampler";
