@@ -33,6 +33,7 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -91,6 +92,10 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
     } else {
       Tracing.activeRecording().setNumChildren(_dataSourceMap.size());
       _dataBlockCache.initNewBlock(docIdSetBlock.getDocIds(), docIdSetBlock.getLength());
+      // Sample resource usage once per projected block so OOM accounting stays fresh across long scans. This is the
+      // shared projection path for scan-based operators (aggregation, group-by, distinct, selection). Termination is
+      // already checked per block by BaseOperator#nextBlock.
+      QueryThreadContext.sampleUsage();
       return new ProjectionBlock(_dataSourceMap, _dataBlockCache);
     }
   }

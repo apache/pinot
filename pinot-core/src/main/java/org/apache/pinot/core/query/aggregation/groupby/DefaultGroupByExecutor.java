@@ -38,7 +38,6 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -191,9 +190,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   @Override
   public void process(ValueBlock valueBlock) {
-    // Sample usage and check termination once per block so OOM accounting stays fresh and the per-segment scan
-    // remains cancellable while the group-by hash table grows.
-    QueryThreadContext.checkTerminationAndSampleUsage("DefaultGroupByExecutor#process");
     // Generate group keys
     // NOTE: groupKeyGenerator will limit the number of groups. Once reaching limit, no new group will be generated
     if (_hasMVGroupByExpression) {
