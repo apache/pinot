@@ -23,6 +23,7 @@ import com.dynatrace.hash4j.hashing.Hasher128;
 import com.google.common.hash.Hashing;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.UUID;
 import net.jpountz.xxhash.XXHashFactory;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -47,6 +48,13 @@ public class HashUtils {
   /**
    * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values.
    * If any of the values is not a valid UUID, then we return the result of {@link PrimaryKey#asBytes()}.
+   *
+   * <p>String inputs are parsed via {@link UUID#fromString(String)} (lenient — accepts non-canonical short
+   * forms like {@code "1-2-3-4-5"}) for backward compatibility with tables that have been hashed under the
+   * pre-UUID-type {@code HashFunction.UUID} contract. Binary inputs ({@code byte[]} or {@link UUID}) go
+   * through {@link UuidUtils#toBytes(Object)} since they carry no parse ambiguity. Newly-declared
+   * {@code DataType.UUID} primary-key columns are independently constrained to canonical form at ingest
+   * time by {@code DataTypeTransformer.validateCanonicalUuidPrimaryKey}.
    */
   public static byte[] hashUUID(PrimaryKey primaryKey) {
     Object[] values = primaryKey.getValues();
@@ -57,7 +65,13 @@ public class HashUtils {
         throw new IllegalArgumentException("Found null value in primary key");
       }
       try {
-        byteBuffer.put(UuidUtils.toBytes(value));
+        if (value instanceof CharSequence) {
+          UUID uuid = UUID.fromString(value.toString());
+          byteBuffer.putLong(uuid.getMostSignificantBits());
+          byteBuffer.putLong(uuid.getLeastSignificantBits());
+        } else {
+          byteBuffer.put(UuidUtils.toBytes(value));
+        }
       } catch (RuntimeException e) {
         return primaryKey.asBytes();
       }

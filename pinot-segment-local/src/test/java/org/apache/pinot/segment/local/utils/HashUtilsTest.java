@@ -80,6 +80,33 @@ public class HashUtilsTest {
         new PrimaryKey(new Object[]{UuidUtils.toBytes(firstUuid), UuidUtils.toBytes(secondUuid)})), expectedHash);
   }
 
+  /**
+   * Regression: {@link HashUtils#hashUUID} must accept non-canonical-but-Java-parseable UUID strings
+   * (e.g. {@code "1-2-3-4-5"}) so existing upsert tables using {@code HashFunction.UUID} keep producing
+   * the same hash before and after this PR. {@link UuidUtils#toBytes(String)} is strict and would reject
+   * such inputs — for the legacy hash path we route String inputs through {@code UUID.fromString} directly
+   * to preserve the lenient pre-PR behavior.
+   */
+  @Test
+  public void testHashUUIDLenientForNonCanonicalStrings() {
+    String nonCanonical = "1-2-3-4-5";
+    UUID expected = UUID.fromString(nonCanonical);
+
+    byte[] hashResult = HashUtils.hashUUID(new PrimaryKey(new Object[]{nonCanonical}));
+    assertEquals(hashResult.length, 16);
+
+    long msb = 0;
+    long lsb = 0;
+    for (int i = 0; i < 8; i++) {
+      msb = (msb << 8) | (hashResult[i] & 0xFF);
+    }
+    for (int i = 8; i < 16; i++) {
+      lsb = (lsb << 8) | (hashResult[i] & 0xFF);
+    }
+    assertEquals(new UUID(msb, lsb), expected,
+        "hashUUID(\"1-2-3-4-5\") must equal UUID.fromString output for backward compatibility");
+  }
+
   @Test
   public void testHashPrimaryKeyWithMd5Disabled() {
     PrimaryKey primaryKey = new PrimaryKey(new Object[]{"hello world"});
