@@ -436,6 +436,65 @@ public class PinotClientRequestTest {
   }
 
   @Test
+  public void testValidateSqlSyntaxSingleStage() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"SELECT * FROM myTable WHERE id > 10\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    SqlSyntaxValidationResponse body = (SqlSyntaxValidationResponse) response.getEntity();
+    Assert.assertTrue(body.isValid(), "Valid single-stage query should parse successfully");
+    assertEquals(body.getSqlType(), "DQL");
+    Assert.assertNull(body.getErrorMessage());
+  }
+
+  @Test
+  public void testValidateSqlSyntaxMultiStage() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"SET useMultistageEngine=true; \\n"
+        + "SELECT * FROM t1 LEFT JOIN t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    SqlSyntaxValidationResponse body = (SqlSyntaxValidationResponse) response.getEntity();
+    Assert.assertTrue(body.isValid(), "Valid multi-stage query should parse successfully");
+    assertEquals(body.getSqlType(), "DQL");
+    Assert.assertNull(body.getErrorMessage());
+  }
+
+  @Test
+  public void testValidateSqlSyntaxWithInvalidSql() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"SELECT FROM WHERE\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode(),
+        "Invalid SQL should still return HTTP 200 with valid=false in body");
+    SqlSyntaxValidationResponse body = (SqlSyntaxValidationResponse) response.getEntity();
+    assertFalse(body.isValid(), "Unparseable query should report valid=false");
+    Assert.assertNull(body.getSqlType());
+    Assert.assertNotNull(body.getErrorMessage(), "Failed validation should include an error message");
+  }
+
+  @Test
+  public void testValidateSqlSyntaxMissingSqlField() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"notSql\": \"SELECT * FROM myTable\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode(),
+        "Payload missing the 'sql' field should return BAD_REQUEST");
+  }
+
+  @Test
   public void testQueryResponseSizeMetric()
       throws Exception {
     // Create a broker response with some result data
