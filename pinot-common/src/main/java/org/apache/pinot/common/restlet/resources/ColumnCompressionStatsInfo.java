@@ -26,20 +26,36 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 
-/**
- * Per-column forward index compression statistics.
- *
- * <p>Contains the column name, uncompressed and compressed sizes, compression ratio, codec,
- * whether the column has a dictionary, and the list of indexes present on the column.
- */
+/// Per-column forward index compression statistics, as reported by each server for a given segment.
+///
+/// For raw (non-dictionary) columns, both `uncompressedSizeInBytes` and `compressedSizeInBytes` are populated
+/// and `codec` reflects the compression algorithm. For dictionary-encoded columns, `hasDictionary` is true,
+/// `codec` is null, and only `compressedSizeInBytes` reflects the on-disk forward index size. Columns without a
+/// forward index (forward-index-disabled) are excluded entirely.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnCompressionStatsInfo {
   private final String _column;
+
+  /// Total uncompressed byte size of values written to the forward index during segment creation.
+  /// `-1` (sentinel) when unavailable — e.g. for dictionary-encoded columns or old segments built before
+  /// stats tracking was enabled.
   private final long _uncompressedSizeInBytes;
+
+  /// On-disk byte size of the forward index file for this column in this segment.
   private final long _compressedSizeInBytes;
+
+  /// Compression ratio (`uncompressedSizeInBytes / compressedSizeInBytes`). `0` when unavailable.
   private final double _compressionRatio;
+
+  /// Compression codec name (e.g. `"ZSTANDARD"`, `"LZ4"`, `"SNAPPY"`, `"PASS_THROUGH"`), or `null` for
+  /// dictionary-encoded columns. `"MIXED"` when segments in the same table use different codecs for this column.
   private final String _codec;
+
+  /// Whether this column is dictionary-encoded. A column can transition between dict and raw across segments
+  /// when the table config changes; in that case both encodings may coexist in the same table.
   private final boolean _hasDictionary;
+
+  /// Names of all indexes present on this column in this segment (e.g. `["forward_index", "inverted_index"]`).
   private final List<String> _indexes;
 
   @JsonCreator
