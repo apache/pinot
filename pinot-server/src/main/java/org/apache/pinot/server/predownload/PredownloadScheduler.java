@@ -173,10 +173,15 @@ public class PredownloadScheduler {
           new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
               serverConf.getAllowedTablesForEmittingMetrics());
       serverMetrics.initializeGlobalMeters();
-      ServerMetrics.register(serverMetrics);
-    } catch (Throwable t) {
+      boolean registered = ServerMetrics.register(serverMetrics);
+      if (registered) {
+        LOGGER.info("ServerMetrics successfully registered for predownload container");
+      } else {
+        LOGGER.error("Failed to register ServerMetrics; an instance was already registered");
+      }
+    } catch (Exception e) {
       LOGGER.error("Failed to initialize ServerMetrics in predownload container; "
-          + "continuing with the currently registered ServerMetrics instance", t);
+          + "continuing with the currently registered ServerMetrics instance", e);
     }
 
     _predownloadMetrics = new PredownloadMetrics();
