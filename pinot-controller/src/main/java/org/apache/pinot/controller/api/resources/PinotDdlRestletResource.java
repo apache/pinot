@@ -81,11 +81,15 @@ import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.sql.ddl.compile.CompiledCreateMaterializedView;
 import org.apache.pinot.sql.ddl.compile.CompiledCreateTable;
 import org.apache.pinot.sql.ddl.compile.CompiledDdl;
+import org.apache.pinot.sql.ddl.compile.CompiledDropMaterializedView;
 import org.apache.pinot.sql.ddl.compile.CompiledDropTable;
+import org.apache.pinot.sql.ddl.compile.CompiledShowCreateMaterializedView;
 import org.apache.pinot.sql.ddl.compile.CompiledShowCreateTable;
 import org.apache.pinot.sql.ddl.compile.DdlCompilationException;
+import org.apache.pinot.sql.ddl.compile.DdlCompileContext;
 import org.apache.pinot.sql.ddl.compile.DdlCompiler;
 import org.apache.pinot.sql.ddl.compile.DdlOperation;
 import org.apache.pinot.sql.ddl.reverse.CanonicalDdlEmitter;
@@ -98,7 +102,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 
 /// Controller endpoint for executing Pinot SQL DDL statements. Currently supports CREATE TABLE,
-/// DROP TABLE, SHOW TABLES, and SHOW CREATE TABLE.
+/// CREATE MATERIALIZED VIEW, DROP TABLE, DROP MATERIALIZED VIEW, SHOW TABLES,
+/// SHOW MATERIALIZED VIEWS, SHOW CREATE TABLE, and SHOW CREATE MATERIALIZED VIEW.
 ///
 /// Pipeline:
 /// 1. [DdlCompiler] parses + compiles the SQL into a [CompiledDdl].
@@ -150,14 +155,17 @@ public class PinotDdlRestletResource {
   @Path("/sql/ddl")
   @ManualAuthorization // permission check is done after parsing the DDL so we know the operation
   @ApiOperation(value = "Execute a Pinot SQL DDL statement",
-      notes = "Supports CREATE TABLE, DROP TABLE, SHOW TABLES, and SHOW CREATE TABLE. Returns the "
-          + "generated Schema/TableConfig (CREATE), operation outcome (DROP/SHOW TABLES), or "
-          + "canonical DDL string (SHOW CREATE TABLE).")
+      notes = "Supports CREATE TABLE, CREATE MATERIALIZED VIEW, DROP TABLE, DROP MATERIALIZED VIEW, SHOW TABLES, "
+          + "SHOW MATERIALIZED VIEWS, SHOW CREATE TABLE, and SHOW CREATE MATERIALIZED VIEW. Returns the generated "
+          + "Schema/TableConfig (CREATE), operation outcome (DROP/SHOW TABLES/SHOW MATERIALIZED VIEWS), or canonical "
+          + "DDL string (SHOW CREATE TABLE / SHOW CREATE MATERIALIZED VIEW).")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success (DROP, SHOW TABLES, SHOW CREATE TABLE, dry-run, IF NOT EXISTS)"),
-      @ApiResponse(code = 201, message = "Table created"),
+      @ApiResponse(code = 200, message = "Success (DROP, SHOW TABLES, SHOW MATERIALIZED VIEWS, "
+          + "SHOW CREATE TABLE, SHOW CREATE MATERIALIZED VIEW, dry-run, IF NOT EXISTS / IF EXISTS)"),
+      @ApiResponse(code = 201, message = "Table or materialized view created"),
       @ApiResponse(code = 400, message = "Bad request (parse error, semantic error, oversize input, "
-          + "unsupported emitter type, or type-incompatible default value)"),
+          + "unsupported emitter type, type-incompatible default value, or DROP/SHOW CREATE form does "
+          + "not match the underlying table shape)"),
       @ApiResponse(code = 404, message = "Table or schema not found (DROP without IF EXISTS, SHOW CREATE)"),
       @ApiResponse(code = 409, message = "Conflict (duplicate CREATE without IF NOT EXISTS, logical-table "
           + "reference blocking DROP, or race lost to a concurrent writer)"),
@@ -178,15 +186,26 @@ public class PinotDdlRestletResource {
       throw badRequest("DDL statement exceeds maximum length of " + MAX_DDL_SQL_CHARS + " characters.");
     }
 
+    // Compile context carries the TableCache (for the MV schema inferer's Calcite catalog)
+    // and the request-header database (so an unqualified `FROM <src>` resolves under the
+    // operator's intended database). The `_pinotHelixResourceManager == null` branch is the
+    // unit-test escape hatch for non-inferer DDL forms (CREATE TABLE, DROP, SHOW, SHOW CREATE,
+    // explicit-column CREATE MATERIALIZED VIEW). The inferer surfaces a clear "no TableCache
+    // configured" error if it ever runs under STATELESS in production.
+    String requestDatabase = httpHeaders == null ? null : httpHeaders.getHeaderString(DATABASE);
+    DdlCompileContext compileCtx = (_pinotHelixResourceManager == null)
+        ? DdlCompileContext.STATELESS
+        : new DdlCompileContext(_pinotHelixResourceManager.getTableCache(), requestDatabase);
+
     CompiledDdl compiled;
     try {
-      compiled = DdlCompiler.compile(request.getSql());
+      compiled = DdlCompiler.compile(request.getSql(), compileCtx);
     } catch (DdlCompilationException e) {
       throw badRequest(e.getMessage());
-    } catch (RuntimeException e) {
-      LOGGER.warn("Unexpected DDL compilation failure", e);
-      throw badRequest("DDL compilation failed: " + e.getMessage());
     }
+    // Any other RuntimeException is a programmer error or unexpected upstream failure;
+    // let it propagate to the JAX-RS default handler as 500 so monitoring fires on it
+    // instead of seeing it as a user-facing 400.
 
     DdlOperation op = compiled.getOperation();
     String requestedDatabase = compiled.getDatabaseName();
@@ -195,20 +214,39 @@ public class PinotDdlRestletResource {
     // Authorization is performed inside each execute*() method, AFTER the target table name has
     // been DB-translated. Authorizing on the pre-translation name would let a header-supplied
     // database substitute past the auth check.
+    //
+    // Dispatch order mirrors `DdlOperation`: Catalog → Table → Materialized View, lifecycle
+    // CREATE → SHOW CREATE → DROP within each object-level family.
     switch (op) {
+      // Catalog DDL.
+      case SHOW_TABLES:
+        return Response.ok(executeShow(effectiveDatabase, httpHeaders, httpRequest)).build();
+      case SHOW_MATERIALIZED_VIEWS:
+        return Response.ok(executeShowMaterializedViews(effectiveDatabase, httpHeaders, httpRequest)).build();
+      // Table DDL.
       case CREATE_TABLE:
         return executeCreate((CompiledCreateTable) compiled, effectiveDatabase, dryRun,
             httpHeaders, httpRequest);
-      case DROP_TABLE:
-        return Response.ok(
-            executeDrop((CompiledDropTable) compiled, effectiveDatabase, dryRun,
-                httpHeaders, httpRequest)).build();
-      case SHOW_TABLES:
-        return Response.ok(executeShow(effectiveDatabase, httpHeaders, httpRequest)).build();
       case SHOW_CREATE_TABLE:
         return Response.ok(
             executeShowCreate((CompiledShowCreateTable) compiled, effectiveDatabase,
                 httpHeaders, httpRequest)).build();
+      case DROP_TABLE:
+        return Response.ok(
+            executeDrop((CompiledDropTable) compiled, effectiveDatabase, dryRun,
+                httpHeaders, httpRequest)).build();
+      // Materialized View DDL.
+      case CREATE_MATERIALIZED_VIEW:
+        return executeCreateMaterializedView((CompiledCreateMaterializedView) compiled,
+            effectiveDatabase, dryRun, httpHeaders, httpRequest);
+      case SHOW_CREATE_MATERIALIZED_VIEW:
+        return Response.ok(
+            executeShowCreateMaterializedView((CompiledShowCreateMaterializedView) compiled,
+                effectiveDatabase, httpHeaders, httpRequest)).build();
+      case DROP_MATERIALIZED_VIEW:
+        return Response.ok(
+            executeDropMaterializedView((CompiledDropMaterializedView) compiled, effectiveDatabase,
+                dryRun, httpHeaders, httpRequest)).build();
       default:
         throw new ControllerApplicationException(LOGGER, "Unhandled DDL operation: " + op,
             Response.Status.INTERNAL_SERVER_ERROR);
@@ -216,7 +254,7 @@ public class PinotDdlRestletResource {
   }
 
   // -------------------------------------------------------------------------------------------
-  // CREATE
+  // Table DDL: CREATE TABLE
   // -------------------------------------------------------------------------------------------
 
   private Response executeCreate(CompiledCreateTable create, String database,
@@ -254,6 +292,44 @@ public class PinotDdlRestletResource {
         .setSchema(toJson(create.getSchema()))
         .setTableConfig(toJson(create.getTableConfig()))
         .setWarnings(create.getWarnings());
+
+    // Q2=B preflight (raw-name exclusivity rule, mirror of `executeCreateMaterializedView`):
+    // an MV must not share its raw name with EITHER a plain OFFLINE table OR a REALTIME table
+    // at the same name. The two checks together — split across the CREATE TABLE and CREATE
+    // MATERIALIZED VIEW endpoints — enforce a symmetric invariant: any given raw name is
+    // exclusively owned by one of {plain OFFLINE table, REALTIME table, hybrid pair,
+    // materialized view}, regardless of the creation order.
+    //
+    // On the OFFLINE create path: if an MV occupies the OFFLINE znode, refuse with 400. Without
+    // this guard a CREATE TABLE could 409 with the generic "already exists" message — true but
+    // unhelpful, because the operator would not know they were colliding with a derived MV that
+    // has its own DROP form, refresh schedule, and minion task wiring.
+    //
+    // On the REALTIME create path: an MV at the OFFLINE half would form a hybrid pair whose
+    // OFFLINE half is a materialized view — a state with no defined semantics in the broker
+    // rewrite, minion task generator, or consistency manager. Refuse symmetrically with 400.
+    //
+    // IF NOT EXISTS does not suppress these type-mismatch errors: IF NOT EXISTS suppresses
+    // "object not found at the requested type", not "wrong DDL verb for the conflicting
+    // object". Mirror of `executeDrop`'s Q2=B preflight.
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableConfig conflictingOfflineConfig = null;
+    if (create.getTableConfig().getTableType() == TableType.OFFLINE) {
+      conflictingOfflineConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    } else {
+      String offlineNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+      conflictingOfflineConfig = _pinotHelixResourceManager.getTableConfig(offlineNameWithType);
+    }
+    if (conflictingOfflineConfig != null && conflictingOfflineConfig.isMaterializedView()) {
+      String tableTypeLabel = create.getTableConfig().getTableType().toString();
+      throw new ControllerApplicationException(LOGGER,
+          "Cannot create " + tableTypeLabel + " table '" + rawTableName
+              + "': a materialized view already exists at this name. A "
+              + (create.getTableConfig().getTableType() == TableType.OFFLINE ? "plain" : tableTypeLabel)
+              + " table cannot share its name with a materialized view — pick a different name "
+              + "for the table, or drop the existing materialized view first.",
+          Response.Status.BAD_REQUEST);
+    }
 
     // Existence check runs first so CREATE TABLE IF NOT EXISTS is a successful no-op when the
     // table already exists, matching the SQL-standard semantics (PostgreSQL, MySQL, SQLite,
@@ -545,7 +621,282 @@ public class PinotDdlRestletResource {
   }
 
   // -------------------------------------------------------------------------------------------
-  // DROP
+  // Materialized View DDL: CREATE MATERIALIZED VIEW
+  // -------------------------------------------------------------------------------------------
+
+  /// Persists a `CREATE MATERIALIZED VIEW` DDL. Mirrors [#executeCreate] but is hard-wired
+  /// to OFFLINE: MVs have no realtime form, so the hybrid-pair coordination in the regular
+  /// CREATE TABLE path does not apply.
+  ///
+  /// The MV runtime watermark znode is intentionally NOT seeded by this endpoint. The
+  /// scheduler's cold-start path (see `MaterializedViewTaskScheduler#getWatermarkMs`) derives
+  /// the watermark from the source table's earliest segment on the first tick, which is the
+  /// only durable source of truth a user can rely on; piping a user-supplied watermark
+  /// through DDL added a second, easily-out-of-sync writer and tied the DDL contract to a
+  /// runtime znode lifecycle. The grammar accordingly has no `REFRESH START(...)` clause.
+  ///
+  /// MV-specific semantic validation (source table existence, time-column TIMESTAMP contract,
+  /// `bucketTimePeriod` alignment with any `DATETRUNC` in the SELECT, definedSQL parseability,
+  /// nested-SELECT rejection) is performed inside [#validateTableConfig] via
+  /// `TaskConfigUtils.validateTaskConfigs` → `MaterializedViewTaskGenerator.validateTaskConfigs`
+  /// → `MaterializedViewAnalyzer.analyze`. The DDL endpoint does not call the analyzer
+  /// directly — the same validation pipeline POST `/tables` uses governs DDL-created MVs.
+  private Response executeCreateMaterializedView(CompiledCreateMaterializedView create,
+      String database, boolean dryRun, HttpHeaders headers, Request httpRequest) {
+    // MV is always OFFLINE: the compiler enforces this. Don't read getTableType() because the
+    // compiler-set value would shadow that contract for any reader of this method.
+    String tableNameWithType = translateTableNameForDdl(
+        TableNameBuilder.OFFLINE.tableNameWithType(create.getTableConfig().getTableName()), headers);
+    create.getTableConfig().setTableName(tableNameWithType);
+
+    String compiledSchemaName = create.getSchema().getSchemaName();
+    String dottedSchemaName = create.getDatabaseName() == null
+        ? compiledSchemaName
+        : create.getDatabaseName() + "." + compiledSchemaName;
+    String schemaName = translateTableNameForDdl(dottedSchemaName, headers);
+    create.getSchema().setSchemaName(schemaName);
+
+    // Authorize against the FULLY-QUALIFIED, post-translation table name. Re-use the
+    // CREATE_TABLE action because the MV is implemented as an OFFLINE Pinot table — operators
+    // who own the table-create surface should be able to materialize a view over data they
+    // already manage. Introducing a separate Actions.Table.CREATE_MATERIALIZED_VIEW would
+    // silently lock existing privileged callers out of the new endpoint.
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, httpRequest, headers,
+        AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
+
+    DdlExecutionResponse response = new DdlExecutionResponse()
+        .setOperation(DdlOperation.CREATE_MATERIALIZED_VIEW)
+        .setDryRun(dryRun)
+        .setDatabaseName(database)
+        .setTableName(tableNameWithType)
+        .setTableType(TableType.OFFLINE.toString())
+        .setIfNotExists(create.isIfNotExists())
+        .setSchema(toJson(create.getSchema()))
+        .setTableConfig(toJson(create.getTableConfig()))
+        .setWarnings(create.getWarnings());
+
+    // Q2=B preflight (raw-name exclusivity rule): a materialized view occupies the entire raw
+    // name, so it must not collide with EITHER an existing plain OFFLINE table at the same name
+    // OR an existing REALTIME table at the same raw name. The two checks together form the
+    // CREATE-MV side of the symmetric invariant that `executeCreate` enforces from the
+    // CREATE-TABLE side: any given raw name is exclusively owned by one of {plain OFFLINE table,
+    // REALTIME table, hybrid pair, materialized view}, never two at once, regardless of the
+    // order in which the operator runs CREATE statements.
+    //
+    // The OFFLINE check runs first because the OFFLINE znode is where an existing MV would live
+    // — if we find an MV there, `IF NOT EXISTS` legitimately resolves to a no-op (idempotent
+    // re-deployment), matching the CREATE TABLE policy. A plain OFFLINE table at the same name
+    // is a type mismatch and is rejected with 400 (NOT 409) so the operator gets a pointer at
+    // the resolution rather than a generic "already exists" — mirroring `executeDrop`'s Q2=B
+    // preflight on the symmetric DROP side. IF NOT EXISTS does NOT suppress the type-mismatch
+    // error: IF NOT EXISTS suppresses "object not found", not "wrong DDL verb for this object".
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    TableConfig existingOfflineConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (existingOfflineConfig != null) {
+      if (existingOfflineConfig.isMaterializedView()) {
+        if (create.isIfNotExists()) {
+          // Echo the persisted state, not the client-attempted body: an idempotent re-run
+          // must not advertise the new (rejected) config as if it had been applied.
+          populateNoOpResponseFromPersisted(response, existingOfflineConfig, schemaName);
+          response.setMessage("Materialized view " + tableNameWithType
+              + " already exists; CREATE IF NOT EXISTS is a no-op.");
+          return Response.ok(response).build();
+        }
+        throw new ControllerApplicationException(LOGGER,
+            "Materialized view " + tableNameWithType + " already exists.", Response.Status.CONFLICT);
+      }
+      // Existing OFFLINE config is a plain table (or a corrupted MV missing `definedSQL`):
+      // either way, the raw name is held by a non-MV resource and creating an MV here is
+      // refused. The 400 message is intentional and identical regardless of IF NOT EXISTS.
+      throw new ControllerApplicationException(LOGGER,
+          "Cannot create materialized view '" + rawTableName + "': a plain OFFLINE table already "
+              + "exists at this name. A materialized view cannot share its name with a plain "
+              + "table — pick a different name for the materialized view, or drop the existing "
+              + "table first.",
+          Response.Status.BAD_REQUEST);
+    }
+    // No OFFLINE config: check the REALTIME side. REALTIME tables and MVs live in disjoint
+    // znodes (foo_REALTIME vs foo_OFFLINE) and would not collide physically, but the contract
+    // says raw-name exclusivity is whole-namespace so an MV cannot squat on a name that already
+    // has a base-table half. Without this guard, an operator could legitimately end up with
+    // both an MV at foo_OFFLINE and a base REALTIME at foo_REALTIME — the resulting "hybrid
+    // table whose OFFLINE half is an MV" has no well-defined semantics in the broker rewrite,
+    // minion task generator, or consistency manager.
+    String realtimeNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    if (_pinotHelixResourceManager.hasTable(realtimeNameWithType)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Cannot create materialized view '" + rawTableName + "': a REALTIME table already "
+              + "exists at this name. A materialized view cannot share its name with a base "
+              + "table — pick a different name for the materialized view, or drop the existing "
+              + "REALTIME table first.",
+          Response.Status.BAD_REQUEST);
+    }
+
+    // A pre-existing schema can survive a prior failed CREATE (addSchema succeeded but
+    // addTable failed). Accept it iff the column shape matches; otherwise 409 so the
+    // operator can clean up the stale schema explicitly rather than silently mutate it.
+    Schema storedSchema = _pinotHelixResourceManager.getSchema(schemaName);
+    boolean schemaPreexisted = storedSchema != null;
+    if (schemaPreexisted) {
+      String mismatch = describeColumnShapeMismatch(storedSchema, create.getSchema());
+      if (mismatch != null) {
+        throw new ControllerApplicationException(LOGGER,
+            "Schema '" + schemaName + "' already exists and does not match the column list in the DDL: "
+                + mismatch
+                + ". Either omit the column list to reuse the existing schema, or drop the stale schema "
+                + "and recreate the materialized view.",
+            Response.Status.CONFLICT);
+      }
+    }
+
+    Schema schemaForValidation = schemaPreexisted ? storedSchema : create.getSchema();
+    response.setSchema(toJson(schemaForValidation));
+    // Apply tuner configs before validation so the validators see the post-tuner shape, matching
+    // POST /tables. The MV TableConfig already carries the MaterializedViewTask wiring set up
+    // by the compiler; tuners only fill in defaulted index/segment configs.
+    TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, create.getTableConfig(),
+        schemaForValidation, Collections.emptyMap());
+    response.setTableConfig(toJson(create.getTableConfig()));
+
+    // validateTableConfig fans out to TaskConfigUtils.validateTaskConfigs which triggers
+    // MaterializedViewTaskGenerator → MaterializedViewAnalyzer.analyze. That path enforces:
+    // source-table existence, source/MV time column TIMESTAMP contract, bucketTimePeriod
+    // alignment with DATETRUNC unit, SELECT-list coverage of MV schema, no nested SELECTs,
+    // and parseable LIMIT injection. There is no need for the DDL endpoint to call
+    // MaterializedViewAnalyzer directly — doing so would duplicate the validation and
+    // create a code path that drifts from the JSON /tables endpoint over time.
+    validateTableConfig(schemaForValidation, create.getTableConfig());
+    PinotTableRestletResource.tableTasksValidation(create.getTableConfig(), _pinotHelixTaskResourceManager);
+
+    if (dryRun) {
+      response.setMessage("Dry run: validated CREATE MATERIALIZED VIEW without persisting.");
+      return Response.ok(response).build();
+    }
+
+    try {
+      if (!schemaPreexisted) {
+        _pinotHelixResourceManager.addSchema(create.getSchema(), false, false);
+      }
+      _pinotHelixResourceManager.addTable(create.getTableConfig());
+    } catch (TableAlreadyExistsException e) {
+      Response noOp = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response);
+      if (noOp != null) {
+        return noOp;
+      }
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+    } catch (SchemaAlreadyExistsException e) {
+      // Schema-create race: another writer beat us. Validate-then-retry against the raced
+      // schema, mirroring the CREATE TABLE recovery path so the two endpoints behave the same
+      // under concurrent provisioning.
+      return retryCreateMaterializedViewAfterSchemaRace(create, response, schemaName,
+          tableNameWithType, e);
+    } catch (Exception e) {
+      // Same intentional decision as CREATE TABLE: do not roll back the schema on a generic
+      // addTable failure. A concurrent sibling CREATE may already be reusing the schema and
+      // a non-atomic orphan-check + deleteSchema would race with it. Operators can DELETE
+      // stale schemas explicitly via /schemas.
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to create materialized view " + tableNameWithType + ": " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+
+    response.setMessage("Successfully created materialized view " + tableNameWithType);
+    LOGGER.info("DDL created materialized view {}", tableNameWithType);
+    return Response.status(Response.Status.CREATED).entity(response).build();
+  }
+
+  private Response retryCreateMaterializedViewAfterSchemaRace(CompiledCreateMaterializedView create,
+      DdlExecutionResponse response, String schemaName, String tableNameWithType,
+      SchemaAlreadyExistsException schemaFailure) {
+    Response noOp = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response);
+    if (noOp != null) {
+      return noOp;
+    }
+    Schema racedSchema = _pinotHelixResourceManager.getSchema(schemaName);
+    if (racedSchema == null) {
+      throw new ControllerApplicationException(LOGGER, schemaFailure.getMessage(), Response.Status.CONFLICT,
+          schemaFailure);
+    }
+    String mismatch = describeColumnShapeMismatch(racedSchema, create.getSchema());
+    if (mismatch != null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema '" + schemaName + "' was concurrently created and does not match the column list in the DDL: "
+              + mismatch,
+          Response.Status.CONFLICT, schemaFailure);
+    }
+    response.setSchema(toJson(racedSchema));
+    validateTableConfig(racedSchema, create.getTableConfig());
+    PinotTableRestletResource.tableTasksValidation(create.getTableConfig(), _pinotHelixTaskResourceManager);
+    try {
+      _pinotHelixResourceManager.addTable(create.getTableConfig());
+    } catch (TableAlreadyExistsException e) {
+      Response noOp2 = mvIfNotExistsNoOpResponse(create.isIfNotExists(), tableNameWithType, schemaName, response);
+      if (noOp2 != null) {
+        return noOp2;
+      }
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to create materialized view " + tableNameWithType
+              + " after concurrent schema create: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+    response.setMessage("Successfully created materialized view " + tableNameWithType);
+    LOGGER.info("DDL created materialized view {} after concurrent schema create", tableNameWithType);
+    return Response.status(Response.Status.CREATED).entity(response).build();
+  }
+
+  /// Overload: takes an already-fetched [TableConfig] (the fast-path pre-check has it in
+  /// hand) and only re-fetches the schema. Avoids a redundant ZK read while preserving the
+  /// "echo persisted, not client-attempted" contract documented on the other overload.
+  private void populateNoOpResponseFromPersisted(DdlExecutionResponse response,
+      TableConfig persistedTableConfig, String schemaName) {
+    if (persistedTableConfig != null) {
+      response.setTableConfig(toJson(persistedTableConfig));
+    }
+    Schema persistedSchema = _pinotHelixResourceManager.getSchema(schemaName);
+    if (persistedSchema != null) {
+      response.setSchema(toJson(persistedSchema));
+    }
+  }
+
+  /// Rewrites `response.tableConfig` and `response.schema` to reflect what is currently
+  /// persisted in Helix/ZK rather than what the client submitted. Without this rewrite, a
+  /// `CREATE MATERIALIZED VIEW IF NOT EXISTS` that lands on an existing MV returns 200 with
+  /// the client-attempted body echoed back — leading an operator running an idempotent
+  /// deployment script to believe their drifted body was applied when in fact the persisted
+  /// MV is unchanged. If either ZK read returns null (transient blip, raced DROP, etc.) the
+  /// corresponding response field is left as-is so the operator never sees an empty payload.
+  private void populateNoOpResponseFromPersisted(DdlExecutionResponse response,
+      String tableNameWithType, String schemaName) {
+    populateNoOpResponseFromPersisted(response,
+        _pinotHelixResourceManager.getTableConfig(tableNameWithType), schemaName);
+  }
+
+  /// CREATE MATERIALIZED VIEW IF NOT EXISTS no-op helper for `addTable` retry catches. Returns
+  /// a 200 response built from the already-persisted state when the raced table at this name
+  /// is itself an MV. Returns null when `ifNotExists` is false, when no config is present, or
+  /// when a non-MV plain OFFLINE table raced in (in which case the caller must throw CONFLICT
+  /// rather than silently report success). Centralizes the three identical retry checks
+  /// (`executeCreateMaterializedView` main path, schema-race retry, and inner addTable retry).
+  @Nullable
+  private Response mvIfNotExistsNoOpResponse(boolean ifNotExists, String tableNameWithType,
+      String schemaName, DdlExecutionResponse response) {
+    if (!ifNotExists) {
+      return null;
+    }
+    TableConfig raced = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (raced == null || !raced.isMaterializedView()) {
+      return null;
+    }
+    populateNoOpResponseFromPersisted(response, tableNameWithType, schemaName);
+    response.setMessage("Materialized view " + tableNameWithType
+        + " already exists; CREATE IF NOT EXISTS is a no-op.");
+    return Response.ok(response).build();
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Table DDL: DROP TABLE
   // -------------------------------------------------------------------------------------------
 
   private DdlExecutionResponse executeDrop(CompiledDropTable drop, String database, boolean dryRun,
@@ -612,6 +963,28 @@ public class PinotDdlRestletResource {
         .setTableType(drop.getTableType() == null ? null : drop.getTableType().toString())
         .setDeletedTables(targets);
 
+    // Q2=B contract enforcement (mirror of `executeShowCreate`): the user wrote `DROP TABLE`
+    // but the target is actually a materialized view. The two DROP forms are strictly
+    // partitioned by underlying TableConfig shape — silently allowing this would mean
+    // operators could destroy an MV with a copy/paste of a vanilla `DROP TABLE` from a
+    // sibling-table runbook, with no syntactic signal that they were dropping a derived
+    // asset (and, in the future, cascading dependent views). Returning 400 with a pointer at
+    // the correct form forces an explicit acknowledgement that the target is an MV.
+    //
+    // Important: the check happens BEFORE the IF EXISTS short-circuit above resolves to a
+    // no-op for a missing target — `targets` is non-empty here, so we know at least one
+    // candidate table really exists, and we can compare its shape against the requested form.
+    for (String target : targets) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(target);
+      if (tableConfig != null && tableConfig.isMaterializedView()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Table " + target + " is a materialized view. "
+                + "Use 'DROP MATERIALIZED VIEW " + fullyQualifiedRaw
+                + "' to drop it.",
+            Response.Status.BAD_REQUEST);
+      }
+    }
+
     // Reject drop if any target is referenced by a logical table, matching the safeguard in
     // the existing /tables and /tableConfigs DELETE endpoints.
     assertNoLogicalTableReferences(targets);
@@ -625,8 +998,9 @@ public class PinotDdlRestletResource {
     List<String> dropped = new ArrayList<>();
     for (String target : targets) {
       boolean tasksCleaned = false;
+      TaskCleanupRestorer restorer = null;
       try {
-        cleanupTableTasksBeforeDrop(target);
+        restorer = cleanupTableTasksBeforeDrop(target);
         tasksCleaned = true;
         // deleteTable(rawName, type, retention) takes the raw name and re-derives the typed
         // name internally via TableNameBuilder.forType(type).tableNameWithType(rawName); see
@@ -637,9 +1011,15 @@ public class PinotDdlRestletResource {
         dropped.add(target);
         LOGGER.info("DDL dropped table {}", target);
       } catch (ControllerApplicationException e) {
+        if (restorer != null && restorer.restore()) {
+          tasksCleaned = false;
+        }
         LOGGER.warn("DROP TABLE on {} failed: {}", target, e.getMessage());
         throw dropFailed(target, dropped, tasksCleaned, e.getResponse().getStatus(), e);
       } catch (Exception e) {
+        if (restorer != null && restorer.restore()) {
+          tasksCleaned = false;
+        }
         LOGGER.warn("DROP TABLE on {} failed unexpectedly: {}", target, e.toString());
         throw dropFailed(target, dropped, tasksCleaned,
             Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
@@ -653,6 +1033,148 @@ public class PinotDdlRestletResource {
     response.setMessage("Dropped " + dropped.size() + " table metadata target(s).");
     LOGGER.info("DDL dropped tables {}", dropped);
     return response;
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Materialized View DDL: DROP MATERIALIZED VIEW
+  // -------------------------------------------------------------------------------------------
+
+  /// Drops a materialized view. MVs are always realized as OFFLINE Pinot tables (the grammar
+  /// has no `TYPE` clause for this form, see `SqlPinotDrop`), so the resolve step skips the
+  /// dual-variant handshake that [#executeDrop] needs.
+  ///
+  /// Q2=B contract: this form refuses any target whose TableConfig is **not** an MV (no
+  /// `task.MaterializedViewTask.definedSQL` marker), even under `IF EXISTS`. We deliberately do
+  /// NOT collapse a type-mismatched target to a 200 no-op: `IF EXISTS` exists to make repeated
+  /// runs of an idempotent provisioning script tolerate "already gone" — not to silently accept
+  /// a name that resolves to a different kind of object. Returning 200 in that case would
+  /// silently leave a plain table in place that the operator expected to be either an MV or
+  /// missing; surfacing 400 forces them to inspect the cluster before acting.
+  ///
+  /// Cleanup is delegated entirely to [PinotHelixResourceManager#deleteTable], which already
+  /// (a) blocks the drop when other MVs depend on this base/MV (matching the legacy
+  /// `DELETE /materializedViews/{name}` endpoint), (b) removes the MV definition and runtime
+  /// znodes via `MaterializedViewDefinitionMetadataUtils.delete` /
+  /// `MaterializedViewRuntimeMetadataUtils.delete`, and (c) unregisters from the consistency
+  /// manager. Adding any of those steps here would be a maintenance hazard (two doors, one
+  /// state machine, drift over time).
+  private DdlExecutionResponse executeDropMaterializedView(CompiledDropMaterializedView drop,
+      String database, boolean dryRun, HttpHeaders headers, Request httpRequest) {
+    String dottedRaw = drop.getDatabaseName() == null
+        ? drop.getRawTableName()
+        : drop.getDatabaseName() + "." + drop.getRawTableName();
+    String fullyQualifiedRaw = translateTableNameForDdl(dottedRaw, headers);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(fullyQualifiedRaw);
+
+    // Authorize BEFORE existence-revealing branches so 403 and 404 are indistinguishable to an
+    // unauthorized caller — same pattern as executeDrop / executeShowCreate. MVs reuse the
+    // regular table DELETE permission because MV-as-OFFLINE-table is the underlying realization
+    // model and operators already authorized to delete tables should be able to delete MVs.
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, httpRequest, headers,
+        AccessType.DELETE, Actions.Table.DELETE_TABLE, _accessControlFactory, LOGGER);
+
+    boolean exists = _pinotHelixResourceManager.hasTable(tableNameWithType)
+        || _pinotHelixResourceManager.getTableConfig(tableNameWithType) != null;
+
+    DdlExecutionResponse response = new DdlExecutionResponse()
+        .setOperation(DdlOperation.DROP_MATERIALIZED_VIEW)
+        .setDryRun(dryRun)
+        .setDatabaseName(database)
+        .setTableName(tableNameWithType)
+        .setTableType(TableType.OFFLINE.toString())
+        .setIfExists(drop.isIfExists());
+
+    if (!exists) {
+      if (drop.isIfExists()) {
+        return response
+            .setDeletedTables(Collections.emptyList())
+            .setMessage("No matching materialized view to drop; IF EXISTS satisfied.");
+      }
+      throw new ControllerApplicationException(LOGGER,
+          "Materialized view not found: " + fullyQualifiedRaw,
+          Response.Status.NOT_FOUND);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      // hasTable was true but the config disappeared between the two reads. Same diagnosis as
+      // the SHOW CREATE path: ZK torn write or concurrent delete. Surface as 500 so monitoring
+      // catches the inconsistency.
+      throw new ControllerApplicationException(LOGGER,
+          "Table " + tableNameWithType + " has IdealState but no TableConfig in ZK; "
+              + "possible torn write or concurrent delete.",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    // Q2=B contract enforcement: a plain OFFLINE table is not an MV. We refuse to drop it
+    // through this form because the request explicitly said "MATERIALIZED VIEW" — silently
+    // accepting plain-table drops here would make the two DROP forms interchangeable, the same
+    // pitfall the SHOW CREATE Q2=B prevents on the read side. We refuse even under IF EXISTS
+    // for the reason called out in the Javadoc above.
+    if (!tableConfig.isMaterializedView()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table " + tableNameWithType + " is not a materialized view. "
+              + "Use 'DROP TABLE " + fullyQualifiedRaw + "' to drop it.",
+          Response.Status.BAD_REQUEST);
+    }
+
+    List<String> targets = Collections.singletonList(tableNameWithType);
+
+    // Reuse the same logical-table and active-task safeguards as executeDrop. An MV is realized
+    // as an OFFLINE table, so it is reachable from a logical-table union and may be a target of
+    // active MaterializedViewTask runs; the two checks apply for the same reasons.
+    assertNoLogicalTableReferences(targets);
+    assertNoActiveTasksBeforeDrop(targets);
+
+    if (dryRun) {
+      return response
+          .setDeletedTables(targets)
+          .setMessage("Dry run: would drop materialized view " + tableNameWithType + ".");
+    }
+
+    boolean tasksCleaned = false;
+    TaskCleanupRestorer restorer = null;
+    try {
+      restorer = cleanupTableTasksBeforeDrop(tableNameWithType);
+      tasksCleaned = true;
+      // deleteTable already handles MV znode cleanup (definition + runtime) and consistency-
+      // manager unregister; see PinotHelixResourceManager.deleteTable for the full flow. Pass
+      // the raw DB-qualified name + explicit OFFLINE type so the call is unambiguous.
+      _pinotHelixResourceManager.deleteTable(fullyQualifiedRaw, TableType.OFFLINE, null);
+      LOGGER.info("DDL dropped materialized view {}", tableNameWithType);
+    } catch (ControllerApplicationException e) {
+      if (restorer != null && restorer.restore()) {
+        tasksCleaned = false;
+      }
+      LOGGER.warn("DROP MATERIALIZED VIEW on {} failed: {}", tableNameWithType, e.getMessage());
+      throw dropFailed(tableNameWithType, Collections.emptyList(), tasksCleaned,
+          e.getResponse().getStatus(), e);
+    } catch (IllegalStateException e) {
+      // Thrown by deleteTable when a dependent MV blocks the delete (matches the legacy
+      // DELETE /materializedViews/{name} contract). Surface as 409 so the caller sees the same
+      // status code that endpoint returns for the same condition.
+      if (restorer != null && restorer.restore()) {
+        tasksCleaned = false;
+      }
+      LOGGER.warn("DROP MATERIALIZED VIEW on {} blocked: {}", tableNameWithType, e.getMessage());
+      throw dropFailed(tableNameWithType, Collections.emptyList(), tasksCleaned,
+          Response.Status.CONFLICT.getStatusCode(), e);
+    } catch (Exception e) {
+      if (restorer != null && restorer.restore()) {
+        tasksCleaned = false;
+      }
+      LOGGER.warn("DROP MATERIALIZED VIEW on {} failed unexpectedly: {}",
+          tableNameWithType, e.toString());
+      throw dropFailed(tableNameWithType, Collections.emptyList(), tasksCleaned,
+          Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), e);
+    }
+
+    // Schema is intentionally NOT deleted, matching the DROP TABLE contract and the legacy
+    // DELETE /materializedViews/{name} endpoint. A caller who wants to remove the schema can
+    // issue an explicit DELETE /schemas/{name} afterwards.
+    return response
+        .setDeletedTables(targets)
+        .setMessage("Dropped materialized view " + tableNameWithType + ".");
   }
 
   /// Rejects the DROP when any target physical table is currently referenced by a logical table.
@@ -711,11 +1233,15 @@ public class PinotDdlRestletResource {
     }
   }
 
-  private void cleanupTableTasksBeforeDrop(String tableWithType)
+  /// Removes task schedules + completed task entities ahead of a DROP. Returns a token the
+  /// caller can use to restore schedules if the subsequent `deleteTable` call rejects the
+  /// drop (e.g. blocked by a dependent MV). Returns null if nothing was changed.
+  @Nullable
+  private TaskCleanupRestorer cleanupTableTasksBeforeDrop(String tableWithType)
       throws Exception {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableWithType);
     if (tableConfig == null || tableConfig.getTaskConfig() == null) {
-      return;
+      return null;
     }
     Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
     Set<String> taskTypes = new HashSet<>(taskTypeConfigsMap.keySet());
@@ -755,6 +1281,34 @@ public class PinotDdlRestletResource {
         }
       }
       throw e;
+    }
+    return schedulesPersisted ? new TaskCleanupRestorer(tableWithType, tableConfig, removedSchedules) : null;
+  }
+
+  /// Captures the state needed to undo `cleanupTableTasksBeforeDrop` if a downstream
+  /// `deleteTable` rejects the drop (e.g. dependent MV blocks deletion).
+  private final class TaskCleanupRestorer {
+    private final String _tableWithType;
+    private final TableConfig _tableConfig;
+    private final Map<String, String> _removedSchedules;
+
+    TaskCleanupRestorer(String tableWithType, TableConfig tableConfig, Map<String, String> removedSchedules) {
+      _tableWithType = tableWithType;
+      _tableConfig = tableConfig;
+      _removedSchedules = removedSchedules;
+    }
+
+    /// Returns true iff the restore succeeded; callers use this to decide whether the
+    /// "schedules need manual restoration" hint should still appear in the error response.
+    boolean restore() {
+      try {
+        restoreTaskSchedules(_tableWithType, _tableConfig, _removedSchedules);
+        return true;
+      } catch (ControllerApplicationException restoreFailure) {
+        LOGGER.warn("DROP TABLE on {} could not restore task schedules after deleteTable rejected the drop: {}",
+            _tableWithType, restoreFailure.getMessage());
+        return false;
+      }
     }
   }
 
@@ -848,11 +1402,17 @@ public class PinotDdlRestletResource {
   }
 
   // -------------------------------------------------------------------------------------------
-  // SHOW
+  // SHOW sections begin here.
+  //
+  // Physical section order in this file is historical (CREATE → DROP → SHOW). The canonical
+  // logical grouping — mirrored by `DdlOperation`, `executeDdl`'s switch above, and
+  // `DESIGN.md` §3/§4 — is Catalog → Table → Materialized View, lifecycle CREATE → SHOW CREATE
+  // → DROP inside each object-level family. Banner prefixes on every section below name the
+  // family explicitly so navigation by section is unambiguous regardless of physical position.
   // -------------------------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------------------------
-  // SHOW CREATE TABLE
+  // Table DDL: SHOW CREATE TABLE
   // -------------------------------------------------------------------------------------------
 
   private DdlExecutionResponse executeShowCreate(CompiledShowCreateTable show, String database,
@@ -925,6 +1485,27 @@ public class PinotDdlRestletResource {
               + "possible torn write or concurrent delete.",
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+
+    // Q2=B contract enforcement: an MV-backed OFFLINE table must be inspected via
+    // `SHOW CREATE MATERIALIZED VIEW`, not `SHOW CREATE TABLE`. The two emit different DDL
+    // (CREATE MATERIALIZED VIEW vs CREATE TABLE) and silently emitting the wrong header would
+    // produce DDL that, when replayed, recreates the MV as a plain table (the parser refuses
+    // to compile `CREATE TABLE` with an `AS <query>` clause, so the round-trip would simply
+    // fail at apply-time — long after the operator copied the wrong text). 400 here points
+    // the caller at the correct form before they can act on the misleading output.
+    //
+    // The check delegates to the canonical `TableConfig#isMaterializedView` flag (single source
+    // of truth per PR #18564) — the same predicate the emitter dispatches on — so a config that
+    // the SHOW CREATE TABLE path would have routed through the MV branch anyway is caught here
+    // before any rendering happens.
+    if (tableConfig != null && tableConfig.isMaterializedView()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table " + tableNameWithType + " is a materialized view. "
+              + "Use 'SHOW CREATE MATERIALIZED VIEW " + fullyQualifiedRaw
+              + "' to render its canonical DDL.",
+          Response.Status.BAD_REQUEST);
+    }
+
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
     if (schema == null) {
       // Unlike a missing TableConfig (which would indicate a torn-write inconsistency since
@@ -974,6 +1555,110 @@ public class PinotDdlRestletResource {
         .setMessage("Rendered canonical CREATE TABLE for " + tableNameWithType + ".");
   }
 
+  // -------------------------------------------------------------------------------------------
+  // Materialized View DDL: SHOW CREATE MATERIALIZED VIEW
+  // -------------------------------------------------------------------------------------------
+
+  /// Renders canonical DDL for a materialized view. MVs are always backed by an OFFLINE Pinot
+  /// table (the grammar has no `TYPE` clause for this form, see `SqlPinotShow`), so the resolve
+  /// step skips the dual-variant handshake that [#executeShowCreate] needs.
+  ///
+  /// Symmetric guard to the Q2=B enforcement on the regular `SHOW CREATE TABLE` path: a
+  /// `SHOW CREATE MATERIALIZED VIEW` against a plain OFFLINE table — i.e. a config whose
+  /// canonical `isMaterializedView` flag is false (per PR #18564) — is a 400. We do not
+  /// silently fall back to the table emitter because the caller asked for the MV view of the
+  /// world; returning a `CREATE TABLE` statement in response would mislead any tooling that
+  /// compares the response DDL header against the request.
+  private DdlExecutionResponse executeShowCreateMaterializedView(
+      CompiledShowCreateMaterializedView show, String database, HttpHeaders headers,
+      Request httpRequest) {
+    String dottedRaw = show.getDatabaseName() == null
+        ? show.getRawTableName()
+        : show.getDatabaseName() + "." + show.getRawTableName();
+    String fullyQualifiedRaw = translateTableNameForDdl(dottedRaw, headers);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(fullyQualifiedRaw);
+
+    // Authorize before any existence check so 403 and 404 are indistinguishable to an
+    // unauthorized caller (same pattern as executeShowCreate). MVs reuse the regular
+    // table READ permission for the same reason CREATE_MATERIALIZED_VIEW reuses CREATE_TABLE:
+    // an MV is realized as an OFFLINE Pinot table, and operators already authorized to inspect
+    // tables should be able to inspect MVs through this dedicated form without an additional
+    // grant.
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, httpRequest, headers,
+        AccessType.READ, Actions.Table.GET_TABLE_CONFIG, _accessControlFactory, LOGGER);
+
+    if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Materialized view not found: " + fullyQualifiedRaw,
+          Response.Status.NOT_FOUND);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table " + tableNameWithType + " has IdealState but no TableConfig in ZK; "
+              + "possible torn write or concurrent delete.",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    // Q2=B mirror: refuse the MV form for a plain OFFLINE table. The error is symmetric to the
+    // one `executeShowCreate` throws when handed an MV — together they keep the two DDL forms
+    // strictly partitioned by what the underlying TableConfig actually is.
+    //
+    // A previous version of this method also handled the "MaterializedViewTask block present
+    // but definedSQL missing" corrupted shape with a distinct 400 / fix hint. That state is no
+    // longer reachable for any persisted config: the SPI invariant introduced in PR #18564
+    // (TableConfigUtils#validateMaterializedViewInvariants) rejects it at addTable / updateTable
+    // time, and the canonical isMaterializedView flag — not the task block — is the identity
+    // source. Anything still failing this branch is a plain table that was never an MV.
+    if (!tableConfig.isMaterializedView()) {
+      throw new ControllerApplicationException(LOGGER,
+          "Table " + tableNameWithType + " is not a materialized view. "
+              + "Use 'SHOW CREATE TABLE " + fullyQualifiedRaw + "' to render its canonical DDL.",
+          Response.Status.BAD_REQUEST);
+    }
+
+    Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+    if (schema == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema '" + tableNameWithType
+              + "' not found; SHOW CREATE MATERIALIZED VIEW requires the schema to exist. "
+              + "Re-create it via POST /schemas if it was deleted.",
+          Response.Status.NOT_FOUND);
+    }
+
+    String ddl;
+    try {
+      ddl = CanonicalDdlEmitter.emit(schema, tableConfig, database);
+    } catch (IllegalArgumentException e) {
+      // IllegalArgumentException from the MV branch of CanonicalDdlEmitter covers the
+      // caller-actionable failure modes: non-round-trippable cron schedule (Q1=A —
+      // a hand-typed cron that `cronToPeriod` cannot invert), schema/config columns the
+      // grammar cannot express, or PROPERTIES collisions. All are 400.
+      throw new ControllerApplicationException(LOGGER,
+          "SHOW CREATE MATERIALIZED VIEW is not supported for " + tableNameWithType
+              + ": " + e.getMessage(),
+          Response.Status.BAD_REQUEST, e);
+    } catch (RuntimeException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Internal error rendering SHOW CREATE MATERIALIZED VIEW for " + tableNameWithType
+              + ": " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+
+    return new DdlExecutionResponse()
+        .setOperation(DdlOperation.SHOW_CREATE_MATERIALIZED_VIEW)
+        .setDatabaseName(database)
+        .setTableName(tableNameWithType)
+        .setTableType(TableType.OFFLINE.toString())
+        .setDdl(ddl)
+        .setMessage("Rendered canonical CREATE MATERIALIZED VIEW for " + tableNameWithType + ".");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Catalog DDL: SHOW TABLES
+  // -------------------------------------------------------------------------------------------
+
   private DdlExecutionResponse executeShow(String database, HttpHeaders headers, Request httpRequest) {
     // SHOW TABLES is scoped to a single database to prevent silently leaking table names across
     // databases the caller may not have access to. The database resolution chain (SQL FROM
@@ -997,6 +1682,46 @@ public class PinotDdlRestletResource {
         .setDatabaseName(scopedDatabase)
         .setTableNames(tables)
         .setMessage("Found " + tables.size() + " table(s).");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Catalog DDL: SHOW MATERIALIZED VIEWS
+  // -------------------------------------------------------------------------------------------
+
+  private DdlExecutionResponse executeShowMaterializedViews(String database, HttpHeaders headers,
+      Request httpRequest) {
+    // Same database-scoping convention as SHOW TABLES: SQL `FROM db` -> Database header ->
+    // DEFAULT_DATABASE. A scoped listing prevents silently leaking MV names across databases
+    // the caller may not have access to.
+    String scopedDatabase = database == null ? CommonConstants.DEFAULT_DATABASE : database;
+    // Authorization parity with SHOW TABLES and the existing GET /materializedViews REST: an
+    // MV is physically an OFFLINE table, so the cluster-level GET_TABLE action is the
+    // appropriate scope. Introducing a new `GET_MATERIALIZED_VIEW` action would split the
+    // listing auth surface for what is the same underlying read, and would also diverge from
+    // the existing REST endpoint without a behaviour change to justify it.
+    String endpointUrl = httpRequest.getRequestURL().toString();
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(null, AccessType.READ, headers, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(headers, TargetType.CLUSTER, scopedDatabase,
+        Actions.Cluster.GET_TABLE)) {
+      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
+    }
+    // The lister returns raw names (no `_OFFLINE` suffix) — matching SHOW TABLES and the MV
+    // DDL input surface (CREATE / SHOW CREATE / DROP MATERIALIZED VIEW all take raw names
+    // because the MV form has no TYPE clause). Returning suffixed names here would mean the
+    // listing output could not be copy-pasted back into any other MV DDL.
+    //
+    // NOTE: An MV may also appear in SHOW TABLES because the underlying TableConfig is an
+    // OFFLINE resource. The two listings are intentionally not mutually exclusive — SHOW
+    // TABLES has always returned every OFFLINE/REALTIME resource, and we preserve that
+    // contract rather than mutate the meaning of SHOW TABLES post-merge.
+    List<String> materializedViews =
+        _pinotHelixResourceManager.getAllRawMaterializedViewNames(scopedDatabase);
+    return new DdlExecutionResponse()
+        .setOperation(DdlOperation.SHOW_MATERIALIZED_VIEWS)
+        .setDatabaseName(scopedDatabase)
+        .setTableNames(materializedViews)
+        .setMessage("Found " + materializedViews.size() + " materialized view(s).");
   }
 
   // -------------------------------------------------------------------------------------------

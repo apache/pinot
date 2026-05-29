@@ -166,6 +166,7 @@ import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
 import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataBuilder;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
@@ -889,6 +890,58 @@ public class PinotHelixResourceManager {
     return getAllResources().stream().filter(
         resourceName -> TableNameBuilder.isTableResource(resourceName) && DatabaseUtils.isPartOfDatabase(resourceName,
             databaseName)).map(TableNameBuilder::extractRawTableName).distinct().collect(Collectors.toList());
+  }
+
+  /**
+   * Get all raw materialized view names from provided database name. Backs
+   * {@code SHOW MATERIALIZED VIEWS [FROM db]}.
+   *
+   * <p>Identity is decided by {@link org.apache.pinot.spi.config.table.TableConfig#isMaterializedView()},
+   * the canonical MV flag (PR #18564), rather than by inferring MV-ness from the presence of a
+   * {@code MaterializedViewTask} block. Reading the flag from TableConfig keeps this listing
+   * aligned with every other MV-aware code site in the controller and surfaces corruption
+   * (e.g. a definition znode that was created without its TableConfig) instead of hiding it.
+   *
+   * <p>An MV is always realized as an OFFLINE physical table, so only OFFLINE resources are
+   * considered; REALTIME resources are skipped without a ZK round-trip. Resources whose
+   * TableConfig fetch fails or returns null are dropped silently — a single corrupted znode
+   * must not break the entire listing for an operator running SHOW MATERIALIZED VIEWS to
+   * diagnose cluster state.
+   *
+   * <p>Returned names are raw (no {@code _OFFLINE} suffix), matching {@link #getAllRawTables}
+   * so callers can pipe the result directly into {@code SHOW CREATE MATERIALIZED VIEW} or
+   * {@code DROP MATERIALIZED VIEW} (neither of which accepts a type suffix).
+   *
+   * @param databaseName database name; {@code null} returns MVs from every database (callers
+   *                     scoping by database should pass an explicit name).
+   * @return List of raw materialized view names in the provided database, in resource-iteration
+   *         order; deduplicated by raw name.
+   */
+  public List<String> getAllRawMaterializedViewNames(@Nullable String databaseName) {
+    return getAllResources().stream()
+        .filter(TableNameBuilder::isOfflineTableResource)
+        .filter(resourceName -> DatabaseUtils.isPartOfDatabase(resourceName, databaseName))
+        .filter(this::isMaterializedViewResource)
+        .map(TableNameBuilder::extractRawTableName)
+        .distinct()
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Returns true iff {@code tableNameWithType} is an OFFLINE resource whose stored TableConfig
+   * has {@code isMaterializedView=true}. Returns false (rather than throwing) when the
+   * TableConfig is missing or the read fails — the caller is a best-effort listing that must
+   * tolerate a single broken znode without aborting.
+   */
+  private boolean isMaterializedViewResource(String tableNameWithType) {
+    try {
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      return tableConfig != null && tableConfig.isMaterializedView();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read TableConfig for {} while filtering MVs; treating as non-MV",
+          tableNameWithType, e);
+      return false;
+    }
   }
 
   /**
@@ -2052,6 +2105,13 @@ public class PinotHelixResourceManager {
       return is;
     });
     _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
+    // Persist the MV definition znode BEFORE notify so the consistency manager registration
+    // below reads the authoritative `baseTables` list rather than relying on its
+    // `extractSourceTableName(definedSQL)` fallback. The write is best-effort: a transient
+    // ZK glitch must not undo a successfully created table, and the notify fallback path
+    // remains correct because every MV that reaches this method has already passed
+    // `MaterializedViewAnalyzer.analyze` (single-FROM, simple-name source).
+    persistMaterializedViewDefinitionMetadataBestEffort(tableConfig);
     notifyMaterializedViewConsistencyManagerForTableCreate(tableConfig);
     LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
   }
@@ -5386,6 +5446,254 @@ public class PinotHelixResourceManager {
 
   // ── MV Consistency Manager helpers ──
 
+  /// Persists [MaterializedViewDefinitionMetadata] to ZooKeeper for an MV table at create
+  /// time so [#notifyMaterializedViewConsistencyManagerForTableCreate] can register the MV
+  /// against the authoritative `baseTables` list rather than depending on its `definedSQL`
+  /// re-parse fallback. The scheduler's cold-start path will also find the znode and skip
+  /// its own lazy initialisation (see
+  /// [org.apache.pinot.materializedview.scheduler.MaterializedViewTaskScheduler#getWatermarkMs]).
+  ///
+  /// Write semantics:
+  ///
+  ///   - **Best-effort**: this runs after the table is otherwise fully set up
+  ///       (TableConfig persisted, ideal state assigned, BrokerResource updated). Throwing
+  ///       here would leave the cluster in a half-committed state — the table is already
+  ///       visible to brokers and the rollback handler at the top of `addTable` has been
+  ///       passed. Any exception is logged at WARN and we continue; the notify path's
+  ///       `extractSourceTableName` fallback keeps registration correct.
+  ///   - **`createIfAbsent`**: an existing znode from a prior scheduler cold-start or a
+  ///       prior CREATE retry is left in place. The scheduler's createIfAbsent uses the same
+  ///       contract, and the
+  ///       [MaterializedViewDefinitionMetadataBuilder] produces byte-identical content for
+  ///       the same MV, so an existing znode is by construction equivalent to what we would
+  ///       write.
+  ///   - **Non-MV tables**: early-returns without any ZK round-trips.
+  private void persistMaterializedViewDefinitionMetadataBestEffort(TableConfig tableConfig) {
+    if (!tableConfig.isMaterializedView()) {
+      return;
+    }
+    String tableNameWithType = tableConfig.getTableName();
+    try {
+      Map<String, String> taskConfigs = tableConfig.getMaterializedViewTaskConfigs();
+      if (taskConfigs == null) {
+        LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
+            tableNameWithType);
+        return;
+      }
+      String definedSql = taskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+      if (definedSql == null || definedSql.isEmpty()) {
+        LOGGER.warn("MV table {} has no definedSQL; skipping definition metadata persist", tableNameWithType);
+        return;
+      }
+      // The source table name MUST be a simple identifier — `MaterializedViewAnalyzer` rejects
+      // anything else at validate time, so this call is safe for any MV that reached addTable.
+      String sourceRawTableName = MaterializedViewAnalyzer.extractSourceTableName(definedSql);
+
+      String sourceTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(sourceRawTableName);
+      TableConfig sourceTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, sourceTableWithType);
+      if (sourceTableConfig == null) {
+        sourceTableWithType = TableNameBuilder.REALTIME.tableNameWithType(sourceRawTableName);
+        sourceTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, sourceTableWithType);
+      }
+      if (sourceTableConfig == null) {
+        LOGGER.warn("MV table {} source table '{}' not found in OFFLINE or REALTIME variants; "
+            + "skipping definition metadata persist", tableNameWithType, sourceRawTableName);
+        return;
+      }
+      Schema sourceSchema = ZKMetadataProvider.getSchema(_propertyStore, sourceRawTableName);
+      if (sourceSchema == null) {
+        LOGGER.warn("MV table {} source table '{}' has no schema; skipping definition metadata persist",
+            tableNameWithType, sourceRawTableName);
+        return;
+      }
+      String viewRawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      Schema viewSchema = ZKMetadataProvider.getSchema(_propertyStore, viewRawTableName);
+      if (viewSchema == null) {
+        LOGGER.warn("MV table {} has no schema; skipping definition metadata persist", tableNameWithType);
+        return;
+      }
+
+      // partitionExprMaps comes from analyzer post-validation; we re-extract from the
+      // already-validated definedSQL + viewSchema, which is cheap (single Calcite parse).
+      Map<String, String> partitionExprMaps =
+          MaterializedViewAnalyzer.extractPartitionExprMaps(definedSql, viewSchema);
+
+      MaterializedViewDefinitionMetadata definition = MaterializedViewDefinitionMetadataBuilder.build(
+          tableNameWithType, tableConfig, viewSchema, sourceTableConfig, sourceSchema,
+          sourceRawTableName, definedSql, partitionExprMaps);
+      if (MaterializedViewDefinitionMetadataUtils.createIfAbsent(_propertyStore, definition)) {
+        LOGGER.info("Adding table {}: Persisted MV definition metadata (baseTables={})",
+            tableNameWithType, definition.getBaseTables());
+      } else {
+        LOGGER.info("Adding table {}: MV definition metadata already exists; leaving in place",
+            tableNameWithType);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Adding table {}: Best-effort MV definition metadata persist failed; "
+              + "consistency manager will fall back to extractSourceTableName",
+          tableNameWithType, e);
+    }
+  }
+
+  /// Backfills the {@link MaterializedViewConsistencyManager}'s reverse index against the
+  /// authoritative TableConfig list at controller startup, closing the post-restart orphan
+  /// window for MVs whose definition znode is missing.
+  ///
+  /// <h3>Why this is needed</h3>
+  ///
+  /// The consistency manager's startup `rebuildReverseIndex` only scans existing definition
+  /// znodes, while the in-session {@link #persistMaterializedViewDefinitionMetadataBestEffort}
+  /// is best-effort: a transient ZK failure at create time leaves an MV with
+  /// `tableConfig.isMaterializedView()=true` but no definition znode.  Same controller session
+  /// is fine — {@link #notifyMaterializedViewConsistencyManagerForTableCreate} also
+  /// `extractSourceTableName`-falls back into the in-memory reverse index.  But on restart
+  /// `rebuildReverseIndex` would not see that MV at all, and the {@code DROP TABLE} delete-guard
+  /// (which consults only the in-memory reverse index) would let an operator silently orphan
+  /// the MV by dropping its base table.  The same hole applies to MVs created on a controller
+  /// version older than definition znodes (none ever existed for them) and to znodes lost
+  /// to manual ZK surgery.
+  ///
+  /// <h3>What it does</h3>
+  ///
+  /// Walks {@link #getAllRawMaterializedViewNames} (filtered by
+  /// {@code TableConfig.isMaterializedView()}) and, for every MV missing a definition znode:
+  ///
+  ///   1. Resolves `baseTables` via {@link MaterializedViewAnalyzer#extractSourceTableName} on
+  ///      the persisted `definedSQL` — same fallback used by the in-session create path, so
+  ///      post-restart and same-session reverse indexes are by construction byte-identical.
+  ///   2. Registers the MV with the consistency manager in memory.  Idempotent: the manager
+  ///      dedupes inside {@code onMaterializedViewTableCreated}.
+  ///   3. Best-effort writes the definition znode via
+  ///      {@link #persistMaterializedViewDefinitionMetadataBestEffort} so the next restart
+  ///      doesn't have to backfill again, and so the listener-driven rebuilds stay self-healing.
+  ///
+  /// <h3>Two-phase ordering</h3>
+  ///
+  /// In-memory registration runs to completion BEFORE any znode write — phase 2's writes fire
+  /// {@code DefinitionChangeListener.handleChildChange} which clears+rebuilds the reverse index
+  /// from znodes, so kicking off znode writes mid-iteration would race against partially
+  /// rebuilt in-memory state and force MVs with missing source tables out of the index. By
+  /// finishing phase 1 first, even MVs that ultimately can't have their znode written keep the
+  /// in-memory protection until the next listener-driven rebuild (and that rebuild only wipes
+  /// MVs whose source is gone — for which the DROP-base-table orphan path is moot anyway).
+  ///
+  /// <h3>Failure isolation</h3>
+  ///
+  /// Per-MV try/catch.  A single corrupt `definedSQL`, missing source, or ZK glitch logs WARN
+  /// and continues — controller startup must not be held hostage by one broken MV.
+  ///
+  /// <h3>Caller contract</h3>
+  ///
+  /// Must be called exactly once at controller startup, AFTER
+  /// {@link MaterializedViewConsistencyManager#init} and BEFORE
+  /// {@link #registerMaterializedViewConsistencyManager} so the reverse index is fully
+  /// populated before any segment / table notify path can short-circuit on a missing entry.
+  public void backfillMaterializedViewReverseIndex(MaterializedViewConsistencyManager mgr) {
+    if (mgr == null) {
+      return;
+    }
+    List<String> mvRawNames;
+    try {
+      mvRawNames = getAllRawMaterializedViewNames(null);
+    } catch (Exception e) {
+      LOGGER.error("MV reverse-index backfill: failed to enumerate MVs; skipping backfill", e);
+      return;
+    }
+    if (mvRawNames.isEmpty()) {
+      LOGGER.info("MV reverse-index backfill: no MVs in cluster; nothing to do");
+      return;
+    }
+
+    // Phase 1: register every missing-znode MV in memory using the same extractSourceTableName
+    // fallback the in-session create path uses.  No znode writes here, so no listener firings,
+    // so phase 1's in-memory state is fully built before any clear+rebuild can interleave.
+    List<TableConfig> mvsNeedingZnodePersist = new ArrayList<>();
+    int registered = 0;
+    for (String rawName : mvRawNames) {
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawName);
+      try {
+        TableConfig cfg = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        // Defensive re-check — getAllRawMaterializedViewNames already filtered, but the
+        // TableConfig could have flipped (or been deleted) between that scan and here.
+        if (cfg == null || !cfg.isMaterializedView()) {
+          continue;
+        }
+        // Skip MVs whose authoritative definition znode is already present — the manager's
+        // init() already picked them up via rebuildReverseIndex.  Avoid the redundant
+        // in-memory register and the redundant phase-2 znode build.
+        if (MaterializedViewDefinitionMetadataUtils.fetch(_propertyStore, tableNameWithType) != null) {
+          continue;
+        }
+        List<String> baseTables = resolveBaseTablesForBackfill(cfg);
+        if (baseTables == null || baseTables.isEmpty()) {
+          continue;
+        }
+        mgr.onMaterializedViewTableCreated(tableNameWithType, baseTables);
+        mvsNeedingZnodePersist.add(cfg);
+        registered++;
+      } catch (Exception e) {
+        LOGGER.warn("MV reverse-index backfill: failed to register {} in memory; skipping",
+            tableNameWithType, e);
+      }
+    }
+    LOGGER.info("MV reverse-index backfill phase 1: scanned {} MV(s), registered {} missing entries",
+        mvRawNames.size(), registered);
+
+    if (mvsNeedingZnodePersist.isEmpty()) {
+      return;
+    }
+
+    // Phase 2: best-effort persist the definition znode so the next restart doesn't have to
+    // re-backfill, and so MVs whose source is intact transition cleanly to "znode-backed".
+    // persistMaterializedViewDefinitionMetadataBestEffort handles the source-missing /
+    // schema-missing cases internally and is itself try/catch-wrapped, so a single MV's
+    // failure here cannot abort the loop.
+    int znodeAttempted = 0;
+    for (TableConfig cfg : mvsNeedingZnodePersist) {
+      try {
+        persistMaterializedViewDefinitionMetadataBestEffort(cfg);
+        znodeAttempted++;
+      } catch (Exception e) {
+        LOGGER.warn("MV reverse-index backfill: best-effort znode persist threw for {}; continuing",
+            cfg.getTableName(), e);
+      }
+    }
+    LOGGER.info("MV reverse-index backfill phase 2: attempted znode persist for {} MV(s)",
+        znodeAttempted);
+  }
+
+  /// Resolves the {@code baseTables} list for an MV during reverse-index backfill, using the
+  /// same {@link MaterializedViewAnalyzer#extractSourceTableName} fallback as the in-session
+  /// create path so post-restart and same-session reverse indexes are byte-identical.
+  ///
+  /// Returns {@code null} when the MV is not currently registerable (no taskConfigs, no
+  /// `definedSQL`, or unparseable SQL) — the caller logs and skips.  The caller has already
+  /// checked the authoritative znode path; this helper is only the fallback.
+  @Nullable
+  private List<String> resolveBaseTablesForBackfill(TableConfig cfg) {
+    String tableNameWithType = cfg.getTableName();
+    Map<String, String> taskCfg = cfg.getMaterializedViewTaskConfigs();
+    if (taskCfg == null) {
+      LOGGER.warn("MV reverse-index backfill: MV table {} has no MaterializedViewTask config; skipping",
+          tableNameWithType);
+      return null;
+    }
+    String definedSql = taskCfg.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+    if (definedSql == null || definedSql.isEmpty()) {
+      LOGGER.warn("MV reverse-index backfill: MV table {} has no definedSQL; skipping",
+          tableNameWithType);
+      return null;
+    }
+    try {
+      String sourceTable = MaterializedViewAnalyzer.extractSourceTableName(definedSql);
+      return Collections.singletonList(sourceTable);
+    } catch (Exception e) {
+      LOGGER.warn("MV reverse-index backfill: failed to extract source table from definedSQL "
+          + "for MV table {}; skipping", tableNameWithType, e);
+      return null;
+    }
+  }
+
   private void notifyMaterializedViewConsistencyManagerForTableCreate(TableConfig tableConfig) {
     MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
     if (mgr == null || !tableConfig.isMaterializedView()) {
@@ -5431,8 +5739,30 @@ public class PinotHelixResourceManager {
           && !materializedViewDefinition.getBaseTables().isEmpty()) {
         mgr.onMaterializedViewTableDropped(tableNameWithType, materializedViewDefinition.getBaseTables());
       } else if (tableConfig != null && tableConfig.isMaterializedView()) {
-        LOGGER.warn("MV table {} dropped without definition metadata; consistency reverse index may be stale",
-            tableNameWithType);
+        // Definition znode missing but the MV exists — fall back to extractSourceTableName
+        // from the persisted definedSQL, mirroring the symmetric in-session fallback used by
+        // notifyMaterializedViewConsistencyManagerForTableCreate.  Without this, an MV whose
+        // znode persist failed at create time (best-effort path) would be unregisterable on
+        // drop, leaking a ghost reverse-index entry that subsequently blocks legitimate
+        // DROP TABLE on its (now genuinely independent) base table.
+        Map<String, String> mvTaskCfgs = tableConfig.getMaterializedViewTaskConfigs();
+        String definedSqlForDrop = mvTaskCfgs == null
+            ? null : mvTaskCfgs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+        if (definedSqlForDrop != null && !definedSqlForDrop.isEmpty()) {
+          try {
+            String src = MaterializedViewAnalyzer.extractSourceTableName(definedSqlForDrop);
+            mgr.onMaterializedViewTableDropped(tableNameWithType, Collections.singletonList(src));
+            LOGGER.info("MV table {} dropped via definedSQL fallback (definition znode absent)",
+                tableNameWithType);
+            return;
+          } catch (Exception ignore) {
+            // fall through to the warn below — the SQL is unparseable so the in-memory entry
+            // (if any) was registered with a different key and we cannot deterministically
+            // reverse it.  Operator action required.
+          }
+        }
+        LOGGER.warn("MV table {} dropped without recoverable definition; "
+            + "consistency reverse index may be stale", tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.warn("Failed to unregister MV table {} from consistency manager", tableNameWithType, e);

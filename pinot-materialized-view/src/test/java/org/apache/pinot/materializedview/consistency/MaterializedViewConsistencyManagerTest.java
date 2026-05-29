@@ -25,11 +25,15 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
 import org.apache.pinot.materializedview.metadata.PartitionState;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
@@ -37,6 +41,7 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -92,6 +97,13 @@ public class MaterializedViewConsistencyManagerTest {
         MV_TABLE, List.of(BASE_TABLE), "SELECT count(*) FROM baseTable", Map.of(), null);
     when(propertyStore.get(eq(definitionPath), any(), eq(AccessOption.PERSISTENT)))
         .thenReturn(definition.toZNRecord());
+    // rebuildReverseIndex verifies the MV's TableConfig still exists and is an MV; mock a
+    // matching znode so the orphan-skip check doesn't drop this MV.
+    String tableConfigPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(MV_TABLE);
+    TableConfig mvTableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(MV_TABLE).setIsMaterializedView(true).build();
+    when(propertyStore.get(eq(tableConfigPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(mvTableConfig));
 
     MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
         MV_TABLE, 2 * BUCKET_MS,
@@ -120,6 +132,39 @@ public class MaterializedViewConsistencyManagerTest {
         MaterializedViewRuntimeMetadata.fromZNRecord(recordCaptor.getValue());
     assertEquals(updated.getPartitions().get(0L).getState(), PartitionState.STALE);
     assertEquals(updated.getPartitions().get(BUCKET_MS).getState(), PartitionState.VALID);
+  }
+
+  /// Regression: a stale definition znode whose TableConfig was already removed (best-effort
+  /// delete failed mid-DROP) must NOT be re-registered into the reverse index — the rebuild
+  /// path must skip the orphan so DROP-followed-by-CREATE doesn't resurrect a ghost MV.
+  @Test
+  public void testOrphanDefinitionZnodeWithoutTableConfigIsSkipped()
+      throws Exception {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    String definitionParentPath = ZKMetadataProvider.getPropertyStorePathForMaterializedViewDefinitionPrefix();
+    String definitionPath = ZKMetadataProvider.constructPropertyStorePathForMaterializedViewDefinition(MV_TABLE);
+    String tableConfigPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(MV_TABLE);
+    String runtimePath = ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(MV_TABLE);
+
+    when(propertyStore.getChildNames(eq(definitionParentPath), eq(AccessOption.PERSISTENT)))
+        .thenReturn(List.of(MV_TABLE));
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        MV_TABLE, List.of(BASE_TABLE), "SELECT count(*) FROM baseTable", Map.of(), null);
+    when(propertyStore.get(eq(definitionPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(definition.toZNRecord());
+    // TableConfig is gone — the prior DROP succeeded at removing the config but failed the
+    // best-effort znode cleanup, leaving the definition orphaned.
+    when(propertyStore.get(eq(tableConfigPath), any(), eq(AccessOption.PERSISTENT))).thenReturn(null);
+
+    MaterializedViewConsistencyManager manager = new MaterializedViewConsistencyManager();
+    manager.init(propertyStore);
+    // Orphan was skipped, so the reverse index has no mapping for BASE_TABLE; an event for
+    // BASE_TABLE must produce no runtime znode writes.
+    manager.onBaseTableDataChange(BASE_TABLE, 0L, BUCKET_MS - 1);
+    manager.flush(BASE_TABLE);
+    manager.stop();
+    verify(propertyStore, never())
+        .set(eq(runtimePath), any(ZNRecord.class), eq(0), eq(AccessOption.PERSISTENT));
   }
 
   /// Regression test for M1: full-range invalidation must NOT create synthetic STALE entries

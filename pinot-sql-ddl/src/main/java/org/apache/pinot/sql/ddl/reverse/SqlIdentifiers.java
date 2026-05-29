@@ -36,6 +36,13 @@ final class SqlIdentifiers {
       // grammar keywords introduced by Pinot DDL that could appear as user identifiers
       "DIMENSION", "METRIC", "DATETIME", "FORMAT", "GRANULARITY", "OFFLINE", "REALTIME",
       "PROPERTIES", "TABLES", "TABLE_TYPE", "IF", "TYPE", "FROM",
+      // additional keywords introduced by the CREATE / SHOW CREATE / SHOW MATERIALIZED VIEW(S)
+      // grammar. Both `VIEW` (singular, used by CREATE/DROP/SHOW CREATE MATERIALIZED VIEW) and
+      // `VIEWS` (plural, declared as a parser keyword in `pinot-common/.../config.fmpp` for the
+      // catalog-listing verb `SHOW MATERIALIZED VIEWS`) must be quoted: an identifier `views`
+      // would otherwise round-trip into the `VIEWS` token slot and break re-parse the same way
+      // an identifier `tables` collides with `TABLES` (already in this set).
+      "MATERIALIZED", "VIEW", "VIEWS", "REFRESH", "EVERY",
       // standard SQL keywords that round-trip incorrectly when bare
       "TABLE", "CREATE", "DROP", "SHOW", "NOT", "NULL", "DEFAULT", "EXISTS", "AS", "BY",
       "ORDER", "PRIMARY", "KEY", "WITH", "ON", "AND", "OR", "SELECT", "WHERE",
