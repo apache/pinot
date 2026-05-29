@@ -256,7 +256,7 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
-  private final QueryWorkloadManager _queryWorkloadManager;
+  private QueryWorkloadManager _queryWorkloadManager;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
   // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
@@ -292,7 +292,6 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _queryWorkloadManager = new QueryWorkloadManager(this);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -604,7 +603,8 @@ public class PinotHelixResourceManager {
     if (shouldUpdateBrokerResource) {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
           newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
       return PinotResourceManagerResponse.success("Added instance: " + instanceId + ", and updated broker resource - "
@@ -648,7 +648,8 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId + ", and updated broker resource - "
@@ -693,7 +694,8 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId
@@ -721,7 +723,8 @@ public class PinotHelixResourceManager {
         instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
     List<String> tablesAdded = new ArrayList<>();
     List<String> tablesRemoved = new ArrayList<>();
-    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
+    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved,
+        _queryWorkloadManager);
     LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
         instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
     return PinotResourceManagerResponse.success("Updated broker resource for broker: " + instanceId
@@ -2098,13 +2101,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding table {}: Updating BrokerResource for table", tableNameWithType);
     List<String> brokers =
         HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
-    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
-      assert is != null;
-      is.getRecord().getMapFields()
-          .put(tableNameWithType, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
-      return is;
-    });
-    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
+    HelixHelper.updateBrokerResource(_helixZkManager, tableNameWithType,
+        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
     // Persist the MV definition znode BEFORE notify so the consistency manager registration
     // below reads the authoritative `baseTables` list rather than relying on its
     // `extractSourceTableName(definedSQL)` fallback. The write is best-effort: a transient
@@ -2401,7 +2399,7 @@ public class PinotHelixResourceManager {
                 referenceInstancePartitionsName);
           }
         }
-        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions, _queryWorkloadManager);
       }
     }
 
@@ -2419,7 +2417,8 @@ public class PinotHelixResourceManager {
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions,
+                _queryWorkloadManager);
           }
         }
       }
@@ -2519,12 +2518,8 @@ public class PinotHelixResourceManager {
   private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
     List<String> brokers = HelixHelper.getInstancesWithTag(
         _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
-    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
-      assert is != null;
-      is.getRecord().getMapFields()
-          .put(tableName, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
-      return is;
-    });
+    HelixHelper.updateBrokerResource(_helixZkManager, tableName,
+        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
   }
 
   public void validateNewLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
@@ -2626,8 +2621,6 @@ public class PinotHelixResourceManager {
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
-    // TODO: Propagate workload for tables if there is change is change instance characteristics
-    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
   }
 
   public void deleteUser(String username) {
@@ -5413,6 +5406,10 @@ public class PinotHelixResourceManager {
       return new WatermarkInductionResult.Watermark(status.getPartitionGroupId(), seq, startOffset);
     }).collect(Collectors.toList());
     return new WatermarkInductionResult(watermarks);
+  }
+
+  public void setQueryWorkloadManager(QueryWorkloadManager queryWorkloadManager) {
+    _queryWorkloadManager = queryWorkloadManager;
   }
 
   /*
