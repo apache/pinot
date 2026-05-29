@@ -52,7 +52,9 @@ public class HashUtils {
    * <p>String inputs are parsed via {@link UUID#fromString(String)} (lenient — accepts non-canonical short
    * forms like {@code "1-2-3-4-5"}) for backward compatibility with tables that have been hashed under the
    * pre-UUID-type {@code HashFunction.UUID} contract. Binary inputs ({@code byte[]} or {@link UUID}) go
-   * through {@link UuidUtils#toBytes(Object)} since they carry no parse ambiguity. Newly-declared
+   * through {@link UuidUtils#toBytes(Object)} since they carry no parse ambiguity. Un-parseable strings
+   * (and any other invalid value) still fall through to {@link PrimaryKey#asBytes()} via the outer
+   * {@code catch (RuntimeException)} below — matching master's behavior. Newly-declared
    * {@code DataType.UUID} primary-key columns are independently constrained to canonical form at ingest
    * time by {@code DataTypeTransformer.validateCanonicalUuidPrimaryKey}.
    */
