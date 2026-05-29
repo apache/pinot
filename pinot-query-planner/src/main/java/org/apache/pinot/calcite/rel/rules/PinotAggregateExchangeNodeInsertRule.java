@@ -132,7 +132,7 @@ public class PinotAggregateExchangeNodeInsertRule {
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
 
-      if (!isGroupTrimmingEnabled(call, hintOptions)) {
+      if (!isGroupTrimmingEnabled(call, hintOptions, aggRel)) {
         return;
       } else if (hintOptions == null) {
         hintOptions = Collections.emptyMap();
@@ -186,7 +186,7 @@ public class PinotAggregateExchangeNodeInsertRule {
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
 
-      if (!isGroupTrimmingEnabled(call, hintOptions)) {
+      if (!isGroupTrimmingEnabled(call, hintOptions, aggRel)) {
         return;
       } else if (hintOptions == null) {
         hintOptions = Collections.emptyMap();
@@ -479,12 +479,28 @@ public class PinotAggregateExchangeNodeInsertRule {
     return null;
   }
 
-  private static boolean isGroupTrimmingEnabled(RelOptRuleCall call, Map<String, String> hintOptions) {
+  private static boolean isGroupTrimmingEnabled(RelOptRuleCall call, Map<String, String> hintOptions,
+      Aggregate aggRel) {
     if (hintOptions != null) {
       String option = hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM);
       if (option != null) {
+        // Explicit hint always wins (true or false), for aggregates with AND without aggregate functions.
         return Boolean.parseBoolean(option);
       }
+    }
+
+    // Group-by WITHOUT aggregate functions (DISTINCT or `GROUP BY col` with no agg calls) can always push the
+    // limit/collations down to the leaf stage by default: ORDER BY can only reference group keys, which are fully
+    // materialized at the leaf, so leaf-level trim is exact (and a plain LIMIT without ORDER BY returns a valid
+    // subset). This mirrors PinotLogicalAggregateRule (the physical-optimizer path).
+    // TODO: Consider also enabling this by default for aggregation queries whose ORDER BY references only group keys
+    //       (not aggregate results). The same argument holds there - a group's rank by its key is identical at every
+    //       leaf, so keeping the per-leaf top-K never drops a group that belongs in the global top-N, and the kept
+    //       groups still get their aggregates fully merged at the final stage. It is NOT safe when ORDER BY is over an
+    //       aggregate (partial values rank differently per leaf) or for an unordered limit with aggregates (an
+    //       arbitrarily dropped group would be under-counted).
+    if (aggRel.getAggCallList().isEmpty()) {
+      return true;
     }
 
     Context genericContext = call.getPlanner().getContext();

@@ -27,6 +27,7 @@ import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMeta
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -153,5 +154,99 @@ public class MaterializedViewMetadataTest {
     ZNRecord znRecord = metadata.toZNRecord();
     assertTrue(znRecord.getSimpleFields().containsKey("watermarkMs"),
         "watermarkMs key must always be written");
+  }
+
+  /// Definition equality is the controller's idempotency check at CREATE MV time: a second
+  /// CREATE with the same definedSQL must hash/compare equal to the first so a stale orphan
+  /// znode from a prior failed CREATE doesn't get classified as "different content".
+  ///
+  /// Verifies that every direct field of [MaterializedViewDefinitionMetadata] independently
+  /// flips equality (so an equals() that silently drops a comparison is caught here). The
+  /// nested SplitSpec's own field-by-field coverage is pinned separately in
+  /// [#testSplitSpecEqualsAndHashCode]; that test also documents the one persisted-but-not-
+  /// compared field (`materializedViewTimeFormat`), which is intentional and tracked as a
+  /// separate follow-up. A regression that adds a new direct field on
+  /// [MaterializedViewDefinitionMetadata] without wiring it through equals/hashCode must add
+  /// a matching `assertNotEquals` line below — otherwise the controller's idempotency check
+  /// would silently treat two distinct definitions as the same.
+  @Test
+  public void testDefinitionEqualsAndHashCodeAllFields() {
+    Map<String, String> partitionExprMaps = new HashMap<>();
+    partitionExprMaps.put("ts", "ts");
+    MaterializedViewSplitSpec splitSpec =
+        new MaterializedViewSplitSpec("ts", "1:MILLISECONDS:TIMESTAMP", "ts",
+            "1:MILLISECONDS:TIMESTAMP", 86400000L);
+    MaterializedViewDefinitionMetadata a = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
+    MaterializedViewDefinitionMetadata b = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", new HashMap<>(partitionExprMaps),
+        new MaterializedViewSplitSpec("ts", "1:MILLISECONDS:TIMESTAMP", "ts",
+            "1:MILLISECONDS:TIMESTAMP", 86400000L),
+        0L, true);
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
+
+    // Each field independently flips equality — guards against an equals() that silently
+    // omits a field. Use a fresh `a` baseline for each delta so order in the chain doesn't
+    // matter.
+    MaterializedViewDefinitionMetadata diffName = new MaterializedViewDefinitionMetadata(
+        "mv_other_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
+    assertNotEquals(a, diffName);
+
+    MaterializedViewDefinitionMetadata diffBase = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("products"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, true);
+    assertNotEquals(a, diffBase);
+
+    MaterializedViewDefinitionMetadata diffSql = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM other", partitionExprMaps, splitSpec, 0L, true);
+    assertNotEquals(a, diffSql);
+
+    Map<String, String> diffExprMap = new HashMap<>();
+    diffExprMap.put("ts", "renamed_ts");
+    MaterializedViewDefinitionMetadata diffExpr = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", diffExprMap, splitSpec, 0L, true);
+    assertNotEquals(a, diffExpr);
+
+    MaterializedViewSplitSpec diffSpec =
+        new MaterializedViewSplitSpec("ts", "1:HOURS:EPOCH", "ts", "1:HOURS:EPOCH", 86400000L);
+    MaterializedViewDefinitionMetadata diffSplit = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, diffSpec, 0L, true);
+    assertNotEquals(a, diffSplit);
+
+    MaterializedViewDefinitionMetadata diffStaleness = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 60000L, true);
+    assertNotEquals(a, diffStaleness);
+
+    MaterializedViewDefinitionMetadata diffRewrite = new MaterializedViewDefinitionMetadata(
+        "mv_OFFLINE", Collections.singletonList("orders"),
+        "SELECT ts FROM orders", partitionExprMaps, splitSpec, 0L, false);
+    assertNotEquals(a, diffRewrite);
+  }
+
+  /// SplitSpec equality covers `sourceTimeColumn`, `sourceTimeFormat`,
+  /// `materializedViewTimeColumn`, and `bucketMs` — the same four fields whose Δ flips
+  /// definition equality (so a regression that drops a field comparison is caught here too).
+  /// `materializedViewTimeFormat` is intentionally NOT part of this contract today (it was
+  /// added later, and the existing equals/hashCode predates it); changing that is tracked as a
+  /// separate follow-up since it would alter the `createIfAbsent` idempotency surface.
+  @Test
+  public void testSplitSpecEqualsAndHashCode() {
+    MaterializedViewSplitSpec a = new MaterializedViewSplitSpec("ts", "fmt", "v", "vfmt", 1000L);
+    MaterializedViewSplitSpec b = new MaterializedViewSplitSpec("ts", "fmt", "v", "vfmt", 1000L);
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
+
+    assertNotEquals(a, new MaterializedViewSplitSpec("other", "fmt", "v", "vfmt", 1000L));
+    assertNotEquals(a, new MaterializedViewSplitSpec("ts", "other", "v", "vfmt", 1000L));
+    assertNotEquals(a, new MaterializedViewSplitSpec("ts", "fmt", "other", "vfmt", 1000L));
+    assertNotEquals(a, new MaterializedViewSplitSpec("ts", "fmt", "v", "vfmt", 2000L));
   }
 }

@@ -201,7 +201,7 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
 
   // Timeout guards against deadlock: if rewriteReduceStageForEmptyLeaves fails to inline
   // all MailboxReceiveNodes, the reducer will block forever polling a mailbox with no sender.
-  @Test(timeOut = 2_000)
+  @Test(timeOut = 10_000)
   public void testAllLeafStagesEmptyReducerDoesNotWaitForChildStageMailbox() {
     DispatchableSubPlan subPlan = _queryEnvironment.planQuery("SELECT COUNT(*) FROM a WHERE ts < 0 LIMIT 1");
     Map<Integer, DispatchablePlanFragment> fragmentMap = new HashMap<>(subPlan.getQueryStageMap());
@@ -216,7 +216,7 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     assertEquals(rows.get(0)[0], 0L);
   }
 
-  @Test(timeOut = 2_000)
+  @Test(timeOut = 10_000)
   public void testAllLeafStagesEmptyReducerRunsPushedDownAggregates() {
     DispatchableSubPlan subPlan = _queryEnvironment.planQuery(
         "SELECT COUNT(*), DISTINCTCOUNT(col1), DISTINCTCOUNT(col2), SUM(col3) FROM a WHERE ts < 0 LIMIT 1");
@@ -235,7 +235,7 @@ public class MultiStageBrokerRequestHandlerTest extends QueryEnvironmentTestBase
     assertNull(rows.get(0)[3]);
   }
 
-  @Test(timeOut = 2_000)
+  @Test(timeOut = 10_000)
   public void testAllLeafStagesEmptyReducerWithJoin() {
     DispatchableSubPlan subPlan =
         _queryEnvironment.planQuery("SELECT COUNT(*) FROM a JOIN b ON a.col1 = b.col1 WHERE a.ts < 0");

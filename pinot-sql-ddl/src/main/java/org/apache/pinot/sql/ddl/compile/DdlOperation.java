@@ -19,9 +19,30 @@
 package org.apache.pinot.sql.ddl.compile;
 
 /// Discriminator for the operation a [CompiledDdl] represents.
+///
+/// Ordering convention (mirrored by `DdlCompiler#compile`, `PinotDdlRestletResource#executeDdl`,
+/// and §3/§4 of `DESIGN.md`): Catalog → Table → Materialized View. Within each object-level
+/// family (Table, Materialized View) the lifecycle order CREATE → SHOW CREATE → DROP is used,
+/// so the two families read as mirror images of each other — making it obvious at a glance that
+/// every Table verb has a Materialized View counterpart (the "Q2=B" strict-type-partitioning
+/// contract). Catalog-level operations (multi-object reads like SHOW TABLES and
+/// SHOW MATERIALIZED VIEWS) are grouped first because they have no object lifecycle and are
+/// typically the first call a user makes against a fresh database. Future schema-level verbs
+/// (e.g. SHOW DATABASES, SHOW FUNCTIONS) belong in the Catalog group, not in the object-level
+/// Table/MV groups.
 public enum DdlOperation {
-  CREATE_TABLE,
-  DROP_TABLE,
+  // Catalog (schema-level, multi-object reads). Listed in object-family order to mirror the
+  // Table → Materialized View grouping of the object-level lifecycle verbs below.
   SHOW_TABLES,
-  SHOW_CREATE_TABLE
+  SHOW_MATERIALIZED_VIEWS,
+
+  // Table (single-object lifecycle).
+  CREATE_TABLE,
+  SHOW_CREATE_TABLE,
+  DROP_TABLE,
+
+  // Materialized View (single-object lifecycle, mirrors Table).
+  CREATE_MATERIALIZED_VIEW,
+  SHOW_CREATE_MATERIALIZED_VIEW,
+  DROP_MATERIALIZED_VIEW
 }

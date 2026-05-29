@@ -634,6 +634,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         return null;
       }
     });
+    // Backfill the reverse index against the authoritative TableConfig list before exposing
+    // the consistency manager to controller-side notify paths.  init() above only seeds the
+    // index from existing definition znodes, so MVs whose znode is missing — best-effort
+    // persist failures, znodes lost to manual ZK surgery, or MVs created on a controller
+    // version older than definition znodes — would be invisible to the DROP TABLE delete-guard
+    // and an operator could silently orphan them by dropping their base table.  Backfill must
+    // run BEFORE the register* calls below so segment / table notifies that begin firing as
+    // soon as `_materializedViewConsistencyManager` is non-null already see a complete index.
+    _helixResourceManager.backfillMaterializedViewReverseIndex(_materializedViewConsistencyManager);
     _helixResourceManager.registerMaterializedViewConsistencyManager(_materializedViewConsistencyManager);
     _helixResourceManager.getSegmentDeletionManager()
         .registerMaterializedViewConsistencyManager(_materializedViewConsistencyManager);

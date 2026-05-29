@@ -710,6 +710,11 @@ public class CommonConstants {
          * 30 for dictCard <= 1K, 10 for dictCard <= 10K, 6 for dictCard > 10K.
          */
         public static final String INVERTED_INDEX_DISTINCT_COST_RATIO = "invertedIndexDistinctCostRatio";
+        /// When true, `JsonIndexDistinctOperator` skips missing-path handling — it does not add a 4-arg default
+        /// value, does not add null (even when `nullHandling` is enabled), and does not throw `Illegal Json Path`.
+        /// The result is purely the distinct values produced by the JSON-index lookup (filtered by the optional
+        /// 5-arg `jsonFilterExpression` and intersected with the `WHERE`-clause filter).
+        public static final String JSON_INDEX_DISTINCT_SKIP_MISSING_PATH = "jsonIndexDistinctSkipMissingPath";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String TABLE_SAMPLER = "sampler";
@@ -1022,6 +1027,7 @@ public class CommonConstants {
       public static final String AGGREGATE_REMOVE = "AggregateRemove";
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
       public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
+      public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
@@ -1043,6 +1049,14 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
       public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
+      public static final String AGGREGATE_PROJECT_PULL_UP_CONSTANTS = "AggregateProjectPullUpConstants";
+      public static final String LIMIT_MERGE = "LimitMerge";
+      public static final String SORT_REMOVE_CONSTANT_KEYS = "SortRemoveConstantKeys";
+      // Default-off — firing in BASIC_RULES disrupts ProjectToSemiJoinRule pattern matching on
+      // partition-hinted IN (SELECT) queries. See PinotQueryRuleSets for full rationale.
+      public static final String SORT_PROJECT_TRANSPOSE = "SortProjectTranspose";
+      public static final String UNION_MERGE = "UnionMerge";
+      public static final String PROJECT_AGGREGATE_MERGE = "ProjectAggregateMerge";
     }
 
     /**
@@ -1060,7 +1074,11 @@ public class CommonConstants {
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
         PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
-        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
+        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES,
+        // Stock Calcite rule kept opt-in via usePlannerRules — see SORT_PROJECT_TRANSPOSE javadoc
+        // above for the rationale (firing in BASIC_RULES disrupts ProjectToSemiJoinRule on
+        // partition-hinted IN(SELECT) queries, breaking colocated broadcast semi-joins).
+        PlannerRuleNames.SORT_PROJECT_TRANSPOSE
     );
 
     public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
@@ -2518,13 +2536,12 @@ public class CommonConstants {
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
 
-    /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
-    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
-    /// they are not included by default but can be included by setting this flag to false (upper or lower case).
-    ///
-    /// It is expected that in 1.6.0 and later, MSE pipeline breaker stats will be included by default.
+    /// Used to indicate whether MSE pipeline breaker stats should be included in the stageStats field.
+    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. In 1.5.0 they were
+    /// not included by default but could be included by setting this flag to false (upper or lower case). Starting
+    /// from 1.6.0, they are included by default and can be excluded by setting this flag to true (upper or lower case).
     public static final String KEY_OF_SKIP_PIPELINE_BREAKER_STATS = "pinot.query.mse.skip.pipeline.breaker.stats";
-    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = true;
+    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = false;
 
     /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
     ///

@@ -62,6 +62,13 @@ data: {
       "PROPERTIES"
       "TABLES"
       "TABLE_TYPE"
+      # Pinot DDL (CREATE / SHOW / DROP MATERIALIZED VIEW(S)) keywords.
+      # MATERIALIZED is shared by every MV verb; VIEWS is the plural-form lexeme used by the
+      # Catalog-listing verb `SHOW MATERIALIZED VIEWS [FROM db]`. VIEW (singular) is a core
+      # Calcite keyword and is not redeclared here.
+      "MATERIALIZED"
+      "REFRESH"
+      "VIEWS"
       # IF is not a SQL reserved word but Calcite core does not declare it as a token; we need it
       # for DDL "IF [NOT] EXISTS" clauses.
       "IF"
@@ -92,6 +99,9 @@ data: {
       "TABLES"
       "TABLE_TYPE"
       "IF"
+      "MATERIALIZED"
+      "REFRESH"
+      "VIEWS"
 
       # The following keywords are reserved in core Calcite,
       # are reserved in some version of SQL,
@@ -590,8 +600,9 @@ data: {
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
+      "SqlPinotCreateMaterializedView()"
       "SqlPinotCreateTable()"
-      "SqlPinotDropTable()"
+      "SqlPinotDrop()"
       "SqlPinotShow()"
     ]
 
