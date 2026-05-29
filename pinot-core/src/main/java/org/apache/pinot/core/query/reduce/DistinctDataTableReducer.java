@@ -74,12 +74,11 @@ public class DistinctDataTableReducer implements DataTableReducer {
       BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
     try {
-      // No data for this bucket (or LIMIT 0): emit an empty intermediate DataTable carrying the schema.
       if (dataTableMap.isEmpty() || _queryContext.getLimit() == 0) {
         return DataTableBuilderFactory.getDataTableBuilder(dataSchema).build();
       }
       DistinctTable distinctTable = mergeToDistinctTable(dataSchema, dataTableMap.values());
-      // Intermediate form: limit/sorting not applied; re-mergeable on a later reduce.
+      // Intermediate form: limit/sorting not applied
       return distinctTable.toDataTable();
     } catch (IOException e) {
       throw new RuntimeException("Caught IOException while building merged intermediate DataTable for distinct", e);

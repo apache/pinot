@@ -149,7 +149,6 @@ public class AggregationDataTableReducer implements DataTableReducer {
     }
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(_queryContext, dataSchema);
     try {
-      // No data for this bucket: emit an empty (0-row) intermediate DataTable carrying the schema.
       if (dataTableMap.isEmpty()) {
         return DataTableBuilderFactory.getDataTableBuilder(dataSchema).build();
       }

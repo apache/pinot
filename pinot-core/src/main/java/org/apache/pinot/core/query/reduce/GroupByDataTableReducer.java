@@ -140,7 +140,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
     }
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(_queryContext, dataSchema);
     try {
-      // No data for this bucket: emit an empty (0-row) intermediate DataTable carrying the schema.
       if (dataTableMap.isEmpty()) {
         return DataTableBuilderFactory.getDataTableBuilder(dataSchema).build();
       }
@@ -148,8 +147,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
       // Reuse the regular reduce's merge: builds the IndexedTable of group keys + intermediate agg state.
       IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
       DataTable mergedDataTable = buildIntermediateDataTable(dataSchema, indexedTable);
-      // Surface completeness flags so a downstream consumer can decide whether the merged intermediate
-      // is complete enough to use. No skip policy is enforced here.
       if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
         mergedDataTable.getMetadata().put(MetadataKey.GROUPS_TRIMMED.getName(), "true");
       }

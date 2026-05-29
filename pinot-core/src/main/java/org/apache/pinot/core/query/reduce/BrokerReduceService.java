@@ -180,47 +180,33 @@ public class BrokerReduceService extends BaseReduceService {
    * Merge-only counterpart of {@link #reduceOnDataTable}: merges the per-server DataTables into a single
    * intermediate {@link DataTable} WITHOUT finalizing (no {@code extractFinalResult}). Returns
    * {@code null} when there is nothing to merge (empty map, or all servers returned no data / errored).
-   * Reuses the same schema-filtering preamble and reducer/trim resolution as the regular reduce, but
-   * does NOT aggregate per-server execution stats (the merged intermediate does not carry them) and
-   * skips the nested-query / gapfill / alias handling (those query shapes are out of scope for
-   * merge-only).
+   * Reuses the same schema-filtering preamble and reducer/trim resolution as the regular reduce.
    *
    * <p>The returned DataTable carries intermediate, non-finalized state (byte-shape identical to a
-   * single server's partial response), so a downstream consumer can intercept it and custom handle
-   * the intermediate results.
+   * single server's partial response).
    *
    * <p>If one or more input server DataTables are dropped during merge (e.g., due to a schema
    * conflict with the first non-empty table), the returned DataTable's metadata carries the
    * {@link DataTable.MetadataKey#PARTIAL_INTERMEDIATE_RESULT} flag set to {@code "true"} and the
-   * {@link BrokerMeter#RESPONSE_MERGE_EXCEPTIONS} meter is incremented. This is symmetric with how
-   * the regular reduce path surfaces conflicting-schema servers via a response exception and the
-   * same meter; downstream consumers can read the flag and decide policy (skip, retry, accept).
+   * {@link BrokerMeter#RESPONSE_MERGE_EXCEPTIONS} meter is incremented. The callers can
+   * read the flag and decide policy (skip, retry, accept).
    *
    * <p>Execution stats from the input DataTables are aggregated via {@link ExecutionStatsAggregator}
    * and written back onto the merged DataTable: additive longs (e.g. {@code numDocsScanned},
    * {@code numSegments*}, {@code threadCpuTimeNs}), {@code minConsumingFreshnessTimeMs} (MIN-reduced),
    * boolean flags ({@code groupsTrimmed}, {@code numGroupsLimitReached}, etc., OR-reduced),
-   * per-server exceptions, and trace info (JSON-encoded if {@code trace=true}). Unlike the regular
-   * reduce path, this method does NOT bump broker meters/timers for the input stats — those will
-   * fire when the result is eventually re-reduced through {@link #reduceOnDataTable}, so a consumer
-   * that uses both APIs sees one set of increments per logical query, not two.
+   * per-server exceptions, and trace info (JSON-encoded if {@code trace=true}). This method does NOT bump
+   * broker meters/timers for the input stats.
    *
-   * <p>Limitations of the round-trip:
+   * <p>Limitations on stats:
    * <ul>
-   *   <li>CPU and memory stats round-trip as a single combined value per key (the wire format has
-   *       no per-tableType variants). On a re-reduce, the downstream aggregator dumps the whole
-   *       value into one bucket — whichever tableType the caller assigned to the synthetic
-   *       server response — so the offline-vs-realtime split surfaced on {@link
-   *       BrokerResponseNative} is lost across the round-trip, even though the total is preserved.
    *   <li>Exception attribution to original servers is lost; the wire format is {@code Map<Integer,
    *       String>} so collisions on the same error code are resolved last-write-wins.
-   *   <li>Per-server trace info is JSON-encoded into a single {@code TRACE_INFO} entry; the
-   *       downstream aggregator reads it back as one trace blob under the synthetic server's name.
+   *   <li>Per-server trace info is JSON-encoded into a single {@code TRACE_INFO} entry
    * </ul>
    *
    * <p>WARNING: this performs a full cross-server merge and re-serializes the result — heavyweight work
-   * that must be run asynchronously, decoupled from request serving. Invoking it inline while a query is
-   * being served can severely degrade its latency. Intended for downstream consumers that want to
+   * that must be run asynchronously, decoupled from request serving. Intended for callers that want to
    * intercept the merged intermediate result instead of the finalized one.
    *
    * <p>[org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
@@ -235,8 +221,6 @@ public class BrokerReduceService extends BaseReduceService {
     boolean enableTrace =
         queryOptions != null && Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
     // Aggregate stats while filtering so we can write them back onto the merged DataTable's metadata.
-    // Aggregator.aggregate() runs BEFORE filterDataTablesAndPickSchema removes any entry, matching
-    // reduceOnDataTable: empty / conflicting-schema servers' stats are still counted.
     ExecutionStatsAggregator aggregator = new ExecutionStatsAggregator(enableTrace);
     List<ServerRoutingInstance> conflictingServers = new ArrayList<>();
     DataSchema cachedDataSchema = filterDataTablesAndPickSchema(dataTableMap, aggregator, conflictingServers);
@@ -255,12 +239,9 @@ public class BrokerReduceService extends BaseReduceService {
 
     if (merged != null) {
       // Write accumulated stats (additive longs, booleans, MIN freshness, exceptions, trace) onto the
-      // merged DataTable so it round-trips through reduceOnDataTable. Unlike setStats() this does NOT
-      // bump broker meters — those will fire when the result is eventually re-reduced.
+      // merged DataTable
       aggregator.setStatsOnMergedDataTable(merged);
 
-      // Symmetric with reduceOnDataTable: surface conflicting-schema drops via meter + warn + a metadata
-      // flag on the merged DataTable so downstream consumers can detect a partial merge.
       if (!conflictingServers.isEmpty()) {
         LOGGER.warn("Merge-only reduce dropped {} server response(s) for table {} due to data schema "
             + "inconsistency: {}", conflictingServers.size(), rawTableName, conflictingServers);
