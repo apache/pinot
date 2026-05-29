@@ -46,6 +46,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.mockito.MockedStatic;
@@ -150,6 +151,126 @@ public class PinotDdlRestletResourceUnitTest {
     verify(resource._pinotHelixResourceManager, never()).deleteTable("events", TableType.OFFLINE, null);
     assertEquals(tableConfig.getTaskConfig().getTaskTypeConfigsMap()
         .get("SegmentRefreshTask").get(PinotTaskManager.SCHEDULE_KEY), "0 0 * * * ?");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // CREATE TABLE Q2=B preflight (raw-name exclusivity with materialized views)
+  //
+  // These three tests pin the CREATE-TABLE side of the symmetric Q2=B contract that splits
+  // raw-name ownership cleanly between plain tables, REALTIME tables, hybrid pairs, and
+  // materialized views. The MV-side of the symmetric contract is covered in
+  // PinotDdlRestletResourceMaterializedViewUnitTest's `createMv*` family.
+  // -------------------------------------------------------------------------------------------
+
+  /// CREATE TABLE OFFLINE handed a name whose OFFLINE znode is already a materialized view
+  /// must 400 with a pointer at CREATE MATERIALIZED VIEW. Without this preflight the request
+  /// would fall through to the legacy `hasTable` check and report a generic 409 "already
+  /// exists" — true but unhelpful because the operator would not know they were colliding with
+  /// a derived MV that has its own DROP form, refresh schedule, and minion task wiring.
+  @Test
+  public void createTableOfflineOnExistingMaterializedViewReturns400() {
+    PinotDdlRestletResource resource = new PinotDdlRestletResource();
+    resource._pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    resource._accessControlFactory = mock(AccessControlFactory.class);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+    });
+
+    TableConfig mvConfig = newMaterializedViewShapedConfig("events_OFFLINE");
+    when(resource._pinotHelixResourceManager.getTableConfig("events_OFFLINE")).thenReturn(mvConfig);
+
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
+
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> resource.executeDdl(
+            new DdlExecutionRequest("CREATE TABLE events (id INT) TABLE_TYPE = OFFLINE"), false,
+            mock(HttpHeaders.class), request));
+
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(e.getMessage().contains("materialized view"),
+        "Error must call out that the colliding object is an MV; got: " + e.getMessage());
+    assertTrue(e.getMessage().contains("pick a different name")
+            && e.getMessage().contains("drop the existing materialized view"),
+        "Error must surface both actionable resolutions; got: " + e.getMessage());
+  }
+
+  /// IF NOT EXISTS does not suppress the type-mismatch — it suppresses "object not found",
+  /// not "wrong DDL verb for the conflicting object". Same outcome as the non-IF-NOT-EXISTS
+  /// case above. Mirror of the `DROP MATERIALIZED VIEW IF EXISTS on plain table → 400` policy.
+  @Test
+  public void createTableOfflineIfNotExistsOnExistingMaterializedViewReturns400() {
+    PinotDdlRestletResource resource = new PinotDdlRestletResource();
+    resource._pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    resource._accessControlFactory = mock(AccessControlFactory.class);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+    });
+
+    TableConfig mvConfig = newMaterializedViewShapedConfig("events_OFFLINE");
+    when(resource._pinotHelixResourceManager.getTableConfig("events_OFFLINE")).thenReturn(mvConfig);
+
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
+
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> resource.executeDdl(
+            new DdlExecutionRequest(
+                "CREATE TABLE IF NOT EXISTS events (id INT) TABLE_TYPE = OFFLINE"),
+            false, mock(HttpHeaders.class), request));
+
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode(),
+        "Type-mismatched target must 400 even under IF NOT EXISTS — IF NOT EXISTS handles "
+            + "absence, not type confusion.");
+    assertTrue(e.getMessage().contains("materialized view"), e.getMessage());
+  }
+
+  /// CREATE TABLE REALTIME at a raw name whose OFFLINE half is already an MV must 400. An
+  /// MV occupies its raw name exclusively across both type halves — letting the REALTIME side
+  /// proceed would create a hybrid pair whose OFFLINE half is a materialized view, a state
+  /// with no defined semantics in the broker rewrite, minion task generator, or consistency
+  /// manager. This test pins the REALTIME-side preflight: even though the REALTIME znode is
+  /// empty, the OFFLINE-half lookup must still happen and rebuke the request.
+  @Test
+  public void createTableRealtimeOnExistingMaterializedViewReturns400() {
+    PinotDdlRestletResource resource = new PinotDdlRestletResource();
+    resource._pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    resource._accessControlFactory = mock(AccessControlFactory.class);
+    when(resource._accessControlFactory.create()).thenReturn(new AccessControl() {
+    });
+
+    TableConfig mvConfig = newMaterializedViewShapedConfig("events_OFFLINE");
+    when(resource._pinotHelixResourceManager.getTableConfig("events_OFFLINE")).thenReturn(mvConfig);
+    when(resource._pinotHelixResourceManager.getTableConfig("events_REALTIME")).thenReturn(null);
+
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder("http://localhost/sql/ddl"));
+
+    ControllerApplicationException e = expectThrows(ControllerApplicationException.class,
+        () -> resource.executeDdl(
+            new DdlExecutionRequest("CREATE TABLE events (id INT) TABLE_TYPE = REALTIME"), false,
+            mock(HttpHeaders.class), request));
+
+    assertEquals(e.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    assertTrue(e.getMessage().contains("REALTIME"), e.getMessage());
+    assertTrue(e.getMessage().contains("materialized view"),
+        "Error must call out that the colliding object is an MV; got: " + e.getMessage());
+  }
+
+  /// Hand-built minimal materialized-view-shaped TableConfig: an OFFLINE table with the
+  /// canonical `isMaterializedView` flag set (per PR #18564 — this is the single source of
+  /// truth the Q2=B dispatch reads) plus a `task.MaterializedViewTask.definedSQL` body so
+  /// the SPI invariant `TableConfigUtils.validateMaterializedViewInvariants` is satisfied.
+  /// We construct this inline rather than compiling a real `CREATE MATERIALIZED VIEW` DDL
+  /// because the Table-DDL unit test class deliberately stays free of the MV compilation
+  /// toolchain.
+  private static TableConfig newMaterializedViewShapedConfig(String tableNameWithType) {
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(tableNameWithType)
+        .setIsMaterializedView(true)
+        .setTaskConfig(new TableTaskConfig(Collections.singletonMap(
+            MaterializedViewTask.TASK_TYPE,
+            Collections.singletonMap(MaterializedViewTask.DEFINED_SQL_KEY,
+                "SELECT id FROM source"))))
+        .build();
   }
 
   /// SQL database qualifiers and the Database header must agree; conflicts are caller input

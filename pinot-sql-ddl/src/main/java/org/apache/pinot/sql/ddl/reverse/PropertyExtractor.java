@@ -332,9 +332,11 @@ public final class PropertyExtractor {
     if (config.isDimTable()) {
       props.put("isDimTable", "true");
     }
-    if (config.isMaterializedView()) {
-      props.put("isMaterializedView", "true");
-    }
+    // `isMaterializedView` is intentionally NOT emitted here. The flag (introduced in
+    // PR #18564) is identity, not configuration: it decides whether CanonicalDdlEmitter
+    // renders `CREATE TABLE` or `CREATE MATERIALIZED VIEW`, and round-tripping it through a
+    // PROPERTIES entry would only confuse users — both forward routers reject the key
+    // explicitly. The compiler stamps the flag automatically on the MV path.
     putIfPresent(props, "description", config.getDescription());
     List<String> tags = config.getTags();
     if (tags != null && !tags.isEmpty()) {

@@ -464,6 +464,24 @@ public class MaterializedViewAnalyzerTest {
     expectError(sql, viewSchema, "No DateTimeFieldSpec found");
   }
 
+  @Test
+  public void testRejectsJoinInFromClause() {
+    // CalciteSqlParser routes JOIN into DataSource.join rather than DataSource.tableName.
+    // Without the explicit JOIN guard the test would still fail, but with the misleading
+    // "Could not extract source table name from SQL" message. The new guard surfaces the
+    // actual unsupported-construct cause directly.
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders "
+        + "JOIN products ON orders.product_id = products.id "
+        + "GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+
+    expectError(sql, viewSchema, "JOIN queries are not supported");
+  }
+
   // -----------------------------------------------------------------------
   //  Source-table type eligibility (Step 2): MV's coverage model assumes the base table is
   //  append-only with monotonically advancing time. Tables whose contents can be replaced or
@@ -608,6 +626,40 @@ public class MaterializedViewAnalyzerTest {
     expectError(sql, viewSchema, "does not exist in source table");
   }
 
+  @Test
+  public void testWhereClauseColumnNotExist() {
+    // A typo in a WHERE predicate (here `nonexistent_col` instead of an actual source column)
+    // would previously slip past create-time validation because validateSourceColumns only
+    // walked SELECT + GROUP BY, then surface as a broker error at task-execution time. The
+    // analyzer now walks the filter tree so the operator sees the diagnostic at DDL time.
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders "
+        + "WHERE nonexistent_col = 42 "
+        + "GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+
+    expectError(sql, viewSchema, "does not exist in source table");
+  }
+
+  @Test
+  public void testHavingClauseColumnNotExist() {
+    // Same hazard as the WHERE case but for HAVING — exercised separately because the
+    // analyzer reads HAVING from a different PinotQuery accessor.
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders "
+        + "GROUP BY DaysSinceEpoch, city "
+        + "HAVING sum(nonexistent_col) > 0";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+
+    expectError(sql, viewSchema, "does not exist in source table");
+  }
+
   // -----------------------------------------------------------------------
   //  Step 3: MV schema column validation
   // -----------------------------------------------------------------------
@@ -669,7 +721,26 @@ public class MaterializedViewAnalyzerTest {
         .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
         .build();
 
-    expectError(sql, viewSchema, "must have an AS alias");
+    // Helper now lives in RequestUtils and emits a slightly broader message that covers
+    // both accepted shapes (bare column or AS <alias>).
+    expectError(sql, viewSchema, "use AS <alias>");
+  }
+
+  @Test
+  public void testRejectsSelectStar() {
+    // `SELECT *` would otherwise reach the schema-coverage check with a single SELECT field
+    // literally named "*", producing the misleading "MV schema column 'X' is not produced
+    // by any SELECT expression" error. The explicit guard names the unsupported construct
+    // so the operator immediately knows to enumerate columns with aliases.
+    String sql = "SELECT * FROM orders";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("status", FieldSpec.DataType.STRING)
+        .addMetric("amount", FieldSpec.DataType.DOUBLE)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+
+    expectError(sql, viewSchema, "does not support `SELECT *`");
   }
 
   // -----------------------------------------------------------------------
@@ -769,6 +840,50 @@ public class MaterializedViewAnalyzerTest {
     expectError(sql, viewSchema, taskConfigs, "Invalid maxNumRecordsPerSegment");
   }
 
+  @Test
+  public void testNonNumericStalenessThresholdMs() {
+    // A typo like '60s' would silently fall back to the default at the builder/scheduler
+    // level, masking the operator's intent. Analyzer must reject loudly at CREATE time.
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    Map<String, String> taskConfigs = buildTaskConfigs(sql);
+    taskConfigs.put(MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY, "60s");
+    expectError(sql, viewSchema, taskConfigs, "Invalid stalenessThresholdMs");
+  }
+
+  @Test
+  public void testNegativeStalenessThresholdMsRejected() {
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    Map<String, String> taskConfigs = buildTaskConfigs(sql);
+    taskConfigs.put(MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY, "-1");
+    expectError(sql, viewSchema, taskConfigs, "stalenessThresholdMs must be non-negative");
+  }
+
+  @Test
+  public void testZeroStalenessThresholdMsAccepted() {
+    // 0 is the documented "no SLO" sentinel — the rewrite engine treats <= 0 as disabled.
+    // An explicit '0' must round-trip without rejection.
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    TableConfig viewTableConfig = buildMaterializedViewTableConfig();
+    Map<String, String> taskConfigs = buildTaskConfigs(sql);
+    taskConfigs.put(MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY, "0");
+    MaterializedViewAnalyzer.analyze(withLimit(sql), viewTableConfig, viewSchema, taskConfigs, _mockAccessor);
+  }
+
   // -----------------------------------------------------------------------
   //  Complex SQL
   // -----------------------------------------------------------------------
@@ -831,6 +946,72 @@ public class MaterializedViewAnalyzerTest {
       assertTrue(e.getMessage().contains("REALTIME"),
           "Unexpected message: " + e.getMessage());
     }
+  }
+
+  @Test
+  public void testRejectsHybridSourceTable() {
+    // When both `_OFFLINE` and `_REALTIME` variants exist, the raw source name is ambiguous:
+    // the broker would silently hybrid-route the persisted definedSQL at query time while
+    // STALE-marking only covered the OFFLINE half (LLC realtime commits bypass the MV
+    // consistency manager).  The resolver MUST fail fast so a misconfigured MV never reaches
+    // cluster metadata — the OFFLINE-first preference that used to silently let hybrid bases
+    // through is exactly the silent-drift trap this guard closes.
+    String hybridTable = "hybrid_orders";
+    TableConfig offlineCfg = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(hybridTable + "_OFFLINE")
+        .setTimeColumnName(TIME_COLUMN)
+        .build();
+    TableConfig realtimeCfg = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(hybridTable + "_REALTIME")
+        .setTimeColumnName(TIME_COLUMN)
+        .build();
+    Schema hybridSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    stubTable(hybridTable + "_OFFLINE", offlineCfg, hybridSchema);
+    stubTable(hybridTable + "_REALTIME", realtimeCfg, hybridSchema);
+
+    String sql = "SELECT DaysSinceEpoch, city FROM " + hybridTable;
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    TableConfig viewTableConfig = buildMaterializedViewTableConfig();
+    Map<String, String> taskConfigs = buildTaskConfigs(sql);
+
+    try {
+      MaterializedViewAnalyzer.analyze(withLimit(sql), viewTableConfig, viewSchema, taskConfigs, _mockAccessor);
+      fail("Expected IllegalStateException for hybrid source table");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("hybrid"),
+          "Expected 'hybrid' in error message, got: " + e.getMessage());
+      assertTrue(e.getMessage().contains(hybridTable),
+          "Expected source table name in error message, got: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void testAcceptsOfflineOnlySource() {
+    // Regression guard for the hybrid-rejection change: when only the OFFLINE variant exists,
+    // the resolver must still succeed.  The default `setUp()` already stubs SOURCE_TABLE_OFFLINE
+    // only; explicitly stub the REALTIME variant as absent to make the OFFLINE-only intent
+    // unambiguous against future mock setup churn.
+    stubTable(SOURCE_TABLE + "_REALTIME", null, null);
+
+    String sql = "SELECT DaysSinceEpoch, city, count(*) AS cnt FROM orders GROUP BY DaysSinceEpoch, city";
+    Schema viewSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("city", FieldSpec.DataType.STRING)
+        .addMetric("cnt", FieldSpec.DataType.LONG)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS")
+        .build();
+    TableConfig viewTableConfig = buildMaterializedViewTableConfig();
+    Map<String, String> taskConfigs = buildTaskConfigs(sql);
+
+    MaterializedViewAnalyzer.AnalysisResult result =
+        MaterializedViewAnalyzer.analyze(withLimit(sql), viewTableConfig, viewSchema, taskConfigs, _mockAccessor);
+    assertNotNull(result);
+    assertEquals(result.getSourceTableName(), SOURCE_TABLE);
   }
 
   // -----------------------------------------------------------------------
@@ -1102,8 +1283,12 @@ public class MaterializedViewAnalyzerTest {
         .build();
     Map<String, String> taskConfigs = buildTaskConfigs(sql);
 
+    // Wording comes from MaterializedViewTimeExpressionParser, which the validator delegates
+    // to for shape recognition; matching on the substring
+    // "second argument" keeps this test stable across parser-message wording tweaks while
+    // still asserting the rejection lands on the right argument.
     expectErrorRaw(withLimit(sql), viewSchema, viewTableConfig, taskConfigs,
-        "second argument must be the base time column");
+        "second argument");
   }
 
 

@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import java.util.List;
 import java.util.Set;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -31,7 +35,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -82,5 +89,118 @@ public class RequestUtilsTest {
     } else {
       assertEquals(tableNames, expectedSet);
     }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Alias helpers: isAliased / unwrapAlias / extractAliasOrIdentifierName
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  public void testIsAliasedAliasedFunctionReturnsTrue() {
+    Expression expr = aliased(sumOf("amount"), "total");
+    assertTrue(RequestUtils.isAliased(expr));
+  }
+
+  @Test
+  public void testIsAliasedBareIdentifierReturnsFalse() {
+    Expression expr = RequestUtils.getIdentifierExpression("country");
+    assertFalse(RequestUtils.isAliased(expr));
+  }
+
+  @Test
+  public void testIsAliasedAggregationWithoutAsReturnsFalse() {
+    // SUM(x) without AS — the operator is "sum", not "as".
+    Expression expr = sumOf("amount");
+    assertFalse(RequestUtils.isAliased(expr));
+  }
+
+  @Test
+  public void testIsAliasedNullReturnsFalse() {
+    assertFalse(RequestUtils.isAliased(null));
+  }
+
+  @Test
+  public void testIsAliasedLiteralReturnsFalse() {
+    Expression expr = RequestUtils.getLiteralExpression(42L);
+    assertFalse(RequestUtils.isAliased(expr));
+  }
+
+  @Test
+  public void testUnwrapAliasAliasedReturnsUnderlyingExpression() {
+    Expression sum = sumOf("amount");
+    Expression aliased = aliased(sum, "total");
+    Expression unwrapped = RequestUtils.unwrapAlias(aliased);
+    // Same Expression instance returned (we store it in operands, no copy).
+    assertSame(unwrapped, sum);
+  }
+
+  @Test
+  public void testUnwrapAliasBareIdentifierReturnsExpressionUnchanged() {
+    Expression expr = RequestUtils.getIdentifierExpression("country");
+    Expression unwrapped = RequestUtils.unwrapAlias(expr);
+    assertSame(unwrapped, expr);
+  }
+
+  @Test
+  public void testUnwrapAliasAggregationWithoutAsReturnsExpressionUnchanged() {
+    Expression expr = sumOf("amount");
+    Expression unwrapped = RequestUtils.unwrapAlias(expr);
+    assertSame(unwrapped, expr);
+  }
+
+  @Test
+  public void testExtractAliasOrIdentifierNameAliasedFunctionReturnsAliasName() {
+    Expression expr = aliased(sumOf("amount"), "total");
+    assertEquals(RequestUtils.extractAliasOrIdentifierName(expr), "total");
+  }
+
+  @Test
+  public void testExtractAliasOrIdentifierNameBareIdentifierReturnsIdentifierName() {
+    Expression expr = RequestUtils.getIdentifierExpression("country");
+    assertEquals(RequestUtils.extractAliasOrIdentifierName(expr), "country");
+  }
+
+  @Test
+  public void testExtractAliasOrIdentifierNameAggregationWithoutAsThrows() {
+    Expression expr = sumOf("amount");
+    assertThrows(IllegalStateException.class, () -> RequestUtils.extractAliasOrIdentifierName(expr));
+  }
+
+  @Test
+  public void testExtractAliasOrIdentifierNameLiteralThrows() {
+    Expression expr = RequestUtils.getLiteralExpression(42L);
+    assertThrows(IllegalStateException.class, () -> RequestUtils.extractAliasOrIdentifierName(expr));
+  }
+
+  @Test
+  public void testExtractAliasOrIdentifierNameAliasOperandNotIdentifierThrows() {
+    // Construct a malformed `as` call whose alias operand is a literal — should throw.
+    Function asFunc = new Function(SqlKind.AS.lowerName);
+    asFunc.addToOperands(RequestUtils.getIdentifierExpression("amount"));
+    asFunc.addToOperands(RequestUtils.getLiteralExpression(99L));
+    Expression expr = new Expression(ExpressionType.FUNCTION);
+    expr.setFunctionCall(asFunc);
+    assertThrows(IllegalStateException.class, () -> RequestUtils.extractAliasOrIdentifierName(expr));
+  }
+
+  // ---------- helpers ----------
+
+  private static Expression sumOf(String column) {
+    Function func = new Function("sum");
+    func.setOperands(List.of(RequestUtils.getIdentifierExpression(column)));
+    Expression expr = new Expression(ExpressionType.FUNCTION);
+    expr.setFunctionCall(func);
+    return expr;
+  }
+
+  private static Expression aliased(Expression expression, String alias) {
+    Function asFunc = new Function(SqlKind.AS.lowerName);
+    asFunc.addToOperands(expression);
+    Expression aliasExpr = new Expression(ExpressionType.IDENTIFIER);
+    aliasExpr.setIdentifier(new Identifier(alias));
+    asFunc.addToOperands(aliasExpr);
+    Expression result = new Expression(ExpressionType.FUNCTION);
+    result.setFunctionCall(asFunc);
+    return result;
   }
 }

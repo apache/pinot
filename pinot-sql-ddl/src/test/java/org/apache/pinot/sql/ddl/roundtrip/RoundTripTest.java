@@ -40,6 +40,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.sql.ddl.compile.CompiledCreateMaterializedView;
 import org.apache.pinot.sql.ddl.compile.CompiledCreateTable;
 import org.apache.pinot.sql.ddl.compile.DdlCompiler;
 import org.apache.pinot.sql.ddl.reverse.CanonicalDdlEmitter;
@@ -500,6 +501,92 @@ public class RoundTripTest {
   }
 
   // -------------------------------------------------------------------------------------------
+  // Materialized View round-trip cases
+  //
+  // The end-to-end shape for an MV is `CREATE MATERIALIZED VIEW` DDL → compile → emit (via
+  // CanonicalDdlEmitter dispatching to the MV branch) → recompile → assert byte- and JSON-
+  // equivalent (schema + table config + canonical text). Together these tests pin the four
+  // MV-only fidelity guarantees:
+  //
+  //   1. omitted REFRESH stays omitted (PR3.5 cluster-cron fallback),
+  //   2. `REFRESH EVERY '<period>'` round-trips through the cron ↔ period inversion,
+  //   3. canonical MV task knobs (`bucketTimePeriod`, `bufferTimePeriod`,
+  //      `maxNumRecordsPerSegment`) survive as bare PROPERTIES,
+  //   4. a database-qualified MV name survives the qualifier stripping in resolveQualifiedName.
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  public void materializedViewWithoutRefreshClauseRoundTrips() {
+    // PR3.5 contract: no REFRESH clause => no `schedule` knob on disk => emit must NOT add one.
+    // If a future change ever defaulted the schedule on the parser side, this test would catch
+    // the silent insertion because the second compile would carry a `schedule` the first did not.
+    String ddl = "CREATE MATERIALIZED VIEW mv (\n"
+        + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:DAYS',\n"
+        + "  carrier STRING\n"
+        + ")\n"
+        + "PROPERTIES (\n"
+        + "  'timeColumnName' = 'ts',\n"
+        + "  'bucketTimePeriod' = '1d'\n"
+        + ")\n"
+        + "AS SELECT ts, carrier FROM src;\n";
+    assertMaterializedViewRoundTrip(ddl);
+  }
+
+  @Test
+  public void materializedViewWithRefreshEveryOneDayRoundTrips() {
+    // Daily schedule exercises the `0 0 0 * * ?` ↔ `1d` cron/period inverse.
+    String ddl = "CREATE MATERIALIZED VIEW mv (\n"
+        + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:DAYS',\n"
+        + "  carrier STRING\n"
+        + ")\n"
+        + "REFRESH EVERY '1d'\n"
+        + "PROPERTIES (\n"
+        + "  'timeColumnName' = 'ts',\n"
+        + "  'bucketTimePeriod' = '1d'\n"
+        + ")\n"
+        + "AS SELECT ts, carrier FROM src;\n";
+    assertMaterializedViewRoundTrip(ddl);
+  }
+
+  @Test
+  public void materializedViewWithFullKnobSetRoundTrips() {
+    // Exercises every canonical task knob in one go so the flatten-on-extract /
+    // route-on-parse symmetry is locked down in a single test. Also uses the 15-minute cron
+    // template (`0 0/15 * * * ?`) to vary the schedule cell.
+    String ddl = "CREATE MATERIALIZED VIEW mv (\n"
+        + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:DAYS',\n"
+        + "  carrier STRING,\n"
+        + "  amount DOUBLE METRIC\n"
+        + ")\n"
+        + "REFRESH EVERY '15m'\n"
+        + "PROPERTIES (\n"
+        + "  'timeColumnName' = 'ts',\n"
+        + "  'bucketTimePeriod' = '1h',\n"
+        + "  'bufferTimePeriod' = '2h',\n"
+        + "  'maxNumRecordsPerSegment' = '500000'\n"
+        + ")\n"
+        + "AS SELECT ts, carrier, amount FROM src;\n";
+    assertMaterializedViewRoundTrip(ddl);
+  }
+
+  @Test
+  public void databaseQualifiedMaterializedViewRoundTrips() {
+    // Mirrors the table-side database-qualified case (`databaseQualifiedNameRendered`) — pins
+    // the `<db>.<name>` qualifier through the emitter's MV branch.
+    String ddl = "CREATE MATERIALIZED VIEW analytics.mv (\n"
+        + "  ts TIMESTAMP DATETIME FORMAT '1:MILLISECONDS:TIMESTAMP' GRANULARITY '1:DAYS',\n"
+        + "  carrier STRING\n"
+        + ")\n"
+        + "REFRESH EVERY '1d'\n"
+        + "PROPERTIES (\n"
+        + "  'timeColumnName' = 'ts',\n"
+        + "  'bucketTimePeriod' = '1d'\n"
+        + ")\n"
+        + "AS SELECT ts, carrier FROM src;\n";
+    assertMaterializedViewRoundTrip(ddl, "analytics");
+  }
+
+  // -------------------------------------------------------------------------------------------
   // Equivalence machinery
   // -------------------------------------------------------------------------------------------
 
@@ -526,6 +613,44 @@ public class RoundTripTest {
     // Idempotency: emit-parse-emit should yield the same canonical text.
     String secondEmit = CanonicalDdlEmitter.emit(round.getSchema(), round.getTableConfig());
     assertEquals(secondEmit, ddl, "Canonical DDL must be idempotent across round-trip:\n" + ddl);
+  }
+
+  private static void assertMaterializedViewRoundTrip(String ddl) {
+    assertMaterializedViewRoundTrip(ddl, null);
+  }
+
+  /// MV variant of [#assertRoundTrip]. The starting point is a `CREATE MATERIALIZED VIEW`
+  /// DDL string (rather than a programmatically-built TableConfig) because constructing an
+  /// MV TableConfig by hand reproduces the compiler's bucketing / definedSQL / cron logic in
+  /// every test fixture — fragile and a tautology. Starting from the DDL we compile, emit
+  /// (which dispatches to the MV branch via [TableConfig#isMaterializedView]),
+  /// recompile, and assert the second (schema, table config) pair is JSON-equivalent to the
+  /// first and that the canonical text is byte-stable across the second emit.
+  ///
+  /// `databaseName` is passed straight through to [CanonicalDdlEmitter#emit] so the
+  /// db-qualified test exercises the same code path the controller's
+  /// `executeShowCreateMaterializedView` will use.
+  private static void assertMaterializedViewRoundTrip(String ddl, @javax.annotation.Nullable String databaseName) {
+    CompiledCreateMaterializedView first =
+        (CompiledCreateMaterializedView) DdlCompiler.compile(ddl);
+    assertNotNull(first, "Source DDL should compile: " + ddl);
+
+    String firstEmit =
+        CanonicalDdlEmitter.emit(first.getSchema(), first.getTableConfig(), databaseName);
+    assertTrue(firstEmit.startsWith("CREATE MATERIALIZED VIEW "),
+        "MV dispatch must produce a `CREATE MATERIALIZED VIEW` statement; got:\n" + firstEmit);
+
+    CompiledCreateMaterializedView second =
+        (CompiledCreateMaterializedView) DdlCompiler.compile(firstEmit);
+    assertNotNull(second, "Round-tripped MV DDL should compile:\n" + firstEmit);
+
+    assertSchemaEquivalent(first.getSchema(), second.getSchema(), firstEmit);
+    assertTableConfigEquivalent(first.getTableConfig(), second.getTableConfig(), firstEmit);
+
+    String secondEmit =
+        CanonicalDdlEmitter.emit(second.getSchema(), second.getTableConfig(), databaseName);
+    assertEquals(secondEmit, firstEmit,
+        "Canonical MV DDL must be idempotent across round-trip:\n" + firstEmit);
   }
 
   private static void assertSchemaEquivalent(Schema a, Schema b, String ddl) {
