@@ -29,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -451,17 +452,19 @@ public class ServerRoutingStatsManager {
           BrokerGauge.ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS,
           BrokerGauge.ADAPTIVE_SERVER_LATENCY_EMA,
           BrokerGauge.ADAPTIVE_SERVER_HYBRID_SCORE);
+      // TODO: Export MSE latency stats once we support it
       exportStatsForMap(_mseServerQueryStatsMap, "server.",
           BrokerGauge.ADAPTIVE_SERVER_MSE_NUM_IN_FLIGHT_REQUESTS,
-          BrokerGauge.ADAPTIVE_SERVER_MSE_LATENCY_EMA,
-          BrokerGauge.ADAPTIVE_SERVER_MSE_HYBRID_SCORE);
+          null,
+          null);
     } catch (Exception e) {
       LOGGER.error("Exception caught while exporting routing stats as metrics.", e);
     }
   }
 
   private void exportStatsForMap(ConcurrentHashMap<String, ServerRoutingStatsEntry> statsMap, String tagPrefix,
-      BrokerGauge numInFlightGauge, BrokerGauge latencyEmaGauge, BrokerGauge hybridScoreGauge) {
+      BrokerGauge numInFlightGauge, @Nullable BrokerGauge latencyEmaGauge,
+      @Nullable BrokerGauge hybridScoreGauge) {
     for (Map.Entry<String, ServerRoutingStatsEntry> entry : statsMap.entrySet()) {
       String serverInstanceId = entry.getKey();
       ServerRoutingStatsEntry stats = entry.getValue();
@@ -481,8 +484,12 @@ public class ServerRoutingStatsManager {
 
       String tag = tagPrefix + serverInstanceId;
       _brokerMetrics.setValueOfGlobalGauge(numInFlightGauge, tag, numInFlightRequests);
-      _brokerMetrics.setValueOfGlobalGauge(latencyEmaGauge, tag, (long) latencyEma);
-      _brokerMetrics.setValueOfGlobalGauge(hybridScoreGauge, tag, (long) hybridScore);
+      if (latencyEmaGauge != null) {
+        _brokerMetrics.setValueOfGlobalGauge(latencyEmaGauge, tag, (long) latencyEma);
+      }
+      if (hybridScoreGauge != null) {
+        _brokerMetrics.setValueOfGlobalGauge(hybridScoreGauge, tag, (long) hybridScore);
+      }
     }
   }
 }
