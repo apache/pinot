@@ -175,7 +175,7 @@ public enum TransformFunctionType {
       ReturnTypes.cascade(opBinding -> positionalComponentType(opBinding, 2), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY, SqlTypeFamily.ARRAY))),
   IN_ID_SET("inIdSet", ReturnTypes.BOOLEAN, OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)),
-  LOOKUP("lookUp"),
+  LOOKUP("lookUp", ReturnTypes.explicit(SqlTypeName.ANY), OperandTypes.variadic(SqlOperandCountRanges.from(4))),
   GROOVY("groovy"),
   SCALAR("scalar"),
 
