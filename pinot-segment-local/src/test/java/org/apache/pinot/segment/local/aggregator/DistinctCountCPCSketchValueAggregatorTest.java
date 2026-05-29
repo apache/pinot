@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.stream.IntStream;
 import org.apache.datasketches.cpc.CpcSketch;
@@ -100,6 +101,38 @@ public class DistinctCountCPCSketchValueAggregatorTest {
 
     assertEquals(result.getEstimate(), merged.getEstimate());
     assertEquals(agg.getMaxAggregatedValueByteSize(), 2580);
+  }
+
+  @Test
+  public void applyRawValueFromBufferShouldMatchByteArray() {
+    CpcSketch input1 = new CpcSketch();
+    IntStream.range(0, 1000).forEach(input1::update);
+    CpcSketch input2 = new CpcSketch();
+    IntStream.range(0, 1000).forEach(input2::update);
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    byte[] result2bytes = agg.serializeAggregatedValue(input2);
+
+    CpcSketch viaArray = toSketch(agg.applyRawValue(input1, result2bytes));
+    DistinctCountCPCSketchValueAggregator aggBuf =
+        new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    CpcSketch viaBuffer = toSketch(aggBuf.applyRawValueFromBuffer(input1, ByteBuffer.wrap(result2bytes)));
+    assertEquals(viaBuffer.getEstimate(), viaArray.getEstimate());
+  }
+
+  @Test
+  public void applyAggregatedValueFromBufferShouldMatchByteArray() {
+    CpcSketch input1 = new CpcSketch();
+    IntStream.range(0, 1000).forEach(input1::update);
+    CpcSketch input2 = new CpcSketch();
+    IntStream.range(0, 1000).forEach(input2::update);
+    DistinctCountCPCSketchValueAggregator agg = new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    byte[] input2bytes = agg.serializeAggregatedValue(input2);
+
+    CpcSketch viaArray = toSketch(agg.applyAggregatedValue(input1, input2));
+    DistinctCountCPCSketchValueAggregator aggBuf =
+        new DistinctCountCPCSketchValueAggregator(Collections.emptyList());
+    CpcSketch viaBuffer = toSketch(aggBuf.applyAggregatedValueFromBuffer(input1, ByteBuffer.wrap(input2bytes)));
+    assertEquals(viaBuffer.getEstimate(), viaArray.getEstimate());
   }
 
   @Test

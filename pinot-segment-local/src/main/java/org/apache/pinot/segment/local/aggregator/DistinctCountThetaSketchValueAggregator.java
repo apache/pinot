@@ -19,7 +19,10 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
+import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Union;
@@ -168,6 +171,27 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
   public Object applyAggregatedValue(Object value, Object aggregatedValue) {
     Union thetaUnion = extractUnion(aggregatedValue);
     singleItemUpdate(thetaUnion, value);
+    _maxByteSize = Math.max(_maxByteSize, thetaUnion.getCurrentBytes());
+    return thetaUnion;
+  }
+
+  @Override
+  public Object applyRawValueFromBuffer(Object aggregatedValue, ByteBuffer buf) {
+    // True zero-copy: Sketch.wrap returns a read-only sketch view over the underlying Memory,
+    // which itself wraps the ByteBuffer without copying. Union.union walks the wrapped sketch's
+    // entries directly out of the source bytes — no heap allocation for sketch internals.
+    Union thetaUnion = extractUnion(aggregatedValue);
+    Sketch sketch = Sketch.wrap(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN));
+    thetaUnion.union(sketch);
+    _maxByteSize = Math.max(_maxByteSize, thetaUnion.getCurrentBytes());
+    return thetaUnion;
+  }
+
+  @Override
+  public Object applyAggregatedValueFromBuffer(Object value, ByteBuffer buf) {
+    Union thetaUnion = extractUnion(value);
+    Sketch sketch = Sketch.wrap(Memory.wrap(buf, ByteOrder.LITTLE_ENDIAN));
+    thetaUnion.union(sketch);
     _maxByteSize = Math.max(_maxByteSize, thetaUnion.getCurrentBytes());
     return thetaUnion;
   }

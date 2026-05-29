@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -55,10 +56,49 @@ public interface ValueAggregator<R, A> {
   A applyRawValue(A value, R rawValue);
 
   /**
+   * Applies a raw value to the current aggregated value, reading from a {@link ByteBuffer} view of
+   * the serialized payload.
+   *
+   * <p>The default implementation drains the buffer into a {@code byte[]} and delegates to
+   * {@link #applyRawValue}, preserving source compatibility for implementors that only handle
+   * byte-array raw values. Sketch implementations override to consume the buffer directly via
+   * {@code Memory.wrap(ByteBuffer)}, avoiding the per-call {@code byte[]} allocation.
+   *
+   * <p>The implementation MUST drain the buffer's remaining bytes before returning. The caller
+   * may invalidate the buffer immediately after the call (see the lifetime contract on
+   * {@link org.apache.pinot.segment.spi.index.reader.ForwardIndexReader#getBytesView}).
+   *
+   * <p>This method is only meaningful for aggregators whose raw values are byte payloads
+   * ({@code R = byte[]} or {@code R = Object} with {@code byte[]} dispatch). Aggregators with
+   * non-byte raw types should not be invoked through this method.
+   */
+  @SuppressWarnings("unchecked")
+  default A applyRawValueFromBuffer(A value, ByteBuffer buf) {
+    byte[] bytes = new byte[buf.remaining()];
+    buf.get(bytes);
+    return applyRawValue(value, (R) bytes);
+  }
+
+  /**
    * Applies an aggregated value to the current aggregated value.
    * <p>NOTE: if value is mutable, will directly modify the value.
    */
   A applyAggregatedValue(A value, A aggregatedValue);
+
+  /**
+   * Applies an aggregated value to the current aggregated value, reading from a {@link ByteBuffer}
+   * view of a serialized aggregated value.
+   *
+   * <p>The default implementation drains the buffer, deserializes via
+   * {@link #deserializeAggregatedValue(byte[])}, and delegates to {@link #applyAggregatedValue}.
+   * Sketch implementations override to consume the buffer directly. The same lifetime contract
+   * applies: the buffer must be consumed before this method returns.
+   */
+  default A applyAggregatedValueFromBuffer(A value, ByteBuffer buf) {
+    byte[] bytes = new byte[buf.remaining()];
+    buf.get(bytes);
+    return applyAggregatedValue(value, deserializeAggregatedValue(bytes));
+  }
 
   /**
    * Clones an aggregated value.

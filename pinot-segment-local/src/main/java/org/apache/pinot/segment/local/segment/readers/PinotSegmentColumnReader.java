@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -93,6 +94,29 @@ public class PinotSegmentColumnReader implements Closeable {
 
   public int getDictId(int docId) {
     return _forwardIndexReader.getDictId(docId, _forwardIndexReaderContext);
+  }
+
+  /**
+   * Returns the BYTES single-value at the given doc id as a {@link ByteBuffer} view, avoiding the
+   * per-call {@code byte[]} allocation of {@link #getValue}. Only valid for a non-dictionary-encoded
+   * single-value BYTES column whose underlying forward index reader reports
+   * {@link #isBufferViewStableAcrossReads()} {@code true}; callers must gate on that flag.
+   *
+   * <p>This is the build-time analog of {@link org.apache.pinot.core.common.BlockValSet#getBytesValueViewsSV()}
+   * on the query path. The lifetime contract of the returned buffer follows
+   * {@link org.apache.pinot.segment.spi.index.reader.ForwardIndexReader#getBytesView}.
+   */
+  public ByteBuffer getValueAsBuffer(int docId) {
+    return _forwardIndexReader.getBytesView(docId, _forwardIndexReaderContext);
+  }
+
+  /**
+   * Returns {@code true} if {@link #getValueAsBuffer} views remain valid across the whole batch
+   * (i.e. holding many of them in a record array across a sort is safe). Answers from the underlying
+   * forward index reader.
+   */
+  public boolean isBufferViewStableAcrossReads() {
+    return _forwardIndexReader.isBufferViewStableAcrossReads();
   }
 
   public Object getValue(int docId) {
