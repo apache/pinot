@@ -42,6 +42,8 @@ public class PinotSegmentColumnReader implements Closeable {
   private final NullValueVectorReader _nullValueVectorReader;
   private final int[] _dictIdBuffer;
   private final DataType _valueType;
+  @Nullable
+  private final String _columnName;
 
   public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
     DataSource dataSource = indexSegment.getDataSource(column);
@@ -51,6 +53,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _dictionary = dataSource.getDictionary();
     _nullValueVectorReader = dataSource.getNullValueVector();
     _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
+    _columnName = column;
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -67,6 +70,7 @@ public class PinotSegmentColumnReader implements Closeable {
     _dictionary = dictionary;
     _nullValueVectorReader = nullValueVectorReader;
     _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
+    _columnName = null;
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
@@ -92,7 +96,34 @@ public class PinotSegmentColumnReader implements Closeable {
   }
 
   public int getDictId(int docId) {
-    return _forwardIndexReader.getDictId(docId, _forwardIndexReaderContext);
+    if (_forwardIndexReader.isDictionaryEncoded()) {
+      return _forwardIndexReader.getDictId(docId, _forwardIndexReaderContext);
+    }
+    if (_dictionary == null) {
+      throw new UnsupportedOperationException(
+          "Cannot resolve dictId: forward index is raw and no dictionary is materialized for column: " + (
+              _columnName != null ? _columnName : "<unknown>"));
+    }
+    // If we have separate dictionary on a RAW forward index column, use that dictionary.
+    switch (_valueType.getStoredType()) {
+      case INT:
+        return _dictionary.indexOf(_forwardIndexReader.getInt(docId, _forwardIndexReaderContext));
+      case LONG:
+        return _dictionary.indexOf(_forwardIndexReader.getLong(docId, _forwardIndexReaderContext));
+      case FLOAT:
+        return _dictionary.indexOf(_forwardIndexReader.getFloat(docId, _forwardIndexReaderContext));
+      case DOUBLE:
+        return _dictionary.indexOf(_forwardIndexReader.getDouble(docId, _forwardIndexReaderContext));
+      case BIG_DECIMAL:
+        return _dictionary.indexOf(_forwardIndexReader.getBigDecimal(docId, _forwardIndexReaderContext));
+      case STRING:
+        return _dictionary.indexOf(_forwardIndexReader.getString(docId, _forwardIndexReaderContext));
+      case BYTES:
+        return _dictionary.indexOf(new ByteArray(_forwardIndexReader.getBytes(docId, _forwardIndexReaderContext)));
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot resolve dictId for raw forward index of stored type: " + _valueType.getStoredType());
+    }
   }
 
   public Object getValue(int docId) {
