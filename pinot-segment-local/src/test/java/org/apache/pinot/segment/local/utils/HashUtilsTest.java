@@ -107,6 +107,40 @@ public class HashUtilsTest {
         "hashUUID(\"1-2-3-4-5\") must equal UUID.fromString output for backward compatibility");
   }
 
+  /**
+   * Multi-column PK regression: each element must independently round-trip through the lenient
+   * {@code UUID.fromString} path. A composite PK mixing one non-canonical and one canonical UUID must
+   * produce a 32-byte concatenation where each 16-byte half matches its corresponding
+   * {@code UUID.fromString} output.
+   */
+  @Test
+  public void testHashUUIDLenientForMultiColumnPrimaryKey() {
+    String nonCanonical = "1-2-3-4-5";
+    String canonical = "550e8400-e29b-41d4-a716-446655440000";
+    UUID expectedFirst = UUID.fromString(nonCanonical);
+    UUID expectedSecond = UUID.fromString(canonical);
+
+    byte[] hashResult = HashUtils.hashUUID(new PrimaryKey(new Object[]{nonCanonical, canonical}));
+    assertEquals(hashResult.length, 32, "Two-column PK must produce 32 bytes (16 per UUID)");
+
+    assertEquals(reconstructUuid(hashResult, 0), expectedFirst,
+        "First half must match UUID.fromString of the non-canonical input");
+    assertEquals(reconstructUuid(hashResult, 16), expectedSecond,
+        "Second half must match UUID.fromString of the canonical input");
+  }
+
+  private static UUID reconstructUuid(byte[] hashBytes, int offset) {
+    long msb = 0;
+    long lsb = 0;
+    for (int i = 0; i < 8; i++) {
+      msb = (msb << 8) | (hashBytes[offset + i] & 0xFF);
+    }
+    for (int i = 0; i < 8; i++) {
+      lsb = (lsb << 8) | (hashBytes[offset + 8 + i] & 0xFF);
+    }
+    return new UUID(msb, lsb);
+  }
+
   @Test
   public void testHashPrimaryKeyWithMd5Disabled() {
     PrimaryKey primaryKey = new PrimaryKey(new Object[]{"hello world"});
