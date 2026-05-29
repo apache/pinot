@@ -55,6 +55,7 @@ public class QueryLogger {
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
+  private final boolean _debugInsteadOfDrop;
 
   public QueryLogger(PinotConfiguration config) {
     this(RateLimiter.create(config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND,
@@ -63,20 +64,35 @@ public class QueryLogger {
         config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
             Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING),
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING,
-            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING), LOGGER, RateLimiter.create(1)
-        // log once a second for dropped log count
+            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING), LOGGER, RateLimiter.create(1),
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_ON_RATE_LIMIT,
+            Broker.DEFAULT_BROKER_QUERY_LOG_ON_RATE_LIMIT)
     );
   }
 
   @VisibleForTesting
   QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, boolean logBeforeProcessing,
       Logger logger, RateLimiter droppedLogRateLimiter) {
+    this(logRateLimiter, maxQueryLengthToLog, enableIpLogging, logBeforeProcessing, logger, droppedLogRateLimiter,
+        null);
+  }
+
+  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, boolean logBeforeProcessing,
+      Logger logger, RateLimiter droppedLogRateLimiter, @Nullable String onRateMode) {
     _logRateLimiter = logRateLimiter;
     _maxQueryLengthToLog = maxQueryLengthToLog;
     _enableIpLogging = enableIpLogging;
     _logger = logger;
     _droppedLogRateLimiter = droppedLogRateLimiter;
     _logBeforeProcessing = logBeforeProcessing;
+    if (onRateMode == null || onRateMode.equalsIgnoreCase("drop")) {
+      _debugInsteadOfDrop = false;
+    } else if (onRateMode.equalsIgnoreCase("debug")) {
+      _debugInsteadOfDrop = true;
+    } else {
+      logger.warn("Invalid onRateMode: {}. Falling back to not logging dropped logs.", onRateMode);
+      _debugInsteadOfDrop = false;
+    }
   }
 
   /**
@@ -89,16 +105,11 @@ public class QueryLogger {
    * @return true if the rate limiter allowed this query (not rate-limited), false if rate-limited
    */
   public boolean logQueryReceived(long requestId, String query) {
-    if (!checkRateLimiter()) {
-      return false;
-    }
-
+    LogMode logMode = getLogMode();
     if (_logBeforeProcessing) {
-      _logger.info("SQL query for request {}: {}", requestId, query);
+      logMode.log(_logger, "SQL query for request {}: {}", requestId, query);
     }
-
-    tryLogDropped();
-    return true;
+    return logMode == LogMode.INFO;
   }
 
   /**
@@ -112,7 +123,8 @@ public class QueryLogger {
   public void logQueryCompleted(QueryLogParams params, boolean wasLogged) {
     _logger.debug("Broker Response: {}", params._response);
 
-    if (!wasLogged && !shouldForceLog(params)) {
+    LogMode logMode = getLogMode(params, wasLogged);
+    if (logMode == LogMode.DROP) {
       return;
     }
 
@@ -121,21 +133,39 @@ public class QueryLogger {
       value.format(queryLogBuilder, this, params);
       queryLogBuilder.append(',');
     }
-
-    // always log the query last - don't add this to the QueryLogEntry enum
     queryLogBuilder.append("query=")
         .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
-    _logger.info(queryLogBuilder.toString());
 
-    tryLogDropped();
+    logMode.log(_logger, queryLogBuilder.toString());
   }
 
-  private boolean checkRateLimiter() {
+  private LogMode getLogMode() {
     boolean allowed = _logRateLimiter.tryAcquire();
-    if (!allowed) {
+    if (allowed) {
+      tryLogDropped();
+      return LogMode.INFO;
+    } else {
       _numDroppedLogs.incrementAndGet();
+      if (_debugInsteadOfDrop) {
+        return LogMode.DEBUG;
+      } else {
+        return LogMode.DROP;
+      }
     }
-    return allowed;
+  }
+
+  private LogMode getLogMode(QueryLogParams params, boolean wasLogged) {
+    if (wasLogged || shouldForceLog(params)) {
+      tryLogDropped();
+      return LogMode.INFO;
+    } else {
+      _numDroppedLogs.incrementAndGet();
+      if (_debugInsteadOfDrop) {
+        return LogMode.DEBUG;
+      } else {
+        return LogMode.DROP;
+      }
+    }
   }
 
   private void tryLogDropped() {
@@ -198,6 +228,54 @@ public class QueryLogger {
 
       private String getName() {
         return _name;
+      }
+    }
+  }
+
+  private enum LogMode {
+    INFO,
+    DEBUG,
+    DROP;
+
+    public void log(Logger logger, String logTemplate) {
+      switch (this) {
+        case INFO:
+          logger.info(logTemplate);
+          break;
+        case DEBUG:
+          logger.debug(logTemplate);
+          break;
+        case DROP:
+          // do nothing
+          break;
+      }
+    }
+
+    public void log(Logger logger, String logTemplate, Object arg) {
+      switch (this) {
+        case INFO:
+          logger.info(logTemplate, arg);
+          break;
+        case DEBUG:
+          logger.debug(logTemplate, arg);
+          break;
+        case DROP:
+          // do nothing
+          break;
+      }
+    }
+
+    public void log(Logger logger, String logTemplate, Object arg1, Object arg2) {
+      switch (this) {
+        case INFO:
+          logger.info(logTemplate, arg1, arg2);
+          break;
+        case DEBUG:
+          logger.debug(logTemplate, arg1, arg2);
+          break;
+        case DROP:
+          // do nothing
+          break;
       }
     }
   }
