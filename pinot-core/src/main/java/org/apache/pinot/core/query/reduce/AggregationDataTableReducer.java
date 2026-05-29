@@ -98,9 +98,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
 
   /**
    * Merges the per-server intermediate aggregation results into a single {@code Object[]} of merged
-   * intermediate results (one per aggregation function), WITHOUT finalizing. Shared by the normal
-   * reduce path ({@link #reduceWithIntermediateResult}) and the merge-only path
-   * ({@link #mergeDataTablesOnly}).
+   * intermediate results (one per aggregation function), WITHOUT finalizing.
    */
   private Object[] mergeIntermediateResults(DataSchema dataSchema, Collection<DataTable> dataTables) {
     int numAggregationFunctions = _aggregationFunctions.length;
@@ -138,14 +136,10 @@ public class AggregationDataTableReducer implements DataTableReducer {
   public DataTable mergeDataTablesOnly(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, DataTableReducerContext reducerContext,
       BrokerMetrics brokerMetrics) {
-    // When servers are configured to return final aggregate state, the input DataTables hold final
-    // (not intermediate) values, so the merge-only contract — "produce an intermediate DataTable that
-    // can be re-merged via the normal reduce path" — cannot be honored.
+    // cannot support finalized value types returned by the servers as an intermediate result type
     if (_queryContext.isServerReturnFinalResult()) {
       throw new UnsupportedOperationException(
-          "Merge-only reduction is not supported when servers return final aggregate results "
-              + "(server.returnFinalResult / isServerReturnFinalResult); input would be final-typed, "
-              + "not intermediate.");
+          "Datatable merge to intermediate results cannot be supported when servers return final result");
     }
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(_queryContext, dataSchema);
     try {

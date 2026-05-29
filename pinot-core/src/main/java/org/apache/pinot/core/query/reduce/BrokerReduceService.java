@@ -253,11 +253,15 @@ public class BrokerReduceService extends BaseReduceService {
   }
 
   /**
-   * Processes per-server response metadata and filters {@code dataTableMap} in place: drops tables with a
-   * null schema, drops empty tables (remembering their schema as a fallback), and drops tables whose
-   * column data types conflict with the first non-empty table (collected into {@code conflictingServers}).
+   * Processes per-server response metadata and filters {@code dataTableMap} in place:
+   *  - drops tables with a null schema
+   *  - drops empty tables (remembering their schema as a fallback)
+   *  - drops tables whose column data types conflict with the first non-empty table
+   *  (collected into {@code conflictingServers}).
+   *
    * When an {@code aggregator} is provided, per-table execution stats are aggregated before a table is
-   * dropped. Returns the remembered data schema (non-empty preferred, else empty-table schema, else
+   * dropped.
+   * Returns the remembered data schema (non-empty preferred, else empty-table schema, else
    * {@code null}).
    */
   private static DataSchema filterDataTablesAndPickSchema(Map<ServerRoutingInstance, DataTable> dataTableMap,
@@ -305,7 +309,7 @@ public class BrokerReduceService extends BaseReduceService {
 
   /**
    * Resolves the group-by trim parameters (query option overrides, else broker defaults) and builds the
-   * {@link DataTableReducerContext}. Shared by the regular reduce and the merge-only path.
+   * {@link DataTableReducerContext}
    */
   private DataTableReducerContext createReducerContext(@Nullable Map<String, String> queryOptions,
       long reduceTimeOutMs) {

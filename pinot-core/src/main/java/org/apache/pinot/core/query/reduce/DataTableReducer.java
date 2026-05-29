@@ -56,9 +56,7 @@ public interface DataTableReducer {
    * latency.
    *
    * <p>Reducers that cannot produce a re-mergeable intermediate (e.g. explain-plan) leave this default
-   * implementation, which throws {@link UnsupportedOperationException}. Aggregation and group-by
-   * reducers also throw when the query is configured for server-side final-result return
-   * ({@code server.returnFinalResult}) because the inputs are then finalized, not intermediate.
+   * implementation, which throws {@link UnsupportedOperationException}.
    *
    * @param tableName table name
    * @param dataSchema schema from broker reduce service
