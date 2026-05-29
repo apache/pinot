@@ -20,15 +20,19 @@ package org.apache.pinot.core.data.manager.offline;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -38,6 +42,17 @@ import org.apache.pinot.spi.data.Schema;
  */
 @ThreadSafe
 public class OfflineTableDataManager extends BaseTableDataManager {
+
+  private final BooleanSupplier _isServerReadyToServeQueries;
+  private OfflineFreshnessTracker _freshnessTracker;
+
+  public OfflineTableDataManager() {
+    this(() -> true);
+  }
+
+  public OfflineTableDataManager(BooleanSupplier isServerReadyToServeQueries) {
+    _isServerReadyToServeQueries = isServerReadyToServeQueries;
+  }
 
   @Override
   protected void doInit() {
@@ -49,6 +64,8 @@ public class OfflineTableDataManager extends BaseTableDataManager {
           TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
               this, _segmentOperationsThrottlerSet);
     }
+    _freshnessTracker =
+        new OfflineFreshnessTracker(_serverMetrics, _tableNameWithType, _isServerReadyToServeQueries);
   }
 
   @Override
@@ -57,6 +74,9 @@ public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
+    if (_freshnessTracker != null) {
+      _freshnessTracker.shutdown();
+    }
     if (_tableUpsertMetadataManager != null) {
       _tableUpsertMetadataManager.stop();
     }
@@ -81,6 +101,19 @@ public class OfflineTableDataManager extends BaseTableDataManager {
     } else {
       replaceSegmentIfCrcMismatch(segmentDataManager, zkMetadata, indexLoadingConfig);
     }
+
+    // Track freshness after segment is loaded
+    if (_freshnessTracker != null) {
+      trackSegmentFreshness(segmentName, zkMetadata);
+    }
+  }
+
+  @Override
+  protected void doOffloadSegment(String segmentName) {
+    if (_freshnessTracker != null) {
+      _freshnessTracker.segmentRemoved(segmentName);
+    }
+    super.doOffloadSegment(segmentName);
   }
 
   @Override
@@ -99,5 +132,37 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   @Override
   public void addConsumingSegment(String segmentName) {
     throw new UnsupportedOperationException("Cannot add CONSUMING segment to OFFLINE table");
+  }
+
+  private void trackSegmentFreshness(String segmentName, SegmentZKMetadata zkMetadata) {
+    try {
+      SegmentDataManager sdm = _segmentDataManagerMap.get(segmentName);
+      if (sdm == null) {
+        return;
+      }
+      SegmentMetadata meta = sdm.getSegment().getSegmentMetadata();
+      TimeUnit timeUnit = meta.getTimeUnit();
+      if (timeUnit == null) {
+        return;
+      }
+      long endTimeMs = timeUnit.toMillis(meta.getEndTime());
+
+      int partitionId;
+      if (zkMetadata == null || zkMetadata.getPartitionMetadata() == null) {
+        // No partition metadata — treat as non-partitioned
+        partitionId = OfflineFreshnessTracker.NON_PARTITIONED_SENTINEL;
+      } else {
+        // getSegmentPartitionId returns null when partition ID is ambiguous (e.g. multi-partition segment)
+        Integer derivedPartitionId = SegmentUtils.getSegmentPartitionId(zkMetadata, null);
+        if (derivedPartitionId == null) {
+          // Skip tracking for ambiguous segments to avoid polluting the non-partitioned bucket
+          return;
+        }
+        partitionId = derivedPartitionId;
+      }
+      _freshnessTracker.segmentLoaded(segmentName, endTimeMs, partitionId);
+    } catch (Exception e) {
+      _logger.warn("Failed to track freshness for segment: {}", segmentName, e);
+    }
   }
 }
