@@ -20,11 +20,13 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -623,25 +625,18 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
   }
 
   /**
-   * Reproduces a bug where {@code shouldRelocateCompletedSegments} ignores {@code instancePartitionsMap}.
+   * Regression for imported COMPLETED instance partitions during rebalance.
    *
-   * <p><b>Scenario (exact prod case):</b> Table A has instanceAssignment config producing 64 servers across
-   * 2 replica groups, 8 explicit partitions, 4 servers per partition. Table B uses {@code instancePartitionsMap}
-   * to import Table A's instance partitions for both CONSUMING and COMPLETED (same 64-server pool).
-   * Table B has 8 stream partitions (1:1 mapping with instance partitions).
+   * <p><b>Prod scenario:</b> Table B imports Table A's CONSUMING and COMPLETED instance partitions via
+   * {@code instancePartitionsMap} (no {@code instanceAssignmentConfigMap} for COMPLETED). During rebalance,
+   * {@link org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap} only
+   * loads COMPLETED IPs when {@link InstanceAssignmentConfigUtils#shouldRelocateCompletedSegments} returns true.
    *
-   * <p><b>Bug:</b> {@code shouldRelocateCompletedSegments} only checks {@code instanceAssignmentConfigMap},
-   * not {@code instancePartitionsMap}. So even though Table B configures COMPLETED in its
-   * {@code instancePartitionsMap}, COMPLETED instance partitions are never loaded during rebalance.
-   * COMPLETED segments fall through to {@code assignConsumingSegment} which pins all segments from the same
-   * stream partition to a single server, leaving 48 of 64 servers without segments.
+   * <p><b>Bug:</b> {@code shouldRelocateCompletedSegments} ignored {@code instancePartitionsMap}, so rebalance
+   * passed only CONSUMING IPs to segment assignment and completed segments stayed on one server per partition.
    *
-   * <p>The fix: when both CONSUMING and COMPLETED IPs are provided (as they should be after the
-   * {@code shouldRelocateCompletedSegments} fix), the {@code ReplicaGroupSegmentAssignmentStrategy}
-   * distributes completed segments correctly across all servers within each instance partition.
-   *
-   * <p>This test provides both CONSUMING and COMPLETED IPs (as in production) and verifies that
-   * completed segments are distributed across all 4 servers per partition per stream partition.
+   * <p>This test mirrors {@code TableRebalancer}: the rebalance {@code instancePartitionsMap} is built from
+   * {@code shouldRelocateCompletedSegments(tableConfig)}, not by always passing COMPLETED IPs directly.
    */
   @Test
   public void testImportedInstancePartitionsWithMultipleServersPerPartition() {
@@ -656,14 +651,20 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
 
     List<String> allServers = SegmentAssignmentTestUtils.getNameList(serverPrefix, numServers);
 
-    // Table config with segmentAssignmentConfigMap for COMPLETED (needed for strategy selection)
+    // Table B: imports CONSUMING/COMPLETED IPs from Table A; no instanceAssignmentConfigMap for COMPLETED.
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    Map<InstancePartitionsType, String> importedInstancePartitions = new HashMap<>();
+    importedInstancePartitions.put(InstancePartitionsType.CONSUMING, "sourceTable_CONSUMING");
+    importedInstancePartitions.put(InstancePartitionsType.COMPLETED, "sourceTable_COMPLETED");
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(numReplicas)
             .setStreamConfigs(streamConfigs)
+            .setInstancePartitionsMap(importedInstancePartitions)
             .setSegmentAssignmentConfigMap(Collections.singletonMap(InstancePartitionsType.COMPLETED.toString(),
                 new SegmentAssignmentConfig(AssignmentStrategy.REPLICA_GROUP_SEGMENT_ASSIGNMENT_STRATEGY)))
             .build();
+    assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig),
+        "Imported COMPLETED instance partitions must trigger completed-segment relocation during rebalance");
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
 
@@ -713,25 +714,32 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
       }
     }
 
-    // Rebalance with BOTH CONSUMING and COMPLETED IPs (same server pool).
-    // This is what happens after the shouldRelocateCompletedSegments fix — COMPLETED IPs are now loaded.
-    // The ReplicaGroupSegmentAssignmentStrategy should distribute completed segments across all servers.
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
-    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
-    instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
+    // Mirror TableRebalancer.getInstancePartitionsMap(): CONSUMING always; COMPLETED only when relocation applies.
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        buildRebalanceInstancePartitionsMap(tableConfig, consumingInstancePartitions, completedInstancePartitions);
 
+    // Simulate pre-fix rebalance: only CONSUMING IPs in the map (COMPLETED omitted even though import is configured).
+    // Completed segments stay pinned to one server per stream partition.
+    Map<InstancePartitionsType, InstancePartitions> consumingOnlyPartitionsMap = new TreeMap<>();
+    consumingOnlyPartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setIncludeConsuming(true);
+    Map<String, Map<String, String>> consumingOnlyAssignment =
+        segmentAssignment.rebalanceTable(currentAssignment, consumingOnlyPartitionsMap, null, null,
+            rebalanceConfig);
+    int expectedCompletedSegmentServerCountWhenCompletedIpsOmitted = numStreamPartitions * numReplicaGroups;
+    assertEquals(countServersWithCompletedSegments(consumingOnlyAssignment),
+        expectedCompletedSegmentServerCountWhenCompletedIpsOmitted,
+        "Without COMPLETED instance partitions (buggy rebalance path), completed segments should stay on "
+            + expectedCompletedSegmentServerCountWhenCompletedIpsOmitted + " servers");
+
+    assertTrue(instancePartitionsMap.containsKey(InstancePartitionsType.COMPLETED),
+        "Rebalance must include COMPLETED instance partitions when imported via instancePartitionsMap");
     Map<String, Map<String, String>> newAssignment =
         segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, rebalanceConfig);
 
     // COMPLETED segments should be distributed across all 64 servers
-    HashSet<String> completedServers = new HashSet<>();
-    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
-      if (entry.getValue().containsValue(SegmentStateModel.ONLINE)) {
-        completedServers.addAll(entry.getValue().keySet());
-      }
-    }
+    HashSet<String> completedServers = collectServersWithCompletedSegments(newAssignment);
     assertEquals(completedServers.size(), numServers,
         "All " + numServers + " servers should have COMPLETED segments, but only "
             + completedServers.size() + " were used.");
@@ -783,12 +791,7 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
     Map<String, Map<String, String>> bootstrapAssignment =
         segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, null, null, bootstrapConfig);
 
-    HashSet<String> bootstrapCompletedServers = new HashSet<>();
-    for (Map.Entry<String, Map<String, String>> entry : bootstrapAssignment.entrySet()) {
-      if (entry.getValue().containsValue(SegmentStateModel.ONLINE)) {
-        bootstrapCompletedServers.addAll(entry.getValue().keySet());
-      }
-    }
+    HashSet<String> bootstrapCompletedServers = collectServersWithCompletedSegments(bootstrapAssignment);
     assertEquals(bootstrapCompletedServers.size(), numServers,
         "Bootstrap: all " + numServers + " servers should have COMPLETED segments, but only "
             + bootstrapCompletedServers.size() + " were used.");
@@ -815,6 +818,36 @@ public class RealtimeReplicaGroupSegmentAssignmentTest {
                 + ", but only used: " + actualServers);
       }
     }
+  }
+
+  /**
+   * Builds the instance-partitions map the same way as
+   * {@link org.apache.pinot.controller.helix.core.rebalance.TableRebalancer#getInstancePartitionsMap}.
+   */
+  private static Map<InstancePartitionsType, InstancePartitions> buildRebalanceInstancePartitionsMap(
+      TableConfig tableConfig, InstancePartitions consumingInstancePartitions,
+      InstancePartitions completedInstancePartitions) {
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    instancePartitionsMap.put(InstancePartitionsType.CONSUMING, consumingInstancePartitions);
+    if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+      instancePartitionsMap.put(InstancePartitionsType.COMPLETED, completedInstancePartitions);
+    }
+    return instancePartitionsMap;
+  }
+
+  private static HashSet<String> collectServersWithCompletedSegments(
+      Map<String, Map<String, String>> assignment) {
+    HashSet<String> completedServers = new HashSet<>();
+    for (Map.Entry<String, Map<String, String>> entry : assignment.entrySet()) {
+      if (entry.getValue().containsValue(SegmentStateModel.ONLINE)) {
+        completedServers.addAll(entry.getValue().keySet());
+      }
+    }
+    return completedServers;
+  }
+
+  private static int countServersWithCompletedSegments(Map<String, Map<String, String>> assignment) {
+    return collectServersWithCompletedSegments(assignment).size();
   }
 
   private HelixManager createHelixManager() {
