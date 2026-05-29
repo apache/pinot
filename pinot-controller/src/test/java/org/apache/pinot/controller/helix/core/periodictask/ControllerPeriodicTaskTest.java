@@ -58,8 +58,8 @@ public class ControllerPeriodicTaskTest {
   private static final String TASK_NAME = "TestTask";
 
   private final ControllerPeriodicTask _task = new ControllerPeriodicTask<Void>(TASK_NAME, RUN_FREQUENCY_IN_SECONDS,
-      _controllerConf.getPeriodicTaskInitialDelayInSeconds(), _resourceManager, _leadControllerManager,
-      _controllerMetrics, null) {
+        _controllerConf.getPeriodicTaskInitialDelayInSeconds(), null, _resourceManager,
+      _leadControllerManager, _controllerMetrics) {
 
     @Override
     protected void setUpTask() {
