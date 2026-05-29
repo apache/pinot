@@ -16,22 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.integration.tests;
+package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -45,7 +41,8 @@ import static org.testng.Assert.*;
  * to be consumed, and then verifies that the controller's {@code GET /tables/{table}/size} API response
  * includes valid compression statistics for the completed (COMPLETED) segments.
  */
-public class CompressionStatsRealtimeIngestionIntegrationTest extends BaseClusterIntegrationTestSet {
+@Test(suiteName = "CustomClusterIntegrationTest")
+public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomDataQueryClusterIntegrationTest {
 
   // Raw columns that will have compression stats tracked.
   // These are metric/dimension columns from the default On_Time schema that support raw encoding.
@@ -53,13 +50,33 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends BaseCluste
       List.of("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
 
   @Override
-  protected String getTableName() {
+  public String getTableName() {
     return "compressionStatsRealtimeTest";
   }
 
   @Override
   protected long getCountStarResult() {
     return DEFAULT_COUNT_STAR_RESULT;
+  }
+
+  @Override
+  public boolean isRealtimeTable() {
+    return true;
+  }
+
+  @Override
+  public Schema createSchema() {
+    try {
+      return createSchema(getSchemaFileName());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public List<File> createAvroFiles()
+      throws Exception {
+    return unpackAvroData(_tempDir);
   }
 
   @Override
@@ -87,50 +104,6 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends BaseCluste
     indexingConfig.setCompressionStatsEnabled(true);
 
     return tableConfig;
-  }
-
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
-
-    // Start the Pinot cluster
-    startZk();
-    startKafka();
-    startController();
-    startBroker();
-    startServer();
-
-    // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
-
-    // Create and upload the schema and table config
-    Schema schema = createSchema();
-    addSchema(schema);
-    TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
-    addTableConfig(tableConfig);
-    waitForAllRealtimePartitionsConsuming(
-        TableNameBuilder.REALTIME.tableNameWithType(getTableName()), 120_000L);
-
-    // Push data into Kafka
-    pushAvroIntoKafka(avroFiles);
-
-    // Wait for all documents to be loaded
-    waitForAllDocsLoaded(600_000L);
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws Exception {
-    dropRealtimeTable(getTableName());
-    waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
-    waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
-    stopServer();
-    stopBroker();
-    stopController();
-    stopKafka();
-    stopZk();
-    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Test
