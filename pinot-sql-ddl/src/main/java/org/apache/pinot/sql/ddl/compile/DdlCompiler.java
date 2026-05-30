@@ -30,7 +30,6 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -88,7 +87,27 @@ import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 /// Stateless and thread-safe. All entry points are static.
 public final class DdlCompiler {
 
+  /// Pluggable handler for `CREATE MATERIALIZED VIEW` compilation (query validation + task-config
+  /// routing). Defaults to single-source / single-stage behavior. A distribution that supports
+  /// richer MV definitions (e.g. a multi-stage-engine MV whose `AS` clause is a JOIN) installs its
+  /// own handler via [#setMaterializedViewDdlHandler] once at controller startup, before any DDL is
+  /// served. Volatile because it is read on the DDL request path and may be set from a different
+  /// (startup) thread; not intended to be swapped while DDL is in flight.
+  private static volatile MaterializedViewDdlHandler _materializedViewDdlHandler =
+      new DefaultMaterializedViewDdlHandler();
+
   private DdlCompiler() {
+  }
+
+  /// Installs the [MaterializedViewDdlHandler] used for all subsequent `CREATE MATERIALIZED VIEW`
+  /// compilations. Call once at controller startup; defaults to [DefaultMaterializedViewDdlHandler].
+  public static void setMaterializedViewDdlHandler(MaterializedViewDdlHandler handler) {
+    _materializedViewDdlHandler = handler;
+  }
+
+  /// Returns the active materialized-view DDL handler (never null; defaults to single-source SSE).
+  public static MaterializedViewDdlHandler getMaterializedViewDdlHandler() {
+    return _materializedViewDdlHandler;
   }
 
   /// Parses and compiles a DDL statement using a stateless {@link DdlCompileContext}.
@@ -526,11 +545,14 @@ public final class DdlCompiler {
     List<String> warnings = new ArrayList<>();
     Map<String, String> properties = resolveProperties(node.getProperties().getList());
 
-    // Reject JOIN early so the inferer's single-source assumption (and the analyzer's
-    // downstream check) cannot be violated by a definedSql we haven't validated yet.
-    rejectJoinInDefinedSql(node.getQuery());
+    // The engine (SSE vs MSE) is the registered handler's choice — not the compiler's. Extract the
+    // verbatim AS-clause text, then let the handler validate it for its target engine (the default
+    // handler re-compiles it as a single-stage Pinot query; an MSE handler does a multi-stage check).
+    // Done before column resolution / schema inference so the single-source inferer cannot be fed a
+    // definition the handler hasn't accepted.
+    MaterializedViewDdlHandler mvHandler = getMaterializedViewDdlHandler();
     String definedSql = extractDefinedSql(originalSql, node.getQuery());
-    verifyDefinedSqlIsParseable(definedSql);
+    mvHandler.validateDefinedQuery(node.getQuery(), definedSql, properties);
 
     // Two paths:
     //   1) Explicit column list — legacy path, will be deprecated once the inferer matures.
@@ -539,6 +561,15 @@ public final class DdlCompiler {
     //      surfaces a clear message when it's absent.
     List<ResolvedColumnDefinition> columns;
     if (node.getColumns().getList().isEmpty()) {
+      // Schema inference from the AS <query> projection is single-source-only. A handler whose
+      // definedSQL may be multi-source (e.g. a multi-stage-engine MV) reports that it does not
+      // support inference, so an explicit column list is required.
+      if (!mvHandler.supportsSchemaInference(properties)) {
+        throw new DdlCompilationException(
+            "CREATE MATERIALIZED VIEW requires an explicit column list for this materialized view; "
+                + "schema inference from the AS <query> projection is only supported for "
+                + "single-source materialized views.");
+      }
       // Fall back to the request-header database when the DDL itself does not qualify the
       // MV name — Calcite needs SOME database to resolve `FROM src` against, and the
       // header's intent ("operate on database X") matches where the MV will be created.
@@ -598,10 +629,17 @@ public final class DdlCompiler {
     TableConfigBuilder builder = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(tableNameForConfig)
         .setIsMaterializedView(true);
-    MaterializedViewPropertyRouter.apply(properties, definedSql, schedule, builder);
+    // The handler routes the MV properties onto the builder and returns the minion task type it
+    // stamped (default: MaterializedViewTask). The consistency check below uses that task type.
+    String mvTaskType = mvHandler.applyTaskConfig(properties, definedSql, schedule, builder);
+    if (mvTaskType == null) {
+      throw new DdlCompilationException("MaterializedViewDdlHandler "
+          + mvHandler.getClass().getName() + " returned a null task type from applyTaskConfig; it "
+          + "must return the task type it stamped onto the table config.");
+    }
     TableConfig tableConfig = builder.build();
 
-    validateMaterializedViewConsistency(schema, tableConfig);
+    validateMaterializedViewConsistency(schema, tableConfig, mvTaskType);
 
     return new CompiledCreateMaterializedView(resolved.getDatabaseName(), schema, tableConfig,
         node.isIfNotExists(), warnings);
@@ -734,64 +772,10 @@ public final class DdlCompiler {
             + sql.length() + ".");
   }
 
-  /// Walks the parsed AS-clause AST and throws a clear, MV-specific error if any JOIN node
-  /// is found at any depth (top-level FROM, subquery FROM, lateral join, etc.). See the
-  /// call-site comment in [#compileCreateMaterializedView] for *why* we do this against the
-  /// AST rather than letting the downstream re-parse / analyzer surface the limitation.
-  private static void rejectJoinInDefinedSql(SqlNode queryNode) {
-    if (containsJoin(queryNode)) {
-      throw new DdlCompilationException(
-          "CREATE MATERIALIZED VIEW does not support JOIN in the AS clause. "
-              + "Materialized views currently read from a single source table; "
-              + "pre-join the inputs into a base table and reference that single table "
-              + "in the MV definition.");
-    }
-  }
-
-  /// Returns true iff `node` or any descendant is a [SqlKind#JOIN] call. We walk via the
-  /// `SqlCall#getOperandList` / `SqlNodeList` axes so the traversal stays wrapper-agnostic
-  /// (SqlOrderBy, SqlWith, SqlExplain) — mirroring how [#collectPositions] walks the tree.
-  /// Leaves (SqlLiteral, SqlIdentifier, ...) terminate the recursion naturally.
-  private static boolean containsJoin(@Nullable SqlNode node) {
-    if (node == null) {
-      return false;
-    }
-    if (node.getKind() == SqlKind.JOIN) {
-      return true;
-    }
-    if (node instanceof SqlCall) {
-      for (SqlNode child : ((SqlCall) node).getOperandList()) {
-        if (containsJoin(child)) {
-          return true;
-        }
-      }
-    } else if (node instanceof SqlNodeList) {
-      for (SqlNode child : (SqlNodeList) node) {
-        if (containsJoin(child)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /// Sanity check: the substring we extracted must be a standalone parseable Pinot query.
-  /// This guards against DDL-layer slicing bugs (off-by-one in [#lineColToOffset], parser
-  /// position quirks) so the error surfaces in the DDL layer rather than at first scheduler
-  /// tick or at create-time analysis (PR 3).
-  private static void verifyDefinedSqlIsParseable(String definedSql) {
-    try {
-      CalciteSqlParser.compileToPinotQuery(definedSql);
-    } catch (Exception e) {
-      throw new DdlCompilationException(
-          "AS <query> did not re-parse as a Pinot query: " + e.getMessage()
-              + " (extracted text: " + definedSql + ")", e);
-    }
-  }
-
   /// Cross-checks: `timeColumnName` must reference a declared DATETIME column, and
   /// `bucketTimePeriod` must be present so the scheduler has a window size.
-  private static void validateMaterializedViewConsistency(Schema schema, TableConfig tableConfig) {
+  private static void validateMaterializedViewConsistency(Schema schema, TableConfig tableConfig,
+      String mvTaskType) {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     if (timeColumnName == null || timeColumnName.isEmpty()) {
       throw new DdlCompilationException(
@@ -809,9 +793,18 @@ public final class DdlCompiler {
     }
     Map<String, String> mvTaskConfig = tableConfig.getTaskConfig() == null
         ? null
-        : tableConfig.getTaskConfig().getConfigsForTaskType(MaterializedViewTask.TASK_TYPE);
-    if (mvTaskConfig == null
-        || !mvTaskConfig.containsKey(MaterializedViewTask.BUCKET_TIME_PERIOD_KEY)) {
+        : tableConfig.getTaskConfig().getConfigsForTaskType(mvTaskType);
+    if (mvTaskConfig == null) {
+      // The handler's applyTaskConfig returned this task type but did not stamp a matching task
+      // config onto the builder — a handler-contract violation, not a user error. Surface it as
+      // such so a custom MaterializedViewDdlHandler author gets an actionable diagnostic rather
+      // than the misleading "bucketTimePeriod missing" message below.
+      throw new DdlCompilationException(
+          "MaterializedViewDdlHandler returned task type '" + mvTaskType + "' from applyTaskConfig "
+              + "but did not stamp a task config under it; the returned task type must match the "
+              + "task config written to the table.");
+    }
+    if (!mvTaskConfig.containsKey(MaterializedViewTask.BUCKET_TIME_PERIOD_KEY)) {
       throw new DdlCompilationException(
           "CREATE MATERIALIZED VIEW requires a 'bucketTimePeriod' property (e.g. '1d', '1h'); "
               + "it defines the time window each refresh tick materializes.");

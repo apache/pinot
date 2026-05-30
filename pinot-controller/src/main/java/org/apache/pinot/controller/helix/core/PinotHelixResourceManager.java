@@ -5473,8 +5473,18 @@ public class PinotHelixResourceManager {
     try {
       Map<String, String> taskConfigs = tableConfig.getMaterializedViewTaskConfigs();
       if (taskConfigs == null) {
-        LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
-            tableNameWithType);
+        // This MV is not materialized by the built-in MaterializedViewTask. A downstream
+        // MaterializedViewDdlHandler / task type may materialize it via its own minion runtime; by
+        // contract (see MaterializedViewDdlHandler) that runtime also owns its definition metadata
+        // and consistency tracking, so the built-in machinery here intentionally does not manage it.
+        if (tableConfig.hasMaterializedViewTaskWithDefinedSql()) {
+          LOGGER.info("MV table {} uses a non-built-in MV task type; its definition metadata is owned "
+              + "by that task type's runtime — skipping built-in MaterializedViewTask metadata persist",
+              tableNameWithType);
+        } else {
+          LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
+              tableNameWithType);
+        }
         return;
       }
       String definedSql = taskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
@@ -5705,8 +5715,16 @@ public class PinotHelixResourceManager {
       }
       Map<String, String> materializedViewTaskConfigs = tableConfig.getMaterializedViewTaskConfigs();
       if (materializedViewTaskConfigs == null) {
-        LOGGER.warn("MV table {} has no MaterializedViewTask config for consistency registration",
-            tableConfig.getTableName());
+        // Not a built-in MaterializedViewTask MV: a downstream task type materializes it and, by
+        // contract (see MaterializedViewDdlHandler), owns its own consistency tracking. The built-in
+        // MaterializedViewConsistencyManager intentionally does not register it here.
+        if (tableConfig.hasMaterializedViewTaskWithDefinedSql()) {
+          LOGGER.info("MV table {} uses a non-built-in MV task type; consistency is owned by that task "
+              + "type's runtime — skipping built-in consistency registration", tableConfig.getTableName());
+        } else {
+          LOGGER.warn("MV table {} has no MaterializedViewTask config for consistency registration",
+              tableConfig.getTableName());
+        }
         return;
       }
       String definedSQL = materializedViewTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
