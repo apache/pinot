@@ -802,7 +802,6 @@ public class SchemaTest {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("test")
         .addOpenStruct("attrs",
-            new DimensionFieldSpec("default", FieldSpec.DataType.STRING, true),
             Map.of("count", new DimensionFieldSpec("count", FieldSpec.DataType.INT, true)))
         .build();
 
@@ -810,7 +809,6 @@ public class SchemaTest {
     Assert.assertNotNull(fs);
     Assert.assertEquals(fs.getDataType(), FieldSpec.DataType.OPEN_STRUCT);
     ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
-    Assert.assertEquals(cfs.getDefaultValueFieldSpec().getDataType(), FieldSpec.DataType.STRING);
     Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
   }
 }

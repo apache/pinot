@@ -825,13 +825,10 @@ public final class Schema implements Serializable {
      * Adds an OPEN_STRUCT field to the schema.
      *
      * @param name field name
-     * @param defaultValueFieldSpec required default FieldSpec for unlisted keys
-     * @param childFieldSpecs optional per-key declared types (any names)
+     * @param childFieldSpecs per-key declared types; pass {@code Map.of()} for none
      */
-    public SchemaBuilder addOpenStruct(String name, FieldSpec defaultValueFieldSpec,
-        @Nullable Map<String, FieldSpec> childFieldSpecs) {
-      _schema.addField(new ComplexFieldSpec(name, FieldSpec.DataType.OPEN_STRUCT, true,
-          childFieldSpecs, defaultValueFieldSpec));
+    public SchemaBuilder addOpenStruct(String name, Map<String, FieldSpec> childFieldSpecs) {
+      _schema.addField(new ComplexFieldSpec(name, FieldSpec.DataType.OPEN_STRUCT, true, childFieldSpecs));
       return this;
     }
 

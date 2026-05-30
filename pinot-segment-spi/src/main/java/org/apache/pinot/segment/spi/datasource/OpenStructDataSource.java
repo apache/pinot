@@ -28,12 +28,11 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 /// which carries fixed-typed MAP semantics (single value type per column).
 public interface OpenStructDataSource extends DataSource {
 
-  /// Returns the OPEN_STRUCT FieldSpec view.
-  ComplexFieldSpec.OpenStructFieldSpec getFieldSpec();
+  /// Returns the OPEN_STRUCT ComplexFieldSpec.
+  ComplexFieldSpec getFieldSpec();
 
   /// Returns the DataSource for the given key's values. The DataSource's value type is the
-  /// per-key declared type (from `_valueFieldSpecs`) when present, otherwise the default
-  /// type (from `_defaultValueFieldSpec`).
+  /// per-key declared type (from `childFieldSpecs`) when present, otherwise auto-derived.
   DataSource getDataSource(String key);
 
   /// Returns whether the given key has a materialized per-key index in this segment. Exact,

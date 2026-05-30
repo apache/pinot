@@ -26,44 +26,26 @@ import static org.apache.pinot.spi.data.ComplexFieldSpec.KEY_FIELD;
 import static org.apache.pinot.spi.data.ComplexFieldSpec.VALUE_FIELD;
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
 public class OpenStructDataTypeTest {
 
   @Test
-  public void openStructWithoutExplicitDefaultUsesStringDimension() {
-    ComplexFieldSpec spec = new ComplexFieldSpec("o", DataType.OPEN_STRUCT, true, null, null);
-    FieldSpec dflt = spec.getDefaultValueFieldSpec();
-    assertNotNull(dflt);
-    assertEquals(dflt.getDataType(), DataType.STRING);
-    assertTrue(dflt.isSingleValueField());
-    assertEquals(dflt.getFieldType(), FieldSpec.FieldType.DIMENSION);
+  public void openStructWithEmptyChildFieldSpecs() {
+    ComplexFieldSpec spec = new ComplexFieldSpec("o", DataType.OPEN_STRUCT, true, Map.of());
+    assertEquals(spec.getDataType(), DataType.OPEN_STRUCT);
+    assertTrue(spec.getChildFieldSpecs().isEmpty());
   }
 
   @Test
-  public void openStructAcceptsChildFieldSpecsAndDefault() {
-    FieldSpec dflt = new DimensionFieldSpec("default", DataType.STRING, true);
+  public void openStructAcceptsChildFieldSpecs() {
     Map<String, FieldSpec> childFieldSpecs = Map.of(
         "count", new DimensionFieldSpec("count", DataType.INT, true),
         "name", new DimensionFieldSpec("name", DataType.STRING, true));
-    ComplexFieldSpec spec = new ComplexFieldSpec(
-        "o", DataType.OPEN_STRUCT, true, childFieldSpecs, dflt);
+    ComplexFieldSpec spec = new ComplexFieldSpec("o", DataType.OPEN_STRUCT, true, childFieldSpecs);
     assertEquals(spec.getChildFieldSpec("count").getDataType(), DataType.INT);
     assertEquals(spec.getChildFieldSpec("name").getDataType(), DataType.STRING);
-    assertEquals(spec.getDefaultValueFieldSpec(), dflt);
-  }
-
-  @Test
-  public void mapRejectsDefaultValueFieldSpec() {
-    FieldSpec dflt = new DimensionFieldSpec("default", DataType.STRING, true);
-    assertThrows(IllegalArgumentException.class, () -> new ComplexFieldSpec(
-        "m", DataType.MAP, true,
-        Map.of(KEY_FIELD, new DimensionFieldSpec(KEY_FIELD, DataType.STRING, true),
-            VALUE_FIELD, new DimensionFieldSpec(VALUE_FIELD, DataType.INT, true)),
-        dflt));
   }
 
   @Test
@@ -77,31 +59,25 @@ public class OpenStructDataTypeTest {
   }
 
   @Test
-  public void openStructJsonRoundtripWithExplicitDefault()
+  public void openStructJsonRoundtrip()
       throws Exception {
-    FieldSpec dflt = new DimensionFieldSpec("default", DataType.INT, true);
     Map<String, FieldSpec> childFieldSpecs = Map.of(
         "count", new DimensionFieldSpec("count", DataType.INT, true));
-    ComplexFieldSpec original = new ComplexFieldSpec(
-        "o", DataType.OPEN_STRUCT, true, childFieldSpecs, dflt);
+    ComplexFieldSpec original = new ComplexFieldSpec("o", DataType.OPEN_STRUCT, true, childFieldSpecs);
 
     String json = JsonUtils.objectToString(original);
     ComplexFieldSpec roundtripped = JsonUtils.stringToObject(json, ComplexFieldSpec.class);
 
     assertEquals(roundtripped.getDataType(), DataType.OPEN_STRUCT);
-    assertEquals(roundtripped.getDefaultValueFieldSpec().getDataType(), DataType.INT);
     assertEquals(roundtripped.getChildFieldSpec("count").getDataType(), DataType.INT);
   }
 
   @Test
-  public void openStructJsonWithoutDefaultUsesStringDimensionFallback()
+  public void openStructJsonWithoutChildFieldSpecs()
       throws Exception {
     String json = "{\"name\":\"o\",\"dataType\":\"OPEN_STRUCT\",\"singleValueField\":true}";
     ComplexFieldSpec spec = JsonUtils.stringToObject(json, ComplexFieldSpec.class);
     assertEquals(spec.getDataType(), DataType.OPEN_STRUCT);
-    FieldSpec dflt = spec.getDefaultValueFieldSpec();
-    assertNotNull(dflt);
-    assertEquals(dflt.getDataType(), DataType.STRING);
-    assertTrue(dflt.isSingleValueField());
+    assertTrue(spec.getChildFieldSpecs().isEmpty());
   }
 }
