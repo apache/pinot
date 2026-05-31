@@ -73,13 +73,13 @@ public class OpenStructIndexConfig extends IndexConfig {
   public OpenStructIndexConfig(
       @JsonProperty("disabled") Boolean disabled,
       @JsonProperty("defaultValueFieldConfig") @Nullable FieldConfig defaultValueFieldConfig,
-      @JsonProperty("maxDenseKeys") int maxDenseKeys,
+      @JsonProperty("maxDenseKeys") @Nullable Integer maxDenseKeys,
       @JsonProperty("denseKeys") @Nullable Set<String> denseKeys,
       @JsonProperty("denseKeyMinFillRate") @Nullable Double denseKeyMinFillRate,
       @JsonProperty("valueFieldConfigs") @Nullable List<FieldConfig> valueFieldConfigs) {
     super(disabled);
     _defaultValueFieldConfig = defaultValueFieldConfig;
-    _maxDenseKeys = maxDenseKeys;
+    _maxDenseKeys = maxDenseKeys != null ? maxDenseKeys : DEFAULT_MAX_DENSE_KEYS;
     _denseKeys = denseKeys;
     _denseKeyMinFillRate = denseKeyMinFillRate != null ? denseKeyMinFillRate : DEFAULT_DENSE_KEY_MIN_FILL_RATE;
     _valueFieldConfigs = valueFieldConfigs;
