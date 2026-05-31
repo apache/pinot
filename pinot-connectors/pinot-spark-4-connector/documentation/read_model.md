@@ -35,7 +35,7 @@ val df = spark.read
       .load()
 ```
 
-Custom schema can be specified directly. If schema is not specified, connector read table schema from Pinot controller, and then convert to the Spark schema. 
+Custom schema can be specified directly. If schema is not specified, connector read table schema from Pinot controller, and then convert to the Spark schema.
 
 ### Architecture
 
@@ -72,16 +72,16 @@ If `segmentsPerSplit` is equal to 1, there will be created 6 Spark partition;
 | partition5  | offlineServer10 / segment10 |
 | partition6  | offlineServer10 / segment20 |
 
-If `segmentsPerSplit` value is too low, that means more parallelism. But this also mean that a lot of connection will be opened with Pinot servers, and will increase QPS on the Pinot servers. 
+If `segmentsPerSplit` value is too low, that means more parallelism. But this also mean that a lot of connection will be opened with Pinot servers, and will increase QPS on the Pinot servers.
 
-If `segmentsPerSplit` value is too high, that means less parallelism. Each Pinot server will scan more segments per request.  
+If `segmentsPerSplit` value is too high, that means less parallelism. Each Pinot server will scan more segments per request.
 
 **Note:** Pinot servers prunes segments based on the segment metadata when query comes. In some cases(for example filtering based on the some columns), some servers may not return data. Therefore, some Spark partitions will be empty. In this cases, `repartition()` may be applied for efficient data analysis after loading data to Spark.
 
 ### Filter And Column Push Down
 Connector supports filter and column push down. Filters and columns are pushed to the pinot servers. Filter and column push down improves the performance while reading data because of its minimizing data transfer between Pinot and Spark. In default, filter push down enabled. If filters are desired to be applied in Spark, `usePushDownFilters` should be set as `false`.
 
-Connector uses SQL, as a result all sql filters are supported. 
+Connector uses SQL, as a result all sql filters are supported.
 
 ### Segment Pruning
 
@@ -90,13 +90,13 @@ Connector receives routing table of given query to get information on which Pino
 ### Table Querying
 Connector uses SQL to query Pinot tables.
 
-Connector creates realtime and offline queries based on the filters and required columns. 
-- If queried table type is `OFFLINE` or `REALTIME`, routing table information will be got for specific table type. 
+Connector creates realtime and offline queries based on the filters and required columns.
+- If queried table type is `OFFLINE` or `REALTIME`, routing table information will be got for specific table type.
 - If queried table type is `HYBRID`, realtime and offline routing table information will be got. Also, connector receives `TimeBoundary` information for given table, and use it in query to ensure that the overlap between realtime and offline segment data is queried exactly once. For more information; [Pinot Broker](https://docs.pinot.apache.org/basics/components/broker)
 
 ### Query Generation
 
-Example generated queries for given usages(assume that `airlineStats` table is hybrid and TimeBoundary information is `DaysSinceEpoch, 16084`); 
+Example generated queries for given usages(assume that `airlineStats` table is hybrid and TimeBoundary information is `DaysSinceEpoch, 16084`);
 
 ```scala
 val df = spark.read
@@ -133,9 +133,9 @@ val df = spark.read
 | table                 | Pinot table name without table type                                                                                                                                                                           | Yes | -                                                     |
 | tableType             | Pinot table type(`realtime`, `offline` or `hybrid`)                                                                                                                                                           | Yes | -                                                     |
 | controller            | Pinot controller `host:port` (schema inferred from `useHttps`/`secureMode`)                                                                                             | No | localhost:9000                                        |
-| broker                | Pinot broker `host:port` (schema inferred from `useHttps`/`secureMode`)                                                                                                 | No | Fetch broker instances of table from Pinot Controller | 
+| broker                | Pinot broker `host:port` (schema inferred from `useHttps`/`secureMode`)                                                                                                 | No | Fetch broker instances of table from Pinot Controller |
 | usePushDownFilters    | Push filters to pinot servers or not. If true, data exchange between pinot server and spark will be minimized.                                                                                                | No | true                                                  |
-| segmentsPerSplit      | Represents the maximum segment count that will be scanned by pinot server in one connection                                                                                                                   | No | 3                                                     | 
+| segmentsPerSplit      | Represents the maximum segment count that will be scanned by pinot server in one connection                                                                                                                   | No | 3                                                     |
 | pinotServerTimeoutMs  | The maximum timeout(ms) to get data from pinot server                                                                                                                                                         | No | 10 mins                                               |
 | useGrpcServer         | Boolean value to enable reads via gRPC. This option is more memory efficient both on Pinot server and Spark executor side because it utilizes streaming. Requires gRPC to be enabled on Pinot server.         | No | false                                                 |
 | queryOptions          | Comma separated list of Pinot query options (e.g. "enableNullHandling=true,skipUpsert=true")                                                                                                                  | No | ""                                                    |
