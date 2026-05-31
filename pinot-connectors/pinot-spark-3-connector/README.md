@@ -52,7 +52,7 @@ runtime will fail with `UnsupportedClassVersionError` at first class resolution.
 `pinot-spark-4-connector` is a faithful port of this module: the read API surface is
 identical (`spark.read.format("pinot")…`), the write API is the same except `mode("overwrite")`
 now fails fast (which is also true here as of this release — see "Behavior changes" below).
-The Spark 4 module requires Spark 4.0.x and JDK 21+.
+The Spark 4 module requires Spark 4.1.x and JDK 21+.
 
 ## Behavior changes since the previous release
 
