@@ -42,9 +42,9 @@ not load on a JDK 17 runtime despite Spark 4 itself supporting JDK 17. If JDK 17
 required, use the Spark 3 connector.
 
 This module sits next to [`pinot-spark-3-connector`](../pinot-spark-3-connector) under
-`pinot-connectors/` and is only registered in the reactor when the active JDK is 21 or later
-(see the `pinot-spark-4-connector` profile in [`pinot-connectors/pom.xml`](../pom.xml)). It is
-automatically excluded when `-Pscala-2.12` is active because Apache Spark 4 is Scala 2.13 only.
+`pinot-connectors/` and is built unconditionally as part of the default reactor. JDK 21+ is
+enforced build-wide by the root pom's `requireJavaVersion` rule, and the module's own
+`maven-enforcer-plugin` rule rejects `-Pscala-2.12` because Apache Spark 4 is Scala 2.13 only.
 
 ### Mutual exclusion with `pinot-spark-3-connector`
 

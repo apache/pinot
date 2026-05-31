@@ -393,4 +393,3 @@ class SuccessWriterCommitMessage(val segmentName: String) extends WriterCommitMe
       '}'
   }
 }
-
