@@ -48,8 +48,3 @@ Launch the example in `spark-shell` with the following command:
 ```bash
 spark-shell --master 'local[*]' --name read-pinot --jars "$PINOT_HOME/pinot-connectors/pinot-spark-4-connector/target/pinot-spark-4-connector-*-shaded.jar" < "$PINOT_HOME/pinot-connectors/pinot-spark-4-connector/examples/read_pinot_from_proxy_with_auth_token.scala"
 ```
-
-
-
-
-

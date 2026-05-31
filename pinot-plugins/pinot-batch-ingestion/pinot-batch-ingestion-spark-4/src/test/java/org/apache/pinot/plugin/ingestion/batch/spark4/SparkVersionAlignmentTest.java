@@ -26,14 +26,12 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Pins the cross-module invariant that this module's local {@code netty.version} override
- * (see pom.xml) is in the netty 4.2.x line — required by Spark 4.1+, which uses
- * {@code io.netty.channel.kqueue.KQueueIoHandler} / {@code EpollIoHandler} (new APIs
- * introduced in netty 4.2). If a future {@code spark4.version} bump silently re-shadows
- * netty back to 4.1.x or forward to 4.3.x, this test fails at build time on every platform
- * — instead of failing only on macOS (kqueue) / Linux (epoll) at job runtime.
- */
+/// Pins the cross-module invariant that this module's local `netty.version` override (see pom.xml) is in the netty
+/// 4.2.x line — required by Spark 4.1+, which uses `io.netty.channel.kqueue.KQueueIoHandler` / `EpollIoHandler`
+/// (new APIs introduced in netty 4.2). If a future `spark4.version` bump silently re-shadows netty back to 4.1.x or
+/// forward to
+/// 4.3.x, this test fails at build time on every platform — instead of failing only on macOS (kqueue) / Linux (epoll)
+/// at job runtime.
 public class SparkVersionAlignmentTest {
 
   @Test
