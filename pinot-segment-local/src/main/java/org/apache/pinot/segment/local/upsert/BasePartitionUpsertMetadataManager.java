@@ -658,8 +658,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
-          validDocIdsForOldSegment);
+      doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+          oldSegment, validDocIdsForOldSegment);
     }
     if (_upsertViewManager != null) {
       // When using consistency mode, the old segment's bitmap is updated in place, so we get the validDocIds after
