@@ -108,28 +108,28 @@ public class ColumnMetadataImplTest {
   }
 
   @Test
-  public void parentOpenStructColumnRoundtrip() {
+  public void parentColumnRoundtrip() {
     ColumnMetadataImpl meta = ColumnMetadataImpl.builder()
         .setFieldSpec(new DimensionFieldSpec("metrics$cpu", DataType.DOUBLE, true))
-        .setParentOpenStructColumn("metrics")
+        .setParentColumn("metrics")
         .build();
-    assertEquals(meta.getParentOpenStructColumn(), "metrics");
-    assertTrue(meta.isMaterializedFromOpenStruct());
+    assertEquals(meta.getParentColumn(), "metrics");
+    assertTrue(meta.isMaterializedChild());
   }
 
   /**
-   * Verify the PARENT_OPEN_STRUCT_COLUMN key in metadata.properties round-trips through
+   * Verify the PARENT_COLUMN key in metadata.properties round-trips through
    * {@link ColumnMetadataImpl#fromPropertiesConfiguration}.
    */
   @Test
-  public void parentOpenStructColumnReadFromPropertiesConfig() {
+  public void parentColumnReadFromPropertiesConfig() {
     PropertiesConfiguration config = baseConfig("metrics$cpu");
-    config.setProperty(Column.getKeyFor("metrics$cpu", Column.PARENT_OPEN_STRUCT_COLUMN), "metrics");
+    config.setProperty(Column.getKeyFor("metrics$cpu", Column.PARENT_COLUMN), "metrics");
 
     ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "metrics$cpu");
 
-    assertEquals(metadata.getParentOpenStructColumn(), "metrics");
-    assertTrue(metadata.isMaterializedFromOpenStruct());
+    assertEquals(metadata.getParentColumn(), "metrics");
+    assertTrue(metadata.isMaterializedChild());
   }
 
   private static PropertiesConfiguration baseConfig(String column) {

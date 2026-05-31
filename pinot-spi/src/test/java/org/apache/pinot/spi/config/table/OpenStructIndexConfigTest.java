@@ -36,7 +36,7 @@ public class OpenStructIndexConfigTest {
   public void testDefaultConfig() {
     OpenStructIndexConfig config = OpenStructIndexConfig.DEFAULT;
     assertTrue(config.isEnabled());
-    assertEquals(config.getMaxDenseKeys(), 0);
+    assertEquals(config.getMaxDenseKeys(), -1);
     assertEquals(config.getDenseKeyMinFillRate(), 0.5);
     assertTrue(config.getDenseKeys().isEmpty());
     assertNull(config.getValueFieldConfigs());

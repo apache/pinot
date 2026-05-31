@@ -39,8 +39,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 ///
 /// **maxDenseKeys cutoff:** when more keys qualify as dense than `maxDenseKeys` allows, the top
 /// `maxDenseKeys` keys ranked by fill rate are materialized; the rest fall back to the sparse
-/// column. A non-positive value (default `0`) means unlimited — every qualifying key is
-/// materialized. Use `denseKeys` to pin specific keys regardless of fill rate ranking.
+/// column. `-1` (default) means unlimited — every qualifying key is materialized. `0` disables
+/// dense keys entirely (all keys go to the sparse column). Use `denseKeys` to pin specific keys
+/// regardless of fill rate ranking.
 ///
 /// **Per-key index settings** are specified via `valueFieldConfigs` — each entry is a standard
 /// [FieldConfig] (modern `indexes` format) for one materialized OPEN_STRUCT key. Keys without an
@@ -51,8 +52,8 @@ public class OpenStructIndexConfig extends IndexConfig {
   public static final OpenStructIndexConfig DEFAULT = new OpenStructIndexConfig(true);
 
   public static final double DEFAULT_DENSE_KEY_MIN_FILL_RATE = 0.5;
-  /// Default `maxDenseKeys`. `0` means unlimited.
-  public static final int DEFAULT_MAX_DENSE_KEYS = 0;
+  /// Default `maxDenseKeys`. `-1` means unlimited.
+  public static final int DEFAULT_MAX_DENSE_KEYS = -1;
   private static final String INVERTED_INDEX_KEY = "inverted";
 
   private final FieldConfig _defaultValueFieldConfig;
@@ -101,10 +102,10 @@ public class OpenStructIndexConfig extends IndexConfig {
     return _defaultValueFieldConfig;
   }
 
-  /// Maximum number of OPEN_STRUCT keys to materialise as dense columns. Non-positive (default
-  /// `0`) means unlimited — every key qualifying as dense is materialized. When positive and more
-  /// keys qualify, the top `maxDenseKeys` by fill rate are materialized; the rest fall back to
-  /// the sparse OPEN_STRUCT column.
+  /// Maximum number of OPEN_STRUCT keys to materialise as dense columns. `-1` (default) means
+  /// unlimited — every key qualifying as dense is materialized. `0` disables dense keys entirely.
+  /// When positive and more keys qualify, the top `maxDenseKeys` by fill rate are materialized;
+  /// the rest fall back to the sparse OPEN_STRUCT column.
   public int getMaxDenseKeys() {
     return _maxDenseKeys;
   }
