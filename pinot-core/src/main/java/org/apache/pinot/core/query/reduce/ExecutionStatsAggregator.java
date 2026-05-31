@@ -374,6 +374,13 @@ public class ExecutionStatsAggregator {
    *   <li>Per-server trace info is JSON-encoded into a single
    *       {@link DataTable.MetadataKey#TRACE_INFO} entry; the downstream aggregator reads it back
    *       as one trace blob attributed to the synthetic server.
+   *   <li>DISTINCT early-termination reasons round-trip as a single enum name
+   *       ({@link DataTable.MetadataKey#EARLY_TERMINATION_REASON}) because the wire format is one
+   *       string per DataTable. The aggregator OR-reduces multiple per-server reasons into three
+   *       independent booleans; on re-injection we encode only the first set flag in declaration
+   *       order. The user-visible "DISTINCT is partial" signal is preserved (each of the three
+   *       flags independently sets partial-ness on {@link BrokerResponseNative}); the exact reason
+   *       granularity is best-effort when multiple flags are true.
    * </ul>
    */
   public void setStatsOnMergedDataTable(DataTable dataTable) {
@@ -429,6 +436,25 @@ public class ExecutionStatsAggregator {
     }
     if (_numGroupsWarningLimitReached) {
       metadata.put(DataTable.MetadataKey.NUM_GROUPS_WARNING_LIMIT_REACHED.getName(), "true");
+    }
+
+    // EARLY_TERMINATION_REASON: 1-string wire format ↔ 3-boolean accumulator. aggregate() OR-reduces
+    // multiple per-server reasons into the three DISTINCT booleans (each per-server DataTable carries
+    // at most one enum name); on re-injection we can encode only one reason back. Pick the first set
+    // flag in declaration order so the round-trip is deterministic. Granularity loss when multiple
+    // flags are true is inherent to the single-string wire format — the user-visible "DISTINCT is
+    // partial" signal is preserved because any one of the three flags independently sets
+    // partial-ness on BrokerResponseNative.
+    BaseResultsBlock.EarlyTerminationReason distinctReason = null;
+    if (_maxRowsInDistinctReached) {
+      distinctReason = BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS;
+    } else if (_maxRowsWithoutChangeInDistinctReached) {
+      distinctReason = BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_ROWS_WITHOUT_CHANGE;
+    } else if (_maxExecutionTimeInDistinctReached) {
+      distinctReason = BaseResultsBlock.EarlyTerminationReason.DISTINCT_MAX_EXECUTION_TIME;
+    }
+    if (distinctReason != null) {
+      metadata.put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(), distinctReason.name());
     }
 
     // Exceptions: copy each accumulated exception onto the DataTable. Last-write-wins on error-code
