@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,6 +57,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -226,6 +228,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           byte[] rawBytes = storedType == DataType.BYTES ? (byte[]) coerced
               : ((String) coerced).getBytes(StandardCharsets.UTF_8);
           _totalRawBytesPerKey.merge(key, (long) rawBytes.length, Long::sum);
+        } else if (storedType == DataType.BIG_DECIMAL) {
+          _totalRawBytesPerKey.merge(key, (long) BigDecimalUtils.serialize((BigDecimal) coerced).length, Long::sum);
         }
       }
     }
@@ -462,6 +466,25 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         }
         break;
       }
+      case BIG_DECIMAL: {
+        int maxLen = 1;
+        for (Object v : values) {
+          maxLen = Math.max(maxLen, BigDecimalUtils.serialize((BigDecimal) v).length);
+        }
+        SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
+            _indexDir, ChunkCompressionType.LZ4, materializedCol, _numDocs, storedType, maxLen);
+        try {
+          int ordinal = 0;
+          for (int docId = 0; docId < _numDocs; docId++) {
+            creator.putBigDecimal(
+                presence.contains(docId) ? (BigDecimal) values.get(ordinal++) : (BigDecimal) defaultVal);
+          }
+          creator.seal();
+        } finally {
+          creator.close();
+        }
+        break;
+      }
       default:
         throw new IllegalStateException("Unsupported stored type for raw forward index: " + storedType);
     }
@@ -643,7 +666,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         dictSize = (long) cardinality * Double.BYTES;
         break;
       case STRING:
-      case BYTES: {
+      case BYTES:
+      case BIG_DECIMAL: {
         long totalRawBytes = _totalRawBytesPerKey.getOrDefault(key, 0L);
         rawSize = Integer.BYTES + (long) (_numDocs + 1) * Integer.BYTES + totalRawBytes;
         dictSize = 0;
@@ -673,6 +697,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         return "";
       case BYTES:
         return new byte[0];
+      case BIG_DECIMAL:
+        return BigDecimal.ZERO;
       default:
         throw new IllegalStateException("Unsupported OPEN_STRUCT stored type for default value: " + storedType);
     }
@@ -736,11 +762,26 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         sortedSet.add(defaultStr);
         return sortedSet.toArray(new String[0]);
       }
+      case BIG_DECIMAL: {
+        // Dedup on BigDecimal.equals (scale-sensitive) to match SegmentDictionaryCreator.indexOfSV,
+        // which resolves dict ids via an equals-keyed map. A compareTo-based dedup (e.g. TreeSet)
+        // would collapse equal-but-differently-scaled values (1.0 vs 1.00) into one dictionary entry,
+        // causing the dropped value's forward-index lookup to silently resolve to dict id 0. This
+        // mirrors BigDecimalColumnPreIndexStatsCollector (ObjectOpenHashSet + Arrays.sort).
+        Set<BigDecimal> distinct = new HashSet<>();
+        distinct.add((BigDecimal) getDefaultValue(storedType));
+        for (Object v : values) {
+          distinct.add((BigDecimal) v);
+        }
+        BigDecimal[] sorted = distinct.toArray(new BigDecimal[0]);
+        Arrays.sort(sorted);
+        return sorted;
+      }
       default:
-        // Logical types (BIG_DECIMAL, BOOLEAN, TIMESTAMP, JSON, etc.) have a stored type that
-        // belongs to the enumerated set above. Reaching here means a new stored type was added
-        // upstream without updating this dispatch — fail loudly rather than write a segment with
-        // a corrupt dictionary that contains only the default value.
+        // BIG_DECIMAL, STRING, BYTES and the numeric types are all handled above. The only stored
+        // types that can reach here are non-scalar (STRUCT/MAP/LIST/OPEN_STRUCT) or UNKNOWN, which
+        // are never valid stored types for an OPEN_STRUCT key — fail loudly rather than write a
+        // segment with a corrupt dictionary that contains only the default value.
         throw new IllegalStateException("Unsupported OPEN_STRUCT stored type for dictionary build: " + storedType);
     }
   }

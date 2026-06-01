@@ -19,14 +19,19 @@
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.testng.annotations.AfterMethod;
@@ -160,5 +165,106 @@ public class OpenStructColumnSplitterTest {
     s.seal();
     String sparseCol = OpenStructNaming.sparseColumnName("metrics");
     assertTrue(s.getMaterializedColumnMetadata().containsKey(sparseCol));
+  }
+
+  @Test
+  public void testBigDecimalDictionaryRoundTrip()
+      throws Exception {
+    // Regression: an untyped key whose value is a BigDecimal used to crash seal() with
+    // IllegalStateException("Unsupported OPEN_STRUCT stored type for dictionary build: BIG_DECIMAL").
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("amount", new BigDecimal("12.34").add(BigDecimal.valueOf(d))), d);
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "amount");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.DATA_TYPE)), "BIG_DECIMAL");
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY)), "true");
+    assertTrue(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
+  }
+
+  @Test
+  public void testBigDecimalScaleDistinctValuesNotCollapsed()
+      throws Exception {
+    // 1.0 and 1.00 are equal by compareTo but distinct by equals. The dictionary lookup is
+    // equals-based, so they must remain separate dictionary entries. With the default (BigDecimal.ZERO)
+    // that is 3 distinct values; a compareTo-based dedup would wrongly collapse to 2 and silently
+    // mis-resolve forward-index dict ids.
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    s.add(Map.of("amount", new BigDecimal("1.0")), 0);
+    s.add(Map.of("amount", new BigDecimal("1.00")), 1);
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "amount");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    assertEquals(props.getInt(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.CARDINALITY)), 3);
+  }
+
+  @Test
+  public void testBigDecimalExplicitChildSpec()
+      throws Exception {
+    // A key declared BIG_DECIMAL in the schema bypasses inferDataType but must still seal.
+    Map<String, FieldSpec> children = Map.of(
+        "amount", new DimensionFieldSpec("amount", DataType.BIG_DECIMAL, true));
+    ComplexFieldSpec specWithChild = new ComplexFieldSpec("metrics", DataType.OPEN_STRUCT, true, children);
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", specWithChild,
+        config(0.5, -1, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("amount", new BigDecimal("100.5")), d);
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "amount");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.DATA_TYPE)), "BIG_DECIMAL");
+  }
+
+  @Test
+  public void testBigDecimalRawForwardIndex()
+      throws Exception {
+    // RAW-encoded BIG_DECIMAL key must take the raw var-byte forward index path, not the dictionary.
+    FieldConfig rawConfig = new FieldConfig.Builder("amount")
+        .withEncodingType(FieldConfig.EncodingType.RAW).build();
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(
+        false, null, -1, null, 0.5, List.of(rawConfig));
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("amount", new BigDecimal("7.5").add(BigDecimal.valueOf(d))), d);
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "amount");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY)), "false");
+    assertFalse(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
+    assertTrue(new File(_tempDir,
+        denseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION).exists());
+  }
+
+  @Test
+  public void testBigDecimalSparseKey()
+      throws Exception {
+    // A BIG_DECIMAL key below the fill-rate threshold goes to the sparse JSON column without crashing.
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.9, -1, null));
+    s.add(Map.of("rare", new BigDecimal("3.14159")), 0);
+    for (int d = 1; d < 10; d++) {
+      s.add(Map.of(), d);
+    }
+    s.seal();
+    assertTrue(s.getMaterializedColumnMetadata().containsKey(OpenStructNaming.sparseColumnName("metrics")));
   }
 }
