@@ -47,6 +47,15 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
+      <exclusions>
+        <!-- hadoop-common pulls org.eclipse.jetty (jetty-server -> jetty-http, etc.) for its
+             embedded HttpServer2 web UI, which is unused when only reading Parquet. These leak
+             into runtime distributions and carry CVE-2026-2332 (jetty-http request smuggling). -->
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -66,11 +75,13 @@
       <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
 
-    <!-- Used for Parquet Writer in tests -->
+    <!-- Used for Parquet Writer in tests. Kept at test scope so YARN/Jetty
+         transitives (hadoop-yarn-client -> websocket-client -> jetty-client ->
+         jetty-http) do not leak into runtime distributions. -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-mapreduce-client-core</artifactId>
-      <scope>${hadoop.dependencies.scope}</scope>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
