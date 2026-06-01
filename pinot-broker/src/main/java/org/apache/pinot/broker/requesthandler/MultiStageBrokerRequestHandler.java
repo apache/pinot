@@ -656,7 +656,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Validate QPS quota
     if (hasExceededQPSQuota(query.getDatabase(), tableNames, requestContext)) {
-      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
+      String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId,
+          _queryLogger.redactQuery(query.getTextQuery(), requestContext.getQueryFingerprint()));
       return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
     }
 

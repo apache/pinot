@@ -1372,7 +1372,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     serverPinotQuery.setQueryOptions(queryOptions);
     CalciteSqlParser.queryRewrite(serverPinotQuery, RlsFiltersRewriter.class);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
-    LOGGER.debug("Applied RLS filters for request {} on table {}: {}", requestId, rawTableName, query);
+    LOGGER.debug("Applied RLS filters for request {} on table {}: {}", requestId, rawTableName,
+        _queryLogger.redactQuery(query));
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
