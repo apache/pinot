@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorU
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -300,9 +301,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
 
     Object sortedDistinctArray = useDictionary ? statsCollector.getUniqueValuesSet() : null;
     int cardinality = useDictionary ? statsCollector.getCardinality() : numDocsForKey;
-    Comparable minValue = (Comparable) statsCollector.getMinValue();
-    Comparable maxValue = (Comparable) statsCollector.getMaxValue();
 
+    int dictElementSize = 0;
     SegmentDictionaryCreator dictCreator = null;
     if (useDictionary) {
       dictCreator = new SegmentDictionaryCreator(
@@ -358,6 +358,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     } finally {
       if (dictCreator != null) {
+        dictElementSize = dictCreator.getNumBytesPerEntry();
         dictCreator.seal();
         dictCreator.close();
       }
@@ -375,16 +376,21 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       nullCreator.close();
     }
 
-    int maxLength = 0;
-    if (storedType == DataType.STRING || storedType == DataType.BYTES) {
-      for (Object v : values) {
-        int len = storedType == DataType.BYTES ? ((byte[]) v).length
-            : ((String) v).getBytes(StandardCharsets.UTF_8).length;
-        maxLength = Math.max(maxLength, len);
-      }
+    PropertiesConfiguration props = new PropertiesConfiguration();
+    FieldConfig.EncodingType encoding =
+        useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
+    int dictionaryElementSize = useDictionary ? dictElementSize : 0;
+    BaseSegmentCreator.addColumnMetadataInfo(props, materializedCol, statsCollector, _numDocs, childFieldSpec,
+        useDictionary, dictionaryElementSize, encoding, false);
+    // OPEN_STRUCT-specific keys not written by addColumnMetadataInfo.
+    props.setProperty(
+        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
+        _columnName);
+    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasNullValue"), true);
+    if (enableInverted && useDictionary) {
+      props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasInvertedIndex"), true);
     }
-    emitVirtualColumnMetadata(materializedCol, storedType, cardinality, useDictionary,
-        enableInverted && useDictionary, minValue, maxValue, maxLength);
+    _materializedColumnMetadata.put(materializedCol, props);
   }
 
   private void writeRawForwardIndex(String materializedCol, DataType storedType,
@@ -575,56 +581,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         V1Constants.MetadataKeys.Column.getKeyFor(_columnName, V1Constants.MetadataKeys.Column.HAS_SPARSE_COLUMN),
         hasSparseColumn);
     _materializedColumnMetadata.put(_columnName, props);
-  }
-
-  private void emitVirtualColumnMetadata(String materializedCol, DataType storedType, int cardinality,
-      boolean hasDictionary, boolean hasInvertedIndex, @Nullable Object minValue, @Nullable Object maxValue,
-      int maxLength) {
-    PropertiesConfiguration props = new PropertiesConfiguration();
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.DATA_TYPE),
-        storedType.name());
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
-        FieldSpec.FieldType.DIMENSION.name());
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
-        true);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.CARDINALITY),
-        cardinality);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
-        _numDocs);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(
-            materializedCol, V1Constants.MetadataKeys.Column.TOTAL_NUMBER_OF_ENTRIES),
-        _numDocs);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
-        hasDictionary);
-    if (hasDictionary) {
-      int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(Math.max(cardinality - 1, 0));
-      props.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT),
-          numBitsPerValue);
-    }
-    if (hasInvertedIndex) {
-      props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasInvertedIndex"), true);
-    }
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasNullValue"), true);
-    if (maxLength > 0) {
-      props.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(
-              materializedCol, V1Constants.MetadataKeys.Column.LENGTH_OF_LONGEST_ELEMENT),
-          maxLength);
-    }
-    BaseSegmentCreator.addColumnMinMaxValueInfo(props, materializedCol, minValue, maxValue, storedType);
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(
-            materializedCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
-        _columnName);
-    _materializedColumnMetadata.put(materializedCol, props);
   }
 
   private boolean shouldUseDictionary(String key, DataType storedType, int numDocsForKey) {
