@@ -25,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -85,7 +84,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   // Per-key accumulation
   private final Map<String, RoaringBitmap> _presenceBitmaps = new HashMap<>();
   private final Map<String, List<Object>> _values = new HashMap<>();
-  private final Map<String, Set<String>> _distinctValuesPerKey = new HashMap<>();
   private final Map<String, Long> _totalRawBytesPerKey = new HashMap<>();
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
   private int _numDocs;
@@ -218,8 +216,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         _values.get(key).add(coerced);
 
         DataType storedType = valueType.getStoredType();
-        String stringRep = storedType.toString(coerced);
-        _distinctValuesPerKey.computeIfAbsent(key, k -> new HashSet<>()).add(stringRep);
         if (storedType == DataType.STRING || storedType == DataType.BYTES) {
           byte[] rawBytes = storedType == DataType.BYTES ? (byte[]) coerced
               : ((String) coerced).getBytes(StandardCharsets.UTF_8);
@@ -280,9 +276,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     List<Object> values = _values.get(key);
     int numDocsForKey = presence.getCardinality();
 
-    boolean useDictionary = shouldUseDictionary(key, storedType, numDocsForKey);
-    boolean enableInverted = _config.shouldEnableInvertedIndexForKey(key);
-
     // Synthetic field spec for the materialized child; its default-null-value matches the value stored
     // for absent docs so column metadata stays consistent with on-disk content.
     Object defaultValue = getDefaultValue(storedType);
@@ -298,6 +291,9 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       statsCollector.collect(presence.contains(docId) ? values.get(statsOrdinal++) : defaultValue);
     }
     statsCollector.seal();
+
+    boolean useDictionary = shouldUseDictionary(key, storedType, statsCollector);
+    boolean enableInverted = _config.shouldEnableInvertedIndexForKey(key);
 
     Object sortedDistinctArray = useDictionary ? statsCollector.getUniqueValuesSet() : null;
     int cardinality = useDictionary ? statsCollector.getCardinality() : numDocsForKey;
@@ -583,18 +579,18 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     _materializedColumnMetadata.put(_columnName, props);
   }
 
-  private boolean shouldUseDictionary(String key, DataType storedType, int numDocsForKey) {
+  private boolean shouldUseDictionary(String key, DataType storedType,
+      AbstractColumnStatisticsCollector statsCollector) {
     if (_config.shouldEnableInvertedIndexForKey(key)) {
       return true;
     }
     if (!_config.shouldUseDictionaryForKey(key)) {
       return false;
     }
-    Set<String> distinctValues = _distinctValuesPerKey.get(key);
-    if (distinctValues == null || distinctValues.isEmpty()) {
+    int cardinality = statsCollector.getCardinality();
+    if (cardinality == 0) {
       return false;
     }
-    int cardinality = distinctValues.size() + 1;
     int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(Math.max(cardinality - 1, 0));
     long dictIdFwdSize = ((long) _numDocs * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
     long rawSize;
@@ -620,11 +616,11 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       case BYTES:
       case BIG_DECIMAL: {
         long totalRawBytes = _totalRawBytesPerKey.getOrDefault(key, 0L);
+        int longestElement = statsCollector.getLengthOfLongestElement();
         rawSize = Integer.BYTES + (long) (_numDocs + 1) * Integer.BYTES + totalRawBytes;
-        dictSize = 0;
-        for (String v : distinctValues) {
-          dictSize += Integer.BYTES + v.getBytes(StandardCharsets.UTF_8).length;
-        }
+        // Conservative upper bound on the var-length dictionary: per-entry offset plus a payload
+        // bounded by the longest element (actual var-length payload is <= this).
+        dictSize = (long) cardinality * (Integer.BYTES + longestElement);
         break;
       }
       default:
