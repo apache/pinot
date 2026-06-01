@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
 import java.io.File;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,27 +32,32 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
-import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.BaseSegmentCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorUtil;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -73,7 +77,6 @@ import org.slf4j.LoggerFactory;
 public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpenStructColumnSplitter.class);
-  private static final double NO_DICTIONARY_SIZE_RATIO_THRESHOLD = 0.85;
 
   private final File _indexDir;
   private final String _columnName;
@@ -84,7 +87,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   // Per-key accumulation
   private final Map<String, RoaringBitmap> _presenceBitmaps = new HashMap<>();
   private final Map<String, List<Object>> _values = new HashMap<>();
-  private final Map<String, Long> _totalRawBytesPerKey = new HashMap<>();
   private final Map<String, DataType> _inferredTypes = new HashMap<>();
   private int _numDocs;
 
@@ -214,15 +216,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
           continue;
         }
         _values.get(key).add(coerced);
-
-        DataType storedType = valueType.getStoredType();
-        if (storedType == DataType.STRING || storedType == DataType.BYTES) {
-          byte[] rawBytes = storedType == DataType.BYTES ? (byte[]) coerced
-              : ((String) coerced).getBytes(StandardCharsets.UTF_8);
-          _totalRawBytesPerKey.merge(key, (long) rawBytes.length, Long::sum);
-        } else if (storedType == DataType.BIG_DECIMAL) {
-          _totalRawBytesPerKey.merge(key, (long) BigDecimalUtils.serialize((BigDecimal) coerced).length, Long::sum);
-        }
       }
     }
     _numDocs++;
@@ -274,13 +267,11 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     DataType storedType = valueType.getStoredType();
     RoaringBitmap presence = _presenceBitmaps.get(key);
     List<Object> values = _values.get(key);
-    int numDocsForKey = presence.getCardinality();
 
-    // Synthetic field spec for the materialized child; its default-null-value matches the value stored
-    // for absent docs so column metadata stays consistent with on-disk content.
-    Object defaultValue = getDefaultValue(storedType);
+    // Synthetic field spec for the materialized child. Its natural Pinot dimension null value is the value
+    // stored for absent docs, so column metadata stays consistent with on-disk content.
     DimensionFieldSpec childFieldSpec = new DimensionFieldSpec(materializedCol, storedType, true);
-    childFieldSpec.setDefaultNullValue(defaultValue);
+    Object defaultValue = childFieldSpec.getDefaultNullValue();
 
     // Collect statistics the standard way: present docs contribute their value, absent docs the default
     // (absent docs are also marked in the null vector below).
@@ -292,70 +283,94 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
     statsCollector.seal();
 
-    boolean useDictionary = shouldUseDictionary(key, storedType, statsCollector);
+    // Decide dictionary vs raw exactly as BaseSegmentCreator.createDictionaryForColumn, with standard
+    // default flags (optimizeDictionary off => dictionary unless explicitly disabled and not index-required).
     boolean enableInverted = _config.shouldEnableInvertedIndexForKey(key);
+    FieldIndexConfigs.Builder fieldIndexConfigsBuilder = new FieldIndexConfigs.Builder();
+    fieldIndexConfigsBuilder.add(StandardIndexes.dictionary(),
+        _config.shouldUseDictionaryForKey(key) ? DictionaryIndexConfig.DEFAULT : DictionaryIndexConfig.DISABLED);
+    if (enableInverted) {
+      fieldIndexConfigsBuilder.add(StandardIndexes.inverted(), IndexConfig.ENABLED);
+    }
+    FieldIndexConfigs fieldIndexConfigs = fieldIndexConfigsBuilder.build();
 
-    Object sortedDistinctArray = useDictionary ? statsCollector.getUniqueValuesSet() : null;
-    int cardinality = useDictionary ? statsCollector.getCardinality() : numDocsForKey;
-
-    int dictElementSize = 0;
-    SegmentDictionaryCreator dictCreator = null;
-    if (useDictionary) {
-      dictCreator = new SegmentDictionaryCreator(
-          materializedCol, storedType, new File(_indexDir,
-          materializedCol + V1Constants.Dict.FILE_EXTENSION), true);
-      dictCreator.build(sortedDistinctArray);
+    boolean useDictionary;
+    if (DictionaryIndexConfig.requiresDictionary(childFieldSpec, fieldIndexConfigs)) {
+      useDictionary = true;
+    } else if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      useDictionary = false;
+    } else {
+      useDictionary = DictionaryIndexType.ignoreDictionaryOverride(false, false,
+          IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD, null, childFieldSpec, fieldIndexConfigs,
+          statsCollector.getCardinality(), statsCollector.getTotalNumberOfEntries());
     }
 
+    // Dictionary built from the collector's sorted unique values (same as the standard pipeline).
+    int dictElementSize = 0;
+    SegmentDictionaryCreator dictCreator = null;
     try {
       if (useDictionary) {
-        int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(Math.max(cardinality - 1, 0));
-        int defaultDictId = dictCreator.indexOfSV(getDefaultValue(storedType));
+        dictCreator = new SegmentDictionaryCreator(materializedCol, storedType,
+            new File(_indexDir, materializedCol + V1Constants.Dict.FILE_EXTENSION), true);
+        dictCreator.build(statsCollector.getUniqueValuesSet());
+      }
 
-        FixedBitSVForwardIndexWriter fwdWriter = new FixedBitSVForwardIndexWriter(
-            new File(_indexDir, materializedCol + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION),
-            _numDocs, numBitsPerValue);
+      // Index-creation context built from the sealed collector (a ColumnShape) — no TableConfig required.
+      IndexCreationContext context =
+          new IndexCreationContext.Builder(_indexDir, null, statsCollector, useDictionary, false)
+              .withOnHeap(false).build();
+      ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(
+          useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW)
+          .withCompressionCodec(FieldConfig.CompressionCodec.LZ4).build();
+
+      ForwardIndexCreator forwardCreator;
+      try {
+        forwardCreator = StandardIndexes.forward().createIndexCreator(context, forwardIndexConfig);
+      } catch (IOException e) {
+        throw e;
+      } catch (Exception e) {
+        throw new IOException("Failed to create forward index creator for: " + materializedCol, e);
+      }
+      try {
+        DictionaryBasedInvertedIndexCreator invertedCreator;
+        try {
+          invertedCreator = (enableInverted && useDictionary)
+              ? StandardIndexes.inverted().createIndexCreator(context, IndexConfig.ENABLED) : null;
+        } catch (IOException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new IOException("Failed to create inverted index creator for: " + materializedCol, e);
+        }
         try {
           int ordinal = 0;
           for (int docId = 0; docId < _numDocs; docId++) {
-            if (presence.contains(docId)) {
-              Object typedValue = values.get(ordinal++);
-              fwdWriter.putDictId(dictCreator.indexOfSV(typedValue));
-            } else {
-              fwdWriter.putDictId(defaultDictId);
+            Object value = presence.contains(docId) ? values.get(ordinal++) : defaultValue;
+            int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
+            forwardCreator.add(value, dictId);
+            if (invertedCreator != null) {
+              invertedCreator.add(value, dictId);
             }
           }
+          forwardCreator.seal();
+          if (invertedCreator != null) {
+            invertedCreator.seal();
+          }
         } finally {
-          fwdWriter.close();
+          if (invertedCreator != null) {
+            invertedCreator.close();
+          }
         }
-      } else {
-        writeRawForwardIndex(materializedCol, storedType, presence, values);
+      } finally {
+        forwardCreator.close();
       }
 
-      if (enableInverted && useDictionary) {
-        FieldSpec fakeFieldSpec = new DimensionFieldSpec(materializedCol, storedType, true);
-        OffHeapBitmapInvertedIndexCreator invCreator = new OffHeapBitmapInvertedIndexCreator(
-            _indexDir, fakeFieldSpec, cardinality, _numDocs, _numDocs);
-        try {
-          int defaultDictId = dictCreator.indexOfSV(getDefaultValue(storedType));
-          int ordinal = 0;
-          for (int docId = 0; docId < _numDocs; docId++) {
-            if (presence.contains(docId)) {
-              Object typedValue = values.get(ordinal++);
-              invCreator.add(dictCreator.indexOfSV(typedValue));
-            } else {
-              invCreator.add(defaultDictId);
-            }
-          }
-          invCreator.seal();
-        } finally {
-          invCreator.close();
-        }
-      }
-    } finally {
+      // Seal the dictionary only after the index writes succeeded; capture its element size for metadata.
       if (dictCreator != null) {
         dictElementSize = dictCreator.getNumBytesPerEntry();
         dictCreator.seal();
+      }
+    } finally {
+      if (dictCreator != null) {
         dictCreator.close();
       }
     }
@@ -386,104 +401,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasInvertedIndex"), true);
     }
     _materializedColumnMetadata.put(materializedCol, props);
-  }
-
-  private void writeRawForwardIndex(String materializedCol, DataType storedType,
-      RoaringBitmap presence, List<Object> values)
-      throws IOException {
-    Object defaultVal = getDefaultValue(storedType);
-    switch (storedType) {
-      case INT:
-      case LONG:
-      case FLOAT:
-      case DOUBLE: {
-        SingleValueFixedByteRawIndexCreator creator = new SingleValueFixedByteRawIndexCreator(
-            _indexDir, ChunkCompressionType.LZ4, materializedCol, _numDocs, storedType);
-        try {
-          int ordinal = 0;
-          for (int docId = 0; docId < _numDocs; docId++) {
-            Object val = presence.contains(docId) ? values.get(ordinal++) : defaultVal;
-            switch (storedType) {
-              case INT:
-                creator.putInt((Integer) val);
-                break;
-              case LONG:
-                creator.putLong((Long) val);
-                break;
-              case FLOAT:
-                creator.putFloat((Float) val);
-                break;
-              case DOUBLE:
-                creator.putDouble((Double) val);
-                break;
-              default:
-                break;
-            }
-          }
-          creator.seal();
-        } finally {
-          creator.close();
-        }
-        break;
-      }
-      case STRING: {
-        int maxLen = 1;
-        for (Object v : values) {
-          maxLen = Math.max(maxLen, ((String) v).getBytes(StandardCharsets.UTF_8).length);
-        }
-        SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
-            _indexDir, ChunkCompressionType.LZ4, materializedCol, _numDocs, storedType, maxLen);
-        try {
-          int ordinal = 0;
-          for (int docId = 0; docId < _numDocs; docId++) {
-            creator.putString(presence.contains(docId) ? (String) values.get(ordinal++) : (String) defaultVal);
-          }
-          creator.seal();
-        } finally {
-          creator.close();
-        }
-        break;
-      }
-      case BYTES: {
-        int maxLen = 1;
-        for (Object v : values) {
-          maxLen = Math.max(maxLen, ((byte[]) v).length);
-        }
-        SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
-            _indexDir, ChunkCompressionType.LZ4, materializedCol, _numDocs, storedType, maxLen);
-        try {
-          int ordinal = 0;
-          for (int docId = 0; docId < _numDocs; docId++) {
-            creator.putBytes(presence.contains(docId) ? (byte[]) values.get(ordinal++) : (byte[]) defaultVal);
-          }
-          creator.seal();
-        } finally {
-          creator.close();
-        }
-        break;
-      }
-      case BIG_DECIMAL: {
-        int maxLen = 1;
-        for (Object v : values) {
-          maxLen = Math.max(maxLen, BigDecimalUtils.serialize((BigDecimal) v).length);
-        }
-        SingleValueVarByteRawIndexCreator creator = new SingleValueVarByteRawIndexCreator(
-            _indexDir, ChunkCompressionType.LZ4, materializedCol, _numDocs, storedType, maxLen);
-        try {
-          int ordinal = 0;
-          for (int docId = 0; docId < _numDocs; docId++) {
-            creator.putBigDecimal(
-                presence.contains(docId) ? (BigDecimal) values.get(ordinal++) : (BigDecimal) defaultVal);
-          }
-          creator.seal();
-        } finally {
-          creator.close();
-        }
-        break;
-      }
-      default:
-        throw new IllegalStateException("Unsupported stored type for raw forward index: " + storedType);
-    }
   }
 
   private void writeSparseJsonColumn(List<String> sparseKeys)
@@ -576,77 +493,5 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         V1Constants.MetadataKeys.Column.getKeyFor(_columnName, V1Constants.MetadataKeys.Column.HAS_SPARSE_COLUMN),
         hasSparseColumn);
     _materializedColumnMetadata.put(_columnName, props);
-  }
-
-  private boolean shouldUseDictionary(String key, DataType storedType,
-      AbstractColumnStatisticsCollector statsCollector) {
-    if (_config.shouldEnableInvertedIndexForKey(key)) {
-      return true;
-    }
-    if (!_config.shouldUseDictionaryForKey(key)) {
-      return false;
-    }
-    int cardinality = statsCollector.getCardinality();
-    if (cardinality == 0) {
-      return false;
-    }
-    int numBitsPerValue = PinotDataBitSet.getNumBitsPerValue(Math.max(cardinality - 1, 0));
-    long dictIdFwdSize = ((long) _numDocs * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
-    long rawSize;
-    long dictSize;
-    switch (storedType) {
-      case INT:
-        rawSize = (long) _numDocs * Integer.BYTES;
-        dictSize = (long) cardinality * Integer.BYTES;
-        break;
-      case LONG:
-        rawSize = (long) _numDocs * Long.BYTES;
-        dictSize = (long) cardinality * Long.BYTES;
-        break;
-      case FLOAT:
-        rawSize = (long) _numDocs * Float.BYTES;
-        dictSize = (long) cardinality * Float.BYTES;
-        break;
-      case DOUBLE:
-        rawSize = (long) _numDocs * Double.BYTES;
-        dictSize = (long) cardinality * Double.BYTES;
-        break;
-      case STRING:
-      case BYTES:
-      case BIG_DECIMAL: {
-        long totalRawBytes = _totalRawBytesPerKey.getOrDefault(key, 0L);
-        int longestElement = statsCollector.getLengthOfLongestElement();
-        rawSize = Integer.BYTES + (long) (_numDocs + 1) * Integer.BYTES + totalRawBytes;
-        // Conservative upper bound on the var-length dictionary: per-entry offset plus a payload
-        // bounded by the longest element (actual var-length payload is <= this).
-        dictSize = (long) cardinality * (Integer.BYTES + longestElement);
-        break;
-      }
-      default:
-        return true;
-    }
-    double ratio = (double) rawSize / (dictSize + dictIdFwdSize);
-    return ratio > NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
-  }
-
-  private static Object getDefaultValue(DataType storedType) {
-    switch (storedType) {
-      case INT:
-        return 0;
-      case LONG:
-        return 0L;
-      case FLOAT:
-        return 0.0f;
-      case DOUBLE:
-        return 0.0;
-      case STRING:
-        return "";
-      case BYTES:
-        return new byte[0];
-      case BIG_DECIMAL:
-        return BigDecimal.ZERO;
-      default:
-        throw new IllegalStateException("Unsupported OPEN_STRUCT stored type for default value: " + storedType);
-    }
   }
 }
