@@ -508,6 +508,7 @@ public class WorkerManager {
   }
 
   private void updateContextForLeafStage(DispatchablePlanMetadata metadata, DispatchablePlanContext context) {
+    filterLeafStageSegments(context, metadata);
     if (context.isUseLeafServerForIntermediateStage()) {
       Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = metadata.getWorkerIdToServerInstanceMap();
       assert workerIdToServerInstanceMap != null;
@@ -735,6 +736,15 @@ public class WorkerManager {
 
     // TODO: Support unavailable segments and optional segments for replicated leaf stage
     metadata.setReplicatedSegments(segmentsMap);
+    filterReplicatedLeafStageSegments(context, metadata);
+  }
+
+  /** Extension point to filter the non-replicated leaf-stage per-worker segment assignment; no-op by default. */
+  protected void filterLeafStageSegments(DispatchablePlanContext context, DispatchablePlanMetadata metadata) {
+  }
+
+  /** Extension point to filter the replicated leaf-stage segments; no-op by default. */
+  protected void filterReplicatedLeafStageSegments(DispatchablePlanContext context, DispatchablePlanMetadata metadata) {
   }
 
   /**
