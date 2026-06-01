@@ -18,16 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
-import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
-import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +31,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -48,6 +42,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedB
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorUtil;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
@@ -58,7 +54,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -287,26 +282,26 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     boolean useDictionary = shouldUseDictionary(key, storedType, numDocsForKey);
     boolean enableInverted = _config.shouldEnableInvertedIndexForKey(key);
 
-    Object sortedDistinctArray = null;
-    int cardinality;
-    if (useDictionary) {
-      sortedDistinctArray = buildTypedDistinctArray(key, storedType);
-      cardinality = java.lang.reflect.Array.getLength(sortedDistinctArray);
-    } else {
-      cardinality = numDocsForKey;
-    }
+    // Synthetic field spec for the materialized child; its default-null-value matches the value stored
+    // for absent docs so column metadata stays consistent with on-disk content.
+    Object defaultValue = getDefaultValue(storedType);
+    DimensionFieldSpec childFieldSpec = new DimensionFieldSpec(materializedCol, storedType, true);
+    childFieldSpec.setDefaultNullValue(defaultValue);
 
-    Comparable minValue = null;
-    Comparable maxValue = null;
-    for (Object v : values) {
-      Comparable cv = (storedType == DataType.BYTES) ? new ByteArray((byte[]) v) : (Comparable) v;
-      if (minValue == null || cv.compareTo(minValue) < 0) {
-        minValue = cv;
-      }
-      if (maxValue == null || cv.compareTo(maxValue) > 0) {
-        maxValue = cv;
-      }
+    // Collect statistics the standard way: present docs contribute their value, absent docs the default
+    // (absent docs are also marked in the null vector below).
+    AbstractColumnStatisticsCollector statsCollector =
+        StatsCollectorUtil.createStatsCollector(childFieldSpec, null);
+    int statsOrdinal = 0;
+    for (int docId = 0; docId < _numDocs; docId++) {
+      statsCollector.collect(presence.contains(docId) ? values.get(statsOrdinal++) : defaultValue);
     }
+    statsCollector.seal();
+
+    Object sortedDistinctArray = useDictionary ? statsCollector.getUniqueValuesSet() : null;
+    int cardinality = useDictionary ? statsCollector.getCardinality() : numDocsForKey;
+    Comparable minValue = (Comparable) statsCollector.getMinValue();
+    Comparable maxValue = (Comparable) statsCollector.getMaxValue();
 
     SegmentDictionaryCreator dictCreator = null;
     if (useDictionary) {
@@ -701,88 +696,6 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         return BigDecimal.ZERO;
       default:
         throw new IllegalStateException("Unsupported OPEN_STRUCT stored type for default value: " + storedType);
-    }
-  }
-
-  private Object buildTypedDistinctArray(String key, DataType storedType) {
-    List<Object> values = _values.get(key);
-    switch (storedType) {
-      case INT: {
-        IntOpenHashSet set = new IntOpenHashSet();
-        set.add((int) getDefaultValue(storedType));
-        for (Object v : values) {
-          set.add((int) v);
-        }
-        int[] sorted = set.toIntArray();
-        Arrays.sort(sorted);
-        return sorted;
-      }
-      case LONG: {
-        LongOpenHashSet set = new LongOpenHashSet();
-        set.add((long) getDefaultValue(storedType));
-        for (Object v : values) {
-          set.add((long) v);
-        }
-        long[] sorted = set.toLongArray();
-        Arrays.sort(sorted);
-        return sorted;
-      }
-      case FLOAT: {
-        FloatOpenHashSet set = new FloatOpenHashSet();
-        set.add((float) getDefaultValue(storedType));
-        for (Object v : values) {
-          set.add((float) v);
-        }
-        float[] sorted = set.toFloatArray();
-        Arrays.sort(sorted);
-        return sorted;
-      }
-      case DOUBLE: {
-        DoubleOpenHashSet set = new DoubleOpenHashSet();
-        set.add((double) getDefaultValue(storedType));
-        for (Object v : values) {
-          set.add((double) v);
-        }
-        double[] sorted = set.toDoubleArray();
-        Arrays.sort(sorted);
-        return sorted;
-      }
-      case BYTES: {
-        TreeSet<ByteArray> sortedSet = new TreeSet<>();
-        sortedSet.add(new ByteArray((byte[]) getDefaultValue(storedType)));
-        for (Object v : values) {
-          sortedSet.add(new ByteArray((byte[]) v));
-        }
-        return sortedSet.toArray(new ByteArray[0]);
-      }
-      case STRING: {
-        Set<String> distinctStrings = _distinctValuesPerKey.getOrDefault(key, Set.of());
-        TreeSet<String> sortedSet = new TreeSet<>(distinctStrings);
-        String defaultStr = storedType.toString(getDefaultValue(storedType));
-        sortedSet.add(defaultStr);
-        return sortedSet.toArray(new String[0]);
-      }
-      case BIG_DECIMAL: {
-        // Dedup on BigDecimal.equals (scale-sensitive) to match SegmentDictionaryCreator.indexOfSV,
-        // which resolves dict ids via an equals-keyed map. A compareTo-based dedup (e.g. TreeSet)
-        // would collapse equal-but-differently-scaled values (1.0 vs 1.00) into one dictionary entry,
-        // causing the dropped value's forward-index lookup to silently resolve to dict id 0. This
-        // mirrors BigDecimalColumnPreIndexStatsCollector (ObjectOpenHashSet + Arrays.sort).
-        Set<BigDecimal> distinct = new HashSet<>();
-        distinct.add((BigDecimal) getDefaultValue(storedType));
-        for (Object v : values) {
-          distinct.add((BigDecimal) v);
-        }
-        BigDecimal[] sorted = distinct.toArray(new BigDecimal[0]);
-        Arrays.sort(sorted);
-        return sorted;
-      }
-      default:
-        // BIG_DECIMAL, STRING, BYTES and the numeric types are all handled above. The only stored
-        // types that can reach here are non-scalar (STRUCT/MAP/LIST/OPEN_STRUCT) or UNKNOWN, which
-        // are never valid stored types for an OPEN_STRUCT key — fail loudly rather than write a
-        // segment with a corrupt dictionary that contains only the default value.
-        throw new IllegalStateException("Unsupported OPEN_STRUCT stored type for dictionary build: " + storedType);
     }
   }
 }
