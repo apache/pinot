@@ -39,9 +39,6 @@ public enum ControllerTimer implements AbstractMetrics.Timer {
   // Audit logging timers
   AUDIT_REQUEST_PROCESSING_TIME("auditRequestProcessingTime", true),
   AUDIT_RESPONSE_PROCESSING_TIME("auditResponseProcessingTime", true),
-  // Log subtask waiting (until not started) and running (until not completed) time
-  SUBTASK_WAITING_TIME("subtaskWaitingTime", false),
-  SUBTASK_RUNNING_TIME("subtaskRunningTime", false),
   // Query workload propagation metrics
   QUERY_WORKLOAD_PROPAGATE_TIME_MS("queryWorkloadPropagateTimeMs", false),
   QUERY_WORKLOAD_SEND_MESSAGE_TIME_MS("queryWorkloadSendMessageTimeMs", false),
