@@ -192,14 +192,14 @@ public class OpenStructColumnSplitterTest {
   @Test
   public void testBigDecimalScaleDistinctValuesNotCollapsed()
       throws Exception {
-    // 1.0 and 1.00 are equal by compareTo but distinct by equals. The dictionary lookup is
-    // equals-based, so they must remain separate dictionary entries. With the default (BigDecimal.ZERO)
-    // that is 3 distinct values; a compareTo-based dedup would wrongly collapse to 2 and silently
-    // mis-resolve forward-index dict ids.
+    // 1.0 and 1.00 are equal by compareTo but distinct by equals; they must stay separate dictionary
+    // entries. Doc 2 is absent, so the default (BigDecimal.ZERO) is also collected -> 3 distinct values.
+    // A compareTo-based dedup would wrongly collapse 1.0/1.00 and yield 2.
     OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
         config(0.5, -1, null));
     s.add(Map.of("amount", new BigDecimal("1.0")), 0);
     s.add(Map.of("amount", new BigDecimal("1.00")), 1);
+    s.add(Map.of(), 2);
     s.seal();
 
     String denseCol = OpenStructNaming.materializedColumnName("metrics", "amount");
