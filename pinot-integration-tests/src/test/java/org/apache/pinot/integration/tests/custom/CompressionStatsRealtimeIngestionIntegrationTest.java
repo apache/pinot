@@ -126,10 +126,10 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
     // Verify compression stats are nested under compressionStats object
     JsonNode compressionStatsNode = realtimeSegments.get("compressionStats");
     assertNotNull(compressionStatsNode, "compressionStats should be present");
-    assertTrue(compressionStatsNode.has("rawForwardIndexSizePerReplicaInBytes"),
-        "compressionStats should have rawForwardIndexSizePerReplicaInBytes");
-    assertTrue(compressionStatsNode.has("compressedForwardIndexSizePerReplicaInBytes"),
-        "compressionStats should have compressedForwardIndexSizePerReplicaInBytes");
+    assertTrue(compressionStatsNode.has("rawIngestSizePerReplicaInBytes"),
+        "compressionStats should have rawIngestSizePerReplicaInBytes");
+    assertTrue(compressionStatsNode.has("onDiskSizePerReplicaInBytes"),
+        "compressionStats should have onDiskSizePerReplicaInBytes");
     assertTrue(compressionStatsNode.has("compressionRatio"),
         "compressionStats should have compressionRatio");
     assertTrue(compressionStatsNode.has("segmentsWithStats"),
@@ -137,8 +137,8 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
     assertTrue(compressionStatsNode.has("totalSegments"),
         "compressionStats should have totalSegments");
 
-    long rawFwdIndexSize = compressionStatsNode.get("rawForwardIndexSizePerReplicaInBytes").asLong();
-    long compressedFwdIndexSize = compressionStatsNode.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
+    long rawFwdIndexSize = compressionStatsNode.get("rawIngestSizePerReplicaInBytes").asLong();
+    long compressedFwdIndexSize = compressionStatsNode.get("onDiskSizePerReplicaInBytes").asLong();
     double compressionRatio = compressionStatsNode.get("compressionRatio").asDouble();
     int segmentsWithStats = compressionStatsNode.get("segmentsWithStats").asInt();
     int totalSegments = compressionStatsNode.get("totalSegments").asInt();
@@ -156,15 +156,15 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
     // If any completed segments exist with stats, verify the compression data makes sense
     if (segmentsWithStats > 0) {
       assertTrue(rawFwdIndexSize > 0,
-          "rawForwardIndexSizePerReplicaInBytes should be > 0 when segments have stats, got: "
+          "rawIngestSizePerReplicaInBytes should be > 0 when segments have stats, got: "
               + rawFwdIndexSize);
       assertTrue(compressedFwdIndexSize > 0,
-          "compressedForwardIndexSizePerReplicaInBytes should be > 0 when segments have stats, got: "
+          "onDiskSizePerReplicaInBytes should be > 0 when segments have stats, got: "
               + compressedFwdIndexSize);
       assertTrue(compressionRatio > 0,
           "compressionRatio should be > 0 when segments have stats, got: " + compressionRatio);
       assertTrue(rawFwdIndexSize >= compressedFwdIndexSize,
-          "rawForwardIndexSize (" + rawFwdIndexSize + ") should be >= compressedForwardIndexSize ("
+          "rawIngestSize (" + rawFwdIndexSize + ") should be >= onDiskSize ("
               + compressedFwdIndexSize + ")");
       assertTrue(compressionRatio >= 1.0,
           "compressionRatio should be >= 1.0, got: " + compressionRatio);

@@ -237,8 +237,8 @@ public class TablesResource {
     // Per-column compression stats accumulators: [0]=uncompressed, [1]=compressed (fwd index)
     Map<String, long[]> columnCompressionAccum = new HashMap<>();
     Map<String, String> columnCodecMap = new HashMap<>();
-    // Track hasDictionary and index names per column for the compression stats DTO
-    Map<String, Boolean> columnHasDictMap = new HashMap<>();
+    // Secondary per-codec breakdown accumulators: column → codec → [rawIngest, onDisk, segmentCount]
+    Map<String, Map<String, long[]>> columnCodecBreakdownAccum = new HashMap<>();
     Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
     Map<String, long[]> tierAccum = new HashMap<>(); // [count, size]
     int segmentsWithStats = 0;
@@ -314,20 +314,39 @@ public class TablesResource {
                 // Raw column with stats: include in both numerator and denominator
                 long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
                 accum[0] += uncompressedSize;
-                accum[1] += (fwdIndexSize > 0 ? fwdIndexSize : 0);
+                long rawOnDisk = fwdIndexSize > 0 ? fwdIndexSize : 0;
+                accum[1] += rawOnDisk;
                 columnCodecMap.merge(column, codec,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
-                // Raw columns never have a dictionary; once any segment is raw, mark the column as no-dict
-                columnHasDictMap.merge(column, false, (existing, incoming) -> false);
+                // Always track per-codec breakdown so we can expose it when codec becomes MIXED
+                Map<String, long[]> breakdown =
+                    columnCodecBreakdownAccum.computeIfAbsent(column, k -> new HashMap<>());
+                long[] codecAccum = breakdown.computeIfAbsent(codec, k -> new long[3]);
+                codecAccum[0] += uncompressedSize;
+                codecAccum[1] += rawOnDisk;
+                codecAccum[2]++;
                 columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
                 segmentHasCompressionStats = true;
               } else if (columnMetadata.hasDictionary() && fwdIndexSize > 0) {
-                // Dictionary-encoded column: track forward index size but no raw uncompressed size
+                // Dictionary-encoded column: track forward index size + dict file size + raw ingest size
+                long dictFileSize = columnMetadata.getIndexSizeFor(StandardIndexes.dictionary());
+                long dictRawIngest = columnMetadata.getDictColumnRawIngestSizeBytes();
                 long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
-                accum[1] += fwdIndexSize;
-                // Only set hasDictionary=true if not already seen as raw (raw wins)
-                columnHasDictMap.merge(column, true, (existing, incoming) -> existing && incoming);
+                accum[0] += (dictRawIngest >= 0 ? dictRawIngest : 0);
+                long dictOnDisk = (fwdIndexSize > 0 ? fwdIndexSize : 0) + (dictFileSize >= 0 ? dictFileSize : 0);
+                accum[1] += dictOnDisk;
+                columnCodecMap.merge(column, ColumnCompressionStatsInfo.CODEC_DICT_ENCODED,
+                    (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
+                // Always track per-codec breakdown so we can expose it when codec becomes MIXED
+                Map<String, long[]> breakdown =
+                    columnCodecBreakdownAccum.computeIfAbsent(column, k -> new HashMap<>());
+                long[] codecAccum =
+                    breakdown.computeIfAbsent(ColumnCompressionStatsInfo.CODEC_DICT_ENCODED, k -> new long[3]);
+                codecAccum[0] += (dictRawIngest >= 0 ? dictRawIngest : 0);
+                codecAccum[1] += dictOnDisk;
+                codecAccum[2]++;
                 columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
+                segmentHasCompressionStats = true;
               }
               // Old segments without stats (codec==null, uncompressed==INDEX_NOT_FOUND) are
               // excluded entirely — not added to any accumulation maps
@@ -375,25 +394,39 @@ public class TablesResource {
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
         String col = entry.getKey();
         long[] accum = entry.getValue();
-        boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
-        // Dict columns have no raw forward index; report -1 to distinguish from 0-size raw columns
-        long uncompressed = (hasDictionary && accum[0] == 0) ? -1 : accum[0];
+        String colCodec = columnCodecMap.get(col);
+        // Dict-only columns: if no raw ingest size was accumulated (old segment), report -1 to distinguish from 0-size
+        long uncompressed = (ColumnCompressionStatsInfo.CODEC_DICT_ENCODED.equals(colCodec)
+            && accum[0] == 0) ? -1 : accum[0];
         long compressed = accum[1];
         double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
         Set<String> idxNames = columnIndexNamesMap.get(col);
         List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
+        // Build codecBreakdown only when codec is MIXED
+        Map<String, ColumnCompressionStatsInfo.CodecBreakdownEntry> codecBreakdown = null;
+        if ("MIXED".equals(colCodec)) {
+          Map<String, long[]> bdAccum = columnCodecBreakdownAccum.get(col);
+          if (bdAccum != null) {
+            codecBreakdown = new HashMap<>();
+            for (Map.Entry<String, long[]> bdEntry : bdAccum.entrySet()) {
+              long[] bd = bdEntry.getValue();
+              codecBreakdown.put(bdEntry.getKey(), new ColumnCompressionStatsInfo.CodecBreakdownEntry(
+                  (int) bd[2], bd[0], bd[1]));
+            }
+          }
+        }
         columnCompressionStats.add(new ColumnCompressionStatsInfo(
-            col, uncompressed, compressed, ratio, columnCodecMap.get(col), hasDictionary, indexes));
-        // Only include raw columns in the table-level summary
-        if (!hasDictionary && uncompressed > 0) {
-          totalRaw += uncompressed;
+            col, uncompressed, compressed, ratio, colCodec, indexes, codecBreakdown));
+        // Include all columns with on-disk size in the table-level summary
+        if (compressed > 0) {
+          totalRaw += uncompressed > 0 ? uncompressed : 0;
           totalCompressed += compressed;
         }
       }
       columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
-      // Build table-level compression summary (null if no raw columns have stats)
-      if (totalRaw > 0 || totalCompressed > 0) {
-        double summaryRatio = totalCompressed > 0 ? (double) totalRaw / totalCompressed : 0;
+      // Build table-level compression summary when any column has on-disk stats
+      if (totalCompressed > 0) {
+        double summaryRatio = totalRaw > 0 ? (double) totalRaw / totalCompressed : 0;
         boolean isPartialCoverage = segmentsWithStats < totalSegmentCount;
         compressionStatsSummary = new CompressionStatsSummary(totalRaw, totalCompressed, summaryRatio,
             segmentsWithStats, totalSegmentCount, isPartialCoverage);

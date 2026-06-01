@@ -160,8 +160,8 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
     JsonNode compressionStatsNode = offlineSegments.get("compressionStats");
     assertNotNull(compressionStatsNode, "compressionStats should be present");
 
-    long rawFwdIndexSize = compressionStatsNode.get("rawForwardIndexSizePerReplicaInBytes").asLong();
-    long compressedFwdIndexSize = compressionStatsNode.get("compressedForwardIndexSizePerReplicaInBytes").asLong();
+    long rawFwdIndexSize = compressionStatsNode.get("rawIngestSizePerReplicaInBytes").asLong();
+    long compressedFwdIndexSize = compressionStatsNode.get("onDiskSizePerReplicaInBytes").asLong();
     double compressionRatio = compressionStatsNode.get("compressionRatio").asDouble();
     int segmentsWithStats = compressionStatsNode.get("segmentsWithStats").asInt();
     int totalSegments = compressionStatsNode.get("totalSegments").asInt();
@@ -169,11 +169,11 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
 
     // Raw forward index size should be > 0 (we have 4 raw columns across 12 segments)
     assertTrue(rawFwdIndexSize > 0,
-        "rawForwardIndexSizePerReplicaInBytes should be > 0, got: " + rawFwdIndexSize);
+        "rawIngestSizePerReplicaInBytes should be > 0, got: " + rawFwdIndexSize);
 
-    // Compressed forward index size should be > 0
+    // On-disk forward index size should be > 0
     assertTrue(compressedFwdIndexSize > 0,
-        "compressedForwardIndexSizePerReplicaInBytes should be > 0, got: " + compressedFwdIndexSize);
+        "onDiskSizePerReplicaInBytes should be > 0, got: " + compressedFwdIndexSize);
 
     // Compression ratio should be > 0 (raw / compressed)
     assertTrue(compressionRatio > 0,
@@ -181,7 +181,7 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
 
     // Raw size should be >= compressed size (compression should not expand data for numeric columns)
     assertTrue(rawFwdIndexSize >= compressedFwdIndexSize,
-        "rawForwardIndexSize (" + rawFwdIndexSize + ") should be >= compressedForwardIndexSize ("
+        "rawIngestSize (" + rawFwdIndexSize + ") should be >= onDiskSize ("
             + compressedFwdIndexSize + ")");
 
     // Compression ratio = raw / compressed, should be >= 1.0
@@ -242,16 +242,17 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
             for (String col : RAW_COLUMNS) {
               if (columnStats.has(col)) {
                 JsonNode colInfo = columnStats.get(col);
-                assertTrue(colInfo.get("uncompressedSizeInBytes").asLong() > 0,
-                    "Per-column uncompressed size should be > 0 for " + col);
-                assertTrue(colInfo.get("compressedSizeInBytes").asLong() > 0,
-                    "Per-column compressed size should be > 0 for " + col);
+                assertTrue(colInfo.get("rawIngestSizeInBytes").asLong() > 0,
+                    "Per-column raw ingest size should be > 0 for " + col);
+                assertTrue(colInfo.get("onDiskSizeInBytes").asLong() > 0,
+                    "Per-column on-disk size should be > 0 for " + col);
                 assertTrue(colInfo.get("compressionRatio").asDouble() > 0,
                     "Per-column compression ratio should be > 0 for " + col);
                 assertEquals(colInfo.get("codec").asText(), "LZ4",
                     "Compression codec should be LZ4 for " + col);
-                assertFalse(colInfo.get("hasDictionary").asBoolean(),
-                    "Raw column should not have dictionary for " + col);
+                // hasDictionary is no longer emitted — raw columns are identified by their codec value
+                assertFalse(colInfo.has("hasDictionary"),
+                    "hasDictionary field should no longer be present in the response for " + col);
                 columnsWithStats++;
               }
             }

@@ -127,7 +127,8 @@ public class ServerSegmentMetadataReader {
     // Per-column compression stats accumulators: [0]=uncompressed, [1]=compressed
     final Map<String, long[]> columnCompressionAccum = new HashMap<>();
     final Map<String, String> columnCodecMap = new HashMap<>();
-    final Map<String, Boolean> columnHasDictMap = new HashMap<>();
+    // Secondary per-codec breakdown accumulators: column → codec → [rawIngest, onDisk, segmentCount]
+    final Map<String, Map<String, long[]>> columnCodecBreakdownAccum = new HashMap<>();
     final Map<String, Set<String>> columnIndexNamesMap = new HashMap<>();
     long aggRawSize = 0;
     long aggCompressedSize = 0;
@@ -163,32 +164,47 @@ public class ServerSegmentMetadataReader {
         List<ColumnCompressionStatsInfo> serverColStats = tableMetadataInfo.getColumnCompressionStats();
         if (serverColStats != null) {
           for (ColumnCompressionStatsInfo info : serverColStats) {
-            // Skip columns with no meaningful compression data (old raw segments without persisted codec)
-            if (info.getCodec() == null && !info.hasDictionary()) {
+            // Skip entries with no meaningful data: no codec, no raw ingest, and no on-disk size.
+            // Old servers (pre-CODEC_DICT_ENCODED) report dict columns with codec=null and onDisk>0;
+            // those must NOT be skipped. Old raw columns without stats have codec=null, rawIngest=0,
+            // and onDisk=0 — those are the only ones we drop.
+            if (info.getCodec() == null && info.getRawIngestSizeInBytes() <= 0
+                && info.getOnDiskSizeInBytes() <= 0) {
               continue;
             }
             String col = info.getColumn();
             long[] accum = columnCompressionAccum.computeIfAbsent(col, k -> new long[2]);
             // Only accumulate uncompressed size when it is a real value (not the -1 sentinel from dict columns)
-            if (info.getUncompressedSizeInBytes() >= 0) {
-              accum[0] += info.getUncompressedSizeInBytes();
+            if (info.getRawIngestSizeInBytes() >= 0) {
+              accum[0] += info.getRawIngestSizeInBytes();
             }
-            accum[1] += info.getCompressedSizeInBytes();
+            accum[1] += info.getOnDiskSizeInBytes();
             if (info.getCodec() != null) {
               columnCodecMap.merge(col, info.getCodec(),
                   (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
             }
-            columnHasDictMap.put(col, info.hasDictionary());
             if (info.getIndexes() != null) {
               columnIndexNamesMap.computeIfAbsent(col, k -> new HashSet<>()).addAll(info.getIndexes());
+            }
+            // Aggregate per-codec breakdown from server info
+            if (info.getCodecBreakdown() != null) {
+              Map<String, long[]> localBreakdown =
+                  columnCodecBreakdownAccum.computeIfAbsent(col, k -> new HashMap<>());
+              for (Map.Entry<String, ColumnCompressionStatsInfo.CodecBreakdownEntry> bdEntry
+                  : info.getCodecBreakdown().entrySet()) {
+                long[] bdAccum = localBreakdown.computeIfAbsent(bdEntry.getKey(), k -> new long[3]);
+                bdAccum[0] += bdEntry.getValue().getRawIngestSizeInBytes();
+                bdAccum[1] += bdEntry.getValue().getOnDiskSizeInBytes();
+                bdAccum[2] += bdEntry.getValue().getSegments();
+              }
             }
           }
         }
         // Aggregate compressionStats summary (sum raw/compressed across servers)
         CompressionStatsSummary serverSummary = tableMetadataInfo.getCompressionStats();
         if (serverSummary != null) {
-          aggRawSize += serverSummary.getRawForwardIndexSizePerReplicaInBytes();
-          aggCompressedSize += serverSummary.getCompressedForwardIndexSizePerReplicaInBytes();
+          aggRawSize += serverSummary.getRawIngestSizePerReplicaInBytes();
+          aggCompressedSize += serverSummary.getOnDiskSizePerReplicaInBytes();
           aggSegmentsWithStats += serverSummary.getSegmentsWithStats();
           aggTotalSegments += serverSummary.getTotalSegments();
           hasCompressionSummary = true;
@@ -231,15 +247,29 @@ public class ServerSegmentMetadataReader {
       for (Map.Entry<String, long[]> entry : columnCompressionAccum.entrySet()) {
         String col = entry.getKey();
         long[] accum = entry.getValue();
-        boolean hasDictionary = Boolean.TRUE.equals(columnHasDictMap.get(col));
-        // Dict columns have no uncompressed size; preserve -1 sentinel instead of dividing 0
-        long uncompressed = (hasDictionary && accum[0] == 0) ? -1 : accum[0] / numReplica;
+        String colCodec = columnCodecMap.get(col);
+        // Dict-only columns have no uncompressed size; preserve -1 sentinel instead of dividing 0
+        long uncompressed = (ColumnCompressionStatsInfo.CODEC_DICT_ENCODED.equals(colCodec)
+            && accum[0] == 0) ? -1 : accum[0] / numReplica;
         long compressed = accum[1] / numReplica;
         double ratio = (uncompressed > 0 && compressed > 0) ? (double) uncompressed / compressed : 0;
         Set<String> idxNames = columnIndexNamesMap.get(col);
         List<String> indexes = idxNames != null ? new ArrayList<>(idxNames) : null;
+        // Build codecBreakdown only when codec is MIXED; divide sizes by numReplica
+        Map<String, ColumnCompressionStatsInfo.CodecBreakdownEntry> codecBreakdown = null;
+        if ("MIXED".equals(colCodec)) {
+          Map<String, long[]> bdAccum = columnCodecBreakdownAccum.get(col);
+          if (bdAccum != null) {
+            codecBreakdown = new HashMap<>();
+            for (Map.Entry<String, long[]> bdEntry : bdAccum.entrySet()) {
+              long[] bd = bdEntry.getValue();
+              codecBreakdown.put(bdEntry.getKey(), new ColumnCompressionStatsInfo.CodecBreakdownEntry(
+                  (int) (bd[2] / numReplica), bd[0] / numReplica, bd[1] / numReplica));
+            }
+          }
+        }
         columnCompressionStats.add(new ColumnCompressionStatsInfo(
-            col, uncompressed, compressed, ratio, columnCodecMap.get(col), hasDictionary, indexes));
+            col, uncompressed, compressed, ratio, colCodec, indexes, codecBreakdown));
       }
       columnCompressionStats.sort((a, b) -> a.getColumn().compareTo(b.getColumn()));
     }

@@ -29,8 +29,8 @@ public class CompressionStatsSummaryTest {
   @Test
   public void testGetters() {
     CompressionStatsSummary summary = new CompressionStatsSummary(100000, 40000, 2.5, 8, 10, true);
-    assertEquals(summary.getRawForwardIndexSizePerReplicaInBytes(), 100000);
-    assertEquals(summary.getCompressedForwardIndexSizePerReplicaInBytes(), 40000);
+    assertEquals(summary.getRawIngestSizePerReplicaInBytes(), 100000);
+    assertEquals(summary.getOnDiskSizePerReplicaInBytes(), 40000);
     assertEquals(summary.getCompressionRatio(), 2.5, 0.001);
     assertEquals(summary.getSegmentsWithStats(), 8);
     assertEquals(summary.getTotalSegments(), 10);
@@ -51,16 +51,16 @@ public class CompressionStatsSummaryTest {
     CompressionStatsSummary original = new CompressionStatsSummary(200000, 80000, 2.5, 3, 4, true);
     String json = JsonUtils.objectToString(original);
 
-    assertTrue(json.contains("rawForwardIndexSizePerReplicaInBytes"));
-    assertTrue(json.contains("compressedForwardIndexSizePerReplicaInBytes"));
+    assertTrue(json.contains("rawIngestSizePerReplicaInBytes"));
+    assertTrue(json.contains("onDiskSizePerReplicaInBytes"));
     assertTrue(json.contains("compressionRatio"));
     assertTrue(json.contains("segmentsWithStats"));
     assertTrue(json.contains("totalSegments"));
     assertTrue(json.contains("isPartialCoverage"));
 
     CompressionStatsSummary deserialized = JsonUtils.stringToObject(json, CompressionStatsSummary.class);
-    assertEquals(deserialized.getRawForwardIndexSizePerReplicaInBytes(), 200000);
-    assertEquals(deserialized.getCompressedForwardIndexSizePerReplicaInBytes(), 80000);
+    assertEquals(deserialized.getRawIngestSizePerReplicaInBytes(), 200000);
+    assertEquals(deserialized.getOnDiskSizePerReplicaInBytes(), 80000);
     assertEquals(deserialized.getCompressionRatio(), 2.5, 0.001);
     assertEquals(deserialized.getSegmentsWithStats(), 3);
     assertEquals(deserialized.getTotalSegments(), 4);
@@ -70,11 +70,11 @@ public class CompressionStatsSummaryTest {
   @Test
   public void testJsonIgnoresUnknownFields()
       throws Exception {
-    String json = "{\"rawForwardIndexSizePerReplicaInBytes\":1000,\"compressedForwardIndexSizePerReplicaInBytes\":500,"
+    String json = "{\"rawIngestSizePerReplicaInBytes\":1000,\"onDiskSizePerReplicaInBytes\":500,"
         + "\"compressionRatio\":2.0,\"segmentsWithStats\":1,\"totalSegments\":1,\"isPartialCoverage\":false,"
         + "\"unknownFutureField\":\"ignored\"}";
     CompressionStatsSummary summary = JsonUtils.stringToObject(json, CompressionStatsSummary.class);
-    assertEquals(summary.getRawForwardIndexSizePerReplicaInBytes(), 1000);
+    assertEquals(summary.getRawIngestSizePerReplicaInBytes(), 1000);
     assertFalse(summary.isPartialCoverage());
   }
 }

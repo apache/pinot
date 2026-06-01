@@ -793,14 +793,14 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testGetTableMetadataHasDictionaryRawWinsOverDict()
+  public void testGetTableMetadataMixedDictRawCodec()
       throws Exception {
     // Regression test: when a table has mixed-age segments (some dict, some raw for the same column),
-    // the reported hasDictionary must be false once any segment is raw (raw wins).
+    // the reported codec must be "MIXED" and codecBreakdown must be present.
     String mixedTableName = "mixedDictRaw_OFFLINE";
     List<ImmutableSegment> mixedSegments = new ArrayList<>();
 
-    // Segment 1: dict-encoded (default config — no noDictionaryColumns)
+    // Segment 1: dict-encoded (default config — no noDictionaryColumns), produces CODEC_DICT_ENCODED
     File tableDataDir = new File(TEMP_DIR, mixedTableName);
     SegmentGeneratorConfig dictConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, tableDataDir, mixedTableName);
@@ -857,8 +857,10 @@ public class TablesResourceTest extends BaseResourceTest {
       Assert.assertNotNull(ccs, "columnCompressionStats should be present when flag=ON and segments have stats");
       for (ColumnCompressionStatsInfo colStats : ccs) {
         if ("column1".equals(colStats.getColumn()) || "column2".equals(colStats.getColumn())) {
-          Assert.assertFalse(colStats.hasDictionary(),
-              "column " + colStats.getColumn() + " should report hasDictionary=false (raw wins over dict)");
+          Assert.assertEquals(colStats.getCodec(), "MIXED",
+              "column " + colStats.getColumn() + " should report codec=MIXED when dict and raw segments coexist");
+          Assert.assertNotNull(colStats.getCodecBreakdown(),
+              "column " + colStats.getColumn() + " should have codecBreakdown when codec=MIXED");
         }
       }
     } finally {

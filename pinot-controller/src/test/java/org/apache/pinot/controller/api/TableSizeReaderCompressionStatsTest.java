@@ -115,11 +115,11 @@ public class TableSizeReaderCompressionStatsTest {
 
     // server0: segment s1 and s2 with compression stats
     Map<String, ColumnCompressionStatsInfo> s1ColStats = new HashMap<>();
-    s1ColStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", false, null));
-    s1ColStats.put("col_b", new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", false, null));
+    s1ColStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 10000, 2000, 5.0, "LZ4", null, null));
+    s1ColStats.put("col_b", new ColumnCompressionStatsInfo("col_b", 20000, 5000, 4.0, "ZSTANDARD", null, null));
 
     Map<String, ColumnCompressionStatsInfo> s2ColStats = new HashMap<>();
-    s2ColStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 15000, 3000, 5.0, "LZ4", false, null));
+    s2ColStats.put("col_a", new ColumnCompressionStatsInfo("col_a", 15000, 3000, 5.0, "LZ4", null, null));
 
     List<SegmentSizeInfo> server0Sizes = Arrays.asList(
         new SegmentSizeInfo("s1", 50000, 30000, 7000, "default", s1ColStats),
@@ -214,8 +214,8 @@ public class TableSizeReaderCompressionStatsTest {
     // Total per replica: raw=45000, compressed=10000
     TableSizeReader.CompressionStats cs = offlineDetails._compressionStats;
     assertNotNull(cs);
-    assertEquals(cs._rawForwardIndexSizePerReplicaInBytes, 45000);
-    assertEquals(cs._compressedForwardIndexSizePerReplicaInBytes, 10000);
+    assertEquals(cs._rawIngestSizePerReplicaInBytes, 45000);
+    assertEquals(cs._onDiskSizePerReplicaInBytes, 10000);
 
     // Compression ratio = 45000 / 10000 = 4.5
     assertEquals(cs._compressionRatio, 4.5, 0.01);
@@ -245,15 +245,15 @@ public class TableSizeReaderCompressionStatsTest {
     // List is sorted by column name: col_a, col_b
     ColumnCompressionStatsInfo colA = colStats.get(0);
     assertEquals(colA.getColumn(), "col_a");
-    assertEquals(colA.getUncompressedSizeInBytes(), 25000);
-    assertEquals(colA.getCompressedSizeInBytes(), 5000);
+    assertEquals(colA.getRawIngestSizeInBytes(), 25000);
+    assertEquals(colA.getOnDiskSizeInBytes(), 5000);
     assertEquals(colA.getCompressionRatio(), 5.0, 0.01);
     assertEquals(colA.getCodec(), "LZ4");
 
     ColumnCompressionStatsInfo colB = colStats.get(1);
     assertEquals(colB.getColumn(), "col_b");
-    assertEquals(colB.getUncompressedSizeInBytes(), 20000);
-    assertEquals(colB.getCompressedSizeInBytes(), 5000);
+    assertEquals(colB.getRawIngestSizeInBytes(), 20000);
+    assertEquals(colB.getOnDiskSizeInBytes(), 5000);
     assertEquals(colB.getCompressionRatio(), 4.0, 0.01);
     assertEquals(colB.getCodec(), "ZSTANDARD");
 
@@ -284,8 +284,8 @@ public class TableSizeReaderCompressionStatsTest {
     assertTrue(cs._isPartialCoverage);
 
     // Compression ratio still computed from segments that have stats
-    assertEquals(cs._rawForwardIndexSizePerReplicaInBytes, 45000);
-    assertEquals(cs._compressedForwardIndexSizePerReplicaInBytes, 10000);
+    assertEquals(cs._rawIngestSizePerReplicaInBytes, 45000);
+    assertEquals(cs._onDiskSizePerReplicaInBytes, 10000);
     assertEquals(cs._compressionRatio, 4.5, 0.01);
   }
 
