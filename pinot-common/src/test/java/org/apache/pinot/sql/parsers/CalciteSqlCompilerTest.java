@@ -3108,16 +3108,16 @@ public class CalciteSqlCompilerTest {
       }
     }
     {
-      // Having will be rewritten to (SUM(col1) + SUM(col3)) - MAX(col4) > 0
+      // Having will be rewritten to greaterThan(SUM(col1) + SUM(col3), MAX(col4)) = true
       String query = "SELECT SUM(col1), col2 FROM foo GROUP BY col2 HAVING SUM(col1) + SUM(col3) > MAX(col4)";
       PinotQuery pinotQuery = compileToPinotQuery(query);
       Function functionCall = pinotQuery.getHavingExpression().getFunctionCall();
-      Assert.assertEquals(functionCall.getOperator(), FilterKind.GREATER_THAN.name());
+      Assert.assertEquals(functionCall.getOperator(), FilterKind.EQUALS.name());
       List<Expression> operands = functionCall.getOperands();
       Assert.assertEquals(operands.size(), 2);
-      Assert.assertEquals(operands.get(1).getLiteral().getIntValue(), 0);
+      Assert.assertTrue(operands.get(1).getLiteral().getBoolValue());
       functionCall = operands.get(0).getFunctionCall();
-      Assert.assertEquals(functionCall.getOperator(), "minus");
+      Assert.assertEquals(functionCall.getOperator(), "greater_than");
       operands = functionCall.getOperands();
       Assert.assertEquals(operands.size(), 2);
       Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), "max");
