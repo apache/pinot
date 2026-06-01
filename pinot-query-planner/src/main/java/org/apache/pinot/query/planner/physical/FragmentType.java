@@ -27,6 +27,13 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
+/**
+ * Classifies dispatchable physical-plan fragments that participate in mailbox-based stage execution.
+ * <p>
+ * The values describe whether a fragment is a scanning leaf, a leaf reached through singleton exchanges,
+ * or an intermediate stage. Fragments outside this scope are left unclassified: {@link #classify(PlanNode,
+ * boolean, Map)} returns {@code null} when the fragment root is not a {@link MailboxSendNode}.
+ */
 public enum FragmentType {
   // Scans a fact table; non-SINGLETON sender
   LEAF,
