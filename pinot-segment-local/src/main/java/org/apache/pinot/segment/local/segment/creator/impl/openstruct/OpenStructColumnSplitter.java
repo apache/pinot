@@ -375,9 +375,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     PropertiesConfiguration props = new PropertiesConfiguration();
     FieldConfig.EncodingType encoding =
         useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
-    int dictionaryElementSize = useDictionary ? dictElementSize : 0;
     BaseSegmentCreator.addColumnMetadataInfo(props, materializedCol, statsCollector, _numDocs, childFieldSpec,
-        useDictionary, dictionaryElementSize, encoding, false);
+        useDictionary, dictElementSize, encoding, false);
     // OPEN_STRUCT-specific keys not written by addColumnMetadataInfo.
     props.setProperty(
         V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
