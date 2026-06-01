@@ -94,8 +94,9 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       BrokerServiceHelper brokerServiceHelper) {
     super(TASK_NAME, config.getRetentionControllerFrequencyInSeconds(),
-        config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
-        controllerMetrics);
+            config.getRetentionManagerInitialDelayInSeconds(), config.getRetentionControllerCronExpression(),
+        pinotHelixResourceManager,
+        leadControllerManager, controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
     _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
     _agedSegmentsDeletionBatchSize = config.getAgedSegmentsDeletionBatchSize();

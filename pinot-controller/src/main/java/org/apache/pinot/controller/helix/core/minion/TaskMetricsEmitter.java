@@ -73,7 +73,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       PinotHelixTaskResourceManager helixTaskResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(TASK_NAME, controllerConf.getTaskMetricsEmitterFrequencyInSeconds(),
-        controllerConf.getPeriodicTaskInitialDelayInSeconds());
+        controllerConf.getPeriodicTaskInitialDelayInSeconds(), controllerConf.getTaskMetricsEmitterCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixTaskResourceManager = helixTaskResourceManager;
     _controllerMetrics = controllerMetrics;
