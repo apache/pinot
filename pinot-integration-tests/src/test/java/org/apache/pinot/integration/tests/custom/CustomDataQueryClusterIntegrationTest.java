@@ -150,8 +150,8 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
       TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
       addRealtimeTableConfigWithRetry(tableConfig);
 
-      // Push data into Kafka
-      pushAvroIntoKafka(avroFiles);
+      // Push data into Kafka — override pushDataIntoKafka() for non-Avro formats
+      pushDataIntoKafka(avroFiles);
     } else {
       // create offline table
       TableConfig tableConfig = createOfflineTableConfig();
@@ -246,6 +246,16 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     ClusterIntegrationTestUtils.pushAvroIntoKafka(avroFiles,
         _sharedClusterTestSuite.getKafkaBrokerList(), getKafkaTopic(),
         getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn(), injectTombstones());
+  }
+
+  /**
+   * Pushes data into Kafka for realtime ingestion. Subclasses using non-Avro formats
+   * (e.g., protobuf, CSV) can override this method and ignore the dataFiles parameter.
+   * The default implementation delegates to {@link #pushAvroIntoKafka(List)}.
+   */
+  protected void pushDataIntoKafka(List<File> dataFiles)
+      throws Exception {
+    pushAvroIntoKafka(dataFiles);
   }
 
   @Override

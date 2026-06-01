@@ -56,6 +56,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -1134,7 +1135,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
   }
 
   @Nullable
-  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId,
+  @VisibleForTesting
+  SegmentPartitionMetadata getPartitionMetadataFromTableConfig(TableConfig tableConfig, int partitionId,
       int numPartitionGroups) {
     SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (partitionConfig == null) {
@@ -1144,18 +1146,30 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     if (columnPartitionMap.size() == 1) {
       Map.Entry<String, ColumnPartitionConfig> entry = columnPartitionMap.entrySet().iterator().next();
       ColumnPartitionConfig columnPartitionConfig = entry.getValue();
-      if (numPartitionGroups != columnPartitionConfig.getNumPartitions()) {
-        LOGGER.warn("Number of partition groups fetched from the stream '{}' is different than "
-                + "columnPartitionConfig.numPartitions '{}' in the table config. The stream partition count is used. "
-                + "Please update the table config accordingly.", numPartitionGroups,
-            columnPartitionConfig.getNumPartitions());
-      }
       // For multi-stream tables, convert Pinot partition ID (which includes padding offset) to stream partition ID.
       // This ensures the partition metadata stored in ZK matches what the broker's partition function computes
       // during query pruning. For example, stream 1 partition 5 has Pinot partition ID 10005, but should store 5.
       int streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(tableConfig, partitionId);
+      // If there are multiple streams, we assume the partition groups are evenly distributed across the streams, and
+      // compute the per-stream partition group count accordingly.
+      // This is needed for the partition function to correctly compute the stream partition id for pruning.
+      int numStreams = IngestionConfigUtils.getStreamConfigs(tableConfig).size();
+      if (numStreams > 1 && numPartitionGroups % numStreams != 0) {
+        LOGGER.warn("Number of partition groups '{}' is not divisible by number of streams '{}'. This might lead to "
+                + "incorrect pruning if the partition function is based on stream partition id. Please update the "
+                + "table config to ensure the partition groups are evenly distributed across the streams.",
+            numPartitionGroups, numStreams);
+        return null;
+      }
+      int perStreamNumPartitions = numStreams > 1 ? numPartitionGroups / numStreams : numPartitionGroups;
+      if (perStreamNumPartitions != columnPartitionConfig.getNumPartitions()) {
+        LOGGER.warn("Number of partitions per stream '{}' is different than "
+                + "columnPartitionConfig.numPartitions '{}' in the table config. "
+                + "The stream partition count is used. Please update the table config accordingly.",
+            perStreamNumPartitions, columnPartitionConfig.getNumPartitions());
+      }
       ColumnPartitionMetadata columnPartitionMetadata =
-          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitionGroups,
+          new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), perStreamNumPartitions,
               Collections.singleton(streamPartitionId), columnPartitionConfig.getFunctionConfig());
       return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
     } else {
@@ -2358,6 +2372,19 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       currentMetadata.setCrc(uploadedMetadata.getCrc());
       currentMetadata.setDataCrc(uploadedMetadata.getDataCrc());
     }
+    // Merge the custom map from the server into the current metadata. The server merges segment-file customMap entries
+    // into the existing ZK customMap; without this merge those entries would be dropped when we persist
+    // currentMetadata. Additive merge matches the server-side convention of preserving existing keys.
+    Map<String, String> uploadedCustomMap = uploadedMetadata.getCustomMap();
+    if (MapUtils.isNotEmpty(uploadedCustomMap)) {
+      Map<String, String> mergedCustomMap = currentMetadata.getCustomMap();
+      if (mergedCustomMap == null) {
+        mergedCustomMap = new HashMap<>(uploadedCustomMap);
+      } else {
+        mergedCustomMap.putAll(uploadedCustomMap);
+      }
+      currentMetadata.setCustomMap(mergedCustomMap);
+    }
     moveSegmentAndSetDownloadUrl(rawTableName, segmentName, uploadedMetadata.getDownloadUrl(), pinotFS,
         currentMetadata);
   }
@@ -2894,9 +2921,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
-      // TODO: add paused topics information
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
-          pauseState.getComment(), pauseState.getTimeInMillis());
+          pauseState.getComment(), pauseState.getTimeInMillis(), pauseState.getIndexOfInactiveTopics());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments,

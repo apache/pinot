@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.retention.strategy;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.RetentionUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,21 +33,28 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
 
   private final long _retentionMs;
+  private final boolean _useCreationTimeFallback;
 
   public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue) {
+    this(timeUnit, timeValue, false);
+  }
+
+  public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue, boolean useCreationTimeFallback) {
     _retentionMs = timeUnit.toMillis(timeValue);
+    _useCreationTimeFallback = useCreationTimeFallback;
   }
 
   @Override
   public boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
 
     // For realtime tables, only completed segments(DONE or UPLOADED) are eligible for purging.
-    //For offline tables, status defaults to UPLOADED which is completed, so they proceed to normal retention
+    // For offline tables, status defaults to UPLOADED which is completed, so they proceed to normal retention
     if (!segmentZKMetadata.getStatus().isCompleted()) {
       return false; // Incomplete segments don't have final end time and should not be purged
     }
 
-    return isPurgeable(tableNameWithType, segmentZKMetadata.getSegmentName(), segmentZKMetadata.getEndTimeMs());
+    return RetentionUtils.isPurgeable(tableNameWithType, segmentZKMetadata, _retentionMs,
+        System.currentTimeMillis(), _useCreationTimeFallback);
   }
 
   @Override

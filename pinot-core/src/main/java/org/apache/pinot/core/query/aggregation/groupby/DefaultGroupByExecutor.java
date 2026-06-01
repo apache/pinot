@@ -87,7 +87,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (ExpressionContext groupByExpression : groupByExpressions) {
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       hasMVGroupByExpression |= !columnContext.isSingleValue();
-      hasNoDictionaryGroupByExpression |= columnContext.getDictionary() == null;
+      // A column with EncodingType.RAW + explicit dictionaryIndex has a non-null dictionary but a RAW forward
+      // index that throws on readDictIds; route those through the no-dict GROUP BY generator via the explicit
+      // isDictionaryEncoded() flag rather than gating on dictionary nullness alone.
+      hasNoDictionaryGroupByExpression |= !columnContext.isDictionaryEncoded();
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
 

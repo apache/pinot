@@ -63,6 +63,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.core.instance.context.BrokerContext;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -113,6 +114,7 @@ public class QueryDispatcher {
   private final TlsConfig _tlsConfig;
   @Nullable
   private final SslContext _clientGrpcSslContext;
+  private final DispatchClient.KeepAliveConfig _keepAliveConfig;
   // maps broker-generated query id to the set of servers that the query was dispatched to
   private final Map<Long, Set<QueryServerInstance>> _serversByQuery;
   private final FailureDetector _failureDetector;
@@ -120,12 +122,28 @@ public class QueryDispatcher {
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        DispatchClient.KeepAliveConfig.DISABLED);
+  }
+
+  /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
+  /// disables keep-alive.
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
+      boolean keepAliveWithoutCalls) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
+        new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls));
+  }
+
+  private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig) {
     _cancelTimeout = cancelTimeout;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
     _tlsConfig = tlsConfig;
     _clientGrpcSslContext = initClientSslContext(tlsConfig);
+    _keepAliveConfig = keepAliveConfig;
     _failureDetector = failureDetector;
 
     if (enableCancellation) {
@@ -150,10 +168,40 @@ public class QueryDispatcher {
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
+    return submitAndReduce(context, dispatchableSubPlan, timeoutMs, queryOptions, null);
+  }
+
+  /// Same as {@link #submitAndReduce(RequestContext, DispatchableSubPlan, long, Map)} but records per-server
+  /// in-flight request statistics into {@code statsManager} for use by the adaptive query router.
+  /// When {@code statsManager} is non-null:
+  /// <ul>
+  ///   <li>Each leaf server is registered as having one more in-flight request via
+  ///       {@link ServerRoutingStatsManager#recordStatsForQuerySubmission} after the fan-out begins.</li>
+  ///   <li>After the full fan-out completes (or fails), each server is decremented via
+  ///       {@link ServerRoutingStatsManager#recordStatsUponResponseArrival} with {@code latency = -1}
+  ///       (no latency is recorded at this stage).</li>
+  /// </ul>
+  /// TODO: Replace the coarse end-of-fanout decrement with per-sender arrival once per-sender EOS
+  ///       interception is in place, and record real leaf-stage latency at that point.
+  public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+      Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
+      throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
+    // Tracks servers where recordStatsForQuerySubmission was actually called, so the finally block only
+    // decrements servers that were incremented — guarding against a partial failure in submit().
+    Set<QueryServerInstance> incrementedServers = new HashSet<>();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
+      // The SSE engine increments before `submit`, but here we increment after because `submit` populates
+      // the list of servers. Getting the list of servers before calling `submit` would expose
+      // implementation details of `submit`.
+      if (statsManager != null) {
+        for (QueryServerInstance server : servers) {
+          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
+          incrementedServers.add(server);
+        }
+      }
       QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         cancel(requestId);
@@ -166,6 +214,11 @@ public class QueryDispatcher {
       cancel(requestId);
       throw e;
     } finally {
+      if (statsManager != null) {
+        for (QueryServerInstance server : incrementedServers) {
+          statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
+        }
+      }
       if (isQueryCancellationEnabled()) {
         _serversByQuery.remove(requestId);
       }
@@ -522,7 +575,7 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     return _dispatchClientMap.computeIfAbsent(toHostnamePortKey(hostname, port),
-        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext));
+        k -> new DispatchClient(hostname, port, _tlsConfig, _clientGrpcSslContext, _keepAliveConfig));
   }
 
   /**

@@ -183,7 +183,7 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
       row.putValue(LONG_COLUMN, random.nextLong());
       row.putValue(FLOAT_COLUMN, random.nextFloat());
       row.putValue(DOUBLE_COLUMN, random.nextDouble());
-      row.putValue(STRING_COLUMN, RandomStringUtils.randomAscii(100));
+      row.putValue(STRING_COLUMN, RandomStringUtils.secure().nextAscii(100));
       rows.add(row);
     }
 

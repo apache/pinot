@@ -233,7 +233,7 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
         continue;
       }
       for (int step = 0; step < 2; step++) {
-          expectedResult[i][step] = expectedResult[i][step] * getExpectedInterSegmentMultiplier();
+        expectedResult[i][step] = expectedResult[i][step] * getExpectedInterSegmentMultiplier();
       }
       Object[] expectedRow = { Double.valueOf(i), expectedResult[i] };
       expectedRows.add(expectedRow);

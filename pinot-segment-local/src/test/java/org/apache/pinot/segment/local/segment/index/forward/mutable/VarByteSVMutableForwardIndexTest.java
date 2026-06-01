@@ -64,7 +64,7 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
       for (int i = 0; i < rows; i++) {
         // generate a random string of length between 10 and 100
         int length = 10 + random.nextInt(100 - 10);
-        data[i] = RandomStringUtils.randomAlphanumeric(length);
+        data[i] = RandomStringUtils.secure().nextAlphanumeric(length);
         readerWriter.setString(i, data[i]);
       }
 
@@ -88,7 +88,7 @@ public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassC
 
       for (int i = 0; i < rows; i++) {
         int length = 10 + random.nextInt(100 - 10);
-        data[i] = RandomStringUtils.randomAlphanumeric(length);
+        data[i] = RandomStringUtils.secure().nextAlphanumeric(length);
         readerWriter.setBytes(i, data[i].getBytes(UTF_8));
       }
 

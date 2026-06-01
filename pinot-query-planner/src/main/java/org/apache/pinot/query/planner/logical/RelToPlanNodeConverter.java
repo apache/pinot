@@ -941,7 +941,8 @@ public final class RelToPlanNodeConverter {
     boolean isArray = (sqlTypeName == SqlTypeName.ARRAY);
     if (isArray) {
       assert relDataType.getComponentType() != null;
-      sqlTypeName = relDataType.getComponentType().getSqlTypeName();
+      relDataType = relDataType.getComponentType();
+      sqlTypeName = relDataType.getSqlTypeName();
     }
     switch (sqlTypeName) {
       case BOOLEAN:
@@ -1005,6 +1006,8 @@ public final class RelToPlanNodeConverter {
       } else if (precision <= 38) {
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
       } else {
+        // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
+        //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     } else {
@@ -1013,6 +1016,8 @@ public final class RelToPlanNodeConverter {
       if (precision <= 30) {
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       } else {
+        // TODO: Modify it to return ColumnDataType.BIG_DECIMAL_ARRAY after `1.6.0` release
+        //       BIG_DECIMAL_ARRAY support is added in `1.6.0`
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.BIG_DECIMAL;
       }
     }

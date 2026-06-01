@@ -42,10 +42,10 @@ public class QueryOptionsUtilsTest {
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
   private static final List<String> INT_KEYS = new ArrayList<>() {{
-    addAll(POSITIVE_INT_KEYS);
-    addAll(NON_NEGATIVE_INT_KEYS);
-    addAll(UNBOUNDED_INT_KEYS);
-  }};
+      addAll(POSITIVE_INT_KEYS);
+      addAll(NON_NEGATIVE_INT_KEYS);
+      addAll(UNBOUNDED_INT_KEYS);
+    }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
 
@@ -262,6 +262,8 @@ public class QueryOptionsUtilsTest {
   @Test
   public void testInvertedIndexDistinctCostRatioValid() {
     assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
+        Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "0")), Double.valueOf(0));
+    assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
         Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, "2.5")), Double.valueOf(2.5));
     assertEquals(QueryOptionsUtils.getInvertedIndexDistinctCostRatio(
         Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, " 3.5 ")), Double.valueOf(3.5));
@@ -270,13 +272,13 @@ public class QueryOptionsUtilsTest {
 
   @Test
   public void testInvertedIndexDistinctCostRatioRejectsNonFiniteValues() {
-    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "0", "-1"}) {
+    for (String value : new String[]{"NaN", "Infinity", "-Infinity", "-1", "invalid"}) {
       try {
         QueryOptionsUtils.getInvertedIndexDistinctCostRatio(Map.of(INVERTED_INDEX_DISTINCT_COST_RATIO, value));
         fail();
       } catch (IllegalArgumentException e) {
         assertEquals(e.getMessage(),
-            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a positive number, got: " + value);
+            INVERTED_INDEX_DISTINCT_COST_RATIO + " must be a non-negative number, got: " + value);
       }
     }
   }

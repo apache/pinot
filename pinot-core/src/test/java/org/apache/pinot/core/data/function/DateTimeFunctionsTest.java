@@ -309,6 +309,28 @@ public class DateTimeFunctionsTest {
         row114, -1L
     });
 
+    // fromDateTime on a DST spring-forward gap: 2010-04-30 00:00 did not exist in Africa/Cairo because the
+    // clock sprang forward to 01:00. Instead of throwing, the scalar should shift forward past the gap and
+    // return the first valid instant (01:00 EEST). Using a historical date keeps this test stable against
+    // future tzdata updates.
+    GenericRow row115 = new GenericRow();
+    row115.putValue("dateTime", "2010-04-30");
+    long cairoDstGapExpected =
+        new DateTime(2010, 4, 30, 1, 0, 0, 0, DateTimeZone.forID("Africa/Cairo")).getMillis();
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo')", Lists.newArrayList("dateTime"), row115,
+        cairoDstGapExpected
+    });
+
+    // Same DST gap through the defaultVal overload: the fix resolves a valid instant rather than silently
+    // falling through to the default sentinel.
+    GenericRow row116 = new GenericRow();
+    row116.putValue("dateTime", "2010-04-30");
+    inputs.add(new Object[]{
+        "fromDateTime(dateTime, 'yyyy-MM-dd', 'Africa/Cairo', -1)", Lists.newArrayList("dateTime"), row116,
+        cairoDstGapExpected
+    });
+
     // timezone_hour and timezone_minute
     List<String> expectedArguments = Collections.singletonList("tz");
     GenericRow row120 = new GenericRow();

@@ -689,8 +689,8 @@ public class PinotSegmentRestletResource {
 
   private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
       @Nullable String retentionPeriod) {
-    PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
-        retentionPeriod);
+    PinotResourceManagerResponse response =
+        _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments, retentionPeriod);
     if (!response.isSuccessful()) {
       throw new ControllerApplicationException(LOGGER,
           "Failed to delete segments from table: " + tableNameWithType + ", error message: " + response.getMessage(),

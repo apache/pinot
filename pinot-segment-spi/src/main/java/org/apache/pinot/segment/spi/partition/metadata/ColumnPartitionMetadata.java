@@ -25,8 +25,9 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -113,10 +114,10 @@ public class ColumnPartitionMetadata {
    *   TODO: remove range format once all segments use integer format
    * </ul>
    */
-  public static Set<Integer> extractPartitions(List partitionList) {
-    Set<Integer> partitions = new HashSet<>();
-    for (Object o : partitionList) {
-      String partitionString = o.toString();
+  public static IntSet extractPartitions(List<Object> partitionList) {
+    IntSet partitions = new IntOpenHashSet(partitionList.size());
+    for (Object partition : partitionList) {
+      String partitionString = partition.toString();
       if (partitionString.charAt(0) == '[') {
         // Range format
         addRangeToPartitions(partitionString, partitions);
@@ -130,7 +131,7 @@ public class ColumnPartitionMetadata {
   /**
    * Helper method to add a partition range to a set of partitions.
    */
-  private static void addRangeToPartitions(String rangeString, Set<Integer> partitions) {
+  private static void addRangeToPartitions(String rangeString, IntSet partitions) {
     int delimiterIndex = rangeString.indexOf(' ');
     int start = Integer.parseInt(rangeString.substring(1, delimiterIndex));
     int end = Integer.parseInt(rangeString.substring(delimiterIndex + 1, rangeString.length() - 1));
@@ -159,15 +160,17 @@ public class ColumnPartitionMetadata {
     public ColumnPartitionMetadata deserialize(JsonParser p, DeserializationContext ctxt)
         throws IOException {
       JsonNode jsonMetadata = p.getCodec().readTree(p);
-      Set<Integer> partitions = new HashSet<>();
+      IntSet partitions;
       JsonNode jsonPartitions = jsonMetadata.get(PARTITIONS_KEY);
       if (jsonPartitions != null) {
         // Integer format: "partitions":[0,1,5]
+        partitions = new IntOpenHashSet(jsonPartitions.size());
         for (JsonNode jsonPartition : jsonPartitions) {
           partitions.add(jsonPartition.asInt());
         }
       } else {
         // Legacy format: "partitionRanges":"[0 1],[5 5]"
+        partitions = new IntOpenHashSet();
         String partitionRanges = jsonMetadata.get(LEGACY_PARTITIONS_KEY).asText();
         for (String partitionRange : StringUtils.split(partitionRanges, LEGACY_PARTITION_DELIMITER)) {
           addRangeToPartitions(partitionRange, partitions);
@@ -175,11 +178,9 @@ public class ColumnPartitionMetadata {
       }
       Map<String, String> functionConfig = null;
       if (jsonMetadata.has(FUNCTION_CONFIG_KEY)) {
-        functionConfig =
-            JsonUtils.jsonNodeToObject(jsonMetadata.get(FUNCTION_CONFIG_KEY), new TypeReference<Map<String, String>>() {
-            });
+        functionConfig = JsonUtils.jsonNodeToObject(jsonMetadata.get(FUNCTION_CONFIG_KEY), new TypeReference<>() {
+        });
       }
-
       return new ColumnPartitionMetadata(jsonMetadata.get(FUNCTION_NAME_KEY).asText(),
           jsonMetadata.get(NUM_PARTITIONS_KEY).asInt(), partitions, functionConfig);
     }

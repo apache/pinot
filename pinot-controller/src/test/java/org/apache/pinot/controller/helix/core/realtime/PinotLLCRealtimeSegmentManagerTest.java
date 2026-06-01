@@ -58,6 +58,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.BatchConfig;
@@ -74,12 +75,17 @@ import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -520,6 +526,43 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(capturedConfig[0], batchConfig, "pauseConsumption should forward the supplied batch config");
     assertEquals(pauseStatusDetails.getConsumingSegments(), Collections.singleton(consumingSegment),
         "pauseConsumption should include consuming segments from the updated ideal state");
+  }
+
+  @Test
+  public void testGetPauseStatusDetailsIncludesInactiveTopics()
+      throws Exception {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+    setUpNewTable(segmentManager, 2, 4, 2);
+
+    List<Integer> inactiveTopicIndices = List.of(0, 1);
+    PauseState pauseState =
+        new PauseState(false, PauseState.ReasonCode.ADMINISTRATIVE, null, "12345", inactiveTopicIndices);
+    segmentManager._idealState.getRecord().setSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE,
+        pauseState.toJsonString());
+
+    PauseStatusDetails details = segmentManager.getPauseStatusDetails(tableNameWithType);
+
+    assertEquals(details.getIndexOfInactiveTopics(), inactiveTopicIndices,
+        "getPauseStatusDetails should propagate indexOfInactiveTopics from PauseState");
+    assertFalse(details.getPauseFlag());
+  }
+
+  @Test
+  public void testPauseStatusDetailsJsonRoundTrip()
+      throws Exception {
+    List<Integer> inactiveTopics = List.of(0, 2);
+    PauseStatusDetails original = new PauseStatusDetails(false, Collections.emptySet(),
+        PauseState.ReasonCode.ADMINISTRATIVE, "comment", "12345", inactiveTopics);
+
+    String json = org.apache.pinot.spi.utils.JsonUtils.objectToString(original);
+    PauseStatusDetails deserialized =
+        org.apache.pinot.spi.utils.JsonUtils.stringToObject(json, PauseStatusDetails.class);
+
+    assertEquals(deserialized.getIndexOfInactiveTopics(), inactiveTopics,
+        "indexOfInactiveTopics should survive JSON round-trip");
+    assertFalse(deserialized.getPauseFlag());
+    assertEquals(deserialized.getComment(), "comment");
   }
 
   @Test
@@ -1776,10 +1819,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
+    // Pre-populate the current ZK metadata with a controller-side customMap entry to verify that the controller's
+    // additive merge preserves existing keys when the server response is propagated.
+    Map<String, String> existingCustomMap = new HashMap<>();
+    existingCustomMap.put("controllerKey", "controllerValue");
+    segmentsZKMetadata.get(0).setCustomMap(existingCustomMap);
+
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
 
     segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
+    // Simulate the server-side merge of segment-file customMap entries into the uploaded ZK metadata. The controller
+    // must propagate these entries to the persisted ZK metadata.
+    Map<String, String> uploadedCustomMap = new HashMap<>();
+    uploadedCustomMap.put("segmentFileKey", "segmentFileValue");
+    segmentZKMetadataCopy.setCustomMap(uploadedCustomMap);
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
         serverUploadRequestUrl0)).thenReturn(segmentZKMetadataCopy);
 
@@ -1833,6 +1887,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
         expectedSegmentLocation);
     assertFalse(tempSegmentFileLocation.exists(),
         "Deep-store retry task should move the file from temp location to permanent location");
+    Map<String, String> persistedCustomMap =
+        segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getCustomMap();
+    assertNotNull(persistedCustomMap);
+    assertEquals(persistedCustomMap.get("segmentFileKey"), "segmentFileValue");
+    assertEquals(persistedCustomMap.get("controllerKey"), "controllerValue");
 
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
         METADATA_URI_FOR_PEER_DOWNLOAD);
@@ -2301,6 +2360,58 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
     segmentManager.onChange(Set.of("some.other.config"), clusterConfigs);
     assertEquals(segmentManager.getMaxSegmentCompletionTimeMillis(), 600_000L);
+  }
+
+  @Test
+  public void testGetPartitionMetadataFromTableConfig() {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    Map<String, String> singleStreamConfigMap =
+        FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+    SegmentPartitionConfig partitionConfig = new SegmentPartitionConfig(
+        Collections.singletonMap("col", new ColumnPartitionConfig("Modulo", 4, null)));
+
+    // No SegmentPartitionConfig → null
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setStreamConfigs(singleStreamConfigMap).build();
+    assertNull(segmentManager.getPartitionMetadataFromTableConfig(tableConfig, 2, 4));
+
+    // Single-stream: perStreamNumPartitions = numPartitionGroups
+    tableConfig.getIndexingConfig().setSegmentPartitionConfig(partitionConfig);
+    SegmentPartitionMetadata metadata = segmentManager.getPartitionMetadataFromTableConfig(tableConfig, 2, 4);
+    assertNotNull(metadata);
+    ColumnPartitionMetadata colMetadata = metadata.getColumnPartitionMap().get("col");
+    assertEquals(colMetadata.getNumPartitions(), 4);
+    assertEquals(colMetadata.getPartitions(), Collections.singleton(2));
+
+    // Multi-stream, even distribution: perStreamNumPartitions = numPartitionGroups / numStreams
+    // 2 streams × 4 partitions each = 8 total partition groups
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(Arrays.asList(singleStreamConfigMap, singleStreamConfigMap)));
+    TableConfig multiStreamTableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
+            .build();
+    multiStreamTableConfig.getIndexingConfig().setSegmentPartitionConfig(partitionConfig);
+
+    // Stream 0, partition 2: Pinot partition ID = 0 * 10000 + 2 = 2
+    metadata = segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig, 2, 8);
+    assertNotNull(metadata);
+    colMetadata = metadata.getColumnPartitionMap().get("col");
+    assertEquals(colMetadata.getNumPartitions(), 4,
+        "Multi-stream partition count must be per-stream (numPartitionGroups / numStreams), not total");
+    assertEquals(colMetadata.getPartitions(), Collections.singleton(2));
+
+    // Stream 1, partition 3: Pinot partition ID = 1 * 10000 + 3 = 10003
+    int stream1Partition3 = IngestionConfigUtils.PARTITION_PADDING_OFFSET + 3;
+    metadata = segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig, stream1Partition3, 8);
+    assertNotNull(metadata);
+    colMetadata = metadata.getColumnPartitionMap().get("col");
+    assertEquals(colMetadata.getNumPartitions(), 4);
+    assertEquals(colMetadata.getPartitions(), Collections.singleton(3));
+
+    // Multi-stream, uneven distribution: numPartitionGroups not divisible by numStreams → null
+    assertNull(segmentManager.getPartitionMetadataFromTableConfig(multiStreamTableConfig, 0, 7),
+        "Uneven partition distribution across streams must return null");
   }
 
   //////////////////////////////////////////////////////////////////////////////////

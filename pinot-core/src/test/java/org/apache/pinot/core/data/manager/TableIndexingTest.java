@@ -159,7 +159,8 @@ public class TableIndexingTest {
 
   protected void createSchemas() {
     for (DataType type : DataType.values()) {
-      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT) {
+      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT
+          || type == DataType.OPEN_STRUCT) {
         continue;
       }
 
@@ -291,7 +292,7 @@ public class TableIndexingTest {
               ...
             } */
           // no params
-          indexes.put("bloom", JsonUtils.newObjectNode());
+          indexes.set("bloom", JsonUtils.newObjectNode());
 
           break;
         case "fst_index":
@@ -342,7 +343,7 @@ public class TableIndexingTest {
                  old:
                -> "tableIndexConfig": {  "invertedIndexColumns": ["uuid"], */
           // no params, has to be dictionary
-          indexes.put("inverted", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("inverted", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "json_index":
             /* json index (string or json column), should be no-dictionary
@@ -358,7 +359,7 @@ public class TableIndexingTest {
               ...
               } */
           // no params, should be no dictionary, only string or json
-          indexes.put("json", new ObjectNode(JsonNodeFactory.instance));
+          indexes.set("json", new ObjectNode(JsonNodeFactory.instance));
           break;
         case "text_index":
             /* text index

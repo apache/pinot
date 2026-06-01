@@ -391,8 +391,9 @@ public class PinotTenantRestletResource {
   private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
     try {
       LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+      // WorkloadChangeListener is not needed for tenant instance partitions update
       InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
-          instancePartitions);
+          instancePartitions, null);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions. "
           + "Reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -471,12 +472,12 @@ public class PinotTenantRestletResource {
 
     if (StateType.DISABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.disableInstance(instance)));
       }
     }
     if (StateType.ENABLE.name().equalsIgnoreCase(stateStr)) {
       for (String instance : allInstances) {
-        instanceResult.put(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
+        instanceResult.set(instance, JsonUtils.objectToJsonNode(_pinotHelixResourceManager.enableInstance(instance)));
       }
     }
     return new SuccessResponse("Changed state of tenant " + tenantName + " to " + stateStr + " successfully.");

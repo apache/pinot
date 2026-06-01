@@ -29,7 +29,6 @@ import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.fst.IFSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,12 +87,6 @@ public class LuceneIFSTIndexCreator implements FSTIndexCreator {
         }
       }
     }
-  }
-
-  public LuceneIFSTIndexCreator(IndexCreationContext context)
-      throws IOException {
-    this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
-        context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray());
   }
 
   // Expects dictionary entries in sorted order.

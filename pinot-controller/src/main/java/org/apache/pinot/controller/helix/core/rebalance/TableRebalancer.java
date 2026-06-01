@@ -80,6 +80,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -160,6 +161,7 @@ public class TableRebalancer {
   private final RebalancePreChecker _rebalancePreChecker;
   private final TableSizeReader _tableSizeReader;
   private final PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+  private QueryWorkloadManager _queryWorkloadManager;
 
   public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
       @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
@@ -174,8 +176,22 @@ public class TableRebalancer {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
   }
 
+  public TableRebalancer(HelixManager helixManager, @Nullable TableRebalanceObserver tableRebalanceObserver,
+      @Nullable ControllerMetrics controllerMetrics, @Nullable RebalancePreChecker rebalancePreChecker,
+      @Nullable TableSizeReader tableSizeReader,
+      @Nullable PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager,
+      @Nullable QueryWorkloadManager queryWorkloadManager) {
+    this(helixManager, tableRebalanceObserver, controllerMetrics, rebalancePreChecker, tableSizeReader,
+        pinotLLCRealtimeSegmentManager);
+    _queryWorkloadManager = queryWorkloadManager;
+  }
+
   public TableRebalancer(HelixManager helixManager) {
     this(helixManager, null, null, null, null, null);
+  }
+
+  public TableRebalancer(HelixManager helixManager, @Nullable QueryWorkloadManager queryWorkloadManager) {
+    this(helixManager, null, null, null, null, null, queryWorkloadManager);
   }
 
   public static String createUniqueRebalanceJobIdentifier() {
@@ -1281,7 +1297,7 @@ public class TableRebalancer {
           if (!dryRun && !instancePartitionsUnchanged) {
             tableRebalanceLogger.info("Persisting instance partitions: {} to ZK", instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
-                instancePartitions);
+                instancePartitions, _queryWorkloadManager);
           }
         } else {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
@@ -1298,7 +1314,7 @@ public class TableRebalancer {
               tableRebalanceLogger.info("Persisting instance partitions: {} (based on {})", instancePartitions,
                   preConfiguredInstancePartitions);
               InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
-                  instancePartitions);
+                  instancePartitions, _queryWorkloadManager);
             }
           } else {
             instancePartitions =
@@ -1309,7 +1325,7 @@ public class TableRebalancer {
               tableRebalanceLogger.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
                   referenceInstancePartitionsName);
               InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
-                  instancePartitions);
+                  instancePartitions, _queryWorkloadManager);
             }
           }
         }
@@ -1419,7 +1435,8 @@ public class TableRebalancer {
         boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
         if (!dryRun && !instancePartitionsUnchanged) {
           tableRebalanceLogger.info("Persisting instance partitions: {} to ZK", instancePartitions);
-          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions,
+              _queryWorkloadManager);
         }
         return Pair.of(instancePartitions, instancePartitionsUnchanged);
       }
@@ -1852,9 +1869,9 @@ public class TableRebalancer {
    *         all segments that fall in that category
    */
   private static Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
-  getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher) {
+      getCurrentAndTargetInstancesToPartitionIdToCurrentAssignmentMap(
+          Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
+          Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher) {
     Map<Pair<Set<String>, Set<String>>, Map<Integer, Map<String, Map<String, String>>>>
         currentAndTargetInstancesToPartitionIdToCurrentAssignmentMap = new HashMap<>();
 

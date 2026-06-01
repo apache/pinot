@@ -60,7 +60,7 @@ public class ThriftRecordReader implements RecordReader {
     TBase tObject;
     try {
       _thriftClass = this.getClass().getClassLoader().loadClass(recordReaderConfig.getThriftClass());
-      tObject = (TBase) _thriftClass.newInstance();
+      tObject = (TBase) _thriftClass.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -108,7 +108,7 @@ public class ThriftRecordReader implements RecordReader {
       throws IOException {
     TBase tObject;
     try {
-      tObject = (TBase) _thriftClass.newInstance();
+      tObject = (TBase) _thriftClass.getDeclaredConstructor().newInstance();
       tObject.read(_tProtocol);
     } catch (Exception e) {
       throw new RecordFetchException("Caught exception while reading thrift object", e);

@@ -72,6 +72,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -116,7 +117,7 @@ import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -219,9 +220,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
-    _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
-        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
-            : NetUtils.getHostAddress());
+    _hostname = getServerHostname(_serverConf);
     // Override multi-stage query runner hostname if not set explicitly
     if (!_serverConf.containsKey(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
       _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
@@ -321,6 +320,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
    */
   protected QueryOperatorFactoryProvider createQueryOperatorFactoryProvider(PinotConfiguration serverConf) {
     return DefaultQueryOperatorFactoryProvider.INSTANCE;
+  }
+
+  @VisibleForTesting
+  static String getServerHostname(PinotConfiguration serverConf)
+      throws IOException {
+    String configuredHost = serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST);
+    if (configuredHost != null) {
+      return configuredHost;
+    }
+    return serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
+        : NetUtils.getHostAddress();
   }
 
   /**
@@ -754,7 +764,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // because it might be used by the accountant.
     PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_serverConf,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
-    WorkloadBudgetManager.set(createWorkloadBudgetManager(accountingConfig));
+    WorkloadBudgetManagerFactory.register(accountingConfig);
     _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
@@ -767,7 +777,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
             _threadAccountant, sendStatsPredicate, keepPipelineBreakerStatsPredicate, _reloadJobStatusCache);
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+    instanceDataManager.setSupplierOfIsServerReadyToConsumeData(this::isServerReadyToConsumeData);
+    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(this::isServerReadyToServeQueries);
 
     // Enable Server level realtime ingestion rate limier
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, _serverMetrics);
@@ -777,7 +788,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager, _transitionThreadPoolManager);
+        createSegmentOnlineOfflineStateModelFactory(instanceDataManager, _transitionThreadPoolManager);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
     // Start the data manager as a pre-connect callback so that it starts after connecting to the ZK in order to access
@@ -788,6 +799,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     updateInstanceConfigIfNeeded(serverConf);
+
+    // Get all workload budgets this instance should support (must be done after HelixManager is connected)
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _helixManager,
+        status -> _serverMetrics.setValueOfGlobalGauge(ServerGauge.WORKLOAD_CONFIG_FETCH_STATUS, status));
 
     // Start a background task to monitor Helix message count
     int refreshIntervalSeconds = _serverConf.getProperty(Server.CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS,
@@ -849,7 +864,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
+        createSegmentMessageHandlerFactory(instanceDataManager, _serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
@@ -946,6 +961,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     NettyInspector.registerMetrics(_serverMetrics);
   }
 
+  protected boolean isServerReadyToConsumeData() {
+    return true;
+  }
+
+  protected boolean isServerReadyToServeQueries() {
+    return _isServerReadyToServeQueries;
+  }
+
   protected SegmentOperationsThrottler createMultiColumnIndexPreprocessThrottler() {
     int maxConcurrency = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_MULTICOL_TEXT_INDEX_PREPROCESS_PARALLELISM,
@@ -1005,13 +1028,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
    */
   protected void preServeQueries() {
     _segmentOperationsThrottlerSet.startServingQueries();
-  }
-
-  /**
-   * Can be overridden to create a custom WorkloadBudgetManager.
-   */
-  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
-    return new WorkloadBudgetManager(config);
   }
 
   @Override
@@ -1253,6 +1269,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _reloadJobStatusCache, _serverConf);
+  }
+
+  /**
+   * Creates the {@link SegmentMessageHandlerFactory} used to handle user-defined Helix messages for segments.
+   * Subclasses can override to return a custom factory that handles additional message sub-types.
+   */
+  protected SegmentMessageHandlerFactory createSegmentMessageHandlerFactory(InstanceDataManager instanceDataManager,
+      ServerMetrics serverMetrics) {
+    return new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
+  }
+
+  /**
+   * Creates the {@link SegmentOnlineOfflineStateModelFactory} used to handle Helix state transitions for segments.
+   * Subclasses can override to return a custom factory.
+   */
+  protected SegmentOnlineOfflineStateModelFactory createSegmentOnlineOfflineStateModelFactory(
+      InstanceDataManager instanceDataManager, StateTransitionThreadPoolManager transitionThreadPoolManager) {
+    return new SegmentOnlineOfflineStateModelFactory(instanceDataManager, transitionThreadPoolManager);
   }
 
   private void refreshMessageCount() {

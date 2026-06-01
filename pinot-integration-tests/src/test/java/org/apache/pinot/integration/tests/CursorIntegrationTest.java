@@ -26,11 +26,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
-import org.apache.pinot.controller.cursors.ResponseStoreCleaner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -63,11 +61,6 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
       "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
 
   private static int _resultSize;
-
-  @Override
-  protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
-  }
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
@@ -122,6 +115,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     return getBrokerGetAllResponseStoresApiUrl(brokerBaseApiUrl) + "/" + requestId;
   }
 
+  protected String getBrokerDeleteExpiredResponseStoresApiUrl(String brokerBaseApiUrl, long expiredBeforeMs) {
+    return getBrokerGetAllResponseStoresApiUrl(brokerBaseApiUrl) + "?expiredBefore=" + expiredBeforeMs;
+  }
+
   protected String getCursorQueryProperties(int numRows) {
     return String.format("?getCursor=true&numRows=%d", numRows);
   }
@@ -136,6 +133,22 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
   protected Map<String, String> getHeaders() {
     return Collections.emptyMap();
+  }
+
+  /**
+   * Deletes all cursor responses currently in the broker's response store.
+   * Call at the start of tests that need a known clean state.
+   */
+  protected void deleteAllResponses()
+      throws Exception {
+    List<CursorResponseNative> responses = JsonUtils.stringToObject(
+        ClusterTest.sendGetRequest(getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
+        new TypeReference<>() {
+        });
+    for (CursorResponseNative response : responses) {
+      ClusterTest.sendDeleteRequest(
+          getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), response.getRequestId()), getHeaders());
+    }
   }
 
   /*
@@ -168,18 +181,22 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     if (!pinotPagingResponse.getExceptions().isEmpty()) {
       throw new RuntimeException("Got Exceptions from Query Response: " + pinotPagingResponse.getExceptions().get(0));
     }
-    List<CursorResponse> resultPages = getAllResultPages(queryResourceUrl, headers, pinotPagingResponse, _resultSize);
+    String requestId = pinotPagingResponse.getRequestId();
+    try {
+      List<CursorResponse> resultPages = getAllResultPages(queryResourceUrl, headers, pinotPagingResponse, _resultSize);
 
-    int brokerPagingResponseSize = 0;
-    for (CursorResponse response : resultPages) {
-      brokerPagingResponseSize += response.getNumRows();
-    }
+      int brokerPagingResponseSize = 0;
+      for (CursorResponse response : resultPages) {
+        brokerPagingResponseSize += response.getNumRows();
+      }
 
-    // Compare the number of rows.
-    if (brokerResponseSize != brokerPagingResponseSize) {
-      throw new RuntimeException(
-          "Pinot # of rows from paging API " + brokerPagingResponseSize + " doesn't match # of rows from default API "
-              + brokerResponseSize);
+      if (brokerResponseSize != brokerPagingResponseSize) {
+        throw new RuntimeException(
+            "Pinot # of rows from paging API " + brokerPagingResponseSize
+                + " doesn't match # of rows from default API " + brokerResponseSize);
+      }
+    } finally {
+      ClusterTest.sendDeleteRequest(getBrokerDeleteResponseStoresApiUrl(queryResourceUrl, requestId), headers);
     }
   }
 
@@ -265,9 +282,16 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testGetAndDelete()
       throws Exception {
+    deleteAllResponses();
+
     _resultSize = 100000;
-    testQuery(TEST_QUERY_ONE);
-    testQuery(TEST_QUERY_TWO);
+    // Create responses directly (don't use testQuery which auto-cleans)
+    ClusterTest.postQuery(TEST_QUERY_ONE,
+        ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine())
+            + getCursorQueryProperties(_resultSize), getHeaders(), getExtraQueryProperties());
+    ClusterTest.postQuery(TEST_QUERY_TWO,
+        ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine())
+            + getCursorQueryProperties(_resultSize), getHeaders(), getExtraQueryProperties());
 
     List<CursorResponseNative> requestIds = JsonUtils.stringToObject(
         ClusterTest.sendGetRequest(getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
@@ -288,6 +312,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
     Assert.assertEquals(requestIds.size(), 1);
     Assert.assertNotEquals(requestIds.get(0).getRequestId(), deleteRequestId);
+
+    // Clean up the surviving response
+    ClusterTest.sendDeleteRequest(
+        getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), requestIds.get(0).getRequestId()), getHeaders());
   }
 
   @Test
@@ -327,6 +355,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     // Rows in the current response should be 0
     Assert.assertEquals(pinotResponse.get("numRows").asInt(), 0);
     Assert.assertTrue(pinotResponse.get("exceptions").isEmpty());
+
+    // Clean up the stored response
+    String requestId = pinotResponse.get("requestId").asText();
+    ClusterTest.sendDeleteRequest(getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), requestId), getHeaders());
   }
 
   @DataProvider(name = "InvalidOffsetQueryProvider")
@@ -344,9 +376,14 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
             + getCursorQueryProperties(_resultSize), getHeaders(), getExtraQueryProperties()),
         CursorResponseNative.class);
     Assert.assertTrue(pinotPagingResponse.getExceptions().isEmpty());
-    ClusterTest.sendGetRequest(
-        getBrokerResponseApiUrl(getBrokerBaseApiUrl(), pinotPagingResponse.getRequestId()) + getCursorOffset(
-            pinotPagingResponse.getNumRowsResultSet() + 1), getHeaders());
+    try {
+      ClusterTest.sendGetRequest(
+          getBrokerResponseApiUrl(getBrokerBaseApiUrl(), pinotPagingResponse.getRequestId()) + getCursorOffset(
+              pinotPagingResponse.getNumRowsResultSet() + 1), getHeaders());
+    } finally {
+      ClusterTest.sendDeleteRequest(
+          getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), pinotPagingResponse.getRequestId()), getHeaders());
+    }
   }
 
   @Test
@@ -366,60 +403,66 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testResponseStoreCleaner()
+  public void testDeleteExpiredResponses()
       throws Exception {
-    List<CursorResponseNative> requestIds = JsonUtils.stringToObject(
-        ClusterTest.sendGetRequest(getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
-        new TypeReference<>() {
-        });
-
-    int numQueryResults = requestIds.size();
+    // Establish clean state so count-based assertions are deterministic
+    deleteAllResponses();
 
     _resultSize = 100000;
-    this.testQuery(TEST_QUERY_ONE);
+    // Post queries directly instead of via testQuery(), which deletes its cursor response after completion.
+    ClusterTest.postQuery(TEST_QUERY_ONE,
+        ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine())
+            + getCursorQueryProperties(_resultSize), getHeaders(), getExtraQueryProperties());
     // Sleep so that both the queries do not have the same submission time.
     Thread.sleep(50);
-    this.testQuery(TEST_QUERY_TWO);
+    ClusterTest.postQuery(TEST_QUERY_TWO,
+        ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine())
+            + getCursorQueryProperties(_resultSize), getHeaders(), getExtraQueryProperties());
 
-    requestIds = JsonUtils.stringToObject(
+    List<CursorResponseNative> responsesAfter = JsonUtils.stringToObject(
         ClusterTest.sendGetRequest(getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
         new TypeReference<>() {
         });
+    Assert.assertEquals(responsesAfter.size(), 2, "Expected exactly 2 responses after clean start");
 
-    int numQueryResultsAfter = requestIds.size();
-    Assert.assertEquals(requestIds.size() - numQueryResults, 2);
+    CursorResponseNative cursorResponse0 = responsesAfter.get(0);
+    CursorResponseNative cursorResponse1 = responsesAfter.get(1);
 
-    CursorResponseNative cursorResponse0 = JsonUtils.stringToObject(
-        ClusterTest.sendGetRequest(getBrokerResponseApiUrl(getBrokerBaseApiUrl(), requestIds.get(0).getRequestId()),
-            getHeaders()), new TypeReference<>() {
-        });
-
-    CursorResponseNative cursorResponse1 = JsonUtils.stringToObject(
-        ClusterTest.sendGetRequest(getBrokerResponseApiUrl(getBrokerBaseApiUrl(), requestIds.get(1).getRequestId()),
-            getHeaders()), new TypeReference<>() {
-        });
-
-    // Get the lower submission time.
     long expirationTime0 = cursorResponse0.getExpirationTimeMs();
     long expirationTime1 = cursorResponse1.getExpirationTimeMs();
+    Assert.assertNotEquals(expirationTime0, expirationTime1,
+        "Expiration timestamps must differ for this test to be deterministic");
+    long cutoffMs = Math.min(expirationTime0, expirationTime1);
 
-    Properties perodicTaskProperties = new Properties();
-    perodicTaskProperties.setProperty("requestId", "CursorIntegrationTest");
-    perodicTaskProperties.setProperty(ResponseStoreCleaner.CLEAN_AT_TIME,
-        Long.toString(Math.min(expirationTime0, expirationTime1)));
-    _controllerStarter.getPeriodicTaskScheduler().scheduleNow("ResponseStoreCleaner", perodicTaskProperties);
+    // Call the broker's batch delete endpoint
+    ClusterTest.sendDeleteRequest(
+        getBrokerDeleteExpiredResponseStoresApiUrl(getBrokerBaseApiUrl(), cutoffMs), getHeaders());
 
-    // The periodic task is run in an executor thread. Give the thread some time to run the cleaner.
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        List<CursorResponse> getNumQueryResults = JsonUtils.stringToObject(
-            ClusterTest.sendGetRequest(getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
-            List.class);
-        return getNumQueryResults.size() < numQueryResultsAfter;
-      } catch (Exception e) {
-        LOGGER.error(e.getMessage());
-        return false;
-      }
-    }, 500L, 100_000L, "Failed to load delete query results");
+    // Verify exactly one of the two responses was deleted
+    List<CursorResponseNative> remaining = JsonUtils.stringToObject(
+        ClusterTest.sendGetRequest(getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
+        new TypeReference<>() {
+        });
+    Assert.assertEquals(remaining.size(), 1,
+        "Expected exactly one response to be deleted by batch delete");
+
+    // Verify the response with the higher expiration survived
+    String survivorId = (expirationTime0 > expirationTime1)
+        ? cursorResponse0.getRequestId() : cursorResponse1.getRequestId();
+    Assert.assertEquals(remaining.get(0).getRequestId(), survivorId,
+        "Response with higher expirationTimeMs should survive batch delete");
+
+    // Clean up the survivor
+    ClusterTest.sendDeleteRequest(
+        getBrokerDeleteResponseStoresApiUrl(getBrokerBaseApiUrl(), survivorId), getHeaders());
+  }
+
+  @Test
+  public void testDeleteExpiredResponsesWithoutExpiredBeforeQueryParam()
+      throws Exception {
+    deleteAllResponses();
+    String result = ClusterTest.sendDeleteRequest(
+        getBrokerGetAllResponseStoresApiUrl(getBrokerBaseApiUrl()), getHeaders());
+    Assert.assertTrue(result.contains("Deleted"), result);
   }
 }

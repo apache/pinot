@@ -46,6 +46,7 @@ import org.apache.pinot.query.runtime.KeepPipelineBreakerStatsPredicate;
 import org.apache.pinot.query.runtime.SendStatsPredicate;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottlerSet;
 import org.apache.pinot.segment.local.utils.ServerReloadJobStatusCache;
+import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
@@ -107,10 +108,11 @@ public class ServerInstance {
     _instanceDataManager.init(serverConf.getInstanceDataManagerConfig(), helixManager, _serverMetrics,
         segmentOperationsThrottlerSet, _reloadJobStatusCache);
 
-    // Initialize ServerQueryLogger and FunctionRegistry before starting the query executor
+    // Initialize ServerQueryLogger, FunctionRegistry and PartitionFunctionFactory before starting the query executor
     ServerQueryLogger.init(serverConf.getQueryLogMaxRate(), serverConf.getQueryLogDroppedReportMaxRate(),
         _serverMetrics);
     FunctionRegistry.init();
+    PartitionFunctionFactory.init();
     String queryExecutorClassName = serverConf.getQueryExecutorClassName();
     LOGGER.info("Initializing query executor of class: {}", queryExecutorClassName);
     _queryExecutor = PluginManager.get().createInstance(queryExecutorClassName);

@@ -65,6 +65,18 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   ADAPTIVE_SERVER_SELECTOR_TYPE("adaptiveServerSelectorType", true),
 
   /**
+   * Per-server adaptive routing stats exported as metrics (SSE / single-stage engine).
+   */
+  ADAPTIVE_SERVER_NUM_IN_FLIGHT_REQUESTS("adaptiveServerNumInFlightRequests", false),
+  ADAPTIVE_SERVER_LATENCY_EMA("adaptiveServerLatencyEma", false),
+  ADAPTIVE_SERVER_HYBRID_SCORE("adaptiveServerHybridScore", false),
+
+  /**
+   * Per-server adaptive routing stats exported as metrics (MSE / multi-stage engine).
+   */
+  ADAPTIVE_SERVER_MSE_NUM_IN_FLIGHT_REQUESTS("adaptiveServerMseNumInFlightRequests", false),
+
+  /**
    * The queue size of ServerRoutingStatsManager main executor service.
    */
   ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),
@@ -99,6 +111,10 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
   MAILBOX_SERVER_CHUNK_SIZE("bytes", true),
 
+  // MailboxService gRPC client (outbound to peer mailboxes) memory metrics
+  MAILBOX_CLIENT_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_CLIENT_USED_HEAP_MEMORY("bytes", true),
+
   /// Exports the max amount of direct memory that can be allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.maxDirectMemory()
   ///
@@ -106,7 +122,14 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   GRPC_TOTAL_MAX_DIRECT_MEMORY("bytes", true),
   /// Exports the total amount of direct memory allocated by the shaded Netty code used by gRPC
   /// It is basically an adaptor for io.grpc.netty.shaded.io.netty.util.internal.PlatformDependent.usedDirectMemory()
-  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true);
+  GRPC_TOTAL_USED_DIRECT_MEMORY("bytes", true),
+  /// Number of MV definition+runtime entries the broker currently holds in
+  /// `MaterializedViewMetadataCache`.  Operators monitor this to confirm the cache is not
+  /// growing unboundedly: a cluster with K MVs should plateau near K; sustained growth
+  /// signals a leak in the ZK listener / drop path.
+  MATERIALIZED_VIEW_CACHE_ENTRY_COUNT("materializedViewCacheEntries", true),
+  // Workload config fetch status: 1 = success, 0 = failure
+  WORKLOAD_CONFIG_FETCH_STATUS("status", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

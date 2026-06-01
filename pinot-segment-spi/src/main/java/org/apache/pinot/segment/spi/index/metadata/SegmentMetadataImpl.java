@@ -74,9 +74,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
-  private final TreeMap<String, ColumnMetadataImpl> _columnMetadataMap;
-  private String _segmentName;
+  private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
   private final Schema _schema;
+  private String _segmentName;
+  private int _totalDocs;
+  private SegmentVersion _segmentVersion;
+  private String _creatorName;
   private long _crc = Long.MIN_VALUE;
   private long _dataCrc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
@@ -89,10 +92,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentEndTime = Long.MIN_VALUE;
   private Interval _timeInterval;
 
-  private SegmentVersion _segmentVersion;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList;
-  private String _creatorName;
-  private int _totalDocs;
   private final Map<String, String> _customMap = new HashMap<>();
 
   // Fields specific to realtime table
@@ -117,7 +117,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         CommonsConfigurationUtils.fromInputStream(metadataPropertiesInputStream);
     init(segmentMetadataPropertiesConfiguration);
     setTimeInfo(segmentMetadataPropertiesConfiguration);
-    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
 
     loadCreationMeta(creationMetaInputStream);
   }
@@ -137,7 +136,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     init(segmentMetadataPropertiesConfiguration);
     setTimeInfo(segmentMetadataPropertiesConfiguration);
-    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
 
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     if (creationMetaFile != null) {
@@ -218,13 +216,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private void init(PropertiesConfiguration segmentMetadata)
       throws ConfigurationException {
-    if (segmentMetadata.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
-      _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION);
-    }
+    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
+    _totalDocs = segmentMetadata.getInt(Segment.SEGMENT_TOTAL_DOCS);
+    _segmentVersion = segmentMetadata.getEnum(Segment.SEGMENT_VERSION, SegmentVersion.class, SegmentVersion.v1);
+    _creatorName = segmentMetadata.getString(Segment.SEGMENT_CREATOR_VERSION, null);
 
-    String versionString =
-        segmentMetadata.getString(Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
-    _segmentVersion = SegmentVersion.valueOf(versionString);
+    // Set the table name (for backward compatibility)
+    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
+    if (tableName != null) {
+      _rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    }
 
     // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
     // NOTE: getList() will always return an non-null List with trimmed strings:
@@ -237,41 +238,43 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     addPhysicalColumns(segmentMetadata.getList(Segment.DATETIME_COLUMNS), physicalColumns);
     addPhysicalColumns(segmentMetadata.getList(Segment.COMPLEX_COLUMNS), physicalColumns);
 
-    // Set the table name (for backward compatibility)
-    String tableName = segmentMetadata.getString(Segment.TABLE_NAME);
-    if (tableName != null) {
-      _rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    }
+    // Build column metadata map and schema. Empty segments use a stripped-down [EmptyColumnMetadata] since the
+    // shape stats (cardinality, element lengths, etc.) are meaningless when there are no rows.
+    if (_totalDocs > 0) {
+      for (String column : physicalColumns) {
+        ColumnMetadata columnMetadata =
+            ColumnMetadataImpl.fromPropertiesConfiguration(segmentMetadata, _totalDocs, column);
+        _columnMetadataMap.put(column, columnMetadata);
+        _schema.addField(columnMetadata.getFieldSpec());
+      }
 
-    // Set segment name.
-    _segmentName = segmentMetadata.getString(Segment.SEGMENT_NAME);
-
-    // Build column metadata map and schema.
-    for (String column : physicalColumns) {
-      ColumnMetadataImpl columnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadata);
-      _columnMetadataMap.put(column, columnMetadata);
-      _schema.addField(columnMetadata.getFieldSpec());
-    }
-
-    // Load index metadata
-    // Support V3 (e.g. SingleFileIndexDirectory only)
-    if (_segmentVersion == SegmentVersion.v3) {
-      File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
-      if (indexMapFile.exists()) {
-        IndexService indexService = IndexService.getInstance();
-
-        PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
-        for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
-          try {
-            String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
-            if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
-              short indexType = indexService.getNumericId(parsedKeys[1]);
-              _columnMetadataMap.get(parsedKeys[0]).addIndexSize(indexType, mapConfig.getLong(key));
+      // Load index metadata
+      // Support V3 (e.g. SingleFileIndexDirectory only). Skip for empty segments — there is no payload to size up,
+      // and [EmptyColumnMetadata] does not support `addIndexSize`.
+      if (_segmentVersion == SegmentVersion.v3) {
+        File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
+        if (indexMapFile.exists()) {
+          IndexService indexService = IndexService.getInstance();
+          PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
+          for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
+            try {
+              String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
+              if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
+                short indexType = indexService.getNumericId(parsedKeys[1]);
+                ((ColumnMetadataImpl) _columnMetadataMap.get(parsedKeys[0])).addIndexSize(indexType,
+                    mapConfig.getLong(key));
+              }
+            } catch (Exception e) {
+              LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);
             }
-          } catch (Exception e) {
-            LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);
           }
         }
+      }
+    } else {
+      for (String column : physicalColumns) {
+        ColumnMetadata columnMetadata = EmptyColumnMetadata.fromPropertiesConfiguration(segmentMetadata, column);
+        _columnMetadataMap.put(column, columnMetadata);
+        _schema.addField(columnMetadata.getFieldSpec());
       }
     }
 
@@ -492,7 +495,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    return (TreeMap<String, ColumnMetadata>) (TreeMap<String, ?>) _columnMetadataMap;
+    return _columnMetadataMap;
   }
 
   @Override
@@ -547,7 +550,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     if (_columnMetadataMap != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      for (Map.Entry<String, ColumnMetadataImpl> entry : _columnMetadataMap.entrySet()) {
+      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
         if (columnFilter == null || columnFilter.contains(entry.getKey())) {
           columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
         }

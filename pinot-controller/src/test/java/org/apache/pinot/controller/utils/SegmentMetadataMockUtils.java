@@ -23,10 +23,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.partition.function.MurmurPartitionFunction;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.partition.MurmurPartitionFunction;
 import org.joda.time.Interval;
 import org.mockito.Mockito;
 
@@ -84,12 +84,26 @@ public class SegmentMetadataMockUtils {
     return segmentZKMetadata;
   }
 
+  public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,
+      String crc, long startTime, long endTime, TimeUnit timeUnit, String partitionColumn, int partitionId,
+      int numPartitions) {
+    SegmentMetadata segmentMetadata =
+        mockSegmentMetadata(tableName, segmentName, numTotalDocs, crc, startTime, endTime, timeUnit);
+    ColumnMetadata colMeta = mock(ColumnMetadata.class);
+    when(colMeta.getPartitions()).thenReturn(Collections.singleton(partitionId));
+    when(colMeta.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(numPartitions, null));
+    TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
+    columnMetadataMap.put(partitionColumn, colMeta);
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    return segmentMetadata;
+  }
+
   public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String rawTableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     Set<Integer> partitions = Collections.singleton(partitionNumber);
     when(columnMetadata.getPartitions()).thenReturn(partitions);
-    when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5));
+    when(columnMetadata.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(5, null));
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     if (columnName != null) {

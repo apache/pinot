@@ -20,8 +20,9 @@
 package org.apache.pinot.controller.recommender.rules.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.io.Files;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.ConfigManager;
@@ -82,7 +83,12 @@ public class SegmentSizeRule extends AbstractRule {
         && segmentSizeRuleParams.getNumRowsInActualSegment() == RecommenderConstants.SegmentSizeRule.NOT_PROVIDED) {
 
       // generate a segment
-      File workingDir = Files.createTempDir();
+      File workingDir;
+      try {
+        workingDir = Files.createTempDirectory("pinot-segment-size-").toFile();
+      } catch (IOException e) {
+        throw new InvalidInputException("Failed to create temp directory for segment sizing", e);
+      }
       try {
         TableConfig tableConfig = createTableConfig(_input.getSchema());
         int numRowsInGeneratedSegment = segmentSizeRuleParams.getNumRowsInGeneratedSegment();

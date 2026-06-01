@@ -88,6 +88,7 @@ public class TypeFactoryTest {
         case LIST:
         case STRUCT:
         case MAP:
+        case OPEN_STRUCT:
         case UNKNOWN:
           continue;
         default:

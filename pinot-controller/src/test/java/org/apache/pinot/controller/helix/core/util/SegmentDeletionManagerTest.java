@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
-import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -230,7 +230,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     FakeDeletionManager deletionManager = new FakeDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, propertyStore, 7);
@@ -351,23 +351,23 @@ public class SegmentDeletionManagerTest {
 
     // All files should get deleted but the directory will be deleted in the next run
     TestUtils.waitForCondition((aVoid) -> {
-          try {
-            return pinotFS.listFiles(tableUri2, false).length == 0;
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }, 1000, 10000,
+      try {
+        return pinotFS.listFiles(tableUri2, false).length == 0;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000,
         "Could not delete all the files for table_2");
     Assert.assertTrue(pinotFS.exists(tableUri2));
 
     // One file that doesn't meet retention criteria, and another file due to the per attempt batch limit remains.
     TestUtils.waitForCondition((aVoid) -> {
-          try {
-            return pinotFS.listFiles(tableUri1, false).length == 2;
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }, 1000, 10000,
+      try {
+        return pinotFS.listFiles(tableUri1, false).length == 2;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000,
         "100 out of 102 files could not be deleted from tableUri1 directory");
 
     // the next run of the deletion manager should remove the empty directory as well.
@@ -385,7 +385,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
@@ -441,7 +441,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
@@ -510,7 +510,7 @@ public class SegmentDeletionManagerTest {
 
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
-    File tempDir = Files.createTempDir();
+    File tempDir = Files.createTempDirectory("pinot-test-").toFile();
     tempDir.deleteOnExit();
     SegmentDeletionManager deletionManager = new SegmentDeletionManager(
         tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);

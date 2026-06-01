@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
@@ -42,6 +43,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.ws.rs.BadRequestException;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -176,6 +178,7 @@ public class PinotClientRequest {
   @ApiOperation(value = "Querying pinot")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 400, message = "Bad Request"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   @ManualAuthorization
@@ -187,15 +190,23 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       if (!requestJson.has(Request.SQL)) {
-        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+        throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+    } catch (BadRequestException bre) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      asyncResponse.resume(bre);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -219,6 +230,7 @@ public class PinotClientRequest {
           + "Supports both single-stage and multi-stage queries.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query fingerprint"),
+      @ApiResponse(code = 400, message = "Bad Request"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   @ManualAuthorization
@@ -226,19 +238,66 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       if (!requestJson.has(Request.SQL)) {
-        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+        throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
 
       QueryFingerprint fingerprint = generateQueryFingerprint((ObjectNode) requestJson);
 
       return Response.ok(fingerprint).build();
+    } catch (BadRequestException bre) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      throw bre;
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while generating query fingerprint for POST request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      ObjectNode errorJson = JsonUtils.newObjectNode();
+      errorJson.put("error", e.getMessage());
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(errorJson.toString())
+          .build();
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/sql/validateSyntax")
+  @ApiOperation(value = "Validate the syntax of a SQL query without executing it",
+      notes = "Parses the query using Pinot's Calcite-based SQL parser. No table metadata or "
+          + "schema validation is performed, and the query is not executed. Supports both "
+          + "single-stage and multi-stage queries. Returns HTTP 200 in both the valid and invalid "
+          + "cases; clients should inspect the `valid` field of the response body.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Syntax validation result"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  @ManualAuthorization
+  public Response validateSqlSyntax(String query,
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      if (!requestJson.has(Request.SQL)) {
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("{\"error\": \"Payload is missing the query string field 'sql'\"}")
+            .build();
+      }
+      return Response.ok(validateSqlSyntax((ObjectNode) requestJson)).build();
+    } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
+      throw wae;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while validating SQL syntax for POST request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity("{\"error\": \"" + e.getMessage() + "\"}")
@@ -284,6 +343,7 @@ public class PinotClientRequest {
   @ApiOperation(value = "Querying pinot using MultiStage Query Engine")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 400, message = "Bad Request"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   @ManualAuthorization
@@ -295,15 +355,23 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       if (!requestJson.has(Request.SQL)) {
-        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+        throw new BadRequestException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+    } catch (BadRequestException bre) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      asyncResponse.resume(bre);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -324,27 +392,32 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/timeseries")
   @ApiOperation(value = "Query Pinot using the Time Series Engine")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Query response"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
   @ManualAuthorization
   public void processTimeSeriesQueryEngine(JsonNode requestJson, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestCtx, @Context HttpHeaders httpHeaders) {
     try {
       if (!requestJson.has(Request.QUERY)) {
-        throw new IllegalStateException("Payload is missing the query string field 'query'");
+        throw new BadRequestException("Payload is missing the query string field 'query'");
       }
       String language = requestJson.has(Request.LANGUAGE) ? requestJson.get(Request.LANGUAGE).asText() : null;
       String queryString = requestJson.get(Request.QUERY).asText();
       Map<String, String> queryParams = new HashMap<>();
-      requestJson.fields().forEachRemaining(entry -> {
-          if (entry.getValue().isTextual()) {
-            queryParams.put(entry.getKey(), entry.getValue().asText());
-          } else {
-            queryParams.put(entry.getKey(), entry.getValue().toString());
-          }
+      requestJson.properties().forEach(entry -> {
+        if (entry.getValue().isTextual()) {
+          queryParams.put(entry.getKey(), entry.getValue().asText());
+        } else {
+          queryParams.put(entry.getKey(), entry.getValue().toString());
+        }
       });
 
       if (isExplainMode(requestJson)) {
         BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
-          queryParams);
+            queryParams);
         asyncResponse.resume(explainResponse);
         return;
       }
@@ -354,6 +427,12 @@ public class PinotClientRequest {
             requestContext, makeHttpIdentity(requestCtx), httpHeaders);
         asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock));
       }
+    } catch (BadRequestException bre) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      asyncResponse.resume(bre);
+    } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
+      asyncResponse.resume(wae);
     } catch (QueryException e) {
       asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
     } catch (Exception e) {
@@ -378,7 +457,7 @@ public class PinotClientRequest {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, Map.of(), requestContext,
-          makeHttpIdentity(requestCtx), httpHeaders);
+            makeHttpIdentity(requestCtx), httpHeaders);
         PinotBrokerTimeSeriesResponse response = PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(timeSeriesBlock);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());
@@ -417,6 +496,7 @@ public class PinotClientRequest {
       + "the two query engines.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query result comparison response"),
+      @ApiResponse(code = 400, message = "Bad Request"),
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   @ManualAuthorization
@@ -424,13 +504,18 @@ public class PinotClientRequest {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
-      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      JsonNode requestJson;
+      try {
+        requestJson = JsonUtils.stringToJsonNode(query);
+      } catch (JsonProcessingException e) {
+        throw new BadRequestException("Invalid JSON: " + e.getMessage(), e);
+      }
       String v1Query;
       String v2Query;
 
       if (!requestJson.has(Request.SQL)) {
         if (!requestJson.has(Request.SQL_V1) || !requestJson.has(Request.SQL_V2)) {
-          throw new IllegalStateException("Payload should either contain the query string field '" + Request.SQL + "' "
+          throw new BadRequestException("Payload should either contain the query string field '" + Request.SQL + "' "
               + "or both of '" + Request.SQL_V1 + "' and '" + Request.SQL_V2 + "'");
         } else {
           v1Query = requestJson.get(Request.SQL_V1).asText();
@@ -472,10 +557,15 @@ public class PinotClientRequest {
       CompletableFuture.allOf(v1Response, v2Response).join();
 
       asyncResponse.resume(getPinotQueryComparisonResponse(v1Query, v1Response.get(), v2Response.get()));
+    } catch (BadRequestException bre) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      asyncResponse.resume(bre);
     } catch (WebApplicationException wae) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       asyncResponse.resume(
           new WebApplicationException(e,
               Response
@@ -493,8 +583,10 @@ public class PinotClientRequest {
       + "given id on the requested broker. Query may continue to run for a short while after calling cancel as "
       + "it's done in a non-blocking manner. The cancel method can be called multiple times.")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
-      @ApiResponse(code = 404, message = "Query not found on the requested broker")
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Query not found on the requested broker"),
+      @ApiResponse(code = 500, message = "Internal server error")
   })
   public String cancelQuery(
       @ApiParam(value = "Query id", required = true) @PathParam("id") String id,
@@ -525,7 +617,8 @@ public class PinotClientRequest {
         }
       }
     } catch (NumberFormatException e) {
-      Response.status(Response.Status.BAD_REQUEST).entity(String.format("Invalid internal query id: %s", id));
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      throw new BadRequestException(String.format("Invalid internal query id: %s", id), e);
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity(String.format("Failed to cancel query: %s on the broker due to error: %s", id, e.getMessage()))
@@ -619,23 +712,34 @@ public class PinotClientRequest {
     }
   }
 
+  @VisibleForTesting
+  SqlSyntaxValidationResponse validateSqlSyntax(ObjectNode sqlRequestJson) {
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions =
+          RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
+      return SqlSyntaxValidationResponse.valid(sqlNodeAndOptions.getSqlType().name());
+    } catch (Exception e) {
+      return SqlSyntaxValidationResponse.invalid(e.getMessage());
+    }
+  }
+
   private QueryFingerprint generateQueryFingerprint(ObjectNode sqlRequestJson) throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
       sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
     } catch (Exception e) {
-      throw new Exception("SQL parsing failed: " + e.getMessage(), e);
+      throw new BadRequestException("SQL parsing failed: " + e.getMessage(), e);
     }
 
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (sqlType != PinotSqlType.DQL) {
-      throw new Exception("Only DQL queries are supported for fingerprinting, got: " + sqlType);
+      throw new BadRequestException("Only DQL queries are supported for fingerprinting, got: " + sqlType);
     }
 
     QueryFingerprint fingerprint = QueryFingerprintUtils.generateFingerprint(sqlNodeAndOptions);
 
     if (fingerprint == null) {
-      throw new Exception("Failed to generate query fingerprint");
+      throw new IllegalStateException("Failed to generate query fingerprint");
     }
 
     return fingerprint;

@@ -394,7 +394,6 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
-      // TODO: Add the sender stage id to the error message
       String errMsg = "Timed out on stage " + _stageId + " waiting for data from child stage " + _senderStageId;
       // We log this case as debug because:
       // - The opchain will already log a stackless message once the opchain fail
@@ -412,8 +411,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       if (terminateException != null) {
         return onException(terminateException.getErrorCode(), terminateException.getMessage());
       }
-      // TODO: Add the sender stage id to the error message
-      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage";
+      String errMsg = "Found an error on stage " + _stageId + " while reading from a child stage " + _senderStageId;
       // We log this case as warn because contrary to the timeout case, it should be rare to finish an execution
       // with an exception and the stack trace may be useful to find the root cause.
       LOGGER.warn(errMsg, e);

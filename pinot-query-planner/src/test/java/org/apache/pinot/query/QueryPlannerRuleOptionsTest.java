@@ -51,10 +51,18 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   private String explainQueryWithRuleEnabled(String query, String ruleToEnable) {
+    return explainQueryWithRules(query, ruleToEnable, null);
+  }
+
+  private String explainQueryWithRules(String query, String rulesToEnable, String rulesToDisable) {
     SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
     Map<String, String> options = new HashMap<>();
-    // disable rule
-    options.put(CommonConstants.Broker.Request.QueryOptionKey.USE_PLANNER_RULES, ruleToEnable);
+    if (rulesToEnable != null) {
+      options.put(CommonConstants.Broker.Request.QueryOptionKey.USE_PLANNER_RULES, rulesToEnable);
+    }
+    if (rulesToDisable != null) {
+      options.put(CommonConstants.Broker.Request.QueryOptionKey.SKIP_PLANNER_RULES, rulesToDisable);
+    }
     SqlNodeAndOptions sqlNodeAndOptions =
         new SqlNodeAndOptions(
             sqlNode,
@@ -94,7 +102,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.AGGREGATE_REDUCE_FUNCTIONS);
     //@formatter:off
     assertEquals(explain,
-      "Execution Plan\n"
+        "Execution Plan\n"
           + "PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[FINAL])\n"
           + "  PinotLogicalExchange(distribution=[hash])\n"
           + "    PinotLogicalAggregate(group=[{}], agg#0=[SUM($0)], aggType=[LEAF])\n"
@@ -169,11 +177,13 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "UNION\n"
         + "SELECT col1 FROM b;\n";
 
+    // Skip AggregateUnionTranspose too so the focus stays on PruneEmptyUnion; otherwise the surviving non-empty
+    // branch ends up with a partial aggregate, which is correct but unrelated to what this test is asserting.
     String explain = explainQueryWithRuleDisabled(query,
-        PlannerRuleNames.PRUNE_EMPTY_UNION);
+        PlannerRuleNames.PRUNE_EMPTY_UNION + "," + PlannerRuleNames.AGGREGATE_UNION_TRANSPOSE);
     //@formatter:off
     assertEquals(explain,
-      "Execution Plan\n"
+        "Execution Plan\n"
           + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
           + "  PinotLogicalExchange(distribution=[hash[0]])\n"
           + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
@@ -258,7 +268,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES);
     //@formatter:off
     assertEquals(explain,
-    "Execution Plan\n"
+        "Execution Plan\n"
         + "LogicalJoin(condition=[=($0, $9)], joinType=[inner])\n"
         + "  PinotLogicalExchange(distribution=[hash[0]])\n"
         + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
@@ -478,6 +488,130 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     //@formatter:on
   }
 
+  // ---------------------------------------------------------------------------
+  // Tests for Calcite optimization rules added to the planner in this change. The 5 default-on
+  // rules each have a paired enabled-by-default / disabled assertion to keep the contract
+  // explicit; the SortProjectTranspose opt-in rule has the same pair so a future flip to
+  // default-on is caught. ResourceBasedQueryPlansTest covers the broader plan-shape surface.
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testAggregateProjectPullUpConstantsEnabledByDefault() {
+    // Default-on. `WHERE col1='US' GROUP BY col1, col2` drops col1 from the group key and
+    // re-introduces it as a projected literal — shuffle key shrinks from (col1, col2) to (col2).
+    String query = "EXPLAIN PLAN FOR SELECT col1, col2, COUNT(*) FROM a WHERE col1 = 'US' GROUP BY col1, col2";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(explain.contains("group=[{0, 1}]"),
+        "AggregateProjectPullUpConstants should remove col1 from group keys. Plan:\n" + explain);
+    assertTrue(explain.contains("col1=[_UTF-8'US'"),
+        "AggregateProjectPullUpConstants should re-project col1 as the literal 'US'. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testDisableAggregateProjectPullUpConstants() {
+    // Disabling the rule must leave the full (col1, col2) group key intact.
+    String query = "EXPLAIN PLAN FOR SELECT col1, col2, COUNT(*) FROM a WHERE col1 = 'US' GROUP BY col1, col2";
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.AGGREGATE_PROJECT_PULL_UP_CONSTANTS);
+    assertTrue(explain.contains("group=[{0, 1}]"),
+        "Without AggregateProjectPullUpConstants, both columns must remain in GROUP BY. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testLimitMergeEnabledByDefault() {
+    // Default-on. An outer LIMIT 5 over an inner LIMIT 10 collapses to the tighter outer LIMIT.
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM (SELECT col1 FROM a LIMIT 10) LIMIT 5";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(explain.contains("fetch=[10]"),
+        "LimitMerge should drop the wider inner LIMIT=10. Plan:\n" + explain);
+    assertTrue(explain.contains("fetch=[5]"),
+        "LimitMerge should keep the tighter outer LIMIT=5. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testDisableLimitMerge() {
+    // Disabling the rule must keep both LIMIT nodes (the inner fetch=10 survives).
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM (SELECT col1 FROM a LIMIT 10) LIMIT 5";
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.LIMIT_MERGE);
+    assertTrue(explain.contains("fetch=[10]"),
+        "Without LimitMerge, the inner fetch=[10] must remain. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testUnionMergeEnabledByDefault() {
+    // Default-on. A 3-way UNION ALL must be a single n-ary LogicalUnion, not Union(Union(a,b), c).
+    String query = "EXPLAIN PLAN FOR "
+        + "SELECT col1, col2 FROM a UNION ALL "
+        + "SELECT col1, col2 FROM b UNION ALL "
+        + "SELECT col1, col2 FROM c";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    int unionCount = explain.split("LogicalUnion\\(all=\\[true]\\)", -1).length - 1;
+    assertEquals(unionCount, 1,
+        "UnionMerge should collapse nested LogicalUnion to a single n-ary Union. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testDisableUnionMerge() {
+    // Disabling the rule preserves the nested Union(Union(a,b),c) shape.
+    String query = "EXPLAIN PLAN FOR "
+        + "SELECT col1, col2 FROM a UNION ALL "
+        + "SELECT col1, col2 FROM b UNION ALL "
+        + "SELECT col1, col2 FROM c";
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.UNION_MERGE);
+    int unionCount = explain.split("LogicalUnion\\(all=\\[true]\\)", -1).length - 1;
+    assertEquals(unionCount, 2,
+        "Without UnionMerge, two LogicalUnion nodes must remain in a nested 3-way UNION ALL. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testSortRemoveConstantKeysEnabledByDefault() {
+    // Default-on. ORDER BY pinning a filtered-to-constant column should drop that column from the
+    // sort key (and from the resulting exchange's hash key).
+    String query = "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col1 = 'US' ORDER BY col1, col2";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertFalse(explain.contains("sort0=[$0], sort1=[$1]"),
+        "SortRemoveConstantKeys should drop col1 from the multi-key ORDER BY. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testDisableSortRemoveConstantKeys() {
+    // Disabling the rule preserves the multi-key (col1, col2) ORDER BY.
+    String query = "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col1 = 'US' ORDER BY col1, col2";
+    String explain = explainQueryWithRuleDisabled(query, PlannerRuleNames.SORT_REMOVE_CONSTANT_KEYS);
+    assertTrue(explain.contains("sort0=[$0], sort1=[$1]"),
+        "Without SortRemoveConstantKeys, the multi-key ORDER BY must remain. Plan:\n" + explain);
+  }
+
+  // NOTE: ProjectAggregateMergeRule has no dedicated unit test. On the query shapes we tested
+  // (e.g. SELECT col1, total FROM (SELECT col1, SUM(col2) AS total, COUNT(*) AS unused FROM a
+  // GROUP BY col1)), other Pinot rules already prune the unused aggregate call before
+  // ProjectAggregateMergeRule gets a chance to fire. The rule is registered defensively in case
+  // a future query shape evades the existing pruning, but its standalone behavior is not
+  // observable in current test queries.
+
+  @Test
+  public void testSortProjectTransposeDisabledByDefault() {
+    // Default-OFF (opt-in). Plan must keep Sort above Project — without the rule the outer
+    // projection wraps the sort, not the other way around.
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM a ORDER BY col1";
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    int sortIdx = explain.indexOf("LogicalSort");
+    int projectIdx = explain.indexOf("LogicalProject");
+    assertTrue(sortIdx >= 0 && projectIdx > sortIdx,
+        "Default plan must place Sort above Project. Plan:\n" + explain);
+  }
+
+  @Test
+  public void testEnableSortProjectTranspose() {
+    // Opt-in. With the rule enabled the Project bubbles above the Sort so LIMIT can apply before
+    // projection expressions are evaluated.
+    String query = "EXPLAIN PLAN FOR SELECT col1 FROM a ORDER BY col1";
+    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.SORT_PROJECT_TRANSPOSE);
+    int sortIdx = explain.indexOf("LogicalSort");
+    int projectIdx = explain.indexOf("LogicalProject");
+    assertTrue(projectIdx >= 0 && sortIdx > projectIdx,
+        "With SortProjectTranspose enabled, Project must be above Sort. Plan:\n" + explain);
+  }
+
   @Test
   public void testAggregateUnionAggregateDisabledByDefault() {
     // Verify that the AggregateUnionAggregateRule is disabled by default
@@ -521,7 +655,10 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
         + "(SELECT DISTINCT col1 FROM b)";
     //@formatter:on
 
-    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE);
+    // Disable AggregateUnionTranspose for this test so the AggregateUnionAggregate merge behavior is isolated;
+    // otherwise transpose pushes aggregates back into each branch and undoes the merge.
+    String explain = explainQueryWithRules(query, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
+        PlannerRuleNames.AGGREGATE_UNION_TRANSPOSE);
 
     // There shouldn't be aggregates above the table scans since they should be merged into the one above the UNION ALL
     assertEquals(explain,

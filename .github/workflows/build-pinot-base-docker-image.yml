@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [11, 17, 21, 25]
+        jdk_version: [21, 25]
         arch: [amd64, arm64]
         type: [build, runtime]
         include:
@@ -39,11 +39,11 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Build ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}-${{ matrix.arch }} Pinot Base Docker Image
         env:
           OPEN_JDK_DIST: ${{ matrix.openJdkDist }}
@@ -60,15 +60,15 @@ jobs:
     strategy:
       matrix:
         openJdkDist: ["amazoncorretto", "ms-openjdk"]
-        jdk_version: [11, 17, 21, 25]
+        jdk_version: [21, 25]
         type: [build, runtime]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Push ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }} Pinot Base Docker manifest
         env:
           BASE_IMAGE_TYPE: ${{ matrix.type }}

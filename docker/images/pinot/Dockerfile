@@ -16,13 +16,13 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG PINOT_BASE_IMAGE_TAG=11-amazoncorretto
+ARG PINOT_BASE_IMAGE_TAG=21-amazoncorretto
 FROM apachepinot/pinot-base-build:${PINOT_BASE_IMAGE_TAG} AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
 ARG PINOT_GIT_REF=master
-ARG JDK_VERSION=11
+ARG JDK_VERSION=21
 ARG CI=true
 
 RUN echo "Build Pinot based on image: apachepinot/pinot-base-build:${PINOT_BASE_IMAGE_TAG}"

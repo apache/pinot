@@ -291,7 +291,7 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   }
 
   public static ExpressionContext create(String language, String valueExpressionStr, ExpressionContext timeExpression,
-    TimeUnit timeUnit, long offsetSeconds, TimeBuckets timeBuckets, AggInfo aggInfo) {
+      TimeUnit timeUnit, long offsetSeconds, TimeBuckets timeBuckets, AggInfo aggInfo) {
     ExpressionContext valueExpression = RequestContextUtils.getExpression(valueExpressionStr);
     List<ExpressionContext> arguments = new ArrayList<>();
     arguments.add(ExpressionContext.forLiteral(Literal.stringValue(language)));

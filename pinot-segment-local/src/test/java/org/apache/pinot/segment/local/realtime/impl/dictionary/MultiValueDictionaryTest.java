@@ -262,7 +262,7 @@ public class MultiValueDictionaryTest implements PinotBuffersAfterClassCheckRule
     try (DirectMemoryManager memManager = new DirectMemoryManager("test");
         FixedByteMVMutableForwardIndex indexer = new FixedByteMVMutableForwardIndex(MAX_N_VALUES, MAX_N_VALUES / 2,
             NROWS / 3, 24, memManager, "indexer",
-        false, FieldSpec.DataType.BYTES)) {
+            false, FieldSpec.DataType.BYTES)) {
       // Insert rows into the indexer
       Random random = new Random(seed);
       for (int row = 0; row < NROWS; row++) {

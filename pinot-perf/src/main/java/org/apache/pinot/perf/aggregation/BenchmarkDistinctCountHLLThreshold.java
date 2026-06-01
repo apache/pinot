@@ -335,6 +335,11 @@ public class BenchmarkDistinctCountHLLThreshold {
     }
 
     @Override
+    public BigDecimal[][] getBigDecimalValuesMV() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public String[][] getStringValuesMV() {
       throw new UnsupportedOperationException();
     }

@@ -43,6 +43,7 @@ public class BytesColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public void collect(Object entry) {
     assert !_sealed;
+    _totalDocs++;
 
     if (entry instanceof Object[]) {
       Object[] values = (Object[]) entry;

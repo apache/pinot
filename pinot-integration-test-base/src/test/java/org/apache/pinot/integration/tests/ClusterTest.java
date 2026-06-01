@@ -318,6 +318,14 @@ public abstract class ClusterTest extends ControllerTest {
     return serverStarter;
   }
 
+  protected BaseBrokerStarter startOneBroker(PinotConfiguration brokerConfig)
+      throws Exception {
+    BaseBrokerStarter brokerStarter = createBrokerStarter();
+    brokerStarter.init(brokerConfig);
+    brokerStarter.start();
+    return brokerStarter;
+  }
+
   /**
    * Can be overridden to add more properties.
    */
@@ -406,6 +414,24 @@ public abstract class ClusterTest extends ControllerTest {
     PinotConfiguration serverConfig = serverStarter.getConfig();
     serverStarter.stop();
     return startOneServer(serverConfig);
+  }
+
+  protected void restartBrokers()
+      throws Exception {
+    assertNotNull(_brokerStarters, "Brokers are not started");
+    List<BaseBrokerStarter> oldBrokers = new ArrayList<>(_brokerStarters);
+    int numBrokers = _brokerStarters.size();
+    _brokerStarters.clear();
+    for (int i = 0; i < numBrokers; i++) {
+      _brokerStarters.add(restartBroker(oldBrokers.get(i)));
+    }
+  }
+
+  protected BaseBrokerStarter restartBroker(BaseBrokerStarter brokerStarter)
+      throws Exception {
+    PinotConfiguration brokerConfig = brokerStarter.getConfig();
+    brokerStarter.stop();
+    return startOneBroker(brokerConfig);
   }
 
   /**
@@ -589,7 +615,7 @@ public abstract class ClusterTest extends ControllerTest {
       Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
-        String.valueOf(startTime), "end", String.valueOf(endTime));
+          String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
@@ -758,8 +784,9 @@ public abstract class ClusterTest extends ControllerTest {
         case DOUBLE_ARRAY:
           array[k] = jsonValue.get(k).asDouble();
           break;
-        case STRING_ARRAY:
+        case BIG_DECIMAL_ARRAY:
         case TIMESTAMP_ARRAY:
+        case STRING_ARRAY:
         case BYTES_ARRAY:
           array[k] = jsonValue.get(k).textValue();
           break;
@@ -791,11 +818,11 @@ public abstract class ClusterTest extends ControllerTest {
       case DOUBLE:
         object = jsonValue.asDouble();
         break;
+      case BIG_DECIMAL:
+      case TIMESTAMP:
       case STRING:
       case BYTES:
-      case TIMESTAMP:
       case JSON:
-      case BIG_DECIMAL:
         object = jsonValue.textValue();
         break;
       case UNKNOWN:

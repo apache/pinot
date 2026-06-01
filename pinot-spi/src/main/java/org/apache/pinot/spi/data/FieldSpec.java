@@ -96,6 +96,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
 
   public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_MAP = Map.of();
+  public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_OPEN_STRUCT = Map.of();
   public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
   public static final int DEFAULT_MAX_LENGTH = 512;
 
@@ -304,6 +305,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     return DEFAULT_MAX_LENGTH;
   }
 
+  /// Returns the max length of the column if it is not using the default length, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public Integer getNonDefaultMaxLength() {
+    int effectiveMaxLength = getEffectiveMaxLength();
+    return effectiveMaxLength != DEFAULT_MAX_LENGTH ? effectiveMaxLength : null;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   // Use getEffectiveMaxLength() for default-aware access.
   @Nullable
@@ -335,6 +345,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         return getDefaultJsonMaxLengthExceedStrategy();
       default:
         return MaxLengthExceedStrategy.NO_ACTION;
+    }
+  }
+
+  /// Returns the max length exceed strategy of the column if it is not using the default strategy, `null` otherwise.
+  /// This method should be used to write the `ColumnMetadata`.
+  @JsonIgnore
+  @Nullable
+  public MaxLengthExceedStrategy getNonDefaultMaxLengthExceedStrategy() {
+    MaxLengthExceedStrategy effectiveMaxLengthExceedStrategy = getEffectiveMaxLengthExceedStrategy();
+    if (_dataType == DataType.STRING) {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.TRIM_LENGTH ? effectiveMaxLengthExceedStrategy
+          : null;
+    } else {
+      return effectiveMaxLengthExceedStrategy != MaxLengthExceedStrategy.NO_ACTION ? effectiveMaxLengthExceedStrategy
+          : null;
     }
   }
 
@@ -469,6 +494,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           switch (dataType) {
             case MAP:
               return DEFAULT_COMPLEX_NULL_VALUE_OF_MAP;
+            case OPEN_STRUCT:
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_OPEN_STRUCT;
             case LIST:
               return DEFAULT_COMPLEX_NULL_VALUE_OF_LIST;
             case STRUCT:
@@ -595,6 +622,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
         case MAP:
+        case OPEN_STRUCT:
         case LIST:
           jsonNode.set(key, JsonUtils.objectToJsonNode(_defaultNullValue));
           break;
@@ -672,6 +700,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES(false, false),
     STRUCT(false, false),
     MAP(false, false),
+    OPEN_STRUCT(false, false),
     LIST(false, false),
     UNKNOWN(false, true);
 
@@ -770,6 +799,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toBytes(value);
           case MAP:
+          case OPEN_STRUCT:
             return JsonUtils.stringToObject(value, Map.class);
           case LIST:
             return JsonUtils.stringToObject(value, List.class);
@@ -818,6 +848,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
         case MAP:
+        case OPEN_STRUCT:
         case LIST:
           throw new UnsupportedOperationException("Cannot compare complex data types: " + this);
         default:
@@ -835,7 +866,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
       }
-      if (this == MAP || this == LIST) {
+      if (this == MAP || this == OPEN_STRUCT || this == LIST) {
         try {
           return JsonUtils.objectToString(value);
         } catch (JsonProcessingException e) {
@@ -871,6 +902,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toByteArray(value);
           case MAP:
+          case OPEN_STRUCT:
           case LIST:
             throw new UnsupportedOperationException("Cannot convert complex data types: " + this);
           default:

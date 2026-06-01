@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.function;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.Base64;
@@ -28,9 +29,13 @@ import java.util.Random;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
+import org.apache.pinot.common.function.scalar.IpAddressFunctions;
+import org.apache.pinot.common.function.scalar.StringFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ArrayCopyUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -134,7 +139,7 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
     assertEquals(transformFunction.getName(), "replace");
     String[] expectedValues = new String[NUM_ROWS];
     for (int i = 0; i < NUM_ROWS; i++) {
-      expectedValues[i] = StringUtils.replace(_stringAlphaNumericSVValues[i], "A", "B");
+      expectedValues[i] = Strings.CS.replace(_stringAlphaNumericSVValues[i], "A", "B");
     }
     testTransformFunction(transformFunction, expectedValues);
   }
@@ -687,6 +692,22 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
   }
 
   @Test
+  public void testArraySliceLongTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("array_slice_long(%s, 1, 3)", LONG_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "arraySliceLong");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    assertFalse(transformFunction.getResultMetadata().isSingleValue());
+    long[][] expectedValues = new long[NUM_ROWS][];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Arrays.copyOfRange(_longMVValues[i], 1, 3);
+    }
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  @Test
   public void testArrayDistinctIntTransformFunction() {
     ExpressionContext expression =
         RequestContextUtils.getExpression(String.format("array_distinct_int(%s)", INT_MV_COLUMN));
@@ -1207,5 +1228,439 @@ public class ScalarTransformFunctionWrapperTest extends BaseTransformFunctionTes
       }
     }
     testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  @Test
+  public void testCbrtTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("cbrt(%s)", DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "cbrt");
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.cbrt(_doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testExp2TransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("exp2(%s)", DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "exp2");
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.pow(2, _doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testExp10TransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("exp10(%s)", DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "exp10");
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.pow(10, _doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testLog1pTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("log1p(%s)", DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "log1p");
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Math.log1p(_doubleSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSigmoidTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("sigmoid(%s)", DOUBLE_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "sigmoid");
+    double[] expectedValues = new double[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = 1.0 / (1.0 + Math.exp(-_doubleSVValues[i]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testPiTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("pi()");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "pi");
+    double[] expectedValues = new double[NUM_ROWS];
+    Arrays.fill(expectedValues, Math.PI);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testETransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("e()");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "e");
+    double[] expectedValues = new double[NUM_ROWS];
+    Arrays.fill(expectedValues, Math.E);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testBitCountTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("bitCount(%s)", LONG_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "bitCount");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = Long.bitCount(_longSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  // --- IP Address Functions ---
+
+  @Test
+  public void testIsIPv4StringTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("isIPv4String('192.168.1.1')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "isIPv4String");
+    int[] expectedValues = new int[NUM_ROWS];
+    Arrays.fill(expectedValues, 1);
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression("isIPv4String('::1')");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedFalse = new int[NUM_ROWS];
+    Arrays.fill(expectedFalse, 0);
+    testTransformFunction(transformFunction, expectedFalse);
+  }
+
+  @Test
+  public void testIsIPv6StringTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("isIPv6String('::1')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "isIPv6String");
+    int[] expectedValues = new int[NUM_ROWS];
+    Arrays.fill(expectedValues, 1);
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression("isIPv6String('192.168.1.1')");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    int[] expectedFalse = new int[NUM_ROWS];
+    Arrays.fill(expectedFalse, 0);
+    testTransformFunction(transformFunction, expectedFalse);
+  }
+
+  @Test
+  public void testIpv4ToLongTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("ipv4ToLong('192.168.1.1')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipv4ToLong");
+    long[] expectedValues = new long[NUM_ROWS];
+    Arrays.fill(expectedValues, IpAddressFunctions.ipv4ToLong("192.168.1.1"));
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testLongToIpv4TransformFunction() {
+    long ipLong = IpAddressFunctions.ipv4ToLong("10.0.0.1");
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("longToIpv4(%d)", ipLong));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "longToIpv4");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, "10.0.0.1");
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIpv4ToIpv6TransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("ipv4ToIpv6('192.168.1.1')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipv4ToIpv6");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, IpAddressFunctions.ipv4ToIpv6("192.168.1.1"));
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIpPrefixTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("ipPrefix('192.168.1.100', 24)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipPrefix");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, IpAddressFunctions.ipPrefix("192.168.1.100", 24));
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIsSubnetOfTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("isSubnetOf('192.168.1.0/24', '192.168.1.100')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "isSubnetOf");
+    int[] expectedValues = new int[NUM_ROWS];
+    Arrays.fill(expectedValues, 1);
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIpSubnetMinTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("ipSubnetMin('10.1.2.0/24')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipSubnetMin");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, IpAddressFunctions.ipSubnetMin("10.1.2.0/24"));
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIpSubnetMaxTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("ipSubnetMax('10.1.2.0/24')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipSubnetMax");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, IpAddressFunctions.ipSubnetMax("10.1.2.0/24"));
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIpv6ToBytesTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("ipv6ToBytes('2001:db8::1')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipv6ToBytes");
+    byte[][] expectedValues = new byte[NUM_ROWS][];
+    Arrays.fill(expectedValues, IpAddressFunctions.ipv6ToBytes("2001:db8::1"));
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testBytesToIpv6TransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("bytesToIpv6(ipv6ToBytes('2001:db8::1'))");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "bytesToIpv6");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, "2001:db8::1");
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIpv4CIDRToRangeTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression("ipv4CIDRToRange('192.168.1.0/24')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ipv4CIDRToRange");
+    String[][] expectedValues = new String[NUM_ROWS][];
+    Arrays.fill(expectedValues, new String[]{"192.168.1.0", "192.168.1.255"});
+    testTransformFunctionMV(transformFunction, expectedValues);
+  }
+
+  // --- String Functions ---
+
+  @Test
+  public void testAsciiTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("ascii(%s)", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "ascii");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringFunctions.ascii(_stringAlphaNumericSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSpaceTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("space(5)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "space");
+    String[] expectedValues = new String[NUM_ROWS];
+    Arrays.fill(expectedValues, "     ");
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSubstringIndexTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("substringIndex(%s, 'a', 1)", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "substringIndex");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringFunctions.substringIndex(_stringAlphaNumericSVValues[i], "a", 1);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testFirstLineTransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("firstLine(%s)", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "firstLine");
+    String[] expectedValues = new String[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringFunctions.firstLine(_stringAlphaNumericSVValues[i]);
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testStartsWithCaseInsensitiveTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("startsWithCaseInsensitive(%s, 'A')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "startsWithCaseInsensitive");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringFunctions.startsWithCaseInsensitive(
+          _stringAlphaNumericSVValues[i], "A") ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testEndsWithCaseInsensitiveTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("endsWithCaseInsensitive(%s, 'Z')", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "endsWithCaseInsensitive");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringFunctions.endsWithCaseInsensitive(
+          _stringAlphaNumericSVValues[i], "Z") ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testIsValidASCIITransformFunction() {
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("isValidASCII(%s)", STRING_ALPHANUM_SV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "isValidASCII");
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = StringFunctions.isValidASCII(_stringAlphaNumericSVValues[i]) ? 1 : 0;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  // Test-only scalar functions registered via FunctionRegistry's reflection scan (the test class is
+  // in a `.function.` package, matching the scan regex). They exist solely to exercise the
+  // `PRIMITIVE_BOOLEAN_ARRAY` and `TIMESTAMP_ARRAY` dispatch cases in
+  // ScalarTransformFunctionWrapper.getNonLiteralValues — no production scalar function in OSS Pinot
+  // currently declares a `boolean[]` or `Timestamp[]` parameter.
+
+  @ScalarFunction
+  public static int countTrueBooleans(boolean[] booleans) {
+    int count = 0;
+    for (boolean b : booleans) {
+      if (b) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  @ScalarFunction
+  public static long sumTimestampMillis(Timestamp[] timestamps) {
+    long sum = 0;
+    for (Timestamp t : timestamps) {
+      sum += t.getTime();
+    }
+    return sum;
+  }
+
+  @Test
+  public void testCountTrueBooleansTransformFunction() {
+    // Exercises the PRIMITIVE_BOOLEAN_ARRAY dispatch in getNonLiteralValues: the int MV column is
+    // read as int[][] via transformToIntValuesMV, then converted per-row to boolean[][] (intValue
+    // == 1 → true) before being passed to countTrueBooleans(boolean[]).
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("countTrueBooleans(%s)", INT_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "countTrueBooleans");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.INT);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    int[] expectedValues = new int[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int count = 0;
+      for (int v : _intMVValues[i]) {
+        if (v == 1) {
+          count++;
+        }
+      }
+      expectedValues[i] = count;
+    }
+    testTransformFunction(transformFunction, expectedValues);
+  }
+
+  @Test
+  public void testSumTimestampMillisTransformFunction() {
+    // Exercises the TIMESTAMP_ARRAY dispatch in getNonLiteralValues: the long MV column is read as
+    // long[][] via transformToLongValuesMV, then converted per-row to Timestamp[][] (new
+    // Timestamp(long)) before being passed to sumTimestampMillis(Timestamp[]). Each Timestamp's
+    // getTime() returns the original long, so the per-row sum equals the sum of input longs.
+    ExpressionContext expression =
+        RequestContextUtils.getExpression(String.format("sumTimestampMillis(%s)", LONG_MV_COLUMN));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof ScalarTransformFunctionWrapper);
+    assertEquals(transformFunction.getName(), "sumTimestampMillis");
+    assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.LONG);
+    assertTrue(transformFunction.getResultMetadata().isSingleValue());
+    long[] expectedValues = new long[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      long sum = 0;
+      for (long v : _longMVValues[i]) {
+        sum += v;
+      }
+      expectedValues[i] = sum;
+    }
+    testTransformFunction(transformFunction, expectedValues);
   }
 }

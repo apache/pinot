@@ -87,6 +87,8 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -116,6 +118,7 @@ import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
@@ -128,12 +131,14 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
+import org.apache.pinot.common.utils.helix.ZkMultiWriteBuilder;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
@@ -150,6 +155,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
+import org.apache.pinot.controller.helix.core.lineage.SegmentsInLineageException;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.util.ControllerZkHelixUtils;
@@ -157,6 +163,12 @@ import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.core.util.NumericException;
+import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
+import org.apache.pinot.materializedview.consistency.MaterializedViewConsistencyManager;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataBuilder;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
+import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
@@ -231,6 +243,8 @@ public class PinotHelixResourceManager {
   private final boolean _enableBatchMessageMode;
   private final int _deletedSegmentsRetentionInDays;
   private final boolean _enableTieredSegmentAssignment;
+  @Nullable
+  private final ControllerConf _controllerConf;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -242,17 +256,27 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
-  private final QueryWorkloadManager _queryWorkloadManager;
+  private QueryWorkloadManager _queryWorkloadManager;
+  // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
+  // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
+  // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
+  // reachable — reusing it would require reflection, which breaks on Helix point-release field
+  // renames. The resulting extra session is consistent with the controller's existing footprint
+  // (_propertyStore cache client, _leadControllerManager manager client are each distinct).
+  private volatile ZkClient _zkClient;
+  private volatile MaterializedViewConsistencyManager _materializedViewConsistencyManager;
 
   public PinotHelixResourceManager(String helixClusterName, @Nullable String dataDir,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
-      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager,
+      @Nullable ControllerConf controllerConf) {
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _enableTieredSegmentAssignment = enableTieredSegmentAssignment;
+    _controllerConf = controllerConf;
     _instanceAdminEndpointCache =
         CacheBuilder.newBuilder().expireAfterWrite(CACHE_ENTRY_EXPIRE_TIME_HOURS, TimeUnit.HOURS)
             .build(new CacheLoader<>() {
@@ -268,14 +292,13 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _queryWorkloadManager = new QueryWorkloadManager(this);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
     this(controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
         controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
         controllerConf.getDeletedSegmentsRetentionInDays(), controllerConf.tieredSegmentAssignmentEnabled(),
-        LineageManagerFactory.create(controllerConf));
+        LineageManagerFactory.create(controllerConf), controllerConf);
   }
 
   /**
@@ -337,6 +360,12 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    ZkClient zkClient = _zkClient;
+    if (zkClient != null) {
+      _zkClient = null;
+      LOGGER.info("Closing dedicated multiWriteZK ZkClient");
+      ZkStarter.closeAsync(zkClient);
+    }
   }
 
   /**
@@ -574,7 +603,8 @@ public class PinotHelixResourceManager {
     if (shouldUpdateBrokerResource) {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
           newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
       return PinotResourceManagerResponse.success("Added instance: " + instanceId + ", and updated broker resource - "
@@ -618,7 +648,8 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId + ", and updated broker resource - "
@@ -663,7 +694,8 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId
@@ -691,7 +723,8 @@ public class PinotHelixResourceManager {
         instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
     List<String> tablesAdded = new ArrayList<>();
     List<String> tablesRemoved = new ArrayList<>();
-    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
+    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved,
+        _queryWorkloadManager);
     LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
         instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
     return PinotResourceManagerResponse.success("Updated broker resource for broker: " + instanceId
@@ -863,6 +896,58 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all raw materialized view names from provided database name. Backs
+   * {@code SHOW MATERIALIZED VIEWS [FROM db]}.
+   *
+   * <p>Identity is decided by {@link org.apache.pinot.spi.config.table.TableConfig#isMaterializedView()},
+   * the canonical MV flag (PR #18564), rather than by inferring MV-ness from the presence of a
+   * {@code MaterializedViewTask} block. Reading the flag from TableConfig keeps this listing
+   * aligned with every other MV-aware code site in the controller and surfaces corruption
+   * (e.g. a definition znode that was created without its TableConfig) instead of hiding it.
+   *
+   * <p>An MV is always realized as an OFFLINE physical table, so only OFFLINE resources are
+   * considered; REALTIME resources are skipped without a ZK round-trip. Resources whose
+   * TableConfig fetch fails or returns null are dropped silently — a single corrupted znode
+   * must not break the entire listing for an operator running SHOW MATERIALIZED VIEWS to
+   * diagnose cluster state.
+   *
+   * <p>Returned names are raw (no {@code _OFFLINE} suffix), matching {@link #getAllRawTables}
+   * so callers can pipe the result directly into {@code SHOW CREATE MATERIALIZED VIEW} or
+   * {@code DROP MATERIALIZED VIEW} (neither of which accepts a type suffix).
+   *
+   * @param databaseName database name; {@code null} returns MVs from every database (callers
+   *                     scoping by database should pass an explicit name).
+   * @return List of raw materialized view names in the provided database, in resource-iteration
+   *         order; deduplicated by raw name.
+   */
+  public List<String> getAllRawMaterializedViewNames(@Nullable String databaseName) {
+    return getAllResources().stream()
+        .filter(TableNameBuilder::isOfflineTableResource)
+        .filter(resourceName -> DatabaseUtils.isPartOfDatabase(resourceName, databaseName))
+        .filter(this::isMaterializedViewResource)
+        .map(TableNameBuilder::extractRawTableName)
+        .distinct()
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Returns true iff {@code tableNameWithType} is an OFFLINE resource whose stored TableConfig
+   * has {@code isMaterializedView=true}. Returns false (rather than throwing) when the
+   * TableConfig is missing or the read fails — the caller is a best-effort listing that must
+   * tolerate a single broken znode without aborting.
+   */
+  private boolean isMaterializedViewResource(String tableNameWithType) {
+    try {
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      return tableConfig != null && tableConfig.isMaterializedView();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to read TableConfig for {} while filtering MVs; treating as non-MV",
+          tableNameWithType, e);
+      return false;
+    }
+  }
+
+  /**
    * Given a table name in any case, returns the table name as defined in Helix/Segment/Schema
    * @param tableName tableName in any case.
    * @return tableName actually defined in Pinot (matches case) and exists ,else, return the input value
@@ -1022,10 +1107,22 @@ public class PinotHelixResourceManager {
   }
 
   public Collection<String> getLastLLCCompletedSegments(String tableNameWithType) {
+    return getLastLLCCompletedSegments(getSegmentsZKMetadata(tableNameWithType));
+  }
+
+  /// Overload that operates on a caller-supplied list of {@link SegmentZKMetadata}, avoiding a
+  /// redundant ZK fetch when the caller already holds the list (e.g. periodic tasks that scan all
+  /// segments of a table and want to derive the last-completed LLC segment per partition without
+  /// re-reading the property store).
+  public Collection<String> getLastLLCCompletedSegments(List<? extends SegmentZKMetadata> segmentZKMetadataList) {
     Map<Integer, String> partitionIdToLastLLCCompletedSegmentMap = new HashMap<>();
-    for (SegmentZKMetadata zkMetadata : getSegmentsZKMetadata(tableNameWithType)) {
+    for (SegmentZKMetadata zkMetadata : segmentZKMetadataList) {
       if (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
         LLCSegmentName llcName = LLCSegmentName.of(zkMetadata.getSegmentName());
+        if (llcName == null) {
+          // llcName can be null if the segment is uploaded through offline ingestion
+          continue;
+        }
         int partitionGroupId = llcName.getPartitionGroupId();
         int sequenceNumber = llcName.getSequenceNumber();
         String lastCompletedSegName = partitionIdToLastLLCCompletedSegmentMap.get(partitionGroupId);
@@ -1045,6 +1142,15 @@ public class PinotHelixResourceManager {
   /**
    * Delete a list of segments from ideal state and remove them from the local storage.
    *
+   * <p>Pre-checks the table's segment lineage znode and rejects the whole batch with a failure response if any
+   * target segment participates in a live lineage entry (signalled internally via {@link SegmentsInLineageException}).
+   * If we don't do this and a segment is deleted while it is being replaced, it could lead to the deleted data
+   * resurfacing with the replaced segment. To prevent that, we will block segment deletion if its part of the FROM
+   * list in an IN_PROGRESS / COMPLETED Segment Lineage entry.
+   *
+   * <p>Cleanup paths that already coordinated with the lineage lifecycle must call
+   * {@link #deleteSegmentsForLineageCleanup} instead.
+   *
    * @param tableNameWithType Table name with type suffix
    * @param segmentNames List of names of segment to be deleted
    * @param retentionPeriod The retention period of the deleted segments.
@@ -1052,6 +1158,23 @@ public class PinotHelixResourceManager {
    */
   public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, retentionPeriod, false);
+  }
+
+  /**
+   * Lineage-aware delete path that skips the cross-check against the live lineage entries. Reserved for callers
+   * that have already coordinated with the lineage lifecycle: proactive cleanup in {@code startReplaceSegments},
+   * post-revert cleanup in {@code revertReplaceSegments}, and {@code RetentionManager}'s lineage-cleanup pass.
+   * External call sites (REST handlers, retention based on table config, minion task generators, push-failure
+   * cleanup) must continue to use the public {@link #deleteSegments} overloads.
+   */
+  public PinotResourceManagerResponse deleteSegmentsForLineageCleanup(String tableNameWithType,
+      List<String> segmentNames) {
+    return deleteSegmentsInternal(tableNameWithType, segmentNames, null, true);
+  }
+
+  private PinotResourceManagerResponse deleteSegmentsInternal(String tableNameWithType, List<String> segmentNames,
+      @Nullable String retentionPeriod, boolean bypassLineageCheck) {
     if (segmentNames.isEmpty()) {
       return PinotResourceManagerResponse.success("No segments to delete");
     }
@@ -1059,6 +1182,10 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
+      if (!bypassLineageCheck && isLineageExclusiveDeleteEnabled()) {
+        // Reject the whole batch if any target segment participates in a live lineage entry.
+        rejectIfTargetsLineageLockedSegments(tableNameWithType, segmentNames);
+      }
       HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
       if (retentionPeriod != null) {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
@@ -1068,10 +1195,45 @@ public class PinotHelixResourceManager {
         _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
+    } catch (SegmentsInLineageException e) {
+      LOGGER.warn("Refusing to delete segments from table: {}. {}", tableNameWithType, e.getMessage());
+      return PinotResourceManagerResponse.failure(e.getMessage());
     } catch (final Exception e) {
       LOGGER.error("Caught exception while deleting segment: {} from table: {}", segmentNames, tableNameWithType, e);
       return PinotResourceManagerResponse.failure(e.getMessage());
     }
+  }
+
+  /**
+   * Reads the current segment lineage znode (if any) and throws {@link SegmentsInLineageException} when the
+   * delete batch intersects the lineage-locked set.
+   */
+  private void rejectIfTargetsLineageLockedSegments(String tableNameWithType, List<String> segmentNames) {
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    if (segmentLineage == null) {
+      return;
+    }
+    Set<String> blocked = SegmentLineageUtils.getDeleteBlockedSegments(segmentLineage);
+    if (blocked.isEmpty()) {
+      return;
+    }
+    List<String> blockingTargets = new ArrayList<>();
+    for (String segment : segmentNames) {
+      if (blocked.contains(segment)) {
+        blockingTargets.add(segment);
+      }
+    }
+    if (blockingTargets.isEmpty()) {
+      return;
+    }
+    if (_controllerMetrics != null) {
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.LINEAGE_BLOCKED_DELETE_COUNT, 1L);
+    }
+    throw new SegmentsInLineageException(tableNameWithType, blockingTargets);
+  }
+
+  private boolean isLineageExclusiveDeleteEnabled() {
+    return _controllerConf == null || _controllerConf.isLineageExclusiveDeleteEnabled();
   }
 
   /**
@@ -1119,7 +1281,7 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType)
-  throws Exception {
+      throws Exception {
     Set<String> brokerInstances;
     try {
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
@@ -1939,13 +2101,16 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding table {}: Updating BrokerResource for table", tableNameWithType);
     List<String> brokers =
         HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
-    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
-      assert is != null;
-      is.getRecord().getMapFields()
-          .put(tableNameWithType, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
-      return is;
-    });
-    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
+    HelixHelper.updateBrokerResource(_helixZkManager, tableNameWithType,
+        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
+    // Persist the MV definition znode BEFORE notify so the consistency manager registration
+    // below reads the authoritative `baseTables` list rather than relying on its
+    // `extractSourceTableName(definedSQL)` fallback. The write is best-effort: a transient
+    // ZK glitch must not undo a successfully created table, and the notify fallback path
+    // remains correct because every MV that reaches this method has already passed
+    // `MaterializedViewAnalyzer.analyze` (single-FROM, simple-name source).
+    persistMaterializedViewDefinitionMetadataBestEffort(tableConfig);
+    notifyMaterializedViewConsistencyManagerForTableCreate(tableConfig);
     LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
   }
 
@@ -2081,6 +2246,68 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
   }
 
+  /**
+   * Returns a fresh {@link ZkMultiWriteBuilder} for submitting an atomic ZooKeeper {@code multi()}
+   * transaction over Helix property-store paths (set / create / delete / version-check ops on any
+   * combination of property-store znodes). Either every op commits or none do.
+   * <p>Op paths are property-store-relative (e.g. {@code /SEGMENTS/{table}/{segment}}); the builder
+   * prepends {@code /{cluster}/PROPERTYSTORE} before submitting to ZK. Multi-path writes outside
+   * the property store are intentionally not supported.
+   * <p>Requires {@link #start} to have been called (so the ZK address is reachable via the Helix
+   * manager); throws {@link IllegalStateException} otherwise.
+   * <p>The builder's {@code execute()} throws {@link org.apache.zookeeper.KeeperException} on atomic
+   * rollback (the subtype identifies the cause: {@code BadVersionException}, {@code NoNodeException},
+   * {@code NodeExistsException}, ...). Connectivity / session failures propagate as the original
+   * {@link org.apache.helix.zookeeper.zkclient.exception.ZkException}.
+   * <p>The dedicated underlying {@link ZkClient} honors the controller's
+   * {@value CommonConstants.Helix.ZkClient#ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG} and
+   * {@value CommonConstants.Helix.ZkClient#ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG} overrides; JVM-level
+   * ZooKeeper system properties (e.g. {@code jute.maxbuffer}) are picked up automatically by the
+   * ZooKeeper client library itself.
+   */
+  public ZkMultiWriteBuilder multiWriteZK() {
+    return new ZkMultiWriteBuilder(getOrBuildMultiWriteZkClient(),
+        PropertyPathBuilder.propertyStore(_helixClusterName));
+  }
+
+  private ZkClient getOrBuildMultiWriteZkClient() {
+    ZkClient c = _zkClient;
+    if (c != null) {
+      return c;
+    }
+    synchronized (this) {
+      if (_zkClient == null) {
+        Preconditions.checkState(_helixZkManager != null,
+            "multiWriteZK unavailable: PinotHelixResourceManager has not been started");
+        String zkAddress = _helixZkManager.getMetadataStoreConnectionString();
+        int sessionTimeoutMs = _controllerConf != null
+            ? _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
+                CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS)
+            : CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS;
+        int connectTimeoutMs = _controllerConf != null
+            ? _controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG,
+                CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS)
+            : CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_MS;
+        LOGGER.info("Building dedicated multiWriteZK ZkClient at {} (session={}ms, connect={}ms)",
+            zkAddress, sessionTimeoutMs, connectTimeoutMs);
+        ZkClient built = new ZkClient.Builder()
+            .setZkServer(zkAddress)
+            .setSessionTimeout(sessionTimeoutMs)
+            .setConnectionTimeout(connectTimeoutMs)
+            .setZkSerializer(new ZNRecordSerializer())
+            .build();
+        if (!built.waitUntilConnected(connectTimeoutMs, TimeUnit.MILLISECONDS)) {
+          ZkStarter.closeAsync(built);
+          throw new RuntimeException(
+              "Timed out connecting to ZK at " + zkAddress + " after " + connectTimeoutMs
+                  + "ms for multiWriteZK");
+        }
+        _zkClient = built;
+      }
+      return _zkClient;
+    }
+  }
+
   public boolean createZKNode(String path, ZNRecord record, int accessOption, long ttl) {
     return _helixDataAccessor.getBaseDataAccessor().create(path, record, accessOption, ttl);
   }
@@ -2121,6 +2348,11 @@ public class PinotHelixResourceManager {
 
   public void registerPinotLLCRealtimeSegmentManager(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
     _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
+  }
+
+  public void registerMaterializedViewConsistencyManager(
+      MaterializedViewConsistencyManager materializedViewConsistencyManager) {
+    _materializedViewConsistencyManager = materializedViewConsistencyManager;
   }
 
   private void assignInstances(TableConfig tableConfig, boolean override) {
@@ -2167,7 +2399,7 @@ public class PinotHelixResourceManager {
                 referenceInstancePartitionsName);
           }
         }
-        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions, _queryWorkloadManager);
       }
     }
 
@@ -2185,7 +2417,8 @@ public class PinotHelixResourceManager {
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions,
+                _queryWorkloadManager);
           }
         }
       }
@@ -2285,12 +2518,8 @@ public class PinotHelixResourceManager {
   private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
     List<String> brokers = HelixHelper.getInstancesWithTag(
         _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
-    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
-      assert is != null;
-      is.getRecord().getMapFields()
-          .put(tableName, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
-      return is;
-    });
+    HelixHelper.updateBrokerResource(_helixZkManager, tableName,
+        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
   }
 
   public void validateNewLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
@@ -2392,8 +2621,6 @@ public class PinotHelixResourceManager {
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
-    // TODO: Propagate workload for tables if there is change is change instance characteristics
-    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
   }
 
   public void deleteUser(String username) {
@@ -2421,6 +2648,26 @@ public class PinotHelixResourceManager {
   public void deleteTable(String tableName, TableType tableType, @Nullable String retentionPeriod) {
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", tableNameWithType);
+
+    // Block the delete when materialized views depend on this base table. Orphaning an MV
+    // leaves its runtime znode pointing at a base that no longer exists; the MV's task
+    // generator would then fail forever on every cycle, and the broker rewrite engine (PR 2)
+    // would keep serving the now-orphaned MV partitions as if the base were intact — silent
+    // stale data. Force the operator to drop dependent MVs first.
+    MaterializedViewConsistencyManager mvMgr = _materializedViewConsistencyManager;
+    if (mvMgr != null) {
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      List<String> dependentMVs = mvMgr.getDependentMaterializedViews(rawTableName);
+      // Don't block when the table being dropped IS an MV (self-reference impossible, but the
+      // index entry exists for MVs over MVs — currently unsupported, but the guard is cheap).
+      dependentMVs.remove(tableNameWithType);
+      if (!dependentMVs.isEmpty()) {
+        throw new IllegalStateException(String.format(
+            "Cannot delete table '%s': %d materialized view(s) depend on it: %s. "
+                + "Drop the dependent materialized views first.",
+            tableNameWithType, dependentMVs.size(), dependentMVs));
+      }
+    }
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, tableNameWithType);
@@ -2476,6 +2723,23 @@ public class PinotHelixResourceManager {
     // Remove task related metadata
     MinionTaskMetadataUtils.deleteTaskMetadata(_propertyStore, tableNameWithType);
     LOGGER.info("Deleting table {}: Removed all minion task metadata", tableNameWithType);
+
+    // Remove materialized view metadata (if any) and unregister from consistency manager
+    notifyMaterializedViewConsistencyManagerForTableDrop(tableNameWithType);
+    try {
+      MaterializedViewDefinitionMetadataUtils.delete(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed MV definition metadata", tableNameWithType);
+    } catch (Exception e) {
+      LOGGER.debug("Deleting table {}: No MV definition metadata to remove or removal failed",
+          tableNameWithType, e);
+    }
+    try {
+      MaterializedViewRuntimeMetadataUtils.delete(_propertyStore, tableNameWithType);
+      LOGGER.info("Deleting table {}: Removed MV runtime metadata", tableNameWithType);
+    } catch (Exception e) {
+      LOGGER.debug("Deleting table {}: No MV runtime metadata to remove or removal failed",
+          tableNameWithType, e);
+    }
 
     // Remove table config
     // NOTE: This should always be the last step for deletion to avoid race condition in table re-create
@@ -2749,6 +3013,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, tableNameWithType);
 
     assignSegment(tableConfig, segmentZKMetadata);
+    // MV notify fires inside createSegmentZkMetadata above; no separate call needed here.
   }
 
   public boolean needTieredSegmentAssignment(TableConfig tableConfig) {
@@ -2940,16 +3205,44 @@ public class PinotHelixResourceManager {
    * @return
    */
   public boolean createSegmentZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
-    return ZKMetadataProvider.createSegmentZkMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+    boolean created =
+        ZKMetadataProvider.createSegmentZkMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+    if (created) {
+      // Notify the MV consistency manager so any partition of a dependent MV that overlaps the
+      // new segment's time range is marked STALE.  This hook covers the OFFLINE segment-upload
+      // paths that route through `ZKOperator.processNewSegment` (REST `/segments` upload) and
+      // the legacy `addNewSegment` helper.
+      //
+      // NOTE: the LLC realtime-segment-commit path (`PinotLLCRealtimeSegmentManager
+      // .persistSegmentZKMetadata`) writes directly via `_propertyStore.set` and does NOT
+      // route through this method.  `MaterializedViewAnalyzer.validateSourceTable` rejects
+      // REALTIME source tables at create time precisely because of this gap; if/when realtime
+      // sources are supported in a later PR the LLC commit path must also gain a notify hook.
+      notifyMaterializedViewConsistencyManager(tableNameWithType, segmentZKMetadata.getStartTimeMs(),
+          segmentZKMetadata.getEndTimeMs());
+    }
+    return created;
   }
 
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
-    return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata,
+    boolean updated = ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata,
         expectedVersion);
+    if (updated) {
+      // Segment metadata updates (e.g. refresh, CRC change) may shift the segment's time range
+      // or replace its content.  Notify so MV partitions that overlap pick up STALE.
+      notifyMaterializedViewConsistencyManager(tableNameWithType, segmentZKMetadata.getStartTimeMs(),
+          segmentZKMetadata.getEndTimeMs());
+    }
+    return updated;
   }
 
   public boolean updateZkMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
-    return ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+    boolean updated = ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, tableNameWithType, segmentZKMetadata);
+    if (updated) {
+      notifyMaterializedViewConsistencyManager(tableNameWithType, segmentZKMetadata.getStartTimeMs(),
+          segmentZKMetadata.getEndTimeMs());
+    }
+    return updated;
   }
 
   public boolean removeSegmentZKMetadata(String tableNameWithType, String segmentName) {
@@ -4425,7 +4718,7 @@ public class PinotHelixResourceManager {
     // is safe to physically delete segments.
     if (!segmentsToCleanUp.isEmpty()) {
       LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
-      deleteSegments(tableNameWithType, segmentsToCleanUp);
+      deleteSegmentsForLineageCleanup(tableNameWithType, segmentsToCleanUp);
     }
 
     // Only successful attempt can reach here
@@ -4478,6 +4771,24 @@ public class PinotHelixResourceManager {
         }
 
         Set<String> segmentsForTable = new HashSet<>(getSegmentsFor(tableNameWithType, false));
+        // Re-validate that every segmentsFrom is still present in IdealState.
+        // If a segment was deleted concurrently while it was added in the LineageEntry,
+        // the lineage entry is now corrupt and should be reverted.
+        List<String> missingSegmentsFrom = new ArrayList<>();
+        for (String segment : lineageEntry.getSegmentsFrom()) {
+          if (!segmentsForTable.contains(segment)) {
+            missingSegmentsFrom.add(segment);
+          }
+        }
+        if (!missingSegmentsFrom.isEmpty()) {
+          String errorMsg = "Cannot complete segment replacement: segments from 'segmentsFrom' no longer exist in "
+              + "IdealState (likely deleted by a concurrent request). Recover by calling revertReplaceSegments with "
+              + "forceRevert=true. (tableNameWithType=" + tableNameWithType + ", segmentLineageEntryId="
+              + segmentLineageEntryId + ", missingSegmentsFrom=" + missingSegmentsFrom + ")";
+          LOGGER.error(errorMsg);
+          throw new RuntimeException(errorMsg);
+        }
+
         List<String> segmentsTo = lineageEntry.getSegmentsTo();
         if (endReplaceSegmentsRequest != null && !endReplaceSegmentsRequest.getSegmentsTo().isEmpty()) {
           Set<String> segmentsToInSet = new HashSet<>(segmentsTo);
@@ -4535,6 +4846,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("endReplaceSegments is successfully processed in {} ms on attempt: {}. (tableNameWithType = {}, "
             + "segmentLineageEntryId = {})", System.currentTimeMillis() - endReplaceSegmentsTs, attemptCount + 1,
         tableNameWithType, segmentLineageEntryId);
+
+    notifyMaterializedViewConsistencyManagerForReplace(tableNameWithType, segmentLineageEntryId);
   }
 
   /**
@@ -4659,7 +4972,7 @@ public class PinotHelixResourceManager {
 
           // Invoke the proactive clean-up for segments that we no longer needs
           if (!segmentsTo.isEmpty()) {
-            deleteSegments(tableNameWithType, segmentsTo);
+            deleteSegmentsForLineageCleanup(tableNameWithType, segmentsTo);
           }
           return true;
         } else {
@@ -5095,6 +5408,10 @@ public class PinotHelixResourceManager {
     return new WatermarkInductionResult(watermarks);
   }
 
+  public void setQueryWorkloadManager(QueryWorkloadManager queryWorkloadManager) {
+    _queryWorkloadManager = queryWorkloadManager;
+  }
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
@@ -5123,4 +5440,401 @@ public class PinotHelixResourceManager {
     System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(record));
   }
    */
+
+  // ── MV Consistency Manager helpers ──
+
+  /// Persists [MaterializedViewDefinitionMetadata] to ZooKeeper for an MV table at create
+  /// time so [#notifyMaterializedViewConsistencyManagerForTableCreate] can register the MV
+  /// against the authoritative `baseTables` list rather than depending on its `definedSQL`
+  /// re-parse fallback. The scheduler's cold-start path will also find the znode and skip
+  /// its own lazy initialisation (see
+  /// [org.apache.pinot.materializedview.scheduler.MaterializedViewTaskScheduler#getWatermarkMs]).
+  ///
+  /// Write semantics:
+  ///
+  ///   - **Best-effort**: this runs after the table is otherwise fully set up
+  ///       (TableConfig persisted, ideal state assigned, BrokerResource updated). Throwing
+  ///       here would leave the cluster in a half-committed state — the table is already
+  ///       visible to brokers and the rollback handler at the top of `addTable` has been
+  ///       passed. Any exception is logged at WARN and we continue; the notify path's
+  ///       `extractSourceTableName` fallback keeps registration correct.
+  ///   - **`createIfAbsent`**: an existing znode from a prior scheduler cold-start or a
+  ///       prior CREATE retry is left in place. The scheduler's createIfAbsent uses the same
+  ///       contract, and the
+  ///       [MaterializedViewDefinitionMetadataBuilder] produces byte-identical content for
+  ///       the same MV, so an existing znode is by construction equivalent to what we would
+  ///       write.
+  ///   - **Non-MV tables**: early-returns without any ZK round-trips.
+  private void persistMaterializedViewDefinitionMetadataBestEffort(TableConfig tableConfig) {
+    if (!tableConfig.isMaterializedView()) {
+      return;
+    }
+    String tableNameWithType = tableConfig.getTableName();
+    try {
+      Map<String, String> taskConfigs = tableConfig.getMaterializedViewTaskConfigs();
+      if (taskConfigs == null) {
+        LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
+            tableNameWithType);
+        return;
+      }
+      String definedSql = taskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+      if (definedSql == null || definedSql.isEmpty()) {
+        LOGGER.warn("MV table {} has no definedSQL; skipping definition metadata persist", tableNameWithType);
+        return;
+      }
+      // The source table name MUST be a simple identifier — `MaterializedViewAnalyzer` rejects
+      // anything else at validate time, so this call is safe for any MV that reached addTable.
+      String sourceRawTableName = MaterializedViewAnalyzer.extractSourceTableName(definedSql);
+
+      String sourceTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(sourceRawTableName);
+      TableConfig sourceTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, sourceTableWithType);
+      if (sourceTableConfig == null) {
+        sourceTableWithType = TableNameBuilder.REALTIME.tableNameWithType(sourceRawTableName);
+        sourceTableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, sourceTableWithType);
+      }
+      if (sourceTableConfig == null) {
+        LOGGER.warn("MV table {} source table '{}' not found in OFFLINE or REALTIME variants; "
+            + "skipping definition metadata persist", tableNameWithType, sourceRawTableName);
+        return;
+      }
+      Schema sourceSchema = ZKMetadataProvider.getSchema(_propertyStore, sourceRawTableName);
+      if (sourceSchema == null) {
+        LOGGER.warn("MV table {} source table '{}' has no schema; skipping definition metadata persist",
+            tableNameWithType, sourceRawTableName);
+        return;
+      }
+      String viewRawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      Schema viewSchema = ZKMetadataProvider.getSchema(_propertyStore, viewRawTableName);
+      if (viewSchema == null) {
+        LOGGER.warn("MV table {} has no schema; skipping definition metadata persist", tableNameWithType);
+        return;
+      }
+
+      // partitionExprMaps comes from analyzer post-validation; we re-extract from the
+      // already-validated definedSQL + viewSchema, which is cheap (single Calcite parse).
+      Map<String, String> partitionExprMaps =
+          MaterializedViewAnalyzer.extractPartitionExprMaps(definedSql, viewSchema);
+
+      MaterializedViewDefinitionMetadata definition = MaterializedViewDefinitionMetadataBuilder.build(
+          tableNameWithType, tableConfig, viewSchema, sourceTableConfig, sourceSchema,
+          sourceRawTableName, definedSql, partitionExprMaps);
+      if (MaterializedViewDefinitionMetadataUtils.createIfAbsent(_propertyStore, definition)) {
+        LOGGER.info("Adding table {}: Persisted MV definition metadata (baseTables={})",
+            tableNameWithType, definition.getBaseTables());
+      } else {
+        LOGGER.info("Adding table {}: MV definition metadata already exists; leaving in place",
+            tableNameWithType);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Adding table {}: Best-effort MV definition metadata persist failed; "
+              + "consistency manager will fall back to extractSourceTableName",
+          tableNameWithType, e);
+    }
+  }
+
+  /// Backfills the {@link MaterializedViewConsistencyManager}'s reverse index against the
+  /// authoritative TableConfig list at controller startup, closing the post-restart orphan
+  /// window for MVs whose definition znode is missing.
+  ///
+  /// <h3>Why this is needed</h3>
+  ///
+  /// The consistency manager's startup `rebuildReverseIndex` only scans existing definition
+  /// znodes, while the in-session {@link #persistMaterializedViewDefinitionMetadataBestEffort}
+  /// is best-effort: a transient ZK failure at create time leaves an MV with
+  /// `tableConfig.isMaterializedView()=true` but no definition znode.  Same controller session
+  /// is fine — {@link #notifyMaterializedViewConsistencyManagerForTableCreate} also
+  /// `extractSourceTableName`-falls back into the in-memory reverse index.  But on restart
+  /// `rebuildReverseIndex` would not see that MV at all, and the {@code DROP TABLE} delete-guard
+  /// (which consults only the in-memory reverse index) would let an operator silently orphan
+  /// the MV by dropping its base table.  The same hole applies to MVs created on a controller
+  /// version older than definition znodes (none ever existed for them) and to znodes lost
+  /// to manual ZK surgery.
+  ///
+  /// <h3>What it does</h3>
+  ///
+  /// Walks {@link #getAllRawMaterializedViewNames} (filtered by
+  /// {@code TableConfig.isMaterializedView()}) and, for every MV missing a definition znode:
+  ///
+  ///   1. Resolves `baseTables` via {@link MaterializedViewAnalyzer#extractSourceTableName} on
+  ///      the persisted `definedSQL` — same fallback used by the in-session create path, so
+  ///      post-restart and same-session reverse indexes are by construction byte-identical.
+  ///   2. Registers the MV with the consistency manager in memory.  Idempotent: the manager
+  ///      dedupes inside {@code onMaterializedViewTableCreated}.
+  ///   3. Best-effort writes the definition znode via
+  ///      {@link #persistMaterializedViewDefinitionMetadataBestEffort} so the next restart
+  ///      doesn't have to backfill again, and so the listener-driven rebuilds stay self-healing.
+  ///
+  /// <h3>Two-phase ordering</h3>
+  ///
+  /// In-memory registration runs to completion BEFORE any znode write — phase 2's writes fire
+  /// {@code DefinitionChangeListener.handleChildChange} which clears+rebuilds the reverse index
+  /// from znodes, so kicking off znode writes mid-iteration would race against partially
+  /// rebuilt in-memory state and force MVs with missing source tables out of the index. By
+  /// finishing phase 1 first, even MVs that ultimately can't have their znode written keep the
+  /// in-memory protection until the next listener-driven rebuild (and that rebuild only wipes
+  /// MVs whose source is gone — for which the DROP-base-table orphan path is moot anyway).
+  ///
+  /// <h3>Failure isolation</h3>
+  ///
+  /// Per-MV try/catch.  A single corrupt `definedSQL`, missing source, or ZK glitch logs WARN
+  /// and continues — controller startup must not be held hostage by one broken MV.
+  ///
+  /// <h3>Caller contract</h3>
+  ///
+  /// Must be called exactly once at controller startup, AFTER
+  /// {@link MaterializedViewConsistencyManager#init} and BEFORE
+  /// {@link #registerMaterializedViewConsistencyManager} so the reverse index is fully
+  /// populated before any segment / table notify path can short-circuit on a missing entry.
+  public void backfillMaterializedViewReverseIndex(MaterializedViewConsistencyManager mgr) {
+    if (mgr == null) {
+      return;
+    }
+    List<String> mvRawNames;
+    try {
+      mvRawNames = getAllRawMaterializedViewNames(null);
+    } catch (Exception e) {
+      LOGGER.error("MV reverse-index backfill: failed to enumerate MVs; skipping backfill", e);
+      return;
+    }
+    if (mvRawNames.isEmpty()) {
+      LOGGER.info("MV reverse-index backfill: no MVs in cluster; nothing to do");
+      return;
+    }
+
+    // Phase 1: register every missing-znode MV in memory using the same extractSourceTableName
+    // fallback the in-session create path uses.  No znode writes here, so no listener firings,
+    // so phase 1's in-memory state is fully built before any clear+rebuild can interleave.
+    List<TableConfig> mvsNeedingZnodePersist = new ArrayList<>();
+    int registered = 0;
+    for (String rawName : mvRawNames) {
+      String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawName);
+      try {
+        TableConfig cfg = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+        // Defensive re-check — getAllRawMaterializedViewNames already filtered, but the
+        // TableConfig could have flipped (or been deleted) between that scan and here.
+        if (cfg == null || !cfg.isMaterializedView()) {
+          continue;
+        }
+        // Skip MVs whose authoritative definition znode is already present — the manager's
+        // init() already picked them up via rebuildReverseIndex.  Avoid the redundant
+        // in-memory register and the redundant phase-2 znode build.
+        if (MaterializedViewDefinitionMetadataUtils.fetch(_propertyStore, tableNameWithType) != null) {
+          continue;
+        }
+        List<String> baseTables = resolveBaseTablesForBackfill(cfg);
+        if (baseTables == null || baseTables.isEmpty()) {
+          continue;
+        }
+        mgr.onMaterializedViewTableCreated(tableNameWithType, baseTables);
+        mvsNeedingZnodePersist.add(cfg);
+        registered++;
+      } catch (Exception e) {
+        LOGGER.warn("MV reverse-index backfill: failed to register {} in memory; skipping",
+            tableNameWithType, e);
+      }
+    }
+    LOGGER.info("MV reverse-index backfill phase 1: scanned {} MV(s), registered {} missing entries",
+        mvRawNames.size(), registered);
+
+    if (mvsNeedingZnodePersist.isEmpty()) {
+      return;
+    }
+
+    // Phase 2: best-effort persist the definition znode so the next restart doesn't have to
+    // re-backfill, and so MVs whose source is intact transition cleanly to "znode-backed".
+    // persistMaterializedViewDefinitionMetadataBestEffort handles the source-missing /
+    // schema-missing cases internally and is itself try/catch-wrapped, so a single MV's
+    // failure here cannot abort the loop.
+    int znodeAttempted = 0;
+    for (TableConfig cfg : mvsNeedingZnodePersist) {
+      try {
+        persistMaterializedViewDefinitionMetadataBestEffort(cfg);
+        znodeAttempted++;
+      } catch (Exception e) {
+        LOGGER.warn("MV reverse-index backfill: best-effort znode persist threw for {}; continuing",
+            cfg.getTableName(), e);
+      }
+    }
+    LOGGER.info("MV reverse-index backfill phase 2: attempted znode persist for {} MV(s)",
+        znodeAttempted);
+  }
+
+  /// Resolves the {@code baseTables} list for an MV during reverse-index backfill, using the
+  /// same {@link MaterializedViewAnalyzer#extractSourceTableName} fallback as the in-session
+  /// create path so post-restart and same-session reverse indexes are byte-identical.
+  ///
+  /// Returns {@code null} when the MV is not currently registerable (no taskConfigs, no
+  /// `definedSQL`, or unparseable SQL) — the caller logs and skips.  The caller has already
+  /// checked the authoritative znode path; this helper is only the fallback.
+  @Nullable
+  private List<String> resolveBaseTablesForBackfill(TableConfig cfg) {
+    String tableNameWithType = cfg.getTableName();
+    Map<String, String> taskCfg = cfg.getMaterializedViewTaskConfigs();
+    if (taskCfg == null) {
+      LOGGER.warn("MV reverse-index backfill: MV table {} has no MaterializedViewTask config; skipping",
+          tableNameWithType);
+      return null;
+    }
+    String definedSql = taskCfg.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+    if (definedSql == null || definedSql.isEmpty()) {
+      LOGGER.warn("MV reverse-index backfill: MV table {} has no definedSQL; skipping",
+          tableNameWithType);
+      return null;
+    }
+    try {
+      String sourceTable = MaterializedViewAnalyzer.extractSourceTableName(definedSql);
+      return Collections.singletonList(sourceTable);
+    } catch (Exception e) {
+      LOGGER.warn("MV reverse-index backfill: failed to extract source table from definedSQL "
+          + "for MV table {}; skipping", tableNameWithType, e);
+      return null;
+    }
+  }
+
+  private void notifyMaterializedViewConsistencyManagerForTableCreate(TableConfig tableConfig) {
+    MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
+    if (mgr == null || !tableConfig.isMaterializedView()) {
+      return;
+    }
+    try {
+      MaterializedViewDefinitionMetadata definition =
+          MaterializedViewDefinitionMetadataUtils.fetch(_propertyStore, tableConfig.getTableName());
+      if (definition != null && definition.getBaseTables() != null && !definition.getBaseTables().isEmpty()) {
+        mgr.onMaterializedViewTableCreated(tableConfig.getTableName(), definition.getBaseTables());
+        return;
+      }
+      Map<String, String> materializedViewTaskConfigs = tableConfig.getMaterializedViewTaskConfigs();
+      if (materializedViewTaskConfigs == null) {
+        LOGGER.warn("MV table {} has no MaterializedViewTask config for consistency registration",
+            tableConfig.getTableName());
+        return;
+      }
+      String definedSQL = materializedViewTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+      if (definedSQL == null || definedSQL.isEmpty()) {
+        return;
+      }
+      String sourceTable = MaterializedViewAnalyzer.extractSourceTableName(definedSQL);
+      mgr.onMaterializedViewTableCreated(tableConfig.getTableName(), Collections.singletonList(sourceTable));
+    } catch (Exception e) {
+      LOGGER.warn("Failed to register MV table {} with consistency manager", tableConfig.getTableName(), e);
+    }
+  }
+
+  private void notifyMaterializedViewConsistencyManagerForTableDrop(String tableNameWithType) {
+    MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
+    if (mgr == null) {
+      return;
+    }
+    try {
+      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      if (tableConfig != null && !tableConfig.isMaterializedView()) {
+        return;
+      }
+      MaterializedViewDefinitionMetadata materializedViewDefinition =
+          MaterializedViewDefinitionMetadataUtils.fetch(_propertyStore, tableNameWithType);
+      if (materializedViewDefinition != null && materializedViewDefinition.getBaseTables() != null
+          && !materializedViewDefinition.getBaseTables().isEmpty()) {
+        mgr.onMaterializedViewTableDropped(tableNameWithType, materializedViewDefinition.getBaseTables());
+      } else if (tableConfig != null && tableConfig.isMaterializedView()) {
+        // Definition znode missing but the MV exists — fall back to extractSourceTableName
+        // from the persisted definedSQL, mirroring the symmetric in-session fallback used by
+        // notifyMaterializedViewConsistencyManagerForTableCreate.  Without this, an MV whose
+        // znode persist failed at create time (best-effort path) would be unregisterable on
+        // drop, leaking a ghost reverse-index entry that subsequently blocks legitimate
+        // DROP TABLE on its (now genuinely independent) base table.
+        Map<String, String> mvTaskCfgs = tableConfig.getMaterializedViewTaskConfigs();
+        String definedSqlForDrop = mvTaskCfgs == null
+            ? null : mvTaskCfgs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+        if (definedSqlForDrop != null && !definedSqlForDrop.isEmpty()) {
+          try {
+            String src = MaterializedViewAnalyzer.extractSourceTableName(definedSqlForDrop);
+            mgr.onMaterializedViewTableDropped(tableNameWithType, Collections.singletonList(src));
+            LOGGER.info("MV table {} dropped via definedSQL fallback (definition znode absent)",
+                tableNameWithType);
+            return;
+          } catch (Exception ignore) {
+            // fall through to the warn below — the SQL is unparseable so the in-memory entry
+            // (if any) was registered with a different key and we cannot deterministically
+            // reverse it.  Operator action required.
+          }
+        }
+        LOGGER.warn("MV table {} dropped without recoverable definition; "
+            + "consistency reverse index may be stale", tableNameWithType);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to unregister MV table {} from consistency manager", tableNameWithType, e);
+    }
+  }
+
+  private void notifyMaterializedViewConsistencyManager(String tableNameWithType, long startTimeMs, long endTimeMs) {
+    MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
+    if (mgr == null) {
+      return;
+    }
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    // Fast-path: skip ALL further work — including any log emission — when no MV depends on
+    // this base table.  This method is called on every controller-side ZK segment-metadata
+    // write (createSegmentZkMetadata + updateZkMetadata), which on a realtime table fires at
+    // the per-consuming-segment commit rate.  Without this early bail, even a no-op notify
+    // chain (extract name + WARN log + onBaseTableFullInvalidation → fast-path inside) would
+    // multiply controller CPU + log volume on every realtime commit.  Verified by
+    // PauselessRealtimeIngestionNewSegmentMetadataCreationFailureTest, which timed out at 100s
+    // when the per-commit WARN log was unconditionally emitted.
+    if (mgr.getDependentMaterializedViews(rawTableName).isEmpty()) {
+      return;
+    }
+    if (startTimeMs < 0 || endTimeMs < 0) {
+      // Consuming/realtime segments and segments built from records with null timestamps
+      // can carry -1 startTime/endTime in their ZK metadata. Skipping the notification would
+      // leave any MV defined on top of this base table with stale VALID partitions; we instead
+      // signal a full-range invalidation so the consistency manager marks every affected
+      // partition STALE.
+      LOGGER.warn("Base table {} segment update reports startTimeMs={}, endTimeMs={}; treating "
+              + "as full-range MV invalidation.", tableNameWithType, startTimeMs, endTimeMs);
+      mgr.onBaseTableFullInvalidation(rawTableName);
+      return;
+    }
+    mgr.onBaseTableDataChange(rawTableName, startTimeMs, endTimeMs);
+  }
+
+  private void notifyMaterializedViewConsistencyManagerForReplace(String tableNameWithType,
+      String segmentLineageEntryId) {
+    MaterializedViewConsistencyManager mgr = _materializedViewConsistencyManager;
+    if (mgr == null) {
+      return;
+    }
+    try {
+      SegmentLineage lineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+      if (lineage == null) {
+        return;
+      }
+      LineageEntry entry = lineage.getLineageEntry(segmentLineageEntryId);
+      if (entry == null) {
+        return;
+      }
+      long minStart = Long.MAX_VALUE;
+      long maxEnd = Long.MIN_VALUE;
+      for (String segName : entry.getSegmentsFrom()) {
+        SegmentZKMetadata meta = getSegmentZKMetadata(tableNameWithType, segName);
+        if (meta != null) {
+          minStart = Math.min(minStart, meta.getStartTimeMs());
+          maxEnd = Math.max(maxEnd, meta.getEndTimeMs());
+        }
+      }
+      for (String segName : entry.getSegmentsTo()) {
+        SegmentZKMetadata meta = getSegmentZKMetadata(tableNameWithType, segName);
+        if (meta != null) {
+          minStart = Math.min(minStart, meta.getStartTimeMs());
+          maxEnd = Math.max(maxEnd, meta.getEndTimeMs());
+        }
+      }
+      if (minStart != Long.MAX_VALUE && maxEnd != Long.MIN_VALUE) {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        mgr.onBaseTableDataChange(rawTableName, minStart, maxEnd);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to notify MV consistency manager for segment replace on table: {}",
+          tableNameWithType, e);
+    }
+  }
 }

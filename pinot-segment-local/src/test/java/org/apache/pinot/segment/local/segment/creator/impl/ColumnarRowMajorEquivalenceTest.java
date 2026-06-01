@@ -76,6 +76,7 @@ public class ColumnarRowMajorEquivalenceTest extends ColumnarSegmentBuildingTest
       Assert.assertTrue(columnNames.contains(BIG_DECIMAL_COL), "BIG_DECIMAL column missing");
       Assert.assertTrue(columnNames.contains(BYTES_COL), "BYTES column missing");
       Assert.assertTrue(columnNames.contains(MV_INT_COL), "Multi-value INT column missing");
+      Assert.assertTrue(columnNames.contains(MV_BIG_DECIMAL_COL), "Multi-value BIG_DECIMAL column missing");
       Assert.assertTrue(columnNames.contains(MV_STRING_COL), "Multi-value STRING column missing");
       Assert.assertTrue(columnNames.contains(TIME_COL), "TIME column missing");
     } finally {

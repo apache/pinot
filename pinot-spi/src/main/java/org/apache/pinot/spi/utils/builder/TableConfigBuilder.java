@@ -66,6 +66,7 @@ public class TableConfigBuilder {
   private final TableType _tableType;
   private String _tableName;
   private boolean _isDimTable;
+  private boolean _isMaterializedView;
 
   // Segments config related
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
@@ -74,14 +75,14 @@ public class TableConfigBuilder {
   private String _retentionTimeUnit;
   private String _retentionTimeValue;
   private String _deletedSegmentsRetentionPeriod = DEFAULT_DELETED_SEGMENTS_RETENTION_PERIOD;
+  private String _replacedSegmentsRetentionPeriod;
+  private String _lineageEntryCleanupRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency;
 
   // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
-  @Deprecated
-  private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
   @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
@@ -161,6 +162,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setIsMaterializedView(boolean isMaterializedView) {
+    _isMaterializedView = isMaterializedView;
+    return this;
+  }
+
   public TableConfigBuilder addFieldConfig(FieldConfig config) {
     if (_fieldConfigList == null) {
       _fieldConfigList = new ArrayList<>();
@@ -207,6 +213,16 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setReplacedSegmentsRetentionPeriod(String replacedSegmentsRetentionPeriod) {
+    _replacedSegmentsRetentionPeriod = replacedSegmentsRetentionPeriod;
+    return this;
+  }
+
+  public TableConfigBuilder setLineageEntryCleanupRetentionPeriod(String lineageEntryCleanupRetentionPeriod) {
+    _lineageEntryCleanupRetentionPeriod = lineageEntryCleanupRetentionPeriod;
+    return this;
+  }
+
   /**
    * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
@@ -224,11 +240,6 @@ public class TableConfigBuilder {
    */
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
-    return this;
-  }
-
-  public TableConfigBuilder setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
-    _segmentAssignmentStrategy = segmentAssignmentStrategy;
     return this;
   }
 
@@ -510,9 +521,10 @@ public class TableConfigBuilder {
     validationConfig.setRetentionTimeUnit(_retentionTimeUnit);
     validationConfig.setRetentionTimeValue(_retentionTimeValue);
     validationConfig.setDeletedSegmentsRetentionPeriod(_deletedSegmentsRetentionPeriod);
+    validationConfig.setReplacedSegmentsRetentionPeriod(_replacedSegmentsRetentionPeriod);
+    validationConfig.setLineageEntryCleanupRetentionPeriod(_lineageEntryCleanupRetentionPeriod);
     validationConfig.setSegmentPushFrequency(_segmentPushFrequency);
     validationConfig.setSegmentPushType(_segmentPushType);
-    validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
     validationConfig.setReplication(_numReplicas);
@@ -562,7 +574,8 @@ public class TableConfigBuilder {
         new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
             _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
             _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
-            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap, _tableSamplers);
+            _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap,
+            _tableSamplers, _isMaterializedView);
     tableConfig.setDescription(_description);
     tableConfig.setTags(_tags);
     return tableConfig;

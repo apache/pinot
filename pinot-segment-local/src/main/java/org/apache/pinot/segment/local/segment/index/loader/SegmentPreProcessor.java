@@ -34,7 +34,7 @@ import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.Col
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandler;
 import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.LegacyRawValueInvertedIndexCleanup;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
@@ -113,6 +113,12 @@ public class SegmentPreProcessor implements AutoCloseable {
     removeInvertedIndexTempFiles(indexDir);
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Backward-compat shim: invalidate any legacy raw-value embedded-dictionary inverted indexes left over from
+      // PR #17060 (reverted by PR #18410) so the standard handlers can rebuild them in the dict-id format. Must
+      // run before any handler that may try to read the inverted-index buffer. Safe to delete after Pinot 1.7;
+      // see [LegacyRawValueInvertedIndexCleanup] javadoc for the full sunset checklist.
+      LegacyRawValueInvertedIndexCleanup.removeLegacyRawValueInvertedIndexes(segmentWriter);
+
       // Update default columns according to the schema.
       DefaultColumnHandler defaultColumnHandler =
           DefaultColumnHandlerFactory.getDefaultColumnHandler(indexDir, segmentMetadata, _indexLoadingConfig,
@@ -124,9 +130,14 @@ public class SegmentPreProcessor implements AutoCloseable {
       List<IndexHandler> indexHandlers = new ArrayList<>();
 
       // We cannot just create all the index handlers in a random order.
-      // Specifically, ForwardIndexHandler needs to be executed first. This is because it modifies the segment metadata
-      // while rewriting forward index to create a dictionary. Some other handlers (like the range one) assume that
-      // metadata was already been modified by ForwardIndexHandler.
+      // Specifically, ForwardIndexHandler MUST run first. It is the only handler that:
+      //   (a) creates the shared dictionary for a RAW forward index column when a secondary index requires one
+      //       (ENABLE_DICTIONARY operation in ForwardIndexHandler.createDictionaryForRawForwardIndex);
+      //   (b) updates the segment metadata's HAS_DICTIONARY / FORWARD_INDEX_ENCODING properties accordingly.
+      // The InvertedIndexHandler / RangeIndexHandler / FSTIndexHandler then read the freshly-reloaded metadata and
+      // build dict-id-based indexes on top of the new shared dictionary. If this order is violated, downstream
+      // handlers fail with an IllegalStateException because the dictionary they require does not yet exist.
+      // Any future change to handler scheduling MUST preserve: ForwardIndexHandler → reloadMetadata → other handlers.
       IndexHandler forwardHandler = createHandler(StandardIndexes.forward());
       indexHandlers.add(forwardHandler);
       forwardHandler.updateIndices(segmentWriter);

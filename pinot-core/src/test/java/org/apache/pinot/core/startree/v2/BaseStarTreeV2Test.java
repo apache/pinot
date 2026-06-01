@@ -482,11 +482,11 @@ abstract class BaseStarTreeV2Test<R, A> {
       return dictionary.get(reader.getDictId(docId, readerContext));
     } else {
       int[] dictIds = reader.getDictIdMV(docId, readerContext);
-        Object[] rawValue = new Object[dictIds.length];
-        for (int i = 0; i < dictIds.length; i++) {
-          rawValue[i] = dictionary.get(dictIds[i]);
-        }
-        return rawValue;
+      Object[] rawValue = new Object[dictIds.length];
+      for (int i = 0; i < dictIds.length; i++) {
+        rawValue[i] = dictionary.get(dictIds[i]);
+      }
+      return rawValue;
     }
   }
 

@@ -33,7 +33,7 @@ public class AuthUtils {
     // controller
     properties.put("pinot.controller.segment.fetcher.auth.token", DEFAULT_AUTH_TOKEN);
     properties.put("controller.admin.access.control.factory.class",
-      "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
+        "org.apache.pinot.controller.api.access.BasicAuthAccessControlFactory");
     properties.put("controller.admin.access.control.principals", "admin, user, service, tableonly");
     properties.put("controller.admin.access.control.principals.admin.password", "verysecret");
     properties.put("controller.admin.access.control.principals.service.password", "verysecrettoo");

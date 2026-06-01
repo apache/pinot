@@ -31,7 +31,6 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -51,7 +50,6 @@ public class ConsistentDataPushUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsistentDataPushUtils.class);
-  private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0);
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
 
@@ -113,42 +111,48 @@ public class ConsistentDataPushUtils {
     Map<URI, URI> segmentsUris = getStartReplaceSegmentUris(spec, rawTableName);
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     LOGGER.info("Start replace segment URIs: {}", segmentsUris);
+    FileUploadDownloadClient fileUploadDownloadClient = SegmentPushUtils.getOrCreateFileUploadDownloadClient(spec);
+    int socketTimeoutMs = SegmentPushUtils.getSocketTimeoutMs(spec);
 
-    for (Map.Entry<URI, URI> entry : segmentsUris.entrySet()) {
-      URI controllerUri = entry.getKey();
-      URI startSegmentUri = entry.getValue();
-      List<String> segmentsFrom = uriToSegmentsFrom.get(controllerUri);
+    try {
+      for (Map.Entry<URI, URI> entry : segmentsUris.entrySet()) {
+        URI controllerUri = entry.getKey();
+        URI startSegmentUri = entry.getValue();
+        List<String> segmentsFrom = uriToSegmentsFrom.get(controllerUri);
 
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest =
-          new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo);
-      DEFAULT_RETRY_POLICY.attempt(() -> {
-        try {
-          SimpleHttpResponse response =
-              FILE_UPLOAD_DOWNLOAD_CLIENT.startReplaceSegments(startSegmentUri, startReplaceSegmentsRequest,
-                  authProvider);
-          String responseString = response.getResponse();
-          LOGGER.info(
-              "Got response {}: {} while sending start replace segment request for table: {}, uploadURI: {}, request:"
-                  + " {}", response.getStatusCode(), responseString, rawTableName, startSegmentUri,
-              startReplaceSegmentsRequest);
-          String segmentLineageEntryId =
-              JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
-          uriToLineageEntryIdMap.put(controllerUri, segmentLineageEntryId);
-          return true;
-        } catch (SocketTimeoutException se) {
-          // In case of the timeout, we should re-try.
-          return false;
-        } catch (HttpErrorStatusException e) {
-          if (e.getStatusCode() >= 500) {
+        StartReplaceSegmentsRequest startReplaceSegmentsRequest =
+            new StartReplaceSegmentsRequest(segmentsFrom, segmentsTo);
+        DEFAULT_RETRY_POLICY.attempt(() -> {
+          try {
+            SimpleHttpResponse response =
+                fileUploadDownloadClient.startReplaceSegments(startSegmentUri, startReplaceSegmentsRequest,
+                    authProvider, socketTimeoutMs);
+            String responseString = response.getResponse();
+            LOGGER.info(
+                "Got response {}: {} while sending start replace segment request for table: {}, uploadURI: {}, request:"
+                    + " {}", response.getStatusCode(), responseString, rawTableName, startSegmentUri,
+                startReplaceSegmentsRequest);
+            String segmentLineageEntryId =
+                JsonUtils.stringToJsonNode(responseString).get("segmentLineageEntryId").asText();
+            uriToLineageEntryIdMap.put(controllerUri, segmentLineageEntryId);
+            return true;
+          } catch (SocketTimeoutException se) {
+            // In case of the timeout, we should re-try.
             return false;
-          } else {
-            if (e.getStatusCode() == Response.Status.NOT_FOUND.getStatusCode()) {
-              LOGGER.error("Table: {} not found when sending request: {}", rawTableName, startSegmentUri);
+          } catch (HttpErrorStatusException e) {
+            if (e.getStatusCode() >= 500) {
+              return false;
+            } else {
+              if (e.getStatusCode() == Response.Status.NOT_FOUND.getStatusCode()) {
+                LOGGER.error("Table: {} not found when sending request: {}", rawTableName, startSegmentUri);
+              }
+              throw e;
             }
-            throw e;
           }
-        }
-      });
+        });
+      }
+    } finally {
+      SegmentPushUtils.closeFileUploadDownloadClient(spec, fileUploadDownloadClient);
     }
     return uriToLineageEntryIdMap;
   }
@@ -160,30 +164,35 @@ public class ConsistentDataPushUtils {
       throws Exception {
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     String rawTableName = spec.getTableSpec().getTableName();
-    for (URI controllerUri : uriToLineageEntryIdMap.keySet()) {
-      String segmentLineageEntryId = uriToLineageEntryIdMap.get(controllerUri);
-      URI uri =
-          FileUploadDownloadClient.getEndReplaceSegmentsURI(controllerUri, rawTableName, TableType.OFFLINE.toString(),
-              segmentLineageEntryId, false);
-      DEFAULT_RETRY_POLICY.attempt(() -> {
-        try {
-          SimpleHttpResponse response =
-              FILE_UPLOAD_DOWNLOAD_CLIENT.endReplaceSegments(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS,
-                  null, authProvider);
-          LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURI: {}",
-              response.getStatusCode(), response.getResponse(), rawTableName, uri);
-          return true;
-        } catch (SocketTimeoutException se) {
-          // In case of the timeout, we should re-try.
-          return false;
-        } catch (HttpErrorStatusException e) {
-          if (e.getStatusCode() >= 500) {
+    FileUploadDownloadClient fileUploadDownloadClient = SegmentPushUtils.getOrCreateFileUploadDownloadClient(spec);
+    int socketTimeoutMs = SegmentPushUtils.getSocketTimeoutMs(spec);
+    try {
+      for (URI controllerUri : uriToLineageEntryIdMap.keySet()) {
+        String segmentLineageEntryId = uriToLineageEntryIdMap.get(controllerUri);
+        URI uri =
+            FileUploadDownloadClient.getEndReplaceSegmentsURI(controllerUri, rawTableName, TableType.OFFLINE.toString(),
+                segmentLineageEntryId, false);
+        DEFAULT_RETRY_POLICY.attempt(() -> {
+          try {
+            SimpleHttpResponse response =
+                fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, null, authProvider);
+            LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURI: {}",
+                response.getStatusCode(), response.getResponse(), rawTableName, uri);
+            return true;
+          } catch (SocketTimeoutException se) {
+            // In case of the timeout, we should re-try.
             return false;
-          } else {
-            throw e;
+          } catch (HttpErrorStatusException e) {
+            if (e.getStatusCode() >= 500) {
+              return false;
+            } else {
+              throw e;
+            }
           }
-        }
-      });
+        });
+      }
+    } finally {
+      SegmentPushUtils.closeFileUploadDownloadClient(spec, fileUploadDownloadClient);
     }
   }
 
@@ -198,18 +207,25 @@ public class ConsistentDataPushUtils {
       LOGGER.error("Exception when pushing segments. Marking segment lineage entry to 'REVERTED'.", exception);
       String rawTableName = spec.getTableSpec().getTableName();
       AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
-      for (Map.Entry<URI, String> entry : uriToLineageEntryIdMap.entrySet()) {
-        String segmentLineageEntryId = entry.getValue();
-        try {
-          URI uri = FileUploadDownloadClient.getRevertReplaceSegmentsURI(entry.getKey(), rawTableName,
-              TableType.OFFLINE.name(), segmentLineageEntryId, true);
-          SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.revertReplaceSegments(uri, authProvider);
-          LOGGER.info("Got response {}: {} while sending revert replace segment request for table: {}, uploadURI: {}",
-              response.getStatusCode(), response.getResponse(), rawTableName, entry.getKey());
-        } catch (URISyntaxException | HttpErrorStatusException | IOException e) {
-          LOGGER.error("Exception when sending revert replace segment request to controller: {} for table: {}",
-              entry.getKey(), rawTableName, e);
+      FileUploadDownloadClient fileUploadDownloadClient = SegmentPushUtils.getOrCreateFileUploadDownloadClient(spec);
+      int socketTimeoutMs = SegmentPushUtils.getSocketTimeoutMs(spec);
+      try {
+        for (Map.Entry<URI, String> entry : uriToLineageEntryIdMap.entrySet()) {
+          String segmentLineageEntryId = entry.getValue();
+          try {
+            URI uri = FileUploadDownloadClient.getRevertReplaceSegmentsURI(entry.getKey(), rawTableName,
+                TableType.OFFLINE.name(), segmentLineageEntryId, true);
+            SimpleHttpResponse response =
+                fileUploadDownloadClient.revertReplaceSegments(uri, authProvider, socketTimeoutMs);
+            LOGGER.info("Got response {}: {} while sending revert replace segment request for table: {}, uploadURI: {}",
+                response.getStatusCode(), response.getResponse(), rawTableName, entry.getKey());
+          } catch (URISyntaxException | HttpErrorStatusException | IOException e) {
+            LOGGER.error("Exception when sending revert replace segment request to controller: {} for table: {}",
+                entry.getKey(), rawTableName, e);
+          }
         }
+      } finally {
+        SegmentPushUtils.closeFileUploadDownloadClient(spec, fileUploadDownloadClient);
       }
     }
   }
@@ -231,19 +247,25 @@ public class ConsistentDataPushUtils {
   public static Map<URI, List<String>> getSegmentsToReplace(SegmentGenerationJobSpec spec, String rawTableName)
       throws Exception {
     Map<URI, List<String>> uriToOfflineSegments = new HashMap<>();
-    for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
-      URI controllerURI;
-      List<String> offlineSegments;
-      try {
-        controllerURI = new URI(pinotClusterSpec.getControllerURI());
-        AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
-        Map<String, List<String>> segments =
-            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true, authProvider);
-        offlineSegments = segments.get(TableType.OFFLINE.toString());
-        uriToOfflineSegments.put(controllerURI, offlineSegments);
-      } catch (URISyntaxException e) {
-        throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
+    FileUploadDownloadClient fileUploadDownloadClient = SegmentPushUtils.getOrCreateFileUploadDownloadClient(spec);
+    int socketTimeoutMs = SegmentPushUtils.getSocketTimeoutMs(spec);
+    try {
+      for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
+        URI controllerURI;
+        List<String> offlineSegments;
+        try {
+          controllerURI = new URI(pinotClusterSpec.getControllerURI());
+          AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
+          Map<String, List<String>> segments = fileUploadDownloadClient.getSegments(controllerURI, rawTableName,
+              TableType.OFFLINE, true, authProvider, socketTimeoutMs);
+          offlineSegments = segments.get(TableType.OFFLINE.toString());
+          uriToOfflineSegments.put(controllerURI, offlineSegments);
+        } catch (URISyntaxException e) {
+          throw new RuntimeException("Got invalid controller uri - '" + pinotClusterSpec.getControllerURI() + "'");
+        }
       }
+    } finally {
+      SegmentPushUtils.closeFileUploadDownloadClient(spec, fileUploadDownloadClient);
     }
     return uriToOfflineSegments;
   }

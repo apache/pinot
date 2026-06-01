@@ -41,7 +41,8 @@ public abstract class MetadataEventNotifierFactory {
     try {
       LOGGER.info("Instantiating metadata event notifier factory class {}", metadataEventNotifierClassName);
       metadataEventNotifierFactory =
-          (MetadataEventNotifierFactory) Class.forName(metadataEventNotifierClassName).newInstance();
+          (MetadataEventNotifierFactory) Class.forName(metadataEventNotifierClassName).getDeclaredConstructor()
+              .newInstance();
       metadataEventNotifierFactory.init(configuration, helixResourceManager);
       return metadataEventNotifierFactory;
     } catch (Exception e) {

@@ -84,8 +84,8 @@ public class PinotDriver implements Driver {
   public Connection connect(String url, Properties info)
       throws SQLException {
 
-      PinotClientTransport pinotClientTransport = null;
-      PinotControllerTransport pinotControllerTransport = null;
+    PinotClientTransport pinotClientTransport = null;
+    PinotControllerTransport pinotControllerTransport = null;
     try {
       if (!this.acceptsURL(url)) {
         return null;

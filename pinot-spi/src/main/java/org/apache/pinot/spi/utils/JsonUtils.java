@@ -30,6 +30,9 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
@@ -40,6 +43,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -85,17 +91,42 @@ public class JsonUtils {
   public static final String WILDCARD = "*";
 
 
-  // NOTE: Do not expose the ObjectMapper to prevent configuration change
-  private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
+  // NOTE: Do not expose the ObjectMapper to prevent configuration change.
+  //
+  // JavaTimeModule is registered so the LocalDate / LocalTime values produced by RecordExtractor (per the
+  // contract on org.apache.pinot.spi.data.readers.RecordExtractor) serialize correctly when they reach
+  // Jackson via PinotDataType.toJson. Each java.time type is bound to an explicit ISO-8601 formatter so the
+  // output is independent of SerializationFeature.WRITE_DATES_AS_TIMESTAMPS — the global flag stays at its
+  // default (true), so any java.util.Date / java.sql.Timestamp continues to serialize as numeric epoch
+  // millis (Timestamp.toString is JVM-timezone-dependent JDBC escape format, not ISO-8601, so a string form
+  // would be neither portable nor consistent across paths).
+  // Single shared JSR-310 module instance with ISO-8601 serializers for LocalDate / LocalTime. Safe to
+  // share across ObjectMappers — Jackson copies the module's handlers into each mapper at registration
+  // time, and the serializers themselves are stateless.
+  private static final JavaTimeModule JAVA_TIME_MODULE = buildJavaTimeModule();
+  private static final ObjectMapper DEFAULT_MAPPER = newObjectMapperWithJavaTime();
   public static final ObjectReader DEFAULT_READER = DEFAULT_MAPPER.reader();
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
   public static final ObjectReader READER_WITH_BIG_DECIMAL =
-      new ObjectMapper().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).reader();
+      newObjectMapperWithJavaTime().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).reader();
 
-  public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE =
-      new TypeReference<HashMap<String, Object>>() {
-      };
+  /// Returns a fresh [ObjectMapper] with the JSR-310 [JavaTimeModule] registered (ISO-8601 serializers for
+  /// `LocalDate` / `LocalTime`). Callers needing additional configuration (e.g. sorted map entries) can
+  /// chain `configure(...)` on the returned instance.
+  public static ObjectMapper newObjectMapperWithJavaTime() {
+    return new ObjectMapper().registerModule(JAVA_TIME_MODULE);
+  }
+
+  private static JavaTimeModule buildJavaTimeModule() {
+    JavaTimeModule module = new JavaTimeModule();
+    module.addSerializer(LocalDate.class, new LocalDateSerializer(DateTimeFormatter.ISO_LOCAL_DATE));
+    module.addSerializer(LocalTime.class, new LocalTimeSerializer(DateTimeFormatter.ISO_LOCAL_TIME));
+    return module;
+  }
+
+  public static final TypeReference<HashMap<String, Object>> MAP_TYPE_REFERENCE = new TypeReference<>() {
+  };
 
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws JsonProcessingException {
@@ -155,11 +186,6 @@ public class JsonUtils {
   public static JsonNode stringToJsonNode(String jsonString)
       throws IOException {
     return DEFAULT_READER.readTree(jsonString);
-  }
-
-  public static Map<String, String> jsonNodeToStringMap(JsonNode jsonNode)
-      throws IOException {
-    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
   }
 
   public static JsonNode stringToJsonNodeWithBigDecimal(String jsonString)
@@ -247,10 +273,11 @@ public class JsonUtils {
     return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonNode);
   }
 
-  /**
-   * Parses JSON bytes directly to a Map, avoiding the intermediate JsonNode representation.
-   * This is more efficient than calling bytesToJsonNode followed by jsonNodeToMap.
-   */
+  public static Map<String, Object> stringToMap(String jsonString)
+      throws JsonProcessingException {
+    return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonString);
+  }
+
   public static Map<String, Object> bytesToMap(byte[] jsonBytes)
       throws IOException {
     return DEFAULT_READER.forType(MAP_TYPE_REFERENCE).readValue(jsonBytes);

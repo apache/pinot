@@ -97,7 +97,7 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     return new Object[][]{
         new Object[]{String.format("add(%s)", INT_SV_COLUMN)}, new Object[]{
         String.format("add(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)
-    }
+        }
     };
   }
 

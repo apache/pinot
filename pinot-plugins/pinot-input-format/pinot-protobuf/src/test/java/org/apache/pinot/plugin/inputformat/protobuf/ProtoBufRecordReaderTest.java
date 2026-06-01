@@ -35,15 +35,12 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.AbstractRecordReaderTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
   private final static Random RANDOM = new Random(System.currentTimeMillis());
   private static final String PROTO_DATA = "_test_sample_proto_data.data";
   private static final String DESCRIPTOR_FILE = "sample.desc";
-  private File _dataFile;
-  private RecordReader _recordReader;
   private final static int SAMPLE_RECORDS_SIZE = 10000;
 
   @Override
@@ -91,7 +88,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
       case DOUBLE:
         return RANDOM.nextDouble();
       case STRING:
-        return RandomStringUtils.randomAscii(RANDOM.nextInt(50) + 1);
+        return RandomStringUtils.secure().nextAscii(RANDOM.nextInt(50) + 1);
       default:
         throw new RuntimeException("Not supported fieldSpec - " + fieldSpec);
     }
@@ -109,16 +106,6 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
     _primaryKeys = generatePrimaryKeys(_records, getPrimaryKeyColumns());
     // Write generated random records to file
     writeRecordsToFile(_records);
-    // Create and init RecordReader
-    _recordReader = createRecordReader();
-  }
-
-  @Test
-  public void testRecordReader()
-      throws Exception {
-    checkValue(_recordReader, _records, _primaryKeys);
-    _recordReader.rewind();
-    checkValue(_recordReader, _records, _primaryKeys);
   }
 
   @Override
@@ -135,15 +122,16 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
       throws Exception {
     List<Sample.SampleRecord> lists = new ArrayList<>();
     for (Map<String, Object> record : recordsToWrite) {
-      Sample.SampleRecord sampleRecord =
-          Sample.SampleRecord.newBuilder().setEmail((String) record.get("email")).setName((String) record.get("name"))
-              .setId((Integer) record.get("id")).addAllFriends((List<String>) record.get("friends")).build();
-
+      Sample.SampleRecord sampleRecord = Sample.SampleRecord.newBuilder()
+          .setEmail((String) record.get("email"))
+          .setName((String) record.get("name"))
+          .setId((Integer) record.get("id"))
+          .addAllFriends((List<String>) record.get("friends"))
+          .build();
       lists.add(sampleRecord);
     }
 
-    _dataFile = getSampleDataPath();
-    try (FileOutputStream output = new FileOutputStream(_dataFile, true)) {
+    try (FileOutputStream output = new FileOutputStream(getSampleDataPath(), true)) {
       for (Sample.SampleRecord record : lists) {
         record.writeDelimitedTo(output);
       }

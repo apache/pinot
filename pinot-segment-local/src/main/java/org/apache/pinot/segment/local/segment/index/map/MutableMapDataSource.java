@@ -61,7 +61,7 @@ public class MutableMapDataSource extends BaseMapDataSource {
     if (forwardIndex instanceof MapIndexReader) {
       mapIndexReader = (MapIndexReader) forwardIndex;
     } else {
-      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec());
+      mapIndexReader = new MapIndexReaderWrapper(forwardIndex, getFieldSpec(), numDocs);
     }
     _mapIndexReader = mapIndexReader;
   }

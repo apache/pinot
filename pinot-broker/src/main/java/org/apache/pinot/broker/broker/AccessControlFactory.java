@@ -62,7 +62,8 @@ public abstract class AccessControlFactory {
     }
     try {
       LOGGER.info("Instantiating Access control factory class {}", accessControlFactoryClassName);
-      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClassName).newInstance();
+      accessControlFactory =
+          (AccessControlFactory) Class.forName(accessControlFactoryClassName).getDeclaredConstructor().newInstance();
       LOGGER.info("Initializing Access control factory class {}", accessControlFactoryClassName);
       accessControlFactory.init(configuration, propertyStore);
       return accessControlFactory;

@@ -53,4 +53,9 @@ public class YammerSettableGauge<T> extends Gauge<T> implements SettableValue<T>
   public T value() {
     return _valueSupplier.get();
   }
+
+  @Override
+  public T getValue() {
+    return _valueSupplier.get();
+  }
 }
