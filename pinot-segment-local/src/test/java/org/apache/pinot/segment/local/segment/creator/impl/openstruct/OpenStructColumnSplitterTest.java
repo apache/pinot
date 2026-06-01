@@ -154,6 +154,33 @@ public class OpenStructColumnSplitterTest {
   }
 
   @Test
+  public void testDenseColumnMetadataKeysPresent()
+      throws Exception {
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("clicks", (long) d), d);
+    }
+    s.seal();
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "clicks");
+    PropertiesConfiguration p = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(p);
+    assertEquals(p.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.DATA_TYPE)), "LONG");
+    assertEquals(p.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.COLUMN_TYPE)), "DIMENSION");
+    assertEquals(p.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY)), "true");
+    assertEquals(p.getInt(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.TOTAL_DOCS)), 10);
+    assertEquals(p.getInt(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.CARDINALITY)), 10);
+    assertEquals(p.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN)), "metrics");
+    assertEquals(p.getString(V1Constants.MetadataKeys.Column.getKeyFor(denseCol, "hasNullValue")), "true");
+  }
+
+  @Test
   public void testSparseJsonColumnWritten()
       throws Exception {
     OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
