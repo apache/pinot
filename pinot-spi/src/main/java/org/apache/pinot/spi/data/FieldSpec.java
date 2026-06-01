@@ -96,6 +96,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
 
   public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_MAP = Map.of();
+  public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_OPEN_STRUCT = Map.of();
   public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
   public static final int DEFAULT_MAX_LENGTH = 512;
 
@@ -493,6 +494,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           switch (dataType) {
             case MAP:
               return DEFAULT_COMPLEX_NULL_VALUE_OF_MAP;
+            case OPEN_STRUCT:
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_OPEN_STRUCT;
             case LIST:
               return DEFAULT_COMPLEX_NULL_VALUE_OF_LIST;
             case STRUCT:
@@ -619,6 +622,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
           break;
         case MAP:
+        case OPEN_STRUCT:
         case LIST:
           jsonNode.set(key, JsonUtils.objectToJsonNode(_defaultNullValue));
           break;
@@ -696,6 +700,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BYTES(false, false),
     STRUCT(false, false),
     MAP(false, false),
+    OPEN_STRUCT(false, false),
     LIST(false, false),
     UNKNOWN(false, true);
 
@@ -794,6 +799,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toBytes(value);
           case MAP:
+          case OPEN_STRUCT:
             return JsonUtils.stringToObject(value, Map.class);
           case LIST:
             return JsonUtils.stringToObject(value, List.class);
@@ -842,6 +848,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case BYTES:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
         case MAP:
+        case OPEN_STRUCT:
         case LIST:
           throw new UnsupportedOperationException("Cannot compare complex data types: " + this);
         default:
@@ -859,7 +866,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
       }
-      if (this == MAP || this == LIST) {
+      if (this == MAP || this == OPEN_STRUCT || this == LIST) {
         try {
           return JsonUtils.objectToString(value);
         } catch (JsonProcessingException e) {
@@ -895,6 +902,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case BYTES:
             return BytesUtils.toByteArray(value);
           case MAP:
+          case OPEN_STRUCT:
           case LIST:
             throw new UnsupportedOperationException("Cannot convert complex data types: " + this);
           default:

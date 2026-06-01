@@ -158,6 +158,8 @@ public final class Schema implements Serializable {
           case MAP:
           case LIST:
             break;
+          case OPEN_STRUCT:
+            break;
           default:
             throw new IllegalStateException("Unsupported data type: " + dataType + " in COMPLEX field");
         }
@@ -816,6 +818,17 @@ public final class Schema implements Serializable {
      */
     public SchemaBuilder addComplex(String name, DataType dataType, Map<String, FieldSpec> childFieldSpecs) {
       _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true, childFieldSpecs));
+      return this;
+    }
+
+    /**
+     * Adds an OPEN_STRUCT field to the schema.
+     *
+     * @param name field name
+     * @param childFieldSpecs per-key declared types; pass {@code Map.of()} for none
+     */
+    public SchemaBuilder addOpenStruct(String name, Map<String, FieldSpec> childFieldSpecs) {
+      _schema.addField(new ComplexFieldSpec(name, FieldSpec.DataType.OPEN_STRUCT, true, childFieldSpecs));
       return this;
     }
 

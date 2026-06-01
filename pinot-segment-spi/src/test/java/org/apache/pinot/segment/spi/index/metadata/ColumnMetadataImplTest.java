@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index.metadata;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Column;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.testng.annotations.Test;
@@ -104,6 +105,31 @@ public class ColumnMetadataImplTest {
 
     assertTrue(metadata.hasDictionary());
     assertEquals(metadata.getForwardIndexEncoding(), EncodingType.DICTIONARY);
+  }
+
+  @Test
+  public void parentColumnRoundtrip() {
+    ColumnMetadataImpl meta = ColumnMetadataImpl.builder()
+        .setFieldSpec(new DimensionFieldSpec("metrics$cpu", DataType.DOUBLE, true))
+        .setParentColumn("metrics")
+        .build();
+    assertEquals(meta.getParentColumn(), "metrics");
+    assertTrue(meta.isMaterializedChild());
+  }
+
+  /**
+   * Verify the PARENT_COLUMN key in metadata.properties round-trips through
+   * {@link ColumnMetadataImpl#fromPropertiesConfiguration}.
+   */
+  @Test
+  public void parentColumnReadFromPropertiesConfig() {
+    PropertiesConfiguration config = baseConfig("metrics$cpu");
+    config.setProperty(Column.getKeyFor("metrics$cpu", Column.PARENT_COLUMN), "metrics");
+
+    ColumnMetadataImpl metadata = ColumnMetadataImpl.fromPropertiesConfiguration(config, 1, "metrics$cpu");
+
+    assertEquals(metadata.getParentColumn(), "metrics");
+    assertTrue(metadata.isMaterializedChild());
   }
 
   private static PropertiesConfiguration baseConfig(String column) {
