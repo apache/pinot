@@ -294,4 +294,78 @@ public class OpenStructColumnSplitterTest {
     s.seal();
     assertTrue(s.getMaterializedColumnMetadata().containsKey(OpenStructNaming.sparseColumnName("metrics")));
   }
+
+  @Test
+  public void testAbsentDocUsesDimensionNullDefault()
+      throws Exception {
+    // Absent docs now store the standard Pinot dimension null value (INT -> Integer.MIN_VALUE),
+    // so the column min reflects that default rather than the old metric-style 0.
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    for (int d = 0; d < 5; d++) {
+      s.add(Map.of("clicks", 10 + d), d);   // present: 10..14
+    }
+    for (int d = 5; d < 10; d++) {
+      s.add(Map.of(), d);                    // absent
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "clicks");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    // Default (non-RAW) numeric key is dictionary-encoded.
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY)), "true");
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.MIN_VALUE)), String.valueOf(Integer.MIN_VALUE));
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.MAX_VALUE)), "14");
+  }
+
+  @Test
+  public void testDenseDefaultKeyWritesDictionaryAndInvertedIndex()
+      throws Exception {
+    // Default keys are dictionary-encoded with an inverted index (both default on), now written via the
+    // standard ForwardIndexCreator and inverted index creator.
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(),
+        config(0.5, -1, null));
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("tag", "v" + (d % 3)), d);
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "tag");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY)), "true");
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(denseCol, "hasInvertedIndex")),
+        "true");
+    assertTrue(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
+    assertTrue(new File(_tempDir,
+        denseCol + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION).exists());
+  }
+
+  @Test
+  public void testRawStringForwardIndexViaStandardCreator()
+      throws Exception {
+    // A RAW-configured key takes the standard raw var-byte forward index path (no dictionary).
+    FieldConfig rawConfig = new FieldConfig.Builder("note")
+        .withEncodingType(FieldConfig.EncodingType.RAW).build();
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(rawConfig));
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("note", "n" + d), d);
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "note");
+    PropertiesConfiguration props = s.getMaterializedColumnMetadata().get(denseCol);
+    assertNotNull(props);
+    assertEquals(props.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+        denseCol, V1Constants.MetadataKeys.Column.HAS_DICTIONARY)), "false");
+    assertFalse(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
+    assertTrue(new File(_tempDir,
+        denseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION).exists());
+  }
 }
