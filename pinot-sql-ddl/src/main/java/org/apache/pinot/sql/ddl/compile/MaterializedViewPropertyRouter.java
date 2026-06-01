@@ -139,6 +139,16 @@ public final class MaterializedViewPropertyRouter {
   ///   * The caller has already validated `properties` keys do not duplicate (case-insensitive).
   public static void apply(Map<String, String> properties, String definedSql,
       @Nullable String schedule, TableConfigBuilder builder) {
+    apply(properties, definedSql, schedule, builder, MaterializedViewTask.TASK_TYPE);
+  }
+
+  /// Same as [#apply(Map, String, String, TableConfigBuilder)] but stores the routed MV task config
+  /// under the given `taskType` instead of the built-in `MaterializedViewTask`. Used by alternative
+  /// [MaterializedViewDdlHandler]s that materialize the MV via a different minion task type (e.g. a
+  /// multi-stage-engine generator). Bare task-property keys (e.g. `bucketTimePeriod`) route the same
+  /// way regardless of `taskType`; only the task type the config is stored under changes.
+  public static void apply(Map<String, String> properties, String definedSql,
+      @Nullable String schedule, TableConfigBuilder builder, String mvTaskType) {
     Map<String, Map<String, String>> taskConfigs = new LinkedHashMap<>();
     Map<String, String> customConfigs = new LinkedHashMap<>();
     Map<String, String> mvTaskConfig = new LinkedHashMap<>();
@@ -210,7 +220,11 @@ public final class MaterializedViewPropertyRouter {
         }
         String taskType = afterPrefix.substring(0, dot);
         String taskKey = afterPrefix.substring(dot + 1);
-        if (MaterializedViewTask.TASK_TYPE.equals(taskType)
+        // Compare against the MV's own task type (mvTaskType), not the hard-coded built-in, so a
+        // custom handler's task type is recognized as "this MV's task config" rather than treated
+        // as an unrelated composed task type (which would be dropped by the put(mvTaskType, ...)
+        // below).
+        if (mvTaskType.equals(taskType)
             && (SCHEDULE_KEY.equals(taskKey.toLowerCase(Locale.ROOT))
                 || MaterializedViewTask.DEFINED_SQL_KEY.equalsIgnoreCase(taskKey))) {
           throw new DdlCompilationException(
@@ -218,9 +232,9 @@ public final class MaterializedViewPropertyRouter {
                   + "(REFRESH EVERY for 'schedule', AS <query> for 'definedSQL'); "
                   + "remove it from PROPERTIES.");
         }
-        if (MaterializedViewTask.TASK_TYPE.equals(taskType)) {
+        if (mvTaskType.equals(taskType)) {
           // Canonicalize the knob casing the same way the bare-form branch does, so
-          // `task.MaterializedViewTask.BUCKETTIMEPERIOD` and bare `BUCKETTIMEPERIOD` end up
+          // `task.<mvTaskType>.BUCKETTIMEPERIOD` and bare `BUCKETTIMEPERIOD` end up
           // under the same on-wire key (the constant casing in CommonConstants).
           String canonical = TASK_CONFIG_KEYS.getOrDefault(taskKey.toLowerCase(Locale.ROOT), taskKey);
           mvTaskConfig.put(canonical, value);
@@ -244,7 +258,7 @@ public final class MaterializedViewPropertyRouter {
       mvTaskConfig.put(SCHEDULE_KEY, schedule);
     }
 
-    taskConfigs.put(MaterializedViewTask.TASK_TYPE, mvTaskConfig);
+    taskConfigs.put(mvTaskType, mvTaskConfig);
     builder.setTaskConfig(new TableTaskConfig(taskConfigs));
 
     if (!customConfigs.isEmpty()) {
