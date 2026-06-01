@@ -41,6 +41,12 @@
       <artifactId>pinot-batch-ingestion-spark-base</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-hadoop-shaded-xml</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.compat.version}</artifactId>
       <scope>provided</scope>
@@ -60,6 +66,10 @@
         <exclusion>
           <groupId>org.lz4</groupId>
           <artifactId>lz4-java</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-client-runtime</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

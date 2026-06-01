@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pinot-input-format</artifactId>
+    <groupId>org.apache.pinot</groupId>
+    <version>1.6.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>pinot-hadoop-shaded-xml</artifactId>
+  <name>Pinot Hadoop Shaded XML</name>
+  <url>https://pinot.apache.org/</url>
+
+  <properties>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <shade.phase.prop>process-classes</shade.phase.prop>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>commons-beanutils</groupId>
+      <artifactId>commons-beanutils</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>commons-cli</groupId>
+      <artifactId>commons-cli</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>commons-net</groupId>
+      <artifactId>commons-net</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.woodstox</groupId>
+      <artifactId>woodstox-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-configuration2</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-guava</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.woodstox</groupId>
+      <artifactId>stax2-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>clear-staged-relocated-hadoop-classes</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>clean</goal>
+            </goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets>
+                <fileset>
+                  <directory>${project.build.outputDirectory}/org/apache/hadoop</directory>
+                </fileset>
+                <fileset>
+                  <directory>${project.build.outputDirectory}/META-INF/services</directory>
+                </fileset>
+                <fileset>
+                  <directory>${project.build.outputDirectory}/META-INF/maven</directory>
+                </fileset>
+                <fileset>
+                  <directory>${project.build.outputDirectory}/META-INF/licenses-binary</directory>
+                </fileset>
+                <fileset>
+                  <directory>${project.build.outputDirectory}/assets</directory>
+                </fileset>
+                <fileset>
+                  <directory>${project.build.outputDirectory}</directory>
+                  <includes>
+                    <include>META-INF/NOTICE-binary</include>
+                    <include>PropertyList-1.0.dtd</include>
+                    <include>properties.dtd</include>
+                  </includes>
+                </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <forceCreation>true</forceCreation>
+        </configuration>
+        <executions>
+          <execution>
+            <id>create-main-artifact-before-shade</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>default-jar</id>
+            <phase>none</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration combine.self="override">
+          <outputFile>${project.build.directory}/${project.build.finalName}-relocated.jar</outputFile>
+          <shadedArtifactAttached>false</shadedArtifactAttached>
+          <createDependencyReducedPom>false</createDependencyReducedPom>
+          <artifactSet>
+            <includes>
+              <include>com.fasterxml.woodstox:woodstox-core</include>
+              <include>commons-beanutils:commons-beanutils</include>
+              <include>commons-cli:commons-cli</include>
+              <include>commons-codec:commons-codec</include>
+              <include>commons-collections:commons-collections</include>
+              <include>commons-io:commons-io</include>
+              <include>commons-net:commons-net</include>
+              <include>org.apache.commons:commons-collections4</include>
+              <include>org.apache.commons:commons-compress</include>
+              <include>org.apache.hadoop.thirdparty:hadoop-shaded-guava</include>
+              <include>org.apache.hadoop.thirdparty:hadoop-shaded-protobuf_3_25</include>
+              <include>org.apache.commons:commons-configuration2</include>
+              <include>org.apache.commons:commons-lang3</include>
+              <include>org.apache.commons:commons-math3</include>
+              <include>org.apache.commons:commons-text</include>
+              <include>org.codehaus.woodstox:stax2-api</include>
+            </includes>
+          </artifactSet>
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <exclude>META-INF/*.SF</exclude>
+                <exclude>META-INF/*.DSA</exclude>
+                <exclude>META-INF/*.RSA</exclude>
+                <exclude>module-info.class</exclude>
+                <exclude>META-INF/versions/*/module-info.class</exclude>
+              </excludes>
+            </filter>
+          </filters>
+          <relocations>
+            <relocation>
+              <pattern>org.apache.commons.beanutils</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.beanutils</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.cli</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.cli</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.codec</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.codec</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.collections</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.collections</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.collections4</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.collections4</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.compress</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.compress</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.configuration2</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.configuration2</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.io</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.io</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.lang3</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.lang3</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.math3</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.math3</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.net</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.net</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.apache.commons.text</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.apache.commons.text</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>com.ctc.wstx</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.com.ctc.wstx</shadedPattern>
+            </relocation>
+            <relocation>
+              <pattern>org.codehaus.stax2</pattern>
+              <shadedPattern>org.apache.hadoop.shaded.org.codehaus.stax2</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>stage-relocated-hadoop-classes</id>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <!-- Reactor builds put target/classes, not the packaged jar, on downstream classpaths. -->
+                <unzip src="${project.build.directory}/${project.build.finalName}-relocated.jar"
+                       dest="${project.build.outputDirectory}" />
+                <jar destfile="${project.build.directory}/${project.build.finalName}.jar"
+                     basedir="${project.build.outputDirectory}"
+                     manifest="${project.build.outputDirectory}/META-INF/MANIFEST.MF" />
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

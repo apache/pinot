@@ -44,6 +44,7 @@
     <module>pinot-confluent-avro</module>
     <module>pinot-confluent-json</module>
     <module>pinot-confluent-protobuf</module>
+    <module>pinot-hadoop-shaded-xml</module>
     <module>pinot-orc</module>
     <module>pinot-json</module>
     <module>pinot-parquet</module>

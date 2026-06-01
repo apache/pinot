@@ -216,6 +216,7 @@
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
+    <hadoop-shaded-guava.version>1.5.0</hadoop-shaded-guava.version>
     <hadoop-shaded-protobuf_3_25.version>1.5.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>6.2.0</datasketches-java.version>
@@ -233,6 +234,7 @@
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.20.0</commons-lang3.version>
+    <commons-collections.version>3.2.2</commons-collections.version>
     <commons-collections4.version>4.5.0</commons-collections4.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-compress.version>1.28.0</commons-compress.version>
@@ -301,7 +303,7 @@
     <jettison.version>1.5.5</jettison.version>
     <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.5</dnsjava.version>
-    <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
+    <eclipse.jetty.version>12.0.35</eclipse.jetty.version>
     <woodstox.version>7.2.0</woodstox.version>
     <curator.version>5.9.0</curator.version>
     <javassist.version>3.31.0-GA</javassist.version>
@@ -920,6 +922,11 @@
         <version>${commons-lang3.version}</version>
       </dependency>
       <dependency>
+        <groupId>commons-collections</groupId>
+        <artifactId>commons-collections</artifactId>
+        <version>${commons-collections.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-collections4</artifactId>
         <version>${commons-collections4.version}</version>
@@ -1161,6 +1168,22 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-webapp</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15on</artifactId>
           </exclusion>
@@ -1197,6 +1220,10 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util-ajax</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
           </exclusion>
@@ -1216,6 +1243,18 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <exclusions>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-webapp</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>websocket-client</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
@@ -1260,6 +1299,10 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>websocket-client</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1270,21 +1313,14 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-client-runtime</artifactId>
-        <version>${hadoop.version}</version>
-        <scope>provided</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-client-api</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-guava</artifactId>
+        <version>${hadoop-shaded-guava.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
@@ -1721,27 +1757,35 @@
         <artifactId>dnsjava</artifactId>
         <version>${dnsjava.version}</version>
       </dependency>
-      <!-- Eclipse jetty dependencies in Hadoop/Spark/Pulsar -->
+      <!-- Eclipse Jetty dependencies. Jetty 12 uses renamed EE/websocket artifacts; Hadoop's Jetty 9 transitive
+      artifacts are excluded at their dependency edges instead of being mapped to incompatible coordinates. -->
       <dependency>
         <groupId>org.eclipse.jetty.websocket</groupId>
-        <artifactId>websocket-client</artifactId>
+        <artifactId>jetty-websocket-jetty-client</artifactId>
         <version>${eclipse.jetty.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-servlet</artifactId>
+        <groupId>org.eclipse.jetty.ee8</groupId>
+        <artifactId>jetty-ee8-servlet</artifactId>
         <version>${eclipse.jetty.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-webapp</artifactId>
+        <groupId>org.eclipse.jetty.ee8</groupId>
+        <artifactId>jetty-ee8-webapp</artifactId>
         <version>${eclipse.jetty.version}</version>
       </dependency>
 
-      <!-- jetty bom -->
+      <!-- Jetty BOMs -->
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-bom</artifactId>
+        <version>${eclipse.jetty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty.ee8</groupId>
+        <artifactId>jetty-ee8-bom</artifactId>
         <version>${eclipse.jetty.version}</version>
         <type>pom</type>
         <scope>import</scope>
@@ -2168,6 +2212,12 @@
                       <exclude>org.bouncycastle:bcprov-jdk15on</exclude>
                       <!-- Use at.yawk.lz4:lz4-java -->
                       <exclude>org.lz4:lz4-java</exclude>
+                      <!-- Embeds relocated Jetty 9 classes; use pinot-hadoop-shaded-xml for Hadoop shaded classes. -->
+                      <exclude>org.apache.hadoop:hadoop-client-runtime</exclude>
+                      <!-- Jetty 9/10/11 are not allowed; use Jetty 12+ coordinates or exclude transitive server bits. -->
+                      <exclude>org.eclipse.jetty:*:(,12.0.35)</exclude>
+                      <exclude>org.eclipse.jetty.ee8:*:(,12.0.35)</exclude>
+                      <exclude>org.eclipse.jetty.websocket:*:(,12.0.35)</exclude>
                     </excludes>
                   </bannedDependencies>
                 </rules>
