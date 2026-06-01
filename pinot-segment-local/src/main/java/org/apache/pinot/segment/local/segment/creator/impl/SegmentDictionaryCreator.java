@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Utf8;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -69,6 +70,9 @@ public class SegmentDictionaryCreator implements IndexCreator {
   private Double2IntOpenHashMap _doubleValueToIndexMap;
   private Object2IntOpenHashMap<Object> _objectValueToIndexMap;
   private int _numBytesPerEntry = 0;
+  /// Accumulated raw ingest byte count across all rows indexed. Used for compression stats when enabled.
+  /// Populated only for variable-length types (STRING, BYTES, BIG_DECIMAL); 0 for fixed-width types.
+  private long _totalRawIngestBytes;
 
   public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
       boolean useVarLengthDictionary) {
@@ -304,6 +308,10 @@ public class SegmentDictionaryCreator implements IndexCreator {
     return _numBytesPerEntry;
   }
 
+  public long getTotalRawIngestBytes() {
+    return _totalRawIngestBytes;
+  }
+
   public int indexOfSV(Object value) {
     switch (_storedType) {
       case INT:
@@ -315,9 +323,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
       case DOUBLE:
         return _doubleValueToIndexMap.get((double) value);
       case BIG_DECIMAL:
+        _totalRawIngestBytes += BigDecimalUtils.byteSize((BigDecimal) value);
+        return _objectValueToIndexMap.getInt(value);
       case STRING:
+        _totalRawIngestBytes += Utf8.encodedLength((String) value);
         return _objectValueToIndexMap.getInt(value);
       case BYTES:
+        _totalRawIngestBytes += ((byte[]) value).length;
         return _objectValueToIndexMap.getInt(new ByteArray((byte[]) value));
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
@@ -356,6 +368,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
    * Get dictionary index for a String value.
    */
   public int indexOfSV(String value) {
+    _totalRawIngestBytes += Utf8.encodedLength(value);
     return _objectValueToIndexMap.getInt(value);
   }
 
@@ -363,6 +376,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
    * Get dictionary index for a byte array value.
    */
   public int indexOfSV(byte[] value) {
+    _totalRawIngestBytes += value.length;
     return _objectValueToIndexMap.getInt(new ByteArray(value));
   }
 
@@ -401,6 +415,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(BigDecimal[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
+      _totalRawIngestBytes += BigDecimalUtils.byteSize(values[i]);
       indexes[i] = _objectValueToIndexMap.getInt(values[i]);
     }
     return indexes;
@@ -409,6 +424,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(String[] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
+      _totalRawIngestBytes += Utf8.encodedLength(values[i]);
       indexes[i] = _objectValueToIndexMap.getInt(values[i]);
     }
     return indexes;
@@ -417,6 +433,7 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public int[] indexOfMV(byte[][] values) {
     int[] indexes = new int[values.length];
     for (int i = 0; i < values.length; i++) {
+      _totalRawIngestBytes += values[i].length;
       indexes[i] = _objectValueToIndexMap.getInt(new ByteArray(values[i]));
     }
     return indexes;
@@ -448,13 +465,20 @@ public class SegmentDictionaryCreator implements IndexCreator {
         }
         break;
       case BIG_DECIMAL:
+        for (int i = 0; i < multiValues.length; i++) {
+          _totalRawIngestBytes += BigDecimalUtils.byteSize((BigDecimal) multiValues[i]);
+          indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
+        }
+        break;
       case STRING:
         for (int i = 0; i < multiValues.length; i++) {
+          _totalRawIngestBytes += Utf8.encodedLength((String) multiValues[i]);
           indexes[i] = _objectValueToIndexMap.getInt(multiValues[i]);
         }
         break;
       case BYTES:
         for (int i = 0; i < multiValues.length; i++) {
+          _totalRawIngestBytes += ((byte[]) multiValues[i]).length;
           indexes[i] = _objectValueToIndexMap.getInt(new ByteArray((byte[]) multiValues[i]));
         }
         break;

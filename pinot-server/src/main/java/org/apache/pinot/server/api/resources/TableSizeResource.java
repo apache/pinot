@@ -155,8 +155,8 @@ public class TableSizeResource {
                   columnCompressionStats.put(colMeta.getColumnName(),
                       new ColumnCompressionStatsInfo(colMeta.getColumnName(),
                           uncompressed, fwdIndexSize, ratio,
-                          colMeta.getCompressionCodec(), colMeta.hasDictionary(),
-                          indexNames.isEmpty() ? null : indexNames));
+                          colMeta.getCompressionCodec(),
+                          indexNames.isEmpty() ? null : indexNames, null));
                 }
               }
               segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,

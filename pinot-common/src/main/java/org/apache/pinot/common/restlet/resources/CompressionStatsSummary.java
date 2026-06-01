@@ -34,11 +34,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /// `compressionStatsEnabled` was set), meaning the ratio is computed from a subset of segments only.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CompressionStatsSummary {
-  /// Sum of per-replica max uncompressed forward index sizes across all segments that have stats.
-  private final long _rawForwardIndexSizePerReplicaInBytes;
+  /// Sum of per-replica max raw ingest forward index sizes across all segments that have stats.
+  private final long _rawIngestSizePerReplicaInBytes;
 
-  /// Sum of per-replica max compressed forward index sizes across all segments that have stats.
-  private final long _compressedForwardIndexSizePerReplicaInBytes;
+  /// Sum of per-replica max on-disk forward index sizes across all segments that have stats.
+  private final long _onDiskSizePerReplicaInBytes;
 
   /// Overall ratio of raw to compressed size (`rawSize / compressedSize`). `0` when no segments have stats.
   private final double _compressionRatio;
@@ -54,26 +54,26 @@ public class CompressionStatsSummary {
 
   @JsonCreator
   public CompressionStatsSummary(
-      @JsonProperty("rawForwardIndexSizePerReplicaInBytes") long rawForwardIndexSizePerReplicaInBytes,
-      @JsonProperty("compressedForwardIndexSizePerReplicaInBytes") long compressedForwardIndexSizePerReplicaInBytes,
+      @JsonProperty("rawIngestSizePerReplicaInBytes") long rawIngestSizePerReplicaInBytes,
+      @JsonProperty("onDiskSizePerReplicaInBytes") long onDiskSizePerReplicaInBytes,
       @JsonProperty("compressionRatio") double compressionRatio,
       @JsonProperty("segmentsWithStats") int segmentsWithStats,
       @JsonProperty("totalSegments") int totalSegments,
       @JsonProperty("isPartialCoverage") boolean isPartialCoverage) {
-    _rawForwardIndexSizePerReplicaInBytes = rawForwardIndexSizePerReplicaInBytes;
-    _compressedForwardIndexSizePerReplicaInBytes = compressedForwardIndexSizePerReplicaInBytes;
+    _rawIngestSizePerReplicaInBytes = rawIngestSizePerReplicaInBytes;
+    _onDiskSizePerReplicaInBytes = onDiskSizePerReplicaInBytes;
     _compressionRatio = compressionRatio;
     _segmentsWithStats = segmentsWithStats;
     _totalSegments = totalSegments;
     _isPartialCoverage = isPartialCoverage;
   }
 
-  public long getRawForwardIndexSizePerReplicaInBytes() {
-    return _rawForwardIndexSizePerReplicaInBytes;
+  public long getRawIngestSizePerReplicaInBytes() {
+    return _rawIngestSizePerReplicaInBytes;
   }
 
-  public long getCompressedForwardIndexSizePerReplicaInBytes() {
-    return _compressedForwardIndexSizePerReplicaInBytes;
+  public long getOnDiskSizePerReplicaInBytes() {
+    return _onDiskSizePerReplicaInBytes;
   }
 
   public double getCompressionRatio() {

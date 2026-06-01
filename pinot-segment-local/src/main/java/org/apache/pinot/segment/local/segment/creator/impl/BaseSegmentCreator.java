@@ -586,6 +586,27 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
                   compressionType.name());
             }
           }
+        } else if (fwdCreator != null) {
+          // Dictionary-encoded column: write raw ingest size
+          SegmentDictionaryCreator dictCreator = colCreators.getDictionaryCreator();
+          if (dictCreator != null) {
+            long rawIngestBytes;
+            FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+            DataType storedType = fieldSpec != null ? fieldSpec.getDataType().getStoredType() : null;
+            if (storedType != null && storedType.isFixedWidth()) {
+              // Fixed-width: compute from totalDocs * type size
+              rawIngestBytes = (long) _totalDocs * storedType.size();
+            } else {
+              // Variable-width: accumulated in SegmentDictionaryCreator during indexing
+              rawIngestBytes = dictCreator.getTotalRawIngestBytes();
+            }
+            if (rawIngestBytes > 0) {
+              properties.setProperty(
+                  V1Constants.MetadataKeys.Column.getKeyFor(column,
+                      V1Constants.MetadataKeys.Column.DICT_COLUMN_RAW_INGEST_SIZE),
+                  String.valueOf(rawIngestBytes));
+            }
+          }
         }
       }
     }

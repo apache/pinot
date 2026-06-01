@@ -80,4 +80,9 @@ public interface ColumnMetadata extends ColumnShape {
   default String getCompressionCodec() {
     return null;
   }
+
+  /// Raw ingest byte count for dict-encoded columns written at seal time. Returns {@link #UNAVAILABLE} if not present.
+  default long getDictColumnRawIngestSizeBytes() {
+    return UNAVAILABLE;
+  }
 }

@@ -196,6 +196,8 @@ public class V1Constants {
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
       public static final String FORWARD_INDEX_UNCOMPRESSED_SIZE = "forwardIndex.uncompressedSizeBytes";
       public static final String FORWARD_INDEX_COMPRESSION_CODEC = "forwardIndex.compressionCodec";
+      /// Raw ingest byte count for dictionary-encoded columns, written at seal time.
+      public static final String DICT_COLUMN_RAW_INGEST_SIZE = "dict.rawIngestSizeBytes";
 
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;
