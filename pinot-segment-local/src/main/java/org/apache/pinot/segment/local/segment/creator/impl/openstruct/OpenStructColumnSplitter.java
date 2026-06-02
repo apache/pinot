@@ -283,9 +283,47 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
     statsCollector.seal();
 
-    // Decide dictionary vs raw exactly as BaseSegmentCreator.createDictionaryForColumn, with standard
-    // default flags (optimizeDictionary off => dictionary unless explicitly disabled and not index-required).
     boolean enableInverted = _config.shouldEnableInvertedIndexForKey(key);
+    boolean useDictionary = resolveUseDictionary(key, childFieldSpec, enableInverted, statsCollector);
+
+    int dictElementSize = writeForwardAndInvertedIndexes(materializedCol, storedType, presence, values,
+        defaultValue, statsCollector, useDictionary, enableInverted);
+
+    NullValueVectorCreator nullCreator = new NullValueVectorCreator(_indexDir, materializedCol);
+    try {
+      for (int docId = 0; docId < _numDocs; docId++) {
+        if (!presence.contains(docId)) {
+          nullCreator.setNull(docId);
+        }
+      }
+      nullCreator.seal();
+    } finally {
+      nullCreator.close();
+    }
+
+    PropertiesConfiguration props = new PropertiesConfiguration();
+    FieldConfig.EncodingType encoding =
+        useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
+    BaseSegmentCreator.addColumnMetadataInfo(props, materializedCol, statsCollector, _numDocs, childFieldSpec,
+        useDictionary, dictElementSize, encoding, false);
+    // OPEN_STRUCT-specific keys not written by addColumnMetadataInfo.
+    props.setProperty(
+        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
+        _columnName);
+    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasNullValue"), true);
+    if (enableInverted && useDictionary) {
+      props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasInvertedIndex"), true);
+    }
+    _materializedColumnMetadata.put(materializedCol, props);
+  }
+
+  /**
+   * Decides dictionary vs raw encoding for a materialized child column, mirroring the three steps of
+   * {@code BaseSegmentCreator.createDictionaryForColumn} with standard default flags (optimizeDictionary
+   * off => dictionary unless explicitly disabled and not required by an enabled index).
+   */
+  private boolean resolveUseDictionary(String key, FieldSpec childFieldSpec, boolean enableInverted,
+      AbstractColumnStatisticsCollector statsCollector) {
     FieldIndexConfigs.Builder fieldIndexConfigsBuilder = new FieldIndexConfigs.Builder();
     fieldIndexConfigsBuilder.add(StandardIndexes.dictionary(),
         _config.shouldUseDictionaryForKey(key) ? DictionaryIndexConfig.DEFAULT : DictionaryIndexConfig.DISABLED);
@@ -294,17 +332,32 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
     FieldIndexConfigs fieldIndexConfigs = fieldIndexConfigsBuilder.build();
 
-    boolean useDictionary;
     if (DictionaryIndexConfig.requiresDictionary(childFieldSpec, fieldIndexConfigs)) {
-      useDictionary = true;
-    } else if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
-      useDictionary = false;
-    } else {
-      useDictionary = DictionaryIndexType.ignoreDictionaryOverride(false, false,
-          IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD, null, childFieldSpec, fieldIndexConfigs,
-          statsCollector.getCardinality(), statsCollector.getTotalNumberOfEntries());
+      return true;
     }
+    if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      return false;
+    }
+    return DictionaryIndexType.ignoreDictionaryOverride(false, false,
+        IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD, null, childFieldSpec, fieldIndexConfigs,
+        statsCollector.getCardinality(), statsCollector.getTotalNumberOfEntries());
+  }
 
+  /**
+   * Writes the dictionary (when used), forward index, and inverted index (when enabled and dictionary-encoded)
+   * for a materialized child column via the standard index-creator family, driven from a single per-doc loop.
+   * Returns the dictionary element size in bytes (0 when raw-encoded), for column metadata.
+   */
+  // TODO(open_struct): only dictionary encoding and the inverted index are honored per key. A key's
+  // FieldConfig (OpenStructIndexConfig.valueFieldConfigs) can carry arbitrary indexes (text, range, bloom,
+  // json, fst, h3) via the modern `indexes` format, but those are silently dropped here. To support them,
+  // deserialize the per-key FieldConfig into a FieldIndexConfigs (FieldIndexConfigsUtil) and drive the
+  // standard multi-index creation loop (IndexService#getAllIndexes + IndexType#shouldCreateIndex), like
+  // BaseSegmentCreator, instead of hand-wiring only forward/dictionary/inverted creators.
+  private int writeForwardAndInvertedIndexes(String materializedCol, DataType storedType, RoaringBitmap presence,
+      List<Object> values, Object defaultValue, AbstractColumnStatisticsCollector statsCollector,
+      boolean useDictionary, boolean enableInverted)
+      throws IOException {
     // Dictionary built from the collector's sorted unique values (same as the standard pipeline).
     int dictElementSize = 0;
     SegmentDictionaryCreator dictCreator = null;
@@ -374,33 +427,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         dictCreator.close();
       }
     }
-
-    NullValueVectorCreator nullCreator = new NullValueVectorCreator(_indexDir, materializedCol);
-    try {
-      for (int docId = 0; docId < _numDocs; docId++) {
-        if (!presence.contains(docId)) {
-          nullCreator.setNull(docId);
-        }
-      }
-      nullCreator.seal();
-    } finally {
-      nullCreator.close();
-    }
-
-    PropertiesConfiguration props = new PropertiesConfiguration();
-    FieldConfig.EncodingType encoding =
-        useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
-    BaseSegmentCreator.addColumnMetadataInfo(props, materializedCol, statsCollector, _numDocs, childFieldSpec,
-        useDictionary, dictElementSize, encoding, false);
-    // OPEN_STRUCT-specific keys not written by addColumnMetadataInfo.
-    props.setProperty(
-        V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, V1Constants.MetadataKeys.Column.PARENT_COLUMN),
-        _columnName);
-    props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasNullValue"), true);
-    if (enableInverted && useDictionary) {
-      props.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(materializedCol, "hasInvertedIndex"), true);
-    }
-    _materializedColumnMetadata.put(materializedCol, props);
+    return dictElementSize;
   }
 
   private void writeSparseJsonColumn(List<String> sparseKeys)
