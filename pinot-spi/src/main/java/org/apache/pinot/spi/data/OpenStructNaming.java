@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.spi.data;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.utils.PinotDataType;
-
 
 /// Naming convention for OPEN_STRUCT materialized columns. Each dense OPEN_STRUCT key is stored as
 /// a column named `<openStructColumn>$<key>`. Sparse keys share a single synthetic JSON column
@@ -75,41 +72,5 @@ public final class OpenStructNaming {
       throw new IllegalArgumentException("Sparse column has no key: " + materializedColumnName);
     }
     return key;
-  }
-
-  /// Infers the {@link FieldSpec.DataType} from a raw ingested value, used by OPEN_STRUCT when a key
-  /// has no declared child {@link FieldSpec}. Returns {@code null} when the value cannot be
-  /// represented as a stored column type; callers decide whether to drop the entry or fall back to a
-  /// default (e.g. STRING).
-  @Nullable
-  public static FieldSpec.DataType inferDataType(Object rawValue) {
-    switch (PinotDataType.getSingleValueType(rawValue)) {
-      case INTEGER:
-      case BYTE:
-      case CHARACTER:
-      case SHORT:
-        return FieldSpec.DataType.INT;
-      case LONG:
-        return FieldSpec.DataType.LONG;
-      case FLOAT:
-        return FieldSpec.DataType.FLOAT;
-      case DOUBLE:
-        return FieldSpec.DataType.DOUBLE;
-      case BIG_DECIMAL:
-        return FieldSpec.DataType.BIG_DECIMAL;
-      case BOOLEAN:
-        return FieldSpec.DataType.BOOLEAN;
-      case TIMESTAMP:
-        return FieldSpec.DataType.TIMESTAMP;
-      case STRING:
-      case DATE:
-      case TIME:
-      case UUID:
-        return FieldSpec.DataType.STRING;
-      case BYTES:
-        return FieldSpec.DataType.BYTES;
-      default:
-        return null;
-    }
   }
 }

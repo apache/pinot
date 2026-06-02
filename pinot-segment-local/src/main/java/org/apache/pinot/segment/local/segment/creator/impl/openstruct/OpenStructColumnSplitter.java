@@ -58,6 +58,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -196,7 +197,7 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         DataType valueType = keySpec != null
             ? keySpec.getDataType()
             : _inferredTypes.computeIfAbsent(key, k -> {
-              DataType inferred = OpenStructNaming.inferDataType(rawValue);
+              DataType inferred = OpenStructTypeInference.inferDataType(rawValue);
               return inferred != null ? inferred : DataType.STRING;
             });
         if (!_presenceBitmaps.containsKey(key)) {
