@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import javax.inject.Inject;
@@ -86,6 +87,7 @@ import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
@@ -573,6 +575,63 @@ public class PinotClientRequest {
                   .entity(e.getMessage())
                   .build()));
     }
+  }
+
+  @GET
+  @Path("query/{id}/progress")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get progress for a running query as identified by the id",
+      notes = "Progress is derived from processed work units over total work units. Single-stage work units are "
+          + "selected segments; multi-stage work units include selected segments and stage op-chains. Multi-stage "
+          + "responses may include labeled details for component-level progress.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Query not found on the requested broker"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public QueryProgressStats getQueryProgress(
+      @ApiParam(value = "Query id", required = true) @PathParam("id") String id,
+      @ApiParam(value = "Determines if query id is internal or provided by the client") @QueryParam("client")
+      @DefaultValue("false") boolean isClient,
+      @ApiParam(value = "Timeout for servers to respond the progress request") @QueryParam("timeoutMs")
+      @DefaultValue("1000") int timeoutMs) {
+    try {
+      if (timeoutMs <= 0) {
+        throw new BadRequestException("timeoutMs must be positive");
+      }
+      long reqId;
+      if (isClient) {
+        OptionalLong requestId = _requestHandler.getRequestIdByClientId(id);
+        if (!requestId.isPresent()) {
+          throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+              .entity(String.format("Client query: %s not found on the broker", id))
+              .build());
+        }
+        reqId = requestId.getAsLong();
+      } else {
+        reqId = Long.parseLong(id);
+      }
+      QueryProgressStats progressStats =
+          _requestHandler.getQueryProgressStats(reqId, timeoutMs, _executor, _httpConnMgr);
+      if (progressStats != null) {
+        return progressStats;
+      }
+    } catch (NumberFormatException e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+      throw new BadRequestException(String.format("Invalid internal query id: %s", id), e);
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(String.format("Failed to get progress for query: %s on the broker due to error: %s", id,
+              e.getMessage()))
+          .build());
+    }
+    throw new WebApplicationException(
+        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the broker", id))
+            .build());
   }
 
   @DELETE

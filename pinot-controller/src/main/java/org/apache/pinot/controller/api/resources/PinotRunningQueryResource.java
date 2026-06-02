@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -36,7 +38,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -58,9 +62,11 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.net.URIBuilder;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.http.MultiHttpRequest;
+import org.apache.pinot.common.http.MultiHttpRequestBufferedResponse;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -69,6 +75,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +97,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotRunningQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRunningQueryResource.class);
+  private static final int BROKER_PROGRESS_REQUEST_TIMEOUT_OVERHEAD_MS = 250;
+  private static final int PROGRESS_BROKER_CACHE_EXPIRATION_SECONDS = 5;
+  private static final int PROGRESS_BROKER_CACHE_MAX_DATABASES = 1_000;
+  private static final String DEFAULT_DATABASE_CACHE_KEY = "";
+
+  private final Cache<String, Map<String, InstanceInfo>> _progressBrokers = CacheBuilder.newBuilder()
+      .maximumSize(PROGRESS_BROKER_CACHE_MAX_DATABASES)
+      .expireAfterWrite(PROGRESS_BROKER_CACHE_EXPIRATION_SECONDS, TimeUnit.SECONDS).build();
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -304,6 +319,44 @@ public class PinotRunningQueryResource {
   }
 
   @GET
+  @Path("clientQuery/{clientQueryId}/progress")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get progress for a query as identified by the clientQueryId",
+      notes = "Polls all live brokers and returns the first matching running query progress. No progress is returned "
+          + "if no broker is currently tracking the given clientQueryId. Multi-stage responses may include labeled "
+          + "details for component-level progress.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Query not found on any broker")
+  })
+  public QueryProgressStats getClientQueryProgress(
+      @ApiParam(value = "ClientQueryId provided by the client", required = true)
+      @PathParam("clientQueryId") String clientQueryId,
+      @ApiParam(value = "Timeout for brokers and servers to respond the progress request") @QueryParam("timeoutMs")
+      @DefaultValue("1000") int timeoutMs, @Context HttpHeaders httpHeaders) {
+    try {
+      if (timeoutMs <= 0) {
+        throw new WebApplicationException(
+            Response.status(Response.Status.BAD_REQUEST).entity("timeoutMs must be positive").build());
+      }
+      Map<String, InstanceInfo> brokers = getProgressBrokers(httpHeaders.getHeaderString(DATABASE));
+      QueryProgressStats progressStats =
+          getClientQueryProgress(brokers, clientQueryId, timeoutMs, createRequestHeaders(httpHeaders));
+      if (progressStats != null) {
+        return progressStats;
+      }
+      throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+          .entity(String.format("Client query: %s not found on any broker", clientQueryId)).build());
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Failed to get query progress due to error: " + e.getMessage()).build());
+    }
+  }
+
+  @GET
   @Path("/queries")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)
   @Produces(MediaType.APPLICATION_JSON)
@@ -371,6 +424,80 @@ public class PinotRunningQueryResource {
     return queriesByBroker;
   }
 
+  @Nullable
+  private QueryProgressStats getClientQueryProgress(Map<String, InstanceInfo> brokers, String clientQueryId,
+      int timeoutMs, Map<String, String> requestHeaders)
+      throws Exception {
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int portOverride = _controllerConf.getControllerBrokerPortOverride();
+    List<String> brokerUrls = new ArrayList<>();
+    for (InstanceInfo broker : brokers.values()) {
+      int port = portOverride > 0 ? portOverride : broker.getPort();
+      brokerUrls.add(new URIBuilder().setScheme(protocol).setHost(broker.getHost()).setPort(port)
+          .setPathSegments("query", clientQueryId, "progress").addParameter("client", "true")
+          .addParameter("timeoutMs", Integer.toString(timeoutMs)).build().toString());
+    }
+    if (brokerUrls.isEmpty()) {
+      return null;
+    }
+    LOGGER.debug("Getting query progress via broker urls: {}", brokerUrls);
+    List<String> errMsgs = new ArrayList<>(brokerUrls.size());
+    int brokerRequestTimeoutMs = timeoutMs > Integer.MAX_VALUE - BROKER_PROGRESS_REQUEST_TIMEOUT_OVERHEAD_MS
+        ? Integer.MAX_VALUE : timeoutMs + BROKER_PROGRESS_REQUEST_TIMEOUT_OVERHEAD_MS;
+    long collectionTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(brokerRequestTimeoutMs);
+    long collectionStartNanos = System.nanoTime();
+    int notFoundResponses = 0;
+    int receivedResponses = 0;
+    try (MultiHttpRequest.BufferedRequestExecution execution =
+        new MultiHttpRequest(_executor, _httpConnMgr).executeGetBuffered(brokerUrls, requestHeaders,
+            timeoutMs)) {
+      for (int i = 0; i < brokerUrls.size(); i++) {
+        URI uri = null;
+        try {
+          long remainingNanos = collectionTimeoutNanos - (System.nanoTime() - collectionStartNanos);
+          if (remainingNanos <= 0) {
+            break;
+          }
+          Future<MultiHttpRequestBufferedResponse> responseFuture =
+              execution.poll(remainingNanos, TimeUnit.NANOSECONDS);
+          if (responseFuture == null) {
+            break;
+          }
+          receivedResponses++;
+          MultiHttpRequestBufferedResponse response = responseFuture.get();
+          uri = response.getURI();
+          int status = response.getStatusCode();
+          String responseString = response.getResponseBody();
+          if (status == 200) {
+            if (responseString == null) {
+              throw new Exception("Empty response from uri='" + uri + "'");
+            }
+            return JsonUtils.stringToObject(responseString, QueryProgressStats.class);
+          } else if (status == 404) {
+            notFoundResponses++;
+          } else {
+            throw new Exception(
+                String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw e;
+        } catch (Exception e) {
+          LOGGER.debug("Failed to get progress for client query id: {} from uri: {}", clientQueryId, uri, e);
+          errMsgs.add(String.valueOf(e.getMessage()));
+        }
+      }
+    }
+    int timedOutResponses = brokerUrls.size() - receivedResponses;
+    if (timedOutResponses > 0) {
+      errMsgs.add("Timed out waiting for " + timedOutResponses + " broker response(s)");
+    }
+    if (notFoundResponses == 0 && !errMsgs.isEmpty()) {
+      throw new Exception("Unexpected responses from brokers: " + StringUtils.join(errMsgs, ","));
+    }
+    return null;
+  }
+
   private static String getInstanceKey(InstanceInfo info) {
     return info.getHost() + ":" + info.getPort();
   }
@@ -393,6 +520,17 @@ public class PinotRunningQueryResource {
         _pinotHelixResourceManager.getTableToLiveBrokersMapping(database);
     Map<String, InstanceInfo> brokers = new HashMap<>();
     tableBrokers.values().forEach(list -> list.forEach(info -> brokers.putIfAbsent(getInstanceKey(info), info)));
+    return brokers;
+  }
+
+  private Map<String, InstanceInfo> getProgressBrokers(String database) {
+    String cacheKey = database != null ? database : DEFAULT_DATABASE_CACHE_KEY;
+    Map<String, InstanceInfo> brokers = _progressBrokers.getIfPresent(cacheKey);
+    if (brokers != null) {
+      return brokers;
+    }
+    brokers = Map.copyOf(getBrokers(database));
+    _progressBrokers.put(cacheKey, brokers);
     return brokers;
   }
 }
