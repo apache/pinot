@@ -164,12 +164,9 @@ public class ServerSegmentMetadataReader {
         List<ColumnCompressionStatsInfo> serverColStats = tableMetadataInfo.getColumnCompressionStats();
         if (serverColStats != null) {
           for (ColumnCompressionStatsInfo info : serverColStats) {
-            // Skip entries with no meaningful data: no codec, no raw ingest, and no on-disk size.
-            // Old servers (pre-CODEC_DICT_ENCODED) report dict columns with codec=null and onDisk>0;
-            // those must NOT be skipped. Old raw columns without stats have codec=null, rawIngest=0,
-            // and onDisk=0 — those are the only ones we drop.
-            if (info.getCodec() == null && info.getRawIngestSizeInBytes() <= 0
-                && info.getOnDiskSizeInBytes() <= 0) {
+            // Skip columns with no codec — these are old raw segments built before compression stats
+            // tracking was enabled and carry no meaningful data.
+            if (info.getCodec() == null) {
               continue;
             }
             String col = info.getColumn();
