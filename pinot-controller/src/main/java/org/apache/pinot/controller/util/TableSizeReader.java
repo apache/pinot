@@ -520,10 +520,13 @@ public class TableSizeReader {
         subTypeSizeDetails._estimatedSizeInBytes += sizeDetails._estimatedSizeInBytes;
         subTypeSizeDetails._reportedSizePerReplicaInBytes += sizeDetails._maxReportedSizePerReplicaInBytes;
 
-        // Aggregate forward index compression stats (per-replica max)
-        if (maxRawFwdIndexSize > 0 && maxCompressedFwdIndexSize > 0) {
-          compressionStats._rawIngestSizePerReplicaInBytes += maxRawFwdIndexSize;
-          compressionStats._onDiskSizePerReplicaInBytes += maxCompressedFwdIndexSize;
+        // Aggregate compression stats summary: sum per-column rawIngest and onDisk across all
+        // columns that have stats. This covers raw, dict-only, and mixed tables consistently.
+        if (!perColumnMax.isEmpty()) {
+          for (long[] vals : perColumnMax.values()) {
+            compressionStats._rawIngestSizePerReplicaInBytes += vals[0];
+            compressionStats._onDiskSizePerReplicaInBytes += vals[1];
+          }
           compressionStats._segmentsWithStats++;
         }
 
