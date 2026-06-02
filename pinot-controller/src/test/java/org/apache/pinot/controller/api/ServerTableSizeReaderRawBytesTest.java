@@ -118,8 +118,8 @@ public class ServerTableSizeReaderRawBytesTest {
     SegmentSizeInfo s1 = segments.get(0);
     assertEquals(s1.getSegmentName(), "s1");
     assertEquals(s1.getDiskSizeInBytes(), 50000);
-    assertEquals(s1.getRawForwardIndexSizeBytes(), 30000);
-    assertEquals(s1.getCompressedForwardIndexSizeBytes(), 7000);
+    assertEquals(s1.getRawIngestSizeBytes(), 30000);
+    assertEquals(s1.getOnDiskSizeBytes(), 7000);
     assertEquals(s1.getTier(), "default");
 
     Map<String, ColumnCompressionStatsInfo> colStats = s1.getColumnCompressionStats();
@@ -134,7 +134,7 @@ public class ServerTableSizeReaderRawBytesTest {
     // s2 has tier but no column stats
     SegmentSizeInfo s2 = segments.get(1);
     assertEquals(s2.getTier(), "tier1");
-    assertEquals(s2.getRawForwardIndexSizeBytes(), 15000);
+    assertEquals(s2.getRawIngestSizeBytes(), 15000);
   }
 
   @Test
@@ -155,8 +155,8 @@ public class ServerTableSizeReaderRawBytesTest {
     assertEquals(s3.getSegmentName(), "s3");
     assertEquals(s3.getDiskSizeInBytes(), 60000);
     // Default values for missing fields (-1 indicates not available)
-    assertEquals(s3.getRawForwardIndexSizeBytes(), -1);
-    assertEquals(s3.getCompressedForwardIndexSizeBytes(), -1);
+    assertEquals(s3.getRawIngestSizeBytes(), -1);
+    assertEquals(s3.getOnDiskSizeBytes(), -1);
   }
 
   @Test

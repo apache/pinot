@@ -206,10 +206,10 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
         long diskSize = sizeInfo.get("diskSizeInBytes").asLong();
         if (diskSize > 0) {
           // Verify compression stats fields exist in each server's response
-          assertTrue(sizeInfo.has("rawForwardIndexSizeBytes"),
-              "Server info should have rawForwardIndexSizeBytes for segment " + segmentName);
-          assertTrue(sizeInfo.has("compressedForwardIndexSizeBytes"),
-              "Server info should have compressedForwardIndexSizeBytes for segment " + segmentName);
+          assertTrue(sizeInfo.has("rawIngestSizeBytes"),
+              "Server info should have rawIngestSizeBytes for segment " + segmentName);
+          assertTrue(sizeInfo.has("onDiskSizeBytes"),
+              "Server info should have onDiskSizeBytes for segment " + segmentName);
         }
       }
       segmentsChecked++;

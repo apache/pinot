@@ -478,12 +478,12 @@ public class TableSizeReader {
           sizeDetails._reportedSizeInBytes += sizeInfo.getDiskSizeInBytes();
           sizeDetails._maxReportedSizePerReplicaInBytes =
               Math.max(sizeDetails._maxReportedSizePerReplicaInBytes, sizeInfo.getDiskSizeInBytes());
-          if (sizeInfo.getRawForwardIndexSizeBytes() > 0) {
-            maxRawFwdIndexSize = Math.max(maxRawFwdIndexSize, sizeInfo.getRawForwardIndexSizeBytes());
+          if (sizeInfo.getRawIngestSizeBytes() > 0) {
+            maxRawFwdIndexSize = Math.max(maxRawFwdIndexSize, sizeInfo.getRawIngestSizeBytes());
           }
-          if (sizeInfo.getCompressedForwardIndexSizeBytes() > 0) {
+          if (sizeInfo.getOnDiskSizeBytes() > 0) {
             maxCompressedFwdIndexSize =
-                Math.max(maxCompressedFwdIndexSize, sizeInfo.getCompressedForwardIndexSizeBytes());
+                Math.max(maxCompressedFwdIndexSize, sizeInfo.getOnDiskSizeBytes());
           }
           if (sizeInfo.getTier() != null) {
             segmentTier = sizeInfo.getTier();

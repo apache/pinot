@@ -227,12 +227,12 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
         long diskSize = sizeInfo.get("diskSizeInBytes").asLong();
         if (diskSize > 0) {
           // Segment should have raw and compressed forward index sizes
-          long rawSize = sizeInfo.get("rawForwardIndexSizeBytes").asLong();
-          long compressedSize = sizeInfo.get("compressedForwardIndexSizeBytes").asLong();
+          long rawSize = sizeInfo.get("rawIngestSizeBytes").asLong();
+          long compressedSize = sizeInfo.get("onDiskSizeBytes").asLong();
           assertTrue(rawSize > 0,
-              "rawForwardIndexSizeBytes should be > 0 for segment " + segmentName);
+              "rawIngestSizeBytes should be > 0 for segment " + segmentName);
           assertTrue(compressedSize > 0,
-              "compressedForwardIndexSizeBytes should be > 0 for segment " + segmentName);
+              "onDiskSizeBytes should be > 0 for segment " + segmentName);
 
           // Verify per-column compression stats if present
           JsonNode columnStats = sizeInfo.get("columnCompressionStats");
