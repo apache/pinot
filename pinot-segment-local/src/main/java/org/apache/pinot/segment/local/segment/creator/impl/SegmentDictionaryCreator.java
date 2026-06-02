@@ -77,11 +77,16 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
   public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
       boolean useVarLengthDictionary) {
+    this(columnName, storedType, indexFile, useVarLengthDictionary, false);
+  }
+
+  public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
+      boolean useVarLengthDictionary, boolean trackRawIngestBytes) {
     _columnName = columnName;
     _storedType = storedType;
     _dictionaryFile = indexFile;
     _useVarLengthDictionary = useVarLengthDictionary;
-    _trackRawIngestBytes = false;
+    _trackRawIngestBytes = trackRawIngestBytes;
   }
 
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
