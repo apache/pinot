@@ -148,10 +148,12 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         //   pair-wise is used when numOperators >= numAvailableCores.
         if (_numOperators == 1) {
           _waitingRecords.set(GroupByUtils.getAndPopulateSortedRecords(resultsBlock));
+          markSegmentProcessed();
           break;
         }
         Object waitingObject = _waitingRecords.getAndUpdate(v -> v == null ? resultsBlock : null);
         if (waitingObject == null) {
+          markSegmentProcessed();
           continue;
         }
         SortedRecords records = GroupByUtils.getAndPopulateSortedRecords(resultsBlock);
@@ -177,6 +179,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
           }
           checkTerminationAndSampleUsage();
         }
+        markSegmentProcessed();
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {

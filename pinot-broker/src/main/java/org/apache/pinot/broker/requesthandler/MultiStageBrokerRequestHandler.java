@@ -33,6 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -100,6 +101,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -138,6 +140,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final WorkerManager _multiClusterWorkerManager;
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
+  private final Map<Long, QueryExecutionContext> _executionContextsById;
   @Nullable
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final boolean _explainAskingServerDefault;
@@ -215,6 +218,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new QueryDispatcher(_mailboxService, failureDetector, tlsConfig, isQueryCancellationEnabled(), cancelTimeout,
             dispatchKeepAliveTimeMs, dispatchKeepAliveTimeoutMs, dispatchKeepAliveWithoutCalls, _streamStatsDefault,
             streamStatsDrainMs);
+    _executionContextsById = new ConcurrentHashMap<>();
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}, query cancellation enabled: {}", hostname, port,
         _brokerId, _brokerTimeoutMs, _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit(),
@@ -279,6 +283,37 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryCompileExecutor.shutdown();
     _queryDispatcher.shutdown();
+  }
+
+  @Override
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr) {
+    QueryExecutionContext executionContext = _executionContextsById.get(queryId);
+    if (executionContext == null) {
+      return null;
+    }
+    List<QueryProgressStats> progressStatsList = new ArrayList<>(2);
+    List<QueryProgressStats> details = new ArrayList<>(4);
+    QueryProgressStats brokerProgressStats = executionContext.getProgressStats().withLabel("Broker");
+    progressStatsList.add(brokerProgressStats);
+    details.add(brokerProgressStats);
+    QueryProgressStats serverProgressStats = _queryDispatcher.getQueryProgressStats(queryId, timeoutMs);
+    if (serverProgressStats != null) {
+      progressStatsList.add(serverProgressStats);
+      if (serverProgressStats.getDetails().isEmpty()) {
+        details.add(serverProgressStats.withLabel("Servers"));
+      } else {
+        details.addAll(serverProgressStats.getDetails());
+      }
+    }
+    return QueryProgressStats.aggregate(progressStatsList).withLabel("Query").withDetails(details);
+  }
+
+  @Override
+  protected void onQueryFinish(long requestId) {
+    super.onQueryFinish(requestId);
+    _executionContextsById.remove(requestId);
   }
 
   @Override
@@ -729,6 +764,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       String clientRequestId = extractClientRequestId(query.getSqlNodeAndOptions());
+      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+      executionContext.addTotalWorkUnits(1);
+      if (isQueryCancellationEnabled()) {
+        _executionContextsById.put(requestId, executionContext);
+      }
       onQueryStart(requestId, clientRequestId, query.getTextQuery());
       long executionStartTimeNs = System.nanoTime();
 
@@ -739,6 +779,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (allLeafStagesEmpty) {
         try {
           queryResults = QueryDispatcher.runReducer(dispatchableSubPlan, query.getOptions(), _mailboxService);
+          executionContext.incrementProcessedWorkUnits();
         } catch (QueryException e) {
           // Re-throw typed errors (auth, validation, etc.) so they propagate with their
           // original error codes, matching the dispatch branch behavior.
@@ -763,6 +804,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         try {
           queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan,
               timer.getRemainingTimeMs(), query.getOptions(), _serverRoutingStatsManager);
+          executionContext.incrementProcessedWorkUnits();
         } catch (QueryException e) {
           throw e;
         } catch (Throwable t) {

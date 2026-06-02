@@ -20,10 +20,21 @@
 
 import React, {useEffect, useState} from 'react';
 import {makeStyles} from '@material-ui/core/styles';
-import {Box, Button, ButtonGroup, Checkbox, FormControl, Grid, Input, InputLabel, Typography} from '@material-ui/core';
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  Checkbox,
+  FormControl,
+  Grid,
+  Input,
+  InputLabel,
+  LinearProgress,
+  Typography
+} from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
-import {SqlException, TableData} from 'Models';
+import {QueryProgressStats, SqlException, TableData} from 'Models';
 import {UnControlled as CodeMirror} from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
@@ -50,6 +61,7 @@ import {useHistory, useLocation} from 'react-router-dom';
 import sqlFormatter from '@sqltools/formatter';
 import {FlamegraphMode, FlameGraphQueryStageStats} from '../components/Query/FlamegraphQueryStageStats';
 import {VisualizeQueryStageStats} from '../components/Query/VisualizeQueryStageStats';
+import {getClientQueryProgress} from '../requests';
 
 enum ResultViewType {
   TABULAR = 'tabular',
@@ -64,6 +76,7 @@ enum ErrorViewType {
 }
 
 const QUERY_BOOTSTRAP_TIMEOUT_MS = 3000;
+const QUERY_PROGRESS_POLL_INTERVAL_MS = 1000;
 const EMPTY_TABLE_LIST = {
   columns: ['Tables'],
   records: [],
@@ -71,6 +84,30 @@ const EMPTY_TABLE_LIST = {
 const EMPTY_LOGICAL_TABLE_LIST = {
   columns: ['Logical Tables'],
   records: [],
+};
+
+const getQueryProgressRows = (queryProgress: QueryProgressStats | null): Array<QueryProgressStats | null> => {
+  if (!queryProgress) {
+    return [null];
+  }
+  return queryProgress.details?.length ? [queryProgress, ...queryProgress.details] : [queryProgress];
+};
+
+const getProgressPercent = (queryProgress: QueryProgressStats | null): number => {
+  return queryProgress ? Math.max(0, Math.min(100, queryProgress.progressPercent)) : 0;
+};
+
+const formatProgressPercent = (queryProgress: QueryProgressStats | null): string => {
+  if (!queryProgress) {
+    return '0.0%';
+  }
+  return queryProgress.progressPercent >= 0 ? `${queryProgress.progressPercent.toFixed(1)}%` : '?.?%';
+};
+
+const formatProgressUnits = (queryProgress: QueryProgressStats | null): string => {
+  const processedWorkUnits = queryProgress?.processedWorkUnits || 0;
+  const totalWorkUnits = queryProgress && queryProgress.totalWorkUnits >= 0 ? queryProgress.totalWorkUnits : '?';
+  return `${processedWorkUnits}/${totalWorkUnits}`;
 };
 
 const useStyles = makeStyles((theme) => ({
@@ -126,6 +163,37 @@ const useStyles = makeStyles((theme) => ({
   },
   timeoutControl: {
     bottom: 10
+  },
+  queryProgress: {
+    margin: '8px 0 20px 0',
+  },
+  queryProgressRows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  queryProgressRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(96px, 160px) 1fr',
+    columnGap: 12,
+    alignItems: 'center',
+  },
+  queryProgressLine: {
+    minWidth: 0,
+  },
+  queryProgressLabel: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  queryProgressNumbers: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  queryProgressBar: {
+    height: 8,
+    borderRadius: 4,
   }
 }));
 
@@ -257,6 +325,7 @@ const QueryPage = () => {
   const [boolFlag, setBoolFlag] = useState(false);
 
   const [copyMsg, showCopyMsg] = React.useState(false);
+  const [queryProgress, setQueryProgress] = React.useState<QueryProgressStats | null>(null);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setChecked({ ...checked, [event.target.name]: event.target.checked });
@@ -340,9 +409,15 @@ const QueryPage = () => {
     setInputQuery(formatted);
   };
 
+  const createClientQueryId = () => {
+    return `query-console-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  };
+
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
+    setQueryProgress(null);
     queryExecuted.current = true;
+    const clientQueryId = createClientQueryId();
     let params;
     let queryOptions = [];
     if(queryTimeout){
@@ -351,6 +426,7 @@ const QueryPage = () => {
     if(checked.useMSE){
       queryOptions.push(`useMultistageEngine=true`);
     }
+    queryOptions.push(`clientQueryId=${clientQueryId}`);
     const finalQuery = `${query || inputQuery.trim()}`;
     params = JSON.stringify({
       sql: `${finalQuery}`,
@@ -371,15 +447,37 @@ const QueryPage = () => {
       })
     }
 
-    const results = await PinotMethodUtils.getQueryResults(params);
-    setResultError(results.exceptions || []);
-    setResultData(results.result || { columns: [], records: [] });
-    setQueryStats(results.queryStats || { columns: QUERY_STATS_COLUMNS, records: [] });
-    setOutputResult(JSON.stringify(results.data, null, 2) || '');
-    setStageStats(results?.data?.stageStats || {});
-    setWarnings(extractWarnings(results));
-    setQueryLoader(false);
-    queryExecuted.current = false;
+    let progressStopped = false;
+    let progressTimer = 0;
+    const pollQueryProgress = async () => {
+      try {
+        const response = await getClientQueryProgress(clientQueryId, QUERY_PROGRESS_POLL_INTERVAL_MS);
+        setQueryProgress(response.data);
+      } catch (error) {
+        // The query might not be registered yet, or may already have completed.
+      } finally {
+        if (!progressStopped) {
+          progressTimer = window.setTimeout(pollQueryProgress, QUERY_PROGRESS_POLL_INTERVAL_MS);
+        }
+      }
+    };
+    progressTimer = window.setTimeout(pollQueryProgress, QUERY_PROGRESS_POLL_INTERVAL_MS);
+
+    try {
+      const results = await PinotMethodUtils.getQueryResults(params);
+      setResultError(results.exceptions || []);
+      setResultData(results.result || { columns: [], records: [] });
+      setQueryStats(results.queryStats || { columns: QUERY_STATS_COLUMNS, records: [] });
+      setOutputResult(JSON.stringify(results.data, null, 2) || '');
+      setStageStats(results?.data?.stageStats || {});
+      setWarnings(extractWarnings(results));
+    } finally {
+      progressStopped = true;
+      window.clearTimeout(progressTimer);
+      setQueryProgress(null);
+      setQueryLoader(false);
+      queryExecuted.current = false;
+    }
   };
 
   const extractWarnings = (result) => {
@@ -677,7 +775,41 @@ const QueryPage = () => {
             </Grid>
 
             {queryLoader ? (
-              <AppLoader />
+              <Box className={classes.queryProgress}>
+                <Box className={classes.queryProgressRows}>
+                  {getQueryProgressRows(queryProgress).map((progress, index, rows) => {
+                    const showLabel = rows.length > 1;
+                    const label = progress?.label || (index === 0 ? 'Query' : `Progress ${index + 1}`);
+                    return (
+                      <Box
+                        className={showLabel ? classes.queryProgressRow : classes.queryProgressLine}
+                        key={`${label}-${index}`}
+                      >
+                        {showLabel && (
+                          <Typography className={classes.queryProgressLabel} variant="body2">
+                            {label}
+                          </Typography>
+                        )}
+                        <Box className={classes.queryProgressLine}>
+                          <Box className={classes.queryProgressNumbers}>
+                            <Typography variant="body2">
+                              {formatProgressPercent(progress)}
+                            </Typography>
+                            <Typography variant="body2">
+                              {formatProgressUnits(progress)}
+                            </Typography>
+                          </Box>
+                          <LinearProgress
+                            className={classes.queryProgressBar}
+                            variant={progress && progress.progressPercent >= 0 ? 'determinate' : 'indeterminate'}
+                            value={getProgressPercent(progress)}
+                          />
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
             ) : (
               <>
                 {queryStats.columns.length ? (

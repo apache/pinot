@@ -327,6 +327,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
         executionInfo.getSelectedSegmentsInfo(queryContext, timerContext, executorService, _segmentPrunerService);
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    if (threadContext != null) {
+      threadContext.getExecutionContext().addTotalSegmentsToProcess(selectedSegmentsInfo.getNumSelectedSegments());
+    }
     // Account for resource usage in pruning, given that it can be expensive for large segment lists.
     QueryThreadContext.checkTerminationAndSampleUsage("Server segment pruning");
 
