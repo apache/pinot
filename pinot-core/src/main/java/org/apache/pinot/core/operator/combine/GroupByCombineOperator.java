@@ -168,6 +168,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
           }
         }
+        markSegmentProcessed();
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {

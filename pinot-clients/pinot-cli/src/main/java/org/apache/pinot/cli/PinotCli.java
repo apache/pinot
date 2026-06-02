@@ -21,7 +21,11 @@ package org.apache.pinot.cli;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -30,6 +34,8 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,11 +46,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.client.utils.DriverUtils;
+import org.apache.pinot.spi.query.QueryProgressStats;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
@@ -107,6 +117,10 @@ public class PinotCli implements Callable<Integer> {
   @CommandLine.Option(names = {"--debug"}, description = "Enable debug output and stack traces")
   private boolean _debug = false;
 
+  @CommandLine.Option(names = {"--progress-interval-ms"},
+      description = "Query progress polling interval in milliseconds. Use 0 to disable. (default: 1000)")
+  private Integer _progressIntervalMs;
+
   @CommandLine.Option(names = {"--set"}, description = "Query option key=value (repeatable)")
   private final Map<String, String> _options = new LinkedHashMap<>();
 
@@ -119,6 +133,11 @@ public class PinotCli implements Callable<Integer> {
   public Integer call()
       throws Exception {
     loadConfigDefaults();
+    if (_progressIntervalMs == null) {
+      _progressIntervalMs = 1000;
+    } else if (_progressIntervalMs < 0) {
+      throw new IllegalArgumentException("progress interval must be non-negative");
+    }
     Properties props = new Properties();
     if (_user != null) {
       props.setProperty("user", _user);
@@ -130,6 +149,13 @@ public class PinotCli implements Callable<Integer> {
     for (Map.Entry<String, String> e : _headers.entrySet()) {
       props.setProperty("headers." + e.getKey(), e.getValue());
     }
+    props.putAll(DriverUtils.getURLParams(_jdbcUrl));
+    for (String name : props.stringPropertyNames()) {
+      if (name.startsWith("headers.")) {
+        _headers.put(name.substring("headers.".length()), props.getProperty(name));
+      }
+    }
+    DriverUtils.handleAuth(props, _headers);
     // query options are passed as properties; PinotConnection will convert to SET statements
     for (Map.Entry<String, String> e : _options.entrySet()) {
       props.setProperty(e.getKey(), e.getValue());
@@ -270,16 +296,30 @@ public class PinotCli implements Callable<Integer> {
 
   private void executeAndRender(Connection conn, String sql)
       throws SQLException {
-    String composed = prefixSessionOptions(sql);
+    boolean progressEnabled = _progressIntervalMs > 0 && isInteractiveProgressEnabled();
+    String configuredClientQueryId = getQueryOption("clientQueryId");
+    String generatedClientQueryId = progressEnabled && configuredClientQueryId == null
+        ? "pinotcli" + UUID.randomUUID().toString().replace("-", "") : null;
+    String clientQueryId = configuredClientQueryId != null ? configuredClientQueryId : generatedClientQueryId;
+    String composed = prefixSessionOptions(sql, generatedClientQueryId);
     Instant start = Instant.now();
-    Progress progress = new Progress();
-    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    ScheduledFuture<?> spinner = scheduler.scheduleAtFixedRate(() -> progress.tick(), 0, 120, TimeUnit.MILLISECONDS);
+    Progress progress = null;
+    ScheduledExecutorService scheduler = null;
+    ScheduledFuture<?> spinner = null;
+    if (progressEnabled) {
+      progress = new Progress(getControllerProgressUrl(clientQueryId), _headers);
+      Progress progressMonitor = progress;
+      scheduler = Executors.newSingleThreadScheduledExecutor();
+      spinner = scheduler.scheduleWithFixedDelay(progressMonitor::tick, 0, _progressIntervalMs, TimeUnit.MILLISECONDS);
+    }
     try (Statement stmt = conn.createStatement()) {
       boolean hasResult = stmt.execute(composed);
+      if (progress != null) {
+        spinner = stopProgress(spinner, progress);
+      }
       if (!hasResult) {
         System.out.println("OK");
-        printSqlWarnings(stmt.getWarnings());
+        printSqlWarnings(stmt);
         return;
       }
       try (ResultSet rs = stmt.getResultSet()) {
@@ -294,7 +334,7 @@ public class PinotCli implements Callable<Integer> {
           out = System.out;
         }
         int rows = render(rs, format, out, getTerminalWidthIfInteractive());
-        printSqlWarnings(rs.getWarnings());
+        printSqlWarnings(rs);
         if (usePager && buffer != null) {
           page(buffer.toString());
         }
@@ -305,11 +345,26 @@ public class PinotCli implements Callable<Integer> {
         }
       }
     } finally {
-      spinner.cancel(true);
-      scheduler.shutdownNow();
-      progress.clear();
+      if (progress != null) {
+        spinner = stopProgress(spinner, progress);
+      }
+      if (scheduler != null) {
+        scheduler.shutdownNow();
+      }
       _overrideFormat = null;
     }
+  }
+
+  private static boolean isInteractiveProgressEnabled() {
+    return System.console() != null;
+  }
+
+  private static ScheduledFuture<?> stopProgress(ScheduledFuture<?> spinner, Progress progress) {
+    if (spinner != null) {
+      spinner.cancel(true);
+      progress.clear();
+    }
+    return null;
   }
 
   private int render(ResultSet rs, OutputFormat format, Appendable out, int terminalWidth)
@@ -381,16 +436,39 @@ public class PinotCli implements Callable<Integer> {
     return renderAlignedFromResultSet(rs, out);
   }
 
-  private String prefixSessionOptions(String sql) {
-    if (_options.isEmpty()) {
+  private String prefixSessionOptions(String sql, String clientQueryId) {
+    if (_options.isEmpty() && clientQueryId == null) {
       return sql;
     }
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<String, String> e : _options.entrySet()) {
       sb.append("SET ").append(e.getKey()).append("=").append(e.getValue()).append(";\n");
     }
+    if (clientQueryId != null) {
+      sb.append("SET clientQueryId='").append(clientQueryId).append("';\n");
+    }
     sb.append(sql);
     return sb.toString();
+  }
+
+  private String getQueryOption(String optionName) {
+    for (Map.Entry<String, String> entry : _options.entrySet()) {
+      if (optionName.equalsIgnoreCase(entry.getKey())) {
+        return entry.getValue();
+      }
+    }
+    return null;
+  }
+
+  private String getControllerProgressUrl(String clientQueryId) {
+    try {
+      String scheme = DriverUtils.getURLParams(_jdbcUrl).getOrDefault("scheme", "http");
+      String encodedClientQueryId = URLEncoder.encode(clientQueryId, StandardCharsets.UTF_8).replace("+", "%20");
+      return String.format("%s://%s/clientQuery/%s/progress?timeoutMs=%d", scheme,
+          DriverUtils.getControllerFromURL(_jdbcUrl), encodedClientQueryId, Progress.REQUEST_TIMEOUT_MS);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   private int renderAlignedFromResultSet(ResultSet rs, Appendable out)
@@ -913,6 +991,9 @@ public class PinotCli implements Callable<Integer> {
     if (!_debug && p.getProperty("debug") != null) {
       _debug = Boolean.parseBoolean(p.getProperty("debug"));
     }
+    if (_progressIntervalMs == null) {
+      _progressIntervalMs = Integer.parseInt(p.getProperty("progress-interval-ms", "1000"));
+    }
     // headers.* and arbitrary options
     for (String name : p.stringPropertyNames()) {
       if (name.startsWith("headers.")) {
@@ -935,7 +1016,8 @@ public class PinotCli implements Callable<Integer> {
           || name.equals("output-format-interactive")
           || name.equals("pager")
           || name.equals("history-file")
-          || name.equals("debug")) {
+          || name.equals("debug")
+          || name.equals("progress-interval-ms")) {
         continue;
       }
       // don't override explicit --set
@@ -981,6 +1063,7 @@ public class PinotCli implements Callable<Integer> {
     System.out.println("Roles: " + (_roles.isEmpty() ? "(none)" : String.join(",", _roles)) + " (client-side)");
     System.out.println("Output (batch): " + (_outputFormat == null ? _output : _outputFormat));
     System.out.println("Output (interactive): " + _outputFormatInteractive);
+    System.out.println("Progress interval: " + _progressIntervalMs + " ms");
     if (_pager != null) {
       System.out.println("Pager: " + _pager);
     }
@@ -992,12 +1075,30 @@ public class PinotCli implements Callable<Integer> {
     }
   }
 
-  private void printSqlWarnings(java.sql.SQLWarning warn) {
+  private void printSqlWarnings(Statement stmt)
+      throws SQLException {
+    try {
+      printSqlWarnings(stmt.getWarnings());
+    } catch (SQLFeatureNotSupportedException e) {
+      // Some Pinot JDBC result implementations do not surface warnings.
+    }
+  }
+
+  private void printSqlWarnings(ResultSet rs)
+      throws SQLException {
+    try {
+      printSqlWarnings(rs.getWarnings());
+    } catch (SQLFeatureNotSupportedException e) {
+      // Some Pinot JDBC result implementations do not surface warnings.
+    }
+  }
+
+  private void printSqlWarnings(SQLWarning warn) {
     if (warn == null) {
       return;
     }
     System.err.println("Warnings:");
-    for (java.sql.SQLWarning w = warn; w != null; w = w.getNextWarning()) {
+    for (SQLWarning w = warn; w != null; w = w.getNextWarning()) {
       System.err.println(
           "  " + w.getMessage() + (w.getSQLState() != null ? (" [SQLState=" + w.getSQLState() + "]") : ""));
     }
@@ -1013,21 +1114,165 @@ public class PinotCli implements Callable<Integer> {
     }
   }
 
-  private static final class Progress {
-    private final char[] _spin = new char[]{'|', '/', '-', '\\'};
-    private int _idx = 0;
-    private final long _start = System.currentTimeMillis();
+  static final class Progress {
+    private static final int BAR_WIDTH = 28;
+    static final int REQUEST_TIMEOUT_MS = 1000;
+    private static final int CLIENT_TIMEOUT_MS = REQUEST_TIMEOUT_MS + 1000;
 
-    synchronized void tick() {
-      long elapsed = System.currentTimeMillis() - _start;
-      System.err.print("\r[" + _spin[_idx] + "] Executing... " + elapsed + " ms");
-      System.err.flush();
-      _idx = (_idx + 1) % _spin.length;
+    private final String _progressUrl;
+    private final Map<String, String> _headers;
+    private final long _start = System.currentTimeMillis();
+    private final Object _renderLock = new Object();
+    private volatile boolean _stopped;
+    private volatile HttpURLConnection _activeConnection;
+    private int _renderedLines;
+
+    Progress(String progressUrl, Map<String, String> headers) {
+      _progressUrl = progressUrl;
+      _headers = new LinkedHashMap<>(headers);
     }
 
-    synchronized void clear() {
-      System.err.print("\r\033[K");
-      System.err.flush();
+    void tick() {
+      if (_stopped) {
+        return;
+      }
+      long elapsed = System.currentTimeMillis() - _start;
+      QueryProgressStats progressStats = fetchProgress();
+      synchronized (_renderLock) {
+        if (_stopped) {
+          return;
+        }
+        if (progressStats != null) {
+          writeProgress(formatProgress(progressStats, elapsed));
+        } else {
+          writeProgress(formatElapsed(elapsed));
+        }
+        System.err.flush();
+      }
+    }
+
+    void clear() {
+      _stopped = true;
+      HttpURLConnection activeConnection = _activeConnection;
+      if (activeConnection != null) {
+        activeConnection.disconnect();
+      }
+      synchronized (_renderLock) {
+        clearRenderedLines();
+        System.err.flush();
+      }
+    }
+
+    private void writeProgress(String progress) {
+      clearRenderedLines();
+      System.err.print("\r");
+      String[] lines = progress.split("\n", -1);
+      for (int i = 0; i < lines.length; i++) {
+        if (i > 0) {
+          System.err.print("\n");
+        }
+        System.err.print(lines[i] + "\033[K");
+      }
+      _renderedLines = lines.length;
+    }
+
+    private void clearRenderedLines() {
+      if (_renderedLines == 0) {
+        return;
+      }
+      for (int i = 0; i < _renderedLines; i++) {
+        System.err.print("\r\033[K");
+        if (i < _renderedLines - 1) {
+          System.err.print("\033[A");
+        }
+      }
+      _renderedLines = 0;
+    }
+
+    private QueryProgressStats fetchProgress() {
+      if (_progressUrl == null) {
+        return null;
+      }
+      HttpURLConnection conn = null;
+      try {
+        conn = (HttpURLConnection) URI.create(_progressUrl).toURL().openConnection();
+        _activeConnection = conn;
+        if (_stopped) {
+          return null;
+        }
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(CLIENT_TIMEOUT_MS);
+        conn.setReadTimeout(CLIENT_TIMEOUT_MS);
+        _headers.forEach(conn::setRequestProperty);
+        if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+          return null;
+        }
+        try (InputStream inputStream = conn.getInputStream()) {
+          String response = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+          return JsonUtils.stringToObject(response, QueryProgressStats.class);
+        }
+      } catch (Exception e) {
+        return null;
+      } finally {
+        if (conn != null) {
+          if (_activeConnection == conn) {
+            _activeConnection = null;
+          }
+          conn.disconnect();
+        }
+      }
+    }
+
+    static String formatElapsed(long elapsedMs) {
+      return "[----------------------------]   ?.?% 0/? " + elapsedMs + " ms";
+    }
+
+    static String formatProgress(QueryProgressStats progressStats, long elapsedMs) {
+      if (progressStats.getDetails().isEmpty()) {
+        return formatProgressRow(null, 0, progressStats, elapsedMs);
+      }
+      List<QueryProgressStats> rows = new ArrayList<>(progressStats.getDetails().size() + 1);
+      rows.add(progressStats);
+      rows.addAll(progressStats.getDetails());
+      List<String> labels = new ArrayList<>(rows.size());
+      int labelWidth = 0;
+      for (int i = 0; i < rows.size(); i++) {
+        QueryProgressStats row = rows.get(i);
+        String label = row.getLabel() != null ? row.getLabel() : i == 0 ? "Query" : "Progress " + i;
+        labels.add(label);
+        labelWidth = Math.max(labelWidth, label.length());
+      }
+      labelWidth = Math.min(labelWidth, 24);
+      StringBuilder builder = new StringBuilder();
+      for (int i = 0; i < rows.size(); i++) {
+        if (i > 0) {
+          builder.append('\n');
+        }
+        builder.append(formatProgressRow(labels.get(i), labelWidth, rows.get(i), i == 0 ? elapsedMs : -1));
+      }
+      return builder.toString();
+    }
+
+    private static String formatProgressRow(String label, int labelWidth, QueryProgressStats progressStats,
+        long elapsedMs) {
+      double percent = progressStats.getProgressPercent();
+      String prefix = labelWidth > 0 ? String.format("%-" + labelWidth + "s ", abbreviate(label, labelWidth)) : "";
+      String suffix = elapsedMs >= 0 ? " " + elapsedMs + " ms" : "";
+      if (percent < 0) {
+        return String.format("%s[----------------------------]   ?.?%% %d/?%s", prefix,
+            progressStats.getProcessedWorkUnits(), suffix);
+      }
+      int filled = Math.max(0, Math.min(BAR_WIDTH, (int) Math.round(percent * BAR_WIDTH / 100.0)));
+      String bar = "#".repeat(filled) + "-".repeat(BAR_WIDTH - filled);
+      return String.format("%s[%s] %5.1f%% %d/%d%s", prefix, bar, percent, progressStats.getProcessedWorkUnits(),
+          progressStats.getTotalWorkUnits(), suffix);
+    }
+
+    private static String abbreviate(String value, int maxLength) {
+      if (value == null || value.length() <= maxLength) {
+        return value;
+      }
+      return value.substring(0, maxLength - 1) + "~";
     }
   }
 

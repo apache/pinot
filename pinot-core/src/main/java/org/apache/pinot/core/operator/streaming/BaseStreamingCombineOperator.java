@@ -110,6 +110,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
     Object tracker = createQuerySatisfiedTracker();
     while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
       Operator<T> operator = _operators.get(operatorId);
+      boolean querySatisfied = false;
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
@@ -119,8 +120,7 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
           addResultsBlock(resultsBlock);
           // When query is satisfied, skip processing the remaining segments
           if (isQuerySatisfied(resultsBlock, tracker)) {
-            _nextOperatorId.set(_numOperators);
-            return;
+            querySatisfied = true;
           }
         } else {
           T resultsBlock;
@@ -128,8 +128,8 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
             addResultsBlock(resultsBlock);
             // When query is satisfied, skip processing the remaining segments
             if (isQuerySatisfied(resultsBlock, tracker)) {
-              _nextOperatorId.set(_numOperators);
-              return;
+              querySatisfied = true;
+              break;
             }
           }
         }
@@ -139,6 +139,11 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
+      }
+      markSegmentProcessed();
+      if (querySatisfied) {
+        _nextOperatorId.set(_numOperators);
+        return;
       }
       // offer the LAST_RESULTS_BLOCK indicate finish of the current operator.
       addResultsBlock(LAST_RESULTS_BLOCK);

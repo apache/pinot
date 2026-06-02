@@ -64,6 +64,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -95,6 +96,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @Nullable
   protected final String _regexDictSizeThreshold;
   protected final boolean _enableQueryCancellation;
+  protected final boolean _enableQueryProgress;
   @Nullable
   protected final String _enableAutoRewriteAggregationType;
   @Nullable
@@ -108,6 +110,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Maps broker-generated query id to client-provided query id.
    */
   protected final Map<Long, String> _clientQueryIds;
+  /// Reverse index for O(1) client-query-id lookup. A set preserves existing behavior when callers reuse an id.
+  protected final Map<String, Set<Long>> _requestIdsByClientQueryId;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
@@ -133,14 +137,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _regexDictSizeThreshold = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REGEX_DICT_SIZE_THRESHOLD);
     _enableQueryCancellation = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION,
         Broker.DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION);
+    _enableQueryProgress = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_PROGRESS_ENABLED,
+        Broker.DEFAULT_BROKER_QUERY_PROGRESS_ENABLED);
     _enableAutoRewriteAggregationType =
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE);
-    if (_enableQueryCancellation) {
+    if (_enableQueryCancellation || _enableQueryProgress) {
       _queriesById = new ConcurrentHashMap<>();
       _clientQueryIds = new ConcurrentHashMap<>();
+      _requestIdsByClientQueryId = new ConcurrentHashMap<>();
     } else {
       _queriesById = null;
       _clientQueryIds = null;
+      _requestIdsByClientQueryId = null;
     }
   }
 
@@ -413,6 +421,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   @Override
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr)
+      throws Exception {
+    return null;
+  }
+
+  @Override
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
@@ -440,10 +456,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public OptionalLong getRequestIdByClientId(String clientQueryId) {
-    return _clientQueryIds.entrySet().stream()
-        .filter(e -> clientQueryId.equals(e.getValue()))
-        .mapToLong(Map.Entry::getKey)
-        .findFirst();
+    if (!isQueryTrackingEnabled()) {
+      return OptionalLong.empty();
+    }
+    Set<Long> requestIds = _requestIdsByClientQueryId.get(clientQueryId);
+    if (requestIds == null) {
+      return OptionalLong.empty();
+    }
+    return requestIds.stream().mapToLong(Long::longValue).findFirst();
   }
 
   @Nullable
@@ -458,10 +478,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *   query AND subquery, which means this method is called multiple times for the same query.
    */
   protected void onQueryStart(long requestId, @Nullable String clientRequestId, String query, Object... extras) {
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _queriesById.put(requestId, query);
       if (StringUtils.isNotBlank(clientRequestId)) {
         _clientQueryIds.put(requestId, clientRequestId);
+        _requestIdsByClientQueryId.computeIfAbsent(clientRequestId, ignored -> ConcurrentHashMap.newKeySet())
+            .add(requestId);
         LOGGER.debug("Keep track of running query: {} (with client id {})", requestId, clientRequestId);
       } else {
         LOGGER.debug("Keep track of running query: {}", requestId);
@@ -470,14 +492,28 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   protected void onQueryFinish(long requestId) {
-    if (isQueryCancellationEnabled()) {
+    if (isQueryTrackingEnabled()) {
       _queriesById.remove(requestId);
-      _clientQueryIds.remove(requestId);
+      String clientRequestId = _clientQueryIds.remove(requestId);
+      if (clientRequestId != null) {
+        _requestIdsByClientQueryId.computeIfPresent(clientRequestId, (ignored, requestIds) -> {
+          requestIds.remove(requestId);
+          return requestIds.isEmpty() ? null : requestIds;
+        });
+      }
       LOGGER.debug("Remove track of running query: {}", requestId);
     }
   }
 
   protected boolean isQueryCancellationEnabled() {
     return _enableQueryCancellation;
+  }
+
+  protected boolean isQueryProgressEnabled() {
+    return _enableQueryProgress;
+  }
+
+  protected boolean isQueryTrackingEnabled() {
+    return _enableQueryCancellation || _enableQueryProgress;
   }
 }

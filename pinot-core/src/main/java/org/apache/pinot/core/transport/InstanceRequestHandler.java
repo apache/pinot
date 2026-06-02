@@ -52,6 +52,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -88,14 +89,21 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
   private final ConcurrentHashMap<String, QueryExecutionContext> _executionContexts;
+  private final QueryProgressTracker _queryProgressTracker;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
       AccessControl accessControl, ThreadAccountant threadAccountant) {
+    this(instanceName, config, queryScheduler, accessControl, threadAccountant, new QueryProgressTracker(config));
+  }
+
+  public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
+      AccessControl accessControl, ThreadAccountant threadAccountant, QueryProgressTracker queryProgressTracker) {
     _instanceName = instanceName;
     _queryScheduler = queryScheduler;
     _accessControl = accessControl;
     _threadAccountant = threadAccountant;
+    _queryProgressTracker = queryProgressTracker;
 
     if (config.getProperty(Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, Server.DEFAULT_ENABLE_QUERY_CANCELLATION)) {
       _executionContexts = new ConcurrentHashMap<>();
@@ -156,34 +164,36 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    */
   @VisibleForTesting
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
-    QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
+    QueryExecutionContext executionContext = queryRequest.getOrCreateExecutionContext(_instanceName);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
+      String queryId = queryRequest.getQueryId();
       if (_executionContexts != null) {
-        String queryId = queryRequest.getQueryId();
         // Track the running query for cancellation.
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Keep track of running query: {}", queryId);
         }
         _executionContexts.put(queryId, executionContext);
       }
-      Futures.addCallback(future, createCallback(queryRequest, ctx, queryArrivalTimeMs),
+      _queryProgressTracker.register(queryId, executionContext);
+      Futures.addCallback(future, createCallback(queryRequest, executionContext, ctx, queryArrivalTimeMs),
           MoreExecutors.directExecutor());
     }
   }
 
-  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
-      long queryArrivalTimeMs) {
+  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, QueryExecutionContext executionContext,
+      ChannelHandlerContext ctx, long queryArrivalTimeMs) {
     return new FutureCallback<>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
+        String queryId = queryRequest.getQueryId();
         if (_executionContexts != null) {
-          String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on success", queryId);
           }
-          _executionContexts.remove(queryId);
+          _executionContexts.remove(queryId, executionContext);
         }
+        _queryProgressTracker.complete(queryId, executionContext, responseBytes != null);
         long requestId = queryRequest.getRequestId();
         String tableNameWithType = queryRequest.getTableNameWithType();
         if (responseBytes != null) {
@@ -198,13 +208,14 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
       @Override
       public void onFailure(Throwable t) {
+        String queryId = queryRequest.getQueryId();
         if (_executionContexts != null) {
-          String queryId = queryRequest.getQueryId();
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on failure", queryId);
           }
-          _executionContexts.remove(queryId);
+          _executionContexts.remove(queryId, executionContext);
         }
+        _queryProgressTracker.complete(queryId, executionContext, false);
         // Send exception response.
         Exception e;
         if (t instanceof Exception) {
@@ -264,6 +275,11 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   public Set<String> getRunningQueryIds() {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     return new HashSet<>(_executionContexts.keySet());
+  }
+
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(String queryId) {
+    return _queryProgressTracker.getProgressStats(queryId);
   }
 
   /**

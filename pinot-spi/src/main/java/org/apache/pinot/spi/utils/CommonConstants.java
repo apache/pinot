@@ -395,6 +395,8 @@ public class CommonConstants {
         "pinot.broker.query.regex.dict.size.threshold";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_CANCELLATION = true;
+    public static final String CONFIG_OF_BROKER_QUERY_PROGRESS_ENABLED = "pinot.broker.query.progress.enabled";
+    public static final boolean DEFAULT_BROKER_QUERY_PROGRESS_ENABLED = true;
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_FINGERPRINTING =
         "pinot.broker.enable.query.fingerprinting";
     public static final boolean DEFAULT_BROKER_ENABLE_QUERY_FINGERPRINTING = false;
@@ -1532,6 +1534,8 @@ public class CommonConstants {
     public static final String DEFAULT_SERVER_QUERY_REGEX_CLASS = "JAVA_UTIL";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final boolean DEFAULT_ENABLE_QUERY_CANCELLATION = true;
+    public static final String CONFIG_OF_QUERY_PROGRESS_ENABLED = "pinot.server.query.progress.enabled";
+    public static final boolean DEFAULT_QUERY_PROGRESS_ENABLED = true;
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";

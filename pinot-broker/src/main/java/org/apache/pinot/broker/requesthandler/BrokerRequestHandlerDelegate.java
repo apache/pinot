@@ -35,6 +35,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -157,6 +158,22 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       queries.putAll(_multiStageBrokerRequestHandler.getRunningQueries());
     }
     return queries;
+  }
+
+  @Override
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr)
+      throws Exception {
+    // Both engines share the same request ID generator, so the query will have unique IDs across the two engines.
+    if (_multiStageBrokerRequestHandler != null) {
+      QueryProgressStats mseProgressStats =
+          _multiStageBrokerRequestHandler.getQueryProgressStats(queryId, timeoutMs, executor, connMgr);
+      if (mseProgressStats != null) {
+        return mseProgressStats;
+      }
+    }
+    return _singleStageBrokerRequestHandler.getQueryProgressStats(queryId, timeoutMs, executor, connMgr);
   }
 
   @Override

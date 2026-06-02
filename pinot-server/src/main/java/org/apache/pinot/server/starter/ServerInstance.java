@@ -40,6 +40,7 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.core.transport.ChannelHandlerFactory;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
+import org.apache.pinot.core.transport.QueryProgressTracker;
 import org.apache.pinot.core.transport.QueryServer;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.KeepPipelineBreakerStatsPredicate;
@@ -55,6 +56,7 @@ import org.apache.pinot.server.worker.WorkerQueryServer;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +83,7 @@ public class ServerInstance {
   private final GrpcQueryServer _grpcQueryServer;
   private final WorkerQueryServer _workerQueryServer;
   private final ChannelHandler _instanceRequestHandler;
+  private final QueryProgressTracker _queryProgressTracker;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   private boolean _dataManagerStarted = false;
@@ -96,6 +99,7 @@ public class ServerInstance {
     _helixManager = helixManager;
     _threadAccountant = threadAccountant;
     _reloadJobStatusCache = requireNonNull(reloadJobStatusCache, "reloadJobStatusCache cannot be null");
+    _queryProgressTracker = new QueryProgressTracker(serverConf.getPinotConfig());
 
     if (segmentOperationsThrottlerSet != null) {
       // Initialize the metrics for the throttler so it picks up the newly registered ServerMetrics object
@@ -148,7 +152,7 @@ public class ServerInstance {
       LOGGER.info("Initializing Netty query server on port: {}", nettyPort);
       instanceRequestHandler =
           ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
-              _queryScheduler, new AllowAllAccessFactory().create(), threadAccountant);
+              _queryScheduler, new AllowAllAccessFactory().create(), threadAccountant, _queryProgressTracker);
       _nettyQueryServer = new QueryServer(nettyPort, nettyConfig, instanceRequestHandler);
     } else {
       _nettyQueryServer = null;
@@ -158,7 +162,7 @@ public class ServerInstance {
       LOGGER.info("Initializing TLS-secured Netty query server on port: {}", nettySecPort);
       instanceRequestHandler =
           ChannelHandlerFactory.getInstanceRequestHandler(helixManager.getInstanceName(), serverConf.getPinotConfig(),
-              _queryScheduler, accessControl, threadAccountant);
+              _queryScheduler, accessControl, threadAccountant, _queryProgressTracker);
       _nettyTlsQueryServer = new QueryServer(nettySecPort, nettyConfig, tlsConfig, instanceRequestHandler);
     } else {
       _nettyTlsQueryServer = null;
@@ -172,7 +176,7 @@ public class ServerInstance {
           : null;
       _grpcQueryServer =
           new GrpcQueryServer(instanceName, grpcPort, GrpcConfig.buildGrpcQueryConfig(serverConf.getPinotConfig()),
-              actualTslConfig, _queryExecutor, accessControl, threadAccountant);
+              actualTslConfig, _queryExecutor, accessControl, threadAccountant, _queryProgressTracker);
     } else {
       _grpcQueryServer = null;
     }
@@ -301,6 +305,11 @@ public class ServerInstance {
     Preconditions.checkState(_instanceRequestHandler instanceof InstanceRequestHandler,
         "Unexpected type of instance request handler");
     return (InstanceRequestHandler) _instanceRequestHandler;
+  }
+
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(String queryId) {
+    return _queryProgressTracker.getProgressStats(queryId);
   }
 
   public HelixManager getHelixManager() {
