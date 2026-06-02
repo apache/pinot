@@ -39,7 +39,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.data.OpenStructTypeInference;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,7 +150,7 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     if (spec != null) {
       valueType = spec.getDataType();
     } else {
-      valueType = OpenStructNaming.inferDataType(rawValue);
+      valueType = OpenStructTypeInference.inferDataType(rawValue);
       if (valueType == null) {
         LOGGER.warn("OPEN_STRUCT '{}': could not infer DataType for key '{}' from value of class '{}'."
                 + " Dropping the entry.",
