@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,12 +30,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
@@ -50,6 +56,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterClass;
@@ -63,6 +70,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -404,6 +412,93 @@ public class LeafOperatorTest {
     // Child thread should exit
     executorService.shutdown();
     assertTrue(executorService.awaitTermination(10, TimeUnit.SECONDS));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldPropagateDistinctEarlyTerminationReason() {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(),
+        EarlyTerminationReason.DISTINCT_MAX_ROWS.name());
+    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertEquals(List.copyOf(leafStats.getStringSet(LeafOperator.StatKey.EARLY_TERMINATION_REASONS)),
+        List.of(EarlyTerminationReason.DISTINCT_MAX_ROWS.name()));
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertEquals(brokerResponse.getEarlyTerminationReasons(), List.of(EarlyTerminationReason.DISTINCT_MAX_ROWS.name()));
+    assertTrue(brokerResponse.isPartialResult());
+    JsonNode responseJson = JsonUtils.objectToJsonNode(brokerResponse);
+    assertEquals(responseJson.path("earlyTerminationReasons").path(0).asText(),
+        EarlyTerminationReason.DISTINCT_MAX_ROWS.name());
+    assertFalse(responseJson.has("maxRowsInDistinctReached"));
+    assertFalse(responseJson.has("maxRowsWithoutChangeInDistinctReached"));
+    assertFalse(responseJson.has("maxExecutionTimeInDistinctReached"));
+    assertTrue(responseJson.path("partialResult").asBoolean(false));
+
+    operator.close();
+  }
+
+  @Test
+  public void shouldSkipNoneEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason(EarlyTerminationReason.NONE.name());
+  }
+
+  @Test
+  public void shouldSkipUnknownEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason("UNKNOWN_REASON");
+  }
+
+  @Test
+  public void shouldSkipEmptyEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason("");
+  }
+
+  @Test
+  public void shouldSkipNullEarlyTerminationReason() {
+    assertSkippedEarlyTerminationReason(null);
+  }
+
+  private void assertSkippedEarlyTerminationReason(@Nullable String earlyTerminationReason) {
+    // Given:
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT DISTINCT intCol FROM tbl");
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    metadataBlock.getResponseMetadata().put(DataTable.MetadataKey.EARLY_TERMINATION_REASON.getName(),
+        earlyTerminationReason);
+    QueryExecutor queryExecutor = mockQueryExecutor(Collections.emptyList(), metadataBlock);
+    LeafOperator operator =
+        new LeafOperator(OperatorTestUtil.getTracingContext(), mockQueryRequests(1), schema, queryExecutor,
+            _executorService);
+    _operatorRef.set(operator);
+
+    // When:
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading the metadata block");
+
+    // Then:
+    StatMap<LeafOperator.StatKey> leafStats = operator.copyStatMaps();
+    assertTrue(leafStats.getStringSet(LeafOperator.StatKey.EARLY_TERMINATION_REASONS).isEmpty());
+
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    MultiStageOperator.Type.LEAF.mergeInto(brokerResponse, leafStats);
+    assertTrue(brokerResponse.getEarlyTerminationReasons().isEmpty());
+    assertFalse(brokerResponse.isPartialResult());
 
     operator.close();
   }

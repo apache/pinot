@@ -33,13 +33,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Integration test for distinct early termination query options. Uses SSE (v1) only because these options
- * are enforced in DistinctCombineOperator which is not used by the multi-stage query engine.
- */
+/// Integration test for distinct early termination query options.
+///
+/// SSE responses expose reason-specific boolean fields. MSQ responses expose the aggregated early termination reasons
+/// and mark the response as partial.
 @Test(suiteName = "CustomClusterIntegrationTest")
 public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
   private static final String TABLE_NAME = "DistinctQueriesCustomTest";
@@ -136,6 +138,24 @@ public class DistinctQueriesTest extends CustomDataQueryClusterIntegrationTest {
         "expected maxRowsInDistinctReached flag. Response: " + response);
     assertTrue(response.path("partialResult").asBoolean(false),
         "partialResult should be true. Response: " + response);
+  }
+
+  /// Tests `maxRowsInDistinct` with MSQ: the leaf SSE execution sets early termination metadata and the multi-stage
+  /// response marks itself partial with the aggregated reason.
+  @Test
+  public void testMultiStageMaxRowsInDistinctEarlyTermination()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String sql = String.format("SELECT DISTINCT %s FROM %s LIMIT 10000", STRING_COL, getTableName());
+    JsonNode response = postQueryWithOptions(sql, "maxRowsInDistinct=1");
+
+    assertTrue(response.path("exceptions").isEmpty(), "expected no exceptions. Response: " + response);
+    assertTrue(response.path("partialResult").asBoolean(false),
+        "partialResult should be true. Response: " + response);
+    assertEquals(response.path("earlyTerminationReasons").path(0).asText(), "DISTINCT_MAX_ROWS",
+        "expected distinct early termination reason. Response: " + response);
+    assertFalse(response.has("maxRowsInDistinctReached"),
+        "MSQ response should expose earlyTerminationReasons instead of legacy V1 flags. Response: " + response);
   }
 
   /**

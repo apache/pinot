@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -44,6 +45,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock.EarlyTerminationReason;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -414,12 +416,28 @@ public class LeafOperator extends MultiStageOperator {
         case NUM_CONSUMING_SEGMENTS_MATCHED:
           _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
           break;
-        case SORTED:
         case EARLY_TERMINATION_REASON:
+          mergeEarlyTerminationReason(entry.getValue());
+          break;
+        case SORTED:
           break;
         default:
           throw new IllegalArgumentException("Unhandled leaf execution stat: " + key);
       }
+    }
+  }
+
+  private void mergeEarlyTerminationReason(@Nullable String earlyTerminationReason) {
+    if (earlyTerminationReason == null || earlyTerminationReason.isEmpty()) {
+      return;
+    }
+    try {
+      EarlyTerminationReason reason = EarlyTerminationReason.valueOf(earlyTerminationReason);
+      if (reason != EarlyTerminationReason.NONE) {
+        _statMap.merge(StatKey.EARLY_TERMINATION_REASONS, Set.of(reason.name()));
+      }
+    } catch (IllegalArgumentException e) {
+      LOGGER.debug("Skipping unknown early termination reason: {}", earlyTerminationReason);
     }
   }
 
@@ -749,7 +767,8 @@ public class LeafOperator extends MultiStageOperator {
     /**
      * Time spent in single-stage execution engine for this leaf stage.
      */
-    SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null);
+    SSE_EXECUTION_TIME_MS(StatMap.Type.LONG, null),
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
@@ -797,6 +816,9 @@ public class LeafOperator extends MultiStageOperator {
             break;
           case STRING:
             oldMetadata.merge(_brokerKey, stats.getString(this));
+            break;
+          case STRING_SET:
+            oldMetadata.merge(_brokerKey, stats.getStringSet(this));
             break;
           default:
             throw new IllegalStateException("Unsupported type: " + _type);
