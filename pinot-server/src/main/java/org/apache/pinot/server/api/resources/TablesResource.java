@@ -260,13 +260,15 @@ public class TablesResource {
           totalSegmentSizeBytes += segmentSizeBytes;
           totalNumRows += segmentMetadata.getTotalDocs();
 
+          Set<String> allSegmentColumns = segmentMetadata.getAllColumns();
           if (columnSet == null) {
-            columnSet = segmentMetadata.getAllColumns();
+            columnSet = allSegmentColumns;
           } else {
-            columnSet.retainAll(segmentMetadata.getAllColumns());
+            columnSet.retainAll(allSegmentColumns);
           }
           boolean segmentHasCompressionStats = false;
           IndexService indexService = IndexService.getInstance();
+          // Column stats (length, cardinality, index sizes) — scoped to caller's column filter
           for (String column : columnSet) {
             ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
             int columnLength = columnMetadata.getLengthOfLongestElement();
@@ -291,34 +293,35 @@ public class TablesResource {
               int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
-
-            List<String> indexNames = new ArrayList<>();
             for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
               String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
               long value = columnMetadata.getIndexSize(i);
-
               Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
-              columnIndexSizes.put(indexName, indexSize);
+              columnIndexSizes.put(indexName, columnIndexSizes.getOrDefault(indexName, 0d) + value);
               columnIndexSizesMap.put(column, columnIndexSizes);
-
-              indexNames.add(indexName);
             }
+          }
 
-            // Collect per-column compression stats when feature flag is enabled
-            if (compressionStatsEnabled) {
+          // Compression stats — always over all segment columns, independent of caller's column filter,
+          // since they are segment-level storage metrics not per-requested-column data.
+          if (compressionStatsEnabled) {
+            for (String column : allSegmentColumns) {
+              ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataMap().get(column);
+              List<String> indexNames = new ArrayList<>();
+              for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
+                indexNames.add(indexService.get(columnMetadata.getIndexType(i)).getId());
+              }
               String codec = columnMetadata.getCompressionCodec();
               long uncompressedSize = columnMetadata.getUncompressedForwardIndexSizeBytes();
               long fwdIndexSize = columnMetadata.getIndexSizeFor(StandardIndexes.forward());
               if (codec != null && uncompressedSize > 0) {
-                // Raw column with stats: include in both numerator and denominator
+                // Raw column with stats
                 long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
                 accum[0] += uncompressedSize;
                 long rawOnDisk = fwdIndexSize > 0 ? fwdIndexSize : 0;
                 accum[1] += rawOnDisk;
                 columnCodecMap.merge(column, codec,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
-                // Always track per-codec breakdown so we can expose it when codec becomes MIXED
                 Map<String, long[]> breakdown =
                     columnCodecBreakdownAccum.computeIfAbsent(column, k -> new HashMap<>());
                 long[] codecAccum = breakdown.computeIfAbsent(codec, k -> new long[3]);
@@ -328,7 +331,7 @@ public class TablesResource {
                 columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
                 segmentHasCompressionStats = true;
               } else if (columnMetadata.hasDictionary() && fwdIndexSize > 0) {
-                // Dictionary-encoded column: track forward index size + dict file size + raw ingest size
+                // Dictionary-encoded column
                 long dictFileSize = columnMetadata.getIndexSizeFor(StandardIndexes.dictionary());
                 long dictRawIngest = columnMetadata.getDictColumnRawIngestSizeBytes();
                 long[] accum = columnCompressionAccum.computeIfAbsent(column, k -> new long[2]);
@@ -337,7 +340,6 @@ public class TablesResource {
                 accum[1] += dictOnDisk;
                 columnCodecMap.merge(column, ColumnCompressionStatsInfo.CODEC_DICT_ENCODED,
                     (existing, incoming) -> existing.equals(incoming) ? existing : "MIXED");
-                // Always track per-codec breakdown so we can expose it when codec becomes MIXED
                 Map<String, long[]> breakdown =
                     columnCodecBreakdownAccum.computeIfAbsent(column, k -> new HashMap<>());
                 long[] codecAccum =
@@ -348,8 +350,7 @@ public class TablesResource {
                 columnIndexNamesMap.computeIfAbsent(column, k -> new HashSet<>()).addAll(indexNames);
                 segmentHasCompressionStats = true;
               }
-              // Old segments without stats (codec==null, uncompressed==INDEX_NOT_FOUND) are
-              // excluded entirely — not added to any accumulation maps
+              // Old segments without stats (codec==null, no rawIngest) excluded
             }
           }
 
