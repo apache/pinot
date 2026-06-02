@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.api.AccessControl;
@@ -40,6 +43,8 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
@@ -67,11 +72,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.RequestScope;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -95,6 +104,35 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   @AfterMethod
   public void cleanupMdc() {
     MDC.clear();
+  }
+
+  @Test
+  public void testSingleStageProgressMarksPartialServerResponsesUnknown()
+      throws Exception {
+    QueryProgressStats progressStats = BaseSingleStageBrokerRequestHandler.aggregateSingleStageProgressStats(
+        List.of(new QueryProgressStats(4, 10, 4, 10, false)), 2, List.of("timeout"));
+
+    Assert.assertEquals(progressStats.getProcessedWorkUnits(), 4);
+    Assert.assertEquals(progressStats.getTotalWorkUnits(), -1);
+    Assert.assertEquals(progressStats.getProcessedSegments(), 4);
+    Assert.assertEquals(progressStats.getTotalSegmentsToProcess(), -1);
+    Assert.assertEquals(progressStats.getProgressPercent(), -1.0);
+    Assert.assertTrue(progressStats.isEstimated());
+    Assert.assertTrue(progressStats.getDetails().isEmpty());
+  }
+
+  @Test
+  public void testMaterializedViewProgressTracksSubRequestIds() {
+    ServerInstance baseServer = new ServerInstance(new InstanceConfig("baseServer_9000"));
+    ServerInstance viewServer = new ServerInstance(new InstanceConfig("viewServer_9000"));
+    BaseSingleStageBrokerRequestHandler.QueryServers queryServers =
+        new BaseSingleStageBrokerRequestHandler.QueryServers("query", 11L, Set.of(baseServer), null);
+
+    queryServers.addRequest(12L, Set.of(viewServer), null);
+
+    Assert.assertEquals(queryServers._serversByRequestId.get(11L), Set.of(baseServer));
+    Assert.assertEquals(queryServers._serversByRequestId.get(12L), Set.of(viewServer));
+    Assert.assertEquals(queryServers.numServerRequests(), 2);
   }
 
   @Test
@@ -358,6 +396,114 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     Assert.assertEquals(servers.iterator().next().getInstanceId(), "server01_9000");
     Assert.assertEquals(servers.iterator().next().getAdminEndpoint(), "http://server01:8097");
     latch.countDown();
+  }
+
+  @Test
+  public void testInSubqueryUsesDistinctRequestIdForTracking()
+      throws Exception {
+    String tableName = "myTable_OFFLINE";
+    String rawTableName = "myTable";
+    String clientQueryId = "client-subquery-progress";
+
+    TableCache tableCache = mock(TableCache.class);
+    TableConfig tableCfg = mock(TableConfig.class);
+    when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName(rawTableName)
+        .addSingleValueDimension("airlineID", DataType.INT)
+        .addSingleValueDimension("Carrier", DataType.STRING)
+        .build();
+    when(tableCache.getSchema(rawTableName)).thenReturn(schema);
+    when(tableCache.getColumnNameMap(rawTableName)).thenReturn(
+        Map.of("airlineID", "airlineID", "Carrier", "Carrier"));
+    TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
+    when(tableCfg.getTenantConfig()).thenReturn(tenant);
+    when(tableCache.getTableConfig(tableName)).thenReturn(tableCfg);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(tableName)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+        new SegmentsToQuery(List.of("segment01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
+    when(queryQuotaManager.acquire(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(queryQuotaManager.acquireApplication(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    AtomicInteger processCallCount = new AtomicInteger();
+    List<Long> requestIds = new ArrayList<>();
+    BaseSingleStageBrokerRequestHandler requestHandler =
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
+            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null, null) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
+              BrokerRequest serverBrokerRequest, TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            int callCount = processCallCount.incrementAndGet();
+            requestIds.add(requestId);
+            Assert.assertEquals(getRequestIdByClientId(clientQueryId).getAsLong(), requestId);
+            Assert.assertEquals(getRunningServers(requestId).size(), 1);
+
+            if (callCount == 1) {
+              BrokerResponseNative response = BrokerResponseNative.empty();
+              response.setResultTable(new ResultTable(
+                  new DataSchema(new String[]{"idSet"}, new DataSchema.ColumnDataType[]{
+                      DataSchema.ColumnDataType.STRING
+                  }),
+                  List.<Object[]>of(new Object[]{"serialized-id-set"})));
+              return response;
+            }
+
+            Assert.assertEquals(callCount, 2);
+            Assert.assertNotEquals(requestId, requestIds.get(0).longValue());
+            Assert.assertFalse(getRunningQueries().containsKey(requestIds.get(0)));
+            Assert.assertTrue(getRunningQueries().containsKey(requestId));
+            Assert.assertTrue(getRunningQueries().get(requestId).contains("IN_SUBQUERY"));
+            return BrokerResponseNative.empty();
+          }
+
+          @Override
+          protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+              long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+              TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext)
+              throws Exception {
+            throw new UnsupportedOperationException("Not implemented in test");
+          }
+        };
+
+    String sql = "SELECT COUNT(*) FROM myTable_OFFLINE WHERE "
+        + "IN_SUBQUERY(airlineID, 'SELECT ID_SET(airlineID) FROM myTable_OFFLINE WHERE Carrier = ''AA''') = 1";
+    ObjectNode request = JsonUtils.newObjectNode();
+    request.put(CommonConstants.Broker.Request.SQL, sql);
+    request.put(CommonConstants.Broker.Request.QUERY_OPTIONS,
+        CommonConstants.Broker.Request.QueryOptionKey.CLIENT_QUERY_ID + "=" + clientQueryId);
+    try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+      requestHandler.handleRequest(request, null, null, requestContext, null);
+    }
+
+    Assert.assertEquals(processCallCount.get(), 2);
+    Assert.assertTrue(requestHandler.getRunningQueries().isEmpty());
+    Assert.assertFalse(requestHandler.getRequestIdByClientId(clientQueryId).isPresent());
+    Assert.assertTrue(requestHandler.getRunningServers(requestIds.get(0)).isEmpty());
+    Assert.assertTrue(requestHandler.getRunningServers(requestIds.get(1)).isEmpty());
   }
 
   @Test
