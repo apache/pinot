@@ -24,10 +24,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
 
-/**
- * Storage breakdown by tier. Contains a map of tier names to their respective
- * segment count and per-replica size.
- */
+/// Storage breakdown by tier, reported under the `storageBreakdown` key in the
+/// `GET /tables/{tableName}/size` and `GET /tables/{tableName}/metadata` responses.
+/// Maps tier name (e.g. `"default"`, `"hotTier"`) to segment count and per-replica size.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StorageBreakdownInfo {
 
@@ -42,9 +41,7 @@ public class StorageBreakdownInfo {
     return _tiers;
   }
 
-  /**
-   * Segment count and size for a single storage tier.
-   */
+  /// Segment count and per-replica on-disk size for a single storage tier.
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class TierInfo {
     private final int _count;
