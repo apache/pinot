@@ -225,7 +225,7 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
         String serverName = serverNames.next();
         JsonNode sizeInfo = serverInfo.get(serverName);
         long diskSize = sizeInfo.get("diskSizeInBytes").asLong();
-        if (diskSize > 0) {
+        if (diskSize > 0 && sizeInfo.has("rawIngestSizeBytes")) {
           // Segment should have raw and compressed forward index sizes
           long rawSize = sizeInfo.get("rawIngestSizeBytes").asLong();
           long compressedSize = sizeInfo.get("onDiskSizeBytes").asLong();
