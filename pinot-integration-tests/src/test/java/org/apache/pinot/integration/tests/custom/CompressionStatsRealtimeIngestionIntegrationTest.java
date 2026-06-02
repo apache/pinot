@@ -55,6 +55,11 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
   }
 
   @Override
+  public String getTimeColumnName() {
+    return "DaysSinceEpoch";
+  }
+
+  @Override
   protected long getCountStarResult() {
     return DEFAULT_COUNT_STAR_RESULT;
   }
