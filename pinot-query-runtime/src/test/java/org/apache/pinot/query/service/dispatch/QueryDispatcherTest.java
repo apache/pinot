@@ -46,6 +46,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -66,6 +67,22 @@ public class QueryDispatcherTest extends QueryTestSet {
 
   private QueryEnvironment _queryEnvironment;
   private QueryDispatcher _queryDispatcher;
+
+  @Test
+  public void testConvertsNestedQueryProgressPayload() {
+    Worker.QueryProgress detail = Worker.QueryProgress.newBuilder().setLabel("Stage 1")
+        .setProcessedWorkUnits(2).setTotalWorkUnits(4).setProcessedSegments(1).setTotalSegmentsToProcess(2)
+        .setEstimated(true).build();
+    Worker.QueryProgress progress = Worker.QueryProgress.newBuilder().setProcessedWorkUnits(3).setTotalWorkUnits(6)
+        .setProcessedSegments(1).setTotalSegmentsToProcess(2).setEstimated(true).addDetails(detail).build();
+
+    QueryProgressStats progressStats = QueryDispatcher.toProgressStats(progress, "Server server-1");
+
+    Assert.assertEquals(progressStats.getLabel(), "Server server-1");
+    Assert.assertEquals(progressStats.getProgressPercent(), 50.0);
+    Assert.assertEquals(progressStats.getDetails().size(), 1);
+    Assert.assertEquals(progressStats.getDetails().get(0).getLabel(), "Stage 1");
+  }
 
   @BeforeClass
   public void setUp()
