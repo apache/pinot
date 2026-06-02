@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.openstruct;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -34,6 +35,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.OpenStructNaming;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -41,6 +43,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -367,5 +370,45 @@ public class OpenStructColumnSplitterTest {
     assertFalse(new File(_tempDir, denseCol + V1Constants.Dict.FILE_EXTENSION).exists());
     assertTrue(new File(_tempDir,
         denseCol + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION).exists());
+  }
+
+  @Test
+  public void testRangeAndBloomIndexesWrittenForKey()
+      throws Exception {
+    // An INT key configured with range + bloom must produce those index buffers via the generic loop.
+    JsonNode indexes = JsonUtils.stringToJsonNode("{\"range\": {}, \"bloom\": {}}");
+    FieldConfig keyConfig = new FieldConfig.Builder("clicks").withIndexes(indexes).build();
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig));
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("clicks", d), d);
+    }
+    s.seal();
+
+    String denseCol = OpenStructNaming.materializedColumnName("metrics", "clicks");
+    assertTrue(new File(_tempDir, denseCol + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION).exists(),
+        "range index buffer should be written");
+    assertTrue(new File(_tempDir, denseCol + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION).exists(),
+        "bloom filter buffer should be written");
+  }
+
+  @Test
+  public void testRangeOnRawNonNumericKeyFailsWithCanonicalGuard()
+      throws Exception {
+    // A STRING key with RAW encoding + range resolves to raw (range does not require a dictionary), which the
+    // range creator cannot build. The splitter must surface the canonical RangeIndexType.validate guard
+    // (IllegalStateException) at build time rather than crashing opaquely inside the creator.
+    JsonNode indexes = JsonUtils.stringToJsonNode("{\"range\": {}}");
+    FieldConfig keyConfig = new FieldConfig.Builder("tag")
+        .withEncodingType(FieldConfig.EncodingType.RAW)
+        .withIndexes(indexes)
+        .build();
+    OpenStructIndexConfig cfg = new OpenStructIndexConfig(false, null, -1, null, 0.5, List.of(keyConfig));
+    OpenStructColumnSplitter s = new OpenStructColumnSplitter(_tempDir, "metrics", spec(), cfg);
+    for (int d = 0; d < 10; d++) {
+      s.add(Map.of("tag", "v" + d), d);
+    }
+
+    assertThrows(IllegalStateException.class, s::seal);
   }
 }
