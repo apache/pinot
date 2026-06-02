@@ -45,8 +45,8 @@ public class SegmentSizeInfoTest {
 
     assertEquals(deserialized.getSegmentName(), "seg1");
     assertEquals(deserialized.getDiskSizeInBytes(), 50000);
-    assertEquals(deserialized.getRawForwardIndexSizeBytes(), 30000);
-    assertEquals(deserialized.getCompressedForwardIndexSizeBytes(), 6500);
+    assertEquals(deserialized.getRawIngestSizeBytes(), 30000);
+    assertEquals(deserialized.getOnDiskSizeBytes(), 6500);
     assertEquals(deserialized.getTier(), "tier1");
     assertNotNull(deserialized.getColumnCompressionStats());
     assertEquals(deserialized.getColumnCompressionStats().size(), 2);
@@ -69,8 +69,8 @@ public class SegmentSizeInfoTest {
 
     assertEquals(deserialized.getSegmentName(), "seg1");
     assertEquals(deserialized.getDiskSizeInBytes(), 50000);
-    assertEquals(deserialized.getRawForwardIndexSizeBytes(), 0);
-    assertEquals(deserialized.getCompressedForwardIndexSizeBytes(), 0);
+    assertEquals(deserialized.getRawIngestSizeBytes(), 0);
+    assertEquals(deserialized.getOnDiskSizeBytes(), 0);
     assertNull(deserialized.getTier());
     assertNull(deserialized.getColumnCompressionStats());
   }
@@ -85,8 +85,8 @@ public class SegmentSizeInfoTest {
 
     assertEquals(deserialized.getSegmentName(), "seg1");
     assertEquals(deserialized.getDiskSizeInBytes(), 50000);
-    assertEquals(deserialized.getRawForwardIndexSizeBytes(), 30000);
-    assertEquals(deserialized.getCompressedForwardIndexSizeBytes(), 6500);
+    assertEquals(deserialized.getRawIngestSizeBytes(), 30000);
+    assertEquals(deserialized.getOnDiskSizeBytes(), 6500);
     assertEquals(deserialized.getTier(), "default");
     assertNull(deserialized.getColumnCompressionStats());
   }
@@ -96,8 +96,8 @@ public class SegmentSizeInfoTest {
     SegmentSizeInfo info = new SegmentSizeInfo("seg1", 1000);
     assertEquals(info.getSegmentName(), "seg1");
     assertEquals(info.getDiskSizeInBytes(), 1000);
-    assertEquals(info.getRawForwardIndexSizeBytes(), -1);
-    assertEquals(info.getCompressedForwardIndexSizeBytes(), -1);
+    assertEquals(info.getRawIngestSizeBytes(), -1);
+    assertEquals(info.getOnDiskSizeBytes(), -1);
     assertNull(info.getTier());
     assertNull(info.getColumnCompressionStats());
   }

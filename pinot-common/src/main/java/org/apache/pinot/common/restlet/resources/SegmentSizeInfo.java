@@ -29,8 +29,10 @@ import javax.annotation.Nullable;
 public class SegmentSizeInfo {
   private final String _segmentName;
   private final long _diskSizeInBytes;
-  private final long _rawForwardIndexSizeBytes;
-  private final long _compressedForwardIndexSizeBytes;
+  /// Segment-level aggregate raw ingest size across all columns that have stats. `-1` when unavailable.
+  private final long _rawIngestSizeBytes;
+  /// Segment-level aggregate on-disk size across all columns that have stats. `-1` when unavailable.
+  private final long _onDiskSizeBytes;
   private final String _tier;
   private final Map<String, ColumnCompressionStatsInfo> _columnCompressionStats;
 
@@ -38,23 +40,23 @@ public class SegmentSizeInfo {
     this(segmentName, sizeBytes, -1, -1, null, null);
   }
 
-  public SegmentSizeInfo(String segmentName, long sizeBytes, long rawForwardIndexSizeBytes,
-      long compressedForwardIndexSizeBytes, @Nullable String tier) {
-    this(segmentName, sizeBytes, rawForwardIndexSizeBytes, compressedForwardIndexSizeBytes, tier, null);
+  public SegmentSizeInfo(String segmentName, long sizeBytes, long rawIngestSizeBytes,
+      long onDiskSizeBytes, @Nullable String tier) {
+    this(segmentName, sizeBytes, rawIngestSizeBytes, onDiskSizeBytes, tier, null);
   }
 
   @JsonCreator
   public SegmentSizeInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("diskSizeInBytes") long sizeBytes,
-      @JsonProperty("rawForwardIndexSizeBytes") long rawForwardIndexSizeBytes,
-      @JsonProperty("compressedForwardIndexSizeBytes") long compressedForwardIndexSizeBytes,
+      @JsonProperty("rawIngestSizeBytes") long rawIngestSizeBytes,
+      @JsonProperty("onDiskSizeBytes") long onDiskSizeBytes,
       @JsonProperty("tier") @Nullable String tier,
       @JsonProperty("columnCompressionStats") @Nullable Map<String, ColumnCompressionStatsInfo>
           columnCompressionStats) {
     _segmentName = segmentName;
     _diskSizeInBytes = sizeBytes;
-    _rawForwardIndexSizeBytes = rawForwardIndexSizeBytes;
-    _compressedForwardIndexSizeBytes = compressedForwardIndexSizeBytes;
+    _rawIngestSizeBytes = rawIngestSizeBytes;
+    _onDiskSizeBytes = onDiskSizeBytes;
     _tier = tier;
     _columnCompressionStats = columnCompressionStats;
   }
@@ -67,12 +69,12 @@ public class SegmentSizeInfo {
     return _diskSizeInBytes;
   }
 
-  public long getRawForwardIndexSizeBytes() {
-    return _rawForwardIndexSizeBytes;
+  public long getRawIngestSizeBytes() {
+    return _rawIngestSizeBytes;
   }
 
-  public long getCompressedForwardIndexSizeBytes() {
-    return _compressedForwardIndexSizeBytes;
+  public long getOnDiskSizeBytes() {
+    return _onDiskSizeBytes;
   }
 
   @Nullable
