@@ -66,7 +66,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
     File dictFile = new File(TEMP_DIR, "stringSv.dict");
 
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false, true)) {
       creator.build(dict);
 
       // Simulate two rows, one with each value
@@ -90,7 +90,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
     File dictFile = new File(TEMP_DIR, "stringSvMultiByte.dict");
 
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false, true)) {
       creator.build(dict);
 
       creator.indexOfSV(cafeStr);  // 5 UTF-8 bytes
@@ -108,7 +108,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
     File dictFile = new File(TEMP_DIR, "stringSvRepeat.dict");
 
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false, true)) {
       creator.build(dict);
 
       creator.indexOfSV("foo");  // 3 bytes
@@ -141,7 +141,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
 
     File dictFile = new File(TEMP_DIR, "bytesSv.dict");
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.BYTES, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.BYTES, dictFile, false, true)) {
       creator.build(dict);
 
       // indexOfSV(byte[]) counts val.length per call
@@ -166,7 +166,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
     File dictFile = new File(TEMP_DIR, "stringMv.dict");
 
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false, true)) {
       creator.build(dict);
 
       // MV row 1: ["foo", "bar"]
@@ -190,7 +190,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
     File dictFile = new File(TEMP_DIR, "intSv.dict");
 
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.INT, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.INT, dictFile, false, true)) {
       creator.build(dict);
 
       // Call indexOfSV for each value — should NOT accumulate any bytes
@@ -222,7 +222,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
 
     File dictFile = new File(TEMP_DIR, "bigDecimalSv.dict");
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.BIG_DECIMAL, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.BIG_DECIMAL, dictFile, false, true)) {
       creator.build(dict);
 
       creator.indexOfSV((Object) val1);  // cast to Object to avoid ambiguity
@@ -243,7 +243,7 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
     File dictFile = new File(TEMP_DIR, "initState.dict");
 
     try (SegmentDictionaryCreator creator =
-        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false)) {
+        new SegmentDictionaryCreator("col", DataType.STRING, dictFile, false, true)) {
       creator.build(dict);
 
       // No rows indexed yet — should be 0
