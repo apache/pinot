@@ -290,6 +290,17 @@ export type SQLResult = {
   realtimeTotalCpuTimeNs: number;
 };
 
+export type QueryProgressStats = {
+  label?: string;
+  processedWorkUnits: number;
+  totalWorkUnits: number;
+  processedSegments: number;
+  totalSegmentsToProcess: number;
+  estimated: boolean;
+  progressPercent: number;
+  details?: QueryProgressStats[];
+};
+
 export interface TimeseriesData {
   metric: Record<string, string>;
   values: [number, number][];

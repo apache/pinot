@@ -38,6 +38,8 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -49,6 +51,8 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -139,6 +143,32 @@ public class OpChainSchedulerServiceTest {
     }
 
     assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
+  }
+
+  @Test
+  public void shouldTrackProgressForCompletedOpChains()
+      throws InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    Mockito.when(_operatorA.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.doAnswer(inv -> {
+      latch.countDown();
+      return null;
+    }).when(_operatorA).close();
+
+    OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+      executionContext.addTotalWorkUnits(1);
+      schedulerService.trackExecutionContext(executionContext);
+      schedulerService.register(getChain(_operatorA));
+    }
+
+    assertTrue(latch.await(10, TimeUnit.SECONDS), "expected await to be called in less than 10 seconds");
+    QueryProgressStats progressStats = schedulerService.getQueryProgressStats(123L);
+    assertEquals(progressStats.getProcessedWorkUnits(), 1);
+    assertEquals(progressStats.getTotalWorkUnits(), 1);
+    assertEquals(progressStats.getProgressPercent(), 100.0);
+    assertFalse(schedulerService.hasRunningExecutionContext(123L));
   }
 
   @Test

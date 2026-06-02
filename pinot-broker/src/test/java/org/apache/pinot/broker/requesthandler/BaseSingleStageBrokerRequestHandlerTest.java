@@ -63,6 +63,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.LoggerConstants;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -89,6 +90,21 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   @AfterMethod
   public void cleanupMdc() {
     MDC.clear();
+  }
+
+  @Test
+  public void testSingleStageProgressMarksPartialServerResponsesUnknown()
+      throws Exception {
+    QueryProgressStats progressStats = BaseSingleStageBrokerRequestHandler.aggregateSingleStageProgressStats(
+        List.of(new QueryProgressStats(4, 10, 4, 10, false)), 2, List.of("timeout"));
+
+    Assert.assertEquals(progressStats.getProcessedWorkUnits(), 4);
+    Assert.assertEquals(progressStats.getTotalWorkUnits(), -1);
+    Assert.assertEquals(progressStats.getProcessedSegments(), 4);
+    Assert.assertEquals(progressStats.getTotalSegmentsToProcess(), -1);
+    Assert.assertEquals(progressStats.getProgressPercent(), -1.0);
+    Assert.assertTrue(progressStats.isEstimated());
+    Assert.assertTrue(progressStats.getDetails().isEmpty());
   }
 
   @Test

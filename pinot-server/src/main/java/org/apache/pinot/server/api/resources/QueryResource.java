@@ -27,6 +27,8 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -41,6 +43,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.core.query.utils.QueryIdUtils;
 import org.apache.pinot.core.transport.InstanceRequestHandler;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.query.QueryProgressStats;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -87,6 +90,54 @@ public class QueryResource {
     } catch (Exception e) {
       throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
           .entity(String.format("Failed to cancel query: %s on the server due to error: %s", queryId, e.getMessage()))
+          .build());
+    }
+    throw new WebApplicationException(
+        Response.status(Response.Status.NOT_FOUND).entity(String.format("Query: %s not found on the server", queryId))
+            .build());
+  }
+
+  @GET
+  @Path("/query/{queryId}/progress")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get progress for a query running on the server",
+      notes = "Progress is derived from processed work units over total work units. For server-side single-stage "
+          + "requests, work units map to selected segments.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Query not found running on the server")
+  })
+  public QueryProgressStats getQueryProgress(
+      @ApiParam(value = "QueryId as in the format of <brokerId>_<requestId> or <brokerId>_<requestId>_(O|R)",
+          required = true)
+      @PathParam("queryId") String queryId) {
+    try {
+      InstanceRequestHandler requestHandler = _serverInstance.getInstanceRequestHandler();
+      if (QueryIdUtils.hasTypeSuffix(queryId)) {
+        QueryProgressStats progressStats = requestHandler.getQueryProgressStats(queryId);
+        if (progressStats != null) {
+          return progressStats;
+        }
+      } else {
+        List<QueryProgressStats> progressStatsList = new ArrayList<>(2);
+        QueryProgressStats offlineProgressStats =
+            requestHandler.getQueryProgressStats(QueryIdUtils.withOfflineSuffix(queryId));
+        if (offlineProgressStats != null) {
+          progressStatsList.add(offlineProgressStats);
+        }
+        QueryProgressStats realtimeProgressStats =
+            requestHandler.getQueryProgressStats(QueryIdUtils.withRealtimeSuffix(queryId));
+        if (realtimeProgressStats != null) {
+          progressStatsList.add(realtimeProgressStats);
+        }
+        if (!progressStatsList.isEmpty()) {
+          return QueryProgressStats.aggregate(progressStatsList);
+        }
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(String.format("Failed to get progress for query: %s on the server due to error: %s", queryId,
+              e.getMessage()))
           .build());
     }
     throw new WebApplicationException(

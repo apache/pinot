@@ -75,6 +75,9 @@ public class ServerQueryRequest {
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
+  @Nullable
+  private QueryExecutionContext _executionContext;
+
   /**
    * This is called from the Netty server to create a ServerQueryRequest from the InstanceRequest
    */
@@ -247,7 +250,22 @@ public class ServerQueryRequest {
     return _timerContext;
   }
 
+  public synchronized QueryExecutionContext getOrCreateExecutionContext(String instanceId) {
+    if (_executionContext == null) {
+      _executionContext = createExecutionContext(instanceId);
+    }
+    return _executionContext;
+  }
+
+  public synchronized void setExecutionContext(QueryExecutionContext executionContext) {
+    _executionContext = executionContext;
+  }
+
   public QueryExecutionContext toExecutionContext(String instanceId) {
+    return getOrCreateExecutionContext(instanceId);
+  }
+
+  private QueryExecutionContext createExecutionContext(String instanceId) {
     Map<String, String> queryOptions = _queryContext.getQueryOptions();
     long startTimeMs = _timerContext.getQueryArrivalTimeMs();
     Long timeoutMs = QueryOptionsUtils.getTimeoutMs(queryOptions);

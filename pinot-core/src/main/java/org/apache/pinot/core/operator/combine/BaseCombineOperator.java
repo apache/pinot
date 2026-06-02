@@ -196,6 +196,13 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
     return Math.min(_numTasks, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
 
+  protected void markSegmentProcessed() {
+    QueryThreadContext threadContext = QueryThreadContext.getIfAvailable();
+    if (threadContext != null) {
+      threadContext.getExecutionContext().incrementProcessedSegments();
+    }
+  }
+
   /**
    * Start the combine operator process. This will spin up multiple threads to process data segments in parallel.
    */

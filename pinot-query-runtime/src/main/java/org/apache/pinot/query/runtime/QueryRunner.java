@@ -71,6 +71,7 @@ import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MetricsExecutor;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -525,6 +526,15 @@ public class QueryRunner {
 
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
     return _opChainScheduler.cancel(requestId);
+  }
+
+  public void trackExecutionContext(QueryExecutionContext executionContext) {
+    _opChainScheduler.trackExecutionContext(executionContext);
+  }
+
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long requestId) {
+    return _opChainScheduler.getQueryProgressStats(requestId);
   }
 
   public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,

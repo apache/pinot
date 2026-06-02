@@ -50,6 +50,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.exception.TerminationException;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.slf4j.Logger;
@@ -66,6 +67,8 @@ public class OpChainSchedulerService {
   /// This [ExecutorService] must be wrapped with [QueryThreadContext#contextAwareExecutorService].
   private final ExecutorService _executorService;
   private final Cache<OpChainId, Pair<MultiStageOperator, QueryExecutionContext>> _opChainCache;
+  private final Cache<Long, QueryExecutionContext> _executionContextCache;
+  private final Cache<Long, QueryProgressStats> _completedProgressStatsCache;
   private final ReadWriteLock[] _queryLocks;
   private final Cache<Long, Boolean> _cancelledQueryCache;
   private final Metrics _metrics = new Metrics();
@@ -98,6 +101,14 @@ public class OpChainSchedulerService {
         .maximumWeight(opStatsCacheSize)
         .expireAfterWrite(opStatsCacheExpireMs, TimeUnit.MILLISECONDS)
         .build();
+    _executionContextCache = CacheBuilder.newBuilder()
+        .maximumSize(opStatsCacheSize)
+        .expireAfterWrite(opStatsCacheExpireMs, TimeUnit.MILLISECONDS)
+        .build();
+    _completedProgressStatsCache = CacheBuilder.newBuilder()
+        .maximumSize(opStatsCacheSize)
+        .expireAfterWrite(opStatsCacheExpireMs, TimeUnit.MILLISECONDS)
+        .build();
     _queryLocks = new ReadWriteLock[NUM_QUERY_LOCKS];
     for (int i = 0; i < NUM_QUERY_LOCKS; i++) {
       _queryLocks[i] = new ReentrantReadWriteLock();
@@ -106,6 +117,12 @@ public class OpChainSchedulerService {
         .maximumSize(cancelledQueryCacheSize)
         .expireAfterWrite(cancelledQueryCacheExpireMs, TimeUnit.MILLISECONDS)
         .build();
+  }
+
+  public void trackExecutionContext(QueryExecutionContext executionContext) {
+    long requestId = executionContext.getRequestId();
+    _completedProgressStatsCache.invalidate(requestId);
+    _executionContextCache.put(requestId, executionContext);
   }
 
   public void register(OpChain operatorChain) {
@@ -152,6 +169,7 @@ public class OpChainSchedulerService {
     OpChainId opChainId = operatorChain.getId();
     MultiStageOperator rootOperator = operatorChain.getRoot();
     _opChainCache.put(opChainId, Pair.of(rootOperator, executionContext));
+    trackExecutionContext(executionContext);
 
     // Create a ListenableFutureTask to ensure the opChain is cancelled even if the task is not scheduled
     ListenableFutureTask<Void> listenableFutureTask = ListenableFutureTask.create(new TraceRunnable() {
@@ -179,6 +197,8 @@ public class OpChainSchedulerService {
     Futures.addCallback(listenableFutureTask, new FutureCallback<>() {
       @Override
       public void onSuccess(Void result) {
+        executionContext.incrementProcessedWorkUnits();
+        retainCompletedProgressStatsIfFinished(executionContext);
         _metrics.onOpChainFinished(rootOperator);
         operatorChain.close();
       }
@@ -186,6 +206,8 @@ public class OpChainSchedulerService {
       @Override
       public void onFailure(Throwable t) {
         String logMsg = "Failed to execute operator chain: " + t.getMessage();
+        executionContext.incrementProcessedWorkUnits();
+        retainCompletedProgressStatsIfFinished(executionContext);
         _metrics.onOpChainFinished(rootOperator);
         if (t instanceof QueryException) {
           switch (((QueryException) t).getErrorCode()) {
@@ -208,6 +230,24 @@ public class OpChainSchedulerService {
     _executorService.submit(listenableFutureTask);
   }
 
+  public QueryProgressStats getQueryProgressStats(long requestId) {
+    QueryExecutionContext executionContext = _executionContextCache.getIfPresent(requestId);
+    if (executionContext != null) {
+      return executionContext.getProgressStats();
+    }
+    return _completedProgressStatsCache.getIfPresent(requestId);
+  }
+
+  private void retainCompletedProgressStatsIfFinished(QueryExecutionContext executionContext) {
+    QueryProgressStats progressStats = executionContext.getProgressStats();
+    long totalWorkUnits = progressStats.getTotalWorkUnits();
+    if (totalWorkUnits >= 0 && progressStats.getProcessedWorkUnits() >= totalWorkUnits) {
+      long requestId = executionContext.getRequestId();
+      _completedProgressStatsCache.put(requestId, progressStats);
+      _executionContextCache.invalidate(requestId);
+    }
+  }
+
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
     QueryExecutionContext cancelledExecutionContext = null;
     Map<OpChainId, MultiStageOperator> cancelledOperators = new HashMap<>();
@@ -223,6 +263,8 @@ public class OpChainSchedulerService {
     if (cancelledExecutionContext != null) {
       cancelledExecutionContext.terminate(QueryErrorCode.QUERY_CANCELLATION, "Cancelled on: " + _instanceId);
       _opChainCache.invalidateAll(cancelledOperators.keySet());
+      _executionContextCache.invalidate(requestId);
+      _completedProgressStatsCache.invalidate(requestId);
       Map<Integer, MultiStageQueryStats.StageStats.Closed> statsMap = new HashMap<>();
       for (Map.Entry<OpChainId, MultiStageOperator> entry : cancelledOperators.entrySet()) {
         int stageId = entry.getKey().getStageId();
@@ -242,6 +284,8 @@ public class OpChainSchedulerService {
       writeLock.lock();
       try {
         _cancelledQueryCache.put(requestId, Boolean.TRUE);
+        _executionContextCache.invalidate(requestId);
+        _completedProgressStatsCache.invalidate(requestId);
       } finally {
         writeLock.unlock();
       }
@@ -272,6 +316,11 @@ public class OpChainSchedulerService {
 
   private ReadWriteLock getQueryLock(long requestId) {
     return _queryLocks[(int) (requestId & QUERY_LOCK_MASK)];
+  }
+
+  @VisibleForTesting
+  boolean hasRunningExecutionContext(long requestId) {
+    return _executionContextCache.getIfPresent(requestId) != null;
   }
 
   private static class Metrics {
