@@ -140,7 +140,7 @@ public class TableSizeResource {
                 long onDiskSize;
                 if (codec != null) {
                   // Raw column: use persisted uncompressed size and forward index size
-                  rawIngestSize = colMeta.getUnonDiskSizeBytes();
+                  rawIngestSize = colMeta.getUncompressedForwardIndexSizeBytes();
                   onDiskSize = fwdIndexSize;
                   if (rawIngestSize > 0) {
                     rawFwdIndexSize += rawIngestSize;
