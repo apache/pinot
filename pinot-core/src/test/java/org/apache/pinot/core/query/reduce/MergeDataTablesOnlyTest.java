@@ -228,10 +228,11 @@ public class MergeDataTablesOnlyTest {
   }
 
   @Test
-  public void testConflictingSchemaSurfacedAsPartialMergeResult() {
+  public void testConflictingSchemaSurfacedAsIncompleteMerge() {
     // When one server's column types conflict with the first non-empty table's, filterDataTablesAndPickSchema
     // drops that server. The merge proceeds on the remaining servers and the returned DataTable carries
-    // the PARTIAL_INTERMEDIATE_RESULT flag so a downstream consumer can detect the partial result.
+    // the INCOMPLETE_MERGE flag so a downstream consumer can detect that the merge ran over a strict
+    // subset of inputs.
     String query = "SELECT COUNT(*) FROM testTable";
     DataSchema schemaLong = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
     DataSchema schemaInt = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.INT});
@@ -242,18 +243,18 @@ public class MergeDataTablesOnlyTest {
 
     DataTable merged = merge(query, toMap(List.of(t1, t2, t3)));
     assertNotNull(merged);
-    assertEquals(merged.getMetadata().get(MetadataKey.PARTIAL_INTERMEDIATE_RESULT.getName()), "true",
-        "PARTIAL_INTERMEDIATE_RESULT must be surfaced when a server is dropped due to schema conflict");
+    assertEquals(merged.getMetadata().get(MetadataKey.INCOMPLETE_MERGE.getName()), "true",
+        "INCOMPLETE_MERGE must be surfaced when a server is dropped due to schema conflict");
   }
 
   @Test
-  public void testAllSameSchemaDoesNotSetPartialMergeResult() {
+  public void testAllSameSchemaDoesNotSetIncompleteMerge() {
     String query = "SELECT COUNT(*) FROM testTable";
     DataSchema schema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
     DataTable merged = merge(query, toMap(List.of(buildRow(schema, 5L), buildRow(schema, 7L))));
     assertNotNull(merged);
-    assertNull(merged.getMetadata().get(MetadataKey.PARTIAL_INTERMEDIATE_RESULT.getName()),
-        "PARTIAL_INTERMEDIATE_RESULT must not be set on a clean merge");
+    assertNull(merged.getMetadata().get(MetadataKey.INCOMPLETE_MERGE.getName()),
+        "INCOMPLETE_MERGE must not be set on a clean merge");
   }
 
   @Test

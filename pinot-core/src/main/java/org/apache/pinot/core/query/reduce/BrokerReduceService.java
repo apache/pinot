@@ -187,7 +187,7 @@ public class BrokerReduceService extends BaseReduceService {
    *
    * <p>If one or more input server DataTables are dropped during merge (e.g., due to a schema
    * conflict with the first non-empty table), the returned DataTable's metadata carries the
-   * {@link DataTable.MetadataKey#PARTIAL_INTERMEDIATE_RESULT} flag set to {@code "true"} and the
+   * {@link DataTable.MetadataKey#INCOMPLETE_MERGE} flag set to {@code "true"} and the
    * {@link BrokerMeter#RESPONSE_MERGE_EXCEPTIONS} meter is incremented. The callers can
    * read the flag and decide policy (skip, retry, accept).
    *
@@ -246,7 +246,7 @@ public class BrokerReduceService extends BaseReduceService {
         LOGGER.warn("Merge-only reduce dropped {} server response(s) for table {} due to data schema "
             + "inconsistency: {}", conflictingServers.size(), rawTableName, conflictingServers);
         brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
-        merged.getMetadata().put(DataTable.MetadataKey.PARTIAL_INTERMEDIATE_RESULT.getName(), "true");
+        merged.getMetadata().put(DataTable.MetadataKey.INCOMPLETE_MERGE.getName(), "true");
       }
     }
     return merged;
