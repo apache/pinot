@@ -47,12 +47,24 @@ public class DataTypeConversionFunctions {
     PinotDataType targetDataType;
     switch (transformed) {
       case "BIGINT":
+      // Calcite 1.41+ (CALCITE-1466) makes unsigned integer types parseable under BABEL in the single-stage path too.
+      // Pinot has no unsigned storage, so map the supported ones to the narrowest signed type that holds their range,
+      // mirroring the multi-stage RelToPlanNodeConverter: UTINYINT/USMALLINT -> INT, UINTEGER -> LONG.
+      case "UINTEGER":
         targetDataType = LONG;
         break;
+      // UBIGINT (0..2^64-1) has no signed type wide enough to hold its full range, so reject it rather than silently
+      // wrapping values above Long.MAX_VALUE (mirrors RelToPlanNodeConverter.convertToColumnDataType).
+      case "UBIGINT":
+        throw new IllegalArgumentException(
+            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
+                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
       case "DECIMAL":
         targetDataType = BIG_DECIMAL;
         break;
       case "INT":
+      case "UTINYINT":
+      case "USMALLINT":
         targetDataType = INTEGER;
         break;
       case "VARBINARY":

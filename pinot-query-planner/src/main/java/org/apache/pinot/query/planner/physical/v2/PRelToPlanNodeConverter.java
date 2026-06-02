@@ -307,9 +307,23 @@ public class PRelToPlanNodeConverter {
       case TINYINT:
       case SMALLINT:
       case INTEGER:
+      // Calcite 1.41+ (CALCITE-1466) parses unsigned integer types under BABEL conformance. Pinot has no unsigned
+      // storage, so map each to the narrowest signed type that holds its full range: UTINYINT (0..2^8-1) and
+      // USMALLINT (0..2^16-1) fit in INT; UINTEGER (0..2^32-1) needs LONG (a signed INT would wrap values above 2^31).
+      // Kept in sync with RelToPlanNodeConverter.convertToColumnDataType.
+      case UTINYINT:
+      case USMALLINT:
         return isArray ? ColumnDataType.INT_ARRAY : ColumnDataType.INT;
       case BIGINT:
+      case UINTEGER:
         return isArray ? ColumnDataType.LONG_ARRAY : ColumnDataType.LONG;
+      // UBIGINT (0..2^64-1) has no signed Pinot type wide enough to hold its full range; mapping it to LONG would
+      // silently wrap values above Long.MAX_VALUE (a wrong result), so reject it at planning instead. CALCITE-1466.
+      // Kept in sync with RelToPlanNodeConverter.convertToColumnDataType.
+      case UBIGINT:
+        throw new IllegalArgumentException(
+            "Unsigned BIGINT (BIGINT UNSIGNED) is not supported: Pinot has no type that can represent the full "
+                + "unsigned 64-bit range. CAST to BIGINT or DECIMAL instead.");
       case DECIMAL:
         return resolveDecimal(relDataType, isArray);
       case FLOAT:

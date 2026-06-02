@@ -105,7 +105,9 @@ public class CalciteSqlParserTest {
         new Object[]{"binary"},
         new Object[]{"varbinary"},
         new Object[]{"variant"},
-        new Object[]{"uuid"}
+        new Object[]{"uuid"},
+        // UNSIGNED became reserved in Calcite 1.41 (CALCITE-1466); kept non-reserved for backward compatibility.
+        new Object[]{"unsigned"}
     };
   }
 

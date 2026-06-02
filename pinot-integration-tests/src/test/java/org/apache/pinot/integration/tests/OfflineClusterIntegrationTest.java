@@ -3028,8 +3028,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(query);
   }
 
-  // these tests actually checks a calcite limitation.
-  // Once it is fixed in calcite, we should merge this tests with testQueryRepetedColumnsV1
+  // The repeated-column ORDER BY case below still hits a Calcite limitation in the multi-stage engine: the ORDER BY
+  // reference to a column that appears twice in the SELECT list is rejected as ambiguous, so it is asserted
+  // separately from the single-stage variant (V1). As of Calcite 1.42 the repeated GROUP BY case is now accepted
+  // (the planner de-duplicates the repeated grouping key), matching V1.
   @Test
   public void testQueryWithRepeatedColumnsV2()
       throws Exception {
@@ -3038,7 +3040,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
 
-    //test repeated columns in selection query with order by
+    //test repeated columns in selection query with order by (ambiguous reference, rejected by the MSE validator)
     query = "SELECT ArrTime, ArrTime FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' order by ArrTime";
     testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
 
@@ -3046,10 +3048,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     query = "SELECT COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
     testQuery(query);
 
-    //test repeated columns in agg group by query
+    //test repeated columns in agg group by query (Calcite 1.42 de-duplicates the repeated grouping key)
     query = "SELECT ArrTime, ArrTime, COUNT(*), COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL' "
         + "GROUP BY ArrTime, ArrTime";
-    testQueryError(query, QueryErrorCode.QUERY_VALIDATION);
+    testQuery(query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

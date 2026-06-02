@@ -609,7 +609,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
         operandType = opBinding.getOperandType(0);
       }
 
-      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
+      // A filtered aggregate (or one over an empty group) can observe zero rows, making MIN/MAX nullable. Calcite
+      // 1.42 signals this to the aggregate via SqlOperatorBinding.hasEmptyGroup() (set by SqlFilterOperator during
+      // validation, where the inner aggregate's own hasFilter()/getGroupCount() do not reflect the wrapping FILTER).
+      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter() || opBinding.hasEmptyGroup()) {
         return opBinding.getTypeFactory().createTypeWithNullability(operandType, true);
       } else {
         return operandType;
