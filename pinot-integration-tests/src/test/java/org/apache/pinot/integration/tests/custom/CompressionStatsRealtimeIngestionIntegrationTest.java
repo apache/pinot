@@ -67,7 +67,9 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
   @Override
   public Schema createSchema() {
     try {
-      return createSchema(getSchemaFileName());
+      Schema schema = createSchema(getSchemaFileName());
+      schema.setSchemaName(getTableName());
+      return schema;
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
