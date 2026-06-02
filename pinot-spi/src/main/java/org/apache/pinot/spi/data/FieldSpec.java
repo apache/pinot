@@ -60,7 +60,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  *   <li>"virtualColumnProvider": the virtual column provider to use for this field.</li>
  * </ul>
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "deprecation"})
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     property = "fieldType",

@@ -77,6 +77,7 @@ public final class Schema implements Serializable {
   private boolean _enableColumnBasedNullHandling;
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
+  @SuppressWarnings("deprecation")
   private TimeFieldSpec _timeFieldSpec;
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
@@ -266,6 +267,9 @@ public final class Schema implements Serializable {
     }
   }
 
+  /// @deprecated [TimeFieldSpec] is deprecated. Use [#getSpecForTimeColumn(String)] or
+  /// [#getDateTimeSpec(String)] instead.
+  @Deprecated
   public TimeFieldSpec getTimeFieldSpec() {
     return _timeFieldSpec;
   }
@@ -298,6 +302,7 @@ public final class Schema implements Serializable {
     }
   }
 
+  @SuppressWarnings("deprecation")
   public void addField(FieldSpec fieldSpec) {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
@@ -497,6 +502,7 @@ public final class Schema implements Serializable {
    */
   @JsonIgnore
   @Nullable
+  @SuppressWarnings("deprecation")
   public DateTimeFieldSpec getSpecForTimeColumn(String timeColumnName) {
     FieldSpec fieldSpec = _fieldSpecMap.get(timeColumnName);
     if (fieldSpec != null) {
@@ -983,6 +989,7 @@ public final class Schema implements Serializable {
    * the dateTimeFieldSpec,
    *    and configure a transform function for the conversion from incoming
    */
+  @SuppressWarnings("deprecation")
   public static DateTimeFieldSpec convertToDateTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     DateTimeFieldSpec dateTimeFieldSpec = new DateTimeFieldSpec();
     TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
