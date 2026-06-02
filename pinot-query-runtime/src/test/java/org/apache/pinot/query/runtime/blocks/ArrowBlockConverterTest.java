@@ -45,7 +45,8 @@ import static org.testng.Assert.expectThrows;
 
 /**
  * Tests for {@link ArrowBlockConverter} — verifies that legacy {@link RowHeapDataBlock} data survives
- * a round-trip through Arrow columnar format and back.
+ * a round-trip through Arrow columnar format and back, plus the {@link ArrowBlock} reference-counting
+ * lifetime contract (retain/release, double-free and use-after-free guards).
  *
  * <p>{@link #testConverterRoundTripAllTypes} is the comprehensive test: every scalar type the
  * converter supports (INT, LONG, FLOAT, DOUBLE, STRING, BYTES, BOOLEAN, TIMESTAMP) round-trips
@@ -56,6 +57,10 @@ import static org.testng.Assert.expectThrows;
  * <p>BIG_DECIMAL is intentionally <em>not</em> supported by the converter in this PR — the
  * underlying {@code extractStringColumn} utility only handles {@code DataType.STRING}. BIG_DECIMAL
  * therefore throws via {@link #testUnsupportedColumnTypesThrowWithTypeInMessage}.
+ *
+ * <p>Each block is acquired at refcount 1 and {@link ArrowBlock#release() released} in a {@code finally}
+ * so its off-heap buffers are freed before {@link #tearDown()} closes the allocator — Arrow's
+ * {@code BufferAllocator.close()} throws if any buffer is still outstanding.
  */
 public class ArrowBlockConverterTest {
   private ArrowBuffers _arrowBuffers;
@@ -88,7 +93,8 @@ public class ArrowBlockConverterTest {
             new ByteArray(new byte[]{3}), 0, 1_800_000_000_000L}),
         schema);
 
-    try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator)) {
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
       assertEquals(arrowBlock.getNumRows(), 3);
 
       // Every Pinot ColumnDataType must round-trip unchanged. Guards the lossy Arrow→Pinot mapping
@@ -126,6 +132,8 @@ public class ArrowBlockConverterTest {
         assertTrue(nullIds.contains(1), "col " + col + " row 1 must be null");
         assertFalse(nullIds.contains(2), "col " + col + " row 2 must be non-null");
       }
+    } finally {
+      arrowBlock.release();
     }
   }
 
@@ -145,7 +153,8 @@ public class ArrowBlockConverterTest {
         new Object[]{8, 80L, 0.8f, 0.8, "Bob", new ByteArray(new byte[]{3}), 0, 1_800_000_000_000L}),
         schema);
 
-    try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(source, _allocator)) {
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(source, _allocator);
+    try {
       List<Object[]> out = arrowBlock.asRowHeap().getRows();
       assertEquals(out.size(), 3);
 
@@ -175,6 +184,8 @@ public class ArrowBlockConverterTest {
       assertEquals(db.getBytes(0, 5), new ByteArray(new byte[]{1, 2}));
       assertEquals(db.getInt(0, 6), 1);
       assertEquals(db.getInt(2, 6), 0);
+    } finally {
+      arrowBlock.release();
     }
   }
 
@@ -188,7 +199,8 @@ public class ArrowBlockConverterTest {
         rows(new Object[]{1, "Alice"}, new Object[]{2, null}, new Object[]{3, "Carol"}), schema);
     SerializedDataBlock serialized = rowBlock.asSerialized();
 
-    try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(serialized, _allocator)) {
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(serialized, _allocator);
+    try {
       assertEquals(arrowBlock.getNumRows(), 3);
       DataBlock db = arrowBlock.getDataBlock();
       assertEquals(db.getInt(0, 0), 1);
@@ -199,6 +211,8 @@ public class ArrowBlockConverterTest {
       RoaringBitmap nullIds = db.getNullRowIds(1);
       assertNotNull(nullIds);
       assertTrue(nullIds.contains(1));
+    } finally {
+      arrowBlock.release();
     }
   }
 
@@ -208,8 +222,11 @@ public class ArrowBlockConverterTest {
         new ColumnDataType[]{ColumnDataType.INT});
     RowHeapDataBlock rowBlock = new RowHeapDataBlock(Collections.emptyList(), schema);
 
-    try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator)) {
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
       assertEquals(arrowBlock.getNumRows(), 0);
+    } finally {
+      arrowBlock.release();
     }
   }
 
@@ -218,9 +235,14 @@ public class ArrowBlockConverterTest {
     DataSchema schema = new DataSchema(new String[]{"id"},
         new ColumnDataType[]{ColumnDataType.INT});
     RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(new Object[]{1}), schema);
-    try (ArrowBlock original = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator)) {
+    ArrowBlock original = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
       ArrowBlock same = ArrowBlockConverter.toArrowBlock(original, _allocator);
       assertSame(same, original, "converting an ArrowBlock must return the same instance");
+      // Pass-through is a no-op transfer: no extra holder, so the refcount is unchanged.
+      assertEquals(original.refCount(), 1);
+    } finally {
+      original.release();
     }
   }
 
@@ -230,8 +252,11 @@ public class ArrowBlockConverterTest {
         new ColumnDataType[]{ColumnDataType.INT});
     RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(new Object[]{1}, new Object[]{2}), schema);
 
-    try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator)) {
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
       assertNull(arrowBlock.getDataBlock().getNullRowIds(0), "non-null column must return null bitmap");
+    } finally {
+      arrowBlock.release();
     }
   }
 
@@ -249,11 +274,63 @@ public class ArrowBlockConverterTest {
     DataSchema schema = new DataSchema(new String[]{"id"},
         new ColumnDataType[]{ColumnDataType.INT});
     RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(new Object[]{1}), schema);
-    try (ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator)) {
+    ArrowBlock arrowBlock = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    try {
       assertTrue(arrowBlock.isArrow(), "isArrow() must be true");
       assertFalse(arrowBlock.isSerialized(), "isSerialized() must be false");
       assertFalse(arrowBlock.isRowHeap(), "isRowHeap() must be false");
+    } finally {
+      arrowBlock.release();
     }
+  }
+
+  @Test
+  public void testRefCountRetainReleaseLifecycle() {
+    DataSchema schema = new DataSchema(new String[]{"id"}, new ColumnDataType[]{ColumnDataType.INT});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(new Object[]{1}), schema);
+    ArrowBlock block = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+
+    // Fresh block: the constructor's caller is the single holder.
+    assertEquals(block.refCount(), 1);
+
+    // retain() registers extra holders (e.g. broadcasting one block to N local mailboxes).
+    block.retain();
+    block.retain();
+    assertEquals(block.refCount(), 3);
+
+    // release() walks the count back down; buffers are freed only when the last holder lets go.
+    block.release();
+    block.release();
+    assertEquals(block.refCount(), 1);
+
+    // Buffers stay allocated as long as any holder remains, and are reclaimed on the final release —
+    // assert the actual off-heap reclamation, not just the counter reaching 0.
+    assertTrue(_allocator.getAllocatedMemory() > 0, "buffers must remain allocated while a holder is live");
+    block.release();
+    assertEquals(block.refCount(), 0);
+    assertEquals(_allocator.getAllocatedMemory(), 0, "buffers must be reclaimed when the last holder releases");
+  }
+
+  @Test
+  public void testReleaseAfterFreeThrows() {
+    DataSchema schema = new DataSchema(new String[]{"id"}, new ColumnDataType[]{ColumnDataType.INT});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(new Object[]{1}), schema);
+    ArrowBlock block = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    block.release();   // refcount 1 -> 0, buffers freed
+
+    // A second release is a double-free and must fail loudly rather than double-close the root.
+    expectThrows(IllegalStateException.class, block::release);
+  }
+
+  @Test
+  public void testRetainAfterFreeThrows() {
+    DataSchema schema = new DataSchema(new String[]{"id"}, new ColumnDataType[]{ColumnDataType.INT});
+    RowHeapDataBlock rowBlock = new RowHeapDataBlock(rows(new Object[]{1}), schema);
+    ArrowBlock block = ArrowBlockConverter.toArrowBlock(rowBlock, _allocator);
+    block.release();   // freed
+
+    // Retaining a freed block would resurrect a dangling VectorSchemaRoot.
+    expectThrows(IllegalStateException.class, block::retain);
   }
 
   // ----- helpers -----

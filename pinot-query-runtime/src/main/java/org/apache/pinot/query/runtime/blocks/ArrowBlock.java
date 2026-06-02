@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.pinot.common.datablock.ArrowDataBlock;
@@ -35,20 +37,45 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
  * row-heap format. These fallback conversions are expensive (every primitive gets boxed, every string
  * allocated on heap); they exist as a compatibility bridge, not as the intended hot path.
  *
- * <p><b>Lifetime:</b> the block's off-heap buffers are owned by the {@code BufferAllocator} used to
- * construct it (typically a per-query or per-stage child of the root allocator). When that allocator
- * closes, every block it produced is freed atomically. Individual blocks <em>do not</em> need to be
- * released by operator code — the allocator is the unit of ownership.
+ * <p><b>Lifetime — reference counting.</b> The block's column data lives off-heap and is invisible to the
+ * JVM garbage collector, so it must be reclaimed explicitly. Reclamation is governed by a block-level
+ * reference count, manipulated only through {@link #retain()} and {@link #release()}:
+ * <ul>
+ *   <li>A freshly constructed block starts at refcount 1; the constructor's caller is the initial holder.</li>
+ *   <li>{@link #retain()} increments the count — call it once per additional holder before sharing a block
+ *       (e.g. enqueuing the same block onto multiple local mailbox queues for a broadcast exchange).</li>
+ *   <li>{@link #release()} decrements the count and frees the underlying {@link VectorSchemaRoot} once it
+ *       reaches 0. Every holder must {@code release()} exactly once when done — including on exception
+ *       paths.</li>
+ * </ul>
+ * The invariant is: refcount == number of live holders. Transferring a block to a single new holder
+ * (handing off ownership without keeping it yourself) leaves the count unchanged — no retain, no release.
  *
- * <p>{@link #close()} is provided for explicit early disposal (e.g. in tests, or when a caller wants to
- * free a block before its allocator closes). It is <b>not</b> reference-counted; calling it twice will
- * attempt to close the underlying {@link ArrowDataBlock} twice.
+ * <p>This class deliberately does <b>not</b> implement {@link AutoCloseable}. {@code close()} means
+ * "destroy unconditionally", which collides with reference counting: a try-with-resources block would free
+ * the buffers at scope exit even while other holders are still reading them. Exposing only explicit
+ * {@code retain()}/{@code release()} makes each lifetime event visible at the call site. (This mirrors
+ * Netty's {@code ReferenceCounted}, which avoids {@code AutoCloseable} for the same reason.)
  *
- * <p>To move a block across allocator scopes (e.g. across stage boundaries or onto the wire), use
- * Arrow's {@code TransferPair} API — this is zero-copy and preserves the allocator-ownership invariant.
+ * <p>{@link #asRowHeap()} and {@link #asSerialized()} produce independent heap copies and do <b>not</b>
+ * change this block's refcount — the caller still owns its reference and must {@link #release()} it.
+ *
+ * <p><b>Thread-safety:</b> {@code retain()}/{@code release()} are atomic. Two distinct ordering guarantees
+ * are in play, and they come from different places:
+ * <ul>
+ *   <li>Safe publication of the column <em>buffer contents</em> from a producer thread to a consumer thread
+ *       is supplied by the handoff mechanism (the mailbox queue's publication semantics), <em>not</em> by
+ *       this refcount.</li>
+ *   <li>Safe reclamation is supplied by the {@link AtomicInteger}: the terminal {@code 1 -> 0} transition
+ *       that runs {@code _dataBlock.close()} happens-after every other holder's {@code retain()}/{@code
+ *       release()} — and therefore after each holder's buffer reads, which precede its own release in
+ *       program order — so the buffers are never freed while a holder is still reading them.</li>
+ * </ul>
+ * No extra synchronization on the block itself is required.
  */
-public class ArrowBlock implements MseBlock.Data, AutoCloseable {
+public final class ArrowBlock implements MseBlock.Data {
   private final ArrowDataBlock _dataBlock;
+  private final AtomicInteger _refCount = new AtomicInteger(1);
 
   public ArrowBlock(ArrowDataBlock dataBlock) {
     _dataBlock = dataBlock;
@@ -95,9 +122,9 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
    * that don't yet consume Arrow blocks directly; it is expensive (every primitive gets boxed, every string
    * allocated on heap).
    *
-   * <p>The returned {@link RowHeapDataBlock} is independent of this block's off-heap buffers — the caller
-   * may close this block (or let its allocator close) without affecting the row-heap copy. This block is
-   * <em>not</em> closed as a side effect.
+   * <p>The returned {@link RowHeapDataBlock} is an independent heap copy of this block's off-heap buffers.
+   * This block's refcount is <em>unchanged</em> — the caller still owns its reference and must
+   * {@link #release()} it; the row-heap copy outlives any later release of this block.
    *
    * <p>TODO: remove this method once all operators consume {@link ArrowBlock} directly.
    */
@@ -168,8 +195,57 @@ public class ArrowBlock implements MseBlock.Data, AutoCloseable {
     return "{\"type\": \"arrow\", \"numRows\": " + getNumRows() + "}";
   }
 
-  @Override
-  public void close() {
-    _dataBlock.close();
+  // ----- Reference-counted lifetime (see class Javadoc) -----
+
+  /**
+   * Increments the reference count to register an additional holder. Call this once per extra holder
+   * before sharing the same block (e.g. broadcasting it to multiple local mailbox queues).
+   *
+   * @throws IllegalStateException if the block has already been freed (refcount 0) — retaining a freed
+   *     block would resurrect a dangling {@link VectorSchemaRoot}.
+   */
+  public void retain() {
+    while (true) {
+      int current = _refCount.get();
+      if (current == 0) {
+        throw new IllegalStateException("Cannot retain an ArrowBlock that has already been freed (refcount=0)");
+      }
+      if (_refCount.compareAndSet(current, current + 1)) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * Decrements the reference count, freeing the underlying {@link VectorSchemaRoot} when it reaches 0.
+   * Every holder must call this exactly once for its reference when done with the block — including on
+   * exception paths.
+   *
+   * <p><b>Release exactly once per reference.</b> Do not call {@code release()} for the same reference from
+   * both the happy path and a {@code finally}/{@code catch} — that is a double-free, throws here, and can
+   * mask the original exception. Structure cleanup so each held reference is released on exactly one path.
+   *
+   * @throws IllegalStateException if the block has already been freed (refcount 0) — a second release is a
+   *     double-free.
+   */
+  public void release() {
+    while (true) {
+      int current = _refCount.get();
+      if (current == 0) {
+        throw new IllegalStateException("Cannot release an ArrowBlock that has already been freed (double-free)");
+      }
+      if (_refCount.compareAndSet(current, current - 1)) {
+        if (current == 1) {
+          // Last holder is letting go — free the off-heap buffers now.
+          _dataBlock.close();
+        }
+        return;
+      }
+    }
+  }
+
+  @VisibleForTesting
+  int refCount() {
+    return _refCount.get();
   }
 }

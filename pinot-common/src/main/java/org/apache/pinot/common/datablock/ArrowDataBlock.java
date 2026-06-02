@@ -49,11 +49,11 @@ import org.roaringbitmap.RoaringBitmap;
  * <p>Primitive types use their native Arrow vector types (e.g. {@code IntVector}, {@code BigIntVector}).
  * String columns are stored as plain {@code VarCharVector}.
  *
- * <p><b>Lifetime:</b> the block's off-heap buffers are owned by the {@code BufferAllocator} used to
- * build the underlying {@link VectorSchemaRoot}. Ownership is allocator-scoped — when that allocator
- * closes, every root (and block) it produced is freed atomically. {@link #close()} is provided for
- * explicit early disposal (e.g. in tests, or before the owning allocator closes); it is not
- * reference-counted and must be called at most once per block.
+ * <p><b>Lifetime:</b> this is the low-level columnar container; block-level reference counting lives one
+ * layer up on {@code org.apache.pinot.query.runtime.blocks.ArrowBlock}, which wraps this type for the
+ * multi-stage runtime. {@link #close()} unconditionally frees the underlying {@link VectorSchemaRoot}
+ * (which in turn decrements Arrow's buffer-level refcounts); it is the primitive that
+ * {@code ArrowBlock.release()} invokes once its reference count reaches 0, and must be called at most once.
  *
  * <p>{@link #getStringDictionary()}, {@link #getFixedData()}, and {@link #getVarSizeData()} throw
  * {@link UnsupportedOperationException} — they're part of {@link DataBlock}'s legacy abstraction that assumes
