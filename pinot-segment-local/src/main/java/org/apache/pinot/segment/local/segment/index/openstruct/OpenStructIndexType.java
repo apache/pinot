@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index.openstruct;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -84,6 +87,30 @@ public class OpenStructIndexType
       Preconditions.checkState(fieldSpec.isSingleValueField(),
           "OPEN_STRUCT index can only be created on single-value columns, but column '%s' is multi-value",
           fieldSpec.getName());
+      validatePerKeyIndexes(config);
+    }
+  }
+
+  private void validatePerKeyIndexes(OpenStructIndexConfig config) {
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
+    if (config.getValueFieldConfigs() != null) {
+      fieldConfigs.addAll(config.getValueFieldConfigs());
+    }
+    if (config.getDefaultValueFieldConfig() != null) {
+      fieldConfigs.add(config.getDefaultValueFieldConfig());
+    }
+    for (FieldConfig fieldConfig : fieldConfigs) {
+      JsonNode indexes = fieldConfig.getIndexes();
+      if (indexes == null) {
+        continue;
+      }
+      Iterator<String> indexNames = indexes.fieldNames();
+      while (indexNames.hasNext()) {
+        String indexName = indexNames.next();
+        Preconditions.checkState(OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(indexName),
+            "OPEN_STRUCT key '%s' declares unsupported index '%s'; supported indexes are %s",
+            fieldConfig.getName(), indexName, OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES);
+      }
     }
   }
 
