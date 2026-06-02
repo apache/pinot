@@ -39,16 +39,19 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StatsCollectorUtil;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.openstruct.OpenStructSupportedIndexes;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -284,11 +287,37 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     }
     statsCollector.seal();
 
+    // Build per-key index configuration from the key's FieldConfig (falling back to the default), then apply
+    // the OPEN_STRUCT inverted-on default. No TableConfig/Schema required.
+    FieldConfig keyFieldConfig = _config.getValueFieldConfig(key);
+    if (keyFieldConfig == null) {
+      keyFieldConfig = _config.getDefaultValueFieldConfig();
+    }
     boolean enableInverted = _config.shouldEnableInvertedIndexForKey(key);
-    boolean useDictionary = resolveUseDictionary(key, childFieldSpec, enableInverted, statsCollector);
+    FieldIndexConfigs configsForDecision = new FieldIndexConfigs.Builder(
+        FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))
+        .add(StandardIndexes.inverted(), enableInverted ? IndexConfig.ENABLED : IndexConfig.DISABLED)
+        .build();
 
-    int dictElementSize = writeForwardAndInvertedIndexes(materializedCol, storedType, presence, values,
-        defaultValue, statsCollector, useDictionary, enableInverted);
+    boolean useDictionary = resolveUseDictionary(childFieldSpec, configsForDecision, statsCollector);
+
+    // Reconcile dictionary + forward encoding with the final decision (mirrors BaseSegmentCreator.adaptConfig);
+    // ForwardIndexCreatorFactory selects dict-vs-raw from the forward config's EncodingType. A compression codec
+    // applies only to the raw forward format (LZ4 preserves the dense child's current on-disk layout); attaching
+    // one to a dictionary-encoded forward is rejected by ForwardIndexType.validate.
+    ForwardIndexConfig.Builder forwardBuilder = new ForwardIndexConfig.Builder(
+        useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW);
+    if (!useDictionary) {
+      forwardBuilder.withCompressionCodec(FieldConfig.CompressionCodec.LZ4);
+    }
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder(configsForDecision)
+        .add(StandardIndexes.dictionary(),
+            useDictionary ? DictionaryIndexConfig.DEFAULT : DictionaryIndexConfig.DISABLED)
+        .add(StandardIndexes.forward(), forwardBuilder.build())
+        .build();
+
+    int dictElementSize = writeColumnIndexes(materializedCol, storedType, presence, values,
+        defaultValue, statsCollector, useDictionary, fieldIndexConfigs, childFieldSpec);
 
     NullValueVectorCreator nullCreator = new NullValueVectorCreator(_indexDir, materializedCol);
     try {
@@ -323,16 +352,8 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
    * {@code BaseSegmentCreator.createDictionaryForColumn} with standard default flags (optimizeDictionary
    * off => dictionary unless explicitly disabled and not required by an enabled index).
    */
-  private boolean resolveUseDictionary(String key, FieldSpec childFieldSpec, boolean enableInverted,
+  private boolean resolveUseDictionary(FieldSpec childFieldSpec, FieldIndexConfigs fieldIndexConfigs,
       AbstractColumnStatisticsCollector statsCollector) {
-    FieldIndexConfigs.Builder fieldIndexConfigsBuilder = new FieldIndexConfigs.Builder();
-    fieldIndexConfigsBuilder.add(StandardIndexes.dictionary(),
-        _config.shouldUseDictionaryForKey(key) ? DictionaryIndexConfig.DEFAULT : DictionaryIndexConfig.DISABLED);
-    if (enableInverted) {
-      fieldIndexConfigsBuilder.add(StandardIndexes.inverted(), IndexConfig.ENABLED);
-    }
-    FieldIndexConfigs fieldIndexConfigs = fieldIndexConfigsBuilder.build();
-
     if (DictionaryIndexConfig.requiresDictionary(childFieldSpec, fieldIndexConfigs)) {
       return true;
     }
@@ -345,21 +366,15 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
   }
 
   /**
-   * Writes the dictionary (when used), forward index, and inverted index (when enabled and dictionary-encoded)
-   * for a materialized child column via the standard index-creator family, driven from a single per-doc loop.
-   * Returns the dictionary element size in bytes (0 when raw-encoded), for column metadata.
+   * Writes the dictionary (when used) plus all vetted, enabled indexes for a materialized child column through
+   * the standard index-creator family, driven from a single per-doc loop. Returns the dictionary element size in
+   * bytes (0 when raw-encoded), for column metadata. The dictionary is built separately because its build
+   * lifecycle is CUSTOM and it supplies the dictIds the per-row creators consume.
    */
-  // TODO(open_struct): only dictionary encoding and the inverted index are honored per key. A key's
-  // FieldConfig (OpenStructIndexConfig.valueFieldConfigs) can carry arbitrary indexes (text, range, bloom,
-  // json, fst, h3) via the modern `indexes` format, but those are silently dropped here. To support them,
-  // deserialize the per-key FieldConfig into a FieldIndexConfigs (FieldIndexConfigsUtil) and drive the
-  // standard multi-index creation loop (IndexService#getAllIndexes + IndexType#shouldCreateIndex), like
-  // BaseSegmentCreator, instead of hand-wiring only forward/dictionary/inverted creators.
-  private int writeForwardAndInvertedIndexes(String materializedCol, DataType storedType, RoaringBitmap presence,
+  private int writeColumnIndexes(String materializedCol, DataType storedType, RoaringBitmap presence,
       List<Object> values, Object defaultValue, AbstractColumnStatisticsCollector statsCollector,
-      boolean useDictionary, boolean enableInverted)
+      boolean useDictionary, FieldIndexConfigs fieldIndexConfigs, FieldSpec childFieldSpec)
       throws IOException {
-    // Dictionary built from the collector's sorted unique values (same as the standard pipeline).
     int dictElementSize = 0;
     SegmentDictionaryCreator dictCreator = null;
     try {
@@ -373,49 +388,38 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       IndexCreationContext context =
           new IndexCreationContext.Builder(_indexDir, null, statsCollector, useDictionary, false)
               .withOnHeap(false).build();
-      ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder(
-          useDictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW)
-          .withCompressionCodec(FieldConfig.CompressionCodec.LZ4).build();
 
-      ForwardIndexCreator forwardCreator;
+      List<IndexCreator> creators = new ArrayList<>();
       try {
-        forwardCreator = StandardIndexes.forward().createIndexCreator(context, forwardIndexConfig);
-      } catch (IOException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new IOException("Failed to create forward index creator for: " + materializedCol, e);
-      }
-      try {
-        DictionaryBasedInvertedIndexCreator invertedCreator;
-        try {
-          invertedCreator = (enableInverted && useDictionary)
-              ? StandardIndexes.inverted().createIndexCreator(context, IndexConfig.ENABLED) : null;
-        } catch (IOException e) {
-          throw e;
-        } catch (Exception e) {
-          throw new IOException("Failed to create inverted index creator for: " + materializedCol, e);
+        for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+          if (indexType.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
+            continue;   // excludes dictionary (lifecycle CUSTOM), built separately above
+          }
+          if (!OpenStructSupportedIndexes.ALLOWED_PRETTY_NAMES.contains(indexType.getPrettyName())) {
+            continue;   // non-vetted indexes already rejected at table-config validation; defensive backstop
+          }
+          IndexCreator creator = createColumnIndexCreator(indexType, context, fieldIndexConfigs, materializedCol,
+              childFieldSpec);
+          if (creator != null) {
+            creators.add(creator);
+          }
         }
-        try {
-          int ordinal = 0;
-          for (int docId = 0; docId < _numDocs; docId++) {
-            Object value = presence.contains(docId) ? values.get(ordinal++) : defaultValue;
-            int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
-            forwardCreator.add(value, dictId);
-            if (invertedCreator != null) {
-              invertedCreator.add(value, dictId);
-            }
+
+        int ordinal = 0;
+        for (int docId = 0; docId < _numDocs; docId++) {
+          Object value = presence.contains(docId) ? values.get(ordinal++) : defaultValue;
+          int dictId = useDictionary ? dictCreator.indexOfSV(value) : -1;
+          for (IndexCreator creator : creators) {
+            creator.add(value, dictId);
           }
-          forwardCreator.seal();
-          if (invertedCreator != null) {
-            invertedCreator.seal();
-          }
-        } finally {
-          if (invertedCreator != null) {
-            invertedCreator.close();
-          }
+        }
+        for (IndexCreator creator : creators) {
+          creator.seal();
         }
       } finally {
-        forwardCreator.close();
+        for (IndexCreator creator : creators) {
+          creator.close();
+        }
       }
 
       // Seal the dictionary only after the index writes succeeded; capture its element size for metadata.
@@ -429,6 +433,29 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
       }
     }
     return dictElementSize;
+  }
+
+  @Nullable
+  private static <C extends IndexConfig> IndexCreator createColumnIndexCreator(IndexType<C, ?, ?> indexType,
+      IndexCreationContext context, FieldIndexConfigs fieldIndexConfigs, String materializedCol,
+      FieldSpec childFieldSpec)
+      throws IOException {
+    // Materialized child columns exist in no schema/TableConfig, so the standard table-config-time validation
+    // never sees them. Run the index type's own guards here against the resolved child FieldSpec (e.g. range
+    // rejects a non-numeric column without a dictionary) so misconfigurations fail with the canonical message
+    // instead of crashing opaquely inside the creator. validate() internally no-ops when the index is disabled.
+    indexType.validate(fieldIndexConfigs, childFieldSpec, null);
+    C config = fieldIndexConfigs.getConfig(indexType);
+    if (!config.isEnabled() || !indexType.shouldCreateIndex(context, config)) {
+      return null;
+    }
+    try {
+      return indexType.createIndexCreator(context, config);
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException("Failed to create " + indexType.getPrettyName() + " creator for: " + materializedCol, e);
+    }
   }
 
   private void writeSparseJsonColumn(List<String> sparseKeys)
