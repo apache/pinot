@@ -123,7 +123,7 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
       throws Exception {
     // Call the controller table size API
     String response = sendGetRequest(
-        controllerUrl("/tables/" + getTableName() + "/size"));
+        _sharedClusterTestSuite.controllerUrl("/tables/" + getTableName() + "/size"));
     JsonNode tableSizeJson = JsonUtils.stringToJsonNode(response);
 
     // Verify top-level structure
@@ -188,7 +188,7 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
       throws Exception {
     // Call table size API with verbose=true to get per-segment details
     String response = sendGetRequest(
-        controllerUrl("/tables/" + getTableName() + "/size?verbose=true"));
+        _sharedClusterTestSuite.controllerUrl("/tables/" + getTableName() + "/size?verbose=true"));
     JsonNode tableSizeJson = JsonUtils.stringToJsonNode(response);
 
     JsonNode realtimeSegments = tableSizeJson.get("realtimeSegments");
