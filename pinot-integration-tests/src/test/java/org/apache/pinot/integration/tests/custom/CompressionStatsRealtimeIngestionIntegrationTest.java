@@ -60,6 +60,11 @@ public class CompressionStatsRealtimeIngestionIntegrationTest extends CustomData
   }
 
   @Override
+  protected String getSortedColumn() {
+    return null;
+  }
+
+  @Override
   protected long getCountStarResult() {
     return DEFAULT_COUNT_STAR_RESULT;
   }
