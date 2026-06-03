@@ -279,6 +279,14 @@ public class CommonConstants {
         "pinot.beta.multistage.engine.max.server.query.threads.hardlimit.factor";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR = "4";
 
+    /// Cluster-config knob that selects how the multi-stage engine emits metrics.
+    /// Read at startup by server and broker; mode changes require a restart to take effect.
+    /// Valid values: {@code SERVER} (default; forward to {@code pinot.server.*}), {@code MSE}
+    /// (emit only {@code pinot.mse.*}), {@code DUAL} (emit both). See
+    /// {@code org.apache.pinot.common.metrics.MseMetricsMode}.
+    public static final String CONFIG_OF_MSE_METRICS_MODE = "pinot.metrics.mse.mode";
+    public static final String DEFAULT_MSE_METRICS_MODE = "SERVER";
+
     // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.preprocess.parallelism";

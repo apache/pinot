@@ -62,6 +62,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -674,6 +675,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverMetrics.initializeGlobalMeters();
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     ServerMetrics.register(_serverMetrics);
+    MseMetrics.registerFromConfig(_serverConf, metricsRegistry);
 
     LOGGER.info("Initializing reload job status cache");
     _reloadJobStatusCache = new ServerReloadJobStatusCache(_instanceId);

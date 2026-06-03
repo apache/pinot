@@ -34,7 +34,8 @@ rules:
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"BrokerMetrics\", name=\"pinot\\.broker\\.(uncaughtGet|uncaughtPost|queryRejected|requestCompilation|resourceMissing)Exceptions\"><>(\\w+)"
   name: "pinot_broker_exceptions_$1_$2"
   cache: true
-# All global gauge/meters/timers
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.broker\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_broker_$1_$2"
+# All global gauge/meters/timers. Group-flexible at the prefix so non-broker MBean groups
+# registered in this JVM (e.g. pinot.mse.* from the multi-stage engine emitter) are also exported.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_$1_$2_$3"
   cache: true

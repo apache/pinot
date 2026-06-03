@@ -35,7 +35,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -275,11 +276,12 @@ public class OpChainSchedulerService {
   }
 
   private static class Metrics {
-    private final PinotMeter _startedOpchains = ServerMeter.MSE_OPCHAINS_STARTED.getGlobalMeter();
-    private final PinotMeter _competedOpchains = ServerMeter.MSE_OPCHAINS_COMPLETED.getGlobalMeter();
-    private final PinotMeter _emittedRows = ServerMeter.MSE_EMITTED_ROWS.getGlobalMeter();
-    private final PinotMeter _cpuExecutionTimeMs = ServerMeter.MSE_CPU_EXECUTION_TIME_MS.getGlobalMeter();
-    private final PinotMeter _memoryAllocatedBytes = ServerMeter.MSE_MEMORY_ALLOCATED_BYTES.getGlobalMeter();
+    private final MseMetrics _mseMetrics = MseMetrics.get();
+    private final PinotMeter _startedOpchains = _mseMetrics.getMeteredValue(MseMeter.OPCHAINS_STARTED);
+    private final PinotMeter _competedOpchains = _mseMetrics.getMeteredValue(MseMeter.OPCHAINS_COMPLETED);
+    private final PinotMeter _emittedRows = _mseMetrics.getMeteredValue(MseMeter.EMITTED_ROWS);
+    private final PinotMeter _cpuExecutionTimeMs = _mseMetrics.getMeteredValue(MseMeter.CPU_EXECUTION_TIME_MS);
+    private final PinotMeter _memoryAllocatedBytes = _mseMetrics.getMeteredValue(MseMeter.MEMORY_ALLOCATED_BYTES);
 
     private static final String EMITTED_ROWS = "EMITTED_ROWS";
     private static final String EXECUTION_TIME_MS = "EXECUTION_TIME_MS";
