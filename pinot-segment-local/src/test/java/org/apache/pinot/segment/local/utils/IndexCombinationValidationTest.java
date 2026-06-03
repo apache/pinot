@@ -18,15 +18,18 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.FieldConfig.IndexType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -69,7 +72,78 @@ public class IndexCombinationValidationTest {
   private static FieldConfig rawWithExplicitDict(String col, List<IndexType> indexes) {
     ObjectNode indexesNode = JsonUtils.newObjectNode();
     indexesNode.set("dictionary", JsonUtils.newObjectNode());
-    return new FieldConfig(col, EncodingType.RAW, null, indexes, null, null, indexesNode, null, null);
+    return fieldConfig(col, EncodingType.RAW, null, indexes, null, null, indexesNode, null, null);
+  }
+
+  private static FieldConfig fieldConfig(String name, EncodingType encodingType, IndexType indexType,
+      CompressionCodec compressionCodec, Map<String, String> properties) {
+    return fieldConfig(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
+  }
+
+  private static FieldConfig fieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
+      CompressionCodec compressionCodec, Map<String, String> properties) {
+    return fieldConfig(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
+  }
+
+  private static FieldConfig fieldConfig(String name, EncodingType encodingType, IndexType indexType,
+      List<IndexType> indexTypes, CompressionCodec compressionCodec, TimestampConfig timestampConfig,
+      JsonNode indexes, Map<String, String> properties, JsonNode tierOverwrites) {
+    ObjectNode indexesNode = withForwardEncoding(indexes, encodingType);
+    if (compressionCodec != null) {
+      withForwardCompression(indexesNode, compressionCodec);
+    }
+    if (properties != null) {
+      withForwardProperties(indexesNode, properties);
+    }
+    return new FieldConfig(name, null, indexType, indexTypes, null, timestampConfig, indexesNode, null,
+        tierOverwrites);
+  }
+
+  private static ObjectNode withForwardEncoding(JsonNode indexes, EncodingType encodingType) {
+    ObjectNode indexesNode =
+        indexes != null && indexes.isObject() ? (ObjectNode) indexes.deepCopy() : JsonUtils.newObjectNode();
+    ObjectNode forward;
+    if (indexesNode.has("forward") && indexesNode.get("forward").isObject()) {
+      forward = (ObjectNode) indexesNode.get("forward");
+    } else {
+      forward = JsonUtils.newObjectNode();
+      indexesNode.set("forward", forward);
+    }
+    forward.put("encodingType", encodingType.name());
+    return indexesNode;
+  }
+
+  private static void withForwardCompression(ObjectNode indexes, CompressionCodec compressionCodec) {
+    forwardNode(indexes).put("compressionCodec", compressionCodec.name());
+  }
+
+  private static void withForwardProperties(ObjectNode indexes, Map<String, String> properties) {
+    ObjectNode forward = forwardNode(indexes);
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      switch (entry.getKey()) {
+        case FieldConfig.FORWARD_INDEX_DISABLED:
+          forward.put("disabled", Boolean.parseBoolean(entry.getValue()));
+          break;
+        case FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY:
+          forward.put("deriveNumDocsPerChunk", Boolean.parseBoolean(entry.getValue()));
+          break;
+        case FieldConfig.RAW_INDEX_WRITER_VERSION:
+          forward.put("rawIndexWriterVersion", Integer.parseInt(entry.getValue()));
+          break;
+        default:
+          forward.put(entry.getKey(), entry.getValue());
+          break;
+      }
+    }
+  }
+
+  private static ObjectNode forwardNode(ObjectNode indexes) {
+    if (indexes.has("forward") && indexes.get("forward").isObject()) {
+      return (ObjectNode) indexes.get("forward");
+    }
+    ObjectNode forward = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return forward;
   }
 
   /** Validate and expect success. */
@@ -132,7 +206,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testDictEncodedWithFstIndexPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc)).build();
     assertValid(tc);
@@ -173,7 +247,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithFstIndexNoExplicitDictFails() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.FST, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.FST, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -184,7 +258,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithIfstIndexNoExplicitDictFails() {
     // IFSTIndexType.validate() fires: "Cannot create IFST index on column: <col> without dictionary"
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.IFST, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.IFST, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -195,7 +269,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithMultipleDictRequiringIndexesNoExplicitDictFails() {
     // Both inverted and FST require dictionary; at least one validator fires mentioning "dictionary"
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, List.of(IndexType.FST),
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, null, List.of(IndexType.FST),
         null, null, null, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
@@ -214,7 +288,7 @@ public class IndexCombinationValidationTest {
   public void testRawWithExplicitDictAndInvertedIndexPasses() {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -240,7 +314,7 @@ public class IndexCombinationValidationTest {
   public void testRawWithExplicitDictAndInvertedPlusFstPasses() {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, List.of(IndexType.FST),
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, null, List.of(IndexType.FST),
         null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(STR_COL))
@@ -253,7 +327,7 @@ public class IndexCombinationValidationTest {
   public void testRawWithExplicitDictAndInvertedIndexIntColumnPasses() {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(INT_COL))
         .setFieldConfigList(List.of(fc))
@@ -268,7 +342,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithTextIndexNoDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -287,7 +361,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithJsonIndexStringColumnNoDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.JSON, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.JSON, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -341,7 +415,7 @@ public class IndexCombinationValidationTest {
   public void testRawWithRangeIndexStringColumnWithExplicitDictPasses() {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setRangeIndexColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -375,7 +449,7 @@ public class IndexCombinationValidationTest {
   public void testRawMvWithInvertedIndexWithExplicitDictPasses() {
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(INT_MV_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
+    FieldConfig fc = fieldConfig(INT_MV_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(INT_MV_COL))
         .setFieldConfigList(List.of(fc))
@@ -386,7 +460,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testFstIndexMvColumnFails() {
     // FST on MV column is never valid regardless of encoding
-    FieldConfig fc = new FieldConfig(INT_MV_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
+    FieldConfig fc = fieldConfig(INT_MV_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -410,7 +484,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testMixedColumnsAllValidPasses() {
     // strCol: raw + text (no dict required); intCol: dict + inverted; floatCol: dict + range
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setInvertedIndexColumns(List.of(INT_COL))
@@ -425,7 +499,7 @@ public class IndexCombinationValidationTest {
     // strCol: raw + explicit dict + inverted (valid); intCol: raw + no dict + inverted → fails
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, null, null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(INT_COL))
         .setInvertedIndexColumns(Arrays.asList(STR_COL, INT_COL))
@@ -445,7 +519,7 @@ public class IndexCombinationValidationTest {
     ObjectNode fwdDisabled = JsonUtils.newObjectNode();
     fwdDisabled.put("disabled", true);
     indexes.set("forward", fwdDisabled);
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, null,
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.DICTIONARY, null,
         null, null, null, indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(INT_COL))
@@ -460,7 +534,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithLz4CodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.LZ4, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.LZ4, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -470,7 +544,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithSnappyCodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.SNAPPY, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.SNAPPY, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -480,7 +554,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testRawWithZstdCodecPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.ZSTANDARD, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.ZSTANDARD, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -491,7 +565,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithClpCodecStringColumnPasses() {
     // CLP codecs are valid for raw STRING columns
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.CLP, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.CLP, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -502,7 +576,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testRawWithClpCodecNonStringColumnFails() {
     // CLP is only valid on STRING stored type
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.CLP, null);
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.CLP, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(INT_COL))
         .setFieldConfigList(List.of(fc))
@@ -513,7 +587,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testDeltaDeltaCodecNonNumericColumnFails() {
     // DELTADELTA only valid on INT/LONG columns
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.DELTADELTA, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, (IndexType) null, CompressionCodec.DELTADELTA, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -530,7 +604,7 @@ public class IndexCombinationValidationTest {
     // up with a RAW forward index alongside the standalone dictionary at segment-creation time.
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null,
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.RAW, null, null, CompressionCodec.DELTADELTA, null,
         indexes, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
@@ -544,7 +618,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testFstIndexNonStringColumnFails() {
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.FST, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -553,7 +627,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testTextIndexNonStringColumnFails() {
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -563,7 +637,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testTextIndexStringColumnRawPasses() {
     // Text index does not require dictionary
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.TEXT, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -573,7 +647,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testTextIndexStringColumnDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.TEXT, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -582,7 +656,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testJsonIndexStringColumnRawPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.JSON, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.JSON, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))
@@ -592,7 +666,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testJsonIndexStringColumnDictPasses() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -602,7 +676,7 @@ public class IndexCombinationValidationTest {
   @Test
   public void testJsonIndexIntColumnFails() {
     // JSON index not valid on non-STRING/non-MAP column
-    FieldConfig fc = new FieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
+    FieldConfig fc = fieldConfig(INT_COL, EncodingType.DICTIONARY, IndexType.JSON, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setFieldConfigList(List.of(fc))
         .build();
@@ -647,7 +721,7 @@ public class IndexCombinationValidationTest {
 
   @Test
   public void testErrorMessageNamesFstIndex() {
-    FieldConfig fc = new FieldConfig(STR_COL, EncodingType.RAW, IndexType.FST, null, null);
+    FieldConfig fc = fieldConfig(STR_COL, EncodingType.RAW, IndexType.FST, null, null);
     TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of(STR_COL))
         .setFieldConfigList(List.of(fc))

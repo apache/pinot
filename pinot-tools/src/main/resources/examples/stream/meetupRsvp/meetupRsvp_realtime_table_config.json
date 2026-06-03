@@ -28,7 +28,6 @@
   "fieldConfigList": [
     {
       "name": "mtime",
-      "encodingType": "DICTIONARY",
       "indexTypes": [
         "TIMESTAMP"
       ],
@@ -38,6 +37,11 @@
           "WEEK",
           "MONTH"
         ]
+      },
+      "indexes": {
+        "forward": {
+          "encodingType": "DICTIONARY"
+        }
       }
     }
   ],

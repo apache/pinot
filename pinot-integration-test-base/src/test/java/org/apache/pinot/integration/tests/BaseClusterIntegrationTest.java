@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -140,6 +141,78 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected org.apache.pinot.client.Connection _pinotConnectionV2;
   protected Connection _h2Connection;
   protected QueryGenerator _queryGenerator;
+
+  protected static FieldConfig fieldConfigWithForwardEncoding(String column, FieldConfig.EncodingType encodingType,
+      List<FieldConfig.IndexType> indexTypes, FieldConfig.CompressionCodec compressionCodec,
+      Map<String, String> properties) {
+    ObjectNode indexes = indexesWithForwardEncoding(encodingType);
+    if (compressionCodec != null) {
+      withForwardCompression(indexes, compressionCodec);
+    }
+    if (properties != null) {
+      withForwardProperties(indexes, properties);
+    }
+    return fieldConfigBuilderWithForwardEncoding(column, encodingType)
+        .withIndexTypes(indexTypes)
+        .withIndexes(indexes)
+        .build();
+  }
+
+  protected static FieldConfig.Builder fieldConfigBuilderWithForwardEncoding(String column,
+      FieldConfig.EncodingType encodingType) {
+    return new FieldConfig.Builder(column).withIndexes(indexesWithForwardEncoding(encodingType));
+  }
+
+  protected static ObjectNode indexesWithForwardEncoding(FieldConfig.EncodingType encodingType) {
+    return withForwardEncoding(JsonUtils.newObjectNode(), encodingType);
+  }
+
+  protected static ObjectNode withForwardEncoding(JsonNode indexes, FieldConfig.EncodingType encodingType) {
+    ObjectNode indexesNode =
+        indexes != null && indexes.isObject() ? (ObjectNode) indexes.deepCopy() : JsonUtils.newObjectNode();
+    ObjectNode forward;
+    if (indexesNode.has("forward") && indexesNode.get("forward").isObject()) {
+      forward = (ObjectNode) indexesNode.get("forward");
+    } else {
+      forward = JsonUtils.newObjectNode();
+      indexesNode.set("forward", forward);
+    }
+    forward.put("encodingType", encodingType.name());
+    return indexesNode;
+  }
+
+  protected static void withForwardCompression(ObjectNode indexes, FieldConfig.CompressionCodec compressionCodec) {
+    forwardNode(indexes).put("compressionCodec", compressionCodec.name());
+  }
+
+  protected static void withForwardProperties(ObjectNode indexes, Map<String, String> properties) {
+    ObjectNode forward = forwardNode(indexes);
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      switch (entry.getKey()) {
+        case FieldConfig.FORWARD_INDEX_DISABLED:
+          forward.put("disabled", Boolean.parseBoolean(entry.getValue()));
+          break;
+        case FieldConfig.DERIVE_NUM_DOCS_PER_CHUNK_RAW_INDEX_KEY:
+          forward.put("deriveNumDocsPerChunk", Boolean.parseBoolean(entry.getValue()));
+          break;
+        case FieldConfig.RAW_INDEX_WRITER_VERSION:
+          forward.put("rawIndexWriterVersion", Integer.parseInt(entry.getValue()));
+          break;
+        default:
+          forward.put(entry.getKey(), entry.getValue());
+          break;
+      }
+    }
+  }
+
+  protected static ObjectNode forwardNode(ObjectNode indexes) {
+    if (indexes.has("forward") && indexes.get("forward").isObject()) {
+      return (ObjectNode) indexes.get("forward");
+    }
+    ObjectNode forward = JsonUtils.newObjectNode();
+    indexes.set("forward", forward);
+    return forward;
+  }
 
   /**
    * The following getters can be overridden to change default settings.

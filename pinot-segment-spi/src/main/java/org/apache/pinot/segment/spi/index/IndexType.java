@@ -184,7 +184,7 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   ///     (inverted, fst/ifst, range).
   ///   - Return `false` when the index is computed from raw column values and is therefore identical regardless of
   ///     dictionary presence (bloom, json, text, vector, h3, null-value, forward index — encoding is reconciled
-  ///     with FieldConfig.encodingType independently of dictionary state).
+  ///     with ForwardIndexConfig independently of dictionary state).
   ///   - The dictionary index type itself returns `false` — the dictionary *is* what is changing; its own rebuild
   ///     is driven by the dictionary handler, not by this hook.
   ///   - This must be a pure function of `fieldSpec` and `indexConfig`. Implementations should NOT short-circuit

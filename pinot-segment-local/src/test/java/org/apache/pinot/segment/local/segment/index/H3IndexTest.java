@@ -56,7 +56,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.config.table.FieldConfig.EncodingType.RAW;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -453,9 +452,12 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("location_st_point"))
           .collect(Collectors.toList()).get(0);
-      Assert.assertEquals(fieldConfig.getEncodingType(), RAW);
+      assertFalse(fieldConfig.hasFieldLevelEncodingType());
       assertTrue(fieldConfig.getIndexTypes().isEmpty());
       assertNull(fieldConfig.getProperties());
+      JsonNode forward = fieldConfig.getIndexes().get("forward");
+      assertNotNull(forward);
+      Assert.assertEquals(forward.get("encodingType").asText(), FieldConfig.EncodingType.RAW.name());
       JsonNode node = fieldConfig.getIndexes().get(H3IndexType.INDEX_DISPLAY_NAME);
       Assert.assertEquals(node.toString(), "{\"disabled\":false,\"resolution\":[5,6,13]}");
     }
