@@ -45,7 +45,9 @@ public final class StatsCollectorUtil {
   public static AbstractColumnStatisticsCollector createStatsCollector(String columnName, FieldSpec fieldSpec,
       FieldIndexConfigs indexConfig, StatsCollectorConfig statsCollectorConfig) {
     boolean dictionaryEnabled = indexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
-    if (!dictionaryEnabled && fieldSpec.getDataType().getStoredType() != FieldSpec.DataType.MAP) {
+    FieldSpec.DataType storedType = fieldSpec.getDataType().getStoredType();
+    if (!dictionaryEnabled && storedType != FieldSpec.DataType.MAP
+        && storedType != FieldSpec.DataType.OPEN_STRUCT) {
       if (ClusterConfigForTable.useOptimizedNoDictCollector(statsCollectorConfig.getTableConfig())) {
         return new NoDictColumnStatisticsCollector(columnName, statsCollectorConfig);
       }
@@ -66,6 +68,7 @@ public final class StatsCollectorUtil {
       case BYTES:
         return new BytesColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       case MAP:
+      case OPEN_STRUCT:
         return new MapColumnPreIndexStatsCollector(columnName, statsCollectorConfig);
       default:
         throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
