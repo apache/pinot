@@ -129,6 +129,8 @@ public class QueryContext {
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  // Group-by combine algorithm to use on the server; null means use the instance default
+  private String _groupByAlgorithm;
   private boolean _optimizeMaxInitialResultHolderCapacity;
   // Number of threads to use for final reduce
   private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
@@ -470,6 +472,15 @@ public class QueryContext {
 
   public void setGroupTrimThreshold(int groupTrimThreshold) {
     _groupTrimThreshold = groupTrimThreshold;
+  }
+
+  @Nullable
+  public String getGroupByAlgorithm() {
+    return _groupByAlgorithm;
+  }
+
+  public void setGroupByAlgorithm(String groupByAlgorithm) {
+    _groupByAlgorithm = groupByAlgorithm;
   }
 
   public boolean isOptimizeMaxInitialResultHolderCapacity() {

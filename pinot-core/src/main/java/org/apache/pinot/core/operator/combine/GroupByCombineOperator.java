@@ -53,20 +53,54 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
-  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
+  public static final String ALGORITHM = "CONCURRENT";
 
-  private final int _numAggregationFunctions;
-  private final int _numGroupByExpressions;
-  private final int _numColumns;
+  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
+  protected static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
+
+  protected final int _numAggregationFunctions;
+  protected final int _numGroupByExpressions;
+  protected final int _numColumns;
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
   // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
+  // Shared indexed table for the single-slot tournament exchange. Written exactly once (null → non-null) under
+  // synchronized(this) via DCL. Subsequent reads are unsynchronized volatile reads, which is safe because the field
+  // never reverts to null in this class. Subclasses that call stealSharedTable() / depositSharedTable() must do so
+  // under synchronized(this).
   private volatile IndexedTable _indexedTable;
+  // Written by multiple worker threads via updateCombineResultsStats(). Only transitions false→true,
+  // so concurrent volatile writes are safe without additional synchronization.
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
+
+  /**
+   * Atomically steals the shared indexed table (setting it to null) and returns it.
+   * Returns null if no shared table is available. Must be called under {@code synchronized(this)}.
+   */
+  protected IndexedTable stealSharedTable() {
+    IndexedTable table = _indexedTable;
+    _indexedTable = null;
+    return table;
+  }
+
+  /**
+   * Deposits the given indexed table as the shared result.
+   * Must be called under {@code synchronized(this)}.
+   */
+  protected void depositSharedTable(IndexedTable table) {
+    _indexedTable = table;
+  }
+
+  /**
+   * Returns true if the shared indexed table is non-null.
+   * Must be called under {@code synchronized(this)}.
+   */
+  protected boolean hasSharedTable() {
+    return _indexedTable != null;
+  }
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -113,65 +147,78 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
-              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks,
-                  _executorService);
+              _indexedTable = createIndexedTable(resultsBlock, _numTasks);
             }
           }
         }
-
-        if (resultsBlock.isGroupsTrimmed()) {
-          _groupsTrimmed = true;
-        }
-        // Set groups limit reached flag.
-        if (resultsBlock.isNumGroupsLimitReached()) {
-          _numGroupsLimitReached = true;
-        }
-        if (resultsBlock.isNumGroupsWarningLimitReached()) {
-          _numGroupsWarningLimitReached = true;
-        }
-
-        // Merge aggregation group-by result.
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-        // Count the number of merged keys
-        int mergedKeys = 0;
-        // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-        if (intermediateRecords == null) {
-          // Merge aggregation group-by result.
-          AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-          if (aggregationGroupByResult != null) {
-            // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            try {
-              Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-              while (dicGroupKeyIterator.hasNext()) {
-                QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
-                GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-                Object[] keys = groupKey._keys;
-                Object[] values = Arrays.copyOf(keys, _numColumns);
-                int groupId = groupKey._groupId;
-                for (int i = 0; i < _numAggregationFunctions; i++) {
-                  values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
-                }
-                _indexedTable.upsert(new Key(keys), new Record(values));
-              }
-            } finally {
-              // Release the resources used by the group key generator
-              aggregationGroupByResult.closeGroupKeyGenerator();
-            }
-          }
-        } else {
-          for (IntermediateRecord intermediateResult : intermediateRecords) {
-            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, EXPLAIN_NAME);
-            //TODO: change upsert api so that it accepts intermediateRecord directly
-            _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
-          }
-        }
+        mergeGroupByResultsBlock(_indexedTable, resultsBlock, EXPLAIN_NAME);
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
+      }
+    }
+  }
+
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService);
+  }
+
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads, int numGroupsHint) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService,
+        numGroupsHint);
+  }
+
+  protected IndexedTable createIndexedTable(GroupByResultsBlock resultsBlock, int numThreads, int numGroupsHint,
+      int groupTrimThresholdOverride) {
+    return GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, numThreads, _executorService,
+        numGroupsHint, groupTrimThresholdOverride);
+  }
+
+  protected void updateCombineResultsStats(GroupByResultsBlock resultsBlock) {
+    if (resultsBlock.isGroupsTrimmed()) {
+      _groupsTrimmed = true;
+    }
+    if (resultsBlock.isNumGroupsLimitReached()) {
+      _numGroupsLimitReached = true;
+    }
+    if (resultsBlock.isNumGroupsWarningLimitReached()) {
+      _numGroupsWarningLimitReached = true;
+    }
+  }
+
+  protected void mergeGroupByResultsBlock(IndexedTable indexedTable, GroupByResultsBlock resultsBlock,
+      String explainName) {
+    updateCombineResultsStats(resultsBlock);
+
+    Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+    int mergedKeys = 0;
+    if (intermediateRecords == null) {
+      AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+      if (aggregationGroupByResult != null) {
+        try {
+          Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+          while (dicGroupKeyIterator.hasNext()) {
+            QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, explainName);
+            GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+            Object[] keys = groupKey._keys;
+            Object[] values = Arrays.copyOf(keys, _numColumns);
+            int groupId = groupKey._groupId;
+            for (int i = 0; i < _numAggregationFunctions; i++) {
+              values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+            }
+            indexedTable.upsert(new Key(keys), new Record(values));
+          }
+        } finally {
+          aggregationGroupByResult.closeGroupKeyGenerator();
+        }
+      }
+    } else {
+      for (IntermediateRecord intermediateResult : intermediateRecords) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(mergedKeys++, explainName);
+        indexedTable.upsert(intermediateResult._key, intermediateResult._record);
       }
     }
   }
@@ -187,15 +234,24 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   /**
+   * Waits for all worker tasks to finish, up to the given timeout. Returns {@code true} if all tasks completed before
+   * the timeout expired, {@code false} otherwise.
+   */
+  protected boolean awaitOperatorLatch(long timeoutMs)
+      throws InterruptedException {
+    return _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+  }
+
+  /**
    * {@inheritDoc}
    *
-   * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
+   * <p>Combines intermediate group-by results produced by underlying operators and returns a merged results block.
    * <ul>
    *   <li>
-   *     Merges multiple intermediate selection result blocks as a merged one.
+   *     Merges multiple intermediate group-by result blocks into a single merged result.
    *   </li>
    *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
+   *     Sets all exceptions encountered during execution into the merged result block.
    *   </li>
    * </ul>
    */
@@ -203,35 +259,52 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   public BaseResultsBlock mergeResults()
       throws Exception {
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
-    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    boolean opCompleted = awaitOperatorLatch(timeoutMs);
     if (!opCompleted) {
-      // If this happens, the broker side should already timed out, just log the error and return
-      String userError = "Timed out while combining group-by order-by results after " + timeoutMs + "ms";
-      String logMsg = userError + ", queryContext = " + _queryContext;
-      LOGGER.error(logMsg);
-      return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.EXECUTION_TIMEOUT, userError, logMsg));
+      return getTimeoutResultsBlock(timeoutMs);
     }
 
     Throwable ex = _processingException.get();
     if (ex != null) {
-      String userError = "Caught exception while processing group-by order-by query";
-      String devError = userError + ": " + ex.getMessage();
-      QueryErrorMessage errMsg;
-      if (ex instanceof QueryException) {
-        // If the exception is a QueryException, use the error code from the exception and trust the error message
-        errMsg = new QueryErrorMessage(((QueryException) ex).getErrorCode(), devError, devError);
-      } else {
-        // If the exception is not a QueryException, use the generic error code and don't expose the exception message
-        errMsg = new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, userError, devError);
-      }
-      return new ExceptionResultsBlock(errMsg);
+      return getExceptionResultsBlock(ex);
     }
 
-    if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+    if (_indexedTable == null) {
+      // No segments were processed (e.g. _numOperators == 0 or all blocks contained no groups).
+      // This should not happen in normal execution but is guarded defensively.
+      String msg = "No groups produced by combine operator (indexedTable is null)";
+      LOGGER.warn(msg);
+      return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, msg, msg));
+    }
+
+    return getMergedResultsBlock(_indexedTable);
+  }
+
+  protected ExceptionResultsBlock getTimeoutResultsBlock(long timeoutMs) {
+    long reportedTimeoutMs = Math.max(timeoutMs, 0L);
+    String userError = "Timed out while combining group-by results after " + reportedTimeoutMs + "ms";
+    String logMsg = userError + ", queryContext = " + _queryContext;
+    LOGGER.error(logMsg);
+    return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.EXECUTION_TIMEOUT, userError, logMsg));
+  }
+
+  protected ExceptionResultsBlock getExceptionResultsBlock(Throwable ex) {
+    String userError = "Caught exception while processing group-by query";
+    String devError = userError + ": " + ex.getMessage();
+    QueryErrorMessage errMsg;
+    if (ex instanceof QueryException) {
+      errMsg = new QueryErrorMessage(((QueryException) ex).getErrorCode(), devError, devError);
+    } else {
+      errMsg = new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, userError, devError);
+    }
+    return new ExceptionResultsBlock(errMsg);
+  }
+
+  protected GroupByResultsBlock getMergedResultsBlock(IndexedTable indexedTable) {
+    if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
       _groupsTrimmed = true;
     }
 
-    IndexedTable indexedTable = _indexedTable;
     if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
