@@ -1,0 +1,56 @@
+{
+	"schemaName": "offlineIngestionTestSchema",
+	"dimensionFieldSpecs": [{
+			"name": "intSV",
+			"dataType": "INT"
+		},
+		{
+			"name": "intMV",
+			"dataType": "INT",
+			"singleValueField": false
+		},
+		{
+			"name": "longSV",
+			"dataType": "LONG"
+		},
+		{
+			"name": "longMV",
+			"dataType": "LONG",
+			"singleValueField": false
+		},
+		{
+			"name": "floatSV",
+			"dataType": "FLOAT"
+		},
+		{
+			"name": "floatMV",
+			"dataType": "FLOAT",
+			"singleValueField": false
+		},
+		{
+			"name": "doubleSV",
+			"dataType": "DOUBLE"
+		},
+		{
+			"name": "doubleMV",
+			"dataType": "DOUBLE",
+			"singleValueField": false
+		},
+		{
+			"name": "stringSV",
+			"dataType": "STRING"
+		},
+		{
+			"name": "stringMV",
+			"dataType": "STRING",
+			"singleValueField": false
+		}
+	],
+	"timeFieldSpec": {
+		"incomingGranularitySpec": {
+			"name": "DaysSinceEpoch",
+			"dataType": "INT",
+			"timeType": "DAYS"
+		}
+	}
+}
