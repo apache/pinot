@@ -29,18 +29,24 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.OpenStructNaming;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -413,6 +419,43 @@ public class IndexLoadingConfig {
 
   private <K, V> Map<K, V> unmodifiable(Map<K, V> map) {
     return map == null ? null : Collections.unmodifiableMap(map);
+  }
+
+  public void addOpenStructChildConfigs(SegmentMetadataImpl segmentMetadata) {
+    if (_indexConfigsByColName == null || _dirty) {
+      refreshIndexConfigs();
+    }
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String childColumn = entry.getKey();
+      if (!childColumn.contains(OpenStructNaming.SEPARATOR) || _indexConfigsByColName.containsKey(childColumn)) {
+        continue;
+      }
+      if (OpenStructNaming.isSparseColumn(childColumn)) {
+        continue;
+      }
+      String parentColumn = OpenStructNaming.parseParentColumn(childColumn);
+      FieldIndexConfigs parentConfigs = _indexConfigsByColName.get(parentColumn);
+      if (parentConfigs == null) {
+        continue;
+      }
+      IndexConfig osConfig = parentConfigs.getConfig(StandardIndexes.openStruct());
+      if (!(osConfig instanceof OpenStructIndexConfig)) {
+        continue;
+      }
+      OpenStructIndexConfig openStructConfig = (OpenStructIndexConfig) osConfig;
+      String key = OpenStructNaming.parseKey(childColumn);
+      FieldConfig keyFieldConfig = openStructConfig.getValueFieldConfig(key);
+      if (keyFieldConfig == null) {
+        keyFieldConfig = openStructConfig.getDefaultValueFieldConfig();
+      }
+      FieldSpec childFieldSpec = entry.getValue().getFieldSpec();
+      boolean enableInverted = openStructConfig.shouldEnableInvertedIndexForKey(key);
+      FieldIndexConfigs childConfigs = new FieldIndexConfigs.Builder(
+          FieldIndexConfigsUtil.fromFieldConfig(keyFieldConfig, childFieldSpec))
+          .add(StandardIndexes.inverted(), enableInverted ? IndexConfig.ENABLED : IndexConfig.DISABLED)
+          .build();
+      _indexConfigsByColName.put(childColumn, childConfigs);
+    }
   }
 
   public void addKnownColumns(Set<String> columns) {
