@@ -20,12 +20,15 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.OpenStructDataSource;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.ColumnReader;
@@ -105,18 +108,29 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
       @Nullable RoaringBitmap validDocIds)
       throws IOException {
-    // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
     if (numDocs == 0) {
       return;
     }
+
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+
+    // OPEN_STRUCT parent columns have no forward index — their per-doc value is reconstructed as a
+    // map from the per-key child columns via OpenStructDataSource.getMapValue(). Feed that map to
+    // the OpenStructColumnSplitter so it can classify keys and write the child column indexes.
+    if (fieldSpec.getDataType() == FieldSpec.DataType.OPEN_STRUCT) {
+      DataSource dataSource = segment.getDataSourceNullable(columnName);
+      if (dataSource instanceof OpenStructDataSource) {
+        indexOpenStructColumn(columnName, (OpenStructDataSource) dataSource, numDocs, sortedDocIds, validDocIds);
+      }
+      return;
+    }
+
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
-      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       ColumnIndexCreators colIndexes = _colIndexes.get(columnName);
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          // If validDodIds are provided, only index column if it's a valid doc
           if (validDocIds == null || validDocIds.contains(docId)) {
             indexColumnValue(colReader, columnName, fieldSpec, colIndexes, docId, onDiskDocId);
             onDiskDocId++;
@@ -125,13 +139,40 @@ public class SegmentColumnarIndexCreator extends BaseSegmentCreator {
       } else {
         int onDiskDocId = 0;
         for (int docId = 0; docId < numDocs; docId++) {
-          // If validDodIds are provided, only index column if it's a valid doc
           if (validDocIds == null || validDocIds.contains(docId)) {
             indexColumnValue(colReader, columnName, fieldSpec, colIndexes, docId, onDiskDocId);
             onDiskDocId++;
           }
         }
       }
+    }
+  }
+
+  private void indexOpenStructColumn(String columnName, OpenStructDataSource dataSource, int numDocs,
+      @Nullable int[] sortedDocIds, @Nullable RoaringBitmap validDocIds)
+      throws IOException {
+    List<IndexCreator> creators = _colIndexes.get(columnName).getIndexCreators();
+    if (sortedDocIds != null) {
+      for (int docId : sortedDocIds) {
+        if (validDocIds == null || validDocIds.contains(docId)) {
+          indexOpenStructDoc(dataSource, docId, creators);
+        }
+      }
+    } else {
+      for (int docId = 0; docId < numDocs; docId++) {
+        if (validDocIds == null || validDocIds.contains(docId)) {
+          indexOpenStructDoc(dataSource, docId, creators);
+        }
+      }
+    }
+  }
+
+  private static void indexOpenStructDoc(OpenStructDataSource dataSource, int docId, List<IndexCreator> creators)
+      throws IOException {
+    Map<String, Object> value = dataSource.getMapValue(docId);
+    Object toIndex = value != null ? value : Collections.emptyMap();
+    for (IndexCreator creator : creators) {
+      creator.add(toIndex, -1);
     }
   }
 

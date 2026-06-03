@@ -108,6 +108,12 @@ public class MutableOpenStructDataSource extends BaseDataSource implements OpenS
     return ds instanceof ImmutableDataSource imm ? imm.getIndexContainer() : null;
   }
 
+  @Override
+  @Nullable
+  public Map<String, Object> getMapValue(int docId) {
+    return _index.getMapValue(docId);
+  }
+
   private static class MutableOpenStructDataSourceMetadata implements DataSourceMetadata {
     private final FieldSpec _fieldSpec;
     private final int _numDocs;
