@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -42,6 +43,7 @@ import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.query.QueryScanCostContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -78,7 +80,11 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
     int numGroupByExpressions = _groupByExpressions.length;
     int numAggregationFunctions = _aggregationFunctions.length;
-    int numColumns = numGroupByExpressions + numAggregationFunctions;
+    /// Grouping-set queries append a synthetic $groupingId key column after the union group-by columns (the
+    /// per-set bitmask discriminator); the key columns thus precede the aggregation columns.
+    int numExtraKeyColumns = _queryContext.getNumExtraGroupByKeyColumns();
+    int numKeyColumns = numGroupByExpressions + numExtraKeyColumns;
+    int numColumns = numKeyColumns + numAggregationFunctions;
     String[] columnNames = new String[numColumns];
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
@@ -90,10 +96,16 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
           _projectOperator.getResultColumnContext(groupByExpression).getDataType());
     }
 
+    /// Synthetic grouping-id discriminator column for GROUP BY GROUPING SETS / ROLLUP / CUBE
+    if (numExtraKeyColumns > 0) {
+      columnNames[numGroupByExpressions] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[numGroupByExpressions] = DataSchema.ColumnDataType.INT;
+    }
+
     // Extract column names and data types for aggregation functions
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunction aggregationFunction = _aggregationFunctions[i];
-      int index = numGroupByExpressions + i;
+      int index = numKeyColumns + i;
       columnNames[index] = aggregationFunction.getResultColumnName();
       columnDataTypes[index] = aggregationFunction.getIntermediateResultColumnType();
     }
@@ -153,6 +165,16 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
 
     GroupByResultsBlock resultsBlock;
+    /// Grouping-set queries use a per-set bucketed segment trim (keyed on the $groupingId discriminator) so
+    /// that a global top-K cannot starve low-magnitude sets such as the grand total. The broker still applies
+    /// the final ORDER BY + LIMIT across all sets.
+    if (_queryContext.isGroupingSets()) {
+      /// The $groupingId discriminator is the key column immediately after the union group-by columns.
+      return GroupByUtils.buildGroupingSetsResultsBlock(_queryContext, _dataSchema,
+          groupByExecutor.getGroupKeyGenerator(), groupByExecutor.getGroupByResultHolders(),
+          groupByExecutor.getNumGroups(), _groupByExpressions.length, numGroupsLimitReached,
+          numGroupsWarningLimitReached);
+    }
     // sort and trim segment results if needed
     if (trimSize > 0 && groupByExecutor.getNumGroups() > trimSize) {
       TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);

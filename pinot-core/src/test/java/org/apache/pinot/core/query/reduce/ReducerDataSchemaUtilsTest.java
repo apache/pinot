@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -25,6 +26,8 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 
 public class ReducerDataSchemaUtilsTest {
@@ -105,5 +108,31 @@ public class ReducerDataSchemaUtilsTest {
     DataSchema canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(queryContext, dataSchema);
     assertEquals(canonicalDataSchema, new DataSchema(new String[]{"col1", "plus(col2,col3)"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.DOUBLE}));
+  }
+
+  /// A grouping-set query expects the synthetic $groupingId key column. During a rolling upgrade an older
+  /// server (without grouping-set support) silently ignores the wire field and returns a plain GROUP BY result
+  /// missing that column. The reducer must reject this with an actionable "upgrade all servers" message rather
+  /// than an opaque column-count BUG, and must still canonicalize the fully-upgraded (correct) shape.
+  @Test
+  public void testCanonicalizeDataSchemaForGroupByGroupingSetsMixedVersion() {
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT col3, COUNT(*) FROM testTable GROUP BY ROLLUP(col3)");
+    assertTrue(queryContext.isGroupingSets());
+
+    /// Old-server shape: [col3, count(*)] -- missing the $groupingId column the new broker expects.
+    DataSchema oldServerSchema =
+        new DataSchema(new String[]{"col3", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    IllegalStateException e = expectThrows(IllegalStateException.class,
+        () -> ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, oldServerSchema));
+    assertTrue(e.getMessage().contains("Upgrade all servers"), "unexpected message: " + e.getMessage());
+
+    /// Fully-upgraded shape: [col3, $groupingId, count(*)] canonicalizes without throwing.
+    DataSchema newServerSchema = new DataSchema(new String[]{"col3", GroupingSets.GROUPING_ID_COLUMN, "count(*)"},
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.LONG});
+    DataSchema canonicalDataSchema =
+        ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, newServerSchema);
+    assertEquals(canonicalDataSchema.size(), 3);
+    assertEquals(canonicalDataSchema.getColumnName(1), GroupingSets.GROUPING_ID_COLUMN);
   }
 }
