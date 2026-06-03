@@ -207,10 +207,16 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
     assert aggregationFunctions != null && groupByExpressions != null;
-    int numKeyColumns = groupByExpressions.size();
+    /// Key columns (group-by union columns + the synthetic $groupingId discriminator for grouping sets)
+    /// precede the aggregation columns.
+    int numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     Iterator<Record> iterator = _table.iterator();
     int numRowsAdded = 0;
-    if (_queryContext.isNullHandlingEnabled()) {
+    /// Grouping sets produce NULL group keys (rolled-up columns) regardless of the user's null-handling
+    /// option, so they must be serialized through the null-aware path (null bitmaps) to survive the DataTable
+    /// round-trip -- the non-null path's setNull() writes to the variable buffer that the reducer does not
+    /// read back for fixed-width key columns.
+    if (_queryContext.requiresNullAwareKeySerialization()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {

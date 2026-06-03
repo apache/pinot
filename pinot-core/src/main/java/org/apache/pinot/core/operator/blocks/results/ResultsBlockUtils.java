@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -86,7 +87,11 @@ public class ResultsBlockUtils {
         queryContext.getFilteredAggregationFunctions();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert filteredAggregationFunctions != null && groupByExpressions != null;
-    int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
+    /// Grouping-set queries append a synthetic $groupingId key column after the group-by columns; the empty
+    /// result schema must match the non-empty one (see GroupByOperator) so an empty match (e.g. fully-pruned
+    /// segments) does not produce a narrower DataTable that the reducer would reject as a schema mismatch.
+    int numExtraKeyColumns = queryContext.getNumExtraGroupByKeyColumns();
+    int numColumns = groupByExpressions.size() + numExtraKeyColumns + filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     int index = 0;
@@ -94,6 +99,11 @@ public class ResultsBlockUtils {
       columnNames[index] = groupByExpression.toString();
       // Use STRING column data type as default for group-by expressions
       columnDataTypes[index] = ColumnDataType.STRING;
+      index++;
+    }
+    if (numExtraKeyColumns > 0) {
+      columnNames[index] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[index] = ColumnDataType.INT;
       index++;
     }
     for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {
