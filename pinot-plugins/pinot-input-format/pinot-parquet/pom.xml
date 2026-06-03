@@ -47,10 +47,6 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
-      <!-- org.eclipse.jetty (CVE-2026-2332) is excluded centrally on the managed hadoop-common
-           dependency in the root pom. The hadoop-client-runtime uber-jar below bundles its own
-           relocated Jetty, which a Maven exclusion cannot reach; that is stripped by the
-           shade-plugin filter further down. -->
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -70,13 +66,11 @@
       <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
 
-    <!-- Used for Parquet Writer in tests. Kept at test scope so YARN/Jetty
-         transitives (hadoop-yarn-client -> websocket-client -> jetty-client ->
-         jetty-http) do not leak into runtime distributions. -->
+    <!-- Used for Parquet Writer in tests -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-mapreduce-client-core</artifactId>
-      <scope>test</scope>
+      <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -84,37 +78,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <configuration>
-          <!-- combine.children=append keeps the inherited root-pom filters (signed manifests,
-               module-info, etc.) and adds the hadoop-client-runtime filter below. -->
-          <filters combine.children="append">
-            <filter>
-              <artifact>org.apache.hadoop:hadoop-client-runtime</artifact>
-              <excludes>
-                <!-- hadoop-client-runtime is an uber-jar that bundles Hadoop's own relocated
-                     Jetty (org.apache.hadoop.shaded.org.eclipse.jetty). It exists only for
-                     Hadoop's embedded HttpServer2 web UIs, which Parquet reading never starts,
-                     so the classes are unreachable here. The leftover jetty-* Maven metadata
-                     still makes scanners flag CVE-2026-2332 (jetty-http request smuggling).
-                     Strip both the relocated classes and the metadata from the shaded jar. -->
-                <exclude>org/apache/hadoop/shaded/org/eclipse/jetty/**</exclude>
-                <exclude>META-INF/maven/org.eclipse.jetty/**</exclude>
-                <exclude>META-INF/maven/org.eclipse.jetty.websocket/**</exclude>
-                <!-- ServiceLoader entries whose implementation classes are removed above. -->
-                <exclude>META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty.**</exclude>
-              </excludes>
-            </filter>
-          </filters>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
 
   <profiles>
     <profile>
