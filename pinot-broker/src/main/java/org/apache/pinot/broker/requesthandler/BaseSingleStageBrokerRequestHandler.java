@@ -575,7 +575,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     /// response's `tablesQueried` field tags the user's base table — not the MV the broker
     /// routed through.  Equals `rawTableName` when no MV swap happens.
     String userRawTableName = rawTableName;
-    if (_materializedViewHandler != null) {
+    /// Per-query opt-out (default true). A user — or the MV minion executor for its own
+    /// materialization query — sets `enableMaterializedViewRewrite=false` to force the base-table
+    /// path and avoid rewriting a materialization query back onto an MV.
+    if (_materializedViewHandler != null
+        && QueryOptionsUtils.isMaterializedViewRewriteEnabled(serverPinotQuery.getQueryOptions())) {
       MaterializedViewCompileOutcome outcome = applyMaterializedViewRewriteAtCompile(
           requestId, serverPinotQuery, tableName, rawTableName, schema, _tableCache.isIgnoreCase());
       materializedViewContext = outcome._materializedViewContext;

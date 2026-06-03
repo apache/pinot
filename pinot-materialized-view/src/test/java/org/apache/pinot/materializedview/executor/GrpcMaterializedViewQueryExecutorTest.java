@@ -22,11 +22,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.GrpcConfig;
+import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -177,6 +179,28 @@ public class GrpcMaterializedViewQueryExecutorTest {
 
     _queryExecutor.close();
     assertEquals(_queryExecutor.getCachedClientCount(), 0);
+  }
+
+  @Test
+  public void testBuildMaterializationRequestForcesRewriteOffViaMetadata() {
+    String baseSql = "SELECT a, SUM(b) FROM t WHERE ts >= 1 AND ts < 2 GROUP BY a LIMIT 10";
+    Map<String, String> authHeaders = Map.of("Authorization", "Bearer token");
+
+    Broker.BrokerRequest request =
+        GrpcMaterializedViewQueryExecutor.buildMaterializationRequest(baseSql, authHeaders);
+
+    /// The materialization SQL is sent verbatim — no SET injection that an option already present in
+    /// the user-authored definedSQL could override.
+    assertEquals(request.getSql(), baseSql, "Materialization SQL must be sent verbatim");
+
+    /// The disable travels as request metadata; the broker force-applies it after parsing, so it
+    /// cannot be defeated by an `enableMaterializedViewRewrite` option present in the query text.
+    assertEquals(
+        request.getMetadataMap().get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE),
+        "false", "Materialization request must force enableMaterializedViewRewrite=false via metadata");
+
+    /// Auth headers are preserved alongside the forced flag.
+    assertEquals(request.getMetadataMap().get("Authorization"), "Bearer token", "Auth headers must be preserved");
   }
 
   private InstanceConfig buildBrokerConfig(String instanceName, String hostname, int grpcPort) {
