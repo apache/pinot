@@ -420,12 +420,10 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         for (IndexCreator creator : creators) {
           creator.close();
         }
-      }
-
-      // Seal the dictionary only after the index writes succeeded; capture its element size for metadata.
-      if (dictCreator != null) {
-        dictElementSize = dictCreator.getNumBytesPerEntry();
-        dictCreator.seal();
+        if (dictCreator != null) {
+          dictElementSize = dictCreator.getNumBytesPerEntry();
+          dictCreator.seal();
+        }
       }
     } finally {
       if (dictCreator != null) {
