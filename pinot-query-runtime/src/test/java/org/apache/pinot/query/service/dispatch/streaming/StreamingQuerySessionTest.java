@@ -217,8 +217,9 @@ public class StreamingQuerySessionTest {
 
   /**
    * When two workers report the same stage with incompatible tree shapes (different operator types), the second
-   * merge throws {@link StageStatsTreeNode.ShapeMismatchException}. The first worker's stats are preserved in the
-   * accumulator, the stage is marked merge-failed, and the query still completes.
+   * merge throws {@link StageStatsTreeNode.ShapeMismatchException}. Because {@code StageStatsTreeNode.merge}
+   * mutates the existing node before recursing into children, the partially-merged node is discarded from the
+   * accumulator (it may be corrupt), the stage is marked merge-failed, and the query still completes.
    *
    * <p>Note: the second worker still counts toward {@code respondedByStage} because its payload decoded
    * successfully — the failure occurred at merge time, not decode time.
@@ -244,8 +245,8 @@ public class StreamingQuerySessionTest {
         "both workers decoded successfully so both count as responded");
     Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
         "second worker's shape-mismatched opchain should be counted as merge-failed");
-    Assert.assertNotNull(coverage.getStageAccumulator().get(0),
-        "first worker's stats should remain in the accumulator after the failed merge");
+    Assert.assertNull(coverage.getStageAccumulator().get(0),
+        "the partially-merged stage entry should be discarded from the accumulator after the failed merge");
   }
 
   /**
