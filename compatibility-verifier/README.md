@@ -21,6 +21,17 @@
 
 # Compatibility Regression Testing Scripts for Apache Pinot
 
+## Test suite table configs and deprecated fields
+
+Some compatibility-verifier table configs intentionally use deprecated field-level `FieldConfig` forms such as
+`fieldConfigList[].encodingType` and `fieldConfigList[].properties`. These configs are submitted to the older Pinot
+binary before the compatibility run upgrades to the newer binary, and older controllers do not understand the newer
+`fieldConfigList[].indexes.*` blocks.
+
+Those fixtures are not examples for configs submitted to a new controller. New-controller create/update validation
+rejects field-level `encodingType`, `compressionCodec`, and `properties`; production table configs should use the
+corresponding `fieldConfigList[].indexes.*` blocks.
+
 ## Usage
 
 ### Step 1: checkout source code and build targets for older commit and newer commit
