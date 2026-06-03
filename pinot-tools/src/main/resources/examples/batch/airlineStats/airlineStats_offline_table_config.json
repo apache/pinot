@@ -11,7 +11,6 @@
   "fieldConfigList": [
     {
       "name": "ts",
-      "encodingType": "DICTIONARY",
       "indexTypes": [
         "TIMESTAMP"
       ],
@@ -21,14 +20,21 @@
           "WEEK",
           "MONTH"
         ]
+      },
+      "indexes": {
+        "forward": {
+          "encodingType": "DICTIONARY"
+        }
       }
     },
     {
       "name": "ArrTimeBlk",
-      "encodingType": "DICTIONARY",
       "indexes": {
         "inverted": {
           "enabled": "true"
+        },
+        "forward": {
+          "encodingType": "DICTIONARY"
         }
       },
       "tierOverwrites": {
