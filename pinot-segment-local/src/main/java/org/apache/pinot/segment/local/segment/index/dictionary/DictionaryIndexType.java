@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +38,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.BigDecimalDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.BytesDictionary;
 import org.apache.pinot.segment.local.segment.index.readers.DoubleDictionary;
@@ -137,13 +139,13 @@ public class DictionaryIndexType
       }
       Map<String, DictionaryIndexConfig> result = new HashMap<>();
       for (FieldConfig fieldConfig : fieldConfigList) {
-        // encoding=RAW disables the dictionary unless an explicit dictionary config is given OR an
+        // RAW forward encoding disables the dictionary unless an explicit dictionary config is given OR an
         // index that requires a dictionary is enabled in the FieldConfig. In the latter case let the
         // dictionary fall through to its default-enabled state so the runtime can build it; the
         // auto-creation paths in BaseSegmentCreator/ForwardIndexHandler will produce a shared-dict +
-        // RAW forward index.
+        // RAW forward index. The forward block is canonical; field-level encoding is only a legacy fallback.
         FieldSpec fieldSpec = schema == null ? null : schema.getFieldSpecFor(fieldConfig.getName());
-        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+        if (ForwardIndexType.getForwardEncodingType(fieldConfig) == FieldConfig.EncodingType.RAW
             && !hasExplicitDictionaryConfig(fieldConfig)
             && (fieldSpec == null || !hasIndexRequiringDictionary(fieldConfig, fieldSpec))) {
           result.put(fieldConfig.getName(), DictionaryIndexConfig.DISABLED);
@@ -178,7 +180,7 @@ public class DictionaryIndexType
   }
 
   /// True if any index enabled in the FieldConfig declares
-  /// {@link IndexType#requiresDictionary(FieldSpec, IndexConfig)} for the column. Iterates over every
+  /// [IndexType#requiresDictionary(FieldSpec, IndexConfig)] for the column. Iterates over every
   /// registered IndexType, asks each whether it's enabled in this raw FieldConfig (legacy `indexTypes`
   /// list or the `indexes` map without `disabled:true`), and consults `requiresDictionary` against the
   /// IndexType's default config. (Built-in dict-requiring indexes — FST/IFST/INVERTED — return true
@@ -511,6 +513,7 @@ public class DictionaryIndexType
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns() == null
@@ -520,14 +523,14 @@ public class DictionaryIndexType
         ? Lists.newArrayList()
         : tableConfig.getFieldConfigList();
 
-    List<FieldConfig> configsToUpdate = new ArrayList<>();
+    Set<FieldConfig> configsToUpdate = new LinkedHashSet<>();
     for (FieldConfig fieldConfig : fieldConfigList) {
-      // skip further computation of field configs which already has RAW encodingType
-      if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
+      // Skip further computation for field configs whose canonical forward encoding is already RAW.
+      if (ForwardIndexType.getForwardEncodingType(fieldConfig) == FieldConfig.EncodingType.RAW) {
         noDictionaryColumns.remove(fieldConfig.getName());
         continue;
       }
-      // ensure encodingType is RAW on noDictionaryColumns
+      // Ensure forward encoding is RAW on noDictionaryColumns.
       if (noDictionaryColumns.remove(fieldConfig.getName())) {
         configsToUpdate.add(fieldConfig);
       }
@@ -538,7 +541,7 @@ public class DictionaryIndexType
         DictionaryIndexConfig indexConfig = JsonUtils.jsonNodeToObject(
             fieldConfig.getIndexes().get(getPrettyName()),
             DictionaryIndexConfig.class);
-        // ensure encodingType is RAW where dictionary index config has disabled = true
+        // Ensure forward encoding is RAW where dictionary index config has disabled = true.
         if (indexConfig.isDisabled()) {
           configsToUpdate.add(fieldConfig);
         }
@@ -547,10 +550,12 @@ public class DictionaryIndexType
       }
     }
 
-    // update the encodingType to RAW on the selected field configs
+    // Update the canonical forward encoding to RAW on the selected field configs.
     for (FieldConfig fieldConfig : configsToUpdate) {
+      // The cleanup rewrites legacy dictionary signals into the canonical forward block and clears the old field.
       FieldConfig.Builder builder = new FieldConfig.Builder(fieldConfig);
-      builder.withEncodingType(FieldConfig.EncodingType.RAW);
+      builder.withEncodingType(null).withIndexes(ForwardIndexType.withForwardEncoding(fieldConfig.getIndexes(),
+          FieldConfig.EncodingType.RAW));
       fieldConfigList.remove(fieldConfig);
       fieldConfigList.add(builder.build());
     }
@@ -558,7 +563,7 @@ public class DictionaryIndexType
     // create the missing field config for the remaining noDictionaryColumns
     for (String column : noDictionaryColumns) {
       FieldConfig.Builder builder = new FieldConfig.Builder(column);
-      builder.withEncodingType(FieldConfig.EncodingType.RAW);
+      builder.withIndexes(ForwardIndexType.withForwardEncoding(null, FieldConfig.EncodingType.RAW));
       fieldConfigList.add(builder.build());
     }
 

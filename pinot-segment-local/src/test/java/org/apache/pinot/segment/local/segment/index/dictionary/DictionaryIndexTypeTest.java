@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -121,6 +122,32 @@ public class DictionaryIndexTypeTest {
           + "    \"encodingType\": null\n"
           + "}");
       assertEquals(DictionaryIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void forwardEncodingOverridesRawFieldLevelEncoding()
+        throws IOException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimInt\",\n"
+          + "    \"encodingType\": \"RAW\",\n"
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"encodingType\": \"DICTIONARY\" }"
+          + "    }\n"
+          + "}");
+      assertEquals(DictionaryIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void forwardEncodingOverridesDictionaryFieldLevelEncoding()
+        throws IOException {
+      addFieldIndexConfig("{\n"
+          + "    \"name\": \"dimInt\",\n"
+          + "    \"encodingType\": \"DICTIONARY\",\n"
+          + "    \"indexes\" : {"
+          + "      \"forward\": { \"encodingType\": \"RAW\" }"
+          + "    }\n"
+          + "}");
+      assertEquals(DictionaryIndexConfig.DISABLED);
     }
 
     @Test
@@ -310,7 +337,7 @@ public class DictionaryIndexTypeTest {
       );
       convertToUpdatedFormat();
       FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
-      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(fieldConfig, FieldConfig.EncodingType.RAW);
       postConversionAsserts();
     }
 
@@ -332,7 +359,7 @@ public class DictionaryIndexTypeTest {
       convertToUpdatedFormat();
 
       final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
-      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(fieldConfig, FieldConfig.EncodingType.RAW);
       assertNotNull(fieldConfig.getIndexes());
       assertTrue(fieldConfig.getIndexes().isObject());
       assertNotNull(fieldConfig.getIndexes().get("forward"));
@@ -368,8 +395,8 @@ public class DictionaryIndexTypeTest {
 
       final FieldConfig dimInt = getFieldConfigByColumn("dimInt");
       final FieldConfig dimStr = getFieldConfigByColumn("dimStr");
-      Assert.assertEquals(dimInt.getEncodingType(), FieldConfig.EncodingType.RAW);
-      Assert.assertEquals(dimStr.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(dimInt, FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(dimStr, FieldConfig.EncodingType.RAW);
       assertNotNull(dimInt.getIndexes().get("forward"));
       assertNotNull(dimStr.getIndexes().get("forward"));
 
@@ -398,11 +425,11 @@ public class DictionaryIndexTypeTest {
       convertToUpdatedFormat();
 
       final FieldConfig dimInt = getFieldConfigByColumn("dimInt");
-      Assert.assertEquals(dimInt.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(dimInt, FieldConfig.EncodingType.RAW);
       assertNotNull(dimInt.getIndexes().get("forward"));
 
       final FieldConfig dimStr = getFieldConfigByColumn("dimStr");
-      Assert.assertEquals(dimStr.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(dimStr, FieldConfig.EncodingType.RAW);
 
       for (final String col : new String[]{"dimInt", "dimStr"}) {
         final long count = _tableConfig.getFieldConfigList().stream()
@@ -426,7 +453,7 @@ public class DictionaryIndexTypeTest {
       convertToUpdatedFormat();
 
       final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
-      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(fieldConfig, FieldConfig.EncodingType.RAW);
 
       final long count = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimInt"))
@@ -448,7 +475,7 @@ public class DictionaryIndexTypeTest {
       convertToUpdatedFormat();
 
       final FieldConfig fieldConfig = getFieldConfigByColumn("dimInt");
-      Assert.assertEquals(fieldConfig.getEncodingType(), FieldConfig.EncodingType.RAW);
+      assertForwardEncoding(fieldConfig, FieldConfig.EncodingType.RAW);
 
       final long count = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimInt"))
@@ -463,6 +490,14 @@ public class DictionaryIndexTypeTest {
       return _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals(column))
           .collect(Collectors.toList()).get(0);
+    }
+
+    private void assertForwardEncoding(FieldConfig fieldConfig, FieldConfig.EncodingType expected) {
+      assertNotNull(fieldConfig.getIndexes());
+      assertTrue(fieldConfig.getIndexes().isObject());
+      assertNotNull(fieldConfig.getIndexes().get(ForwardIndexType.INDEX_DISPLAY_NAME));
+      Assert.assertEquals(FieldConfig.EncodingType.valueOf(
+          fieldConfig.getIndexes().get(ForwardIndexType.INDEX_DISPLAY_NAME).get("encodingType").asText()), expected);
     }
 
     private void postConversionAsserts() {

@@ -19,11 +19,11 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -412,17 +412,17 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   public TableConfig createOfflineTableConfig() {
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.RAW);
+    ObjectNode vector = indexes.putObject("vector");
+    vector.put("vectorIndexType", "HNSW");
+    vector.put("vectorDimension", VECTOR_DIM_SIZE);
+    vector.put("vectorDistanceFunction", "COSINE");
+    vector.put("version", 1);
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(getTableName())
         .setFieldConfigList(List.of(
             new FieldConfig.Builder(VECTOR_1)
-                .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-                .withEncodingType(FieldConfig.EncodingType.RAW)
-                .withProperties(Map.of(
-                    "vectorIndexType", "HNSW",
-                    "vectorDimension", String.valueOf(VECTOR_DIM_SIZE),
-                    "vectorDistanceFunction", "COSINE",
-                    "version", "1"))
+                .withIndexes(indexes)
                 .build()
         ))
         .build();

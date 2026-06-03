@@ -117,10 +117,11 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     ingestionConfig.setTransformConfigs(
         List.of(new TransformConfig("ts", "fromEpochDays(DaysSinceEpoch)")));
     realtimeTableConfig.setIngestionConfig(ingestionConfig);
-    FieldConfig tsFieldConfig =
-        new FieldConfig("ts", FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TIMESTAMP, null, null,
-            new TimestampConfig(Arrays.asList(TimestampIndexGranularity.HOUR, TimestampIndexGranularity.DAY,
-                TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH)), null);
+    FieldConfig tsFieldConfig = fieldConfigBuilderWithForwardEncoding("ts", FieldConfig.EncodingType.DICTIONARY)
+        .withIndexTypes(List.of(FieldConfig.IndexType.TIMESTAMP))
+        .withTimestampConfig(new TimestampConfig(Arrays.asList(TimestampIndexGranularity.HOUR,
+            TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH)))
+        .build();
     realtimeTableConfig.setFieldConfigList(List.of(tsFieldConfig));
 
     Map<String, String> taskConfigs = new HashMap<>();

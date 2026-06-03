@@ -190,9 +190,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
-        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT,
-            null));
+    fieldConfigs.add(fieldConfigWithForwardEncoding("DivAirports", FieldConfig.EncodingType.DICTIONARY, List.of(),
+        CompressionCodec.MV_ENTRY_DICT, null));
     return fieldConfigs;
   }
 
@@ -1536,8 +1535,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         .build();
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
-    FieldConfig fieldConfig =
-        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    FieldConfig fieldConfig = new FieldConfig.Builder(column)
+        .withIndexes(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW))
+        .build();
     fieldConfigs.add(fieldConfig);
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
@@ -1559,8 +1559,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         .build();
     indexes = JsonUtils.newObjectNode();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
-    fieldConfig =
-        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfig = new FieldConfig.Builder(column)
+        .withIndexes(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW))
+        .build();
     fieldConfigs.set(fieldConfigs.size() - 1, fieldConfig);
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
@@ -1575,8 +1576,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         .withCompressionCodec(CompressionCodec.SNAPPY)
         .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
-    fieldConfig =
-        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfig = new FieldConfig.Builder(column)
+        .withIndexes(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW))
+        .build();
     fieldConfigs.set(fieldConfigs.size() - 1, fieldConfig);
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
@@ -1600,8 +1602,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         .withCompressionCodec(CompressionCodec.LZ4)
         .build();
     indexes.set("forward", forwardIndexConfig.toJsonNode());
-    fieldConfig =
-        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfig = new FieldConfig.Builder(column)
+        .withIndexes(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW))
+        .build();
     fieldConfigs.add(fieldConfig);
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
@@ -1926,12 +1929,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     noDictionaryColumns.add("NewAddedRawDerivedMVIntDimension");
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     assertNotNull(fieldConfigList);
-    fieldConfigList.add(
-        new FieldConfig("NewAddedDerivedDivAirportSeqIDs", FieldConfig.EncodingType.DICTIONARY, List.of(),
-            CompressionCodec.MV_ENTRY_DICT, null));
-    fieldConfigList.add(
-        new FieldConfig("NewAddedDerivedDivAirportSeqIDsString", FieldConfig.EncodingType.DICTIONARY, List.of(),
-            CompressionCodec.MV_ENTRY_DICT, null));
+    fieldConfigList.add(fieldConfigWithForwardEncoding("NewAddedDerivedDivAirportSeqIDs",
+        FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT, null));
+    fieldConfigList.add(fieldConfigWithForwardEncoding("NewAddedDerivedDivAirportSeqIDsString",
+        FieldConfig.EncodingType.DICTIONARY, List.of(), CompressionCodec.MV_ENTRY_DICT, null));
     updateTableConfig(tableConfig);
 
     // Query the new added columns without reload
@@ -3571,7 +3572,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
     // case with different number of documents in the segment.
     response1 = response1.replaceAll("docs:[0-9]+", "docs:*")
-        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time:*");
+        .replaceAll("Time: \\d+(?:\\.\\d+)?(?:[Ee][+-]?\\d+)?", "Time:*");
 
     JsonNode response1Json = JsonUtils.stringToJsonNode(response1);
     assertEquals(response1Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
@@ -3607,7 +3608,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // language=sql
     String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString()
-        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time: *");
+        .replaceAll("Time: \\d+(?:\\.\\d+)?(?:[Ee][+-]?\\d+)?", "Time: *");
 
     JsonNode response2Json = JsonUtils.stringToJsonNode(response2);
     assertEquals(response2Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");

@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -102,8 +103,11 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private FieldConfig getH3FieldConfig() {
-    return new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.H3, null,
-        H3_INDEX_PROPERTIES);
+    ObjectNode indexes = indexesWithForwardEncoding(FieldConfig.EncodingType.DICTIONARY);
+    indexes.putObject("h3").putArray("resolution").add(Integer.parseInt(H3_INDEX_PROPERTIES.get("resolutions")));
+    return new FieldConfig.Builder(H3_INDEX_COLUMN)
+        .withIndexes(indexes)
+        .build();
   }
 
   @Override
