@@ -1188,6 +1188,21 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- Hadoop pulls org.eclipse.jetty (and org.eclipse.jetty.websocket) for its embedded
+               HttpServer2 web UIs, which downstream Pinot modules never start. These leak into
+               runtime distributions and carry CVE-2026-2332 (jetty-http request smuggling). Exclude
+               centrally here so every module depending on Hadoop is covered by default. Note: this
+               does NOT strip the relocated Jetty bundled inside the hadoop-client-runtime uber-jar
+               (org.apache.hadoop.shaded.org.eclipse.jetty); that requires a shade-plugin filter in
+               the consuming module. -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1208,6 +1223,15 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1219,6 +1243,17 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
+          </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332).
+               For hadoop-client the compile-scoped leak path is
+               hadoop-yarn-client -> websocket-client -> jetty-client -> jetty-http. -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1260,6 +1295,15 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1267,6 +1311,17 @@
         <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+        <exclusions>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>

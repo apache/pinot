@@ -39,15 +39,8 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
-      <exclusions>
-        <!-- hadoop-common pulls org.eclipse.jetty (jetty-server -> jetty-http, etc.) for its
-             embedded HttpServer2 web UI, which is unused when only reading ORC. These leak into
-             runtime distributions and carry CVE-2026-2332 (jetty-http request smuggling). -->
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
+      <!-- org.eclipse.jetty (CVE-2026-2332) is excluded centrally on the managed hadoop-common
+           dependency in the root pom. -->
     </dependency>
     <!-- Replace bcprov-jdk15on which is excluded from hadoop-common -->
     <dependency>
@@ -58,13 +51,6 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
-      <exclusions>
-        <!-- Same as hadoop-common: drop the embedded-Jetty web UI transitives. -->
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

@@ -47,15 +47,10 @@
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
-      <exclusions>
-        <!-- hadoop-common pulls org.eclipse.jetty (jetty-server -> jetty-http, etc.) for its
-             embedded HttpServer2 web UI, which is unused when only reading Parquet. These leak
-             into runtime distributions and carry CVE-2026-2332 (jetty-http request smuggling). -->
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
+      <!-- org.eclipse.jetty (CVE-2026-2332) is excluded centrally on the managed hadoop-common
+           dependency in the root pom. The hadoop-client-runtime uber-jar below bundles its own
+           relocated Jetty, which a Maven exclusion cannot reach; that is stripped by the
+           shade-plugin filter further down. -->
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
