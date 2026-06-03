@@ -318,7 +318,7 @@ public class PinotHelixResourceManager {
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _controllerMetrics = controllerMetrics;
-    _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
+    _segmentDeletionManager = createSegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore,
         _deletedSegmentsRetentionInDays);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
 
@@ -402,6 +402,12 @@ public class PinotHelixResourceManager {
    */
   public SegmentDeletionManager getSegmentDeletionManager() {
     return _segmentDeletionManager;
+  }
+
+  protected SegmentDeletionManager createSegmentDeletionManager(String dataDir, HelixAdmin helixAdmin,
+      String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore, int deletedSegmentsRetentionInDays) {
+    return new SegmentDeletionManager(dataDir, helixAdmin, helixClusterName, propertyStore,
+        deletedSegmentsRetentionInDays);
   }
 
   /**

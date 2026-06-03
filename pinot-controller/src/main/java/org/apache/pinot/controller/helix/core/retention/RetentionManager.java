@@ -312,6 +312,18 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     }
   }
 
+  @VisibleForTesting
+  protected Set<String> getSegmentNames(String tableNameWithType,
+      List<SegmentZKMetadata> segmentZKMetadataList) {
+    return segmentZKMetadataList.stream()
+        .map(SegmentZKMetadata::getSegmentName)
+        .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  protected List<String> getSegmentNames(String tableNameWithType) {
+    return _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, false);
+  }
+
   private List<String> getSegmentsToDeleteFromDeepstore(String tableNameWithType, RetentionStrategy retentionStrategy,
       List<SegmentZKMetadata> segmentZKMetadataList, int untrackedSegmentsDeletionBatchSize,
       RetentionStrategy untrackedSegmentsRetentionStrategy) {
@@ -344,18 +356,11 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       return segmentsToDelete;
     }
 
-    Set<String> segmentsPresentInZK;
+    Set<String> segmentsPresentInZK = getSegmentNames(tableNameWithType, segmentZKMetadataList);
     if (isHybridTable) {
-      segmentsPresentInZK = new HashSet<>();
       // This must be the OFFLINE table
-      segmentsPresentInZK.addAll(
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet()));
       // Add segments from the REALTIME table as well
-      segmentsPresentInZK.addAll(
-          _pinotHelixResourceManager.getSegmentsFor(TableNameBuilder.REALTIME.tableNameWithType(rawTableName), false));
-    } else {
-      segmentsPresentInZK =
-          segmentZKMetadataList.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toSet());
+      segmentsPresentInZK.addAll(getSegmentNames(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)));
     }
 
     try {

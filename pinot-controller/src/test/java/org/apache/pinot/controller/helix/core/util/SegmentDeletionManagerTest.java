@@ -602,7 +602,7 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
-    public void removeSegmentsFromStoreInBatch(String tableNameWithType, List<String> segments,
+    public void removeSegmentsFromStoreInBatch(String tableNameWithType, Collection<String> segments,
         @Nullable Long deletedSegmentsRetentionMs) {
       _segmentsRemovedFromStore.addAll(segments);
     }
