@@ -102,7 +102,7 @@ public class LineageDeleteInterleavingIntegrationTest {
     TEST_INSTANCE.addDummySchema(RETENTION_RAW_TABLE_NAME);
     // replacedSegmentsRetentionPeriod is set to 0s so the lineage-cleanup pass deletes replaced segments as soon
     // as the entry has a timestamp strictly older than "now". This keeps the test deterministic without having to
-    // sleep through the default 1-day retention window.
+    // sleep through the default retention window (4 hours for this APPEND table).
     TableConfig retentionTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RETENTION_RAW_TABLE_NAME).setNumReplicas(1)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setReplacedSegmentsRetentionPeriod("0s").build();

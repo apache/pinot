@@ -190,6 +190,67 @@ public class DefaultLineageManagerTest {
         "APPEND table source segments must be deleted once the configured retention window has elapsed");
   }
 
+  @Test
+  public void testAppendTableDefaultRetentionDeletesAfterFourHours() {
+    // APPEND table with no configured replacedSegmentsRetentionPeriod falls back to the 4-hour default:
+    // a lineage entry completed 5 hours ago is past the window and its source segments MUST be deleted.
+    TableConfig tableConfig = appendTableBuilder().build();
+
+    String entryId = UUID.randomUUID().toString();
+    long fiveHoursAgo = System.currentTimeMillis() - 5 * 60 * 60 * 1000L;
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(Arrays.asList("src1"), Arrays.asList("dst1"), LineageEntryState.COMPLETED, fiveHoursAgo));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, Arrays.asList("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertTrue(segmentsToDelete.contains("src1"),
+        "APPEND table source segments must be deleted once the default 4-hour retention has elapsed");
+  }
+
+  @Test
+  public void testAppendTableDefaultRetentionRetainsWithinFourHours() {
+    // APPEND table with no configured replacedSegmentsRetentionPeriod falls back to the 4-hour default:
+    // a lineage entry completed 1 hour ago is within the window and its source segments must be retained.
+    TableConfig tableConfig = appendTableBuilder().build();
+
+    String entryId = UUID.randomUUID().toString();
+    long oneHourAgo = System.currentTimeMillis() - 60 * 60 * 1000L;
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(Arrays.asList("src1"), Arrays.asList("dst1"), LineageEntryState.COMPLETED, oneHourAgo));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, Arrays.asList("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertFalse(segmentsToDelete.contains("src1"),
+        "APPEND table source segments must be retained within the default 4-hour retention window");
+  }
+
+  @Test
+  public void testRefreshTableDefaultRetentionRetainsBeyondFourHours() {
+    // A REFRESH table's default retention (24 hours) is longer than an APPEND table's (4 hours): a lineage
+    // entry completed 5 hours ago is retained on REFRESH while it would be deleted on APPEND (see
+    // testAppendTableDefaultRetentionDeletesAfterFourHours). This pins the per-ingestion-type default divergence.
+    TableConfig tableConfig = refreshTableBuilder().build();
+
+    String entryId = UUID.randomUUID().toString();
+    long fiveHoursAgo = System.currentTimeMillis() - 5 * 60 * 60 * 1000L;
+    SegmentLineage lineage = new SegmentLineage("testTable_OFFLINE");
+    lineage.addLineageEntry(entryId,
+        new LineageEntry(Arrays.asList("src1"), Arrays.asList("dst1"), LineageEntryState.COMPLETED, fiveHoursAgo));
+
+    List<String> segmentsToDelete = new ArrayList<>();
+    _lineageManager.updateLineageForRetention(tableConfig, lineage, Arrays.asList("src1", "dst1"), segmentsToDelete,
+        new HashSet<>());
+
+    assertFalse(segmentsToDelete.contains("src1"),
+        "REFRESH table source segments must be retained within the default 24-hour retention window");
+  }
+
   // ---------------------------------------------------------------------------
   // lineageEntryCleanupRetentionPeriod / IN_PROGRESS lineage
   // ---------------------------------------------------------------------------

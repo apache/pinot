@@ -82,8 +82,8 @@ public class SegmentLineageCleanupTest {
 
     // Update table config. replacedSegmentsRetentionPeriod is set to 0s so the lineage-cleanup pass deletes
     // replaced segments as soon as the lineage entry timestamp is strictly older than "now". Without this,
-    // the default 1-day retention would make the COMPLETED-lineage assertions in testSegmentLineageCleanup
-    // unable to observe deletion within the test's wait window.
+    // the default retention (4 hours for this APPEND table) would make the COMPLETED-lineage assertions in
+    // testSegmentLineageCleanup unable to observe deletion within the test's wait window.
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(1)
             .setReplacedSegmentsRetentionPeriod("0s").build();

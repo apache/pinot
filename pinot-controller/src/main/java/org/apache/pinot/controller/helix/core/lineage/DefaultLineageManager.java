@@ -31,6 +31,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +39,12 @@ import org.slf4j.LoggerFactory;
 
 public class DefaultLineageManager implements LineageManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLineageManager.class);
-  private static final long REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
+  // Default grace window before replaced (segmentsFrom) segments are dropped, used when the table does not
+  // configure replacedSegmentsRetentionPeriod. REFRESH tables keep a longer window because their replaced
+  // segments are the only copy of the previous snapshot and may be needed for a lineage rollback; other
+  // (e.g. APPEND) tables only need enough of a window for brokers to catch up on the latest lineage/IS/EV.
+  private static final long REFRESH_REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.HOURS.toMillis(24L); // 24 hrs
+  private static final long DEFAULT_REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.HOURS.toMillis(4L); // 4 hrs
   private static final long LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
 
   protected ControllerConf _controllerConf;
@@ -77,9 +83,15 @@ public class DefaultLineageManager implements LineageManager {
     long lineageCleanupRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getLineageEntryCleanupRetentionPeriod(),
         LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS, tableNameWithType, "lineageEntryCleanupRetentionPeriod");
+    // When replacedSegmentsRetentionPeriod is configured it is honored as-is for every table type. When it is
+    // absent we fall back to a longer default for REFRESH tables (their replaced segments back a potential
+    // lineage rollback) and a shorter default for other table types (only a broker-catchup window is needed).
+    String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
+    long defaultReplacedSegmentsRetentionMs = batchSegmentIngestionType.equalsIgnoreCase("REFRESH")
+        ? REFRESH_REPLACED_SEGMENTS_RETENTION_IN_MILLIS : DEFAULT_REPLACED_SEGMENTS_RETENTION_IN_MILLIS;
     long replacedSegmentsRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getReplacedSegmentsRetentionPeriod(),
-        REPLACED_SEGMENTS_RETENTION_IN_MILLIS, tableNameWithType, "replacedSegmentsRetentionPeriod");
+        defaultReplacedSegmentsRetentionMs, tableNameWithType, "replacedSegmentsRetentionPeriod");
     Set<String> segmentsForTable = new HashSet<>(allSegments);
     Iterator<LineageEntry> lineageEntryIterator = lineage.getLineageEntries().values().iterator();
     while (lineageEntryIterator.hasNext()) {
@@ -122,10 +134,11 @@ public class DefaultLineageManager implements LineageManager {
    * Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
    *
    * The replaced segments are safe to delete once the lineage entry has been in "COMPLETED" state for longer
-   * than {@code replacedSegmentsRetentionMs} (configurable via {@code replacedSegmentsRetentionPeriod} in
-   * table config, defaulting to 1 day). The retention period applies uniformly to all batch ingestion
-   * types — any replacement protocol (REFRESH-table snapshot replace, APPEND-table minion-driven replace,
+   * than {@code replacedSegmentsRetentionMs}. The retention applies uniformly to all batch ingestion types —
+   * any replacement protocol (REFRESH-table snapshot replace, APPEND-table minion-driven replace,
    * segment-group merge) gets the same configurable grace window before its replaced segments are dropped.
+   * The window is configurable via {@code replacedSegmentsRetentionPeriod} in table config; when it is unset
+   * the default is resolved per ingestion type by the caller (longer for REFRESH, shorter for others).
    *
    * @param lineageEntry lineage entry
    * @param replacedSegmentsRetentionMs configured retention in ms for replaced segments
