@@ -216,15 +216,18 @@ public abstract class OpenStructIngestionCommitTestBase extends CustomDataQueryC
     // index_map per key.
     try (SegmentDirectory dir = new SegmentLocalFSDirectory(segmentDir, ReadMode.mmap);
         SegmentDirectory.Reader reader = dir.createReader()) {
-      // views: dictionary + forward (inverted index propagation for per-key configs is a follow-up)
+      // views: dictionary + forward + inverted
       assertTrue(reader.hasIndexFor(views, StandardIndexes.dictionary()), "views must have dictionary");
       assertTrue(reader.hasIndexFor(views, StandardIndexes.forward()), "views must have forward");
-      // cpu: dictionary + forward
+      assertTrue(reader.hasIndexFor(views, StandardIndexes.inverted()), "views must have inverted");
+      // cpu: dictionary + forward, NO inverted
       assertTrue(reader.hasIndexFor(cpu, StandardIndexes.dictionary()), "cpu must have dictionary");
       assertTrue(reader.hasIndexFor(cpu, StandardIndexes.forward()), "cpu must have forward");
+      assertFalse(reader.hasIndexFor(cpu, StandardIndexes.inverted()), "cpu must NOT have inverted");
       // host: raw forward only
       assertFalse(reader.hasIndexFor(host, StandardIndexes.dictionary()), "host (raw) must NOT have dictionary");
       assertTrue(reader.hasIndexFor(host, StandardIndexes.forward()), "host must have forward");
+      assertFalse(reader.hasIndexFor(host, StandardIndexes.inverted()), "host must NOT have inverted");
       // sparse: raw forward, no dict, no inverted
       assertTrue(reader.hasIndexFor(sparse, StandardIndexes.forward()), "sparse column must have forward");
       assertFalse(reader.hasIndexFor(sparse, StandardIndexes.dictionary()), "sparse column must NOT have dictionary");
