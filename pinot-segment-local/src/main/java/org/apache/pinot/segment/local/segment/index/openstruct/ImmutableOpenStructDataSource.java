@@ -32,6 +32,7 @@ import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
+
 /**
  * Per-key {@link DataSource} accessor for sealed (immutable) segments with an OPEN_STRUCT column.
  *
