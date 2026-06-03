@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
@@ -33,8 +34,10 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -68,7 +71,8 @@ import org.slf4j.LoggerFactory;
 
 public class RequestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestUtils.class);
-  private static final JsonNode EMPTY_OBJECT_NODE = new ObjectMapper().createObjectNode();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final JsonNode EMPTY_OBJECT_NODE = OBJECT_MAPPER.createObjectNode();
   // This class will only be loaded when a query request comes in, which should only be after the server startup has
   // completed and the global instance config context is initialized.
   private static boolean _useLegacyLiteralUnescaping = CommonConstants.Helix.DEFAULT_SSE_LEGACY_LITERAL_UNESCAPING;
@@ -101,7 +105,7 @@ public class RequestUtils {
   public static void setOptions(SqlNodeAndOptions sqlNodeAndOptions, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
     if (jsonRequest.has(Request.QUERY_OPTIONS)) {
-      queryOptions.putAll(getOptionsFromString(jsonRequest.get(Request.QUERY_OPTIONS).asText()));
+      queryOptions.putAll(getOptions(jsonRequest.get(Request.QUERY_OPTIONS)));
     }
     if (jsonRequest.has(Request.TRACE) && jsonRequest.get(Request.TRACE).asBoolean()) {
       queryOptions.put(Request.TRACE, "true");
@@ -111,6 +115,30 @@ public class RequestUtils {
     }
     // Setting all query options back into SqlNodeAndOptions. The above ordering matters due to priority overwrite rule
     sqlNodeAndOptions.setExtraOptions(queryOptions);
+  }
+
+  private static Map<String, String> getOptions(JsonNode queryOptionsNode) {
+    if (!queryOptionsNode.isObject()) {
+      return getOptionsFromString(queryOptionsNode.asText());
+    }
+    Map<String, String> queryOptions = new HashMap<>();
+    Iterator<Entry<String, JsonNode>> fields = queryOptionsNode.fields();
+    while (fields.hasNext()) {
+      Entry<String, JsonNode> field = fields.next();
+      queryOptions.put(field.getKey(), queryOptionValue(field.getValue()));
+    }
+    return queryOptions;
+  }
+
+  private static String queryOptionValue(JsonNode value) {
+    if (value.isContainerNode()) {
+      try {
+        return OBJECT_MAPPER.writeValueAsString(value);
+      } catch (JsonProcessingException e) {
+        throw new IllegalArgumentException("Failed to serialize query option value: " + value, e);
+      }
+    }
+    return value.asText();
   }
 
   public static Expression getIdentifierExpression(String identifier) {

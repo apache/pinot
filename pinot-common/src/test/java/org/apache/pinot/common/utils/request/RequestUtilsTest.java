@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Set;
 import org.apache.calcite.sql.SqlDialect;
@@ -43,6 +45,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class RequestUtilsTest {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
   public void testNullLiteralParsing() {
@@ -66,6 +69,23 @@ public class RequestUtilsTest {
     assertEquals(result.getSqlType(), PinotSqlType.DQL);
     assertEquals(result.getSqlNode().toSqlString((SqlDialect) null).toString(),
         "SELECT `foo`\n" + "FROM `countries`\n" + "WHERE `bar` > 1");
+  }
+
+  @Test
+  public void testParseQueryAcceptsStructuredQueryOptions()
+      throws Exception {
+    JsonNode request = OBJECT_MAPPER.readTree("{\"queryOptions\":{"
+        + "\"queryOption1\":\"foo\","
+        + "\"timeoutMs\":123,"
+        + "\"snapshotVersionByTable\":{\"orders_OFFLINE\":101,\"customers_OFFLINE\":202}"
+        + "}}");
+
+    SqlNodeAndOptions result = RequestUtils.parseQuery("select foo from countries where bar > 1", request);
+
+    assertEquals(result.getOptions().get("queryOption1"), "foo");
+    assertEquals(result.getOptions().get("timeoutMs"), "123");
+    assertEquals(result.getOptions().get("snapshotVersionByTable"),
+        "{\"orders_OFFLINE\":101,\"customers_OFFLINE\":202}");
   }
 
   @DataProvider(name = "queryProvider")
