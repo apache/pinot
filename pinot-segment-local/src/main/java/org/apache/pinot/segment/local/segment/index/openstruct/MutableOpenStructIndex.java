@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.openstruct;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -60,20 +59,16 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   private final String _openStructColumn;
   private final OpenStructIndexConfig _config;
   private final Map<String, FieldSpec> _childFieldSpecs;
-  private final int _maxDenseKeys;
   private final PinotDataBufferMemoryManager _memoryManager;
   private final int _capacity;
 
   // Volatile for lock-free reader access; writer always holds the consuming-thread lock.
   private volatile Map<String, MutableKeyColumn> _keyColumns = new HashMap<>();
-  private int _distinctKeyCount = 0;
-  private final Set<String> _droppedKeys = new HashSet<>();
 
   public MutableOpenStructIndex(String openStructColumn, ComplexFieldSpec fieldSpec,
       OpenStructIndexConfig config, PinotDataBufferMemoryManager memoryManager, int capacity) {
     _openStructColumn = openStructColumn;
     _config = config;
-    _maxDenseKeys = config.getMaxDenseKeys();
     _memoryManager = memoryManager;
     _capacity = capacity;
 
@@ -110,15 +105,11 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
 
       MutableKeyColumn keyCol = _keyColumns.get(key);
       if (keyCol == null) {
-        if (_maxDenseKeys >= 0 && _distinctKeyCount >= _maxDenseKeys) {
-          if (_droppedKeys.add(key)) {
-            LOGGER.warn("OPEN_STRUCT '{}' reached maxDenseKeys ({}).. Dropping '{}'.",
-                _openStructColumn, _maxDenseKeys, key);
-          }
-          continue;
-        }
-        // Resolve stored type and coerce BEFORE allocating a column. A first-row coercion failure
-        // would otherwise permanently consume a maxDenseKeys slot for a column that was never used.
+        // Mutable mode holds every observed key (see MutableOpenStructDataSource#isFullyMaterialized);
+        // dense/sparse classification (maxDenseKeys / denseKeys) is applied at seal time by the segment
+        // build, so no key is dropped during consumption.
+        // Resolve stored type and coerce BEFORE allocating a column so a first-row coercion failure
+        // does not allocate a column that was never usable.
         DataType resolvedType = resolveStoredType(key, rawValue);
         if (resolvedType == null) {
           continue;
@@ -178,9 +169,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   }
 
   /// Allocates a new MutableKeyColumn for {@code key} with the resolved {@code storedType} and
-  /// publishes it via volatile copy-on-write. Increments the dense-key count.
+  /// publishes it via volatile copy-on-write.
   private MutableKeyColumn allocateKeyColumn(String key, DataType storedType) {
-    _distinctKeyCount++;
     String allocationContext = _openStructColumn + "$" + key;
     MutableKeyColumn newCol =
         new MutableKeyColumn(key, storedType, _memoryManager, _capacity, allocationContext);
@@ -204,6 +194,26 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
   @Nullable
   public MutableKeyColumn getKeyColumn(String key) {
     return _keyColumns.get(key);
+  }
+
+  /// Reconstructs the OPEN_STRUCT value for {@code docId} as a {@code Map<String, Object>} from the
+  /// per-key columns, including only keys present at that doc (presence-aware). Returns {@code null}
+  /// when no key is present. Used by the realtime seal path to re-feed the OPEN_STRUCT column into
+  /// the immutable segment build, where dense/sparse classification is (re)applied.
+  @Nullable
+  public Map<String, Object> getMapValue(int docId) {
+    Map<String, MutableKeyColumn> keyColumns = _keyColumns;
+    Map<String, Object> result = null;
+    for (Map.Entry<String, MutableKeyColumn> entry : keyColumns.entrySet()) {
+      Object value = entry.getValue().getValue(docId);
+      if (value != null) {
+        if (result == null) {
+          result = new HashMap<>();
+        }
+        result.put(entry.getKey(), value);
+      }
+    }
+    return result;
   }
 
   @Override
