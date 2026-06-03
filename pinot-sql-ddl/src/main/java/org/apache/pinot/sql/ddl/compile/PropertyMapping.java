@@ -301,8 +301,19 @@ public final class PropertyMapping {
         builder.setIsDimTable(parseBool(lowerKey, value));
         return true;
       case "ismaterializedview":
-        builder.setIsMaterializedView(parseBool(lowerKey, value));
-        return true;
+        // The materialized-view flag is identity, not configuration: per PR #18564 the canonical
+        // way to mark a table as an MV is the dedicated `CREATE MATERIALIZED VIEW` statement,
+        // and the compiler stamps `TableConfig#isMaterializedView` on that path automatically.
+        // Allowing it as a CREATE TABLE PROPERTY would either (a) construct a config whose flag
+        // is true but task block is empty — rejected at addTable time by the SPI invariant
+        // `TableConfigUtils.validateMaterializedViewInvariants` with a confusing message, or
+        // (b) flip the flag off underneath a CREATE MV path. Reject it up front in both
+        // directions so the operator gets a clear pointer to the right DDL form.
+        throw new DdlCompilationException(
+            "Property 'isMaterializedView' is reserved: materialized views must be created via "
+                + "'CREATE MATERIALIZED VIEW ...' rather than 'CREATE TABLE ... PROPERTIES "
+                + "(\"isMaterializedView\" = ...)'. The flag is stamped on the TableConfig "
+                + "automatically by the MV compiler path.");
       case "invertedindexcolumns":
         builder.setInvertedIndexColumns(splitCsv(value));
         return true;

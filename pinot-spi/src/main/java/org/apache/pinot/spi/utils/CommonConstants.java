@@ -663,6 +663,8 @@ public class CommonConstants {
     // keep the variable to pass the compability test
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
+    // Admin API port for broker, to be used admin operations.
+    public static final String CONFIG_OF_BROKER_ADMIN_API_PORT = "pinot.broker.adminapi.port";
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
@@ -716,6 +718,11 @@ public class CommonConstants {
          * 30 for dictCard <= 1K, 10 for dictCard <= 10K, 6 for dictCard > 10K.
          */
         public static final String INVERTED_INDEX_DISTINCT_COST_RATIO = "invertedIndexDistinctCostRatio";
+        /// When true, `JsonIndexDistinctOperator` skips missing-path handling — it does not add a 4-arg default
+        /// value, does not add null (even when `nullHandling` is enabled), and does not throw `Illegal Json Path`.
+        /// The result is purely the distinct values produced by the JSON-index lookup (filtered by the optional
+        /// 5-arg `jsonFilterExpression` and intersected with the `WHERE`-clause filter).
+        public static final String JSON_INDEX_DISTINCT_SKIP_MISSING_PATH = "jsonIndexDistinctSkipMissingPath";
         public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String TABLE_SAMPLER = "sampler";
@@ -1043,6 +1050,7 @@ public class CommonConstants {
       public static final String AGGREGATE_REMOVE = "AggregateRemove";
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
       public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
+      public static final String AGGREGATE_UNION_TRANSPOSE = "AggregateUnionTranspose";
       public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
       public static final String AGGREGATE_FUNCTION_REWRITE = "AggregateFunctionRewrite";
       public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
@@ -1064,6 +1072,14 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
       public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
+      public static final String AGGREGATE_PROJECT_PULL_UP_CONSTANTS = "AggregateProjectPullUpConstants";
+      public static final String LIMIT_MERGE = "LimitMerge";
+      public static final String SORT_REMOVE_CONSTANT_KEYS = "SortRemoveConstantKeys";
+      // Default-off — firing in BASIC_RULES disrupts ProjectToSemiJoinRule pattern matching on
+      // partition-hinted IN (SELECT) queries. See PinotQueryRuleSets for full rationale.
+      public static final String SORT_PROJECT_TRANSPOSE = "SortProjectTranspose";
+      public static final String UNION_MERGE = "UnionMerge";
+      public static final String PROJECT_AGGREGATE_MERGE = "ProjectAggregateMerge";
     }
 
     /**
@@ -1081,7 +1097,11 @@ public class CommonConstants {
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
         PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
-        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES
+        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES,
+        // Stock Calcite rule kept opt-in via usePlannerRules — see SORT_PROJECT_TRANSPOSE javadoc
+        // above for the rationale (firing in BASIC_RULES disrupts ProjectToSemiJoinRule on
+        // partition-hinted IN(SELECT) queries, breaking colocated broadcast semi-joins).
+        PlannerRuleNames.SORT_PROJECT_TRANSPOSE
     );
 
     public static final String CONFIG_OF_BROKER_MSE_PLANNER_DISABLED_RULES = "pinot.broker.mse.planner.disabled.rules";
@@ -2063,11 +2083,19 @@ public class CommonConstants {
     public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
+
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION =
+        "accounting.workload.enable.cost.emission";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_EMISSION = false;
+
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
+    public static final String CONFIG_OF_WORKLOAD_BUDGET_MANAGER_TYPE_NAME =
+        "accounting.workload.budget.manager.factory.name";
+    public static final String DEFAULT_WORKLOAD_BUDGET_MANAGER_TYPE_NAME = "default";
 
     // Scan-based query killing
     public enum ScanKillingMode {
@@ -2358,6 +2386,139 @@ public class CommonConstants {
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
+    /// Whether the sender side of every `GrpcSendingMailbox` respects gRPC client-side flow control by waiting
+    /// on [io.grpc.stub.ClientCallStreamObserver#isReady] before pushing each chunk.
+    ///
+    /// Default `false` — the gate is **opt-in**. When `false`, the sender pushes unconditionally and the
+    /// behaviour is identical to the pre-PR-#18519 unbounded path. Set to `true` to engage the
+    /// `isReady()`-gated wait that bounds the gRPC client allocator against the `OutOfDirectMemoryError`
+    /// failure mode described in #18519. Operators who hit that OOM (slow consumer / large fan-out / skewed
+    /// shuffle) should flip this on.
+    ///
+    /// Also used as an A/B knob for benchmarks (see `BenchmarkGrpcMailboxSend`).
+    public static final String KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED =
+        "pinot.query.runner.grpc.sender.backpressure.enabled";
+    public static final boolean DEFAULT_GRPC_SENDER_BACKPRESSURE_ENABLED = false;
+
+    /// Per-stream HTTP/2 flow control window, in bytes. The receiver advertises this value to the sender as
+    /// the number of bytes it will accept before requiring a `WINDOW_UPDATE` frame. Wider windows let the
+    /// sender push a whole `MseBlock` without [io.grpc.stub.ClientCallStreamObserver#isReady] flipping
+    /// mid-block. Applied via `NettyServerBuilder.flowControlWindow` in `GrpcMailboxServer`.
+    ///
+    /// This is per HTTP/2 stream, so total inbound buffering at the receiver scales as
+    /// `value × #concurrent streams to this server`. Concretely:
+    /// `Peak receiver direct memory ≈ flowControlWindow × #concurrent_incoming_streams.`
+    ///
+    /// This value is the **per-stalled-stream receiver-side direct-memory exposure**, not just a throughput
+    /// knob: when an inbound stream's receiver application queue stalls (e.g. the downstream operator is slow
+    /// to drain via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]), the wire can
+    /// still buffer up to `flowControlWindow` bytes of data on that stream before the HTTP/2 peer stops
+    /// sending.
+    ///
+    /// This is a direct-memory bound, not just a throughput knob: operators must size it against
+    /// `-XX:MaxDirectMemorySize` given the expected concurrent inbound stream count.
+    ///
+    /// Receiver-side counterpart to [#KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES] (the sender-side
+    /// outbound queue cap). The two are aligned at the same default by design — they cap roughly the
+    /// same conceptual thing (one peer's worth of in-flight bytes) from the two ends of the wire — but
+    /// kept as separate keys so operators can tune them independently for asymmetric workloads.
+    public static final String KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES =
+        "pinot.query.runner.grpc.flow.control.window.bytes";
+    public static final int DEFAULT_GRPC_FLOW_CONTROL_WINDOW_BYTES = 64 * 1024 * 1024;
+
+    /// Netty per-channel WriteQueue high watermark, in bytes. Applied via
+    /// `ChannelOption.WRITE_BUFFER_WATER_MARK` on the sender's `NettyChannelBuilder`. When the channel's
+    /// outbound queue exceeds this value, `Channel.isWritable()` flips to `false` and gRPC's
+    /// [io.grpc.stub.ClientCallStreamObserver#isReady] returns `false` until the queue drops below the low
+    /// watermark.
+    ///
+    /// This is a per-channel (per `host:port`) setting, shared across all streams to that peer. The
+    /// sender's direct-memory footprint is therefore bounded by `value × #peers`, not by
+    /// `value × #streams`. Concretely:
+    /// `Peak sender direct memory ≈ writeBufferHighWaterMark × #peers (one channel per peer, shared across
+    /// streams to that peer).`
+    ///
+    /// This is a direct-memory bound, not just a throughput knob: operators must size it against
+    /// `-XX:MaxDirectMemorySize` given the expected per-query peer fan-out and the number of concurrent
+    /// queries. Pairs with [#KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES].
+    ///
+    /// Sender-side counterpart to [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES] (the receiver-side inbound
+    /// window). The two are aligned at the same default by design, sized together to bound one peer's
+    /// worth of in-flight bytes from each end of the wire.
+    public static final String KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES =
+        "pinot.query.runner.grpc.write.buffer.high.water.mark.bytes";
+    public static final int DEFAULT_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES = 64 * 1024 * 1024;
+
+    /// Netty per-channel WriteQueue low watermark, in bytes. Once the WriteQueue has exceeded the high
+    /// watermark (see [#KEY_OF_GRPC_WRITE_BUFFER_HIGH_WATER_MARK_BYTES] and the
+    /// `writeBufferHighWaterMark × #peers` direct-memory formula documented there), it must drop below this
+    /// value before `Channel.isWritable()` flips back to `true`. Conventionally set to ~50% of the high
+    /// watermark.
+    ///
+    /// The gap `(high − low)` is the drain hysteresis the channel must clear before becoming writable
+    /// again: setting `low` too close to `high` makes the channel flap writable/unwritable on every
+    /// small drain; setting it too low forces the sender to wait longer between writable windows. The
+    /// low watermark itself does not change the peak direct-memory bound — that is set by the high
+    /// watermark — but it controls how aggressively the channel reopens once back-pressure has engaged.
+    public static final String KEY_OF_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES =
+        "pinot.query.runner.grpc.write.buffer.low.water.mark.bytes";
+    public static final int DEFAULT_GRPC_WRITE_BUFFER_LOW_WATER_MARK_BYTES = 32 * 1024 * 1024;
+
+    /// Number of inbound gRPC messages the receiver will accept in flight per stream, before requiring the
+    /// application to consume one (via [org.apache.pinot.query.mailbox.channel.MailboxContentObserver#onNext]
+    /// returning). Implemented by disabling gRPC's default auto-inbound-flow-control on the server side and
+    /// calling [io.grpc.stub.ServerCallStreamObserver#request] explicitly. Only takes effect when
+    /// [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is `true` (off by default).
+    ///
+    /// Default `1`, which mirrors gRPC's auto-inbound-flow-control behaviour (one message in flight). Even
+    /// when [#KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED] is flipped on, this conservative default
+    /// keeps the in-flight window at one message until the operator explicitly widens it.
+    ///
+    /// Larger values let the sender pipeline more messages without waiting for per-message round trips,
+    /// which is the primary throughput knob for small / medium MSE blocks. Memory exposure on the receiver
+    /// is still bounded by the HTTP/2 stream window (see [#KEY_OF_GRPC_FLOW_CONTROL_WINDOW_BYTES]), so this
+    /// credit count is effectively a per-stream message-count limit on top of the byte-count limit.
+    /// Whichever fires first applies.
+    ///
+    /// ## Cancel-propagation tradeoff
+    ///
+    /// Higher credit values widen the in-flight window, which improves throughput for small/medium blocks
+    /// but also **widens worst-case cancel-propagation latency** when the receiver's application queue
+    /// (capacity 5 by default) is stuck. The sender's
+    /// [org.apache.pinot.query.mailbox.GrpcSendingMailbox#cancel] pushes an error EOS **in-band** on the
+    /// same gRPC stream as data; when the receiver's dispatch thread is parked in `_notFull.await`, that
+    /// EOS sits behind every inbound message that already made it past flow control. Worst-case cancel
+    /// latency is bounded by `min(credit messages, flowControlWindow bytes)` worth of buffered inbound that
+    /// has to drain before the EOS reaches the application.
+    ///
+    /// Note that this hang surface is **pre-existing** — the in-band EOS path can stall even with gRPC's
+    /// auto-inbound default of 1 in-flight message if the receiver's application queue is permanently
+    /// stuck (e.g. the consumer is gone). The credit value just controls how much worse the latency gets
+    /// before the hang surfaces. See https://github.com/apache/pinot/issues/18541 for the proper
+    /// out-of-band cancel work.
+    public static final String KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT =
+        "pinot.query.runner.grpc.inbound.message.credit";
+    public static final int DEFAULT_GRPC_INBOUND_MESSAGE_CREDIT = 1;
+
+    /// Whether the receiver overrides gRPC's auto-inbound-flow-control on the mailbox stream and prefetches
+    /// [#KEY_OF_GRPC_INBOUND_MESSAGE_CREDIT] messages of credit up-front, then replenishes one credit
+    /// before each `onNext` does the (possibly blocking) hand-off to the application queue.
+    ///
+    /// Default `false` — the manual-flow-control path is **opt-in**. When `false` (default), the receiver
+    /// leaves gRPC's auto-inbound in place (only 1 message in flight at a time, post-`onNext`-return credit
+    /// replenishment), which is the pre-PR-#18519 behaviour. Set to `true` to engage the manual prefetch +
+    /// pre-`offerRaw` credit replenishment introduced in #18519, which is the primary throughput knob for
+    /// small/medium MSE blocks.
+    ///
+    /// Cancel-propagation latency is bounded more tightly when this is `false`, but the worst case (a stuck
+    /// receiver dispatch thread) is still possible because the sender's cancel travels in-band; see
+    /// https://github.com/apache/pinot/issues/18541.
+    ///
+    /// This is an independent opt-in from [#KEY_OF_GRPC_SENDER_BACKPRESSURE_ENABLED]; the two control
+    /// different sides of the mailbox path.
+    public static final String KEY_OF_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED =
+        "pinot.query.runner.grpc.manual.inbound.flow.control.enabled";
+    public static final boolean DEFAULT_GRPC_MANUAL_INBOUND_FLOW_CONTROL_ENABLED = false;
 
     /**
      * Configuration for channel idle timeout in seconds.
@@ -2411,13 +2572,12 @@ public class CommonConstants {
     /// Value indicating today's legacy mailbox-piggyback stats reporting path. Equivalent to leaving the key unset.
     public static final String STATS_REPORTING_MODE_LEGACY = "legacy";
 
-    /// Used to indicate whether MSE pipeline breaker stats should be included in the queryStats field.
-    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. Starting from 1.5.0,
-    /// they are not included by default but can be included by setting this flag to false (upper or lower case).
-    ///
-    /// It is expected that in 1.6.0 and later, MSE pipeline breaker stats will be included by default.
+    /// Used to indicate whether MSE pipeline breaker stats should be included in the stageStats field.
+    /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. In 1.5.0 they were
+    /// not included by default but could be included by setting this flag to false (upper or lower case). Starting
+    /// from 1.6.0, they are included by default and can be excluded by setting this flag to true (upper or lower case).
     public static final String KEY_OF_SKIP_PIPELINE_BREAKER_STATS = "pinot.query.mse.skip.pipeline.breaker.stats";
-    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = true;
+    public static final boolean DEFAULT_SKIP_PIPELINE_BREAKER_STATS = false;
 
     /// Used to indicate that MSE stats should be logged at INFO level for successful queries.
     ///

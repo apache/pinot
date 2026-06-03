@@ -27,7 +27,10 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.Op;
+import org.apache.zookeeper.OpResult;
 import org.apache.zookeeper.ZooDefs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -56,6 +59,8 @@ import org.apache.zookeeper.ZooDefs;
  * call. A single builder must not be shared across threads; use a fresh builder per thread.
  */
 public final class ZkMultiWriteBuilder {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZkMultiWriteBuilder.class);
 
   /** Pass as {@code expectedVersion} to skip the version check on a {@link #set}/{@link #delete}. */
   public static final int ANY_VERSION = -1;
@@ -152,9 +157,49 @@ public final class ZkMultiWriteBuilder {
     } catch (ZkException ze) {
       Throwable cause = ze.getCause();
       if (cause instanceof KeeperException) {
-        throw (KeeperException) cause;
+        KeeperException ke = (KeeperException) cause;
+        logFailedOps(ke);
+        throw ke;
       }
       throw ze;
+    }
+  }
+
+  private void logFailedOps(KeeperException e) {
+    List<OpResult> results = e.getResults();
+    if (results == null) {
+      LOGGER.warn("ZK multi-op error has no per-op results attached: {}", e.toString());
+      return;
+    }
+    int common = Math.min(results.size(), _ops.size());
+    for (int i = 0; i < common; i++) {
+      Op op = _ops.get(i);
+      OpResult r = results.get(i);
+      String label = opTypeLabel(op.getType()) + " " + op.getPath();
+      if (r instanceof OpResult.ErrorResult) {
+        int err = ((OpResult.ErrorResult) r).getErr();
+        LOGGER.warn("multi-op[{}] FAILED code={} ({}) — {}", i, err, KeeperException.Code.get(err), label);
+      } else {
+        LOGGER.info("multi-op[{}] {} — {}", i, r.getClass().getSimpleName(), label);
+      }
+    }
+    if (results.size() != _ops.size()) {
+      LOGGER.warn("multi-op result count {} != submitted ops {}", results.size(), _ops.size());
+    }
+  }
+
+  private static String opTypeLabel(int type) {
+    switch (type) {
+      case ZooDefs.OpCode.create:
+        return "create";
+      case ZooDefs.OpCode.setData:
+        return "set";
+      case ZooDefs.OpCode.delete:
+        return "delete";
+      case ZooDefs.OpCode.check:
+        return "check";
+      default:
+        return "op(" + type + ")";
     }
   }
 

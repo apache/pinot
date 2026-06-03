@@ -235,9 +235,14 @@ public class SegmentDeletionManager {
       for (int i = 0; i < deleteSuccessful.length; i++) {
         final String segmentId = segmentsToDelete.get(i);
         if (!deleteSuccessful[i]) {
-          // remove API can fail because the prop store entry did not exist, so check first.
-          if (_propertyStore.exists(propStorePathList.get(i), AccessOption.PERSISTENT)) {
-            LOGGER.info("Could not delete {} from propertystore", propStorePathList.get(i));
+          // The batch remove API takes a non-recursive ZK path: it cannot delete a znode that has
+          // accumulated children. Fall back to the single-path remove API, which falls back to a
+          // recursive delete on the same NotEmpty failure. Skip when the znode is already gone
+          // (the batch call may have failed simply because the entry did not exist).
+          String segmentPath = propStorePathList.get(i);
+          if (_propertyStore.exists(segmentPath, AccessOption.PERSISTENT)
+              && !_propertyStore.remove(segmentPath, AccessOption.PERSISTENT)) {
+            LOGGER.info("Could not delete {} from propertystore", segmentPath);
             segmentsToRetryLater.add(segmentId);
             propStoreFailedSegs.add(segmentId);
           }

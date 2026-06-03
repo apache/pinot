@@ -196,7 +196,7 @@ public class PinotHelixResourceManagerAssignmentTest extends ControllerTest {
       InstancePartitions consumingInstancePartitions = new InstancePartitions(consumingPartitionsName);
       consumingInstancePartitions.setInstances(0, 0, Collections.singletonList(pinnedServer));
       InstancePartitionsUtils.persistInstancePartitions(_helixResourceManager.getPropertyStore(),
-          consumingInstancePartitions);
+          consumingInstancePartitions, null);
 
       // Upload the segment -- triggers addNewSegment -> assignSegment -> fetchOrComputeInstancePartitions
       _helixResourceManager.addNewSegment(realtimeTableName,

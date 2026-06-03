@@ -192,6 +192,13 @@ public class QueryOptionsUtils {
         queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
   }
 
+  /// When true, [org.apache.pinot.core.operator.query.JsonIndexDistinctOperator] skips its missing-path handling —
+  /// does not add a 4-arg default, does not add null, and does not throw `Illegal Json Path`. The distinct set is
+  /// purely the values returned by the JSON-index lookup.
+  public static boolean isJsonIndexDistinctSkipMissingPath(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.JSON_INDEX_DISTINCT_SKIP_MISSING_PATH));
+  }
+
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }

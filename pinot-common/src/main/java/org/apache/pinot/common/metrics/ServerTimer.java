@@ -109,7 +109,9 @@ public enum ServerTimer implements AbstractMetrics.Timer {
       "Time taken to download a segment from peers (including untar and move operations)"),
 
   // Ingestion metrics
-  INGESTION_DELAY_TRACKING_MS("milliseconds", false, "Time taken to run a trackIngestionDelay cycle");
+  INGESTION_DELAY_TRACKING_MS("milliseconds", false, "Time taken to run a trackIngestionDelay cycle"),
+  // The total time spent in processing the workload queries
+  WORKLOAD_TOTAL_QUERY_TIME_MS("millis", false);
 
   private final String _timerName;
   private final boolean _global;

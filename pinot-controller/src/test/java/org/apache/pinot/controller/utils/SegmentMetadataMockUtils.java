@@ -84,6 +84,20 @@ public class SegmentMetadataMockUtils {
     return segmentZKMetadata;
   }
 
+  public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,
+      String crc, long startTime, long endTime, TimeUnit timeUnit, String partitionColumn, int partitionId,
+      int numPartitions) {
+    SegmentMetadata segmentMetadata =
+        mockSegmentMetadata(tableName, segmentName, numTotalDocs, crc, startTime, endTime, timeUnit);
+    ColumnMetadata colMeta = mock(ColumnMetadata.class);
+    when(colMeta.getPartitions()).thenReturn(Collections.singleton(partitionId));
+    when(colMeta.getPartitionFunction()).thenReturn(new MurmurPartitionFunction(numPartitions, null));
+    TreeMap<String, ColumnMetadata> columnMetadataMap = new TreeMap<>();
+    columnMetadataMap.put(partitionColumn, colMeta);
+    when(segmentMetadata.getColumnMetadataMap()).thenReturn(columnMetadataMap);
+    return segmentMetadata;
+  }
+
   public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String rawTableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);

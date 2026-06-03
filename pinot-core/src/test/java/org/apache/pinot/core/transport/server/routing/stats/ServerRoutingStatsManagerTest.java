@@ -28,6 +28,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeTest;
@@ -453,6 +454,111 @@ public class ServerRoutingStatsManagerTest {
     double fastScore = managerMultiServer.fetchHybridScoreForServer("fastServer");
     double slowScore = managerMultiServer.fetchHybridScoreForServer("slowServer");
     assertTrue(fastScore < slowScore, "Idle servers should be ranked by latency");
+  }
+
+  @Test
+  public void testMseAndSseStatsIsolation() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+
+    // Record 1 SSE request and 2 MSE requests to the same server.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+    }
+    waitForStatsUpdate(manager, requestId);
+
+    // SSE should see 1 in-flight, MSE should see 2 — stats are isolated.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchNumInFlightRequestsForServer("server1").intValue(), 1);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchNumInFlightRequestsForServer("server1").intValue(), 2);
+    }
+
+    // Complete the SSE request with 50ms latency.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      manager.recordStatsUponResponseArrival(requestId++, "server1", 50);
+    }
+    waitForStatsUpdate(manager, requestId);
+
+    // SSE in-flight drops to 0, MSE remains at 2.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchNumInFlightRequestsForServer("server1").intValue(), 0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchNumInFlightRequestsForServer("server1").intValue(), 2);
+    }
+
+    // SSE latency updated, MSE latency still at init value.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchEMALatencyForServer("server1"), 50.0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchEMALatencyForServer("server1"), 0.0);
+    }
+
+    // Complete one MSE request with 200ms latency.
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      manager.recordStatsUponResponseArrival(requestId++, "server1", 200);
+    }
+    waitForStatsUpdate(manager, requestId);
+
+    // MSE in-flight drops to 1, SSE still 0.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchNumInFlightRequestsForServer("server1").intValue(), 0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchNumInFlightRequestsForServer("server1").intValue(), 1);
+    }
+
+    // MSE latency updated, SSE latency unchanged.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchEMALatencyForServer("server1"), 50.0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchEMALatencyForServer("server1"), 200.0);
+    }
+
+    // Hybrid scores are independent.
+    Double sseScore;
+    Double mseScore;
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      sseScore = manager.fetchHybridScoreForServer("server1");
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      mseScore = manager.fetchHybridScoreForServer("server1");
+    }
+    assertNotNull(sseScore);
+    assertNotNull(mseScore);
+    assertNotEquals(sseScore, mseScore);
+
+    // fetchAllServers lists are also isolated.
+    List<Pair<String, Integer>> sseList;
+    List<Pair<String, Integer>> mseList;
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      sseList = manager.fetchNumInFlightRequestsForAllServers();
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      mseList = manager.fetchNumInFlightRequestsForAllServers();
+    }
+    assertEquals(sseList.size(), 1);
+    assertEquals(mseList.size(), 1);
+    assertEquals(sseList.get(0).getRight().intValue(), 0);
+    assertEquals(mseList.get(0).getRight().intValue(), 1);
   }
 
   private void assertStatsNullForInstance(ServerRoutingStatsManager manager, String instanceId) {

@@ -532,6 +532,18 @@ public class MaterializedViewConsistencyManager {
 
     for (String viewTableName : children) {
       try {
+        // Verify the MV's TableConfig still exists and is an MV. A previous DROP that
+        // succeeded at removing the TableConfig but failed best-effort znode cleanup would
+        // leave a stale definition znode here; re-registering it would resurrect a ghost
+        // MV that source-table updates would chase. Skip the orphan and surface a WARN so
+        // operators can clean up the stranded znode.
+        TableConfig viewConfig = ZKMetadataProvider.getTableConfig(_propertyStore, viewTableName);
+        if (viewConfig == null || !viewConfig.isMaterializedView()) {
+          LOGGER.warn("Skipping orphan MV definition znode '{}': underlying TableConfig is "
+              + "missing or no longer an MV. Operator should DELETE /materializedViewDefinitions "
+              + "to remove the stale znode.", viewTableName);
+          continue;
+        }
         String fullPath = defBasePath + "/" + viewTableName;
         ZNRecord record = _propertyStore.get(fullPath, null, AccessOption.PERSISTENT);
         if (record == null) {

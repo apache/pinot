@@ -46,6 +46,7 @@ import org.apache.calcite.sql.SqlOrderBy;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlSelectKeyword;
 import org.apache.calcite.sql.SqlSetOption;
+import org.apache.calcite.sql.SqlWindow;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
@@ -67,9 +68,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotDropMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotDropTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowCreateTable;
+import org.apache.pinot.sql.parsers.parser.SqlPinotShowMaterializedViews;
 import org.apache.pinot.sql.parsers.parser.SqlPinotShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -142,11 +147,17 @@ public class CalciteSqlParser {
         } else {
           throw new SqlCompilationException("SqlNode with executable statement already exist with type: " + sqlType);
         }
-      } else if (sqlNode instanceof SqlPinotCreateTable
+      } else if (sqlNode instanceof SqlPinotShowTables
+          || sqlNode instanceof SqlPinotShowMaterializedViews
+          || sqlNode instanceof SqlPinotCreateTable
+          || sqlNode instanceof SqlPinotShowCreateTable
           || sqlNode instanceof SqlPinotDropTable
-          || sqlNode instanceof SqlPinotShowTables
-          || sqlNode instanceof SqlPinotShowCreateTable) {
+          || sqlNode instanceof SqlPinotCreateMaterializedView
+          || sqlNode instanceof SqlPinotShowCreateMaterializedView
+          || sqlNode instanceof SqlPinotDropMaterializedView) {
         // Pinot-native DDL statements; the controller dispatches these via the DDL endpoint.
+        // Ordering: Catalog → Table → Materialized View, lifecycle CREATE → SHOW CREATE → DROP,
+        // matching `DdlOperation` and `DdlCompiler#compile`.
         if (sqlType == null) {
           sqlType = PinotSqlType.DDL;
           statementNode = sqlNode;
@@ -803,8 +814,14 @@ public class CalciteSqlParser {
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)
           return RequestUtils.getLiteralExpression(((SqlDataTypeSpec) node).getTypeName().getSimple());
-        } else {
+        } else if (node instanceof SqlWindow) {
+          // Window definitions appear as operands of OVER calls. PinotQuery does not model window frames directly, but
+          // compiling them as literals keeps parsing/table-name extraction from failing on multi-stage window queries.
+          return RequestUtils.getLiteralExpression(node.toString());
+        } else if (node instanceof SqlBasicCall) {
           return compileFunctionExpression((SqlBasicCall) node);
+        } else {
+          throw new SqlCompilationException("Unsupported sql node - " + node);
         }
     }
   }

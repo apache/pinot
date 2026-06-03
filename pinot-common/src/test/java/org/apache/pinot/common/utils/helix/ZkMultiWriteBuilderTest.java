@@ -150,7 +150,7 @@ public class ZkMultiWriteBuilderTest {
     _client.writeData(pB, record("b", "v", "bumped"));
     Assert.assertEquals(version(pB), 1);
 
-    Assert.expectThrows(KeeperException.BadVersionException.class, () ->
+    KeeperException.BadVersionException ex = Assert.expectThrows(KeeperException.BadVersionException.class, () ->
         builder()
             .set(pA, record("a", "v", "2"), 0)
             .set(pB, record("b", "v", "2"), 0) // stale version -> BADVERSION
@@ -160,6 +160,7 @@ public class ZkMultiWriteBuilderTest {
     Assert.assertEquals(read(pA).getSimpleField("v"), "1");
     Assert.assertEquals(version(pA), 0);
     Assert.assertEquals(read(pB).getSimpleField("v"), "bumped");
+    Assert.assertTrue(ex.getResults() != null && !ex.getResults().isEmpty());
   }
 
   @Test

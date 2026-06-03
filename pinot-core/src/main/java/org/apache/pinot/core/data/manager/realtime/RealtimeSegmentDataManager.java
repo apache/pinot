@@ -69,6 +69,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -1821,9 +1822,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
-    // Start new realtime segment
+    // Start new realtime segment. Use a mutable-only tier-overwritten index loading view when consuming tier overrides
+    // are configured; committed segments continue to use the base table config.
     String consumerDir = realtimeTableDataManager.getConsumerDir();
-    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder(indexLoadingConfig)
+    IndexLoadingConfig consumingIndexLoadingConfig =
+        TableConfigUtils.buildConsumingSegmentIndexLoadingConfig(_tableConfig, _schema, indexLoadingConfig);
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder(consumingIndexLoadingConfig);
+    realtimeSegmentConfigBuilder
         .setTableNameWithType(_tableNameWithType)
         .setSegmentName(_segmentNameStr)
         .setStreamName(streamTopic)
@@ -1841,7 +1847,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setConsumerDir(consumerDir)
-        .setTextIndexConfig(_tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig())
+        .setTextIndexConfig(consumingIndexLoadingConfig.getMultiColTextIndexConfig())
         .setDropRecordOnPartitionMismatch(ingestionConfig != null
             && ingestionConfig.getStreamIngestionConfig() != null
             && ingestionConfig.getStreamIngestionConfig().isDropRecordOnPartitionMismatch());

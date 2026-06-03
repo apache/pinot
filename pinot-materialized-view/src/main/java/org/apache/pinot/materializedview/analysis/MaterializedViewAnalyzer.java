@@ -23,14 +23,15 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
+import org.apache.pinot.common.materializedview.MaterializedViewAggregationCatalog;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -312,6 +313,15 @@ public final class MaterializedViewAnalyzer {
     DataSource dataSource = pinotQuery.getDataSource();
     Preconditions.checkState(dataSource != null, "Could not extract data source from SQL: %s", definedSql);
 
+    // CalciteSqlParser leaves dataSource.tableName unset when the FROM clause is a JOIN — the
+    // join structure is stashed under dataSource.join instead.  Without this explicit check the
+    // null tableName falls into the generic "Could not extract source table name" branch below,
+    // which misleadingly suggests a parser failure when the actual cause is "MV does not support
+    // JOIN".  Reject up front with a message that names the unsupported construct directly.
+    Preconditions.checkState(!dataSource.isSetJoin(),
+        "Materialized views over JOIN queries are not supported. Use a single FROM table. SQL: %s",
+        definedSql);
+
     String sourceTableName = dataSource.getTableName();
     Preconditions.checkState(sourceTableName != null && !sourceTableName.isEmpty(),
         "Could not extract source table name from SQL: %s", definedSql);
@@ -397,15 +407,52 @@ public final class MaterializedViewAnalyzer {
     return sourceTableConfig.getValidationConfig().getSegmentPushType();
   }
 
-  /// Resolves the full table name with type suffix. Tries OFFLINE first, then REALTIME.
-  private static String resolveSourceTableWithType(String rawSourceTableName,
+  /// Resolves a raw source-table name to its fully-qualified `_OFFLINE` / `_REALTIME` form.
+  ///
+  /// Hybrid (OFFLINE + REALTIME both exist) is rejected: the raw name is ambiguous and
+  /// accepting it would let an MV silently drift.  The stored `definedSQL` retains the raw
+  /// name and is replayed via broker hybrid routing at task time, which fans out to BOTH
+  /// halves of the base table.  Fingerprinting and STALE-marking, however, only cover the
+  /// OFFLINE half (LLC realtime commits go through `PinotLLCRealtimeSegmentManager`, which
+  /// does not notify the MV consistency manager), so any change on the REALTIME half is
+  /// invisible to staleness tracking — VALID partitions become silently incorrect.  Fail
+  /// fast at the resolver itself so neither the analyzer (create time) nor the scheduler
+  /// (task generation time) can ever bind an MV to a hybrid base table.
+  ///
+  /// Returns:
+  ///
+  ///   - `xxx_OFFLINE` when only OFFLINE exists
+  ///   - `xxx_REALTIME` when only REALTIME exists (the REALTIME-only guard in
+  ///       [#validateSourceTable] rejects it from MV creation, but the resolver itself
+  ///       returns the name so downstream error messages can refer to the typed form)
+  ///
+  ///
+  /// Throws when both exist (hybrid) or neither exists.
+  ///
+  /// Public because [org.apache.pinot.materializedview.scheduler.MaterializedViewTaskScheduler]
+  /// reuses the same logic at task-generation time.  Keeping one resolver guarantees the
+  /// analyzer (create gate) and scheduler (runtime gate) never drift on the hybrid rule.
+  public static String resolveSourceTableWithType(String rawSourceTableName,
       MaterializedViewTaskGeneratorContext context) {
     String offlineName = TableNameBuilder.OFFLINE.tableNameWithType(rawSourceTableName);
-    if (context.tableExists(offlineName)) {
+    String realtimeName = TableNameBuilder.REALTIME.tableNameWithType(rawSourceTableName);
+    boolean hasOffline = context.tableExists(offlineName);
+    boolean hasRealtime = context.tableExists(realtimeName);
+
+    Preconditions.checkState(!(hasOffline && hasRealtime),
+        "Source table '%s' is a hybrid table (both OFFLINE and REALTIME variants exist). "
+            + "Materialized views over hybrid tables are not supported: the stored definedSQL "
+            + "would be replayed against the raw name and the broker would silently merge both "
+            + "halves at query time, while STALE-marking only covers OFFLINE (LLC realtime "
+            + "commits bypass the MV consistency manager). Drop the unwanted variant — or wait "
+            + "for hybrid MV support in a follow-up that wires the LLC commit notify hook — "
+            + "before creating this MV.",
+        rawSourceTableName);
+
+    if (hasOffline) {
       return offlineName;
     }
-    String realtimeName = TableNameBuilder.REALTIME.tableNameWithType(rawSourceTableName);
-    Preconditions.checkState(context.tableExists(realtimeName),
+    Preconditions.checkState(hasRealtime,
         "Source table '%s' does not exist (tried OFFLINE and REALTIME)", rawSourceTableName);
     return realtimeName;
   }
@@ -430,6 +477,17 @@ public final class MaterializedViewAnalyzer {
         collectIdentifiers(expr, referencedIdentifiers);
       }
     }
+    // WHERE / HAVING were previously skipped, so a typo in a filter predicate (e.g. `WHERE
+    // custome_id = 42` where the actual column is `customer_id`) would slip past create-time
+    // validation, succeed at addTable, and only surface at task-execution time as a broker
+    // failure with no clear pointer back to the DDL. Walking the filter trees here keeps the
+    // diagnostic at controller create time where the operator can immediately fix the SQL.
+    if (pinotQuery.getFilterExpression() != null) {
+      collectIdentifiers(pinotQuery.getFilterExpression(), referencedIdentifiers);
+    }
+    if (pinotQuery.getHavingExpression() != null) {
+      collectIdentifiers(pinotQuery.getHavingExpression(), referencedIdentifiers);
+    }
 
     for (String identifier : referencedIdentifiers) {
       Preconditions.checkState(sourceColumns.contains(identifier),
@@ -446,9 +504,22 @@ public final class MaterializedViewAnalyzer {
     List<Expression> selectList = pinotQuery.getSelectList();
     Preconditions.checkState(selectList != null && !selectList.isEmpty(), "SELECT list is empty");
 
+    // Reject `SELECT *` up front.  Without this guard the star identifier (name = "*") would
+    // flow through RequestUtils#extractAliasOrIdentifierName as the literal field name "*",
+    // and the downstream schema-coverage check (Check 1 below) would fail with the misleading
+    // message "MV schema column 'X' is not produced by any SELECT expression" — sending the
+    // operator chasing a schema mismatch when the real cause is "MV does not support SELECT *".
+    for (Expression expr : selectList) {
+      if (expr.getType() == ExpressionType.IDENTIFIER && "*".equals(expr.getIdentifier().getName())) {
+        throw new IllegalStateException(
+            "Materialized view definedSQL does not support `SELECT *`. List each output "
+                + "column explicitly with an `AS <alias>` matching an MV schema column.");
+      }
+    }
+
     Set<String> selectFields = new HashSet<>();
     for (Expression expr : selectList) {
-      String fieldName = extractOutputFieldName(expr);
+      String fieldName = RequestUtils.extractAliasOrIdentifierName(expr);
       selectFields.add(fieldName);
     }
 
@@ -476,65 +547,33 @@ public final class MaterializedViewAnalyzer {
     return selectFields;
   }
 
-  /// Extracts the output field name from a SELECT expression:
-  ///
-  ///   - Alias expressions (`expr AS alias`): returns the alias name
-  ///   - Bare identifiers (`columnName`): returns the column name
-  ///   - Aggregate/function without alias: throws
-  ///
-  private static String extractOutputFieldName(Expression expr) {
-    Function func = expr.getFunctionCall();
-    if (func != null) {
-      if (func.getOperator().equals("as")) {
-        Expression aliasExpr = func.getOperands().get(1);
-        Preconditions.checkState(aliasExpr.getType() == ExpressionType.IDENTIFIER,
-            "AS alias must be an identifier, got: %s", RequestUtils.prettyPrint(aliasExpr));
-        return aliasExpr.getIdentifier().getName();
-      }
-      throw new IllegalStateException(
-          "Expression '" + RequestUtils.prettyPrint(expr)
-              + "' must have an AS alias to map to an MV schema column");
-    }
-    if (expr.getType() == ExpressionType.IDENTIFIER) {
-      return expr.getIdentifier().getName();
-    }
-    throw new IllegalStateException(
-        "Unsupported expression type in SELECT list: " + RequestUtils.prettyPrint(expr));
-  }
-
-  /// MV-side aggregation functions the broker rewrite engine (lands in PR 2) will know how to
-  /// re-aggregate. Mirrored from the equivalence registry that ships alongside the rewrite
-  /// engine; kept here as a static set so PR 1's analyzer can reject misconfigured MVs at
-  /// create time without dragging the rewrite-engine internals into the ingestion module.
-  /// When PR 2 lands its full {@code AggregationEquivalenceRegistry}, this set MUST stay in
-  /// sync — adding a function to the registry without adding it here would silently let a
-  /// usable MV definition slip through create-time validation (still fine in practice, just
-  /// slightly less helpful as a config-error message).
-  private static final Set<String> SUPPORTED_MATERIALIZED_VIEW_AGGREGATIONS = Set.of(
-      "SUM", "MIN", "MAX", "COUNT",
-      "DISTINCTCOUNTRAWHLL", "DISTINCTCOUNTRAWHLLPLUS", "DISTINCTCOUNTRAWTHETASKETCH");
-
   /// Recursively validates that all aggregation functions used are recognized by Pinot AND
   /// can be re-aggregated by the broker rewrite engine (PR 2). An MV defined with an
   /// aggregation that the rewrite engine cannot use would silently never produce rewrites;
   /// surfacing the rejection at create/update time gives the operator a clear error.
+  ///
+  /// The allow-list of "MV-side re-aggregatable" functions is sourced from
+  /// {@link MaterializedViewAggregationCatalog} — the same catalog the MV schema inferer
+  /// uses to pick column types. Both consumers MUST agree on the supported set so an MV
+  /// produced by the inferer cannot be later rejected here, and conversely so this analyzer
+  /// cannot accept an MV the rewrite engine can't use.
   private static void validateAggregationFunctions(Expression expr) {
     Function func = expr.getFunctionCall();
     if (func == null) {
       return;
     }
     String operator = func.getOperator();
-    if (!operator.equals("as") && AggregationFunctionType.isAggregationFunction(operator)) {
+    if (!operator.equals(SqlKind.AS.lowerName) && AggregationFunctionType.isAggregationFunction(operator)) {
       // Known aggregation — verify the rewrite engine knows how to re-aggregate it.  Without
       // re-aggregation support, MaterializedViewQueryRewriteEngine (PR 2) would never select
       // this MV (the strategy returns null on the projection-subsumption check), and the
       // operator would observe an MV that is configured but never hit.
       Preconditions.checkState(
-          SUPPORTED_MATERIALIZED_VIEW_AGGREGATIONS.contains(operator.toUpperCase(Locale.ROOT)),
+          MaterializedViewAggregationCatalog.isSupported(operator),
           "MV definedSQL uses aggregation '%s' for which no MV-side re-aggregation is supported. "
               + "Supported MV-side aggregations: %s. Replace '%s' with a supported aggregation.",
-          operator, SUPPORTED_MATERIALIZED_VIEW_AGGREGATIONS, operator);
-    } else if (!operator.equals("as") && isLikelyAggregation(func)) {
+          operator, MaterializedViewAggregationCatalog.getSupportedOperators(), operator);
+    } else if (!operator.equals(SqlKind.AS.lowerName) && isLikelyAggregation(func)) {
       throw new IllegalStateException(
           "Aggregation function '" + operator + "' is not a recognized Pinot aggregation function");
     }
@@ -623,6 +662,23 @@ public final class MaterializedViewAnalyzer {
             "Invalid maxTasksPerBatch '" + maxTasksPerBatch + "': must be a positive integer", e);
       }
     }
+
+    // stalenessThresholdMs — optional. Accept any non-negative long: 0 is the documented
+    // default ("no SLO"; rewrite engine treats `<= 0` as disabled) and an operator who
+    // wants to disable explicitly should be allowed to write it. Reject malformed values so
+    // a typo like '60s' surfaces at CREATE time rather than silently falling back to default
+    // and disabling the operator's intended freshness behavior.
+    String staleness = taskConfigs.get(MaterializedViewTask.STALENESS_THRESHOLD_MS_KEY);
+    if (staleness != null && !staleness.isEmpty()) {
+      try {
+        long value = Long.parseLong(staleness);
+        Preconditions.checkState(value >= 0,
+            "stalenessThresholdMs must be non-negative milliseconds, got: %s", staleness);
+      } catch (NumberFormatException e) {
+        throw new IllegalStateException(
+            "Invalid stalenessThresholdMs '" + staleness + "': must be a non-negative long (milliseconds)", e);
+      }
+    }
     return bucketMs;
   }
 
@@ -663,11 +719,11 @@ public final class MaterializedViewAnalyzer {
     Map<String, Expression> materializedViewColToSourceExpr = new HashMap<>();
 
     for (Expression expr : selectList) {
-      String outputName = extractOutputFieldName(expr);
+      String outputName = RequestUtils.extractAliasOrIdentifierName(expr);
       if (!dateTimeNames.contains(outputName)) {
         continue;
       }
-      Expression sourceExpr = extractSourceExpression(expr);
+      Expression sourceExpr = RequestUtils.unwrapAlias(expr);
       String exprString = RequestUtils.prettyPrint(sourceExpr);
       partitionExprMaps.put(exprString, outputName);
       materializedViewColToSourceExpr.put(outputName, sourceExpr);
@@ -693,15 +749,6 @@ public final class MaterializedViewAnalyzer {
     }
 
     return new PartitionExprData(partitionExprMaps, materializedViewColToSourceExpr);
-  }
-
-  /// Extracts the source expression from a SELECT item, stripping any AS alias wrapper.
-  private static Expression extractSourceExpression(Expression expr) {
-    Function func = expr.getFunctionCall();
-    if (func != null && func.getOperator().equals("as")) {
-      return func.getOperands().get(0);
-    }
-    return expr;
   }
 
   /// Convenience overload that parses the SQL and extracts partition expression maps

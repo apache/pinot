@@ -77,6 +77,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -136,6 +137,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final WorkerManager _multiClusterWorkerManager;
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
+  @Nullable
+  private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
   private final ExecutorService _queryCompileExecutor;
@@ -157,8 +160,21 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
       MultiClusterRoutingContext multiClusterRoutingContext,
       WorkerManager workerManager, WorkerManager multiClusterWorkerManager) {
+    this(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        queryThrottler, failureDetector, threadAccountant, multiClusterRoutingContext, workerManager,
+        multiClusterWorkerManager, null);
+  }
+
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext,
+      WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
+      @Nullable ServerRoutingStatsManager statsManager) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
         threadAccountant, multiClusterRoutingContext);
+    _serverRoutingStatsManager = statsManager;
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
 
@@ -421,7 +437,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get(), queryWasLogged);
+            rlsFiltersApplied.get(), queryWasLogged, workloadName);
       }
     }
   }
@@ -613,7 +629,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied, boolean queryWasLogged)
+      boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -712,7 +728,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         _opchainsStartedMeter.mark(opChainCount);
         try {
           queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan,
-              timer.getRemainingTimeMs(), query.getOptions());
+              timer.getRemainingTimeMs(), query.getOptions(), _serverRoutingStatsManager);
         } catch (QueryException e) {
           throw e;
         } catch (Throwable t) {
@@ -822,7 +838,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // Log query and stats
       _queryLogger.logQueryCompleted(
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
-              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null),
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null, workloadName),
           queryWasLogged);
 
       return brokerResponse;

@@ -218,6 +218,10 @@ arraysliceint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySliceInt}"
   transform: null
   udf: null
+arrayslicelong:
+  scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySliceLong}"
+  transform: null
+  udf: null
 arrayslicestring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySliceString}"
   transform: null
