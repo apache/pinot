@@ -137,8 +137,7 @@ public class LegacyRawValueInvertedIndexMigrationIntegrationTest extends BaseClu
     ObjectNode indexes = JsonUtils.newObjectNode();
     indexes.set("dictionary", JsonUtils.newObjectNode());
     FieldConfig categoryFieldConfig = new FieldConfig.Builder(CATEGORY_COLUMN)
-        .withEncodingType(FieldConfig.EncodingType.RAW)
-        .withIndexes(indexes)
+        .withIndexes(withForwardEncoding(indexes, FieldConfig.EncodingType.RAW))
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
         .setTableName(tableName)
