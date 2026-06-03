@@ -58,25 +58,22 @@ public class FieldIndexConfigsUtil {
   }
 
   /// Builds a [FieldIndexConfigs] for a single column directly from one [FieldConfig], without a
-  /// `TableConfig` or `Schema`. The dictionary and forward entries are both derived from
-  /// `fieldConfig.getEncodingType()` (RAW => dictionary disabled and a raw forward index, otherwise
-  /// dictionary default-enabled and a dict-encoded forward index); every other index type is read from the
-  /// modern `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default
-  /// config. A `null` fieldConfig yields built-in defaults (dictionary enabled).
+  /// `TableConfig` or `Schema`. The dictionary and forward entries use
+  /// `fieldConfig.indexes.forward.encodingType` when specified, falling back to the legacy field-level encoding.
+  /// Other index types are read from `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back
+  /// to each type's default config. A `null` fieldConfig yields built-in defaults (dictionary enabled).
   ///
   /// This reads only the modern `indexes` format and never legacy `IndexingConfig` lists, so it suits
   /// synthetic columns (e.g. OPEN_STRUCT materialized children) that exist in no schema.
   public static FieldIndexConfigs fromFieldConfig(@Nullable FieldConfig fieldConfig, FieldSpec fieldSpec) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
-    FieldConfig.EncodingType declaredEncoding =
-        fieldConfig != null && fieldConfig.getEncodingType() != null ? fieldConfig.getEncodingType()
-            : FieldConfig.EncodingType.DICTIONARY;
+    boolean rawEncoded = isRawForwardEncoded(fieldConfig);
     JsonNode indexes = fieldConfig != null ? fieldConfig.getIndexes() : null;
     // `indexes.dictionary` decides when it is there, and the column-level encoding decides otherwise. Both spellings
     // have to work: every other column turns a dictionary on through `indexes`, and a reader who has learned that
     // will write it here too -- silently ignoring it leaves them with a raw column and no clue why.
     boolean dictionaryEncoded =
-        declaredEncoding != FieldConfig.EncodingType.RAW || dictionaryEnabledByIndexes(indexes);
+        !rawEncoded || dictionaryEnabledByIndexes(indexes);
     builder.add(StandardIndexes.dictionary(),
         dictionaryEncoded ? DictionaryIndexConfig.DEFAULT : DictionaryIndexConfig.DISABLED);
     // The forward index follows the dictionary decision, not the declared encoding: a key declared RAW whose
@@ -109,6 +106,25 @@ public class FieldIndexConfigsUtil {
   private static boolean dictionaryEnabledByIndexes(@Nullable JsonNode indexes) {
     JsonNode dictionary = indexes != null ? indexes.get(StandardIndexes.DICTIONARY_ID) : null;
     return dictionary != null && dictionary.isObject() && !dictionary.path("disabled").asBoolean(false);
+  }
+
+  // Persisted configs from older nodes still carry field-level encoding; retain that fallback on reload.
+  @SuppressWarnings("deprecation")
+  private static boolean isRawForwardEncoded(@Nullable FieldConfig fieldConfig) {
+    if (fieldConfig == null) {
+      return false;
+    }
+    JsonNode indexes = fieldConfig.getIndexes();
+    JsonNode forward = indexes != null ? indexes.get("forward") : null;
+    if (forward != null && forward.isObject() && forward.hasNonNull("encodingType")) {
+      try {
+        return JsonUtils.jsonNodeToObject(forward, ForwardIndexConfig.class).getEncodingType()
+            == FieldConfig.EncodingType.RAW;
+      } catch (IOException e) {
+        throw new IllegalArgumentException("Failed to parse forward index config from FieldConfig", e);
+      }
+    }
+    return fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW;
   }
 
   private static ForwardIndexConfig forwardConfig(IndexType<?, ?, ?> forwardIndexType, @Nullable JsonNode indexes,
