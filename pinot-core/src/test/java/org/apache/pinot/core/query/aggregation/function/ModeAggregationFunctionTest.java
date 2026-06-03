@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
@@ -33,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction.Seri
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.PinotDataType;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -68,8 +70,12 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
       FieldConfig.EncodingType encodingType =
           _dictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
       return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled, builder -> {
-        builder.withEncodingType(encodingType);
-        builder.withCompressionCodec(FieldConfig.CompressionCodec.PASS_THROUGH);
+        ObjectNode indexes = JsonUtils.newObjectNode();
+        ObjectNode forward = JsonUtils.newObjectNode();
+        forward.put("encodingType", encodingType.name());
+        forward.put("compressionCodec", FieldConfig.CompressionCodec.PASS_THROUGH.name());
+        indexes.set("forward", forward);
+        builder.withIndexes(indexes);
       });
     }
 
@@ -289,8 +295,12 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
       FieldConfig.EncodingType encodingType =
           _dictionary ? FieldConfig.EncodingType.DICTIONARY : FieldConfig.EncodingType.RAW;
       return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled, builder -> {
-        builder.withEncodingType(encodingType);
-        builder.withCompressionCodec(FieldConfig.CompressionCodec.PASS_THROUGH);
+        ObjectNode indexes = JsonUtils.newObjectNode();
+        ObjectNode forward = JsonUtils.newObjectNode();
+        forward.put("encodingType", encodingType.name());
+        forward.put("compressionCodec", FieldConfig.CompressionCodec.PASS_THROUGH.name());
+        indexes.set("forward", forward);
+        builder.withIndexes(indexes);
       });
     }
 

@@ -5,42 +5,52 @@
     "segmentPushType": "APPEND",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "tableIndexConfig": {
     "loadMode": "MMAP",
-    "noDictionaryColumns": ["Text"],
-    "invertedIndexColumns": [
+    "noDictionaryColumns": [
+      "Text"
     ],
+    "invertedIndexColumns": [],
     "multiColumnTextIndexConfig": {
-      "columns": ["UserId", "ProductId", "Summary"]
+      "columns": [
+        "UserId",
+        "ProductId",
+        "Summary"
+      ]
     }
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   },
   "fieldConfigList": [
     {
-      "encodingType": "RAW",
-      "indexType": "VECTOR",
       "name": "embedding",
-      "properties": {
-        "vectorIndexType": "HNSW",
-        "vectorDimension": 1536,
-        "vectorDistanceFunction": "COSINE",
-        "version": 1,
-        "commitDocs": "1"
+      "indexes": {
+        "vector": {
+          "vectorIndexType": "HNSW",
+          "vectorDimension": 1536,
+          "vectorDistanceFunction": "COSINE",
+          "version": 1,
+          "properties": {
+            "commitDocs": "1"
+          }
+        },
+        "forward": {
+          "encodingType": "RAW"
+        }
       }
     },
     {
       "name": "Text",
-      "encodingType": "RAW",
       "indexes": {
         "text": {
           "deriveNumDocsPerChunkForRawIndex": "true",
           "rawIndexWriterVersion": "3",
           "caseSensitive": "true"
+        },
+        "forward": {
+          "encodingType": "RAW"
         }
       }
     }

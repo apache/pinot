@@ -30,6 +30,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -661,6 +662,50 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
           .getMessage().contains("Groovy filter functions are disabled for table config"));
     } finally {
       DEFAULT_INSTANCE.setClusterIngestionGroovyConfig(Boolean.toString(originalDisableGroovy));
+      adminClient.getTableClient().deleteTableConfigs(tableName, null);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testUpdateRejectsStoredLegacyFieldLevelConfigOptions()
+      throws Exception {
+    assertUpdateRejectsStoredLegacyFieldConfig("testUpdateRejectsLegacyEncodingType",
+        new FieldConfig("dimA", FieldConfig.EncodingType.RAW, null, null, null, null, null),
+        "FieldConfig.encodingType is deprecated for column: dimA. Use "
+            + "fieldConfigList[].indexes.forward.encodingType instead.");
+    assertUpdateRejectsStoredLegacyFieldConfig("testUpdateRejectsLegacyCompressionCodec",
+        new FieldConfig.Builder("dimA")
+            .withCompressionCodec(FieldConfig.CompressionCodec.SNAPPY)
+            .build(),
+        "FieldConfig.compressionCodec is deprecated for column: dimA. Use "
+            + "fieldConfigList[].indexes.forward.compressionCodec instead.");
+    assertUpdateRejectsStoredLegacyFieldConfig("testUpdateRejectsLegacyProperties",
+        new FieldConfig.Builder("dimA")
+            .withProperties(Map.of(FieldConfig.RAW_INDEX_WRITER_VERSION, "4"))
+            .build(),
+        "FieldConfig.properties is deprecated for column: dimA. Move these settings into the relevant "
+            + "fieldConfigList[].indexes.<indexName> block instead.");
+  }
+
+  private void assertUpdateRejectsStoredLegacyFieldConfig(String tableName, FieldConfig fieldConfig,
+      String expectedMessage)
+      throws Exception {
+    PinotAdminClient adminClient = getOrCreateAdminClient();
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    offlineTableConfig.setFieldConfigList(List.of(fieldConfig));
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.getHelixResourceManager().addTable(offlineTableConfig);
+    try {
+      String msg = Assert.expectThrows(Exception.class,
+              () -> adminClient.getTableClient()
+                  .updateTableConfigs(tableName, tableConfigs.toPrettyJsonString(), null, false, false))
+          .getMessage();
+      Assert.assertTrue(msg.contains(expectedMessage), msg);
+    } finally {
       adminClient.getTableClient().deleteTableConfigs(tableName, null);
     }
   }
