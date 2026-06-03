@@ -147,6 +147,30 @@ For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, whic
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
+### Forward Index Encoding In Table Configs
+
+Set per-column forward index encoding inside `fieldConfigList[].indexes.forward.encodingType`. The older
+field-level `fieldConfigList[].encodingType` form is deprecated and table creation rejects it.
+
+Use this shape for new table configs:
+
+```json
+{
+  "fieldConfigList": [
+    {
+      "name": "message",
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        },
+        "text": {
+        }
+      }
+    }
+  ]
+}
+```
+
 ### macOS Build Requirements
 
 If you're building Pinot on macOS and encounter issues with the gRPC Java plugin during the build process, you may need to configure the protobuf Maven plugin to use a specific executable path. This is a known issue on macOS ARM (Apple Silicon) systems.

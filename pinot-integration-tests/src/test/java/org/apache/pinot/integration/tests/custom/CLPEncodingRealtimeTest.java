@@ -109,7 +109,7 @@ public class CLPEncodingRealtimeTest extends CustomDataQueryClusterIntegrationTe
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(new FieldConfig.Builder("logLine").withEncodingType(FieldConfig.EncodingType.RAW)
+    fieldConfigs.add(fieldConfigBuilderWithForwardEncoding("logLine", FieldConfig.EncodingType.RAW)
         .withCompressionCodec(_selectedCompressionCodec).build());
     return fieldConfigs;
   }

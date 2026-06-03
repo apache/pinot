@@ -67,9 +67,8 @@ public class IvfPqVectorTest extends CustomDataQueryClusterIntegrationTest {
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    return List.of(new FieldConfig.Builder(VECTOR_COL)
+    return List.of(fieldConfigBuilderWithForwardEncoding(VECTOR_COL, FieldConfig.EncodingType.RAW)
         .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
-        .withEncodingType(FieldConfig.EncodingType.RAW)
         .withProperties(Map.of(
             "vectorIndexType", "IVF_PQ",
             "vectorDimension", String.valueOf(VECTOR_DIMENSION),

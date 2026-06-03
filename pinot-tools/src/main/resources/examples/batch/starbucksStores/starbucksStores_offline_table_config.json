@@ -7,15 +7,18 @@
     "segmentPushType": "APPEND",
     "replication": "1"
   },
-  "tenants": {
-  },
+  "tenants": {},
   "fieldConfigList": [
     {
       "name": "location_st_point",
-      "encodingType": "RAW",
       "indexType": "H3",
       "properties": {
         "resolutions": "5"
+      },
+      "indexes": {
+        "forward": {
+          "encodingType": "RAW"
+        }
       }
     }
   ],
@@ -26,7 +29,6 @@
     ]
   },
   "metadata": {
-    "customConfigs": {
-    }
+    "customConfigs": {}
   }
 }

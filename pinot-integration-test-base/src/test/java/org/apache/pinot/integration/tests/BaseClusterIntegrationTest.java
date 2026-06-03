@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -140,6 +141,39 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected org.apache.pinot.client.Connection _pinotConnectionV2;
   protected Connection _h2Connection;
   protected QueryGenerator _queryGenerator;
+
+  protected static FieldConfig fieldConfigWithForwardEncoding(String column, FieldConfig.EncodingType encodingType,
+      List<FieldConfig.IndexType> indexTypes, FieldConfig.CompressionCodec compressionCodec,
+      Map<String, String> properties) {
+    return fieldConfigBuilderWithForwardEncoding(column, encodingType)
+        .withIndexTypes(indexTypes)
+        .withCompressionCodec(compressionCodec)
+        .withProperties(properties)
+        .build();
+  }
+
+  protected static FieldConfig.Builder fieldConfigBuilderWithForwardEncoding(String column,
+      FieldConfig.EncodingType encodingType) {
+    return new FieldConfig.Builder(column).withIndexes(indexesWithForwardEncoding(encodingType));
+  }
+
+  protected static ObjectNode indexesWithForwardEncoding(FieldConfig.EncodingType encodingType) {
+    return withForwardEncoding(JsonUtils.newObjectNode(), encodingType);
+  }
+
+  protected static ObjectNode withForwardEncoding(JsonNode indexes, FieldConfig.EncodingType encodingType) {
+    ObjectNode indexesNode =
+        indexes != null && indexes.isObject() ? (ObjectNode) indexes.deepCopy() : JsonUtils.newObjectNode();
+    ObjectNode forward;
+    if (indexesNode.has("forward") && indexesNode.get("forward").isObject()) {
+      forward = (ObjectNode) indexesNode.get("forward");
+    } else {
+      forward = JsonUtils.newObjectNode();
+      indexesNode.set("forward", forward);
+    }
+    forward.put("encodingType", encodingType.name());
+    return indexesNode;
+  }
 
   /**
    * The following getters can be overridden to change default settings.

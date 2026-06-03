@@ -73,6 +73,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private static final Logger LOGGER = LoggerFactory.getLogger(ForwardIndexType.class);
 
   public static final String INDEX_DISPLAY_NAME = "forward";
+  public static final String ENCODING_TYPE_CONFIG_KEY = "encodingType";
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -179,10 +180,12 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   /// Resolves per-column [ForwardIndexConfig] in a single pass over [TableConfig], reconciling the legacy signals
-  /// (`indexingConfig.noDictionaryColumns`, `indexingConfig.noDictionaryConfig`, `fieldConfig.encodingType`,
-  /// `fieldConfig.compressionCodec`) with the modern `fieldConfig.indexes.forward` JSON block. The deserializer
-  /// fails fast on conflicting signals.
+  /// (`indexingConfig.noDictionaryColumns`, `indexingConfig.noDictionaryConfig`, deprecated
+  /// `fieldConfig.encodingType`, `fieldConfig.compressionCodec`) with the modern `fieldConfig.indexes.forward` JSON
+  /// block. When `indexes.forward.encodingType` is present, it is the canonical forward-index encoding and wins over
+  /// legacy top-level signals.
   @Override
+  @SuppressWarnings("deprecation")
   protected ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     return (tableConfig, schema) -> {
       Map<String, ForwardIndexConfig> result = new HashMap<>();
@@ -212,12 +215,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             continue;
           }
 
-          // Resolve the forward-index encoding. `FieldConfig.encodingType` is never null (the FieldConfig constructor
-          // defaults it to DICTIONARY when unset), so the per-column override here is the legacy
-          // `noDictionaryColumns` / `noDictionaryConfig` membership — historically these may be set alongside a
-          // FieldConfig that left `encodingType` at the default DICTIONARY.
           FieldConfig.CompressionCodec fcCodec = fieldConfig.getCompressionCodec();
-          FieldConfig.EncodingType encodingType =
+          FieldConfig.EncodingType legacyEncodingType =
               inNoDictionaryList ? FieldConfig.EncodingType.RAW : fieldConfig.getEncodingType();
 
           JsonNode forwardIndexNode = fieldConfig.getIndexes().get(INDEX_DISPLAY_NAME);
@@ -225,14 +224,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             Preconditions.checkState(forwardIndexNode.isObject(), "Invalid forward index config for column: %s",
                 column);
 
-            // Conflict: encodingType mismatch between resolved FieldConfig encoding and indexes.forward.
-            JsonNode innerEncodingNode = forwardIndexNode.get("encodingType");
-            if (innerEncodingNode != null && !innerEncodingNode.isNull()) {
-              FieldConfig.EncodingType inner = FieldConfig.EncodingType.valueOf(innerEncodingNode.asText());
-              Preconditions.checkState(inner == encodingType,
-                  "Conflicting forward-index encoding for column: %s — FieldConfig.encodingType=%s but "
-                      + "indexes.forward.encodingType=%s", column, encodingType, inner);
-            }
+            JsonNode innerEncodingNode = forwardIndexNode.get(ENCODING_TYPE_CONFIG_KEY);
 
             // Conflict: compressionCodec mismatch between FieldConfig and indexes.forward.
             JsonNode innerCodecNode = forwardIndexNode.get("compressionCodec");
@@ -243,11 +235,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
                       + "but indexes.forward.compressionCodec=%s", column, fcCodec, inner);
             }
 
-            // Inject the resolved encodingType / compressionCodec into the JSON when absent so the resulting
-            // ForwardIndexConfig always matches the column-level signals.
+            // Inject legacy encodingType / compressionCodec into the JSON only when the forward block omits them.
             ObjectNode configNode = (ObjectNode) forwardIndexNode.deepCopy();
             if (innerEncodingNode == null || innerEncodingNode.isNull()) {
-              configNode.put("encodingType", encodingType.name());
+              configNode.put(ENCODING_TYPE_CONFIG_KEY, legacyEncodingType.name());
             }
             if ((innerCodecNode == null || innerCodecNode.isNull()) && fcCodec != null) {
               configNode.put("compressionCodec", fcCodec.name());
@@ -258,7 +249,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
               throw new UncheckedIOException(e);
             }
           } else {
-            result.put(column, createConfigFromFieldConfig(fieldConfig, encodingType));
+            result.put(column, createConfigFromFieldConfig(fieldConfig, legacyEncodingType));
           }
         }
       }
@@ -286,6 +277,39 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
       builder.withLegacyProperties(properties);
     }
     return builder.build();
+  }
+
+  /// Returns the canonical forward-index encoding for `fieldConfig`.
+  ///
+  /// Prefer `fieldConfig.indexes.forward.encodingType` when present. Fall back to the deprecated field-level
+  /// `fieldConfig.encodingType` for legacy conversion paths that can still inspect configs before validation.
+  @SuppressWarnings("deprecation")
+  public static FieldConfig.EncodingType getForwardEncodingType(FieldConfig fieldConfig) {
+    JsonNode indexes = fieldConfig.getIndexes();
+    if (indexes != null && indexes.isObject()) {
+      JsonNode forward = indexes.get(INDEX_DISPLAY_NAME);
+      if (forward != null && forward.isObject()) {
+        JsonNode encodingType = forward.get(ENCODING_TYPE_CONFIG_KEY);
+        if (encodingType != null && !encodingType.isNull()) {
+          return FieldConfig.EncodingType.valueOf(encodingType.asText());
+        }
+      }
+    }
+    return fieldConfig.getEncodingType();
+  }
+
+  /// Returns a copy of `indexes` with `indexes.forward.encodingType` set to `encodingType`.
+  public static JsonNode withForwardEncoding(@Nullable JsonNode indexes, FieldConfig.EncodingType encodingType) {
+    ObjectNode indexesNode = indexes != null && indexes.isObject()
+        ? (ObjectNode) indexes.deepCopy()
+        : JsonUtils.newObjectNode();
+    JsonNode forward = indexesNode.get(INDEX_DISPLAY_NAME);
+    ObjectNode forwardNode = forward != null && forward.isObject()
+        ? (ObjectNode) forward.deepCopy()
+        : JsonUtils.newObjectNode();
+    forwardNode.put(ENCODING_TYPE_CONFIG_KEY, encodingType.name());
+    indexesNode.set(INDEX_DISPLAY_NAME, forwardNode);
+    return indexesNode;
   }
 
   public static ChunkCompressionType getDefaultCompressionType(FieldSpec.FieldType fieldType) {
@@ -316,7 +340,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public boolean shouldInvalidateOnDictionaryChange(FieldSpec fieldSpec, ForwardIndexConfig indexConfig) {
-    // The forward index encoding is reconciled with FieldConfig.encodingType independently of dictionary state
+    // The forward index encoding is reconciled with ForwardIndexConfig independently of dictionary state
     // (apache/pinot#18364), so adding or removing a dictionary alone does not change the on-disk forward index
     // layout — the existing forward index can be reused.
     return false;

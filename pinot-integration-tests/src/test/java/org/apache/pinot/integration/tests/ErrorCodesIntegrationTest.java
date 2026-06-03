@@ -110,9 +110,8 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
 
   @Override
   protected List<FieldConfig> getFieldConfigs() {
-    return Collections.singletonList(
-        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-            FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
+    return Collections.singletonList(fieldConfigWithForwardEncoding("DivAirports", FieldConfig.EncodingType.DICTIONARY,
+        Collections.emptyList(), FieldConfig.CompressionCodec.MV_ENTRY_DICT, null));
   }
 
   @Test
