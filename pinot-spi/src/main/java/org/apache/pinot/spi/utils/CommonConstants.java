@@ -1323,6 +1323,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_EXECUTION_THREADS =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS = -1;  // Use number of CPU cores
+    public static final String DEFAULT_EXECUTION_THREADS = "default.execution.threads";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + DEFAULT_EXECUTION_THREADS;
+    public static final int DEFAULT_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS = -1;  // Not set; fall back to max
 
     // OOM protection: heap usage throttle configuration
     public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_QUEUE_MAX_SIZE =
