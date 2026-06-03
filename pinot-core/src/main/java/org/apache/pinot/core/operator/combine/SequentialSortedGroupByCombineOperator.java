@@ -71,7 +71,8 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
     assert (queryContext.shouldSortAggregateUnderSafeTrim());
     Comparator<Record> recordKeyComparator =
         OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
-            queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
+            queryContext.getGroupByExpressions(),
+            queryContext.isNullHandlingEnabled() || queryContext.isGroupingSetsQuery());
     _sortedRecordsMerger = new SortedRecordsMerger(queryContext, queryContext.getLimit(), recordKeyComparator);
   }
 

@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -69,19 +70,24 @@ public class ReducerDataSchemaUtils {
         queryContext.getFilteredAggregationFunctions();
     assert groupByExpressions != null && filteredAggregationFunctions != null;
     int numGroupByExpression = groupByExpressions.size();
+    // Number of leading key columns; for grouping-set queries this includes the synthetic $groupingId column.
+    int numKeyColumns = queryContext.getNumGroupByKeyColumns();
     int numAggregations = filteredAggregationFunctions.size();
-    int numColumns = numGroupByExpression + numAggregations;
+    int numColumns = numKeyColumns + numAggregations;
     String[] columnNames = new String[numColumns];
     Preconditions.checkState(dataSchema.size() == numColumns,
-        "BUG: Expect same number of group-by expressions, aggregations and columns in data schema, got %s group-by "
-            + "expressions, %s aggregations, %s columns in data schema", numGroupByExpression, numAggregations,
+        "BUG: Expect same number of key columns, aggregations and columns in data schema, got %s key "
+            + "columns, %s aggregations, %s columns in data schema", numKeyColumns, numAggregations,
         dataSchema.size());
     for (int i = 0; i < numGroupByExpression; i++) {
       columnNames[i] = groupByExpressions.get(i).toString();
     }
+    if (queryContext.isGroupingSetsQuery()) {
+      columnNames[numGroupByExpression] = GroupingSets.GROUPING_ID_COLUMN;
+    }
     for (int i = 0; i < numAggregations; i++) {
       Pair<AggregationFunction, FilterContext> pair = filteredAggregationFunctions.get(i);
-      columnNames[numGroupByExpression + i] =
+      columnNames[numKeyColumns + i] =
           AggregationFunctionUtils.getResultColumnName(pair.getLeft(), pair.getRight());
     }
     return new DataSchema(columnNames, dataSchema.getColumnDataTypes());

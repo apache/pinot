@@ -88,7 +88,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _numAggregationFunctions = _aggregationFunctions.length;
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    _numGroupByExpressions = groupByExpressions.size();
+    // Number of leading key columns (includes the synthetic $groupingId column for grouping-set queries).
+    _numGroupByExpressions = queryContext.getNumGroupByKeyColumns();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
   }
 
@@ -292,7 +293,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
         public void runJob() {
           try {
             for (DataTable dataTable : reduceGroup) {
-              boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+              // Grouping-set queries serialize rolled-up-NULL key columns via null bitmaps regardless of the
+              // null-handling mode, so the bitmaps must be read and applied here for them too.
+              boolean nullHandlingEnabled =
+                  _queryContext.isNullHandlingEnabled() || _queryContext.isGroupingSetsQuery();
               RoaringBitmap[] nullBitmaps = null;
               if (nullHandlingEnabled) {
                 nullBitmaps = new RoaringBitmap[_numColumns];

@@ -207,10 +207,13 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     List<ExpressionContext> groupByExpressions = _queryContext.getGroupByExpressions();
     assert aggregationFunctions != null && groupByExpressions != null;
-    int numKeyColumns = groupByExpressions.size();
+    // Includes the synthetic $groupingId key column for grouping-set queries (N + 1).
+    int numKeyColumns = _queryContext.getNumGroupByKeyColumns();
     Iterator<Record> iterator = _table.iterator();
     int numRowsAdded = 0;
-    if (_queryContext.isNullHandlingEnabled()) {
+    // Grouping-set queries always emit NULL for rolled-up columns, so they must use the null-bitmap path regardless
+    // of the null-handling mode (the plain setNull path writes a placeholder that corrupts variable-length columns).
+    if (_queryContext.isNullHandlingEnabled() || _queryContext.isGroupingSetsQuery()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {

@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -86,7 +87,9 @@ public class ResultsBlockUtils {
         queryContext.getFilteredAggregationFunctions();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert filteredAggregationFunctions != null && groupByExpressions != null;
-    int numColumns = groupByExpressions.size() + filteredAggregationFunctions.size();
+    // Includes the synthetic $groupingId key column for grouping-set queries, so an empty/pruned server's schema
+    // matches the schema returned by populated servers (otherwise broker reduce sees inconsistent column counts).
+    int numColumns = queryContext.getNumGroupByKeyColumns() + filteredAggregationFunctions.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
     int index = 0;
@@ -94,6 +97,11 @@ public class ResultsBlockUtils {
       columnNames[index] = groupByExpression.toString();
       // Use STRING column data type as default for group-by expressions
       columnDataTypes[index] = ColumnDataType.STRING;
+      index++;
+    }
+    if (queryContext.isGroupingSetsQuery()) {
+      columnNames[index] = GroupingSets.GROUPING_ID_COLUMN;
+      columnDataTypes[index] = ColumnDataType.INT;
       index++;
     }
     for (Pair<AggregationFunction, FilterContext> pair : filteredAggregationFunctions) {

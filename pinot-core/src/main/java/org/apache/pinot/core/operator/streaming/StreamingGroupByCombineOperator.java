@@ -80,7 +80,8 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     assert aggregationFunctions != null;
     _numAggregationFunctions = aggregationFunctions.length;
     assert _queryContext.getGroupByExpressions() != null;
-    _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
+    // Number of leading key columns (includes the synthetic $groupingId column for grouping-set queries).
+    _numGroupByExpressions = _queryContext.getNumGroupByKeyColumns();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
   }
 

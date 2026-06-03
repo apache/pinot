@@ -25,6 +25,8 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,6 +64,7 @@ import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Join;
 import org.apache.pinot.common.request.JoinType;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -490,6 +493,10 @@ public class CalciteSqlParser {
   public static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
     PinotQuery pinotQuery = compileWithoutRewrite(sqlNode);
     queryRewrite(pinotQuery);
+    // Rewrite GROUPING / GROUPING_ID after validation: it references the internal $groupingId column, which is not a
+    // GROUP BY column and would otherwise fail the group-by validation. The original GROUPING(col) form (whose
+    // argument is a group-by column) validates cleanly.
+    rewriteGroupingFunctions(pinotQuery);
     return pinotQuery;
   }
 
@@ -537,7 +544,7 @@ public class CalciteSqlParser {
     // GROUP-BY
     SqlNodeList groupByNodeList = selectNode.getGroup();
     if (groupByNodeList != null) {
-      pinotQuery.setGroupByList(convertSelectList(groupByNodeList));
+      convertGroupBy(pinotQuery, groupByNodeList);
     }
     // HAVING
     SqlNode havingNode = selectNode.getHaving();
@@ -688,6 +695,238 @@ public class CalciteSqlParser {
       selectExpr.add(toExpression(sqlNode));
     }
     return selectExpr;
+  }
+
+  /**
+   * Populates the GROUP BY clause of {@code pinotQuery}. For an ordinary GROUP BY this just sets the flat
+   * {@code groupByList} (no masks), preserving existing behavior. When the clause contains {@code ROLLUP},
+   * {@code CUBE}, {@code GROUPING SETS}, or an empty grouping set {@code ()}, it normalizes them into the
+   * de-duplicated union of group-by columns ({@code groupByList}) plus the participation bitmasks
+   * ({@code groupingSetsMasks}, one per grouping set) consumed by the engine. See {@link GroupingSets}.
+   */
+  private static void convertGroupBy(PinotQuery pinotQuery, SqlNodeList groupByNodeList) {
+    // GROUP BY DISTINCT wraps the whole element list in a single internal $GROUP_BY_DISTINCT call.
+    List<SqlNode> elements = groupByNodeList.getList();
+    boolean distinct = false;
+    if (elements.size() == 1 && elements.get(0).getKind() == SqlKind.GROUP_BY_DISTINCT) {
+      distinct = true;
+      elements = ((SqlBasicCall) elements.get(0)).getOperandList();
+    }
+    if (!hasGroupingSetConstruct(elements)) {
+      // Ordinary GROUP BY: keep the flat list, do not set masks (engine treats this as a single full set).
+      List<Expression> groupByList = new ArrayList<>(elements.size());
+      for (SqlNode element : elements) {
+        groupByList.add(toExpression(element));
+      }
+      pinotQuery.setGroupByList(groupByList);
+      return;
+    }
+    // Normalize ROLLUP/CUBE/GROUPING SETS into union columns + participation masks (Cartesian over elements).
+    // The column count is bounded in unionIndexOf (so masks cannot overflow) and the running set count is bounded
+    // here (so a wide CUBE cannot OOM by eagerly materializing 2^N masks).
+    Map<Expression, Integer> unionIndex = new LinkedHashMap<>();
+    List<List<Integer>> perElementMasks = new ArrayList<>(elements.size());
+    long setCount = 1;
+    for (SqlNode element : elements) {
+      List<Integer> elementMasks = expandGroupingElement(element, unionIndex);
+      setCount *= elementMasks.size();
+      checkGroupingSetCount(setCount);
+      perElementMasks.add(elementMasks);
+    }
+    List<Integer> masks = GroupingSets.crossProduct(perElementMasks);
+    if (distinct) {
+      // GROUP BY DISTINCT removes duplicate grouping sets.
+      masks = new ArrayList<>(new LinkedHashSet<>(masks));
+    }
+    pinotQuery.setGroupByList(new ArrayList<>(unionIndex.keySet()));
+    pinotQuery.setGroupingSetsMasks(masks);
+  }
+
+  private static void checkGroupingSetCount(long count) {
+    if (count > GroupingSets.MAX_GROUPING_SETS) {
+      throw new SqlCompilationException(
+          "GROUP BY produces too many grouping sets (limit " + GroupingSets.MAX_GROUPING_SETS
+              + "); reduce the size of ROLLUP / CUBE / GROUPING SETS");
+    }
+  }
+
+  private static boolean hasGroupingSetConstruct(List<SqlNode> elements) {
+    for (SqlNode element : elements) {
+      SqlKind kind = element.getKind();
+      if (kind == SqlKind.ROLLUP || kind == SqlKind.CUBE || kind == SqlKind.GROUPING_SETS
+          || (element instanceof SqlNodeList && ((SqlNodeList) element).size() == 0)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Expands one top-level GROUP BY element into the list of participation masks it contributes (the alternatives
+   * that the Cartesian product combines). Columns are registered into {@code unionIndex} in first-appearance order.
+   */
+  private static List<Integer> expandGroupingElement(SqlNode element, Map<Expression, Integer> unionIndex) {
+    switch (element.getKind()) {
+      case ROLLUP:
+        return GroupingSets.rollup(unionIndices(((SqlBasicCall) element).getOperandList(), unionIndex));
+      case CUBE: {
+        List<SqlNode> cubeColumns = ((SqlBasicCall) element).getOperandList();
+        // CUBE(n) expands to 2^n sets; reject before cube() materializes them (guard the shift against overflow).
+        int arity = cubeColumns.size();
+        checkGroupingSetCount(arity >= Long.SIZE - 1 ? Long.MAX_VALUE : 1L << arity);
+        return GroupingSets.cube(unionIndices(cubeColumns, unionIndex));
+      }
+      case GROUPING_SETS: {
+        List<Integer> masks = new ArrayList<>();
+        for (SqlNode item : ((SqlBasicCall) element).getOperandList()) {
+          masks.addAll(expandGroupingSetItem(item, unionIndex));
+          checkGroupingSetCount(masks.size());
+        }
+        return masks;
+      }
+      default:
+        // A plain column, a parenthesized set (SqlNodeList), or a row of columns (e.g. the empty set () or (a, b)).
+        return List.of(setMask(element, unionIndex));
+    }
+  }
+
+  /** Expands a single {@code GROUPING SETS} item, which is one set (parenthesized list, row, or column) or a nested
+   * ROLLUP/CUBE/GROUPING SETS. */
+  private static List<Integer> expandGroupingSetItem(SqlNode item, Map<Expression, Integer> unionIndex) {
+    SqlKind kind = item.getKind();
+    if (kind == SqlKind.ROLLUP || kind == SqlKind.CUBE || kind == SqlKind.GROUPING_SETS) {
+      return expandGroupingElement(item, unionIndex);
+    }
+    return List.of(setMask(item, unionIndex));
+  }
+
+  /**
+   * Participation mask for one grouping set described by a node. A parenthesized group arrives either as a
+   * {@link SqlNodeList} (e.g. the empty set {@code ()}) or as a {@code ROW} call (e.g. {@code (a, b)}); a bare column
+   * arrives as itself. Empty group => mask 0 (the grand total).
+   */
+  private static int setMask(SqlNode node, Map<Expression, Integer> unionIndex) {
+    List<SqlNode> columns;
+    if (node instanceof SqlNodeList) {
+      columns = ((SqlNodeList) node).getList();
+    } else if (node.getKind() == SqlKind.ROW) {
+      columns = ((SqlBasicCall) node).getOperandList();
+    } else {
+      return GroupingSets.maskOf(unionIndexOf(node, unionIndex));
+    }
+    int mask = 0;
+    for (SqlNode column : columns) {
+      mask |= GroupingSets.maskOf(unionIndexOf(column, unionIndex));
+    }
+    return mask;
+  }
+
+  private static int[] unionIndices(List<SqlNode> columns, Map<Expression, Integer> unionIndex) {
+    int[] indices = new int[columns.size()];
+    for (int i = 0; i < columns.size(); i++) {
+      indices[i] = unionIndexOf(columns.get(i), unionIndex);
+    }
+    return indices;
+  }
+
+  /** Returns the stable union index of a group-by column, assigning a new one (in first-appearance order) if new. */
+  private static int unionIndexOf(SqlNode column, Map<Expression, Integer> unionIndex) {
+    Expression expression = toExpression(column);
+    Integer index = unionIndex.get(expression);
+    if (index != null) {
+      return index;
+    }
+    int newIndex = unionIndex.size();
+    // Bound the union here so participation masks (1 << index) cannot overflow the 32-bit int.
+    if (newIndex >= GroupingSets.MAX_GROUP_BY_COLUMNS) {
+      throw new SqlCompilationException("GROUPING SETS / ROLLUP / CUBE support at most "
+          + GroupingSets.MAX_GROUP_BY_COLUMNS + " group-by columns");
+    }
+    unionIndex.put(expression, newIndex);
+    return newIndex;
+  }
+
+  /**
+   * Rewrites every {@code GROUPING(col)} / {@code GROUPING_ID(c1, ..., cp)} call in SELECT / HAVING / ORDER BY into a
+   * scalar over the synthetic {@code $groupingId} column. Each argument column is resolved to a bit shift
+   * ({@code numColumns - 1 - unionIndex}) against the GROUP BY union. Indicator functions are only valid with a
+   * grouping-set GROUP BY (ROLLUP / CUBE / GROUPING SETS).
+   */
+  private static void rewriteGroupingFunctions(PinotQuery pinotQuery) {
+    boolean hasGroupingSets = pinotQuery.getGroupingSetsMasks() != null;
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    Map<Expression, Integer> unionIndex = new HashMap<>();
+    if (groupByList != null) {
+      for (int i = 0; i < groupByList.size(); i++) {
+        unionIndex.putIfAbsent(groupByList.get(i), i);
+      }
+    }
+    int numColumns = unionIndex.size();
+    if (pinotQuery.getSelectList() != null) {
+      for (Expression expression : pinotQuery.getSelectList()) {
+        rewriteGroupingExpression(expression, hasGroupingSets, unionIndex, numColumns);
+      }
+    }
+    if (pinotQuery.getHavingExpression() != null) {
+      rewriteGroupingExpression(pinotQuery.getHavingExpression(), hasGroupingSets, unionIndex, numColumns);
+    }
+    if (pinotQuery.getOrderByList() != null) {
+      for (Expression expression : pinotQuery.getOrderByList()) {
+        rewriteGroupingExpression(expression, hasGroupingSets, unionIndex, numColumns);
+      }
+    }
+  }
+
+  private static void rewriteGroupingExpression(Expression expression, boolean hasGroupingSets,
+      Map<Expression, Integer> unionIndex, int numColumns) {
+    if (expression.getType() != ExpressionType.FUNCTION) {
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    if (isGroupingFunction(function.getOperator())) {
+      if (!hasGroupingSets) {
+        throw new SqlCompilationException(
+            "GROUPING / GROUPING_ID can only be used with GROUP BY ROLLUP / CUBE / GROUPING SETS");
+      }
+      rewriteGroupingCall(function, unionIndex, numColumns);
+      return;
+    }
+    List<Expression> operands = function.getOperands();
+    if (operands != null) {
+      for (Expression operand : operands) {
+        rewriteGroupingExpression(operand, hasGroupingSets, unionIndex, numColumns);
+      }
+    }
+  }
+
+  private static boolean isGroupingFunction(String operator) {
+    return operator.equalsIgnoreCase("grouping") || operator.equalsIgnoreCase("groupingid")
+        || operator.equalsIgnoreCase("grouping_id");
+  }
+
+  private static void rewriteGroupingCall(Function function, Map<Expression, Integer> unionIndex, int numColumns) {
+    List<Expression> columns = function.getOperands();
+    int[] shifts = new int[columns.size()];
+    for (int i = 0; i < columns.size(); i++) {
+      Integer index = unionIndex.get(columns.get(i));
+      if (index == null) {
+        throw new SqlCompilationException("Argument of GROUPING / GROUPING_ID must be a GROUP BY column: "
+            + RequestUtils.prettyPrint(columns.get(i)));
+      }
+      // $groupingId bit (numColumns - 1 - index) holds GROUPING(column); see GroupingSets conventions.
+      shifts[i] = numColumns - 1 - index;
+    }
+    Expression groupingIdColumn = RequestUtils.getIdentifierExpression(GroupingSets.GROUPING_ID_COLUMN);
+    if (function.getOperator().equalsIgnoreCase("grouping") && shifts.length == 1) {
+      // GROUPING(col) => grouping($groupingId, shift)
+      function.setOperator("grouping");
+      function.setOperands(new ArrayList<>(List.of(groupingIdColumn, RequestUtils.getLiteralExpression(shifts[0]))));
+    } else {
+      // GROUPING_ID(c1..cp) (or GROUPING with multiple args) => groupingId($groupingId, [shifts])
+      function.setOperator("groupingid");
+      function.setOperands(new ArrayList<>(
+          List.of(groupingIdColumn, RequestUtils.getLiteralExpression(RequestUtils.getLiteral(shifts)))));
+    }
   }
 
   private static List<Expression> convertOrderByList(SqlNodeList orderList) {

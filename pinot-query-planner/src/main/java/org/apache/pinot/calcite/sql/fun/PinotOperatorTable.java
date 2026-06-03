@@ -204,6 +204,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.VAR_POP,
       SqlStdOperatorTable.VAR_SAMP,
       SqlStdOperatorTable.SUM0,
+      // GROUPING / GROUPING_ID indicator aggregates for GROUP BY ROLLUP / CUBE / GROUPING SETS. They are expanded into
+      // per-grouping-set literals by GroupingSetsExpander before reaching the physical planner.
+      SqlStdOperatorTable.GROUPING,
+      SqlStdOperatorTable.GROUPING_ID,
 
       // WINDOW Rank Functions
       SqlStdOperatorTable.DENSE_RANK,

@@ -33,6 +33,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.GroupingSets;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.DataSchema;
@@ -73,10 +74,17 @@ public class TableResizer {
 
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     assert groupByExpressions != null;
-    _numGroupByExpressions = groupByExpressions.size();
+    int numGroupByExpressions = groupByExpressions.size();
+    // Aggregations begin after the key columns, which for grouping-set queries include the synthetic $groupingId.
+    _numGroupByExpressions = queryContext.getNumGroupByKeyColumns();
     _groupByExpressionIndexMap = new HashMap<>();
-    for (int i = 0; i < _numGroupByExpressions; i++) {
+    for (int i = 0; i < numGroupByExpressions; i++) {
       _groupByExpressionIndexMap.put(groupByExpressions.get(i), i);
+    }
+    // Register the synthetic $groupingId column (index N) so ORDER BY GROUPING() / GROUPING_ID() resolves to it.
+    if (queryContext.isGroupingSetsQuery()) {
+      _groupByExpressionIndexMap.put(
+          ExpressionContext.forIdentifier(GroupingSets.GROUPING_ID_COLUMN), numGroupByExpressions);
     }
 
     _aggregationFunctions = queryContext.getAggregationFunctions();
@@ -96,7 +104,9 @@ public class TableResizer {
       comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
       nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
     }
-    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    // Grouping-set queries emit NULL for rolled-up columns, so ORDER BY on those columns needs the null-safe
+    // comparator regardless of the null-handling mode.
+    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled() || queryContext.isGroupingSetsQuery();
     if (nullHandlingEnabled) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {
