@@ -249,7 +249,17 @@ public class OpChainSchedulerService {
       }
     }, MoreExecutors.directExecutor());
 
-    _executorService.submit(listenableFutureTask);
+    try {
+      _executorService.submit(listenableFutureTask);
+    } catch (RuntimeException e) {
+      // The MSE executor is wrapped in HardLimitExecutor + heap throttling, so submit() can throw
+      // RejectedExecutionException. When it does, the task never runs and the directExecutor FutureCallback above
+      // (which decrements the active-opchain counter and removes the per-request context entry) never fires. Back
+      // out that bookkeeping here so the entry — and the QueryExecutionContext it pins — does not leak until a later
+      // cancel. Then rethrow so the caller propagates the failure as a stage error.
+      decrementActiveOpChains(requestId);
+      throw e;
+    }
   }
 
   private void decrementActiveOpChains(long requestId) {

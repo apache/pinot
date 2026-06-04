@@ -75,17 +75,23 @@ public class OpChainExecutionContext {
    * ({@code MultiStageStatsTreeEncoder}) to attach plan-node identifiers to each operator's stats.
    * <p>
    * Identity-based (IdentityHashMap) because PlanNode equality is structural and two distinct nodes can compare equal.
+   * <p>
+   * Lazily allocated (only stream-mode stats reporting populates it), so legacy queries — the default — allocate
+   * nothing here. Written only during single-threaded opchain construction, read only at stats-report time after the
+   * opchain has run, so the lifecycle establishes the happens-before; no volatile/synchronization is needed.
    */
-  private final Map<MultiStageOperator, List<PlanNode>> _operatorToPlanNodes = new IdentityHashMap<>();
+  @Nullable
+  private Map<MultiStageOperator, List<PlanNode>> _operatorToPlanNodes;
   /**
    * Stage-scoped plan-node ids: each PlanNode reachable from the opchain's root receives a sequential integer id
    * assigned by a deterministic pre-order walk. Both broker and server perform the same walk over the same plan
    * structure, so the ids match without being serialized on the wire. Used by {@code MultiStageStatsTreeEncoder} to
    * populate {@code StageStatsNode.plan_node_ids}.
    * <p>
-   * Identity-based for the same reason as {@link #_operatorToPlanNodes}.
+   * Identity-based for the same reason as {@link #_operatorToPlanNodes}; lazily allocated for the same reason too.
    */
-  private final Map<PlanNode, Integer> _planNodeIds = new IdentityHashMap<>();
+  @Nullable
+  private Map<PlanNode, Integer> _planNodeIds;
 
   @VisibleForTesting
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, String cid, long activeDeadlineMs,
@@ -226,6 +232,19 @@ public class OpChainExecutionContext {
     return _sendStats;
   }
 
+  /**
+   * Whether stats for this opchain are reported out-of-band via the {@code SubmitWithStream} bidi RPC (stream mode),
+   * rather than piggybacked on the mailbox EOS (legacy mode). Set server-side by the {@code SubmitWithStream} handler
+   * via {@link CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE}. This is the only mode that consumes
+   * the per-operator plan-node ids, so the id pre-walk in {@code PlanNodeToOpChain} is gated on it — gating on
+   * {@link #isSendStats()} instead would both waste work on every legacy query (the default) and, conversely, skip
+   * the walk in stream mode (where {@code sendStats} is forced off), leaving the ids unpopulated.
+   */
+  public boolean isStreamStatsReporting() {
+    return CommonConstants.MultiStageQueryRunner.STATS_REPORTING_MODE_STREAM.equals(
+        _opChainMetadata.get(CommonConstants.MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE));
+  }
+
   public boolean isKeepPipelineBreakerStats() {
     return _keepPipelineBreakerStats;
   }
@@ -236,6 +255,9 @@ public class OpChainExecutionContext {
    * mutate it after passing it in.
    */
   public void recordPlanNodesForOperator(MultiStageOperator operator, List<PlanNode> planNodes) {
+    if (_operatorToPlanNodes == null) {
+      _operatorToPlanNodes = new IdentityHashMap<>();
+    }
     _operatorToPlanNodes.put(operator, planNodes);
   }
 
@@ -243,7 +265,7 @@ public class OpChainExecutionContext {
    * Returns the PlanNodes that compiled down to the given operator, or an empty list if no mapping was recorded.
    */
   public List<PlanNode> getPlanNodesForOperator(MultiStageOperator operator) {
-    return _operatorToPlanNodes.getOrDefault(operator, List.of());
+    return _operatorToPlanNodes == null ? List.of() : _operatorToPlanNodes.getOrDefault(operator, List.of());
   }
 
   /**
@@ -251,6 +273,9 @@ public class OpChainExecutionContext {
    * {@link org.apache.pinot.query.runtime.plan.PlanNodeToOpChain} pre-walk.
    */
   public void recordPlanNodeId(PlanNode node, int id) {
+    if (_planNodeIds == null) {
+      _planNodeIds = new IdentityHashMap<>();
+    }
     _planNodeIds.put(node, id);
   }
 
@@ -258,7 +283,7 @@ public class OpChainExecutionContext {
    * Returns the stage-scoped id assigned to the given PlanNode, or {@code -1} if no id was recorded for it.
    */
   public int getPlanNodeId(PlanNode node) {
-    Integer id = _planNodeIds.get(node);
+    Integer id = _planNodeIds == null ? null : _planNodeIds.get(node);
     return id != null ? id : -1;
   }
 

@@ -560,8 +560,9 @@ public class QueryRunner {
    *   <li>Collecting stats synchronously on the cancel path required an extra fan-out RPC to every participating
    *       server on every query failure — at high QPS this produced an amplified load spike on already-stressed
    *       servers, risking a cascade (see {@code QueryDispatcher.tryRecover} for full rationale).</li>
-   *   <li>The call site that consumed the returned stats was reverted at the same time, leaving the overhead with
-   *       no benefit.</li>
+   *   <li>This change also removes the only consumer of those stats ({@code QueryDispatcher.tryRecover}, which on
+   *       master merged them into the error result), so retaining the synchronous collection would be pure overhead
+   *       with no benefit.</li>
    * </ul>
    * Stats on the error path are now collected out-of-band via the {@code SubmitWithStream} stream in stream mode:
    * servers push {@code OpChainComplete} messages independently and the broker drains whatever arrives within the

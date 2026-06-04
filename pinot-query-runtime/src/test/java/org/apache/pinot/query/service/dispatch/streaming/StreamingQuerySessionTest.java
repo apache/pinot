@@ -221,8 +221,9 @@ public class StreamingQuerySessionTest {
    * mutates the existing node before recursing into children, the partially-merged node is discarded from the
    * accumulator (it may be corrupt), the stage is marked merge-failed, and the query still completes.
    *
-   * <p>Note: the second worker still counts toward {@code respondedByStage} because its payload decoded
-   * successfully — the failure occurred at merge time, not decode time.
+   * <p>Note: the second worker is counted as {@code mergeFailed} and NOT as {@code responded}, even though its payload
+   * decoded successfully — counting it as both would make {@code responded + mergeFailed} exceed the expected opchain
+   * count for the stage, so the coverage triple would not reconcile.
    */
   @Test
   public void testShapeMismatchDoesNotAbortQuery()
@@ -240,9 +241,9 @@ public class StreamingQuerySessionTest {
     Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
         "query should complete despite shape mismatch");
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    // Both workers decoded successfully, so both count as responded.
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 2,
-        "both workers decoded successfully so both count as responded");
+    // Only worker 0 merged cleanly; worker 1's merge failed, so responded + mergeFailed = 2 = expected (reconciles).
+    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
+        "only the cleanly-merged worker counts as responded");
     Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
         "second worker's shape-mismatched opchain should be counted as merge-failed");
     Assert.assertNull(coverage.getStageAccumulator().get(0),

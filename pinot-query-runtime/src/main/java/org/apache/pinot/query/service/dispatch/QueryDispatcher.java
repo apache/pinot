@@ -91,6 +91,7 @@ import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.PlanVersions;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
@@ -115,9 +116,10 @@ public class QueryDispatcher {
    *       stats before building the error result.</li>
    * </ul>
    * In both cases stats collection is best-effort — a single slow opchain must not hold the client response until
-   * the full query deadline.
+   * the full query deadline. The wait window is configurable via
+   * {@link CommonConstants.Broker#CONFIG_OF_STREAM_STATS_DRAIN_MS}.
    */
-  private static final long STATS_DRAIN_MS = 50L;
+  private final long _statsDrainMs;
 
   private final MailboxService _mailboxService;
   private final ExecutorService _executorService;
@@ -138,23 +140,24 @@ public class QueryDispatcher {
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
-        DispatchClient.KeepAliveConfig.DISABLED, false);
+        DispatchClient.KeepAliveConfig.DISABLED, false, CommonConstants.Broker.DEFAULT_STREAM_STATS_DRAIN_MS);
   }
 
   /// Overload that accepts gRPC keep-alive settings for broker dispatch channels. A non-positive `keepAliveTimeMs`
   /// disables keep-alive.
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, int keepAliveTimeMs, int keepAliveTimeoutMs,
-      boolean keepAliveWithoutCalls, boolean streamStatsDefault) {
+      boolean keepAliveWithoutCalls, boolean streamStatsDefault, long statsDrainMs) {
     this(mailboxService, failureDetector, tlsConfig, enableCancellation, cancelTimeout,
         new DispatchClient.KeepAliveConfig(keepAliveTimeMs, keepAliveTimeoutMs, keepAliveWithoutCalls),
-        streamStatsDefault);
+        streamStatsDefault, statsDrainMs);
   }
 
   private QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation, Duration cancelTimeout, DispatchClient.KeepAliveConfig keepAliveConfig,
-      boolean streamStatsDefault) {
+      boolean streamStatsDefault, long statsDrainMs) {
     _cancelTimeout = cancelTimeout;
+    _statsDrainMs = statsDrainMs;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
@@ -294,8 +297,8 @@ public class QueryDispatcher {
       QueryResult brokerResult = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
 
       // Receiving mailbox finished — data is ready. Wait for stats on a best-effort basis; cap at
-      // STATS_DRAIN_ON_SUCCESS_MS so a single slow opchain cannot delay the client response.
-      long statsWaitMs = Math.min(STATS_DRAIN_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
+      // _statsDrainMs so a single slow opchain cannot delay the client response.
+      long statsWaitMs = Math.min(_statsDrainMs, Math.max(0, deadlineMs - System.currentTimeMillis()));
       boolean fullCoverage = session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
       if (!fullCoverage) {
         LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
@@ -494,7 +497,7 @@ public class QueryDispatcher {
     session.fanOutCancel();
     // Cap the wait: the query result is already determined, so we collect stats on a best-effort basis only.
     // Using the full remaining timeout here would regress error-path latency to the query deadline.
-    long statsWaitMs = Math.min(STATS_DRAIN_MS, Math.max(0, deadlineMs - System.currentTimeMillis()));
+    long statsWaitMs = Math.min(_statsDrainMs, Math.max(0, deadlineMs - System.currentTimeMillis()));
     try {
       session.awaitCompletion(statsWaitMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException ie) {

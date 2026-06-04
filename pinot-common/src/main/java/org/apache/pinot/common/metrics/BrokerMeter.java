@@ -263,6 +263,16 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       create("MSE_STREAM_STATS_INCOMPLETE_COVERAGE", "queries", true);
 
   /**
+   * Number of non-empty cancel broadcasts sent by stream-mode queries to their peer servers. A broadcast is
+   * triggered by the first peer error or by a broker-side processing exception; a single query can contribute more
+   * than one (e.g. a peer error followed by a recovery-path cancel), so this counts broadcasts rather than affected
+   * queries. At high QPS during a partial degradation this can amplify into a cancel storm, so operators can watch
+   * this counter to detect that condition.
+   */
+  public static final BrokerMeter MSE_STREAM_STATS_CANCEL_FANOUTS =
+      create("MSE_STREAM_STATS_CANCEL_FANOUTS", "broadcasts", true);
+
+  /**
    * How many MSE queries have encountered segments with invalid partitions.
    * <p>
    * This is only emitted for when usePhysicalOptimizer is set to true.

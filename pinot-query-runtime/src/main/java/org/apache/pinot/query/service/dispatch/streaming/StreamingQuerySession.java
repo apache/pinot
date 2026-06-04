@@ -27,6 +27,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.runtime.plan.MultiStageStatsTreeDecoder;
 import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
@@ -160,11 +162,16 @@ public class StreamingQuerySession {
             stageId, message.getWorkerId(), _requestId, decodeError.getMessage());
         incrementLocked(_mergeFailedByStage, stageId);
       } else if (decoded != null) {
-        mergeIntoAccumulatorLocked(decoded.getCurrentStageId(), decoded.getCurrentStage());
+        boolean currentMerged = mergeIntoAccumulatorLocked(decoded.getCurrentStageId(), decoded.getCurrentStage());
         for (Map.Entry<Integer, StageStatsTreeNode> upstream : decoded.getUpstreamStages().entrySet()) {
           mergeIntoAccumulatorLocked(upstream.getKey(), upstream.getValue());
         }
-        incrementLocked(_respondedByStage, stageId);
+        // Count this opchain as responded only when its current-stage merge succeeded. On a shape mismatch,
+        // mergeIntoAccumulatorLocked already recorded mergeFailed for the stage; counting it as responded too would
+        // make responded + mergeFailed exceed expected for that stage, so the coverage triple would not reconcile.
+        if (currentMerged) {
+          incrementLocked(_respondedByStage, stageId);
+        }
       } else {
         // Successful opchain with no stats tree (e.g. empty plan). Still counts as responded.
         incrementLocked(_respondedByStage, stageId);
@@ -178,14 +185,20 @@ public class StreamingQuerySession {
     }
   }
 
-  private void mergeIntoAccumulatorLocked(int stageId, StageStatsTreeNode incoming) {
+  /**
+   * Merges {@code incoming} into the accumulator for {@code stageId}. Returns {@code true} if it was stored or merged
+   * cleanly, {@code false} if the merge hit a {@link StageStatsTreeNode.ShapeMismatchException} (in which case the
+   * stage is recorded as merge-failed).
+   */
+  private boolean mergeIntoAccumulatorLocked(int stageId, StageStatsTreeNode incoming) {
     StageStatsTreeNode existing = _stageAccumulator.get(stageId);
     if (existing == null) {
       _stageAccumulator.put(stageId, incoming);
-      return;
+      return true;
     }
     try {
       existing.merge(incoming);
+      return true;
     } catch (StageStatsTreeNode.ShapeMismatchException e) {
       // StageStatsTreeNode.merge mutates _statMap before recursing into children, so a ShapeMismatchException
       // thrown during child recursion leaves the existing node in a partially-accumulated state. Remove it so
@@ -193,6 +206,7 @@ public class StreamingQuerySession {
       _stageAccumulator.remove(stageId);
       LOGGER.warn("Shape mismatch merging stage {} on request {}: {}", stageId, _requestId, e.getMessage());
       incrementLocked(_mergeFailedByStage, stageId);
+      return false;
     }
   }
 
@@ -244,6 +258,12 @@ public class StreamingQuerySession {
       snapshot = new LinkedHashSet<>(_openStreams);
     } finally {
       _lock.unlock();
+    }
+    if (!snapshot.isEmpty()) {
+      // Observable signal that a query broadcast cancel to its peers. fanOutCancel can fire more than once for a
+      // single query (e.g. a peer error then a recovery-path cancel), so this counts non-empty broadcasts, not
+      // affected queries — at high QPS during a partial degradation it can amplify, so it is worth watching in prod.
+      BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_CANCEL_FANOUTS, 1L);
     }
     for (StreamingServerHandle stream : snapshot) {
       try {

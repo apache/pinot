@@ -175,7 +175,10 @@ message StageStatsNode {
   int32 operator_type_id = 1;
   // Plan node ids that compile down to this operator. One-to-many; the leaf
   // operator typically owns the whole sub-tree of v1 plan nodes below the leaf
-  // boundary. Stable per request via PlanNode.getNodeId().
+  // boundary. These are NOT PlanNode.getNodeId() -- they are stage-scoped
+  // sequential ids assigned by PlanNodeToOpChain's pre-order walk. All workers
+  // of a stage walk the same plan structure, so the ids are consistent across
+  // that stage's workers (and are serialized here on the wire).
   repeated int32 plan_node_ids = 2;
   // Opaque StatMap bytes -- same encoding the existing StatMap.serialize
   // produces. The broker decodes by looking up the StatMap key class via

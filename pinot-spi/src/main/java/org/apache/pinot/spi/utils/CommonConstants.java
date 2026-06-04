@@ -558,6 +558,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_STREAM_STATS = "pinot.broker.mse.stream.stats";
     public static final boolean DEFAULT_STREAM_STATS = false;
 
+    /// Best-effort wait window (ms) the broker spends draining out-of-band per-stage stats after the result mailbox
+    /// has finished, in stream-stats mode. Bounded by the query's remaining deadline. A larger value yields more
+    /// complete stats when some stage is slow to report, at the cost of up to this much added latency on a query
+    /// whose results are already in hand. Applies only to the {@code SubmitWithStream} stats path.
+    public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
+    public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 

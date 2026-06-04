@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.query.service.dispatch.streaming;
 
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,6 +142,15 @@ public class StreamingDispatchObserver
 
   @Override
   public void onError(@Nullable Throwable t) {
+    if (t != null && Status.fromThrowable(t).getCode() == Status.Code.UNIMPLEMENTED) {
+      // Stream-stats mode has no automatic fallback to the unary Submit path (by design). A server that does not
+      // implement the SubmitWithStream RPC fails every MSE query while the flag is on, so surface why loudly: this
+      // is the rolling-upgrade / rollback hazard for enabling stream stats on a mixed-version cluster.
+      LOGGER.error("Server {} does not implement the SubmitWithStream RPC that stream-stats mode requires. Disable "
+              + "stream stats (query option '{}' or broker config '{}') until every server is upgraded; there is no "
+              + "automatic fallback, so this query fails.", _server,
+          CommonConstants.Broker.Request.QueryOptionKey.STREAM_STATS, CommonConstants.Broker.CONFIG_OF_STREAM_STATS);
+    }
     int remaining = Math.max(0, _expectedOpChainsForThisServer - _opChainsReportedForThisServer);
     _session.recordStreamError(this, t, remaining);
     if (_ackReceived.compareAndSet(false, true)) {

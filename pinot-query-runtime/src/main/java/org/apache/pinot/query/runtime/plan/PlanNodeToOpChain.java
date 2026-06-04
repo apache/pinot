@@ -97,11 +97,13 @@ public class PlanNodeToOpChain {
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
     // Assign deterministic stage-scoped ids to every PlanNode reachable from the root before constructing operators,
-    // so the encoder can attach plan_node_ids to each StageStatsNode without needing to mutate or re-walk the plan.
-    // Both broker and server perform this same pre-walk over the same plan structure, producing matching ids.
-    // Skip the walk (and the per-opchain map population) when stats are not going to be sent — this is the common case
-    // in legacy mode and avoids O(depth) allocations on the hot path.
-    if (context.isSendStats()) {
+    // so the stream-mode stats encoder can attach plan_node_ids to each StageStatsNode without needing to mutate or
+    // re-walk the plan. All workers of a stage perform this same pre-walk over the same plan structure (the ids are
+    // serialized on the wire), producing matching ids. Gate on stream-mode — the only consumer of these ids
+    // (MultiStageStatsTreeEncoder) — rather than isSendStats(): isSendStats() is true by default (legacy SAFE mode)
+    // where the ids are never read (pure GC dead weight on the hot path) yet false in stream mode (where they ARE
+    // needed), so gating on it is both wasteful and incorrect.
+    if (context.isStreamStatsReporting()) {
       assignPlanNodeIds(node, context);
     }
     MyVisitor visitor = new MyVisitor(context, tracker);
@@ -176,10 +178,11 @@ public class PlanNodeToOpChain {
      * Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
      * to {@code node}. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
      * PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
-     * <p>No-op when the context is not sending stats — avoids the O(depth) sub-tree walk on the legacy hot path.
+     * <p>No-op outside stream-mode stats reporting (the only consumer of this mapping) — avoids the O(depth) sub-tree
+     * walk on the legacy hot path. See {@link OpChainExecutionContext#isStreamStatsReporting()}.
      */
     void record(PlanNode node, MultiStageOperator operator) {
-      if (!_context.isSendStats()) {
+      if (!_context.isStreamStatsReporting()) {
         return;
       }
       List<PlanNode> mapping;
