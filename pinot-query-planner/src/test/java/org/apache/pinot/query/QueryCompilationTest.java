@@ -73,6 +73,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertNotNull(dispatchableSubPlan);
   }
 
+  @Test
+  public void testLookupFunctionSupportsQualifiedJoinColumn() {
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT lookup('b', 'col1', 'col2', e.col1) FROM a AS e JOIN b AS d ON e.col1 = d.col2");
+    assertNotNull(dispatchableSubPlan);
+  }
+
   @Test(dataProvider = "testUnaryOperatorQueries")
   public void testUnaryPrefixOperatorsPlanQuery(String query) {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(query);
