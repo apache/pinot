@@ -42,6 +42,11 @@ public class JsonIndexQuickStart extends Quickstart {
     printStatus(Color.YELLOW, "Most contributed repos by 'LombiqBot'");
     printStatus(Color.CYAN, "Query : " + q1);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+
+    String q2 = "select count(*) from githubEvents where json_match(actor, '\"$.login\"!=''LombiqBot''')";
+    printStatus(Color.YELLOW, "Events from actors other than 'LombiqBot'");
+    printStatus(Color.CYAN, "Query : " + q2);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
     printStatus(Color.GREEN, "***************************************************");
   }
 

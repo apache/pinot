@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.realtime.impl.json.MutableJsonIndexImpl;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OffHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.OnHeapJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
@@ -164,6 +165,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+      assertDirectDocIdSidecar(onHeapBuffer);
+      assertDirectDocIdSidecar(offHeapBuffer);
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -260,6 +263,87 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
+  @Test
+  public void testScalarOnlyImmutableJsonIndexUsesIdentityMarker()
+      throws Exception {
+    String[] records = new String[]{
+        "{\"name\":\"adam\",\"age\":20,\"score\":1.25,\"dir\":\"downstream\"}",
+        "{\"name\":\"bob\",\"age\":25,\"score\":1.94,\"dir\":\"upstream\"}",
+        "{\"name\":\"charles\",\"age\":30,\"score\":0.90}",
+        "{\"name\":\"david\",\"age\":35,\"score\":0.9999,\"dir\":\"side\"}"
+    };
+    JsonIndexConfig jsonIndexConfig = getIndexConfig();
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
+        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+      assertOmittedDocIdMappingIdentityMarker(onHeapBuffer);
+      assertOmittedDocIdMappingIdentityMarker(offHeapBuffer);
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+
+      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapReader, offHeapReader, mutableJsonIndex};
+      for (JsonIndexReader reader : indexReaders) {
+        assertDocIds(reader, "\"$.dir\" = 'downstream'", ids(0));
+        assertDocIds(reader, "\"$.dir\" IN ('downstream', 'side')", ids(0, 3));
+        assertDocIds(reader, "\"$.age\" >= 25", ids(1, 2, 3));
+        assertDocIds(reader, "REGEXP_LIKE(\"$.name\", '.*a.*')", ids(0, 2, 3));
+        assertDocIds(reader, "\"$.dir\" IS NULL", ids(2));
+        assertDocIds(reader, "\"$.dir\" IS NOT NULL", ids(0, 1, 3));
+      }
+    }
+  }
+
+  @Test
+  public void testScalarPathUsesDocIdsWhenOtherPathHasArrays()
+      throws Exception {
+    String[] records = new String[]{
+        "{\"dir\":\"downstream\",\"tags\":[\"a\",\"b\"]}",
+        "{\"dir\":\"upstream\",\"tags\":[\"a\"]}",
+        "{\"tags\":[\"a\",\"b\",\"c\"]}",
+        "{\"dir\":\"side\",\"metadata\":{\"values\":[1,2]}}"
+    };
+    JsonIndexConfig jsonIndexConfig = getIndexConfig();
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
+        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+      JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapReader, offHeapReader, mutableJsonIndex};
+      for (JsonIndexReader reader : indexReaders) {
+        assertDocIds(reader, "\"$.dir\" = 'downstream'", ids(0));
+        assertDocIds(reader, "\"$.dir\" != 'upstream'", ids(0, 3));
+        assertDocIds(reader, "\"$.dir\" IN ('downstream', 'side')", ids(0, 3));
+        assertDocIds(reader, "\"$.dir\" NOT IN ('upstream', 'side')", ids(0));
+        assertDocIds(reader, "\"$.dir\" IS NULL", ids(2));
+        assertDocIds(reader, "\"$.dir\" IS NOT NULL", ids(0, 1, 3));
+      }
+    }
+  }
+
   private int[] empty() {
     return new int[0];
   }
@@ -275,6 +359,31 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     } catch (AssertionError ae) {
       throw new AssertionError(" index: " + indexReader.getClass().getSimpleName() + " " + ae.getMessage(), ae);
     }
+  }
+
+  private void assertOmittedDocIdMappingIdentityMarker(PinotDataBuffer buffer) {
+    assertEquals(buffer.getInt(0), BaseJsonIndexCreator.VERSION_3);
+    long dictionaryLength = buffer.getLong(8);
+    long invertedIndexLength = buffer.getLong(16);
+    long docIdMappingLength = buffer.getLong(24);
+    assertEquals(docIdMappingLength, 0L);
+    long docIdMappingEndOffset =
+        BaseJsonIndexCreator.HEADER_LENGTH + dictionaryLength + invertedIndexLength + docIdMappingLength;
+    assertEquals(buffer.size(), docIdMappingEndOffset + BaseJsonIndexCreator.DIRECT_DOC_ID_INDEX_HEADER_LENGTH);
+    assertEquals(buffer.getLong(docIdMappingEndOffset), 0L);
+    assertEquals(buffer.getLong(docIdMappingEndOffset + Long.BYTES), 0L);
+  }
+
+  private void assertDirectDocIdSidecar(PinotDataBuffer buffer) {
+    assertEquals(buffer.getInt(0), BaseJsonIndexCreator.VERSION_2);
+    long dictionaryLength = buffer.getLong(8);
+    long invertedIndexLength = buffer.getLong(16);
+    long docIdMappingLength = buffer.getLong(24);
+    assertTrue(docIdMappingLength > 0);
+    long docIdMappingEndOffset =
+        BaseJsonIndexCreator.HEADER_LENGTH + dictionaryLength + invertedIndexLength + docIdMappingLength;
+    assertTrue(buffer.getLong(docIdMappingEndOffset) > 0);
+    assertTrue(buffer.getLong(docIdMappingEndOffset + Long.BYTES) > 0);
   }
 
   @Test
