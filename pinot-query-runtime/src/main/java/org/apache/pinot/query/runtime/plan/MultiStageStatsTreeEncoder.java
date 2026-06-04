@@ -21,8 +21,10 @@ package org.apache.pinot.query.runtime.plan;
 import com.google.protobuf.ByteString;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
@@ -44,9 +46,16 @@ import org.apache.pinot.query.runtime.operator.OperatorTypeDescriptor;
  * {@link StatMap} bytes, the recursive children, and the stage-scoped plan-node ids gathered from the
  * {@link OpChainExecutionContext} during opchain construction.
  *
- * <p>Currently only the current-stage tree is encoded. Upstream stages reach the broker via the upstream opchains'
- * own reports in stream mode, so per-opchain reporting of upstream-stage trees is not needed except for the
- * pipeline-breaker case (handled in a follow-up).
+ * <p>Only the current-stage tree is encoded. Upstream stages reach the broker via the upstream opchains' own
+ * reports in stream mode, so per-opchain reporting of upstream-stage trees is not needed.
+ *
+ * <p><b>Pipeline breakers.</b> A pipeline breaker (dynamic-broadcast semi-join / lookup-join build side) runs as a
+ * pre-stage sub-execution: its operators are folded into the leaf opchain's flat stats (an inorder prefix before
+ * the {@code LEAF} entry — see {@code LeafOperator.calculateUpstreamStats}), but they are <b>not</b> children of the
+ * {@code LeafOperator} in the live operator tree. To keep the tree walk aligned with the flat list, callers pass the
+ * pipeline-breaker's root operator via {@code pipelineBreakerRoot}; the encoder grafts it as a child of the
+ * {@code LEAF} node, so the encoded tree matches what the legacy mailbox path serializes
+ * ({@code MAILBOX_SEND -> LEAF -> PIPELINE_BREAKER -> MAILBOX_RECEIVE}).
  */
 public final class MultiStageStatsTreeEncoder {
   private MultiStageStatsTreeEncoder() {
@@ -59,7 +68,18 @@ public final class MultiStageStatsTreeEncoder {
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       OpChainExecutionContext context)
       throws IOException {
-    return encode(root, stats, op -> resolvePlanNodeIds(op, context));
+    return encode(root, stats, context, null);
+  }
+
+  /**
+   * As {@link #encode(MultiStageOperator, MultiStageQueryStats, OpChainExecutionContext)} but grafts the given
+   * pipeline-breaker root operator as a child of the {@code LEAF} node (see the class Javadoc). Pass {@code null}
+   * when the stage has no pipeline breaker.
+   */
+  public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
+      OpChainExecutionContext context, @Nullable MultiStageOperator pipelineBreakerRoot)
+      throws IOException {
+    return encode(root, stats, op -> resolvePlanNodeIds(op, context), pipelineBreakerRoot);
   }
 
   /**
@@ -84,8 +104,20 @@ public final class MultiStageStatsTreeEncoder {
   public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
       Function<MultiStageOperator, List<Integer>> planNodeIdResolver)
       throws IOException {
+    return encode(root, stats, planNodeIdResolver, null);
+  }
+
+  /**
+   * As {@link #encode(MultiStageOperator, MultiStageQueryStats, Function)} but grafts {@code pipelineBreakerRoot}
+   * (if non-null) as a child of the {@code LEAF} node so the walked operator tree aligns with the leaf opchain's
+   * folded flat stats. See the class Javadoc.
+   */
+  public static Worker.MultiStageStatsTree encode(MultiStageOperator root, MultiStageQueryStats stats,
+      Function<MultiStageOperator, List<Integer>> planNodeIdResolver,
+      @Nullable MultiStageOperator pipelineBreakerRoot)
+      throws IOException {
     MultiStageQueryStats.StageStats.Open openStats = stats.getCurrentStats();
-    int treeSize = countOperators(root);
+    int treeSize = countOperators(root, pipelineBreakerRoot);
     int flatSize = openStats.getLastOperatorIndex() + 1;
     if (treeSize != flatSize) {
       throw new IllegalStateException("Operator tree size (" + treeSize + ") does not match flat stats list size ("
@@ -93,7 +125,7 @@ public final class MultiStageStatsTreeEncoder {
           + ". This usually means an operator failed before emitting EOS.");
     }
     int[] cursor = new int[]{0};
-    Worker.StageStatsNode rootNode = encodeNode(root, openStats, cursor, planNodeIdResolver);
+    Worker.StageStatsNode rootNode = encodeNode(root, openStats, cursor, planNodeIdResolver, pipelineBreakerRoot);
     return Worker.MultiStageStatsTree.newBuilder()
         .setCurrentStageId(stats.getCurrentStageId())
         .setCurrentStage(rootNode)
@@ -102,12 +134,13 @@ public final class MultiStageStatsTreeEncoder {
 
   private static Worker.StageStatsNode encodeNode(MultiStageOperator op,
       MultiStageQueryStats.StageStats openStats, int[] cursor,
-      Function<MultiStageOperator, List<Integer>> planNodeIdResolver)
+      Function<MultiStageOperator, List<Integer>> planNodeIdResolver,
+      @Nullable MultiStageOperator pipelineBreakerRoot)
       throws IOException {
     Worker.StageStatsNode.Builder builder = Worker.StageStatsNode.newBuilder();
     // Inorder: encode children first.
-    for (MultiStageOperator child : op.getChildOperators()) {
-      builder.addChildren(encodeNode(child, openStats, cursor, planNodeIdResolver));
+    for (MultiStageOperator child : effectiveChildren(op, pipelineBreakerRoot)) {
+      builder.addChildren(encodeNode(child, openStats, cursor, planNodeIdResolver, pipelineBreakerRoot));
     }
     int idx = cursor[0]++;
     OperatorTypeDescriptor type = openStats.getOperatorType(idx);
@@ -122,12 +155,31 @@ public final class MultiStageStatsTreeEncoder {
     return builder.build();
   }
 
-  private static int countOperators(MultiStageOperator op) {
+  private static int countOperators(MultiStageOperator op, @Nullable MultiStageOperator pipelineBreakerRoot) {
     int count = 1;
-    for (MultiStageOperator child : op.getChildOperators()) {
-      count += countOperators(child);
+    for (MultiStageOperator child : effectiveChildren(op, pipelineBreakerRoot)) {
+      count += countOperators(child, pipelineBreakerRoot);
     }
     return count;
+  }
+
+  /**
+   * The operators to recurse into for {@code op}. This is {@code op.getChildOperators()}, except that a folded
+   * pipeline breaker is grafted as a child of the {@code LEAF} node: the pipeline breaker ran pre-stage and is not a
+   * live child of the {@code LeafOperator}, but its operators occupy the inorder prefix of the leaf opchain's flat
+   * stats, so grafting it here realigns the tree walk with the flat list. The graft only applies at the {@code LEAF}
+   * (the sole place a pipeline breaker folds into); the pipeline-breaker subtree itself contains no {@code LEAF}, so
+   * there is no double-graft.
+   */
+  private static List<MultiStageOperator> effectiveChildren(MultiStageOperator op,
+      @Nullable MultiStageOperator pipelineBreakerRoot) {
+    List<MultiStageOperator> children = op.getChildOperators();
+    if (pipelineBreakerRoot == null || op.getOperatorType() != MultiStageOperator.Type.LEAF) {
+      return children;
+    }
+    List<MultiStageOperator> withGraft = new ArrayList<>(children);
+    withGraft.add(pipelineBreakerRoot);
+    return withGraft;
   }
 
   private static ByteString serializeStatMap(StatMap<?> statMap)

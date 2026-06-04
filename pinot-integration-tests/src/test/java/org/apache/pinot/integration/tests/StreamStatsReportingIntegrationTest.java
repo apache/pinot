@@ -23,11 +23,15 @@ import java.io.File;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.intellij.lang.annotations.Language;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -60,7 +64,15 @@ import static org.testng.Assert.assertTrue;
  */
 public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationTestSet {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamStatsReportingIntegrationTest.class);
   private static final String STREAM_OPTION = "streamStats=true";
+
+  // Dimension table used by testSemiJoinPipelineBreaker to force a dynamic-broadcast (pipeline-breaker) semi-join.
+  private static final String DIM_TABLE = "daysOfWeek";
+  private static final String DIM_TABLE_DATA_PATH = "dimDayOfWeek_data.csv";
+  private static final String DIM_TABLE_SCHEMA_PATH = "dimDayOfWeek_schema.json";
+  private static final String DIM_TABLE_TABLE_CONFIG_PATH = "dimDayOfWeek_config.json";
+  private static final int DIM_NUMBER_OF_RECORDS = 7;
 
   @BeforeClass
   public void setUp()
@@ -81,12 +93,38 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
+    // Wait for the main table to finish loading BEFORE uploading the dimension table — otherwise the dimension
+    // table's own (shorter) load wait competes with the main table's bulk load and can time out.
     waitForAllDocsLoaded(600_000L);
+
+    setupDimensionTable();
+  }
+
+  /**
+   * Sets up the {@value #DIM_TABLE} dimension table, broadcast as the build side of the semi-join in
+   * {@link #testSemiJoinPipelineBreaker}, which makes the planner emit a {@code PIPELINE_BREAKER} exchange.
+   */
+  private void setupDimensionTable()
+      throws Exception {
+    Schema dimSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
+    addSchema(dimSchema);
+    TableConfig dimTableConfig = createTableConfig(DIM_TABLE_TABLE_CONFIG_PATH);
+    dimTableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), getServerTenant(), null));
+    addTableConfig(dimTableConfig);
+    createAndUploadSegmentFromClasspath(dimTableConfig, dimSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+        DIM_NUMBER_OF_RECORDS, 60_000);
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
+    // Drop the dimension table best-effort: if setUp failed before creating it, this must not abort cluster
+    // shutdown (otherwise the embedded ZK/controller leaks and the next run hits "table already exists").
+    try {
+      dropOfflineTable(DIM_TABLE);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to drop dimension table {} during teardown (continuing shutdown)", DIM_TABLE, e);
+    }
     stopServer();
     stopBroker();
     stopController();
@@ -201,6 +239,84 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     JsonNode coverage = response.get("streamStatsCoverage");
     assertTrue(coverage.size() >= 4,
         "Three-way UNION should produce at least 4 stages, coverage size: " + coverage.size());
+  }
+
+  /**
+   * Dynamic-broadcast semi-join — exercises the {@code PIPELINE_BREAKER} path, which is the case that double-counted
+   * opchain completions before the fix. A pipeline-breaker opchain is built from the same
+   * {@link org.apache.pinot.query.runtime.plan.OpChainExecutionContext} as its stage's main (leaf) opchain, so it
+   * carries an identical {@code OpChainId} and fires the server-side completion listener too. If it were reported as
+   * a separate stage it would satisfy the expected-opchain count one early, prematurely emit {@code ServerDone}, and
+   * the real leaf opchain's stats would be dropped.
+   *
+   * <p>This guards both observable variants of that bug:
+   * <ul>
+   *   <li>{@link #assertFullCoverage} catches the missing / shape-mismatch variant (responded/missing/mergeFailed
+   *   would not reconcile);</li>
+   *   <li>the per-stage tree assertion catches the silent-replacement variant — where the pipeline-breaker's own
+   *   tree is recorded as the stage with {@code missing=0} — by requiring the leaf stage to still carry the folded
+   *   pipeline-breaker subtree ({@code LEAF → MAILBOX_RECEIVE → MAILBOX_SEND → LEAF}), exactly as the legacy
+   *   mailbox path reports it.</li>
+   * </ul>
+   */
+  @Test
+  public void testSemiJoinPipelineBreaker()
+      throws Exception {
+    // Broadcasting the small dimension table as the build side of the IN semi-join makes the planner emit a
+    // PIPELINE_BREAKER exchange on the mytable leaf stage (same query shape the legacy testStageStatsPipelineBreaker
+    // relies on).
+    @Language("sql")
+    String sql = "SELECT * FROM mytable WHERE DayOfWeek IN (SELECT dayId FROM daysOfWeek)";
+    JsonNode response = postWithStreamStats(sql);
+
+    assertFalse(hasExceptions(response), "Semi-join should succeed without exceptions");
+    assertNotNull(response.get("resultTable"), "Result table must be present");
+
+    // Counters must reconcile. Catches the missing-stats / shape-mismatch variants of premature ServerDone.
+    assertFullCoverage(response);
+
+    // The leaf stage's tree must still carry the folded pipeline-breaker subtree: a LEAF node whose children
+    // include a MAILBOX_RECEIVE (the dynamic-broadcast build side that ran as a pipeline breaker). This is the
+    // shape the legacy mailbox path reports. With the bug, the pipeline-breaker opchain double-counted against
+    // the expected total, firing ServerDone before the real leaf opchain reported — so the leaf stage's tree was
+    // either dropped (missing) or replaced by the pipeline-breaker's own MAILBOX_RECEIVE-rooted tree, and this
+    // pattern would be absent. assertFullCoverage above cannot catch the silent-replacement case (the broker sees
+    // the pipeline-breaker's event as the stage's single response, so missing=0), which is why we assert the tree.
+    JsonNode stageStats = response.get("stageStats");
+    assertNotNull(stageStats, "stageStats tree must be present");
+    assertTrue(hasLeafWithPipelineBreaker(stageStats),
+        "leaf stage must carry the folded pipeline-breaker subtree (LEAF with a nested MAILBOX_RECEIVE child); "
+            + "its absence means the real leaf opchain's stats were dropped or replaced by the pipeline breaker's. "
+            + "Actual tree: " + stageStats.toPrettyString());
+  }
+
+  /**
+   * Recursively searches the stats tree for a {@code LEAF} node that has at least one {@code MAILBOX_RECEIVE} child —
+   * the signature of a dynamic-broadcast build side that executed as a pipeline breaker and had its stats folded into
+   * the leaf opchain's tree.
+   */
+  private static boolean hasLeafWithPipelineBreaker(JsonNode node) {
+    if (node == null || node.isNull()) {
+      return false;
+    }
+    JsonNode children = node.get("children");
+    if ("LEAF".equals(node.path("type").asText())) {
+      if (children != null) {
+        for (JsonNode child : children) {
+          if ("MAILBOX_RECEIVE".equals(child.path("type").asText())) {
+            return true;
+          }
+        }
+      }
+    }
+    if (children != null) {
+      for (JsonNode child : children) {
+        if (hasLeafWithPipelineBreaker(child)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**

@@ -31,9 +31,11 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.SortOperator;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -200,6 +202,64 @@ public class MultiStageStatsTreeEncoderTest {
     MultiStageStatsTreeEncoder.encode(root, stats, op -> List.of());
   }
 
+  /**
+   * Pipeline-breaker graft: a leaf opchain's live operator tree is {@code MAILBOX_SEND -> LEAF} (the pipeline breaker
+   * ran as a pre-stage sub-execution and is NOT a live child of the {@code LeafOperator}), but its folded flat stats
+   * are {@code [MAILBOX_RECEIVE, PIPELINE_BREAKER, LEAF, MAILBOX_SEND]}. Passing the pipeline-breaker root operator
+   * must graft it as the {@code LEAF}'s child so the encoded tree is
+   * {@code MAILBOX_SEND -> LEAF -> PIPELINE_BREAKER -> MAILBOX_RECEIVE} (matching the legacy mailbox shape), using the
+   * pipeline breaker's real operator arities.
+   */
+  @Test
+  public void testPipelineBreakerGraft()
+      throws IOException {
+    MultiStageOperator pbReceive = mockOperator();                                  // PB's MAILBOX_RECEIVE (no child)
+    MultiStageOperator pbRoot = mockOperator(MultiStageOperator.Type.PIPELINE_BREAKER, pbReceive);
+    MultiStageOperator leaf = mockOperator(MultiStageOperator.Type.LEAF);            // no live children
+    MultiStageOperator send = mockOperator(leaf);                                   // MAILBOX_SEND -> LEAF
+
+    StatMap<BaseMailboxReceiveOperator.StatKey> receiveStat =
+        new StatMap<>(BaseMailboxReceiveOperator.StatKey.class)
+            .merge(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS, 7);
+    StatMap<PipelineBreakerOperator.StatKey> pbStat =
+        new StatMap<>(PipelineBreakerOperator.StatKey.class)
+            .merge(PipelineBreakerOperator.StatKey.EMITTED_ROWS, 7);
+    StatMap<LeafOperator.StatKey> leafStat =
+        new StatMap<>(LeafOperator.StatKey.class).merge(LeafOperator.StatKey.EMITTED_ROWS, 100);
+    StatMap<MailboxSendOperator.StatKey> sendStat =
+        new StatMap<>(MailboxSendOperator.StatKey.class).merge(MailboxSendOperator.StatKey.EXECUTION_TIME_MS, 3);
+
+    // Flat stats are inorder (children before parents): the folded pipeline-breaker prefix precedes the LEAF entry.
+    MultiStageQueryStats stats = new MultiStageQueryStats.Builder(1)
+        .customizeOpen(open -> open
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE, receiveStat)
+            .addLastOperator(MultiStageOperator.Type.PIPELINE_BREAKER, pbStat)
+            .addLastOperator(MultiStageOperator.Type.LEAF, leafStat)
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND, sendStat))
+        .build();
+
+    Worker.MultiStageStatsTree tree = MultiStageStatsTreeEncoder.encode(send, stats, op -> List.of(), pbRoot);
+
+    Worker.StageStatsNode sendNode = tree.getCurrentStage();
+    Assert.assertEquals(sendNode.getOperatorTypeId(), MultiStageOperator.Type.MAILBOX_SEND.getId());
+    Assert.assertEquals(sendNode.getChildrenCount(), 1);
+
+    Worker.StageStatsNode leafNode = sendNode.getChildren(0);
+    Assert.assertEquals(leafNode.getOperatorTypeId(), MultiStageOperator.Type.LEAF.getId());
+    Assert.assertEquals(leafNode.getChildrenCount(), 1, "pipeline breaker must be grafted as the leaf's child");
+
+    Worker.StageStatsNode pbNode = leafNode.getChildren(0);
+    Assert.assertEquals(pbNode.getOperatorTypeId(), MultiStageOperator.Type.PIPELINE_BREAKER.getId());
+    Assert.assertEquals(pbNode.getChildrenCount(), 1);
+
+    Worker.StageStatsNode receiveNode = pbNode.getChildren(0);
+    Assert.assertEquals(receiveNode.getOperatorTypeId(), MultiStageOperator.Type.MAILBOX_RECEIVE.getId());
+    Assert.assertEquals(receiveNode.getChildrenCount(), 0);
+
+    // The grafted subtree's stat bytes round-trip from the folded flat list.
+    Assert.assertEquals(deserialize(receiveNode.getStatMap(), BaseMailboxReceiveOperator.StatKey.class), receiveStat);
+  }
+
   // ---- helpers ----
 
   private static MultiStageOperator mockOperator(MultiStageOperator... children) {
@@ -207,6 +267,13 @@ public class MultiStageStatsTreeEncoderTest {
     Mockito.when(op.getChildOperators()).thenReturn(children.length == 0
         ? Collections.emptyList()
         : Arrays.asList(children));
+    return op;
+  }
+
+  /** As {@link #mockOperator} but also stubs {@link MultiStageOperator#getOperatorType()} (read by the graft logic). */
+  private static MultiStageOperator mockOperator(MultiStageOperator.Type type, MultiStageOperator... children) {
+    MultiStageOperator op = mockOperator(children);
+    Mockito.when(op.getOperatorType()).thenReturn(type);
     return op;
   }
 

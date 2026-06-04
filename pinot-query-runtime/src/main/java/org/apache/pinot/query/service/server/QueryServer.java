@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -493,6 +494,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     private final AtomicInteger _expectedOpChains = new AtomicInteger(-1);
     /// Number of opchains that have reported so far via the completion listener.
     private final AtomicInteger _completedOpChains = new AtomicInteger(0);
+    /// Pipeline-breaker root operators awaiting their stage's main (leaf) opchain, keyed by {@link OpChainId}. A
+    /// pipeline-breaker opchain shares the same OpChainId as its leaf opchain and is not reported as a separate
+    /// stage; its operators are folded into the leaf's flat stats but are absent from the leaf's live operator tree,
+    /// so we stash the PB root here and graft it onto the leaf when the leaf opchain reports (see
+    /// {@link #onOpChainComplete} and {@link MultiStageStatsTreeEncoder}). Keyed by OpChainId to support multiple
+    /// PB-bearing leaf opchains per request (multiple leaf stages / workers). The PB opchain completes strictly
+    /// before its leaf — the leaf consumes the PB results, gated on the PB's CountDownLatch in
+    /// {@code PipelineBreakerExecutor}, which establishes a happens-before from this {@code put} to the leaf's
+    /// {@code remove}; {@link ConcurrentHashMap} also makes the cross-executor-thread read safe directly.
+    private final Map<OpChainId, MultiStageOperator> _pipelineBreakerRoots = new ConcurrentHashMap<>();
     /// Set once we successfully parse the request id from the submit metadata. Used by cancel-via-stream.
     private volatile long _requestId = -1;
     /// Completed once {@link #sendSubmitAck} has been called (success or error path). Guards the ack/done race:
@@ -615,6 +626,21 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
      */
     private void onOpChainComplete(OpChainId opChainId, MultiStageOperator rootOperator,
         @Nullable MultiStageQueryStats stats, OpChainExecutionContext context, @Nullable Throwable error) {
+      // A pipeline-breaker opchain (dynamic-broadcast semi-join / lookup-join build side) is built from the SAME
+      // OpChainExecutionContext as its stage's main (leaf) opchain, so it carries an identical OpChainId and fires
+      // this listener too. It must NOT be reported as a separate stage:
+      //   - _expectedOpChains counts only the main per-worker opchains, so counting the PB here would make
+      //     _completedOpChains reach the expected total one early, prematurely firing ServerDone and causing the
+      //     real opchain's OpChainComplete to be dropped by the !_completed.get() guard at the send site.
+      //   - its stats are not lost: the PB's operators are already folded into the leaf opchain's flat stats (via
+      //     LeafOperator.calculateUpstreamStats, exactly as in the legacy mailbox path), but they are absent from
+      //     the leaf's live operator tree, which is what the encoder walks. So we stash the PB root here and graft
+      //     it onto the leaf below, letting the stage report once — when its leaf opchain completes — with one
+      //     coherent tree.
+      if (rootOperator.getOperatorType() == MultiStageOperator.Type.PIPELINE_BREAKER) {
+        _pipelineBreakerRoots.put(opChainId, rootOperator);
+        return;
+      }
       Worker.OpChainComplete.Builder builder = Worker.OpChainComplete.newBuilder()
           .setStageId(opChainId.getStageId())
           .setWorkerId(opChainId.getVirtualServerId())
@@ -622,9 +648,15 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       if (error != null) {
         builder.setErrorMsg(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage());
       }
+      // Claim any stashed pipeline-breaker root for this stage (remove() so the stash self-cleans, even on the
+      // leaf-error path below where it is unused). The PB always completed before this leaf opchain (see
+      // _pipelineBreakerRoots), so it is already present when the stage folded one.
+      MultiStageOperator pipelineBreakerRoot = _pipelineBreakerRoots.remove(opChainId);
       if (stats != null) {
+        // If this stage folded a pipeline breaker, graft its stashed operator subtree onto the leaf so the encoder's
+        // tree walk realigns with the leaf opchain's folded flat stats.
         try {
-          builder.setStats(MultiStageStatsTreeEncoder.encode(rootOperator, stats, context));
+          builder.setStats(MultiStageStatsTreeEncoder.encode(rootOperator, stats, context, pipelineBreakerRoot));
         } catch (Throwable t) {
           // Encoding failed — no partial stats can be recovered. The encoder is all-or-nothing by design:
           //   1. The upfront treeSize != flatSize check throws IllegalStateException before any proto node is built.
