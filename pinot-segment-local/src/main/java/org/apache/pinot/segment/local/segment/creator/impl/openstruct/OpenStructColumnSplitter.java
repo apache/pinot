@@ -69,15 +69,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Splits an OPEN_STRUCT column into per-key materialized columns using standard Pinot index
- * creators. Dense keys become independent virtual columns; remaining keys go into a single
- * synthetic JSON column for sparse storage.
- *
- * <p>Lifecycle: instantiated by {@code BaseSegmentCreator} for OPEN_STRUCT columns. Receives
- * per-doc {@code Map<String, Object>} values via {@link #add(Map, int)}, accumulates in memory,
- * then on {@link #seal()} writes per-key column files using standard creators.
- */
+/// Splits an OPEN_STRUCT column into per-key materialized columns using standard Pinot index
+/// creators. Dense keys become independent virtual columns; remaining keys go into a single
+/// synthetic JSON column for sparse storage.
+///
+/// Lifecycle: instantiated by `BaseSegmentCreator` for OPEN_STRUCT columns. Receives
+/// per-doc `Map<String, Object>` values via [#add(Map, int)], accumulates in memory,
+/// then on [#seal()] writes per-key column files using standard creators.
 public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OpenStructColumnSplitter.class);
@@ -138,18 +136,14 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     throw new UnsupportedOperationException("OPEN_STRUCT index is single-value only");
   }
 
-  /**
-   * Returns the resolved dense-key set after {@link #seal()} or {@link #classify()}.
-   * Returns an empty set before resolution.
-   */
+  /// Returns the resolved dense-key set after [#seal()] or [#classify()].
+  /// Returns an empty set before resolution.
   public Set<String> getResolvedDenseKeys() {
     return _resolvedDenseKeys != null ? Collections.unmodifiableSet(_resolvedDenseKeys) : Set.of();
   }
 
-  /**
-   * Resolves dense vs sparse keys without writing any files. Exposed for testing and for callers
-   * that need the classification independent of file output. {@link #seal()} calls this internally.
-   */
+  /// Resolves dense vs sparse keys without writing any files. Exposed for testing and for callers
+  /// that need the classification independent of file output. [#seal()] calls this internally.
   public Set<String> classify() {
     if (_resolvedDenseKeys != null) {
       return _resolvedDenseKeys;
@@ -347,11 +341,9 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
     _materializedColumnMetadata.put(materializedCol, props);
   }
 
-  /**
-   * Decides dictionary vs raw encoding for a materialized child column, mirroring the three steps of
-   * {@code BaseSegmentCreator.createDictionaryForColumn} with standard default flags (optimizeDictionary
-   * off => dictionary unless explicitly disabled and not required by an enabled index).
-   */
+  /// Decides dictionary vs raw encoding for a materialized child column, mirroring the three steps of
+  /// `BaseSegmentCreator.createDictionaryForColumn` with standard default flags (optimizeDictionary
+  /// off => dictionary unless explicitly disabled and not required by an enabled index).
   private boolean resolveUseDictionary(FieldSpec childFieldSpec, FieldIndexConfigs fieldIndexConfigs,
       AbstractColumnStatisticsCollector statsCollector) {
     if (DictionaryIndexConfig.requiresDictionary(childFieldSpec, fieldIndexConfigs)) {
@@ -365,12 +357,10 @@ public class OpenStructColumnSplitter implements ColumnarOpenStructIndexCreator 
         statsCollector.getCardinality(), statsCollector.getTotalNumberOfEntries());
   }
 
-  /**
-   * Writes the dictionary (when used) plus all vetted, enabled indexes for a materialized child column through
-   * the standard index-creator family, driven from a single per-doc loop. Returns the dictionary element size in
-   * bytes (0 when raw-encoded), for column metadata. The dictionary is built separately because its build
-   * lifecycle is CUSTOM and it supplies the dictIds the per-row creators consume.
-   */
+  /// Writes the dictionary (when used) plus all vetted, enabled indexes for a materialized child column through
+  /// the standard index-creator family, driven from a single per-doc loop. Returns the dictionary element size in
+  /// bytes (0 when raw-encoded), for column metadata. The dictionary is built separately because its build
+  /// lifecycle is CUSTOM and it supplies the dictIds the per-row creators consume.
   private int writeColumnIndexes(String materializedCol, DataType storedType, RoaringBitmap presence,
       List<Object> values, Object defaultValue, AbstractColumnStatisticsCollector statsCollector,
       boolean useDictionary, FieldIndexConfigs fieldIndexConfigs, FieldSpec childFieldSpec)
