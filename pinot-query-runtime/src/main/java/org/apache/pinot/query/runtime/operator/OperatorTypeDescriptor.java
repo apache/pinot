@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 
 
@@ -72,9 +72,10 @@ public interface OperatorTypeDescriptor {
   void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
 
   /**
-   * Updates server-side metrics from this operator's stats. Default implementation is a no-op; override when the
-   * operator produces metrics that should be recorded on the server at query completion.
+   * Updates MSE metrics from this operator's stats. Default implementation is a no-op; override when the operator
+   * produces metrics that should be recorded at query completion. Emissions are routed by the active
+   * {@link MseMetrics} mode (server / mse / dual).
    */
-  default void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
+  default void updateMseMetrics(StatMap<?> map, MseMetrics mseMetrics) {
   }
 }

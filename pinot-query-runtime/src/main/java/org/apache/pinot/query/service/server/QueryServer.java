@@ -40,8 +40,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
@@ -168,10 +168,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
             "query_submission_executor_on_" + _port + "_port",
             CommonConstants.Server.DEFAULT_MULTISTAGE_SUBMISSION_EXEC_TYPE);
 
-    ServerMetrics serverMetrics = ServerMetrics.get();
+    MseMetrics mseMetrics = MseMetrics.get();
     _submissionExecutorService = new MetricsExecutor(baseExecutorService,
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_STARTED_TASKS),
-        serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_SUBMISSION_COMPLETED_TASKS));
+        mseMetrics.getMeteredValue(MseMeter.SUBMISSION_STARTED_TASKS),
+        mseMetrics.getMeteredValue(MseMeter.SUBMISSION_COMPLETED_TASKS));
 
     NamedThreadFactory explainThreadFactory = new NamedThreadFactory("query_explain_on_" + _port + "_port");
     _explainExecutorService = Executors.newSingleThreadExecutor(explainThreadFactory);
@@ -265,7 +265,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
     // Match the SSE QUERIES counter semantics by counting requests as soon as they reach the handler.
-    ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
+    MseMetrics.get().addMeteredGlobalValue(MseMeter.QUERIES, 1L);
     Map<String, String> reqMetadata;
     try {
       reqMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
@@ -557,7 +557,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         sendErrorAndComplete("Multiple submit messages on the same stream are not allowed");
         return;
       }
-      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.MSE_QUERIES, 1L);
+      // Count stream-path (SubmitWithStream) queries the same way the unary submit() path does, via the MseMetrics
+      // abstraction master introduced (MseMeter.QUERIES forwards to ServerMeter.MSE_QUERIES in SERVER mode).
+      MseMetrics.get().addMeteredGlobalValue(MseMeter.QUERIES, 1L);
       Map<String, String> deserializedMetadata;
       try {
         deserializedMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());

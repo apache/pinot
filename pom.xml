@@ -181,12 +181,12 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-9</zstd-jni.version>
+    <zstd-jni.version>1.5.7-10</zstd-jni.version>
     <lz4-java.version>1.11.0</lz4-java.version>
     <libthrift.verion>0.23.0</libthrift.verion>
     <log4j.version>2.26.0</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.134.Final</netty.version>
+    <netty.version>4.1.135.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.4.0</h3.version>
@@ -196,7 +196,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.46.0</aws.sdk.version>
+    <aws.sdk.version>2.46.2</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
     <azure.msal4j.version>1.25.0</azure.msal4j.version>
     <joda-time.version>2.14.2</joda-time.version>
@@ -307,12 +307,12 @@
     <javassist.version>3.31.0-GA</javassist.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
-    <jna.version>5.18.1</jna.version>
+    <jna.version>5.19.0</jna.version>
     <jnr-ffi.version>2.2.19</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.10.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.3.21</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.4.0</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
     <okio.version>3.17.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
@@ -320,7 +320,7 @@
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.13.0</c3p0.version>
+    <c3p0.version>0.14.0</c3p0.version>
     <mchange-commons-java.version>0.5.0</mchange-commons-java.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
 
@@ -1188,6 +1188,21 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- Hadoop pulls org.eclipse.jetty (and org.eclipse.jetty.websocket) for its embedded
+               HttpServer2 web UIs, which downstream Pinot modules never start. These leak into
+               runtime distributions and carry CVE-2026-2332 (jetty-http request smuggling). Exclude
+               centrally here so every module depending on Hadoop is covered by default. Note: this
+               does NOT strip the relocated Jetty bundled inside the hadoop-client-runtime uber-jar
+               (org.apache.hadoop.shaded.org.eclipse.jetty); that is handled by the maven-shade-plugin
+               filter further down in this pom. -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1208,6 +1223,15 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1219,6 +1243,17 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
+          </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332).
+               For hadoop-client the compile-scoped leak path is
+               hadoop-yarn-client -> websocket-client -> jetty-client -> jetty-http. -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1260,6 +1295,15 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1267,6 +1311,17 @@
         <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+        <exclusions>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -2802,6 +2857,23 @@
 
                 <!-- Exclude NettyInstance because it includes Netty package literals -->
                 <exclude>src/main/java/org/apache/pinot/core/transport/NettyInstance.java</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- hadoop-client-runtime is a Hadoop uber-jar that bundles its own relocated Jetty
+                   (org.apache.hadoop.shaded.org.eclipse.jetty). It exists only for Hadoop's embedded
+                   HttpServer2 web UIs, which Pinot input-format / filesystem plugins never start, so
+                   the classes are unreachable, but the leftover jetty-* Maven metadata still makes
+                   scanners flag CVE-2026-2332 (jetty-http request smuggling). A Maven exclusion
+                   cannot remove these because the classes are baked into the uber-jar rather than
+                   resolved as a dependency node, so strip them from any shaded jar here. -->
+              <artifact>org.apache.hadoop:hadoop-client-runtime</artifact>
+              <excludes>
+                <exclude>org/apache/hadoop/shaded/org/eclipse/jetty/**</exclude>
+                <exclude>META-INF/maven/org.eclipse.jetty/**</exclude>
+                <exclude>META-INF/maven/org.eclipse.jetty.websocket/**</exclude>
+                <!-- ServiceLoader entries whose implementation classes are removed above. -->
+                <exclude>META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty.**</exclude>
               </excludes>
             </filter>
           </filters>

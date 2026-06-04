@@ -436,6 +436,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
+      prepareCompiledQueryForPlanning(compiledQuery, requestId, requestContext, httpHeaders);
 
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
@@ -595,6 +596,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.STREAMING_GROUP_BY_FLUSH_THRESHOLD,
           _defaultStreamingGroupByFlushThreshold);
     }
+  }
+
+  /**
+   * Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
+   * broker defaults, but before planning/explain. Subclasses can use the validated table set from
+   * {@link QueryEnvironment.CompiledQuery#getTableNames()} without re-parsing SQL.
+   */
+  protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
+      RequestContext requestContext, HttpHeaders httpHeaders) {
   }
 
   private long getTimeoutMs(Map<String, String> queryOptions) {

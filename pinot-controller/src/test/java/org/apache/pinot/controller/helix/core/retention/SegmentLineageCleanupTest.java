@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.retention;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.lineage.LineageEntry;
@@ -51,6 +52,10 @@ public class SegmentLineageCleanupTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String OFFLINE_TABLE_NAME = "segmentTable_OFFLINE";
   private static final String REFRESH_OFFLINE_TABLE_NAME = "refreshSegmentTable_OFFLINE";
+  private static final String RETENTION_WINDOW_OFFLINE_TABLE_NAME = "retentionWindowSegmentTable_OFFLINE";
+  // Short retention so the test can observe the before/after states without holding up CI for long.
+  private static final String RETENTION_WINDOW_REPLACED_SEGMENTS_RETENTION = "2s";
+  private static final long RETENTION_WINDOW_REPLACED_SEGMENTS_RETENTION_MS = 2_000L;
 
   private PinotHelixResourceManager _resourceManager;
   private RetentionManager _retentionManager;
@@ -73,10 +78,15 @@ public class SegmentLineageCleanupTest {
     // Create a schema
     TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(OFFLINE_TABLE_NAME));
     TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(REFRESH_OFFLINE_TABLE_NAME));
+    TEST_INSTANCE.addDummySchema(TableNameBuilder.extractRawTableName(RETENTION_WINDOW_OFFLINE_TABLE_NAME));
 
-    // Update table config
+    // Update table config. replacedSegmentsRetentionPeriod is set to 0s so the lineage-cleanup pass deletes
+    // replaced segments as soon as the lineage entry timestamp is strictly older than "now". Without this,
+    // the default retention (4 hours for this APPEND table) would make the COMPLETED-lineage assertions in
+    // testSegmentLineageCleanup unable to observe deletion within the test's wait window.
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(1).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME).setNumReplicas(1)
+            .setReplacedSegmentsRetentionPeriod("0s").build();
     _resourceManager.addTable(tableConfig);
 
     IngestionConfig ingestionConfig = new IngestionConfig();
@@ -85,6 +95,13 @@ public class SegmentLineageCleanupTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(REFRESH_OFFLINE_TABLE_NAME).setNumReplicas(1)
             .setIngestionConfig(ingestionConfig).build();
     _resourceManager.addTable(refreshTableConfig);
+
+    // Table dedicated to exercising the replacedSegmentsRetentionPeriod window: the first retention pass must keep
+    // the replaced segments, and the second pass (after the window elapses) must delete them.
+    TableConfig retentionWindowTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RETENTION_WINDOW_OFFLINE_TABLE_NAME).setNumReplicas(1)
+            .setReplacedSegmentsRetentionPeriod(RETENTION_WINDOW_REPLACED_SEGMENTS_RETENTION).build();
+    _resourceManager.addTable(retentionWindowTableConfig);
   }
 
   @Test
@@ -146,8 +163,12 @@ public class SegmentLineageCleanupTest {
   }
 
   private void verifySegmentsDeleted(int expectedNumRemainingSegments) {
+    verifySegmentsDeleted(OFFLINE_TABLE_NAME, expectedNumRemainingSegments);
+  }
+
+  private void verifySegmentsDeleted(String tableNameWithType, int expectedNumRemainingSegments) {
     // Segment deletion happens asynchronously
-    TestUtils.waitForCondition(aVoid -> getNumSegments(OFFLINE_TABLE_NAME) == expectedNumRemainingSegments, 60_000L,
+    TestUtils.waitForCondition(aVoid -> getNumSegments(tableNameWithType) == expectedNumRemainingSegments, 60_000L,
         "Failed to delete the segments");
   }
 
@@ -184,6 +205,43 @@ public class SegmentLineageCleanupTest {
     _retentionManager.processTable(REFRESH_OFFLINE_TABLE_NAME);
     assertEquals(getNumSegments(REFRESH_OFFLINE_TABLE_NAME), 6);
     assertEquals(_resourceManager.getSegmentsFor(REFRESH_OFFLINE_TABLE_NAME, true).size(), 3);
+  }
+
+  // Verifies that replacedSegmentsRetentionPeriod gates lineage-cleanup deletion: the first retention pass right
+  // after the lineage entry transitions to COMPLETED must preserve the replaced segments, and a later pass run
+  // after the configured window elapses must delete them.
+  @Test
+  public void testReplacedSegmentsRetentionWindow()
+      throws InterruptedException {
+    for (int i = 0; i < 2; i++) {
+      _resourceManager.addNewSegment(RETENTION_WINDOW_OFFLINE_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RETENTION_WINDOW_OFFLINE_TABLE_NAME, "src_" + i), "downloadUrl");
+    }
+    _resourceManager.addNewSegment(RETENTION_WINDOW_OFFLINE_TABLE_NAME,
+        SegmentMetadataMockUtils.mockSegmentMetadata(RETENTION_WINDOW_OFFLINE_TABLE_NAME, "merged_0"), "downloadUrl");
+    assertEquals(getNumSegments(RETENTION_WINDOW_OFFLINE_TABLE_NAME), 3);
+
+    long completedAtMs = System.currentTimeMillis();
+    SegmentLineage segmentLineage = new SegmentLineage(RETENTION_WINDOW_OFFLINE_TABLE_NAME);
+    segmentLineage.addLineageEntry("0",
+        new LineageEntry(Arrays.asList("src_0", "src_1"), Arrays.asList("merged_0"), LineageEntryState.COMPLETED,
+            completedAtMs));
+    SegmentLineageAccessHelper.writeSegmentLineage(_resourceManager.getPropertyStore(), segmentLineage, -1);
+
+    // First pass runs inside the retention window — replaced segments must remain.
+    _retentionManager.processTable(RETENTION_WINDOW_OFFLINE_TABLE_NAME);
+    assertEquals(getNumSegments(RETENTION_WINDOW_OFFLINE_TABLE_NAME), 3);
+
+    // Sleep just past the configured window. Add a small buffer because the cleanup uses a strict less-than
+    // comparison against `now - retentionMs`, and we want any clock granularity to be on the safe side.
+    long sleepMs = (System.currentTimeMillis() - completedAtMs > RETENTION_WINDOW_REPLACED_SEGMENTS_RETENTION_MS)
+        ? 100L : (RETENTION_WINDOW_REPLACED_SEGMENTS_RETENTION_MS + 200L);
+    Thread.sleep(sleepMs);
+
+    // Second pass runs after the window — replaced segments must now be deleted.
+    _retentionManager.processTable(RETENTION_WINDOW_OFFLINE_TABLE_NAME);
+    verifySegmentsDeleted(RETENTION_WINDOW_OFFLINE_TABLE_NAME, 1);
+    assertEquals(getSegments(RETENTION_WINDOW_OFFLINE_TABLE_NAME), Collections.singletonList("merged_0"));
   }
 
   @AfterClass
