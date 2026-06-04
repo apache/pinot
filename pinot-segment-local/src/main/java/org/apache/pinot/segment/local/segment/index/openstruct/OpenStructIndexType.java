@@ -48,13 +48,11 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-/**
- * Index type for the OPEN_STRUCT index on OPEN_STRUCT columns.
- *
- * <p>The OPEN_STRUCT index has no reader of its own — per-key materialized columns are loaded by
- * the standard {@code PhysicalColumnIndexContainer} and served via standard index readers. This
- * type exists for SPI registration, config deserialization, and validation.
- */
+/// Index type for the OPEN_STRUCT index on OPEN_STRUCT columns.
+///
+/// The OPEN_STRUCT index has no reader of its own — per-key materialized columns are loaded by
+/// the standard `PhysicalColumnIndexContainer` and served via standard index readers. This
+/// type exists for SPI registration, config deserialization, and validation.
 public class OpenStructIndexType
     extends AbstractIndexType<OpenStructIndexConfig, OpenStructIndexReader, ColumnarOpenStructIndexCreator> {
 
@@ -173,10 +171,8 @@ public class OpenStructIndexType
     return false;
   }
 
-  /**
-   * Reader factory that always returns null. The OPEN_STRUCT index has no reader of its own —
-   * materialized columns are loaded independently by the standard column loading infrastructure.
-   */
+  /// Reader factory that always returns null. The OPEN_STRUCT index has no reader of its own —
+  /// materialized columns are loaded independently by the standard column loading infrastructure.
   private static class NoOpReaderFactory implements IndexReaderFactory<OpenStructIndexReader> {
     @Nullable
     @Override

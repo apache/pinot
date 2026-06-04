@@ -22,6 +22,7 @@ import com.google.auto.service.AutoService;
 import org.apache.pinot.segment.spi.index.IndexPlugin;
 
 
+/// {@link IndexPlugin} that registers {@link OpenStructIndexType} via `@AutoService`.
 @AutoService(IndexPlugin.class)
 public class OpenStructIndexPlugin implements IndexPlugin<OpenStructIndexType> {
   public static final OpenStructIndexType INSTANCE = new OpenStructIndexType();

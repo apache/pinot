@@ -44,14 +44,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Manages per-key mutable columns for an OPEN_STRUCT column during real-time consumption.
- * Each discovered key gets its own {@link MutableKeyColumn} (dictionary-encoded forward index +
- * presence bitmap). Dense/sparse classification is deferred to seal time.
- *
- * <p>Single-writer for {@link #index}: the consuming thread calls this method. Readers may
- * concurrently read {@link #getKeys()} and {@link #getKeyColumns()} via the volatile map swap.
- */
+/// Manages per-key mutable columns for an OPEN_STRUCT column during real-time consumption.
+/// Each discovered key gets its own {@link MutableKeyColumn} (dictionary-encoded forward index +
+/// presence bitmap). Dense/sparse classification is deferred to seal time.
+///
+/// Single-writer for [#index]: the consuming thread calls this method. Readers may
+/// concurrently read [#getKeys()] and [#getKeyColumns()] via the volatile map swap.
 @SuppressWarnings("rawtypes")
 public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardIndexReaderContext>, MutableIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOpenStructIndex.class);
@@ -86,10 +84,8 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     throw new UnsupportedOperationException("OPEN_STRUCT does not support multi-value indexing");
   }
 
-  /**
-   * Indexes the OPEN_STRUCT value for the given document. {@code value} must be a
-   * {@code Map<String, Object>} or {@code null}; null and non-Map values are silently skipped.
-   */
+  /// Indexes the OPEN_STRUCT value for the given document. `value` must be a
+  /// `Map<String, Object>` or `null`; null and non-Map values are silently skipped.
   @SuppressWarnings("unchecked")
   public void index(int docId, @Nullable Object value) {
     if (!(value instanceof Map)) {
@@ -180,17 +176,17 @@ public class MutableOpenStructIndex implements OpenStructIndexReader<ForwardInde
     return newCol;
   }
 
-  /** Returns the set of keys discovered so far. */
+  /// Returns the set of keys discovered so far.
   public Set<String> getKeys() {
     return _keyColumns.keySet();
   }
 
-  /** Returns a snapshot of the per-key column map. */
+  /// Returns a snapshot of the per-key column map.
   public Map<String, MutableKeyColumn> getKeyColumns() {
     return _keyColumns;
   }
 
-  /** Returns the {@link MutableKeyColumn} for {@code key}, or {@code null} if not seen yet. */
+  /// Returns the {@link MutableKeyColumn} for `key`, or `null` if not seen yet.
   @Nullable
   public MutableKeyColumn getKeyColumn(String key) {
     return _keyColumns.get(key);

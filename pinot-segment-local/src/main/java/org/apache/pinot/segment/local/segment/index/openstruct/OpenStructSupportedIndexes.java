@@ -22,11 +22,9 @@ import java.util.Set;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 
 
-/**
- * The set of index types (by pretty name) supported on OPEN_STRUCT materialized child columns. A key's
- * {@code FieldConfig} may declare only these; non-vetted indexes are rejected at table-config validation.
- * {@code dictionary} is built structurally (lifecycle CUSTOM); {@code forward} is always written.
- */
+/// The set of index types (by pretty name) supported on OPEN_STRUCT materialized child columns. A key's
+/// `FieldConfig` may declare only these; non-vetted indexes are rejected at table-config validation.
+/// `dictionary` is built structurally (lifecycle CUSTOM); `forward` is always written.
 public final class OpenStructSupportedIndexes {
   private OpenStructSupportedIndexes() {
   }

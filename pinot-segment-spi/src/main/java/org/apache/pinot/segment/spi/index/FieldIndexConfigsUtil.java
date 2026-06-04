@@ -57,16 +57,14 @@ public class FieldIndexConfigsUtil {
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
   }
 
-  /**
-   * Builds a {@link FieldIndexConfigs} for a single column directly from one {@link FieldConfig}, without a
-   * {@link TableConfig} or {@link Schema}. The dictionary entry is derived from
-   * {@code fieldConfig.getEncodingType()} (RAW =&gt; disabled, otherwise default-enabled); every other index type is
-   * read from the modern {@code fieldConfig.getIndexes()} JSON (keyed by index pretty name), falling back to each
-   * type's default config. A {@code null} fieldConfig yields built-in defaults (dictionary enabled).
-   *
-   * <p>This reads only the modern {@code indexes} format and never legacy {@code IndexingConfig} lists, so it suits
-   * synthetic columns (e.g. OPEN_STRUCT materialized children) that exist in no schema.
-   */
+  /// Builds a {@link FieldIndexConfigs} for a single column directly from one {@link FieldConfig}, without a
+  /// `TableConfig` or `Schema`. The dictionary entry is derived from `fieldConfig.getEncodingType()`
+  /// (RAW => disabled, otherwise default-enabled); every other index type is read from the modern
+  /// `fieldConfig.getIndexes()` JSON (keyed by index pretty name), falling back to each type's default config.
+  /// A `null` fieldConfig yields built-in defaults (dictionary enabled).
+  ///
+  /// This reads only the modern `indexes` format and never legacy `IndexingConfig` lists, so it suits
+  /// synthetic columns (e.g. OPEN_STRUCT materialized children) that exist in no schema.
   public static FieldIndexConfigs fromFieldConfig(@Nullable FieldConfig fieldConfig, FieldSpec fieldSpec) {
     FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
     boolean rawEncoded = fieldConfig != null && fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW;
