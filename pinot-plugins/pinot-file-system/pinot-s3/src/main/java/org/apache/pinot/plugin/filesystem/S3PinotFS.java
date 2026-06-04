@@ -316,10 +316,10 @@ public class S3PinotFS extends BasePinotFS {
    */
   public void init(S3Client s3Client, String serverSideEncryption, PinotConfiguration serverSideEncryptionConfig) {
     _s3Client = s3Client;
-    S3Config s3Config = new S3Config(serverSideEncryptionConfig);
-    setServerSideEncryption(serverSideEncryption, s3Config);
-    setMultiPartUploadConfigs(s3Config);
-    setDisableAcl(s3Config);
+    _s3Config = new S3Config(serverSideEncryptionConfig);
+    setServerSideEncryption(serverSideEncryption, _s3Config);
+    setMultiPartUploadConfigs(_s3Config);
+    setDisableAcl(_s3Config);
   }
 
   @VisibleForTesting
