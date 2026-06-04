@@ -354,6 +354,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
+      "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
@@ -402,6 +404,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
+  public static final boolean DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM = false;
   public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   public static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
@@ -1191,6 +1194,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getJerseyAdminApiPort() {
     return getProperty(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
+  }
+
+  public boolean isIngestFromUriLocalFileSystemAllowed() {
+    return getProperty(INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM);
   }
 
   public void setInitAccessControlUsername(String username) {
