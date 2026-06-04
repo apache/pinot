@@ -33,24 +33,20 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 
-/**
- * Per-key {@link DataSource} accessor for sealed (immutable) segments with an OPEN_STRUCT column.
- *
- * <p>Always columnar — there is no blob branch. Every key that was dense enough during segment
- * creation gets its own materialized {@link DataSource} (forward index + optional inverted index /
- * dictionary). Keys that did not meet the density threshold are stored in an optional sparse
- * column; the sparse {@link DataSource} is returned for any unmaterialized key lookup.
- *
- * <p>Use {@link #isMaterialized(String)} and {@link #isFullyMaterialized()} together to choose
- * the query execution path:
- * <ul>
- *   <li>Materialized key → fast path via per-key DataSource (inverted/dictionary index available).
- *   <li>Not materialized + not fully materialized → fall back to the sparse DataSource.
- *   <li>Not materialized + fully materialized → key is definitively absent; short-circuit.
- * </ul>
- *
- * <p>Thread-safety: immutable after construction; safe for concurrent reads.
- */
+/// Per-key {@link DataSource} accessor for sealed (immutable) segments with an OPEN_STRUCT column.
+///
+/// Always columnar — there is no blob branch. Every key that was dense enough during segment
+/// creation gets its own materialized {@link DataSource} (forward index + optional inverted index /
+/// dictionary). Keys that did not meet the density threshold are stored in an optional sparse
+/// column; the sparse {@link DataSource} is returned for any unmaterialized key lookup.
+///
+/// Use [#isMaterialized(String)] and [#isFullyMaterialized()] together to choose
+/// the query execution path:
+/// - Materialized key → fast path via per-key DataSource (inverted/dictionary index available).
+/// - Not materialized + not fully materialized → fall back to the sparse DataSource.
+/// - Not materialized + fully materialized → key is definitively absent; short-circuit.
+///
+/// Thread-safety: immutable after construction; safe for concurrent reads.
 public class ImmutableOpenStructDataSource extends BaseDataSource implements OpenStructDataSource {
   private final ComplexFieldSpec _fieldSpec;
   private final Map<String, DataSource> _perKeyDataSources;
@@ -66,11 +62,9 @@ public class ImmutableOpenStructDataSource extends BaseDataSource implements Ope
     _sparseDataSource = sparseDataSource;
   }
 
-  /**
-   * Convenience constructor for segment-load time. Synthesizes a minimal {@link DataSourceMetadata}
-   * for the parent OPEN_STRUCT column (which has no on-disk presence of its own) and uses an empty
-   * {@link ColumnIndexContainer} — all real readers live on the per-key data sources.
-   */
+  /// Convenience constructor for segment-load time. Synthesizes a minimal {@link DataSourceMetadata}
+  /// for the parent OPEN_STRUCT column (which has no on-disk presence of its own) and uses an empty
+  /// {@link ColumnIndexContainer} — all real readers live on the per-key data sources.
   public ImmutableOpenStructDataSource(ComplexFieldSpec fieldSpec, Map<String, DataSource> perKeyDataSources,
       @Nullable DataSource sparseDataSource, int numDocs) {
     this(fieldSpec, perKeyDataSources, sparseDataSource,

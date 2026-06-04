@@ -32,13 +32,11 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-/**
- * A single key's mutable column for an OPEN_STRUCT column: forward index (dictionary-encoded)
- * + presence bitmap tracking which docIds had this key set.
- *
- * Single-writer during ingestion; presence bitmap and forward index are not thread-safe for
- * concurrent writes.
- */
+/// A single key's mutable column for an OPEN_STRUCT column: forward index (dictionary-encoded)
+/// + presence bitmap tracking which docIds had this key set.
+///
+/// Single-writer during ingestion; presence bitmap and forward index are not thread-safe for
+/// concurrent writes.
 public class MutableKeyColumn implements Closeable {
   private static final int DEFAULT_AVG_STRING_LENGTH = 32;
   private static final int DEFAULT_ROWS_PER_CHUNK = 1000;
@@ -83,17 +81,17 @@ public class MutableKeyColumn implements Closeable {
     return _forwardIndex;
   }
 
-  /** Bitmap of docIds where this key was present (non-null). */
+  /// Bitmap of docIds where this key was present (non-null).
   public ImmutableRoaringBitmap getPresenceBitmap() {
     return _presenceBitmap;
   }
 
-  /** Number of documents where this key had a non-null value. */
+  /// Number of documents where this key had a non-null value.
   public int getNumNonNullDocs() {
     return _presenceBitmap.getCardinality();
   }
 
-  /** Distinct values in this key's dictionary, for cardinality estimation at seal time. */
+  /// Distinct values in this key's dictionary, for cardinality estimation at seal time.
   public Set<String> getDistinctValues() {
     int len = _dictionary.length();
     Set<String> result = new java.util.HashSet<>(len);
@@ -112,9 +110,7 @@ public class MutableKeyColumn implements Closeable {
     return _invertedIndex;
   }
 
-  /**
-   * Indexes {@code value} at {@code docId}. The value must already be coerced to the stored type.
-   */
+  /// Indexes `value` at `docId`. The value must already be coerced to the stored type.
   public void setValue(int docId, Object value) {
     _presenceBitmap.add(docId);
     int dictId = _dictionary.index(value);
