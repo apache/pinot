@@ -892,4 +892,220 @@ public class AggregationSubsumptionStrategyTest {
         .getFunctionCall().getOperands().get(0).getIdentifier().getName(), "raw_hll_FlightNum");
     assertTrue(rewritten.getOrderByList().get(0).toString().contains("raw_hll_FlightNum"));
   }
+
+  /// =======================================================================
+  ///  Scalar grouping function support (e.g. DATETRUNC)
+  /// =======================================================================
+
+  /// A scalar grouping function (DATETRUNC) in the SELECT list must be treated as a plain
+  /// projection — a direct MV column hit is sufficient. It must NOT be routed through the
+  /// aggregation-equivalence path (which would reject it for lack of a re-aggregation rule).
+  @Test
+  public void testScalarGroupingFunctionExactMatch() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Scalar grouping function should match via direct MV projection");
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+
+    /// GROUP BY remapped to the MV column.
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "day");
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+
+    /// DATETRUNC('DAY', ts) → day AS datetrunc('DAY', ts) (direct projection, alias preserves name).
+    Function dayAlias = selectList.get(0).getFunctionCall();
+    assertNotNull(dayAlias);
+    assertEquals(dayAlias.getOperator(), "as");
+    assertEquals(dayAlias.getOperands().get(0).getIdentifier().getName(), "day");
+
+    /// SUM(revenue) → SUM(sum_rev) AS sum(revenue).
+    Function sumAlias = selectList.get(1).getFunctionCall();
+    assertNotNull(sumAlias);
+    assertEquals(sumAlias.getOperator(), "as");
+    Function rewrittenSum = sumAlias.getOperands().get(0).getFunctionCall();
+    assertNotNull(rewrittenSum);
+    assertEquals(rewrittenSum.getOperator(), "sum");
+    assertEquals(rewrittenSum.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+  }
+
+  /// A scalar grouping function used in ORDER BY must remap to the MV column.
+  @Test
+  public void testScalarGroupingFunctionInOrderBy() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts) ORDER BY DATETRUNC('DAY', ts) DESC");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getOrderByList());
+    assertEquals(rewritten.getOrderByList().size(), 1);
+    Function orderByFunction = rewritten.getOrderByList().get(0).getFunctionCall();
+    assertNotNull(orderByFunction);
+    assertEquals(orderByFunction.getOperator(), "desc");
+    assertEquals(orderByFunction.getOperands().get(0).getIdentifier().getName(), "day");
+  }
+
+  /// A scalar grouping function used in HAVING must remap to the MV column.
+  @Test
+  public void testScalarGroupingFunctionInHaving() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts) HAVING DATETRUNC('DAY', ts) > 0");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result);
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getHavingExpression());
+    Function havingFunction = rewritten.getHavingExpression().getFunctionCall();
+    assertNotNull(havingFunction);
+    assertEquals(havingFunction.getOperator(), "GREATER_THAN");
+    assertEquals(havingFunction.getOperands().get(0).getIdentifier().getName(), "day");
+  }
+
+  /// A scalar function not present in the MV projection (different truncation unit) must reject.
+  @Test
+  public void testNoMatchScalarFunctionNotMaterialized() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('MONTH', ts), SUM(revenue) FROM orders GROUP BY DATETRUNC('MONTH', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "DATETRUNC('MONTH', ts) is not a materialized projection and must be rejected");
+  }
+
+  /// MV is grouped by a superset of the user keys (DATETRUNC('DAY', ts), city) while the user
+  /// groups only by DATETRUNC('DAY', ts). Re-aggregation is non-trivial here (multiple MV rows
+  /// collapse per day), and the scalar grouping function must still resolve as a direct MV hit.
+  @Test
+  public void testScalarGroupingFunctionFinerMaterializedViewGranularity() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, city, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts), city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Finer MV granularity with a scalar grouping key should re-aggregate");
+
+    PinotQuery rewritten = result.getMaterializedViewQuery();
+    assertNotNull(rewritten.getGroupByList());
+    assertEquals(rewritten.getGroupByList().size(), 1);
+    assertEquals(rewritten.getGroupByList().get(0).getIdentifier().getName(), "day");
+
+    List<Expression> selectList = rewritten.getSelectList();
+    assertEquals(selectList.size(), 2);
+    Function dayAlias = selectList.get(0).getFunctionCall();
+    assertNotNull(dayAlias);
+    assertEquals(dayAlias.getOperator(), "as");
+    assertEquals(dayAlias.getOperands().get(0).getIdentifier().getName(), "day");
+
+    Function sumAlias = selectList.get(1).getFunctionCall();
+    assertNotNull(sumAlias);
+    Function rewrittenSum = sumAlias.getOperands().get(0).getFunctionCall();
+    assertNotNull(rewrittenSum);
+    assertEquals(rewrittenSum.getOperands().get(0).getIdentifier().getName(), "sum_rev");
+  }
+
+  /// The raw source column inside a scalar grouping expression is not available in the MV.
+  /// Filtering on `ts` after it has been truncated to `day` would either reference a missing
+  /// column or incorrectly apply an intra-day predicate to a whole-day bucket.
+  @Test
+  public void testScalarGroupingFunctionRejectsResidualOnSourceColumn() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders WHERE ts >= 1000 "
+            + "GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "Bare source column 'ts' is not projected by the materialized view");
+  }
+
+  /// The complete scalar grouping expression is available as one atomic MV column, so a residual
+  /// on that exact expression is safe and must be remapped without exposing its source column.
+  @Test
+  public void testScalarGroupingFunctionAllowsResidualOnMaterializedExpression() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts)";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders "
+            + "WHERE DATETRUNC('DAY', ts) >= 1000 GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "The complete materialized grouping expression is a valid residual");
+    assertEquals(result.getCost(), 7.0);
+    Expression residual = result.getMaterializedViewQuery().getFilterExpression();
+    assertNotNull(residual);
+    assertEquals(residual.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "day");
+  }
+
+  /// A scalar grouping key must not prevent residual filtering on another grouping key that the
+  /// MV projects directly. The aliased projection also verifies that the residual is remapped to
+  /// the MV-side column name.
+  @Test
+  public void testScalarGroupingFunctionAllowsResidualOnProjectedIdentifierGroupKey() {
+    String definedSql =
+        "SELECT DATETRUNC('DAY', ts) AS day, city AS mv_city, SUM(revenue) AS sum_rev FROM orders "
+            + "GROUP BY DATETRUNC('DAY', ts), city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT DATETRUNC('DAY', ts), SUM(revenue) FROM orders WHERE city = 'NYC' "
+            + "GROUP BY DATETRUNC('DAY', ts)");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNotNull(result, "Directly projected identifier group keys remain valid residuals");
+    assertEquals(result.getCost(), 7.0);
+    Expression residual = result.getMaterializedViewQuery().getFilterExpression();
+    assertNotNull(residual);
+    assertEquals(residual.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "mv_city");
+  }
+
+  /// Regression: a nested aggregate such as ROUND(SUM(x)) must stay on the aggregate path. There is
+  /// no re-aggregation rule for ROUND, so it must be rejected — never treated as a scalar direct hit.
+  @Test
+  public void testNoMatchNestedAggregateRoundSum() {
+    String definedSql = "SELECT city, SUM(revenue) AS sum_rev FROM orders GROUP BY city";
+    MaterializedViewCacheEntry entry = createEntry("mv_orders_OFFLINE", "orders", definedSql);
+
+    PinotQuery userQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT city, ROUND(SUM(revenue)) FROM orders GROUP BY city");
+    MaterializedViewRewritePlan result = _strategy.match(userQuery, entry);
+
+    assertNull(result, "ROUND(SUM(revenue)) has no re-aggregation rule and must be rejected");
+  }
 }
