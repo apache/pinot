@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.5.1</version>
+    <version>1.5.2-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-avro-base</artifactId>
