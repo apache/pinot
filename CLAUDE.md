@@ -113,6 +113,11 @@ Apache Pinot is a real-time distributed OLAP datastore for low-latency analytics
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
 - Avoid deprecated APIs in new code. If you must reference one (e.g., for backward-compat serialization or to test the deprecated path), justify it with a comment.
 
+## Commit messages
+- Do not include `Co-authored-by` trailers that reference AI tools (e.g., Claude, Copilot).
+  - **Why**: These trailers propagate into squash-merge commits on GitHub, making the project history appear AI-authored rather than human-authored.
+  - **Fix**: Omit the `Co-authored-by` line entirely when committing.
+
 ## Pre-commit checks
 Before pushing a commit, run the following checks on the affected modules and fix any failures:
 1. `./mvnw spotless:apply -pl <module>` — auto-format code.
