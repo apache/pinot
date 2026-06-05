@@ -212,6 +212,10 @@ public class ProtoExpressionToRexExpression {
       case UNKNOWN:
         return ColumnDataType.UNKNOWN;
       default:
+        // Rolling-upgrade limitation for UUID columns: an older broker/server that does not know UUID = 22 /
+        // UUID_ARRAY = 23 from expressions.proto will land here with UNRECOGNIZED and throw. Avoid issuing UUID
+        // queries until all brokers and servers are upgraded. See the matching note on expressions.proto and
+        // DataSchema.toBytes.
         throw new IllegalStateException("Unsupported proto ColumnDataType: " + dataType);
     }
   }

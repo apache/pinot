@@ -20,6 +20,10 @@ package org.apache.pinot.common.request.context;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -121,5 +125,51 @@ public class RequestContextUtilsTest {
     BadQueryRequestException exception =
         Assert.expectThrows(BadQueryRequestException.class, () -> RequestContextUtils.getFilter(filterExpression));
     Assert.assertEquals(exception.getMessage(), "CAST function must have exactly 2 operands");
+  }
+
+  /**
+   * Drift guard: {@link RequestContextUtils#evaluateFunctionLiteral} hard-codes the set of UUID-related scalar
+   * functions that may appear on the RHS of a predicate literal. If a new deterministic UUID scalar function is
+   * added via {@code @ScalarFunction} under {@code org.apache.pinot.common.function.scalar.uuid} but the switch
+   * is not updated, queries like {@code col = NEW_UUID_FN(...)} would silently fail with the generic "unsupported
+   * RHS" error. This test fails fast in that scenario so the author is forced to extend the switch.
+   *
+   * <p>Non-deterministic UUID generators ({@code UUID_V4}, {@code UUID_V7}) are intentionally excluded — their
+   * results cannot be folded to a constant RHS.
+   */
+  @Test
+  public void testEvaluateFunctionLiteralCoversAllDeterministicUuidScalarFunctions() {
+    // Canonical names that the RHS-literal switch in RequestContextUtils#evaluateFunctionLiteral handles today.
+    // Keep this list in lock-step with that switch — adding a name here without updating the switch (or vice versa)
+    // is the drift this test is designed to catch.
+    Set<String> supportedByRhsEvaluator = Set.of(
+        "touuid", "uuidtobytes", "bytestouuid", "uuidtostring", "isuuid", "uuidversion", "uuidtimestamp");
+
+    Set<String> registeredDeterministicUuidFunctions = FunctionRegistry.getFunctions().entrySet().stream()
+        // canonical names from FunctionRegistry are already lowercased and underscore-stripped
+        .filter(e -> e.getKey().startsWith("uuid") || "touuid".equals(e.getKey()) || "isuuid".equals(e.getKey()))
+        // A UUID scalar function counts as deterministic if any registered arity (0-2 covers every current UUID
+        // function — TO_UUID/IS_UUID/UUID_TO_*/UUID_VERSION/UUID_TIMESTAMP arity 1; UUID_V4/UUID_V7 arity 0) reports
+        // isDeterministic(). UUID_V4/UUID_V7 are registered with isDeterministic=false and are correctly excluded.
+        .filter(e -> {
+          for (int arity = 0; arity <= 2; arity++) {
+            FunctionInfo info = e.getValue().getFunctionInfo(arity);
+            if (info != null && info.isDeterministic()) {
+              return true;
+            }
+          }
+          return false;
+        })
+        .map(java.util.Map.Entry::getKey)
+        .collect(Collectors.toSet());
+
+    Set<String> missingFromEvaluator = registeredDeterministicUuidFunctions.stream()
+        .filter(name -> !supportedByRhsEvaluator.contains(name))
+        .collect(Collectors.toSet());
+    Assert.assertTrue(missingFromEvaluator.isEmpty(),
+        "Deterministic UUID scalar functions registered in FunctionRegistry but not handled by "
+            + "RequestContextUtils#evaluateFunctionLiteral switch: " + missingFromEvaluator
+            + ". Either add the corresponding case to the switch, or — if the function genuinely cannot be folded "
+            + "to a constant RHS — annotate it with isDeterministic=false in its @ScalarFunction.");
   }
 }
