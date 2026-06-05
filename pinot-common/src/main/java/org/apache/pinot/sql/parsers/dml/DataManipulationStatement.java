@@ -44,6 +44,7 @@ public interface DataManipulationStatement {
   /// Execution method for this SQL statement.
   enum ExecutionType {
     HTTP,
-    MINION
+    MINION,
+    PUSH
   }
 }
