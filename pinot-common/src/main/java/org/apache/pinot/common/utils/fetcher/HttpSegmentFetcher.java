@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.fetcher;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InetAddresses;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.LinkedList;
@@ -32,6 +33,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -120,6 +122,10 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
           throw e;
         }
       } catch (Exception e) {
+        if (ExceptionUtils.isCauseInstanceOf(e, FileNotFoundException.class)) {
+          _logger.error("File not found while downloading segment from: {} to: {}, won't retry", uri, dest, e);
+          throw e;
+        }
         _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
         return false;
       }
