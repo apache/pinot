@@ -123,31 +123,37 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public List<PartitionGroupMetadata> computePartitionGroupMetadata(String clientId, StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatuses, int timeoutMillis)
       throws IOException, java.util.concurrent.TimeoutException {
-    if (_partitionIdSubset.isEmpty()) {
-      return StreamMetadataProvider.super.computePartitionGroupMetadata(clientId, streamConfig,
-          partitionGroupConsumptionStatuses, timeoutMillis);
-    }
     Map<Integer, StreamPartitionMsgOffset> partitionIdToEndOffset =
         new HashMap<>(partitionGroupConsumptionStatuses.size());
     for (PartitionGroupConsumptionStatus s : partitionGroupConsumptionStatuses) {
       partitionIdToEndOffset.put(s.getStreamPartitionGroupId(), s.getEndOffset());
     }
+
+    List<Integer> partitionIds;
+    if (_partitionIdSubset.isEmpty()) {
+      int partitionCount = fetchPartitionCount(timeoutMillis);
+      partitionIds = new ArrayList<>(partitionCount);
+      for (int partitionId = 0; partitionId < partitionCount; partitionId++) {
+        partitionIds.add(partitionId);
+      }
+    } else {
+      partitionIds = _partitionIdSubset;
+    }
+
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    List<PartitionGroupMetadata> result = new ArrayList<>(_partitionIdSubset.size());
-    for (Integer partitionId : _partitionIdSubset) {
-      StreamPartitionMsgOffset endOffset = partitionIdToEndOffset.get(partitionId);
-      StreamPartitionMsgOffset startOffset;
-      if (endOffset == null) {
+    List<PartitionGroupMetadata> result = new ArrayList<>(partitionIds.size());
+    for (Integer partitionId : partitionIds) {
+      if (partitionIdToEndOffset.containsKey(partitionId)) {
+        result.add(new PartitionGroupMetadata(partitionId, partitionIdToEndOffset.get(partitionId)));
+      } else {
         try (StreamMetadataProvider partitionMetadataProvider =
             streamConsumerFactory.createPartitionMetadataProvider(
                 StreamConsumerFactory.getUniqueClientId(clientId), partitionId)) {
-          startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
+          StreamPartitionMsgOffset startOffset = partitionMetadataProvider.fetchStreamPartitionOffset(
               streamConfig.getOffsetCriteria(), timeoutMillis);
+          result.add(new PartitionGroupMetadata(partitionId, startOffset));
         }
-      } else {
-        startOffset = endOffset;
       }
-      result.add(new PartitionGroupMetadata(partitionId, startOffset));
     }
     return result;
   }
