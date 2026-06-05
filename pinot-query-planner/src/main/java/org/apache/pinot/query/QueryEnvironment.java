@@ -50,7 +50,6 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
@@ -66,6 +65,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.rules.PinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
+import org.apache.pinot.calcite.sql2rel.PinotRelDecorrelator;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -455,8 +455,11 @@ public class QueryEnvironment {
       try {
         // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
         //       probably a bug in Calcite.
+        // NOTE: Use PinotRelDecorrelator instead of RelDecorrelator.decorrelateQuery because Calcite still has a strict
+        //       post-decorrelation type assertion (CALCITE-7379) that fails for some Pinot correlated-subquery shapes
+        //       when decorrelation changes output-field nullability.
         RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
-        rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
+        rootNode = PinotRelDecorrelator.decorrelateQuery(rootNode, relBuilder);
       } catch (Throwable e) {
         throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
       }

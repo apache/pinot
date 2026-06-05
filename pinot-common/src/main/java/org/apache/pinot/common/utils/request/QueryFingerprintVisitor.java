@@ -38,7 +38,7 @@ import org.apache.calcite.sql.util.SqlShuttle;
 
 /**
  * QueryFingerprintVisitor traverses the Calcite SqlNode AST and produces a normalized query fingerprint.
- * Implementation is based on Calcite 1.40.0 version. It may change in future versions of Calcite.
+ * Implementation is based on Calcite 1.42.0 version. It may change in future versions of Calcite.
  *
  * <p>
  * <ul>

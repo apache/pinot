@@ -41,6 +41,33 @@ import org.testng.annotations.Test;
 public class TypeFactoryTest {
   private static final JavaTypeFactory TYPE_FACTORY = new TestJavaTypeFactoryImpl();
 
+  @Test
+  public void testDecimalMaxPrecisionAndScale() {
+    // Pinot raises the DECIMAL max precision/scale far above the SQL standard. The Calcite 1.42 upgrade (CALCITE-7351)
+    // made the no-arg getMaxNumericPrecision()/getMaxNumericScale() final; they now delegate to the type-specific
+    // getMaxPrecision(DECIMAL)/getMaxScale(DECIMAL) overrides TypeSystem keeps. Pin the concrete elevated values so a
+    // future Calcite delegation change, or an accidental removal of the type-specific overrides, fails fast instead
+    // of silently regressing DECIMAL precision/scale to the SQL-standard default.
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxPrecision(SqlTypeName.DECIMAL), 2000);
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxScale(SqlTypeName.DECIMAL), 1000);
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxNumericPrecision(), 2000);
+    Assert.assertEquals(TypeSystem.INSTANCE.getMaxNumericScale(), 1000);
+  }
+
+  @Test
+  public void testDeriveSumTypeWidensUnsignedToBigint() {
+    // SUM over a (supported) unsigned integer column must widen to (signed) BIGINT, exactly like the signed integer
+    // types, so accumulating many rows does not silently overflow the narrow operand type. Calcite passes the operand
+    // type to deriveSumType directly (no unsigned->signed coercion), so this override is the only place the widening
+    // happens. Regression guard for the Calcite 1.42 upgrade, which made unsigned SqlTypeNames reachable in plans.
+    // UBIGINT is intentionally excluded -- it is unsupported (rejected during plan conversion).
+    for (SqlTypeName unsigned : new SqlTypeName[]{
+        SqlTypeName.UTINYINT, SqlTypeName.USMALLINT, SqlTypeName.UINTEGER}) {
+      RelDataType sumType = TypeSystem.INSTANCE.deriveSumType(TYPE_FACTORY, TYPE_FACTORY.createSqlType(unsigned));
+      Assert.assertEquals(sumType.getSqlTypeName(), SqlTypeName.BIGINT, "SUM(" + unsigned + ") should widen to BIGINT");
+    }
+  }
+
   @DataProvider(name = "relDataTypeConversion")
   public Iterator<Object[]> relDataTypeConversion() {
     ArrayList<Object[]> cases = new ArrayList<>();

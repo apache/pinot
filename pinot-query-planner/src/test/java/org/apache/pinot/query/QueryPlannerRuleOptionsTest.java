@@ -112,9 +112,14 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testDisablePruneEmptyCorrelateLeft() {
-    // Test that when skipPruneEmptyJoinLeft=true, some queries involving correlate and dummy conditions
-    // fail to be unnested
+  public void testEmptyCorrelateLeftPrunedByJoinLeftAfterDecorrelation() {
+    // EXISTS subquery with an always-false outer predicate (AND 1=0). Before Calcite 1.41, disabling
+    // PRUNE_EMPTY_CORRELATE_LEFT left the empty-left LogicalCorrelate un-pruned. As of the 1.41+ decorrelation rework
+    // the correlate is rewritten to a join before that rule could apply, so PRUNE_EMPTY_JOIN_LEFT (still enabled)
+    // prunes the empty left input and the plan collapses to an empty LogicalValues regardless of whether
+    // PRUNE_EMPTY_CORRELATE_LEFT is enabled. The rule is disabled here only to document that it no longer affects this
+    // shape; PRUNE_EMPTY_CORRELATE_LEFT remains registered (PinotQueryRuleSets) and the dedicated
+    // testDisablePruneEmptyJoinLeft below covers the rule that now performs the pruning.
     String query = "EXPLAIN PLAN FOR SELECT *\n"
         + "FROM a WHERE EXISTS (\n"
         + "  SELECT * FROM b WHERE a.col1 = b.col1\n"
@@ -125,18 +130,7 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
     //@formatter:off
     assertEquals(explain,
         "Execution Plan\n"
-            + "LogicalProject(col1=[$0], col2=[$1], col3=[$2], "
-            + "col4=[$3], col5=[$4], col6=[$5], col7=[$6], ts=[$7], ts_timestamp=[$8])\n"
-            + "  LogicalFilter(condition=[IS NOT NULL($9)])\n"
-            + "    LogicalCorrelate(correlation=[$cor0], joinType=[left], requiredColumns=[{0}])\n"
-            + "      LogicalValues(tuples=[[]])\n"
-            + "      PinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], aggType=[FINAL])\n"
-            + "        PinotLogicalExchange(distribution=[hash])\n"
-            + "          PinotLogicalAggregate(group=[{}], agg#0=[MIN($0)], aggType=[LEAF])\n"
-            + "            LogicalProject($f0=[true])\n"
-            + "              LogicalFilter(condition=[=($cor0.col1, $0)])\n"
-            + "                LogicalProject(col1=[$0])\n"
-            + "                  PinotLogicalTableScan(table=[[default, b]])\n");
+            + "LogicalValues(tuples=[[]])\n");
     //@formatter:on
   }
 

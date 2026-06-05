@@ -407,11 +407,11 @@ org.apache.arrow:arrow-memory-netty-buffer-patch:18.3.0
 org.apache.arrow:arrow-memory-netty:18.3.0
 org.apache.arrow:arrow-vector:18.3.0
 org.apache.avro:avro:1.12.1
-org.apache.calcite.avatica:avatica-core:1.26.0
-org.apache.calcite.avatica:avatica-metrics:1.26.0
-org.apache.calcite:calcite-babel:1.40.0
-org.apache.calcite:calcite-core:1.40.0
-org.apache.calcite:calcite-linq4j:1.40.0
+org.apache.calcite.avatica:avatica-core:1.28.0
+org.apache.calcite.avatica:avatica-metrics:1.28.0
+org.apache.calcite:calcite-babel:1.42.0
+org.apache.calcite:calcite-core:1.42.0
+org.apache.calcite:calcite-linq4j:1.42.0
 org.apache.commons:commons-collections4:4.5.0
 org.apache.commons:commons-compress:1.28.0
 org.apache.commons:commons-configuration2:2.13.0
@@ -527,6 +527,7 @@ org.jetbrains.kotlin:kotlin-scripting-common:2.3.10
 org.jetbrains.kotlin:kotlin-scripting-jvm:2.3.10
 org.jetbrains.kotlin:kotlin-stdlib:2.3.10
 org.jetbrains:annotations:26.1.0
+org.jooq:joou-java-6:0.9.5
 org.jspecify:jspecify:1.0.0
 org.locationtech.proj4j:proj4j:1.2.2
 org.lz4:lz4-java:1.8.0

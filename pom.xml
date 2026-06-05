@@ -172,7 +172,8 @@
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
-    <calcite.version>1.40.0</calcite.version>
+    <calcite.version>1.42.0</calcite.version>
+    <joou.version>0.9.5</joou.version>
     <immutables.version>2.12.2</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
@@ -1428,6 +1429,14 @@
         <groupId>org.immutables</groupId>
         <artifactId>value-annotations</artifactId>
         <version>${immutables.version}</version>
+      </dependency>
+      <!-- Pin joou-java-6 (unsigned integer types library, a Calcite dependency since 1.41 via CALCITE-1466) to
+           resolve a dependency convergence conflict: calcite-core and calcite-linq4j (1.42) pull 0.9.5 while the
+           transitive avatica-core 1.28.0 pulls 0.9.4. -->
+      <dependency>
+        <groupId>org.jooq</groupId>
+        <artifactId>joou-java-6</artifactId>
+        <version>${joou.version}</version>
       </dependency>
 
       <dependency>

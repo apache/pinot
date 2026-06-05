@@ -17,7 +17,7 @@
 # under the License.
 #
 
-# Copied from Calcite 1.40.0 and modified for Pinot syntax. Update this file when upgrading Calcite version.
+# Copied from Calcite 1.42.0 and modified for Pinot syntax. Update this file when upgrading Calcite version.
 
 # Default data declarations for parsers.
 # Each of these may be overridden in a parser's config.fmpp file.
@@ -465,4 +465,9 @@ parser: {
   includeBraces: true
   includeAdditionalDeclarations: false
   includeParsingStringLiteralAsArrayLiteral: false
+  includeIntervalWithoutQualifier: false
+  includeStarExclude: false
+  # Pinot addition: upstream core default_config.fmpp has no includeSelectBy (its Parser.jj uses a literal "!false").
+  # Defined here so Pinot's Parser.jj can guard all three 1.42 babel flags uniformly via "default.parser.<flag>".
+  includeSelectBy: false
 }
