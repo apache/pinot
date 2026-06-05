@@ -40,7 +40,6 @@ import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 
 /**
@@ -69,7 +68,6 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   protected boolean _alwaysTrue;
   protected boolean _alwaysFalse;
   protected boolean _alwaysNull;
-  protected boolean _useUuidComparison;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
     // translate to integer in [0, 5] for guaranteed tableswitch
@@ -115,7 +113,6 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     DataType rightDataType = _rightTransformFunction.getResultMetadata().getDataType();
     _leftStoredType = leftDataType.getStoredType();
     _rightStoredType = rightDataType.getStoredType();
-    _useUuidComparison = leftDataType == DataType.UUID && rightDataType == DataType.UUID;
 
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
@@ -723,10 +720,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillResultBytes(ValueBlock valueBlock, int length) {
     byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(valueBlock);
     byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(valueBlock);
+    // ByteArray.compare is unsigned byte-wise lexicographic; for canonical 16-byte big-endian UUIDs this is
+    // equivalent to UuidUtils.compare's unsigned 64-bit-word ordering, so a single comparator handles both.
     for (int i = 0; i < length; i++) {
-      _intValuesSV[i] = getIntResult(
-          _useUuidComparison ? UuidUtils.compare(leftBytesValues[i], rightBytesValues[i])
-              : ByteArray.compare(leftBytesValues[i], rightBytesValues[i]));
+      _intValuesSV[i] = getIntResult(ByteArray.compare(leftBytesValues[i], rightBytesValues[i]));
     }
   }
 
