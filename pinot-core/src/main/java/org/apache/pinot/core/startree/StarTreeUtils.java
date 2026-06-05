@@ -46,6 +46,9 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -462,5 +465,39 @@ public class StarTreeUtils {
       }
     }
     return null;
+  }
+
+  /**
+   * Converts star-tree metadata from an existing segment back to {@link StarTreeIndexConfig} so the rebuilt segment
+   * preserves the original star-tree configuration exactly.
+   */
+  public static List<StarTreeIndexConfig> toStarTreeIndexConfigs(List<StarTreeV2Metadata> metadataList) {
+    List<StarTreeIndexConfig> configs = new ArrayList<>(metadataList.size());
+    for (StarTreeV2Metadata metadata : metadataList) {
+      List<String> functionColumnPairs = new ArrayList<>();
+      List<StarTreeAggregationConfig> aggregationConfigs = new ArrayList<>();
+      for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry
+          : metadata.getAggregationSpecs().entrySet()) {
+        AggregationFunctionColumnPair pair = entry.getKey();
+        AggregationSpec spec = entry.getValue();
+        functionColumnPairs.add(pair.toColumnName());
+        aggregationConfigs.add(new StarTreeAggregationConfig(
+            pair.getColumn(),
+            pair.getFunctionType().getName(),
+            spec.getFunctionParameters().isEmpty() ? null : spec.getFunctionParameters(),
+            spec.getCompressionCodec(),
+            spec.isDeriveNumDocsPerChunk(),
+            spec.getIndexVersion(),
+            DataSizeUtils.fromBytes(spec.getTargetMaxChunkSizeBytes()),
+            spec.getTargetDocsPerChunk()));
+      }
+      configs.add(new StarTreeIndexConfig(
+          metadata.getDimensionsSplitOrder(),
+          new ArrayList<>(metadata.getSkipStarNodeCreationForDimensions()),
+          functionColumnPairs.isEmpty() ? null : functionColumnPairs,
+          aggregationConfigs.isEmpty() ? null : aggregationConfigs,
+          metadata.getMaxLeafRecords()));
+    }
+    return configs;
   }
 }
