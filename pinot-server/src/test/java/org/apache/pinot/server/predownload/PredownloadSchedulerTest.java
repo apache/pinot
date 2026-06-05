@@ -33,15 +33,19 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
@@ -51,6 +55,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class PredownloadSchedulerTest {
@@ -85,6 +91,11 @@ public class PredownloadSchedulerTest {
     // static mock is not working in separate threads, according to
     // https://github.com/mockito/mockito/issues/2142
     _predownloadScheduler._executor = Runnable::run;
+  }
+
+  @AfterMethod
+  public void cleanUpMetrics() {
+    ServerMetrics.deregister();
   }
 
   @AfterClass
@@ -354,5 +365,69 @@ public class PredownloadSchedulerTest {
     assertEquals(zeroExecutor.getCorePoolSize(), expectedDefaultThreads,
         "Zero parallelism should fall back to default");
     zeroScheduler.stop();
+  }
+
+  @Test
+  public void testInitializeMetricsReporterRegistersServerMetrics()
+      throws Exception {
+    String propertiesFilePath = this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    PredownloadScheduler scheduler = new PredownloadScheduler(properties);
+
+    try (MockedStatic<PinotMetricUtils> pinotMetricUtilsMockedStatic = mockStatic(PinotMetricUtils.class)) {
+      PinotMetricsRegistry mockRegistry = mock(PinotMetricsRegistry.class);
+      pinotMetricUtilsMockedStatic.when(() -> PinotMetricUtils.getPinotMetricsRegistry(any()))
+          .thenReturn(mockRegistry);
+
+      scheduler.initializeMetricsReporter();
+
+      pinotMetricUtilsMockedStatic.verify(() -> PinotMetricUtils.getPinotMetricsRegistry(any()), times(1));
+      ServerMetrics registeredMetrics = ServerMetrics.get();
+      assertNotNull(registeredMetrics, "ServerMetrics should be registered after initializeMetricsReporter");
+    } finally {
+      scheduler.stop();
+    }
+  }
+
+  @Test
+  public void testInitializeMetricsReporterFallsBackOnFailure()
+      throws Exception {
+    String propertiesFilePath = this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    PredownloadScheduler scheduler = new PredownloadScheduler(properties);
+
+    try (MockedStatic<PinotMetricUtils> pinotMetricUtilsMockedStatic = mockStatic(PinotMetricUtils.class)) {
+      pinotMetricUtilsMockedStatic.when(() -> PinotMetricUtils.getPinotMetricsRegistry(any()))
+          .thenThrow(new RuntimeException("Metrics factory not available"));
+
+      scheduler.initializeMetricsReporter();
+
+      ServerMetrics registeredMetrics = ServerMetrics.get();
+      assertNotNull(registeredMetrics, "ServerMetrics.get() should return NOOP instance, not null");
+    } finally {
+      scheduler.stop();
+    }
+  }
+
+  @Test
+  public void testInitializeMetricsReporterAlwaysCreatesPredownloadMetrics()
+      throws Exception {
+    String propertiesFilePath = this.getClass().getClassLoader().getResource(SAMPLE_PROPERTIES_FILE_NAME).getPath();
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
+    PredownloadScheduler scheduler = spy(new PredownloadScheduler(properties));
+
+    try (MockedStatic<PinotMetricUtils> pinotMetricUtilsMockedStatic = mockStatic(PinotMetricUtils.class);
+         MockedStatic<PredownloadStatusRecorder> statusRecorderMockedStatic =
+             mockStatic(PredownloadStatusRecorder.class)) {
+      pinotMetricUtilsMockedStatic.when(() -> PinotMetricUtils.getPinotMetricsRegistry(any()))
+          .thenThrow(new RuntimeException("Metrics factory not available"));
+
+      scheduler.initializeMetricsReporter();
+
+      statusRecorderMockedStatic.verify(
+          () -> PredownloadStatusRecorder.registerMetrics(any(PredownloadMetrics.class)), times(1));
+    } finally {
+      scheduler.stop();
+    }
   }
 }
