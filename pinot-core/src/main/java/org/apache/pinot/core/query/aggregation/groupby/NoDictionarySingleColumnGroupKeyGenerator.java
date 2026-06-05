@@ -53,6 +53,12 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final ExpressionContext _groupByExpression;
+  /**
+   * Group-key dispatch type: stored type of the column, except UUID is preserved as {@link DataType#UUID} so the
+   * group-key map keys on {@link org.apache.pinot.spi.utils.UuidUtils.UuidKey} (two primitive longs) instead of
+   * {@link org.apache.pinot.spi.utils.ByteArray}. For every other logical type this equals
+   * {@code logicalType.getStoredType()}.
+   */
   private final DataType _dataType;
   private final Map _groupKeyMap;
   private final int _globalGroupIdUpperBound;
