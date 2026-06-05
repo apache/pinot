@@ -167,5 +167,24 @@ public class Actions {
     public static final String VALIDATE_SCHEMA = "ValidateSchema";
     public static final String VALIDATE_TABLE_CONFIGS = "ValidateTableConfigs";
     public static final String FORCE_RELEASE_TASK_GENERATION_LOCK = "ForceReleaseTaskGenerationLock";
+    // Push-based INSERT INTO actions. Wire-permanent strings — once shipped, operators wire these
+    // into RBAC/ACL configs and they cannot be renamed without coordinated migration.
+    /** Submit a new INSERT INTO statement. Required for data-write principals. */
+    public static final String EXECUTE_INSERT = "ExecuteInsert";
+    /** Read INSERT statement status. Required for data-read principals (or higher). */
+    public static final String GET_INSERT_STATUS = "GetInsertStatus";
+    /** Abort an in-flight INSERT. Required for data-write or admin principals. */
+    public static final String ABORT_INSERT = "AbortInsert";
+    /**
+     * Mark a FILE-insert manifest VISIBLE after the Minion task produces segments.
+     *
+     * <p><b>Internal-only:</b> this action is intended exclusively for the Minion task callback.
+     * Granting it to a human user lets that user prematurely flip a manifest to VISIBLE with
+     * arbitrary segment names — see InsertStatementResource#completeFileInsert. Do NOT include
+     * this action in human role bindings.
+     */
+    public static final String COMPLETE_INSERT = "CompleteInsert";
+    /** List INSERT statements for a table. Required for data-read principals (or higher). */
+    public static final String LIST_INSERTS = "ListInserts";
   }
 }

@@ -442,6 +442,20 @@ public class ControllerConf extends PinotConfiguration {
 
   public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
   public static final boolean DEFAULT_DISABLE_GROOVY = true;
+  public static final String INSERT_ENABLED = "controller.insert.enabled";
+  public static final boolean DEFAULT_INSERT_ENABLED = false;
+  /**
+   * Controls whether {@code INSERT INTO ... VALUES} (ROW path) is allowed to perform a
+   * destructive rollback against IdealState on partial-batch upload failure. When {@code false}
+   * (the default), a partial-upload failure leaves the already-registered segments in place and
+   * surfaces them in the result so operators can reconcile manually — preserving query
+   * consistency for in-flight queries against the table. When {@code true}, the rollback path
+   * calls {@code deleteSegment} for each registered segment, which can yank segments out from
+   * under live queries. Enable only on tables you know are interactive / quickstart-tier.
+   */
+  public static final String INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK =
+      "controller.insert.row.allow.destructive.rollback";
+  public static final boolean DEFAULT_INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK = false;
 
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
@@ -1553,6 +1567,25 @@ public class ControllerConf extends PinotConfiguration {
    */
   public boolean isDisableIngestionGroovy() {
     return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
+  }
+
+  /**
+   * @return true if push-based INSERT INTO support is enabled on this controller. Default false.
+   *   When false, the {@link org.apache.pinot.controller.helix.core.ingest.InsertStatementCoordinator}
+   *   is not started, {@code /insert/*} REST endpoints return 503, and {@code INSERT INTO} SQL
+   *   statements are rejected.
+   */
+  public boolean isInsertEnabled() {
+    return getProperty(INSERT_ENABLED, DEFAULT_INSERT_ENABLED);
+  }
+
+  /**
+   * Returns whether INSERT INTO VALUES is allowed to destructively roll back partial uploads
+   * via {@code _resourceManager.deleteSegment}. Off by default — see
+   * {@link #INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK} for the operator trade-off.
+   */
+  public boolean isInsertRowAllowDestructiveRollback() {
+    return getProperty(INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK, DEFAULT_INSERT_ROW_ALLOW_DESTRUCTIVE_ROLLBACK);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {
