@@ -305,7 +305,7 @@ public class RenewableTlsUtils {
               LOGGER.info(
                   "reloadSslFactory :: Encountered issues when renewing SSLFactory "
                   + "{} (built from key store {} and "
-                  + "truststore {}) on ", baseSslFactory, keyStorePath, trustStorePath, e);
+                  + "truststore {}), retrying if attempts remain", baseSslFactory, keyStorePath, trustStorePath, e);
               return false;
             }
           });
