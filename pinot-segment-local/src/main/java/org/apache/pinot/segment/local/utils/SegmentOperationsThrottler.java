@@ -198,6 +198,23 @@ public class SegmentOperationsThrottler {
   }
 
   /**
+   * Partial variant of {@link #updatePermits(int, int)}: a {@code null} argument leaves the corresponding value
+   * unchanged. Resolving the current value and writing the new permits happen atomically under this throttler's
+   * lock, so a partial update cannot interleave with another concurrent permit change. This allows a single
+   * changed config to be applied without resetting the other (unchanged) config.
+   *
+   * @param maxConcurrency new max concurrency value, or {@code null} to keep the current value
+   * @param maxConcurrencyBeforeServingQueries new max concurrency before serving queries value, or {@code null} to
+   *     keep the current value
+   */
+  public synchronized void updatePermits(@Nullable Integer maxConcurrency,
+      @Nullable Integer maxConcurrencyBeforeServingQueries) {
+    updatePermits(maxConcurrency == null ? _maxConcurrency : maxConcurrency,
+        maxConcurrencyBeforeServingQueries == null ? _maxConcurrencyBeforeServingQueries
+            : maxConcurrencyBeforeServingQueries);
+  }
+
+  /**
    * Block trying to acquire the semaphore to perform the segment operation steps unless interrupted.
    * <p>
    * {@link #release()} should be called after the segment operation completes. It is the responsibility of the caller
