@@ -180,6 +180,15 @@ public class MaterializedViewQueryRewriteEngine {
   /// Per-bucket eligibility is enforced later by the handler / dispatcher.  Note: an empty
   /// partition map is permitted — V1 routing uses `watermarkMs` as the split point, so the
   /// partition map is only consulted for V2 N-way routing.
+  ///
+  /// <p><b>Known V1 limitation (tracked for V2 per-bucket routing):</b> because the split is a
+  /// single `watermarkMs` cutoff and does NOT consult per-bucket state, a bucket strictly below
+  /// `watermarkMs` that is STALE, absent (VACANT), or VALID-empty — e.g. a historical base-table
+  /// change the consistency manager marked STALE, a backfill into a previously-empty window, or a
+  /// retention-DELETE that emptied the bucket — is still routed to the MV side and can return
+  /// stale or missing rows until the scheduler re-materializes it via OVERWRITE.  V2 will consult
+  /// the partition map (already cached on `MaterializedViewCacheEntry`) to route such buckets to
+  /// the base table; see `pinot-materialized-view/DESIGN.md` for the V2 per-bucket routing plan.
   private static boolean isEligible(MaterializedViewCacheEntry candidate) {
     if (!candidate.getDefinition().isRewriteEnabled()) {
       LOGGER.debug("MV skip [{}]: rewriteEnabled=false on definition",

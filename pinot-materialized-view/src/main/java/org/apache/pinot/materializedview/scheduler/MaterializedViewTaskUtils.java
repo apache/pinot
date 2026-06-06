@@ -19,9 +19,17 @@
 package org.apache.pinot.materializedview.scheduler;
 
 import com.google.common.base.Preconditions;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
 import org.apache.pinot.materializedview.metadata.PartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
@@ -171,5 +179,57 @@ public final class MaterializedViewTaskUtils {
   public static String buildSegmentName(String tableName, long windowStartMs, long windowEndMs,
       String attemptId, int segIdx) {
     return tableName + "_" + windowStartMs + "_" + windowEndMs + "_" + attemptId + "_" + segIdx;
+  }
+
+  /// Computes a [PartitionFingerprint] over the source segments overlapping
+  /// `[windowStartMs, windowEndMs)`.  Single source of truth — both the scheduler (when
+  /// generating tasks) and the minion executor (when validating fingerprints at commit time)
+  /// must call this method, never re-implement the algorithm.
+  ///
+  /// Algorithm (each step is part of the byte-equality contract — changing any one of them
+  /// breaks the fingerprint and forces an MV-wide recompute):
+  ///
+  ///   1. **Filter** to segments overlapping the half-open window: `start < windowEndMs` AND
+  ///      `end >= windowStartMs`.  Asymmetric `>=` on the lower bound is intentional —
+  ///      `SegmentZKMetadata#getEndTimeMs` is inclusive.
+  ///   2. **Sort** the surviving list by segment name.  Listing order from
+  ///      `getSegmentsZKMetadata` is not guaranteed to be stable across calls, so the sort
+  ///      makes the hash deterministic.  The comparator is part of the algorithm: changing
+  ///      it (e.g. to sort by CRC) is byte-equivalent to changing the hash encoding.
+  ///   3. **Hash** the sorted list with `farmHashFingerprint64`, feeding each segment as
+  ///      `<segmentName>\0<crc>\n`.  FarmHash64 is non-cryptographic but collision-resistant
+  ///      for non-adversarial inputs; it replaces an earlier XOR-CRC scheme that exhibited
+  ///      cancellation collisions (swap two segments with equal combined contribution →
+  ///      identical fingerprint).
+  ///
+  /// Empty overlap returns [PartitionFingerprint#EMPTY] — by construction, since
+  /// `farmHashFingerprint64` over zero input bytes is the constant baked into [#EMPTY].
+  /// Callers MUST NOT pre-filter or pre-sort `allSegments`; the helper is responsible for
+  /// both.  Pre-sorting with a different comparator would silently break byte-equality
+  /// against the executor's commit-time recomputation.
+  public static PartitionFingerprint computeWindowFingerprint(
+      List<SegmentZKMetadata> allSegments, long windowStartMs, long windowEndMs) {
+    List<SegmentZKMetadata> overlapping = new ArrayList<>();
+    for (SegmentZKMetadata seg : allSegments) {
+      long segStartMs = seg.getStartTimeMs();
+      long segEndMs = seg.getEndTimeMs();
+      if (segStartMs < windowEndMs && segEndMs >= windowStartMs) {
+        overlapping.add(seg);
+      }
+    }
+    // Empty overlap returns the shared EMPTY constant (byte-identical to hashing zero input bytes),
+    // honoring the documented contract and avoiding a per-call allocation on empty windows.
+    if (overlapping.isEmpty()) {
+      return PartitionFingerprint.EMPTY;
+    }
+    overlapping.sort(Comparator.comparing(SegmentZKMetadata::getSegmentName));
+    Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
+    for (SegmentZKMetadata seg : overlapping) {
+      hasher.putString(seg.getSegmentName(), StandardCharsets.UTF_8);
+      hasher.putByte((byte) 0);
+      hasher.putLong(seg.getCrc());
+      hasher.putByte((byte) '\n');
+    }
+    return new PartitionFingerprint(overlapping.size(), hasher.hash().asLong());
   }
 }

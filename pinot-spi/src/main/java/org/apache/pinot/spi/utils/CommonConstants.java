@@ -1913,6 +1913,14 @@ public class CommonConstants {
     /// Cluster-config key. Overrides the consistency manager's debounce window (ms).
     public static final String CLUSTER_CONFIG_KEY_CONSISTENCY_DEBOUNCE_MS =
         "pinot.materialized.view.consistency.debounce.ms";
+
+    /// Cluster-config key. Overrides the interval (ms) of the consistency manager's periodic
+    /// VALID-empty re-evaluation sweep.  The sweep re-marks in-coverage `VALID-empty` buckets
+    /// STALE when their source window has regained segments, so a DELETE-backfill that raced the
+    /// commit guard self-heals without waiting for a fresh base-table change.  Non-positive values
+    /// fall back to the compile-time default.
+    public static final String CLUSTER_CONFIG_KEY_CONSISTENCY_EMPTY_SWEEP_INTERVAL_MS =
+        "pinot.materialized.view.consistency.empty.sweep.interval.ms";
   }
 
   public static class ControllerJob {

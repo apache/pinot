@@ -24,14 +24,27 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
 import org.apache.pinot.materializedview.metadata.PartitionState;
+import org.apache.pinot.materializedview.scheduler.MaterializedViewTaskUtils;
+import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
+import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -180,7 +193,7 @@ public class MaterializedViewTaskExecutorTest {
 
   @Test
   public void testContiguousEmptyMap() {
-    long result = MaterializedViewTaskExecutor.computeContiguousUpperMs(
+    long result = MaterializedViewTaskUtils.computeContiguousUpperMs(
         WINDOW_START, new LinkedHashMap<>(), BUCKET_MS);
     assertEquals(result, WINDOW_START, "Empty map: cursor unchanged");
   }
@@ -189,7 +202,7 @@ public class MaterializedViewTaskExecutorTest {
   public void testContiguousSingleValid() {
     Map<Long, PartitionInfo> partitions = new LinkedHashMap<>();
     partitions.put(WINDOW_START, validInfo());
-    long result = MaterializedViewTaskExecutor.computeContiguousUpperMs(
+    long result = MaterializedViewTaskUtils.computeContiguousUpperMs(
         WINDOW_START, partitions, BUCKET_MS);
     assertEquals(result, WINDOW_START + BUCKET_MS, "Single VALID: advances by one bucket");
   }
@@ -200,7 +213,7 @@ public class MaterializedViewTaskExecutorTest {
     partitions.put(WINDOW_START, validInfo());
     partitions.put(WINDOW_START + BUCKET_MS, validInfo());
     partitions.put(WINDOW_START + 2 * BUCKET_MS, validInfo());
-    long result = MaterializedViewTaskExecutor.computeContiguousUpperMs(
+    long result = MaterializedViewTaskUtils.computeContiguousUpperMs(
         WINDOW_START, partitions, BUCKET_MS);
     assertEquals(result, WINDOW_START + 3 * BUCKET_MS, "Three VALIDs: advances three buckets");
   }
@@ -211,7 +224,7 @@ public class MaterializedViewTaskExecutorTest {
     Map<Long, PartitionInfo> partitions = new LinkedHashMap<>();
     partitions.put(WINDOW_START, validInfo());
     partitions.put(WINDOW_START + 2 * BUCKET_MS, validInfo());
-    long result = MaterializedViewTaskExecutor.computeContiguousUpperMs(
+    long result = MaterializedViewTaskUtils.computeContiguousUpperMs(
         WINDOW_START, partitions, BUCKET_MS);
     assertEquals(result, WINDOW_START + BUCKET_MS, "Gap after first VALID: stops there");
   }
@@ -221,7 +234,7 @@ public class MaterializedViewTaskExecutorTest {
     Map<Long, PartitionInfo> partitions = new LinkedHashMap<>();
     partitions.put(WINDOW_START, validInfo());
     partitions.put(WINDOW_START + BUCKET_MS, staleInfo());
-    long result = MaterializedViewTaskExecutor.computeContiguousUpperMs(
+    long result = MaterializedViewTaskUtils.computeContiguousUpperMs(
         WINDOW_START, partitions, BUCKET_MS);
     assertEquals(result, WINDOW_START + BUCKET_MS, "STALE breaks the chain like a gap");
   }
@@ -231,7 +244,7 @@ public class MaterializedViewTaskExecutorTest {
     // Cursor starts at a missing key — return immediately without advancing.
     Map<Long, PartitionInfo> partitions = new LinkedHashMap<>();
     partitions.put(WINDOW_START + BUCKET_MS, validInfo());
-    long result = MaterializedViewTaskExecutor.computeContiguousUpperMs(
+    long result = MaterializedViewTaskUtils.computeContiguousUpperMs(
         WINDOW_START, partitions, BUCKET_MS);
     assertEquals(result, WINDOW_START, "fromMs not present: no advance");
   }
@@ -242,9 +255,9 @@ public class MaterializedViewTaskExecutorTest {
     SegmentZKMetadata second = segment("segB", WINDOW_START, WINDOW_START + BUCKET_MS, 1234L);
 
     PartitionFingerprint firstFingerprint =
-        MaterializedViewTaskExecutor.computeWindowFingerprint(List.of(first), WINDOW_START, WINDOW_START + BUCKET_MS);
+        MaterializedViewTaskUtils.computeWindowFingerprint(List.of(first), WINDOW_START, WINDOW_START + BUCKET_MS);
     PartitionFingerprint secondFingerprint =
-        MaterializedViewTaskExecutor.computeWindowFingerprint(List.of(second), WINDOW_START, WINDOW_START + BUCKET_MS);
+        MaterializedViewTaskUtils.computeWindowFingerprint(List.of(second), WINDOW_START, WINDOW_START + BUCKET_MS);
 
     assertTrue(!firstFingerprint.equals(secondFingerprint),
         "Fingerprint must change when segment identity changes even if CRC is reused");
@@ -255,21 +268,93 @@ public class MaterializedViewTaskExecutorTest {
     SegmentZKMetadata overlapping = segment("overlap", WINDOW_START, WINDOW_START + BUCKET_MS, 10L);
     SegmentZKMetadata outside = segment("outside", WINDOW_START + 2 * BUCKET_MS, WINDOW_START + 3 * BUCKET_MS, 20L);
 
-    PartitionFingerprint fingerprint = MaterializedViewTaskExecutor.computeWindowFingerprint(
+    PartitionFingerprint fingerprint = MaterializedViewTaskUtils.computeWindowFingerprint(
         List.of(overlapping, outside), WINDOW_START, WINDOW_START + BUCKET_MS);
 
     assertEquals(fingerprint.getSegmentCount(), 1);
     assertEquals(fingerprint,
-        MaterializedViewTaskExecutor.computeWindowFingerprint(List.of(overlapping), WINDOW_START,
+        MaterializedViewTaskUtils.computeWindowFingerprint(List.of(overlapping), WINDOW_START,
             WINDOW_START + BUCKET_MS));
   }
 
+  @Test
+  public void testWindowFingerprintForEmptyOverlapMatchesEmptyConstant() {
+    // The DELETE branch (MaterializedViewPartitionManager#clearValid) persists
+    // PartitionFingerprint.EMPTY when source data is gone.  Subsequent STALE recomputation calls
+    // computeWindowFingerprint
+    // against the (still-empty) source and compares the result against the stored fingerprint —
+    // those two values MUST be byte-equal so the equality check behaves correctly.  This test
+    // pins the contract: empty overlap → EMPTY constant.
+    PartitionFingerprint emptyOverlap = MaterializedViewTaskUtils.computeWindowFingerprint(
+        List.of(), WINDOW_START, WINDOW_START + BUCKET_MS);
+    assertEquals(emptyOverlap, PartitionFingerprint.EMPTY);
+
+    SegmentZKMetadata noOverlap = segment(
+        "outside", WINDOW_START + 2 * BUCKET_MS, WINDOW_START + 3 * BUCKET_MS, 99L);
+    PartitionFingerprint filteredEmpty = MaterializedViewTaskUtils.computeWindowFingerprint(
+        List.of(noOverlap), WINDOW_START, WINDOW_START + BUCKET_MS);
+    assertEquals(filteredEmpty, PartitionFingerprint.EMPTY);
+  }
+
+  // -----------------------------------------------------------------------
+  //  shouldAbortDeleteForBackfill — the executor's DELETE early-abort criterion: abort (leave
+  //  the bucket STALE for OVERWRITE) when the source window is no longer empty at commit time.
+  // -----------------------------------------------------------------------
+
+  @Test
+  public void testShouldAbortDeleteWhenSourceBackfilled() {
+    // A backfill landed after the scheduler dispatched DELETE on an empty source: non-zero
+    // segmentCount => abort the DELETE so the bucket stays STALE and OVERWRITE re-materializes it.
+    assertTrue(MaterializedViewTaskExecutor.shouldAbortDeleteForBackfill(new PartitionFingerprint(2, 0xABCDL)));
+    assertTrue(MaterializedViewTaskExecutor.shouldAbortDeleteForBackfill(new PartitionFingerprint(1, 0L)));
+  }
+
+  @Test
+  public void testShouldNotAbortDeleteWhenSourceStillEmpty() {
+    // Source still empty at commit (the expected DELETE case): proceed to drop MV segments and
+    // write VALID-empty.  EMPTY and any other zero-segment-count fingerprint must not abort.
+    assertFalse(MaterializedViewTaskExecutor.shouldAbortDeleteForBackfill(PartitionFingerprint.EMPTY));
+    assertFalse(MaterializedViewTaskExecutor.shouldAbortDeleteForBackfill(
+        MaterializedViewTaskUtils.computeWindowFingerprint(List.of(), WINDOW_START, WINDOW_END)));
+  }
+
+  // -----------------------------------------------------------------------
+  //  preProcess fail-fast: a missing runtime znode must abort BEFORE any query / segment-lineage
+  //  side effects, rather than warn-and-proceed (which would strand active-but-untracked segments).
+  // -----------------------------------------------------------------------
+
+  @Test
+  public void testPreProcessFailsFastWhenRuntimeMissing() {
+    @SuppressWarnings("unchecked")
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    // Runtime znode absent => fetchWithVersion returns null.
+    when(store.get(anyString(), any(Stat.class), anyInt())).thenReturn(null);
+
+    ZkHelixPropertyStore<ZNRecord> previous = MinionContext.getInstance().getHelixPropertyStore();
+    try {
+      MinionContext.getInstance().setHelixPropertyStore(store);
+      Map<String, String> configs = new HashMap<>();
+      configs.put(MinionConstants.TABLE_NAME_KEY, TABLE);
+      configs.put(MaterializedViewTask.TASK_MODE_KEY, MaterializedViewTask.TASK_MODE_APPEND);
+      configs.put(MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(WINDOW_START));
+      PinotTaskConfig taskConfig = new PinotTaskConfig(MaterializedViewTask.TASK_TYPE, configs);
+
+      new MaterializedViewTaskExecutor(null, null, null).preProcess(taskConfig);
+      fail("Expected IllegalStateException when the MV runtime znode is missing");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains(TABLE),
+          "message should name the table; got: " + e.getMessage());
+    } finally {
+      MinionContext.getInstance().setHelixPropertyStore(previous);
+    }
+  }
+
   private static PartitionInfo validInfo() {
-    return new PartitionInfo(PartitionState.VALID, new PartitionFingerprint(0, 0), 0L);
+    return PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(0, 0), 0L);
   }
 
   private static PartitionInfo staleInfo() {
-    return new PartitionInfo(PartitionState.STALE, new PartitionFingerprint(0, 0), 0L);
+    return PartitionInfo.forTesting(PartitionState.STALE, new PartitionFingerprint(0, 0), 0L);
   }
 
   private static SegmentZKMetadata segment(String name, long startMs, long endMs, long crc) {
