@@ -81,6 +81,8 @@ import org.testng.annotations.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -1195,6 +1197,125 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     /// And the response must report the MV name (no false positive — the swap really did happen).
     Assert.assertEquals(response.getMaterializedViewQueried(), materializedViewOfflineTable,
         "Response must report the MV name when the swap was committed");
+  }
+
+  /**
+   * Per-query opt-out: a query carrying {@code enableMaterializedViewRewrite=false} (the option the
+   * MV minion executor injects onto its materialization query) MUST bypass the rewrite path
+   * entirely.  This is the regression guard for the circular-rewrite hazard: a materialization
+   * query reads the base table, and with broker-wide MV rewrite enabled it would otherwise be
+   * eligible to be rewritten back onto an MV over the same base table (its own MV, or a sibling).
+   * Using the identical setup to {@link #testMaterializedViewFullRewriteActuallySwapsServerQuery}
+   * (which DOES swap), this asserts the gate prevents the swap: the rewrite engine is never
+   * consulted, the server query targets the base table, no MV marker is stamped, and the response
+   * reports no MV.
+   */
+  @Test
+  public void testMaterializedViewRewriteSkippedWhenDisabledByQueryOption()
+      throws Exception {
+    String baseOfflineTable = "baseTable_OFFLINE";
+    String materializedViewOfflineTable = "mv_baseTable_OFFLINE";
+    String baseRawTable = "baseTable";
+    String materializedViewRawTable = "mv_baseTable";
+
+    String userSql = "SET enableMaterializedViewRewrite='false';"
+        + "SELECT ts, SUM(revenue) FROM baseTable GROUP BY ts LIMIT 100";
+    PinotQuery materializedViewQuery = CalciteSqlParser.compileToPinotQuery(
+        "SELECT ts, SUM(revenue) FROM mv_baseTable_OFFLINE GROUP BY ts LIMIT 100");
+
+    /// The engine WOULD return a committable FULL_REWRITE if consulted — but the gate must ensure
+    /// it is never consulted at all.
+    MaterializedViewRewritePlan plan = new MaterializedViewRewritePlan(
+        materializedViewOfflineTable, MatchType.EXACT, ExecutionMode.FULL_REWRITE, materializedViewQuery, 1.0);
+    MaterializedViewQueryRewriteEngine materializedViewEngine = mock(MaterializedViewQueryRewriteEngine.class);
+    when(materializedViewEngine.tryRewrite(any(PinotQuery.class), anyString())).thenReturn(plan);
+    MaterializedViewHandler materializedViewHandler = new DefaultMaterializedViewHandler(materializedViewEngine);
+
+    Schema baseSchema = new Schema.SchemaBuilder()
+        .setSchemaName(baseRawTable)
+        .addSingleValueDimension("ts", DataType.STRING)
+        .addMetric("revenue", DataType.DOUBLE)
+        .build();
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getActualTableName(baseRawTable)).thenReturn(baseRawTable);
+    when(tableCache.getSchema(baseRawTable)).thenReturn(baseSchema);
+    when(tableCache.getColumnNameMap(anyString())).thenReturn(Map.of("ts", "ts", "revenue", "revenue"));
+    TableConfig tableCfg = mock(TableConfig.class);
+    TenantConfig tenant = new TenantConfig("t_BROKER", "t_SERVER", null);
+    when(tableCfg.getTenantConfig()).thenReturn(tenant);
+    when(tableCache.getTableConfig(baseOfflineTable)).thenReturn(tableCfg);
+    when(tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(baseRawTable))).thenReturn(null);
+
+    BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
+    when(routingManager.routingExists(baseOfflineTable)).thenReturn(true);
+    when(routingManager.getQueryTimeoutMs(anyString())).thenReturn(10000L);
+    RoutingTable rt = mock(RoutingTable.class);
+    when(rt.getServerInstanceToSegmentsMap()).thenReturn(
+        Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
+            new SegmentsToQuery(List.of("seg01"), List.of())));
+    when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
+
+    QueryQuotaManager quotaManager = mock(QueryQuotaManager.class);
+    when(quotaManager.acquireDatabase(anyString())).thenReturn(true);
+    when(quotaManager.acquireApplication(anyString())).thenReturn(true);
+    when(quotaManager.acquire(anyString())).thenReturn(true);
+
+    BrokerMetrics.register(mock(BrokerMetrics.class));
+    PinotConfiguration config = new PinotConfiguration();
+    BrokerQueryEventListenerFactory.init(config);
+
+    AtomicReference<BrokerRequest> capturedServerBrokerRequest = new AtomicReference<>();
+    BaseSingleStageBrokerRequestHandler handler =
+        new BaseSingleStageBrokerRequestHandler(config, "broker1", new BrokerRequestIdGenerator(),
+            routingManager, new AllowAllAccessControlFactory(), quotaManager, tableCache,
+            ThreadAccountantUtils.getNoOpAccountant(), null, materializedViewHandler) {
+          @Override
+          public void start() {
+          }
+
+          @Override
+          public void shutDown() {
+          }
+
+          @Override
+          protected BrokerResponseNative processBrokerRequest(long requestId,
+              BrokerRequest originalBrokerRequest, BrokerRequest serverBrokerRequest,
+              TableRouteInfo route, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            capturedServerBrokerRequest.set(serverBrokerRequest);
+            return BrokerResponseNative.empty();
+          }
+
+          @Override
+          protected BrokerResponseNative processMaterializedViewSplitBrokerRequest(long requestId,
+              long materializedViewRequestId, BrokerRequest originalBrokerRequest, TableRouteInfo baseRoute,
+              TableRouteInfo materializedViewRoute, long timeoutMs, ServerStats serverStats,
+              RequestContext requestContext) {
+            Assert.fail("MV split path must not be reached when enableMaterializedViewRewrite=false");
+            return BrokerResponseNative.empty();
+          }
+        };
+
+    BrokerResponseNative response = (BrokerResponseNative) handler.handleRequest(userSql);
+    BrokerRequest serverBrokerRequest = capturedServerBrokerRequest.get();
+    Assert.assertNotNull(serverBrokerRequest,
+        "processBrokerRequest must have been reached on the base-table path; exceptions: "
+            + response.getExceptions());
+    /// The rewrite engine must never be consulted when the per-query opt-out is set.
+    verify(materializedViewEngine, never()).tryRewrite(any(PinotQuery.class), anyString());
+    /// The server query MUST target the base table — no swap to the MV.
+    String serverTableName = serverBrokerRequest.getPinotQuery().getDataSource().getTableName();
+    Assert.assertEquals(serverTableName, baseOfflineTable,
+        "Query with enableMaterializedViewRewrite=false must target the base table but got: " + serverTableName);
+    /// No MV-rewrite marker may be stamped.
+    Map<String, String> serverOptions = serverBrokerRequest.getPinotQuery().getQueryOptions();
+    Assert.assertTrue(serverOptions == null
+            || !serverOptions.containsKey(CommonConstants.Broker.Request.QueryOptionKey.MATERIALIZED_VIEW_REWRITE),
+        "MV-rewrite marker must not be stamped when rewrite is disabled; options: " + serverOptions);
+    /// And the response must NOT report a materializedViewQueried.
+    Assert.assertNull(response.getMaterializedViewQueried(),
+        "Response must not report a materializedViewQueried when rewrite is disabled by the query option");
   }
 
   /**

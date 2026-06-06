@@ -86,10 +86,7 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
 
     BrokerGrpcQueryClient client = getOrCreateClient(broker.getLeft(), broker.getRight());
 
-    Broker.BrokerRequest brokerRequest = Broker.BrokerRequest.newBuilder()
-        .setSql(sql)
-        .putAllMetadata(authHeaders)
-        .build();
+    Broker.BrokerRequest brokerRequest = buildMaterializationRequest(sql, authHeaders);
     Iterator<Broker.BrokerResponse> responseIterator = client.submit(brokerRequest);
 
     Preconditions.checkState(responseIterator.hasNext(),
@@ -217,6 +214,30 @@ public class GrpcMaterializedViewQueryExecutor implements MaterializedViewQueryE
         }
       }
     }
+  }
+
+  /// Builds the gRPC [Broker.BrokerRequest] for a materialization query, forcing materialized-view
+  /// rewrite OFF via request **metadata** rather than a SQL `SET`.
+  ///
+  /// The materialization query reads the base table; with broker-wide MV rewrite enabled it would
+  /// otherwise be eligible to be rewritten back onto an MV over the same base table (its own MV or
+  /// a sibling), building the MV from MV data instead of the base table.
+  ///
+  /// The disable is carried as request metadata so the broker can apply it as an override *after*
+  /// parsing (see `BrokerGrpcServer#submit`).  A SQL `SET` prefix would be unreliable: the
+  /// (user-authored) `definedSQL` may already contain an `enableMaterializedViewRewrite` option,
+  /// and the parser keeps the LAST value for a duplicated key — so a prepended `SET ... = 'false'`
+  /// would silently lose to a later `SET ... = 'true'` in the query text.  Forcing it from metadata
+  /// at the broker side is unconditional.  Safe to force: disabling MV rewrite only forgoes an
+  /// optimization, never changes results.
+  @VisibleForTesting
+  static Broker.BrokerRequest buildMaterializationRequest(String sql, Map<String, String> authHeaders) {
+    return Broker.BrokerRequest.newBuilder()
+        .setSql(sql)
+        .putAllMetadata(authHeaders)
+        /// Set AFTER auth headers so the forced flag wins even if an auth header reused the key.
+        .putMetadata(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE, "false")
+        .build();
   }
 
   /// Discovers all gRPC-enabled brokers from Helix and selects one using round-robin.

@@ -701,6 +701,16 @@ public class CommonConstants {
          * Not a user-facing option.
          */
         public static final String MATERIALIZED_VIEW_REWRITE = "materializedViewRewrite";
+        /// User-facing per-query switch. Default `true`. When set to `false`, the broker
+        /// skips all materialized-view rewrite for this query and routes to the base table. Safe to
+        /// expose: disabling only forgoes an optimization and never changes results. Distinct from
+        /// the broker-internal [#MATERIALIZED_VIEW_REWRITE] marker (which is stripped from
+        /// user input); this option is honored from user input. The MV minion executor additionally
+        /// forces it to `false` for its materialization query by passing it as gRPC request
+        /// metadata, which the broker applies as an override after parsing (see BrokerGrpcServer) —
+        /// so the materialization query is never rewritten back onto an MV even if its (user-authored)
+        /// SQL sets this option.
+        public static final String ENABLE_MATERIALIZED_VIEW_REWRITE = "enableMaterializedViewRewrite";
         public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
