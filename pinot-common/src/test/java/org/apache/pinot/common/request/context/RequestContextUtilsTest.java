@@ -20,6 +20,7 @@ package org.apache.pinot.common.request.context;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -145,14 +146,15 @@ public class RequestContextUtilsTest {
     Set<String> supportedByRhsEvaluator = Set.of(
         "touuid", "uuidtobytes", "bytestouuid", "uuidtostring", "isuuid", "uuidversion", "uuidtimestamp");
 
+    // Sweep var-arg plus arities 0..8 so a higher-arity UUID function added in future (e.g., UUID_FROM_PARTS(msb,
+    // lsb, version)) still gets considered by the drift guard. UUID_V4/UUID_V7 are registered with
+    // isDeterministic=false and are correctly excluded.
+    int[] aritiesToCheck = {FunctionRegistry.VAR_ARG_KEY, 0, 1, 2, 3, 4, 5, 6, 7, 8};
     Set<String> registeredDeterministicUuidFunctions = FunctionRegistry.getFunctions().entrySet().stream()
         // canonical names from FunctionRegistry are already lowercased and underscore-stripped
         .filter(e -> e.getKey().startsWith("uuid") || "touuid".equals(e.getKey()) || "isuuid".equals(e.getKey()))
-        // A UUID scalar function counts as deterministic if any registered arity (0-2 covers every current UUID
-        // function — TO_UUID/IS_UUID/UUID_TO_*/UUID_VERSION/UUID_TIMESTAMP arity 1; UUID_V4/UUID_V7 arity 0) reports
-        // isDeterministic(). UUID_V4/UUID_V7 are registered with isDeterministic=false and are correctly excluded.
         .filter(e -> {
-          for (int arity = 0; arity <= 2; arity++) {
+          for (int arity : aritiesToCheck) {
             FunctionInfo info = e.getValue().getFunctionInfo(arity);
             if (info != null && info.isDeterministic()) {
               return true;
@@ -160,7 +162,7 @@ public class RequestContextUtilsTest {
           }
           return false;
         })
-        .map(java.util.Map.Entry::getKey)
+        .map(Map.Entry::getKey)
         .collect(Collectors.toSet());
 
     Set<String> missingFromEvaluator = registeredDeterministicUuidFunctions.stream()
