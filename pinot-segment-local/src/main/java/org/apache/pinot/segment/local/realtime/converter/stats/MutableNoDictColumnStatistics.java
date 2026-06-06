@@ -33,7 +33,6 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.UuidUtils;
 
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
@@ -118,9 +117,10 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
 
     int numDocs = _dataSourceMetadata.getNumDocs();
 
-    // Verify that values are non-decreasing when iterated in the given order
+    // Verify that values are non-decreasing when iterated in the given order. The BYTES path uses
+    // ByteArray.compare (unsigned byte-wise lexicographic), which is identical to UuidUtils.compare's unsigned
+    // 64-bit-word ordering on canonical 16-byte big-endian UUIDs, so a single comparator handles both.
     DataType storedType = getStoredType();
-    boolean useUuidComparison = _fieldSpec.getDataType() == DataType.UUID;
     if (_sortedDocIds != null) {
       switch (storedType) {
         case INT: {
@@ -193,7 +193,7 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
           byte[] prev = _forwardIndex.getBytes(_sortedDocIds[0]);
           for (int i = 1; i < numDocs; i++) {
             byte[] curr = _forwardIndex.getBytes(_sortedDocIds[i]);
-            if ((useUuidComparison ? UuidUtils.compare(curr, prev) : ByteArray.compare(curr, prev)) < 0) {
+            if (ByteArray.compare(curr, prev) < 0) {
               return false;
             }
             prev = curr;
@@ -275,7 +275,7 @@ public class MutableNoDictColumnStatistics implements ColumnStatistics, CLPStats
           byte[] prev = _forwardIndex.getBytes(0);
           for (int i = 1; i < numDocs; i++) {
             byte[] curr = _forwardIndex.getBytes(i);
-            if ((useUuidComparison ? UuidUtils.compare(curr, prev) : ByteArray.compare(curr, prev)) < 0) {
+            if (ByteArray.compare(curr, prev) < 0) {
               return false;
             }
             prev = curr;
