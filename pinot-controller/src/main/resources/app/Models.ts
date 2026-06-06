@@ -60,6 +60,8 @@ export enum DISPLAY_SEGMENT_STATUS {
 export enum InstanceState {
   ENABLE = 'enable',
   DISABLE = 'disable',
+  QUERIES_DISABLE = 'queries_disable',
+  QUERIES_ENABLE = 'queries_enable',
 }
 
 export enum InstanceType {

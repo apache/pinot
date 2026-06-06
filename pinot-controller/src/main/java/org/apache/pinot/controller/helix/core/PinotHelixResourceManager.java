@@ -626,9 +626,27 @@ public class PinotHelixResourceManager {
 
     InstanceConfigValidatorRegistry.validate(newInstance);
 
+    // Asymmetric preservation of the operational `queriesDisabled` flag managed by
+    // PUT /instances/{name}/state?state=QUERIES_DISABLE|QUERIES_ENABLE (see #setQueriesDisabled):
+    //   - body=true  -> set true (legacy path; explicit operator intent in this request).
+    //   - body=false -> if live==true, preserve true (the clobber case: a generic update to
+    //                   host/tags/ports must NOT silently re-route queries to a server an
+    //                   operator has explicitly removed from routing).
+    //   - body=false + live!=true -> leave as is (no-op / cleared).
+    boolean liveQueriesDisabled = Boolean.parseBoolean(
+        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+
     List<String> newTags = newInstance.getTags();
     List<String> oldTags = instanceConfig.getTags();
     InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
+    // If the live record had queriesDisabled=true but the request body defaulted it to false,
+    // restore the operational flag so it survives a request-body-driven update.
+    if (liveQueriesDisabled && !newInstance.isQueriesDisabled()) {
+      instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+      LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
+          + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
+          instanceId);
+    }
     if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
@@ -657,6 +675,27 @@ public class PinotHelixResourceManager {
     } else {
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId);
     }
+  }
+
+  /// Sets the `queriesDisabled` flag on the instance config using a field-scoped Helix write.
+  ///
+  /// This avoids clobbering other fields (e.g. `shutdownInProgress`) that are concurrently set
+  /// by other field-scoped writes during rolling upgrades. Full-record writes ([#updateInstance])
+  /// preserve this flag explicitly; see that method for details.
+  ///
+  /// @param serverInstanceName the Helix participant id (must be a server instance)
+  /// @param disabled `true` to disable query routing, `false` to re-enable it
+  /// @throws IllegalArgumentException if `serverInstanceName` is not a server instance
+  public synchronized void setQueriesDisabled(String serverInstanceName, boolean disabled) {
+    Preconditions.checkArgument(InstanceTypeUtils.isServer(serverInstanceName),
+        "setQueriesDisabled only applies to server instances, got: %s", serverInstanceName);
+    Map<String, String> propToUpdate =
+        Collections.singletonMap(CommonConstants.Helix.QUERIES_DISABLED, Boolean.toString(disabled));
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+            .forParticipant(serverInstanceName).build();
+    LOGGER.info("Setting queriesDisabled={} for server instance: {}", disabled, serverInstanceName);
+    _helixAdmin.setConfig(scope, propToUpdate);
   }
 
   /**
