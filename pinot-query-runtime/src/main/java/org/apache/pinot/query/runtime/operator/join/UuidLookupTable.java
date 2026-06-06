@@ -26,7 +26,15 @@ import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 
 
 /**
- * Lookup table optimized for Pinot's logical UUID type.
+ * Lookup table optimized for Pinot's logical UUID type — stores entries keyed by
+ * {@link org.apache.pinot.spi.utils.UuidUtils.UuidKey} (two primitive longs) so the hot path avoids
+ * {@code ByteArray} wrapping/equals.
+ *
+ * <p><b>Contract:</b> {@link #addRow} normalizes the supplied key implicitly via
+ * {@link #normalizeKey(Object)}; {@link #containsKey} and {@link #lookup} do NOT — callers must pass an
+ * already-normalized key (the join operators do this via {@code _rightTable.normalizeKey(...)}). Passing a
+ * raw {@code byte[]}, {@code String}, or {@code ByteArray} to {@link #containsKey} / {@link #lookup} will
+ * silently miss because the table is keyed on {@code UuidKey}, whose equality is by primitive longs.
  */
 @SuppressWarnings("unchecked")
 public class UuidLookupTable extends LookupTable {
