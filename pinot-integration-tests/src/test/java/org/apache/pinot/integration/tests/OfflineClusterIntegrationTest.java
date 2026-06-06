@@ -3571,7 +3571,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // needed because both OfflineClusterIntegrationTest and MultiNodesOfflineClusterIntegrationTest run this test
     // case with different number of documents in the segment.
     response1 = response1.replaceAll("docs:[0-9]+", "docs:*")
-        .replaceAll("Time: \\d+\\.\\d+", "Time:*");
+        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time:*");
 
     JsonNode response1Json = JsonUtils.stringToJsonNode(response1);
     assertEquals(response1Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
@@ -3607,7 +3607,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // language=sql
     String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString()
-        .replaceAll("Time: \\d+\\.\\d+", "Time: *");
+        .replaceAll("Time: \\d+\\.\\d+(?:[eE][-+]?\\d+)?", "Time: *");
 
     JsonNode response2Json = JsonUtils.stringToJsonNode(response2);
     assertEquals(response2Json.get("dataSchema").get("columnNames").get(0).asText(), "SQL");
