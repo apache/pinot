@@ -34,7 +34,9 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
 
 public class JsonFunctionsTest {
@@ -706,5 +708,41 @@ public class JsonFunctionsTest {
     Assert.assertTrue(jsonPathResult.contains("$['field.with.dots']"));
     Assert.assertTrue(jsonPathResult.contains("$['field_with_underscores']"));
     Assert.assertTrue(jsonPathResult.contains("$['field with spaces']"));
+  }
+
+  @Test
+  public void testJsonExtractScalar() {
+    String json = "{\"int-key\":123,\"string-key\":\"value\",\"bool-key\":true,\"double-key\":12.3}";
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.string-key", "STRING", "unknown"), "value");
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.int-key", "INT", -1), 123);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.double-key", "DOUBLE", -1.0), 12.3);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.bool-key", "BOOLEAN", false), true);
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", "missing"), "missing");
+
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING", null), "");
+    assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "STRING"));
+    assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT"));
+    assertThrows(() -> JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT", ""));
+    assertEquals(JsonFunctions.jsonExtractScalar(json, "$.nonexistent", "INT", 0), 0);
+
+    String nestedJson = String.format(
+            "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
+                    + "\"stringVal\":\"%s\", \"arrayField\": [{\"arrIntField\": 1, \"arrStringField\": \"abc\"}, "
+                    + "{\"arrIntField\": 2, \"arrStringField\": \"xyz\"},"
+                    + "{\"arrIntField\": 5, \"arrStringField\": \"wxy\"},"
+                    + "{\"arrIntField\": 6},"
+                    + "{\"arrIntField\": 0, \"arrStringField\": null}], "
+                    + "\"intVals\":[0,1], \"longVals\":[0,1], \"floatVals\":[0.0,1.0], \"doubleVals\":[0.0,1.0], "
+                    + "\"bigDecimalVals\":[0.0,1.0], \"stringVals\":[\"0\",\"1\"]}",
+            42, 9999999999L, 3.14f, 6.28d, 123.456, "hello");
+
+    Object result = JsonFunctions.jsonExtractScalar(nestedJson, "$.arrayField[*].arrIntField", "INT_ARRAY", -1);
+    assertArrayEquals(new int[]{1, 2, 5, 6, 0}, (int[]) result);
+
+    result = JsonFunctions.jsonExtractScalar(nestedJson, "$.arrayWrongField[*].arrIntField", "INT_ARRAY", -1);
+    assertArrayEquals(new int[0], (int[]) result);
+
+    result = JsonFunctions.jsonExtractScalar(nestedJson, "$.arrayField[*].arrStringField", "STRING_ARRAY", "missing");
+    assertArrayEquals(new String[]{"abc", "xyz", "wxy", "missing"}, (String[]) result);
   }
 }
