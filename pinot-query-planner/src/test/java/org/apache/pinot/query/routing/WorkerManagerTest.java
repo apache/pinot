@@ -43,6 +43,7 @@ import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -426,6 +427,58 @@ public class WorkerManagerTest {
       }
     }
     assertTrue(anyT1Server, "Expected at least one T1 server to be used");
+  }
+
+  @Test
+  public void testNonPartitionedLeafPropagatesOptionalSegmentsToWorkerMetadata() {
+    Schema schema = getSchemaBuilder("optTable").build();
+    ServerInstance server = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server.getInstanceId(), server);
+    List<String> optionalSegments = List.of("optionalSeg1");
+    RoutingTable routingTable = new RoutingTable(
+        Map.of(server, new SegmentsToQuery(List.of("requiredSeg1"), optionalSegments)), List.of(), 0);
+    CapturingRoutingManager routingManager = new CapturingRoutingManager(serverInstanceMap,
+        Map.of("optTable_OFFLINE", routingTable));
+
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("optTable_OFFLINE", "optTable_OFFLINE");
+    tableNameMap.put("optTable", "optTable");
+
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("optTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+
+    WorkerManager workerManager = new WorkerManager("Broker_localhost", "localhost", 3, routingManager);
+    QueryEnvironment queryEnvironment = new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache,
+        workerManager);
+
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile("SELECT * FROM optTable")) {
+      DispatchableSubPlan plan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(plan);
+      boolean foundOptional = false;
+      for (DispatchablePlanFragment fragment : plan.getQueryStageMap().values()) {
+        List<WorkerMetadata> workers = fragment.getWorkerMetadataList();
+        if (workers == null) {
+          continue;
+        }
+        for (WorkerMetadata worker : workers) {
+          if (!worker.isLeafStageWorker()) {
+            continue;
+          }
+          Map<String, List<String>> optionalMap = worker.getOptionalTableSegmentsMap();
+          if (optionalMap != null && optionalSegments.equals(optionalMap.get(TableType.OFFLINE.name()))) {
+            foundOptional = true;
+            break;
+          }
+        }
+        if (foundOptional) {
+          break;
+        }
+      }
+      assertTrue(foundOptional, "Leaf worker metadata should include optional segments from routing");
+    }
   }
 
   /**
