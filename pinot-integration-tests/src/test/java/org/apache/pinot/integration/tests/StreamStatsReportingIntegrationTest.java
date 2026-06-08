@@ -342,6 +342,10 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     // Enable stream-mode cluster-wide so testClusterLevelConfigActivatesStreamMode can run without a per-query option.
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_STREAM_STATS, true);
+    // Generous stats-drain window so these coverage assertions don't race the default 50ms cutoff under CI load: the
+    // broker still returns as soon as all opchains report (early completion), so this only raises the upper bound on
+    // how long it will wait for a slow opchain's stats, making full coverage deterministic.
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_STREAM_STATS_DRAIN_MS, 30_000L);
     super.overrideBrokerConf(brokerConf);
   }
 
