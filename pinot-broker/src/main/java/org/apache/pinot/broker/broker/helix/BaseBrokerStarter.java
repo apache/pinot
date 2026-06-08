@@ -255,7 +255,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   /// Override to customize the [WorkerManager] used for multi-stage query engine worker assignment.
   protected WorkerManager createWorkerManager(String brokerId, String hostname, int port,
       RoutingManager routingManager) {
-    return new WorkerManager(brokerId, hostname, port, routingManager);
+    boolean colocatedJoinBestEffort = _brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_COLOCATED_JOIN_BEST_EFFORT,
+        CommonConstants.Broker.DEFAULT_COLOCATED_JOIN_BEST_EFFORT);
+    return new WorkerManager(brokerId, hostname, port, routingManager, colocatedJoinBestEffort);
   }
 
   /// Override to supply a custom [SingleConnectionBrokerRequestHandler] subclass (e.g. one
