@@ -138,6 +138,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
   private final PinotConfiguration _pinotConfig;
   private final boolean _enablePartitionMetadataManager;
+  private final long _newSegmentExpirationMs;
   private final ExecutorService _executorService;
   @Nullable
   private Consumer<ServerInstance> _serverReenableCallback;
@@ -180,6 +181,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _enablePartitionMetadataManager =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER,
             CommonConstants.Broker.DEFAULT_ENABLE_PARTITION_METADATA_MANAGER);
+    _newSegmentExpirationMs = TimeUnit.SECONDS.toMillis(
+        pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS,
+            CommonConstants.Broker.DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS));
     int processSegmentAssignmentChangeNumThreads =
         pinotConfig.getProperty(CommonConstants.Broker.CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM,
             CommonConstants.Broker.DEFAULT_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM);
@@ -807,9 +811,9 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
                 columnPartitionMap.entrySet().iterator().next();
             LOGGER.info("Enabling SegmentPartitionMetadataManager for table: {} on partition column: {}",
                 tableNameWithType, partitionConfig.getKey());
-            partitionMetadataManager =
-                new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
-                    partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+            partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
+                partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions(),
+                _newSegmentExpirationMs);
           } else {
             LOGGER.warn(
                 "Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",

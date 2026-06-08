@@ -22,7 +22,6 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
@@ -41,12 +40,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
  * The instance selector selects server instances to serve the query based on the selected segments.
  */
 public interface InstanceSelector {
-  long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
-
-  static boolean isNewSegment(long creationTimeMs, long currentTimeMs) {
-    return isNewSegment(creationTimeMs, currentTimeMs, NEW_SEGMENT_EXPIRATION_MILLIS);
-  }
-
   static boolean isNewSegment(long creationTimeMs, long currentTimeMs, long newSegmentExpirationMillis) {
     return creationTimeMs > 0 && currentTimeMs - creationTimeMs <= newSegmentExpirationMillis;
   }
