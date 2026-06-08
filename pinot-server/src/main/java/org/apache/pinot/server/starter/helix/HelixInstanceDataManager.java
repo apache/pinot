@@ -211,8 +211,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
-    // Ensure we can write to the instance data dir
-    Preconditions.checkState(instanceDataDir.canWrite(), "Cannot write to the instance data dir: %s", instanceDataDir);
+    ensureDirectoryWritable(instanceDataDir, "instance data dir");
   }
 
   @VisibleForTesting
@@ -221,9 +220,24 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs(), "Failed to create instance segment tar dir: %s",
           instanceSegmentTarDir);
     }
-    // Ensure we can write to the instance segment tar dir
-    Preconditions.checkState(instanceSegmentTarDir.canWrite(), "Cannot write to the instance segment tar dir: %s",
-        instanceSegmentTarDir);
+    ensureDirectoryWritable(instanceSegmentTarDir, "instance segment tar dir");
+  }
+
+  @VisibleForTesting
+  static void ensureDirectoryWritable(File directory, String directoryDescription) {
+    Preconditions.checkState(directory.isDirectory(), "Expected %s to be a directory: %s", directoryDescription,
+        directory);
+
+    File probeFile = null;
+    try {
+      probeFile = File.createTempFile(".pinot-writability-check-", ".tmp", directory);
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot write to the " + directoryDescription + ": " + directory, e);
+    } finally {
+      if (probeFile != null) {
+        Preconditions.checkState(probeFile.delete(), "Failed to delete writability check file: %s", probeFile);
+      }
+    }
   }
 
   @Override
