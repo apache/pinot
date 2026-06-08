@@ -22,7 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.channel.ChannelOption;
+import io.grpc.netty.shaded.io.netty.channel.WriteBufferWaterMark;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -89,6 +92,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
+
+  // Outbound write-buffer watermarks for the SubmitWithStream response stream. When buffered outbound bytes exceed
+  // the high watermark the channel goes non-writable and ServerCallStreamObserver.isReady() returns false; the
+  // stream-stats send path checks isReady() and skips best-effort OpChainComplete stats rather than buffering them
+  // unboundedly on worker threads (see SubmitWithStreamObserver.onOpChainComplete). Bounds per-stream outbound memory.
+  private static final int WRITE_BUFFER_LOW_WATER_MARK = 1024 * 1024;
+  private static final int WRITE_BUFFER_HIGH_WATER_MARK = 8 * 1024 * 1024;
 
   private final String _instanceId;
   private final int _port;
@@ -225,6 +235,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       builder.permitKeepAliveTime(_permitKeepAliveTimeMs, TimeUnit.MILLISECONDS);
     }
     builder.permitKeepAliveWithoutCalls(_permitKeepAliveWithoutCalls);
+    // Bound per-connection outbound buffering so the SubmitWithStream response path (which produces OpChainComplete
+    // messages from worker threads) has a meaningful isReady() signal to backpressure against.
+    builder.withChildOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
+        new WriteBufferWaterMark(WRITE_BUFFER_LOW_WATER_MARK, WRITE_BUFFER_HIGH_WATER_MARK));
     return builder.addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
   }
 
@@ -511,9 +525,18 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     /// waits for this future via {@code thenRun} instead of calling {@link #sendDoneAndComplete} immediately,
     /// ensuring the broker always receives the {@code submit_ack} before {@code ServerDone}.
     private final CompletableFuture<Void> _ackSentFuture = new CompletableFuture<>();
+    /// The response observer cast to {@link ServerCallStreamObserver} (gRPC always hands a server-call observer for a
+    /// streaming method), used only to read {@link ServerCallStreamObserver#isReady()} as an outbound-backpressure
+    /// signal on the best-effort stats path. Never null in production; tolerated as null for unit-test fakes.
+    @Nullable
+    private final ServerCallStreamObserver<Worker.ServerToBroker> _flowControl;
 
     SubmitWithStreamObserver(StreamObserver<Worker.ServerToBroker> responseObserver) {
       _responseObserver = responseObserver;
+      // gRPC hands a ServerCallStreamObserver for streaming methods; the downcast preserves the concrete element type
+      // (Worker.ServerToBroker), so it is a checked cast (no unchecked warning).
+      _flowControl = responseObserver instanceof ServerCallStreamObserver
+          ? (ServerCallStreamObserver<Worker.ServerToBroker>) responseObserver : null;
     }
 
     @Override
@@ -678,7 +701,17 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       try {
         synchronized (_streamLock) {
           if (!_completed.get()) {
-            _responseObserver.onNext(message);
+            if (_flowControl == null || _flowControl.isReady()) {
+              _responseObserver.onNext(message);
+            } else {
+              // Outbound buffer is backed up (broker reading slowly). OpChainComplete stats are best-effort, so drop
+              // this one instead of buffering it unboundedly on worker threads — the opchain is still counted below,
+              // so ServerDone still fires and the broker stops waiting; the broker reports this stage as missing in
+              // its coverage. This is the bound against the server-side memory blow-up the legacy mailbox path's
+              // explicit backpressure already guards against.
+              LOGGER.debug("Dropping OpChainComplete stats for request {} opchain {}: response stream not ready "
+                  + "(outbound backpressure)", _requestId, opChainId);
+            }
           }
         }
       } finally {
@@ -711,6 +744,17 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         _queryRunner.cancel(cancel.getRequestId());
       } catch (Throwable t) {
         LOGGER.warn("Caught exception cancelling request {} via SubmitWithStream", cancel.getRequestId(), t);
+      }
+      // Once this stream's request is cancelled, no further meaningful OpChainComplete reports will arrive — in
+      // particular, opchains cancelled before they register never fire the completion listener, so _completedOpChains
+      // would never reach _expectedOpChains and ServerDone would never be sent. Close the stream promptly so the
+      // broker stops waiting out its full drain window. Gated on the ack so the broker still sees submit_ack before
+      // ServerDone; cleanupListener and sendDoneAndComplete are both idempotent, so racing onOpChainComplete is safe.
+      if (cancel.getRequestId() == _requestId) {
+        _ackSentFuture.thenRun(() -> {
+          cleanupListener();
+          sendDoneAndComplete();
+        });
       }
     }
 

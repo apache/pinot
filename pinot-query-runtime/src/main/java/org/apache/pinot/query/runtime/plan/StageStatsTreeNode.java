@@ -124,6 +124,26 @@ public class StageStatsTreeNode {
     stats.add(_statMap);
   }
 
+  /**
+   * Returns a deep copy of this subtree: every node's {@link StatMap} is cloned via the {@link StatMap} copy
+   * constructor and children are copied recursively. The {@code type} and (immutable) {@code planNodeIds} are shared.
+   *
+   * <p>Used to hand a caller a snapshot of the accumulator that is isolated from subsequent in-place
+   * {@link #merge(StageStatsTreeNode)} mutations of the live tree — otherwise a late merge on one thread would race
+   * with a reader (e.g. {@code StatMap.asJson()}) on another, since {@link StatMap} is not safe for concurrent
+   * read/merge.
+   */
+  // The cloned StatMap keeps the same (erased) key class as the source; Java's type system can't express that, so we
+  // suppress and rely on the StatMap copy constructor copying the key class along with the values.
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public StageStatsTreeNode deepCopy() {
+    List<StageStatsTreeNode> childrenCopy = new ArrayList<>(_children.size());
+    for (StageStatsTreeNode child : _children) {
+      childrenCopy.add(child.deepCopy());
+    }
+    return new StageStatsTreeNode(_type, _planNodeIds, new StatMap((StatMap) _statMap), childrenCopy);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

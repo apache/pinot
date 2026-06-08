@@ -82,6 +82,14 @@ public class StreamingQuerySession {
    * cancel idempotently. */
   private boolean _peerErrorObserved = false;
 
+  /**
+   * Set once {@link #snapshotCoverage()} has been taken (the broker has stopped waiting for stats). After this, late
+   * {@link #recordOpChainComplete} reports are ignored: the broker is about to flatten/serialize the snapshot on its
+   * own thread, and merging into the live accumulator would mutate {@link StatMap}s the broker may be reading. The
+   * snapshot itself is additionally a deep copy, so it stays isolated even from this guard. Guarded by {@link #_lock}.
+   */
+  private boolean _finalized = false;
+
   public StreamingQuerySession(long requestId, int expectedOpChains) {
     _requestId = requestId;
     _expectedOpChains = expectedOpChains;
@@ -151,6 +159,12 @@ public class StreamingQuerySession {
     boolean shouldFanOutCancel = false;
     _lock.lock();
     try {
+      if (_finalized) {
+        // The broker already snapshotted coverage and stopped waiting; ignore this late report so we don't mutate
+        // accumulator StatMaps the broker may be flattening/serializing concurrently. The latch is also already past
+        // awaitCompletion, so there is nothing left to count down.
+        return;
+      }
       if (!isSuccess) {
         if (!_peerErrorObserved) {
           _peerErrorObserved = true;
@@ -296,8 +310,16 @@ public class StreamingQuerySession {
   public Coverage snapshotCoverage() {
     _lock.lock();
     try {
-      return new Coverage(new HashMap<>(_respondedByStage), new HashMap<>(_mergeFailedByStage),
-          new HashMap<>(_stageAccumulator));
+      // Mark finalized so any late report is ignored (see _finalized), and deep-copy the per-stage trees so the
+      // returned snapshot is fully isolated from the live accumulator: the broker flattens/serializes these StatMaps
+      // on its own thread, and StatMap is not safe for concurrent read while another thread merges into it.
+      _finalized = true;
+      Map<Integer, StageStatsTreeNode> accumulatorCopy = new HashMap<>(_stageAccumulator.size());
+      for (Map.Entry<Integer, StageStatsTreeNode> entry : _stageAccumulator.entrySet()) {
+        accumulatorCopy.put(entry.getKey(), entry.getValue().deepCopy());
+      }
+      // _respondedByStage / _mergeFailedByStage hold immutable Integer values, so a shallow copy is already isolated.
+      return new Coverage(new HashMap<>(_respondedByStage), new HashMap<>(_mergeFailedByStage), accumulatorCopy);
     } finally {
       _lock.unlock();
     }

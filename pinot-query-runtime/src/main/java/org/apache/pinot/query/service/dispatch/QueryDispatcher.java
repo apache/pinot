@@ -395,16 +395,21 @@ public class QueryDispatcher {
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
     Map<Integer, StageStatsTreeNode> accumulator = coverage.getStageAccumulator();
 
+    // Bound the result-array size by the broker's own stage count and the stages the broker actually dispatched
+    // (expectedByStage) only — never by the server-supplied accumulator keys. Otherwise a buggy/mismatched server
+    // reporting a huge currentStageId would force a giant ArrayList allocation here. Accumulator entries beyond this
+    // bound are skipped by the loop below (it only iterates 0..maxStageId).
     int maxStageId = brokerResult.getQueryStats().size() - 1;
-    for (Integer stageId : accumulator.keySet()) {
-      if (stageId > maxStageId) {
-        maxStageId = stageId;
-      }
-    }
     for (Integer stageId : expectedByStage.keySet()) {
       if (stageId > maxStageId) {
         maxStageId = stageId;
       }
+    }
+    int maxStageIdBound = maxStageId;
+    long unexpectedStages = accumulator.keySet().stream().filter(id -> id > maxStageIdBound).count();
+    if (unexpectedStages > 0) {
+      LOGGER.warn("Ignoring stream stats for {} unexpected stage id(s) on request {} (max expected stage {})",
+          unexpectedStages, session.getRequestId(), maxStageIdBound);
     }
 
     List<MultiStageQueryStats.StageStats.Closed> merged = new ArrayList<>(maxStageId + 1);

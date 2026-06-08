@@ -102,6 +102,45 @@ public class StreamingQuerySessionTest {
   }
 
   /**
+   * Regression for the snapshot data race: {@link StreamingQuerySession#snapshotCoverage()} must hand back a snapshot
+   * isolated from the live accumulator, and a late {@link StreamingQuerySession#recordOpChainComplete} arriving after
+   * the broker stopped waiting must NOT mutate it. Before the fix, snapshotCoverage shallow-copied the map, so the
+   * returned {@code StageStatsTreeNode}/{@code StatMap} were aliased to the live ones; a post-snapshot merge (which
+   * happens on the success-partial path, where open streams are not cancelled) mutated the very {@code StatMap} the
+   * broker was concurrently flattening/serializing — a real data race. This asserts the observable consequence
+   * deterministically: the snapshot value stays put and the late report is ignored.
+   */
+  @Test
+  @SuppressWarnings("unchecked")
+  public void testSnapshotIsolatedFromLateReports()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+    // Worker 0 reports stage 0 with 5 rows. The broker then stops waiting (e.g. drain window expired) and snapshots.
+    session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
+    StreamingQuerySession.Coverage snapshot = session.snapshotCoverage();
+    StatMap<AggregateOperator.StatKey> snapshotStat =
+        (StatMap<AggregateOperator.StatKey>) snapshot.getStageAccumulator().get(0).getStatMap();
+    Assert.assertEquals(snapshotStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5);
+
+    // A late worker reports another 7 rows for the same stage AFTER the snapshot was taken. With the old shallow copy
+    // + no finalize guard this merged into the snapshot's StatMap (5 -> 12).
+    session.recordOpChainComplete(buildOpChainComplete(0, 1, 1, 7));
+
+    // The already-handed-out snapshot must be untouched...
+    Assert.assertEquals(snapshotStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5,
+        "snapshot StatMap must not be mutated by a post-snapshot report");
+    // ...and the late report must have been dropped entirely (session finalized), so a fresh snapshot also shows 5
+    // and the responded counter did not advance.
+    StreamingQuerySession.Coverage after = session.snapshotCoverage();
+    StatMap<AggregateOperator.StatKey> afterStat =
+        (StatMap<AggregateOperator.StatKey>) after.getStageAccumulator().get(0).getStatMap();
+    Assert.assertEquals(afterStat.getLong(AggregateOperator.StatKey.EMITTED_ROWS), 5,
+        "late report after finalize must be ignored");
+    Assert.assertEquals((int) after.getRespondedByStage().getOrDefault(0, 0), 1,
+        "responded count must not advance after finalize");
+  }
+
+  /**
    * A failed opchain (success=false) records as merge-failed-or-responded depending on whether stats are present,
    * and triggers fan-out cancel exactly once across remaining streams.
    */

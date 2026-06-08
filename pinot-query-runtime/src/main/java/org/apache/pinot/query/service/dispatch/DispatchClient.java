@@ -53,6 +53,13 @@ class DispatchClient {
    * Using a static allocator allows for better memory pooling across all DispatchClient instances.
    */
   private static final PooledByteBufAllocator BUF_ALLOCATOR = new PooledByteBufAllocator(true);
+  /**
+   * Max size of an inbound message on the broker's dispatch channel. The default gRPC limit is 4 MB, but a single
+   * {@code SubmitWithStream} {@code OpChainComplete} can carry a large {@link Worker.MultiStageStatsTree} (wide/deep
+   * plans, large STRING stats), and exceeding the limit fails the whole query with {@code RESOURCE_EXHAUSTED} even
+   * though the query results are already in hand. Matches the server's inbound limit ({@code QueryServer}).
+   */
+  private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
@@ -70,7 +77,8 @@ class DispatchClient {
     // Always use NettyChannelBuilder to allow setting Netty-specific channel options like the buffer allocator.
     // This ensures we can explicitly configure direct (off-heap) buffers for better performance.
     NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port)
-        .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR);
+        .withOption(ChannelOption.ALLOCATOR, BUF_ALLOCATOR)
+        .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE);
     if (tlsConfig == null) {
       channelBuilder.usePlaintext();
     } else {

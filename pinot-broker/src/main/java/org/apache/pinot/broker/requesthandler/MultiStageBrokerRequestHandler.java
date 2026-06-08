@@ -819,8 +819,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       if (QueryOptionsUtils.isStreamStats(query.getOptions(), _streamStatsDefault)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_QUERIES, 1);
+        // Only flag incomplete coverage on the SUCCESS path. A failed/timed-out query returns partial coverage by
+        // definition (via tryRecoverWithStream), so emitting here would spike the meter on every failed stream query
+        // and undercut its purpose as a "persistent stats gap" alert for otherwise-healthy queries.
         List<QueryDispatcher.QueryResult.StageCoverage> coverage = queryResults.getStageCoverage();
-        if (coverage != null && coverage.stream()
+        if (processingException == null && coverage != null && coverage.stream()
             .anyMatch(c -> c != null && (c.getMissing() > 0 || c.getMergeFailed() > 0))) {
           _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_INCOMPLETE_COVERAGE, 1);
         }
