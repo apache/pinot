@@ -140,6 +140,12 @@ public class MultipleTreesBuilder implements Closeable {
   public MultipleTreesBuilder(@Nullable List<StarTreeIndexConfig> indexConfigs, boolean enableDefaultStarTree,
       File indexDir, BuildMode buildMode)
       throws Exception {
+    this(indexConfigs, enableDefaultStarTree, indexDir, buildMode, null);
+  }
+
+  public MultipleTreesBuilder(@Nullable List<StarTreeIndexConfig> indexConfigs, boolean enableDefaultStarTree,
+      File indexDir, BuildMode buildMode, @Nullable IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(indexConfigs) || enableDefaultStarTree,
         "Must provide star-tree index configs or enable default star-tree");
     _buildMode = buildMode;
@@ -148,7 +154,7 @@ public class MultipleTreesBuilder implements Closeable {
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
-    _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    _segment = loadSegment(indexDir, indexLoadingConfig);
     try {
       _builderConfigs = StarTreeBuilderUtils.generateBuilderConfigs(indexConfigs, enableDefaultStarTree,
           _segment.getSegmentMetadata());

@@ -867,8 +867,14 @@ public abstract class BaseSegmentCreator implements SegmentCreator {
     if (CollectionUtils.isNotEmpty(starTreeIndexConfigs) || enableDefaultStarTree) {
       MultipleTreesBuilder.BuildMode buildMode =
           _config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
+      // Pass IndexLoadingConfig so downstream readers (e.g. external-table forward-index readers
+      // backed by remote storage) can resolve table-level configs during the in-place segment load.
+      TableConfig tableConfig = _config.getTableConfig();
+      Schema schema = _config.getSchema();
+      IndexLoadingConfig indexLoadingConfig =
+          (tableConfig != null && schema != null) ? new IndexLoadingConfig(tableConfig, schema) : null;
       MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeIndexConfigs, enableDefaultStarTree, indexDir,
-          buildMode);
+          buildMode, indexLoadingConfig);
       // We don't create the builder using the try-with-resources pattern because builder.close() performs
       // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
       // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an
