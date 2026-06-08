@@ -303,7 +303,7 @@
     <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.5</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
-    <woodstox.version>7.2.0</woodstox.version>
+    <woodstox.version>7.2.1</woodstox.version>
     <curator.version>5.9.0</curator.version>
     <javassist.version>3.31.0-GA</javassist.version>
     <bouncycastle.version>1.84</bouncycastle.version>
