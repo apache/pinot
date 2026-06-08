@@ -792,6 +792,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
               "Found " + unavailableSegmentsInSubPlan + " unavailable segments for table " + tableName + ": "
                   + toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG));
           brokerResponse.addException(errMsg);
+          _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS, 1);
         }
       }
       requestContext.setNumUnavailableSegments(numUnavailableSegments);

@@ -41,6 +41,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.testng.Assert.*;
 
@@ -282,6 +283,80 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
     assertFalse(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
     assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().get(0), segmentInvalid);
+  }
+
+  /**
+   * A non-new segment that is temporarily OFFLINE on all of its servers (e.g. during rebalance, LLC commit, or server
+   * restart) must NOT clear the partition's fully replicated servers. The partition stays routable for its available
+   * segments, and the unavailable segment is recorded separately so that best-effort colocated routing can surface it.
+   */
+  @Test
+  public void testTransientlyUnavailableSegmentDoesNotClearFullyReplicatedServers() {
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+
+    SegmentPartitionMetadataManager partitionMetadataManager =
+        new SegmentPartitionMetadataManager(OFFLINE_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC,
+            NUM_PARTITIONS);
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(OFFLINE_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(partitionMetadataManager);
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
+
+    // Partition 1 has two segments, both fully replicated on SERVER_0.
+    String segment1 = "segment1";
+    String segment2 = "segment2";
+    onlineSegments.add(segment1);
+    onlineSegments.add(segment2);
+    segmentAssignment.put(segment1, Collections.singletonMap(SERVER_0, ONLINE));
+    segmentAssignment.put(segment2, Collections.singletonMap(SERVER_0, ONLINE));
+    setSegmentZKMetadata(segment1, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
+    setSegmentZKMetadata(segment2, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    TablePartitionReplicatedServersInfo info = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap = info.getPartitionInfoMap();
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
+    assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
+    assertTrue(partitionInfoMap[1]._unavailableSegments.isEmpty());
+
+    // segment2 goes OFFLINE on its only replica. Previously this cleared the partition's fully replicated servers
+    // (empty set), making colocated-join routing fail. Now SERVER_0 is preserved for the available segment1, segment2
+    // is dropped from the routable list, and recorded as unavailable.
+    segmentAssignment.put(segment2, Collections.singletonMap(SERVER_0, OFFLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    info = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = info.getPartitionInfoMap();
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
+    assertEquals(partitionInfoMap[1]._segments, Collections.singletonList(segment1));
+    assertEquals(partitionInfoMap[1]._unavailableSegments, Collections.singletonList(segment2));
+    assertTrue(info.getSegmentsWithInvalidPartition().isEmpty());
+
+    // When segment2 comes back online, it returns to the routable list and is no longer unavailable.
+    segmentAssignment.put(segment2, Collections.singletonMap(SERVER_0, ONLINE));
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    info = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = info.getPartitionInfoMap();
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
+    assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
+    assertTrue(partitionInfoMap[1]._unavailableSegments.isEmpty());
+
+    // A partition whose only segment is unavailable keeps a PartitionInfo with no fully replicated servers and no
+    // routable segments (the dark segment is recorded as unavailable), so routing consumers fail non-silently in both
+    // modes rather than silently dropping the partition.
+    String segment0 = "segment0";
+    onlineSegments.add(segment0);
+    segmentAssignment.put(segment0, Collections.singletonMap(SERVER_0, OFFLINE));
+    setSegmentZKMetadata(segment0, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+    info = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = info.getPartitionInfoMap();
+    assertNotNull(partitionInfoMap[0]);
+    assertTrue(partitionInfoMap[0]._fullyReplicatedServers.isEmpty());
+    assertTrue(partitionInfoMap[0]._segments.isEmpty());
+    assertEquals(partitionInfoMap[0]._unavailableSegments, Collections.singletonList(segment0));
+    assertTrue(info.getSegmentsWithInvalidPartition().isEmpty());
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,
