@@ -22,6 +22,9 @@ import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
@@ -40,8 +43,6 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.UnnestNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -53,11 +54,12 @@ import org.slf4j.LoggerFactory;
  *   <li>Its title must contain the text {@code Combine}</li>
  * </ol>
  *
- * The simplification process merges the inputs of the node into a single node.
- * As a corollary, nodes with only one input are already simplified by definition.
+ * The simplification process groups the inputs of the node by merging the ones that describe an equivalent plan.
+ * Inputs that can all be merged collapse into a single input; inputs that cannot be merged (for example because some
+ * segments use an index while others do not) are kept as separate groups. As a corollary, nodes with a single input
+ * are already simplified by definition.
  */
 public class ExplainNodeSimplifier {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ExplainNodeSimplifier.class);
   public static final String COMBINE
       = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
 
@@ -147,20 +149,52 @@ public class ExplainNodeSimplifier {
         return defaultNode(node);
       }
       List<PlanNode> simplifiedChildren = simplifyChildren(node.getInputs());
-      PlanNode child1 = simplifiedChildren.get(0);
 
-      for (int i = 1; i < simplifiedChildren.size(); i++) {
-        PlanNode child2 = simplifiedChildren.get(i);
-        PlanNode merged = PlanNodeMerger.mergePlans(child1, child2, false);
-        if (merged == null) {
-          LOGGER.info("Found unmergeable inputs on node of type {}: {} and {}", node, child1, child2);
-          assert false : "Unmergeable inputs found";
-          return defaultNode(node);
+      // Group the children of a combine node by merging the ones that describe an equivalent plan. Each resulting
+      // group represents a distinct execution plan, shared by one or more segments. Merging is greedy and partial:
+      // a child that cannot be merged into any existing group (for example because some segments use an index while
+      // others do a full scan) becomes its own group instead of forcing the whole node to stay un-simplified. This
+      // keeps the explain plan compact (identical segments collapse into a single group) while still surfacing the
+      // genuinely different per-segment plans, and it never fails when the inputs are not all mergeable.
+      List<PlanNode> groups = new ArrayList<>();
+      List<Integer> segmentCounts = new ArrayList<>();
+      for (PlanNode child : simplifiedChildren) {
+        boolean merged = false;
+        for (int i = 0; i < groups.size(); i++) {
+          PlanNode mergedGroup = PlanNodeMerger.mergePlans(groups.get(i), child, false);
+          if (mergedGroup != null) {
+            groups.set(i, mergedGroup);
+            segmentCounts.set(i, segmentCounts.get(i) + 1);
+            merged = true;
+            break;
+          }
         }
-        child1 = merged;
+        if (!merged) {
+          groups.add(child);
+          segmentCounts.add(1);
+        }
       }
-      return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
-          Collections.singletonList(child1), node.getTitle(), node.getAttributes());
+
+      // When every segment shares the same plan there is a single group: keep the compact output (the combine node
+      // with that single plan as its only input) so the common case stays unchanged.
+      if (groups.size() == 1) {
+        return groups.equals(node.getInputs()) ? node : node.withInputs(groups);
+      }
+
+      // Otherwise wrap each distinct plan in an "Alternative" node annotated with the number of segments that fall
+      // into it, so the reader can tell the plans apart and how many segments run each one. The "segments" attribute
+      // uses the default (additive) merge type, so when the same divergence appears on several servers the per-server
+      // counts are summed as the plans are merged across servers. This mirrors how alternatives across servers are
+      // represented (see AskingServerStageExplainer).
+      List<PlanNode> alternatives = new ArrayList<>(groups.size());
+      for (int i = 0; i < groups.size(); i++) {
+        PlanNode group = groups.get(i);
+        Map<String, Plan.ExplainNode.AttributeValue> attributes =
+            new ExplainAttributeBuilder().putLong("segments", segmentCounts.get(i)).build();
+        alternatives.add(new ExplainedNode(node.getStageId(), group.getDataSchema(), null,
+            Collections.singletonList(group), "Alternative", attributes));
+      }
+      return node.withInputs(alternatives);
     }
 
     @Override
