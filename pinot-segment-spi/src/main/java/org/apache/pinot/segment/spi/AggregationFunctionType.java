@@ -168,8 +168,9 @@ public enum AggregationFunctionType {
   STUNION("STUnion", ReturnTypes.VARBINARY, OperandTypes.BINARY, SqlTypeName.OTHER),
 
   // boolean aggregate functions
-  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
-  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
+  // Intermediate result type is BOOLEAN, serialized through its stored type (INT).
+  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.BOOLEAN),
+  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.BOOLEAN),
 
   // ExprMin and ExprMax
   // TODO: revisit support for ExprMin/Max count in V2, particularly plug query rewriter in the right place

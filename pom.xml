@@ -172,7 +172,8 @@
     <jsonpath.version>2.10.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
     <quartz.version>2.5.2</quartz.version>
-    <calcite.version>1.40.0</calcite.version>
+    <calcite.version>1.42.0</calcite.version>
+    <joou.version>0.9.5</joou.version>
     <immutables.version>2.12.2</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
@@ -181,12 +182,12 @@
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.39</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
-    <zstd-jni.version>1.5.7-9</zstd-jni.version>
+    <zstd-jni.version>1.5.7-10</zstd-jni.version>
     <lz4-java.version>1.11.0</lz4-java.version>
     <libthrift.verion>0.23.0</libthrift.verion>
     <log4j.version>2.26.0</log4j.version>
     <slf4j.version>2.0.18</slf4j.version>
-    <netty.version>4.1.134.Final</netty.version>
+    <netty.version>4.1.135.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.4.0</h3.version>
@@ -196,7 +197,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.3.0</stax2-api.version>
-    <aws.sdk.version>2.44.14</aws.sdk.version>
+    <aws.sdk.version>2.46.4</aws.sdk.version>
     <azure.sdk.version>1.3.7</azure.sdk.version>
     <azure.msal4j.version>1.25.0</azure.msal4j.version>
     <joda-time.version>2.14.2</joda-time.version>
@@ -207,12 +208,12 @@
     <plexus-classworlds.version>2.12.0</plexus-classworlds.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
-    <checker-qual.version>4.1.0</checker-qual.version>
+    <checker-qual.version>4.2.0</checker-qual.version>
     <groovy.version>3.0.25</groovy.version>
     <xml-apis.version>2.0.2</xml-apis.version>
     <roaring-bitmap.version>1.6.14</roaring-bitmap.version>
-    <prometheus.jmx-exporter.version>1.5.0</prometheus.jmx-exporter.version>
-    <prometheus.metrics.version>1.6.1</prometheus.metrics.version>
+    <prometheus.jmx-exporter.version>1.6.0</prometheus.jmx-exporter.version>
+    <prometheus.metrics.version>1.7.0</prometheus.metrics.version>
     <fastutil.version>8.5.18</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
     <snakeyaml.version>2.6</snakeyaml.version>
@@ -296,10 +297,10 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.1</kerby.version>
-    <jline.version>4.1.2</jline.version>
+    <jline.version>4.1.3</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.5</jettison.version>
-    <nimbus-jose-jwt.version>10.9</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.5</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
     <woodstox.version>7.2.0</woodstox.version>
@@ -307,12 +308,12 @@
     <javassist.version>3.31.0-GA</javassist.version>
     <bouncycastle.version>1.84</bouncycastle.version>
     <aircompressor.version>2.0.3</aircompressor.version>
-    <jna.version>5.18.1</jna.version>
+    <jna.version>5.19.0</jna.version>
     <jnr-ffi.version>2.2.19</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.10.1</asm.version>
     <paranamer.version>2.8.3</paranamer.version>
-    <kotlin.stdlib.version>2.3.21</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.4.0</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.1.0</jetbrains.annotations.version>
     <okio.version>3.17.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
@@ -320,8 +321,8 @@
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
     <ivy.version>2.5.3</ivy.version>
-    <c3p0.version>0.13.0</c3p0.version>
-    <mchange-commons-java.version>0.5.0</mchange-commons-java.version>
+    <c3p0.version>0.14.0</c3p0.version>
+    <mchange-commons-java.version>0.6.0</mchange-commons-java.version>
     <animal-sniffer-annotations.version>1.27</animal-sniffer-annotations.version>
 
     <!-- Test Libraries -->
@@ -1188,6 +1189,21 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- Hadoop pulls org.eclipse.jetty (and org.eclipse.jetty.websocket) for its embedded
+               HttpServer2 web UIs, which downstream Pinot modules never start. These leak into
+               runtime distributions and carry CVE-2026-2332 (jetty-http request smuggling). Exclude
+               centrally here so every module depending on Hadoop is covered by default. Note: this
+               does NOT strip the relocated Jetty bundled inside the hadoop-client-runtime uber-jar
+               (org.apache.hadoop.shaded.org.eclipse.jetty); that is handled by the maven-shade-plugin
+               filter further down in this pom. -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1208,6 +1224,15 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1219,6 +1244,17 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
+          </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332).
+               For hadoop-client the compile-scoped leak path is
+               hadoop-yarn-client -> websocket-client -> jetty-client -> jetty-http. -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1260,6 +1296,15 @@
             <groupId>ch.qos.reload4j</groupId>
             <artifactId>reload4j</artifactId>
           </exclusion>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1267,6 +1312,17 @@
         <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+        <exclusions>
+          <!-- See hadoop-common above: drop embedded-Jetty web UI transitives (CVE-2026-2332). -->
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.eclipse.jetty.websocket</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1373,6 +1429,14 @@
         <groupId>org.immutables</groupId>
         <artifactId>value-annotations</artifactId>
         <version>${immutables.version}</version>
+      </dependency>
+      <!-- Pin joou-java-6 (unsigned integer types library, a Calcite dependency since 1.41 via CALCITE-1466) to
+           resolve a dependency convergence conflict: calcite-core and calcite-linq4j (1.42) pull 0.9.5 while the
+           transitive avatica-core 1.28.0 pulls 0.9.4. -->
+      <dependency>
+        <groupId>org.jooq</groupId>
+        <artifactId>joou-java-6</artifactId>
+        <version>${joou.version}</version>
       </dependency>
 
       <dependency>
@@ -2802,6 +2866,23 @@
 
                 <!-- Exclude NettyInstance because it includes Netty package literals -->
                 <exclude>src/main/java/org/apache/pinot/core/transport/NettyInstance.java</exclude>
+              </excludes>
+            </filter>
+            <filter>
+              <!-- hadoop-client-runtime is a Hadoop uber-jar that bundles its own relocated Jetty
+                   (org.apache.hadoop.shaded.org.eclipse.jetty). It exists only for Hadoop's embedded
+                   HttpServer2 web UIs, which Pinot input-format / filesystem plugins never start, so
+                   the classes are unreachable, but the leftover jetty-* Maven metadata still makes
+                   scanners flag CVE-2026-2332 (jetty-http request smuggling). A Maven exclusion
+                   cannot remove these because the classes are baked into the uber-jar rather than
+                   resolved as a dependency node, so strip them from any shaded jar here. -->
+              <artifact>org.apache.hadoop:hadoop-client-runtime</artifact>
+              <excludes>
+                <exclude>org/apache/hadoop/shaded/org/eclipse/jetty/**</exclude>
+                <exclude>META-INF/maven/org.eclipse.jetty/**</exclude>
+                <exclude>META-INF/maven/org.eclipse.jetty.websocket/**</exclude>
+                <!-- ServiceLoader entries whose implementation classes are removed above. -->
+                <exclude>META-INF/services/org.apache.hadoop.shaded.org.eclipse.jetty.**</exclude>
               </excludes>
             </filter>
           </filters>

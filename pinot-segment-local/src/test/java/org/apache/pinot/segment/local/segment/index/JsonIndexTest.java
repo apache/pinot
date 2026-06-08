@@ -45,7 +45,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -269,7 +269,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   private void assertDocIds(JsonIndexReader indexReader, String filter, int[] expected) {
-    MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, filter);
+    ImmutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, filter);
     try {
       assertEquals(matchingDocIds.toArray(), expected);
     } catch (AssertionError ae) {
@@ -321,7 +321,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
 
         assertDocIds(reader, "name = 'adam-100000' AND \"addresses[*].street\" = 'us-100001'", empty());
 
-        MutableRoaringBitmap matchingDocIds = getMatchingDocIds(reader, "name != 'adam-100000'");
+        ImmutableRoaringBitmap matchingDocIds = getMatchingDocIds(reader, "name != 'adam-100000'");
         try {
           assertEquals(matchingDocIds.getCardinality(), 123_455);
         } catch (AssertionError ae) {
@@ -360,7 +360,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
 
       JsonIndexReader[] indexReaders = new JsonIndexReader[]{onHeapReader, offHeapReader, mutableIndex};
       for (JsonIndexReader reader : indexReaders) {
-        MutableRoaringBitmap docIds = getMatchingDocIds(reader, "key1='value1'");
+        ImmutableRoaringBitmap docIds = getMatchingDocIds(reader, "key1='value1'");
         assertEquals(docIds.toArray(), ids(0));
 
         docIds = getMatchingDocIds(reader, "key2='longValue2'");
@@ -422,7 +422,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
-  private MutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter) {
+  private ImmutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter) {
     return indexReader.getMatchingDocIds(filter);
   }
 

@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import org.apache.pinot.segment.spi.index.creator.BloomFilterCreator;
+import org.apache.pinot.segment.spi.index.creator.ColumnarOpenStructIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
@@ -37,12 +38,14 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.segment.spi.index.reader.OpenStructIndexReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.OpenStructIndexConfig;
 
 
 /**
@@ -79,6 +82,7 @@ public class StandardIndexes {
   public static final String TEXT_ID = "text_index";
   public static final String H3_ID = "h3_index";
   public static final String VECTOR_ID = "vector_index";
+  public static final String OPEN_STRUCT_ID = "open_struct_index";
 
   private StandardIndexes() {
   }
@@ -141,5 +145,17 @@ public class StandardIndexes {
   public static IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> vector() {
     return (IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator>)
         IndexService.getInstance().get(VECTOR_ID);
+  }
+
+  /// Returns the OPEN_STRUCT index type. A single `OpenStructIndexReader` implementation
+  /// handles all access patterns for an OPEN_STRUCT column (dense materialized keys, sparse
+  /// blob tier, or a mix). The plugin registration that makes this helper resolve lives in
+  /// pinot-segment-local (`ColumnarOpenStructIndexPlugin`); calling this from a build that
+  /// does not include pinot-segment-local will throw
+  /// `IllegalArgumentException: Unknown index id: open_struct_index`.
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public static IndexType<OpenStructIndexConfig, OpenStructIndexReader, ColumnarOpenStructIndexCreator> openStruct() {
+    return (IndexType<OpenStructIndexConfig, OpenStructIndexReader, ColumnarOpenStructIndexCreator>)
+        IndexService.getInstance().get(OPEN_STRUCT_ID);
   }
 }

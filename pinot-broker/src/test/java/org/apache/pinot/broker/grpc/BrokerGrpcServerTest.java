@@ -32,6 +32,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -212,6 +213,47 @@ public class BrokerGrpcServerTest {
     verify(_brokerMetrics).addMeteredGlobalValue(
         eq(BrokerMeter.GRPC_BYTES_RECEIVED), eq((long) request.getSerializedSize()));
     verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.GRPC_BYTES_SENT), anyLong());
+  }
+
+  @Test
+  public void testForceDisableMaterializedViewRewriteViaMetadataOverridesSql()
+      throws Exception {
+    /// The SQL explicitly tries to ENABLE MV rewrite; the request-metadata flag must force it OFF,
+    /// proving the metadata override beats an `enableMaterializedViewRewrite` option in the query
+    /// text (the exact case the MV minion executor relies on for its materialization query).
+    Broker.BrokerRequest request = Broker.BrokerRequest.newBuilder()
+        .setSql("SET enableMaterializedViewRewrite='true'; SELECT * FROM testTable")
+        .putMetadata(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE, "false")
+        .build();
+
+    ArgumentCaptor<SqlNodeAndOptions> optionsCaptor = ArgumentCaptor.forClass(SqlNodeAndOptions.class);
+    when(_brokerRequestHandler.handleRequest(any(), optionsCaptor.capture(), any(), any(), any()))
+        .thenReturn(new BrokerResponseNative());
+
+    _brokerGrpcServer.submit(request, createMockStreamObserver(new ArrayList<>()));
+
+    assertEquals(optionsCaptor.getValue().getOptions()
+            .get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE),
+        "false", "Request metadata must force enableMaterializedViewRewrite=false, overriding the SQL SET");
+  }
+
+  @Test
+  public void testNoMaterializedViewRewriteMetadataLeavesSqlOptionUntouched()
+      throws Exception {
+    /// Without the metadata flag, no override is applied and the SQL SET is the source of truth.
+    Broker.BrokerRequest request = Broker.BrokerRequest.newBuilder()
+        .setSql("SET enableMaterializedViewRewrite='true'; SELECT * FROM testTable")
+        .build();
+
+    ArgumentCaptor<SqlNodeAndOptions> optionsCaptor = ArgumentCaptor.forClass(SqlNodeAndOptions.class);
+    when(_brokerRequestHandler.handleRequest(any(), optionsCaptor.capture(), any(), any(), any()))
+        .thenReturn(new BrokerResponseNative());
+
+    _brokerGrpcServer.submit(request, createMockStreamObserver(new ArrayList<>()));
+
+    assertEquals(optionsCaptor.getValue().getOptions()
+            .get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE),
+        "true", "Without the metadata flag, the SQL-set option must be preserved");
   }
 
   /**

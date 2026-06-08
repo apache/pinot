@@ -25,6 +25,7 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -794,5 +795,20 @@ public class SchemaTest {
     Schema withoutVirtual = schema.withoutVirtualColumns();
     assertThat(withoutVirtual.getDescription()).isEqualTo("my description");
     assertThat(withoutVirtual.getTags()).isEqualTo(List.of("tag1"));
+  }
+
+  @Test
+  public void schemaBuilderAddOpenStruct() {
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("test")
+        .addOpenStruct("attrs",
+            Map.of("count", new DimensionFieldSpec("count", FieldSpec.DataType.INT, true)))
+        .build();
+
+    FieldSpec fs = schema.getFieldSpecFor("attrs");
+    Assert.assertNotNull(fs);
+    Assert.assertEquals(fs.getDataType(), FieldSpec.DataType.OPEN_STRUCT);
+    ComplexFieldSpec cfs = (ComplexFieldSpec) fs;
+    Assert.assertEquals(cfs.getChildFieldSpec("count").getDataType(), FieldSpec.DataType.INT);
   }
 }

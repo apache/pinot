@@ -378,6 +378,13 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
   }
 
   @Test
+  @Override
+  public void testQueriesDisabled()
+      throws Exception {
+    super.testQueriesDisabled();
+  }
+
+  @Test
   void testControllerJoinQuerySubmit()
       throws Exception {
     setUseMultiStageQueryEngine(true);

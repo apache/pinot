@@ -20,6 +20,7 @@ package org.apache.pinot.controller.workload;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -103,10 +104,15 @@ public class PropagationUtilsTest {
     for (Map.Entry<String, Set<String>> entry : expected.entrySet()) {
       String tableName = entry.getKey();
       Set<String> expectedHelixTags = entry.getValue();
-            // Call the method to get helix tags for the table
-      List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
-                    tableName);
-            // Verify the results
+      // Call the method to get helix tags for the table
+      Set<String> brokerHelixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
+              tableName, NodeConfig.Type.BROKER_NODE);
+      Set<String> serverHelixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager,
+              tableName, NodeConfig.Type.SERVER_NODE);
+      Set<String> helixTags = new HashSet<>();
+      helixTags.addAll(brokerHelixTags);
+      helixTags.addAll(serverHelixTags);
+      // Verify the results
       for (String helixTag : expectedHelixTags) {
         Assert.assertTrue(helixTags.contains(helixTag),
                         "Expected helix tag " + helixTag + " for table " + tableName + " but found " + helixTags);
@@ -175,8 +181,8 @@ public class PropagationUtilsTest {
         // Mock the behavior of getAllTableConfigs to return the list of table configurations
     Mockito.when(_pinotHelixResourceManager.getAllTableConfigs()).thenReturn(tableConfigs);
 
-    List<String> helixTags = List.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
-                "serverTag2_REALTIME", "brokerTenant2_BROKER");
+    Set<String> helixTags = Set.of("serverTag1_OFFLINE", "brokerTenant1_BROKER",
+            "serverTag2_REALTIME", "brokerTenant2_BROKER");
     Set<QueryWorkloadConfig> workloadConfigsForTags =
                 PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, helixTags,
                         queryWorkloadConfigs);

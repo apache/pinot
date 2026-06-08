@@ -256,7 +256,7 @@ public class PinotHelixResourceManager {
   private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   private TableCache _tableCache;
   private final LineageManager _lineageManager;
-  private final QueryWorkloadManager _queryWorkloadManager;
+  private QueryWorkloadManager _queryWorkloadManager;
   // Dedicated ZkClient for transactional multi-path writes (atomic ZK multi()). Lazily built on
   // first multiWriteZK call. A dedicated session is used because Helix 1.3.2 does not expose
   // multi() on BaseDataAccessor, and the underlying ZkClient inside ZKHelixManager is not publicly
@@ -292,7 +292,6 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _queryWorkloadManager = new QueryWorkloadManager(this);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -604,7 +603,8 @@ public class PinotHelixResourceManager {
     if (shouldUpdateBrokerResource) {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, null,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}", instanceId,
           newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
       return PinotResourceManagerResponse.success("Added instance: " + instanceId + ", and updated broker resource - "
@@ -626,9 +626,27 @@ public class PinotHelixResourceManager {
 
     InstanceConfigValidatorRegistry.validate(newInstance);
 
+    // Asymmetric preservation of the operational `queriesDisabled` flag managed by
+    // PUT /instances/{name}/state?state=QUERIES_DISABLE|QUERIES_ENABLE (see #setQueriesDisabled):
+    //   - body=true  -> set true (legacy path; explicit operator intent in this request).
+    //   - body=false -> if live==true, preserve true (the clobber case: a generic update to
+    //                   host/tags/ports must NOT silently re-route queries to a server an
+    //                   operator has explicitly removed from routing).
+    //   - body=false + live!=true -> leave as is (no-op / cleared).
+    boolean liveQueriesDisabled = Boolean.parseBoolean(
+        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.QUERIES_DISABLED));
+
     List<String> newTags = newInstance.getTags();
     List<String> oldTags = instanceConfig.getTags();
     InstanceUtils.updateHelixInstanceConfig(instanceConfig, newInstance);
+    // If the live record had queriesDisabled=true but the request body defaulted it to false,
+    // restore the operational flag so it survives a request-body-driven update.
+    if (liveQueriesDisabled && !newInstance.isQueriesDisabled()) {
+      instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.QUERIES_DISABLED, Boolean.TRUE.toString());
+      LOGGER.warn("Ignoring request body's queriesDisabled=false for instance: {} because the live config has "
+          + "queriesDisabled=true; use PUT /instances/{}/state?state=QUERIES_ENABLE to clear the flag.", instanceId,
+          instanceId);
+    }
     if (!_helixDataAccessor.setProperty(_keyBuilder.instanceConfig(instanceId), instanceConfig)) {
       throw new RuntimeException("Failed to set instance config for instance: " + instanceId);
     }
@@ -648,7 +666,8 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId + ", and updated broker resource - "
@@ -656,6 +675,27 @@ public class PinotHelixResourceManager {
     } else {
       return PinotResourceManagerResponse.success("Updated instance: " + instanceId);
     }
+  }
+
+  /// Sets the `queriesDisabled` flag on the instance config using a field-scoped Helix write.
+  ///
+  /// This avoids clobbering other fields (e.g. `shutdownInProgress`) that are concurrently set
+  /// by other field-scoped writes during rolling upgrades. Full-record writes ([#updateInstance])
+  /// preserve this flag explicitly; see that method for details.
+  ///
+  /// @param serverInstanceName the Helix participant id (must be a server instance)
+  /// @param disabled `true` to disable query routing, `false` to re-enable it
+  /// @throws IllegalArgumentException if `serverInstanceName` is not a server instance
+  public synchronized void setQueriesDisabled(String serverInstanceName, boolean disabled) {
+    Preconditions.checkArgument(InstanceTypeUtils.isServer(serverInstanceName),
+        "setQueriesDisabled only applies to server instances, got: %s", serverInstanceName);
+    Map<String, String> propToUpdate =
+        Collections.singletonMap(CommonConstants.Helix.QUERIES_DISABLED, Boolean.toString(disabled));
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT, _helixClusterName)
+            .forParticipant(serverInstanceName).build();
+    LOGGER.info("Setting queriesDisabled={} for server instance: {}", disabled, serverInstanceName);
+    _helixAdmin.setConfig(scope, propToUpdate);
   }
 
   /**
@@ -693,7 +733,8 @@ public class PinotHelixResourceManager {
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
       List<String> tablesRemoved = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved);
+      HelixHelper.updateBrokerResource(_helixZkManager, instanceId, newBrokerTags, tablesAdded, tablesRemoved,
+          _queryWorkloadManager);
       LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
           instanceId, newBrokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
       return PinotResourceManagerResponse.success("Updated tags: " + newTags + " for instance: " + instanceId
@@ -721,7 +762,8 @@ public class PinotHelixResourceManager {
         instanceConfig.getTags().stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
     List<String> tablesAdded = new ArrayList<>();
     List<String> tablesRemoved = new ArrayList<>();
-    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved);
+    HelixHelper.updateBrokerResource(_helixZkManager, instanceId, brokerTags, tablesAdded, tablesRemoved,
+        _queryWorkloadManager);
     LOGGER.info("Updated broker resource for broker: {} with tags: {} in {}ms, tables added: {}, tables removed: {}",
         instanceId, brokerTags, System.currentTimeMillis() - startTimeMs, tablesAdded, tablesRemoved);
     return PinotResourceManagerResponse.success("Updated broker resource for broker: " + instanceId
@@ -2098,13 +2140,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding table {}: Updating BrokerResource for table", tableNameWithType);
     List<String> brokers =
         HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
-    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
-      assert is != null;
-      is.getRecord().getMapFields()
-          .put(tableNameWithType, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
-      return is;
-    });
-    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
+    HelixHelper.updateBrokerResource(_helixZkManager, tableNameWithType,
+        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
     // Persist the MV definition znode BEFORE notify so the consistency manager registration
     // below reads the authoritative `baseTables` list rather than relying on its
     // `extractSourceTableName(definedSQL)` fallback. The write is best-effort: a transient
@@ -2401,7 +2438,7 @@ public class PinotHelixResourceManager {
                 referenceInstancePartitionsName);
           }
         }
-        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions, _queryWorkloadManager);
       }
     }
 
@@ -2419,7 +2456,8 @@ public class PinotHelixResourceManager {
                 instanceAssignmentDriver.assignInstances(tierConfig.getName(), instanceConfigs, null,
                     tableConfig.getInstanceAssignmentConfigMap().get(tierConfig.getName()));
             LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+            InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions,
+                _queryWorkloadManager);
           }
         }
       }
@@ -2519,12 +2557,8 @@ public class PinotHelixResourceManager {
   private void updateBrokerResourceForLogicalTable(LogicalTableConfig logicalTableConfig, String tableName) {
     List<String> brokers = HelixHelper.getInstancesWithTag(
         _helixZkManager, TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
-    HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
-      assert is != null;
-      is.getRecord().getMapFields()
-          .put(tableName, SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE));
-      return is;
-    });
+    HelixHelper.updateBrokerResource(_helixZkManager, tableName,
+        SegmentAssignmentUtils.getInstanceStateMap(brokers, BrokerResourceStateModel.ONLINE), _queryWorkloadManager);
   }
 
   public void validateNewLogicalTableConfig(LogicalTableConfig logicalTableConfig) {
@@ -2626,8 +2660,6 @@ public class PinotHelixResourceManager {
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
-    // TODO: Propagate workload for tables if there is change is change instance characteristics
-    _queryWorkloadManager.propagateWorkloadFor(tableNameWithType);
   }
 
   public void deleteUser(String username) {
@@ -4646,7 +4678,8 @@ public class PinotHelixResourceManager {
                 } else {
                   // Update the lineage entry to 'REVERTED'
                   entry.setValue(new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsToForEntryToRevert,
-                      LineageEntryState.REVERTED, System.currentTimeMillis()));
+                      LineageEntryState.REVERTED, System.currentTimeMillis(),
+                      lineageEntry.isAutoCompleteLineageEntry()));
                 }
 
                 // Add segments for proactive clean-up.
@@ -4823,7 +4856,7 @@ public class PinotHelixResourceManager {
         // Update lineage entry
         LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsTo, LineageEntryState.COMPLETED,
-                System.currentTimeMillis());
+                System.currentTimeMillis(), lineageEntry.isAutoCompleteLineageEntry());
 
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         Map<String, String> customMap =
@@ -4965,7 +4998,7 @@ public class PinotHelixResourceManager {
         // Update segment lineage entry to 'REVERTED'
         LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), lineageEntry.getSegmentsTo(), LineageEntryState.REVERTED,
-                System.currentTimeMillis());
+                System.currentTimeMillis(), lineageEntry.isAutoCompleteLineageEntry());
 
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
         Map<String, String> customMap =
@@ -5415,6 +5448,10 @@ public class PinotHelixResourceManager {
     return new WatermarkInductionResult(watermarks);
   }
 
+  public void setQueryWorkloadManager(QueryWorkloadManager queryWorkloadManager) {
+    _queryWorkloadManager = queryWorkloadManager;
+  }
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
@@ -5476,8 +5513,18 @@ public class PinotHelixResourceManager {
     try {
       Map<String, String> taskConfigs = tableConfig.getMaterializedViewTaskConfigs();
       if (taskConfigs == null) {
-        LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
-            tableNameWithType);
+        // This MV is not materialized by the built-in MaterializedViewTask. A downstream
+        // MaterializedViewDdlHandler / task type may materialize it via its own minion runtime; by
+        // contract (see MaterializedViewDdlHandler) that runtime also owns its definition metadata
+        // and consistency tracking, so the built-in machinery here intentionally does not manage it.
+        if (tableConfig.hasMaterializedViewTaskWithDefinedSql()) {
+          LOGGER.info("MV table {} uses a non-built-in MV task type; its definition metadata is owned "
+              + "by that task type's runtime — skipping built-in MaterializedViewTask metadata persist",
+              tableNameWithType);
+        } else {
+          LOGGER.warn("MV table {} has no MaterializedViewTask config; skipping definition metadata persist",
+              tableNameWithType);
+        }
         return;
       }
       String definedSql = taskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
@@ -5708,8 +5755,16 @@ public class PinotHelixResourceManager {
       }
       Map<String, String> materializedViewTaskConfigs = tableConfig.getMaterializedViewTaskConfigs();
       if (materializedViewTaskConfigs == null) {
-        LOGGER.warn("MV table {} has no MaterializedViewTask config for consistency registration",
-            tableConfig.getTableName());
+        // Not a built-in MaterializedViewTask MV: a downstream task type materializes it and, by
+        // contract (see MaterializedViewDdlHandler), owns its own consistency tracking. The built-in
+        // MaterializedViewConsistencyManager intentionally does not register it here.
+        if (tableConfig.hasMaterializedViewTaskWithDefinedSql()) {
+          LOGGER.info("MV table {} uses a non-built-in MV task type; consistency is owned by that task "
+              + "type's runtime — skipping built-in consistency registration", tableConfig.getTableName());
+        } else {
+          LOGGER.warn("MV table {} has no MaterializedViewTask config for consistency registration",
+              tableConfig.getTableName());
+        }
         return;
       }
       String definedSQL = materializedViewTaskConfigs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);

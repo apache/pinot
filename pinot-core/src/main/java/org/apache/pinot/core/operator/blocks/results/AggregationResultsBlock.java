@@ -146,7 +146,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
               nullBitmaps[i].add(0);
             }
             assert result != null;
-            setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+            AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
           }
         }
       }
@@ -174,7 +174,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
             if (columnDataTypes[i] == ColumnDataType.OBJECT) {
               dataTableBuilder.setColumn(i, _aggregationFunctions[i].serializeIntermediateResult(result));
             } else {
-              setIntermediateResult(dataTableBuilder, columnDataTypes, i, result);
+              AggregationFunctionUtils.setIntermediateResult(dataTableBuilder, columnDataTypes[i], i, result);
             }
           }
         }
@@ -182,36 +182,6 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       dataTableBuilder.finishRow();
     }
     return dataTableBuilder.build();
-  }
-
-  private void setIntermediateResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,
-      Object result) throws IOException {
-    ColumnDataType columnDataType = columnDataTypes[index];
-    switch (columnDataType) {
-      case INT:
-        dataTableBuilder.setColumn(index, (int) result);
-        break;
-      case LONG:
-        dataTableBuilder.setColumn(index, (long) result);
-        break;
-      case FLOAT:
-        dataTableBuilder.setColumn(index, (float) result);
-        break;
-      case DOUBLE:
-        dataTableBuilder.setColumn(index, (double) result);
-        break;
-      case BIG_DECIMAL:
-        dataTableBuilder.setColumn(index, (BigDecimal) result);
-        break;
-      case STRING:
-        dataTableBuilder.setColumn(index, result.toString());
-        break;
-      case BYTES:
-        dataTableBuilder.setColumn(index, (ByteArray) result);
-        break;
-      default:
-        throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
-    }
   }
 
   private void setFinalResult(DataTableBuilder dataTableBuilder, ColumnDataType[] columnDataTypes, int index,

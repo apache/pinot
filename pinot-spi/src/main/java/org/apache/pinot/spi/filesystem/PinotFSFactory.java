@@ -83,6 +83,17 @@ public class PinotFSFactory {
     return PINOT_FS_MAP.containsKey(scheme);
   }
 
+  public static boolean isSchemeRegisteredWith(String scheme, Class<? extends PinotFS> pinotFSClass) {
+    PinotFS pinotFS = PINOT_FS_MAP.get(scheme);
+    if (pinotFS == null) {
+      return false;
+    }
+    if (pinotFS instanceof NoClosePinotFS) {
+      pinotFS = ((NoClosePinotFS) pinotFS)._delegate;
+    }
+    return pinotFSClass.isInstance(pinotFS);
+  }
+
   public static void shutdown()
       throws IOException {
     for (PinotFS pinotFS : PINOT_FS_MAP.values()) {

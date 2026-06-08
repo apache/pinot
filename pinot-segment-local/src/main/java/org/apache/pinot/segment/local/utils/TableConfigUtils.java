@@ -47,6 +47,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -132,6 +133,7 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
+  private static final String CONSUMING_SEGMENT_TIER = "consuming";
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -170,6 +172,21 @@ public final class TableConfigUtils {
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
     Preconditions.checkArgument(schema != null, "Schema should not be null for table: %s", tableConfig.getTableName());
     Set<ValidationType> skipTypes = parseTypesToSkipString(typesToSkip);
+    validateEffectiveTableConfig(tableConfig, schema, skipTypes);
+    if (skipTypes.contains(ValidationType.ALL) || !hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
+      return;
+    }
+    try {
+      TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
+      validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes);
+    } catch (RuntimeException e) {
+      throw new IllegalStateException(
+          "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
+    }
+  }
+
+  private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
+      Set<ValidationType> skipTypes) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
@@ -2171,6 +2188,32 @@ public final class TableConfigUtils {
     }
   }
 
+  private static TableConfig overwriteTableConfigForConsumingSegmentTier(TableConfig tableConfig) {
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null) {
+      JsonNode tierOverwrite = getTierOverwrite(indexingConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+      if (tierOverwrite != null) {
+        Preconditions.checkState(tierOverwrite.isObject(),
+            "tableIndexConfig.tierOverwrites.%s must be a JSON object", CONSUMING_SEGMENT_TIER);
+      }
+    }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        JsonNode tierOverwrite = getTierOverwrite(fieldConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+        if (tierOverwrite != null) {
+          Preconditions.checkState(tierOverwrite.isObject(),
+              "fieldConfigList[%s].tierOverwrites.%s must be a JSON object", fieldConfig.getName(),
+              CONSUMING_SEGMENT_TIER);
+        }
+      }
+    }
+    TableConfig overwrittenTableConfig = overwriteTableConfigForTier(tableConfig, CONSUMING_SEGMENT_TIER);
+    Preconditions.checkState(overwrittenTableConfig != tableConfig,
+        "Failed to apply tierOverwrites.consuming for table: %s", tableConfig.getTableName());
+    return overwrittenTableConfig;
+  }
+
   private static IndexingConfig applyIndexingConfigTierOverride(IndexingConfig original, String tier)
       throws IOException {
     JsonNode tierOverwrites = original.getTierOverwrites();
@@ -2223,6 +2266,54 @@ public final class TableConfigUtils {
       merged.set(entry.getKey(), entry.getValue());
     }
     return JsonUtils.jsonNodeToObject(merged, FieldConfig.class);
+  }
+
+  private static boolean hasConsumingSegmentTierOverwriteForRealtimeTable(TableConfig tableConfig) {
+    if (tableConfig.getTableType() != TableType.REALTIME
+        || (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
+            && tableConfig.getTierConfigsList().stream()
+                .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
+      return false;
+    }
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    JsonNode tierOverwrite =
+        indexingConfig != null ? getTierOverwrite(indexingConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER) : null;
+    if (tierOverwrite != null && !tierOverwrite.isNull()) {
+      return true;
+    }
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList == null) {
+      return false;
+    }
+    for (FieldConfig fieldConfig : fieldConfigList) {
+      tierOverwrite = getTierOverwrite(fieldConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
+      if (tierOverwrite != null && !tierOverwrite.isNull()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Builds the [IndexLoadingConfig] for a mutable consuming segment. If the realtime table config contains
+  /// `tierOverwrites.consuming` under `tableIndexConfig` or a `fieldConfigList` entry, the index loading config is
+  /// created from the existing tier-overwrite view for that mutable consuming segment.
+  /// Tier-overwrite validation applies the override first and validates the resulting effective table config with the
+  /// normal validation path. Persisted segment commit and immutable segment load continue to use the base table config.
+  /// Real storage-tier overrides are keyed by configured tier names.
+  /// The original [IndexLoadingConfig] is left untouched so the commit path and immutable segment load path continue to
+  /// use the persisted table config and real segment tier.
+  public static IndexLoadingConfig buildConsumingSegmentIndexLoadingConfig(TableConfig tableConfig, Schema schema,
+      IndexLoadingConfig indexLoadingConfig) {
+    if (!hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
+      return indexLoadingConfig;
+    }
+    TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
+    return new IndexLoadingConfig(indexLoadingConfig.getInstanceDataManagerConfig(), consumingTableConfig, schema);
+  }
+
+  @Nullable
+  private static JsonNode getTierOverwrite(@Nullable JsonNode tierOverwrites, String tier) {
+    return tierOverwrites != null && tierOverwrites.isObject() ? tierOverwrites.get(tier) : null;
   }
 
   /**

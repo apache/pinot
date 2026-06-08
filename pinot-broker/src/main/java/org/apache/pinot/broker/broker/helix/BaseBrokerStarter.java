@@ -80,9 +80,11 @@ import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -107,7 +109,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -415,6 +417,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
             Broker.AdaptiveServerSelector.DEFAULT_TYPE), 1);
     BrokerMetrics.register(_brokerMetrics);
+    MseMetrics.registerFromConfig(_brokerConf, _metricsRegistry);
 
     LOGGER.info("Connecting spectator Helix manager");
     initSpectatorHelixManager();
@@ -465,10 +468,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // initialized first because it might be used by the accountant.
     PinotConfiguration accountingConfig = ThreadAccountantUtils.extractAccountingConfig(_brokerConf,
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
-    WorkloadBudgetManager.set(createWorkloadBudgetManager(accountingConfig));
+    WorkloadBudgetManagerFactory.register(accountingConfig);
     _threadAccountant = ThreadAccountantUtils.createAccountant(accountingConfig, _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
     _threadAccountant.startWatcherTask();
+    // Get all workload budgets this instance should support
+    QueryWorkloadConfigUtils.getAndUpdateWorkloadBudgets(_instanceId, _spectatorHelixManager,
+        status -> _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.WORKLOAD_CONFIG_FETCH_STATUS, status));
     PinotClusterConfigChangeListener threadAccountantListener = _threadAccountant.getClusterConfigChangeListener();
     if (threadAccountantListener != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
@@ -775,13 +781,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
-  /**
-   * Can be overridden to create a custom WorkloadBudgetManager.
-   */
-  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration brokerConf) {
-    return new WorkloadBudgetManager(brokerConf);
-  }
-
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
     InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
     boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
@@ -790,6 +789,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     Map<String, String> simpleFields = znRecord.getSimpleFields();
     if (_tlsPort > 0) {
       HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
+
+    // Update admin port
+    String adminApiPortString = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
+    if (adminApiPortString != null) {
+      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.ADMIN_PORT_KEY, Integer.parseInt(adminApiPortString));
     }
     // Update GRPC query engine port
     if (BrokerGrpcServer.isEnabled(_brokerConf)) {

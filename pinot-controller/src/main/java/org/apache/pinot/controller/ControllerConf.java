@@ -105,23 +105,31 @@ public class ControllerConf extends PinotConfiguration {
   public static class ControllerPeriodicTasksConf {
     // frequency configs
     public static final String RETENTION_MANAGER_FREQUENCY_PERIOD = "controller.retention.frequencyPeriod";
+    public static final String RETENTION_MANAGER_CRON_EXPRESSION = "controller.retention.cronExpression";
     public static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_PERIOD =
         "controller.offline.segment.interval.checker.frequencyPeriod";
     public static final String REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD =
         "controller.realtime.segment.validation.frequencyPeriod";
+    public static final String REALTIME_SEGMENT_VALIDATION_CRON_EXPRESSION =
+        "controller.realtime.segment.validation.cronExpression";
     public static final String REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtime.segment.validation.initialDelayInSeconds";
     public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_ENABLED =
         "controller.realtime.offsetAutoReset.backfill.enabled";
     public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_PERIOD =
         "controller.realtime.offsetAutoReset.backfill.frequencyPeriod";
+    public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_CRON_EXPRESSION =
+        "controller.realtime.offsetAutoReset.backfill.cronExpression";
     public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_INITIAL_DELAY_IN_SECONDS =
         "controller.realtime.offsetAutoReset.backfill.initialDelayInSeconds";
     public static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD =
         "controller.broker.resource.validation.frequencyPeriod";
+    public static final String BROKER_RESOURCE_VALIDATION_CRON_EXPRESSION =
+        "controller.broker.resource.validation.cronExpression";
     public static final String BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS =
         "controller.broker.resource.validation.initialDelayInSeconds";
     public static final String STATUS_CHECKER_FREQUENCY_PERIOD = "controller.statuschecker.frequencyPeriod";
+    public static final String STATUS_CHECKER_CRON_EXPRESSION = "controller.statuschecker.cronExpression";
     public static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_PERIOD =
         "controller.statuschecker.waitForPushTimePeriod";
     public static final String TASK_MANAGER_FREQUENCY_PERIOD = "controller.task.frequencyPeriod";
@@ -131,6 +139,8 @@ public class ControllerConf extends PinotConfiguration {
 
     public static final String STALE_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD =
         "controller.stale.instances.cleanup.task.frequencyPeriod";
+    public static final String STALE_INSTANCES_CLEANUP_TASK_CRON_EXPRESSION =
+        "controller.stale.instances.cleanup.task.cronExpression";
     public static final String STALE_INSTANCES_CLEANUP_TASK_INITIAL_DELAY_SECONDS =
         "controller.stale.instances.cleanup.task.initialDelaySeconds";
     public static final String STALE_INSTANCES_CLEANUP_TASK_INSTANCES_RETENTION_PERIOD =
@@ -138,6 +148,8 @@ public class ControllerConf extends PinotConfiguration {
 
     public static final String TASK_METRICS_EMITTER_FREQUENCY_PERIOD =
         "controller.minion.task.metrics.emitter.frequencyPeriod";
+    public static final String TASK_METRICS_EMITTER_CRON_EXPRESSION =
+        "controller.minion.task.metrics.emitter.cronExpression";
 
     public static final String PINOT_TASK_MANAGER_SCHEDULER_ENABLED = "controller.task.scheduler.enabled";
     // This is the expiry for the ended tasks. Helix cleans up the task info from ZK after the expiry time from the
@@ -184,7 +196,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final boolean DEFAULT_CONCURRENT_SCHEDULING_ENABLED = false;
 
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
-
+    public static final String SEGMENT_RELOCATOR_CRON_EXPRESSION = "controller.segment.relocator.cronExpression";
     public static final String SEGMENT_RELOCATOR_REASSIGN_INSTANCES = "controller.segment.relocator.reassignInstances";
     public static final String SEGMENT_RELOCATOR_BOOTSTRAP = "controller.segment.relocator.bootstrap";
     public static final String SEGMENT_RELOCATOR_DOWNTIME = "controller.segment.relocator.downtime";
@@ -211,10 +223,12 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.batchSizePerServer";
 
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
+    public static final String REBALANCE_CHECKER_CRON_EXPRESSION = "controller.rebalance.checker.cronExpression";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
     // with a separate interval
     public static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_PERIOD =
         "controller.segment.level.validation.intervalPeriod";
+
     public static final String AUTO_RESET_ERROR_SEGMENTS_VALIDATION =
         "controller.segment.error.autoReset";
     public static final String ENABLE_PARTIAL_OFFLINE_REPLICA_REPAIR =
@@ -230,13 +244,16 @@ public class ControllerConf extends PinotConfiguration {
         "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
     public static final String OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD =
         "controller.offline.segment.validation.frequencyPeriod";
-
+    public static final String OFFLINE_SEGMENT_VALIDATION_CRON_EXPRESSION =
+        "controller.offline.segment.validation.cronExpression";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
     public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.rebalanceChecker.initialDelayInSeconds";
     public static final String TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD =
         "controller.tenant.rebalance.checker.frequencyPeriod";
+    public static final String TENANT_REBALANCE_CHECKER_CRON_EXPRESSION =
+        "controller.tenant.rebalance.checker.cronExpression";
     public static final String TENANT_REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.tenant.rebalance.checker.initialDelayInSeconds";
 
@@ -311,7 +328,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtimeConsumerMonitor.frequencyPeriod";
     public static final String RT_CONSUMER_MONITOR_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeConsumerMonitor.initialDelayInSeconds";
-
+    public static final String RT_CONSUMER_MONITOR_CRON_EXPRESSION =
+        "controller.realtimeConsumerMonitor.cronExpression";
     public static final String DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_PERIOD = "-1s"; // Disabled by default
   }
 
@@ -320,11 +338,24 @@ public class ControllerConf extends PinotConfiguration {
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   public static final String CONTROLLER_EXECUTOR_NUM_THREADS = "controller.executor.numThreads";
   public static final String CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS = "controller.executor.rebalance.numThreads";
-
+  public static final String CONTROLLER_WORKLOAD_PROPAGATION_REQUESTS_PER_SECOND =
+      "controller.workload.propagation.requestsPerSecond";
+  public static final String CONTROLLER_WORKLOAD_EXECUTOR_THREADS = "controller.workload.executor.threads";
+  public static final String CONTROLLER_WORKLOAD_EXECUTOR_QUEUE_SIZE = "controller.workload.executor.queueSize";
+  public static final String CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS = "controller.workload.http.executor.threads";
+  public static final String CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE =
+      "controller.workload.http.executor.queueSize";
+  public static final String CONTROLLER_WORKLOAD_PROPAGATION_TIMEOUT_SECONDS =
+      "controller.workload.propagation.timeoutSeconds";
+  public static final String CONTROLLER_ENABLE_BROKER_CHANGE_PROPAGATION = "controller.enable.table.change.propagation";
+  public static final String CONTROLLER_ENABLE_INSTANCE_CHANGE_PROPAGATION =
+      "controller.enable.instance.change.propagation";
   public static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   public static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   public static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
+  public static final String INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM =
+      "controller.ingestFromURI.allowLocalFileSystem";
   public static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
   public static final String ACCESS_CONTROL_USERNAME = "access.control.init.username";
   public static final String ACCESS_CONTROL_PASSWORD = "access.control.init.password";
@@ -373,6 +404,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   public static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
   public static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
+  public static final boolean DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM = false;
   public static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   public static final String DEFAULT_ACCESS_CONTROL_USERNAME = "admin";
@@ -588,6 +620,63 @@ public class ControllerConf extends PinotConfiguration {
     return getProperty(CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS, UNSPECIFIED_THREAD_POOL);
   }
 
+  /**
+   * Rate limit the number of http request object created by controller.
+   * During load testing we saw a higher value (> 20K) can lead to memory pressure on controller.
+   */
+  public double getControllerWorkloadPropagationRequestsPerSecond() {
+    return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_REQUESTS_PER_SECOND, 1000.0);
+  }
+
+  /**
+   * Number of threads to used when sending/response for HTTP requests to servers/brokers.
+   */
+  public int getControllerWorkloadExecutorThreads() {
+    // We did benchmarking and found that having 5 threads helps us support about 50 requests per second with latency
+    // of about 500ms and CPU utilization of 1% on a 40 core machine and memory consumption of about 100MB.
+    return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_THREADS, 5);
+  }
+
+  /**
+   * Size of the bounded queue for workload propagation tasks.
+   */
+  public int getControllerWorkloadExecutorQueueSize() {
+    // We did benchmarking and found that each workload request queuing takes about 100K of memory.
+    // So with default of 10,000 queue size we are using about 1GB of memory for queuing in worst case.
+    return getProperty(CONTROLLER_WORKLOAD_EXECUTOR_QUEUE_SIZE, 10000);
+  }
+
+  /**
+   * Number of threads for HTTP callback processing.
+   */
+  public int getControllerWorkloadHttpExecutorThreads() {
+    return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_THREADS, 5);
+  }
+
+  /**
+   * Size of the bounded queue for HTTP callback tasks.
+   */
+  public int getControllerWorkloadHttpExecutorQueueSize() {
+    // We did benchmarking and found that each HTTP callback queuing takes about 10K of memory.
+    // So with default of 10,000 queue size we are using about 100MB of memory for queuing in worst case.
+    return getProperty(CONTROLLER_WORKLOAD_HTTP_EXECUTOR_QUEUE_SIZE, 10000);
+  }
+
+  /**
+   * Timeout in seconds for workload propagation and cost computation operations.
+   */
+  public long getControllerWorkloadPropagationTimeoutSeconds() {
+    return getProperty(CONTROLLER_WORKLOAD_PROPAGATION_TIMEOUT_SECONDS, 120L);
+  }
+
+  public boolean enableInstanceChangePropagation() {
+    return getProperty(CONTROLLER_ENABLE_INSTANCE_CHANGE_PROPAGATION, false);
+  }
+
+  public boolean enableBrokerChangePropagation() {
+    return getProperty(CONTROLLER_ENABLE_BROKER_CHANGE_PROPAGATION, false);
+  }
+
   public boolean isUpdateSegmentStateModel() {
     return getProperty(UPDATE_SEGMENT_STATE_MODEL, false);
   }
@@ -663,9 +752,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getRetentionControllerCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_CRON_EXPRESSION);
+  }
+
   public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_PERIOD,
         Long.toString(retentionFrequencyInSeconds) + "s");
+  }
+
+  public void setRetentionControllerCronExpression(String cronExpression) {
+    setProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_CRON_EXPRESSION, cronExpression);
   }
 
   /**
@@ -706,9 +803,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getRealtimeSegmentValidationCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_CRON_EXPRESSION);
+  }
+
   public void setRealtimeSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
         Long.toString(validationFrequencyInSeconds) + "s");
+  }
+
+  public void setRealtimeSegmentValidationCronExpression(String cronExpression) {
+    setProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_CRON_EXPRESSION, cronExpression);
   }
 
   public boolean isRealtimeOffsetAutoResetBackfillEnabled() {
@@ -725,9 +830,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getRealtimeOffsetAutoResetBackfillCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_CRON_EXPRESSION);
+  }
+
   public void setRealtimeOffsetAutoResetBackfillFrequencyInSeconds(int offsetAutoResetBackfillFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_PERIOD,
         Integer.toString(offsetAutoResetBackfillFrequencyInSeconds) + "s");
+  }
+
+  public void setRealtimeOffsetAutoResetBackfillCronExpression(String cronExpression) {
+    setProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_CRON_EXPRESSION, cronExpression);
   }
 
   /**
@@ -746,9 +859,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getBrokerResourceValidationCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_CRON_EXPRESSION);
+  }
+
   public void setBrokerResourceValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_PERIOD,
         Long.toString(validationFrequencyInSeconds) + "s");
+  }
+
+  public void setBrokerResourceValidationCronExpression(String cronExpression) {
+    setProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_CRON_EXPRESSION, cronExpression);
   }
 
   public long getBrokerResourceValidationInitialDelayInSeconds() {
@@ -765,9 +886,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getStatusCheckerCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_CRON_EXPRESSION);
+  }
+
   public void setStatusCheckerFrequencyInSeconds(int statusCheckerFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_PERIOD,
         Long.toString(statusCheckerFrequencyInSeconds) + "s");
+  }
+
+  public void setStatusCheckerCronExpression(String cronExpression) {
+    setProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_CRON_EXPRESSION, cronExpression);
   }
 
   public int getRebalanceCheckerFrequencyInSeconds() {
@@ -777,6 +906,10 @@ public class ControllerConf extends PinotConfiguration {
       period = ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_PERIOD;
     }
     return (int) convertPeriodToSeconds(period);
+  }
+
+  public String getRebalanceCheckerCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_CRON_EXPRESSION);
   }
 
   public long getRebalanceCheckerInitialDelayInSeconds() {
@@ -793,6 +926,10 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getTenantRebalanceCheckerCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_CRON_EXPRESSION);
+  }
+
   public long getTenantRebalanceCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
@@ -805,6 +942,10 @@ public class ControllerConf extends PinotConfiguration {
       period = ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_PERIOD;
     }
     return (int) convertPeriodToSeconds(period);
+  }
+
+  public String getRealtimeConsumerMonitorCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_CRON_EXPRESSION);
   }
 
   public long getRealtimeConsumerMonitorInitialDelayInSeconds() {
@@ -821,9 +962,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getTaskMetricsEmitterCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_CRON_EXPRESSION);
+  }
+
   public void setTaskMetricsEmitterFrequencyInSeconds(int taskMetricsEmitterFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_FREQUENCY_PERIOD,
         Long.toString(taskMetricsEmitterFrequencyInSeconds) + "s");
+  }
+
+  public void setTaskMetricsEmitterCronExpression(String taskMetricsEmitterCronExpression) {
+    setProperty(ControllerPeriodicTasksConf.TASK_METRICS_EMITTER_CRON_EXPRESSION, taskMetricsEmitterCronExpression);
   }
 
   public int getStatusCheckerWaitForPushTimeInSeconds() {
@@ -854,9 +1003,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getSegmentRelocatorCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_CRON_EXPRESSION);
+  }
+
   public void setSegmentRelocatorFrequencyInSeconds(int segmentRelocatorFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_FREQUENCY_PERIOD,
         Long.toString(segmentRelocatorFrequencyInSeconds) + "s");
+  }
+
+  public void setSegmentRelocatorCronExpression(String segmentRelocatorCronExpression) {
+    setProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_CRON_EXPRESSION, segmentRelocatorCronExpression);
   }
 
   public boolean getSegmentRelocatorReassignInstances() {
@@ -992,8 +1149,16 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getStaleInstancesCleanupTaskCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.STALE_INSTANCES_CLEANUP_TASK_CRON_EXPRESSION);
+  }
+
   public void setStaleInstanceCleanupTaskFrequencyInSeconds(String frequencyPeriod) {
     setProperty(ControllerPeriodicTasksConf.STALE_INSTANCES_CLEANUP_TASK_FREQUENCY_PERIOD, frequencyPeriod);
+  }
+
+  public void setStaleInstancesCleanupTaskCronExpression(String cronExpression) {
+    setProperty(ControllerPeriodicTasksConf.STALE_INSTANCES_CLEANUP_TASK_CRON_EXPRESSION, cronExpression);
   }
 
   public long getStaleInstanceCleanupTaskInitialDelaySeconds() {
@@ -1029,6 +1194,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getJerseyAdminApiPort() {
     return getProperty(JERSEY_ADMIN_API_PORT, String.valueOf(DEFAULT_JERSEY_ADMIN_PORT));
+  }
+
+  public boolean isIngestFromUriLocalFileSystemAllowed() {
+    return getProperty(INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM, DEFAULT_INGEST_FROM_URI_ALLOW_LOCAL_FILE_SYSTEM);
   }
 
   public void setInitAccessControlUsername(String username) {
@@ -1201,9 +1370,17 @@ public class ControllerConf extends PinotConfiguration {
     return (int) convertPeriodToSeconds(period);
   }
 
+  public String getOfflineSegmentValidationCronExpression() {
+    return getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_CRON_EXPRESSION);
+  }
+
   public void setOfflineSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_FREQUENCY_PERIOD,
         TimeUtils.convertMillisToPeriod(validationFrequencyInSeconds * 1000L));
+  }
+
+  public void setOfflineSegmentValidationCronExpression(String validationCronExpression) {
+    setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_VALIDATION_CRON_EXPRESSION, validationCronExpression);
   }
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {

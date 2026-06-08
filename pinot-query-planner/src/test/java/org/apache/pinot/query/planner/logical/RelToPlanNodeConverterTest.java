@@ -79,6 +79,20 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.BIGINT, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.LONG);
+    // Unsigned integer types (Calcite 1.41+, CALCITE-1466): the representable ones map to the narrowest signed type
+    // that holds their range (UTINYINT/USMALLINT -> INT, UINTEGER -> LONG); UBIGINT is rejected because no signed type
+    // holds its full 0..2^64-1 range.
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UTINYINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.USMALLINT, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.UINTEGER, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.LONG);
+    Assert.assertThrows(IllegalArgumentException.class, () -> RelToPlanNodeConverter.convertToColumnDataType(
+        new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null)));
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.FLOAT, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.FLOAT);
@@ -142,6 +156,12 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.BIGINT, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.LONG_ARRAY);
+    // Unsigned integer types (Calcite 1.41+, CALCITE-1466) map to their signed-equivalent array types.
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.UINTEGER, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.LONG_ARRAY);
+    Assert.assertThrows(IllegalArgumentException.class, () -> RelToPlanNodeConverter.convertToColumnDataType(
+        new ArraySqlType(new ObjectSqlType(SqlTypeName.UBIGINT, SqlIdentifier.STAR, true, null, null), true)));
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.FLOAT, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.FLOAT_ARRAY);

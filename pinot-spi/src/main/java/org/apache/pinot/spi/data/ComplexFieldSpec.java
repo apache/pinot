@@ -31,8 +31,8 @@ import org.apache.pinot.spi.utils.StringUtil;
 /**
  * FieldSpec for complex fields. The {@link org.apache.pinot.spi.data.FieldSpec.FieldType}
  * is COMPLEX and the inner data type represents the root data type of the field.
- * It could be STRUCT, MAP or LIST. A complex field is composable with a single root type
- * and a number of child types. Although we have multi-value primitive columns, LIST
+ * It could be STRUCT, MAP, LIST or OPEN_STRUCT. A complex field is composable with a single root
+ * type and a number of child types. Although we have multi-value primitive columns, LIST
  * is for representing lists of both complex and primitives inside a complex field.
  *
  * Consider a person json where the root type is STRUCT and composes of inner members:
@@ -67,8 +67,11 @@ public final class ComplexFieldSpec extends FieldSpec {
   public ComplexFieldSpec(String name, DataType dataType, boolean isSingleValueField,
       Map<String, FieldSpec> childFieldSpecs) {
     super(name, dataType, isSingleValueField);
-    Preconditions.checkArgument(dataType == DataType.STRUCT || dataType == DataType.MAP || dataType == DataType.LIST);
-    _childFieldSpecs = childFieldSpecs;
+    Preconditions.checkArgument(
+        dataType == DataType.STRUCT || dataType == DataType.MAP
+            || dataType == DataType.LIST || dataType == DataType.OPEN_STRUCT,
+        "ComplexFieldSpec dataType must be STRUCT, MAP, LIST, or OPEN_STRUCT (got %s)", dataType);
+    _childFieldSpecs = new HashMap<>(childFieldSpecs);
   }
 
   public static String[] getColumnPath(String column) {

@@ -427,12 +427,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       // Apply broker-default query options before branching to EXPLAIN/execute so both paths see the same options.
       applyBrokerDefaultQueryOptions(compiledQuery.getOptions());
+      prepareCompiledQueryForPlanning(compiledQuery, requestId, requestContext, httpHeaders);
 
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
         return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
-            rlsFiltersApplied.get(), queryWasLogged);
+            rlsFiltersApplied.get(), queryWasLogged, workloadName);
       }
     }
   }
@@ -588,6 +589,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
   }
 
+  /**
+   * Extension hook for preparing a compiled query's planner-visible options after compilation, authorization and
+   * broker defaults, but before planning/explain. Subclasses can use the validated table set from
+   * {@link QueryEnvironment.CompiledQuery#getTableNames()} without re-parsing SQL.
+   */
+  protected void prepareCompiledQueryForPlanning(QueryEnvironment.CompiledQuery compiledQuery, long requestId,
+      RequestContext requestContext, HttpHeaders httpHeaders) {
+  }
+
   private long getTimeoutMs(Map<String, String> queryOptions) {
     Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
     return timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
@@ -624,7 +634,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
       RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
-      boolean rlsFiltersApplied, boolean queryWasLogged)
+      boolean rlsFiltersApplied, boolean queryWasLogged, String workloadName)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -822,7 +832,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // Log query and stats
       _queryLogger.logQueryCompleted(
           new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse,
-              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null),
+              QueryLogger.QueryLogParams.QueryEngine.MULTI_STAGE, requesterIdentity, null, workloadName),
           queryWasLogged);
 
       return brokerResponse;

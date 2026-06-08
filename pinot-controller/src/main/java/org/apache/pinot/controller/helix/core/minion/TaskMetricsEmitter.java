@@ -25,10 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -75,7 +73,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       PinotHelixTaskResourceManager helixTaskResourceManager, LeadControllerManager leadControllerManager,
       ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
     super(TASK_NAME, controllerConf.getTaskMetricsEmitterFrequencyInSeconds(),
-        controllerConf.getPeriodicTaskInitialDelayInSeconds());
+        controllerConf.getPeriodicTaskInitialDelayInSeconds(), controllerConf.getTaskMetricsEmitterCronExpression());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixTaskResourceManager = helixTaskResourceManager;
     _controllerMetrics = controllerMetrics;
@@ -109,6 +107,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
     for (String taskType : taskTypes) {
       TaskCount taskTypeAccumulatedCount = new TaskCount();
       Map<String, TaskCount> tableAccumulatedCount = new HashMap<>();
+      Map<String, Long> tableMaxWaitTimeMs = new HashMap<>();
+      Map<String, Long> tableMaxRunningTimeMs = new HashMap<>();
       try {
         // Capture the current execution timestamp for this task type collection cycle
         long currentExecutionTimestamp = System.currentTimeMillis();
@@ -147,12 +147,10 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
                 }
                 count.accumulate(taskCount);
                 taskStatusSummary.getSubtaskWaitingTimes().values().forEach(subtaskWaitingTime -> {
-                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_WAITING_TIME,
-                      subtaskWaitingTime, TimeUnit.MILLISECONDS);
+                  tableMaxWaitTimeMs.merge(tableNameWithType, subtaskWaitingTime, Math::max);
                 });
                 taskStatusSummary.getSubtaskRunningTimes().values().forEach(subtaskRunningTime -> {
-                  _controllerMetrics.addTimedTableValue(tableNameWithType, ControllerTimer.SUBTASK_RUNNING_TIME,
-                      subtaskRunningTime, TimeUnit.MILLISECONDS);
+                  tableMaxRunningTimeMs.merge(tableNameWithType, subtaskRunningTime, Math::max);
                 });
                 return count;
               });
@@ -209,6 +207,16 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           tablePercent = tableTotal != 0 ? taskCount.getError() * 100 / tableTotal : 0;
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
               ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, tablePercent);
+        });
+
+        // Emit 0 for tables with no waiting/running subtasks so the gauge (and alert) self-resolves
+        tableAccumulatedCount.keySet().forEach(tableNameWithType -> {
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS,
+              tableMaxWaitTimeMs.getOrDefault(tableNameWithType, 0L));
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS,
+              tableMaxRunningTimeMs.getOrDefault(tableNameWithType, 0L));
         });
 
         if (_preReportedTables.containsKey(taskType)) {
@@ -286,6 +294,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_WAIT_TIME_MS);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.MAX_SUBTASK_RUNNING_TIME_MS);
     });
   }
 }

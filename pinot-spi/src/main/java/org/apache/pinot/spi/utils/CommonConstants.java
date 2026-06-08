@@ -279,6 +279,14 @@ public class CommonConstants {
         "pinot.beta.multistage.engine.max.server.query.threads.hardlimit.factor";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR = "4";
 
+    /// Cluster-config knob that selects how the multi-stage engine emits metrics.
+    /// Read at startup by server and broker; mode changes require a restart to take effect.
+    /// Valid values: {@code SERVER} (default; forward to {@code pinot.server.*}), {@code MSE}
+    /// (emit only {@code pinot.mse.*}), {@code DUAL} (emit both). See
+    /// {@code org.apache.pinot.common.metrics.MseMetricsMode}.
+    public static final String CONFIG_OF_MSE_METRICS_MODE = "pinot.metrics.mse.mode";
+    public static final String DEFAULT_MSE_METRICS_MODE = "SERVER";
+
     // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
         "pinot.server.max.segment.preprocess.parallelism";
@@ -655,6 +663,8 @@ public class CommonConstants {
     // keep the variable to pass the compability test
     @Deprecated
     public static final int FALLBACK_REPLICA_GROUP_ID = -1;
+    // Admin API port for broker, to be used admin operations.
+    public static final String CONFIG_OF_BROKER_ADMIN_API_PORT = "pinot.broker.adminapi.port";
 
     public static final String CONFIG_OF_BROKER_QUERY_ENABLE_AUTO_REWRITE_AGGREGATION_TYPE =
         "pinot.broker.query.enable.auto.rewrite.aggregation.type";
@@ -691,6 +701,16 @@ public class CommonConstants {
          * Not a user-facing option.
          */
         public static final String MATERIALIZED_VIEW_REWRITE = "materializedViewRewrite";
+        /// User-facing per-query switch. Default `true`. When set to `false`, the broker
+        /// skips all materialized-view rewrite for this query and routes to the base table. Safe to
+        /// expose: disabling only forgoes an optimization and never changes results. Distinct from
+        /// the broker-internal [#MATERIALIZED_VIEW_REWRITE] marker (which is stripped from
+        /// user input); this option is honored from user input. The MV minion executor additionally
+        /// forces it to `false` for its materialization query by passing it as gRPC request
+        /// metadata, which the broker applies as an override after parsing (see BrokerGrpcServer) —
+        /// so the materialization query is never rewritten back onto an MV even if its (user-authored)
+        /// SQL sets this option.
+        public static final String ENABLE_MATERIALIZED_VIEW_REWRITE = "enableMaterializedViewRewrite";
         public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
         public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
@@ -1321,6 +1341,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_EXECUTION_THREADS =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS = -1;  // Use number of CPU cores
+    public static final String DEFAULT_EXECUTION_THREADS = "default.execution.threads";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + "." + DEFAULT_EXECUTION_THREADS;
+    public static final int DEFAULT_QUERY_EXECUTOR_DEFAULT_EXECUTION_THREADS = -1;  // Not set; fall back to max
 
     // OOM protection: heap usage throttle configuration
     public static final String CONFIG_OF_HEAP_USAGE_THROTTLE_QUEUE_MAX_SIZE =
@@ -2058,11 +2082,19 @@ public class CommonConstants {
     public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS = "accounting.workload.enforcement.window.ms";
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS = "accounting.workload.sleep.time.ms";
+
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_EMISSION =
+        "accounting.workload.enable.cost.emission";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_EMISSION = false;
+
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
     @Deprecated(since = "1.6.0", forRemoval = true)
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
+    public static final String CONFIG_OF_WORKLOAD_BUDGET_MANAGER_TYPE_NAME =
+        "accounting.workload.budget.manager.factory.name";
+    public static final String DEFAULT_WORKLOAD_BUDGET_MANAGER_TYPE_NAME = "default";
 
     // Scan-based query killing
     public enum ScanKillingMode {

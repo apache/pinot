@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query;
 
+import com.google.common.base.Throwables;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -70,6 +72,107 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
         "SELECT abs(col3), negate(col7), least(col4, col4), greatest(col4, col4), positiveModulo(col3, col6), "
             + "moduloOrZero(col4, col4) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testFilteredMinMaxAggregateNullability() {
+    // A grouped MIN/MAX with a FILTER can observe an empty group, so its result must be nullable. Calcite 1.42 signals
+    // this via SqlOperatorBinding.hasEmptyGroup() (set by SqlFilterOperator at validation time), which
+    // PinotMinMaxReturnTypeInference must honor. Assert the validated RelDataType nullability directly rather than
+    // relying on the downstream Project.isValid check (a JVM `assert`, disabled when tests run without -ea, so a
+    // compile-only smoke test would pass vacuously): the filtered MIN/MAX output fields must be nullable, while a
+    // plain grouped MIN/MAX over the non-null metric col3 must NOT be -- the negative control proving it is the
+    // FILTER (hasEmptyGroup) that drives nullability, not something making every MIN/MAX nullable.
+    RelDataType filtered = _queryEnvironment.compile(
+            "SELECT col1, MIN(col3) FILTER (WHERE col3 > 0), MAX(col3) FILTER (WHERE col3 > 0) FROM a GROUP BY col1")
+        .getRelRoot().validatedRowType;
+    assertTrue(filtered.getFieldList().get(1).getType().isNullable(), "filtered MIN must be nullable");
+    assertTrue(filtered.getFieldList().get(2).getType().isNullable(), "filtered MAX must be nullable");
+
+    RelDataType plain = _queryEnvironment.compile("SELECT col1, MIN(col3), MAX(col3) FROM a GROUP BY col1")
+        .getRelRoot().validatedRowType;
+    assertFalse(plain.getFieldList().get(1).getType().isNullable(), "plain grouped MIN must not be nullable");
+    assertFalse(plain.getFieldList().get(2).getType().isNullable(), "plain grouped MAX must not be nullable");
+  }
+
+  @Test
+  public void testCorrelatedSubqueryDecorrelationNullability() {
+    // CALCITE-7379: decorrelating a scalar correlated sub-query feeding an aggregate changes the nullability of the
+    // output row type, which Calcite 1.42's stock RelDecorrelator still rejects with a Litmus.THROW assertion.
+    // PinotRelDecorrelator downgrades that (nullability-only) divergence to a warning so the query compiles. This
+    // query throws "Failed to decorrelate query" if PinotRelDecorrelator is reverted to stock
+    // RelDecorrelator.decorrelateQuery.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT a.col1, newb.sum_col3 FROM a JOIN LATERAL "
+            + "(SELECT SUM(col3) AS sum_col3 FROM b WHERE col2 = a.col2) AS newb ON TRUE");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testUnsignedTypeCastIsAccepted() {
+    // Calcite 1.42 (CALCITE-1466) parses unsigned integer types under BABEL conformance, producing SqlTypeName.U*.
+    // The representable ones (TINYINT/SMALLINT/INTEGER UNSIGNED) are ACCEPTED and reach the converter via real SQL
+    // (i.e. the U* switch arms in (P)RelToPlanNodeConverter.convertToColumnDataType are not dead code). The U* ->
+    // signed ColumnDataType mapping itself is pinned by the unit tests in RelToPlanNodeConverterTest /
+    // PRelToPlanNodeConverterTest. BIGINT UNSIGNED (UBIGINT) is instead rejected -- see
+    // testUnsignedBigintCastIsRejected.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT CAST(col3 AS INTEGER UNSIGNED), CAST(col3 AS SMALLINT UNSIGNED), "
+            + "CAST(col3 AS TINYINT UNSIGNED) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testUnsignedBigintCastIsRejected() {
+    // BIGINT UNSIGNED (UBIGINT, 0..2^64-1) has no signed Pinot type wide enough to hold its full range, so it must be
+    // rejected at planning rather than silently wrapping values above Long.MAX_VALUE (CALCITE-1466). The representable
+    // unsigned types remain accepted (see testUnsignedTypeCastIsAccepted).
+    // Both the column-cast path (reaches convertToColumnDataType directly) and the literal-cast path (reaches it via
+    // the PinotEvaluateLiteralRule constant-folding path) must be rejected -- and assert the dedicated message so an
+    // unrelated planning failure cannot make this pass.
+    List<String> rejected = List.of(
+        "SELECT CAST(col3 AS BIGINT UNSIGNED) FROM a", "SELECT CAST(5 AS BIGINT UNSIGNED) FROM a");
+    for (String sql : rejected) {
+      Throwable thrown = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(sql));
+      assertTrue(Throwables.getStackTraceAsString(thrown).contains("unsigned 64-bit range"),
+          "expected the UBIGINT-rejection error for: " + sql + ", but got: " + thrown);
+    }
+  }
+
+  @Test
+  public void testUnsignedLiteralCastIsFolded() {
+    // Companion to testUnsignedTypeCastIsAccepted using literal (constant-foldable) casts, so the unsigned
+    // literal-folding branch in PinotEvaluateLiteralRule#convertRexCall (which normalizes an unsigned cast to its
+    // signed-equivalent type before building the RexLiteral) actually fires -- the column-cast test above never
+    // reaches literal folding. Asserts the query compiles, i.e. the unsigned literal fold does not error.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT CAST(5 AS INTEGER UNSIGNED) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testPolymorphicArithmeticScalarFunctionsOverUnsignedOperands() {
+    // The polymorphic arithmetic scalar functions infer their return type via
+    // ArithmeticFunctionUtils.normalizeNumericType, whose unsigned arms (CALCITE-1466) keep an unsigned-cast operand
+    // integral instead of widening to DOUBLE. Plan them over unsigned-cast operands (unary, binary unsigned-unsigned,
+    // and binary unsigned-signed) so those arms are exercised end-to-end.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT negate(CAST(col3 AS INTEGER UNSIGNED)), "
+            + "least(CAST(col4 AS INTEGER UNSIGNED), CAST(col4 AS INTEGER UNSIGNED)), "
+            + "greatest(CAST(col3 AS INTEGER UNSIGNED), CAST(col3 AS INTEGER UNSIGNED)), "
+            + "moduloOrZero(CAST(col4 AS INTEGER UNSIGNED), col4) FROM a");
+    assertNotNull(dispatchableSubPlan);
+  }
+
+  @Test
+  public void testWindowFunctionWithGroupByDoesNotNpe() {
+    // CALCITE-7189: Calcite 1.41+ BABEL conformance reports isNonStrictGroupBy()==true, which makes validation of a
+    // window function combined with GROUP BY (e.g. MIN(col) OVER() ... GROUP BY col) NPE in AggFinder. Pinot's
+    // Validator overrides isNonStrictGroupBy() back to false to avoid this; this query NPEs during validation if
+    // that override is removed.
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(
+        "SELECT MIN(col3) OVER() FROM a GROUP BY col3");
     assertNotNull(dispatchableSubPlan);
   }
 

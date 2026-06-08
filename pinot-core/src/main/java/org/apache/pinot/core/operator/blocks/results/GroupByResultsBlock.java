@@ -18,13 +18,7 @@
  */
 package org.apache.pinot.core.operator.blocks.results;
 
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -33,11 +27,11 @@ import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.ArrayListUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
+import org.apache.pinot.core.common.datatable.DataTableBuilderUtils;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
@@ -45,7 +39,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -243,7 +236,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
               nullBitmaps[i].add(rowId);
             }
             assert value != null;
-            setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
+            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
           }
         }
         dataTableBuilder.finishRow();
@@ -265,7 +258,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
           } else if (storedColumnDataTypes[i] == ColumnDataType.OBJECT) {
             dataTableBuilder.setColumn(i, aggregationFunctions[i - numKeyColumns].serializeIntermediateResult(value));
           } else {
-            setDataTableColumn(storedColumnDataTypes[i], dataTableBuilder, i, value);
+            DataTableBuilderUtils.setColumn(dataTableBuilder, storedColumnDataTypes[i], i, value);
           }
         }
         dataTableBuilder.finishRow();
@@ -275,88 +268,6 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return dataTableBuilder.build();
   }
 
-  private void setDataTableColumn(ColumnDataType storedColumnDataType, DataTableBuilder dataTableBuilder,
-      int columnIndex, Object value)
-      throws IOException {
-    switch (storedColumnDataType) {
-      case INT:
-        dataTableBuilder.setColumn(columnIndex, (int) value);
-        break;
-      case LONG:
-        dataTableBuilder.setColumn(columnIndex, (long) value);
-        break;
-      case FLOAT:
-        dataTableBuilder.setColumn(columnIndex, (float) value);
-        break;
-      case DOUBLE:
-        dataTableBuilder.setColumn(columnIndex, (double) value);
-        break;
-      case BIG_DECIMAL:
-        dataTableBuilder.setColumn(columnIndex, (BigDecimal) value);
-        break;
-      case STRING:
-        dataTableBuilder.setColumn(columnIndex, value.toString());
-        break;
-      case BYTES:
-        dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
-        break;
-      case INT_ARRAY:
-        if (value instanceof IntArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toIntArray((IntArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (int[]) value);
-        }
-        break;
-      case LONG_ARRAY:
-        if (value instanceof LongArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toLongArray((LongArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (long[]) value);
-        }
-        break;
-      case FLOAT_ARRAY:
-        if (value instanceof FloatArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toFloatArray((FloatArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (float[]) value);
-        }
-        break;
-      case DOUBLE_ARRAY:
-        if (value instanceof DoubleArrayList) {
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toDoubleArray((DoubleArrayList) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (double[]) value);
-        }
-        break;
-      case BIG_DECIMAL_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex,
-              ArrayListUtils.toBigDecimalArray((ObjectArrayList<BigDecimal>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (BigDecimal[]) value);
-        }
-        break;
-      case STRING_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toStringArray((ObjectArrayList<String>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (String[]) value);
-        }
-        break;
-      case BYTES_ARRAY:
-        if (value instanceof ObjectArrayList) {
-          //noinspection unchecked
-          dataTableBuilder.setColumn(columnIndex, ArrayListUtils.toBytesArray((ObjectArrayList<ByteArray>) value));
-        } else {
-          dataTableBuilder.setColumn(columnIndex, (ByteArray[]) value);
-        }
-        break;
-      default:
-        throw new IllegalStateException("Unsupported stored type: " + storedColumnDataType);
-    }
-  }
 
   @Override
   public Map<String, String> getResultsMetadata() {

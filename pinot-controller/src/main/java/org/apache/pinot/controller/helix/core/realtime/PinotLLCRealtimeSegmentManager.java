@@ -2921,9 +2921,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
-      // TODO: add paused topics information
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
-          pauseState.getComment(), pauseState.getTimeInMillis());
+          pauseState.getComment(), pauseState.getTimeInMillis(), pauseState.getIndexOfInactiveTopics());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments,

@@ -74,10 +74,24 @@ public class SchemaUtils {
   }
 
   public static void validate(Schema schema, List<TableConfig> tableConfigs, boolean isIgnoreCase) {
+    // The deprecation reject is intentionally placed only in this REST-driven overload (not in the single-arg
+    // `validate(Schema)` that server-side table loading uses), so existing legacy schemas in ZK keep
+    // loading. New / updated schemas submitted via the controller REST API are blocked.
+    // See https://github.com/apache/pinot/issues/2756 for the TimeFieldSpec deprecation plan.
+    rejectDeprecatedTimeFieldSpec(schema);
     for (TableConfig tableConfig : tableConfigs) {
       validateCompatibilityWithTableConfig(schema, tableConfig);
     }
     validate(schema, isIgnoreCase);
+  }
+
+  @SuppressWarnings("deprecation")
+  private static void rejectDeprecatedTimeFieldSpec(Schema schema) {
+    if (schema.getTimeFieldSpec() != null) {
+      throw new IllegalStateException(
+          "TimeFieldSpec (fieldType=TIME) is deprecated; use DateTimeFieldSpec (fieldType=DATE_TIME) instead. "
+              + "See https://github.com/apache/pinot/issues/2756");
+    }
   }
 
   /**
