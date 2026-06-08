@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.routing;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -72,10 +73,20 @@ public class TablePartitionReplicatedServersInfo {
   public static class PartitionInfo {
     public final Set<String> _fullyReplicatedServers;
     public final List<String> _segments;
+    // Segments belonging to this partition that currently have no online replica on any server. They are excluded from
+    // {@link #_fullyReplicatedServers} and {@link #_segments} so that a single transiently-unavailable segment does not
+    // make the whole partition unroutable. Best-effort colocated routing surfaces these as a non-fatal warning, while
+    // strict routing fails the query when this list is non-empty.
+    public final List<String> _unavailableSegments;
 
     public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments) {
+      this(fullyReplicatedServers, segments, new ArrayList<>());
+    }
+
+    public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments, List<String> unavailableSegments) {
       _fullyReplicatedServers = fullyReplicatedServers;
       _segments = segments;
+      _unavailableSegments = unavailableSegments;
     }
   }
 }

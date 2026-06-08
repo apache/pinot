@@ -55,6 +55,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -425,6 +426,374 @@ public class WorkerManagerTest {
       }
     }
     assertTrue(anyT1Server, "Expected at least one T1 server to be used");
+  }
+
+  /**
+   * Colocated (partition-based) join routing over a partition that has a transiently-unavailable segment must fail in
+   * strict mode (the default), preserving the original all-or-nothing behavior, and the error must point at the
+   * best-effort query option.
+   */
+  @Test
+  public void testColocatedRoutingStrictModeFailsOnUnavailableSegment() {
+    QueryEnvironment queryEnvironment = createPartitionedQueryEnvironment(false);
+    String query = "SELECT * FROM testTable /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+        + "partition_size='1') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      compiledQuery.planQuery(0);
+      fail("Expected strict colocated routing to fail for a partition with an unavailable segment");
+    } catch (RuntimeException e) {
+      String messages = flattenMessages(e);
+      assertTrue(messages.contains("unavailable"), "Unexpected error: " + messages);
+      assertTrue(messages.contains(CommonConstants.Broker.Request.QueryOptionKey.COLOCATED_JOIN_BEST_EFFORT),
+          "Error should reference the best-effort option: " + messages);
+    }
+  }
+
+  /**
+   * With the best-effort query option set, colocated routing routes the partition's available segments and surfaces the
+   * unavailable ones via the dispatchable plan (so the broker can attach a non-fatal warning) instead of failing.
+   */
+  @Test
+  public void testColocatedRoutingBestEffortModeSurfacesUnavailableSegment() {
+    QueryEnvironment queryEnvironment = createPartitionedQueryEnvironment(false);
+    String query = "SET colocatedJoinBestEffort=true; SELECT * FROM testTable /*+ tableOptions("
+        + "partition_function='hashcode', partition_key='col1', partition_size='1') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      Set<String> allUnavailable = new HashSet<>();
+      dispatchableSubPlan.getTableToUnavailableSegmentsMap().values().forEach(allUnavailable::addAll);
+      assertTrue(allUnavailable.contains("darkSeg"),
+          "Best-effort routing should surface the unavailable segment, got: " + allUnavailable);
+    }
+  }
+
+  /**
+   * The best-effort default can also be set at the broker level (WorkerManager default) instead of per-query.
+   */
+  @Test
+  public void testColocatedRoutingBestEffortDefaultSurfacesUnavailableSegment() {
+    QueryEnvironment queryEnvironment = createPartitionedQueryEnvironment(true);
+    String query = "SELECT * FROM testTable /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+        + "partition_size='1') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertNotNull(dispatchableSubPlan);
+      Set<String> allUnavailable = new HashSet<>();
+      dispatchableSubPlan.getTableToUnavailableSegmentsMap().values().forEach(allUnavailable::addAll);
+      assertTrue(allUnavailable.contains("darkSeg"),
+          "Best-effort default should surface the unavailable segment, got: " + allUnavailable);
+    }
+  }
+
+  /**
+   * The multiple-partitions-per-worker path must also fail in strict mode when one of a worker's partitions has an
+   * unavailable segment (covers {@code assignMultiplePartitionsPerWorker}).
+   */
+  @Test
+  public void testColocatedRoutingMultiplePartitionsPerWorkerStrictFails() {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server1.getInstanceId(), server1);
+    TablePartitionReplicatedServersInfo tpi = buildFourPartitionTpi(server1.getInstanceId(), false);
+    QueryEnvironment queryEnvironment = createQueryEnvironment(serverInstanceMap,
+        new PartitionedRoutingManager(serverInstanceMap, "testTable_OFFLINE", tpi), false);
+    // 4 partitions, partition_size='2' => 2 workers, 2 partitions per worker.
+    String query = "SELECT * FROM testTable /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+        + "partition_size='2') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      compiledQuery.planQuery(0);
+      fail("Expected strict multi-partition-per-worker routing to fail on an unavailable segment");
+    } catch (RuntimeException e) {
+      assertTrue(flattenMessages(e).contains("unavailable"), "Unexpected error: " + flattenMessages(e));
+    }
+  }
+
+  /**
+   * The multiple-partitions-per-worker path must surface unavailable segments in best-effort mode rather than silently
+   * dropping them.
+   */
+  @Test
+  public void testColocatedRoutingMultiplePartitionsPerWorkerBestEffortSurfacesUnavailableSegment() {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server1.getInstanceId(), server1);
+    TablePartitionReplicatedServersInfo tpi = buildFourPartitionTpi(server1.getInstanceId(), false);
+    QueryEnvironment queryEnvironment = createQueryEnvironment(serverInstanceMap,
+        new PartitionedRoutingManager(serverInstanceMap, "testTable_OFFLINE", tpi), true);
+    String query = "SELECT * FROM testTable /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+        + "partition_size='2') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      assertTrue(unavailableSegmentsOf(dispatchableSubPlan).contains("dark0"),
+          "Best-effort multi-partition routing should surface the unavailable segment");
+    }
+  }
+
+  /**
+   * A partition whose segments are ALL unavailable cannot be colocated-routed (no server holds its data). Best-effort
+   * mode must fail the query rather than silently drop the partition's rows from the colocated join.
+   */
+  @Test
+  public void testColocatedRoutingFullyUnavailablePartitionFailsInBestEffortMode() {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server1.getInstanceId(), server1);
+    TablePartitionReplicatedServersInfo tpi = buildFourPartitionTpi(server1.getInstanceId(), true);
+    QueryEnvironment queryEnvironment = createQueryEnvironment(serverInstanceMap,
+        new PartitionedRoutingManager(serverInstanceMap, "testTable_OFFLINE", tpi), true);
+    String query = "SELECT * FROM testTable /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+        + "partition_size='2') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      compiledQuery.planQuery(0);
+      fail("Expected best-effort routing to fail (not silently drop) a fully-unavailable partition");
+    } catch (RuntimeException e) {
+      assertTrue(flattenMessages(e).contains("fully replicated server"), "Unexpected error: " + flattenMessages(e));
+    }
+  }
+
+  /**
+   * For a hybrid table, best-effort routing must surface unavailable segments from both the OFFLINE and REALTIME sides
+   * (covers the hybrid merge in {@code calculatePartitionTableInfo}).
+   */
+  @Test
+  public void testColocatedRoutingHybridBestEffortSurfacesUnavailableFromBothTableTypes() {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server1.getInstanceId(), server1);
+    TablePartitionReplicatedServersInfo offlineTpi =
+        new TablePartitionReplicatedServersInfo("testTable_OFFLINE", "col1", "hashcode", 1,
+            new TablePartitionReplicatedServersInfo.PartitionInfo[]{
+                buildPartitionInfo(Set.of(server1.getInstanceId()), List.of("offAvail"), List.of("offDark"))},
+            List.of());
+    TablePartitionReplicatedServersInfo realtimeTpi = new TablePartitionReplicatedServersInfo("testTable_REALTIME",
+        "col1", "hashcode", 1, new TablePartitionReplicatedServersInfo.PartitionInfo[]{
+        buildPartitionInfo(Set.of(server1.getInstanceId()), List.of("rtAvail"), List.of("rtDark"))}, List.of());
+    RoutingManager routingManager = new HybridPartitionedRoutingManager(serverInstanceMap,
+        Map.of("testTable_OFFLINE", offlineTpi, "testTable_REALTIME", realtimeTpi), new TimeBoundaryInfo("ts", "1000"));
+    QueryEnvironment queryEnvironment = createQueryEnvironment(serverInstanceMap, routingManager, true);
+    String query = "SELECT * FROM testTable /*+ tableOptions(partition_function='hashcode', partition_key='col1', "
+        + "partition_size='1') */ LIMIT 10";
+    try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
+      DispatchableSubPlan dispatchableSubPlan = compiledQuery.planQuery(0).getQueryPlan();
+      Set<String> unavailable = unavailableSegmentsOf(dispatchableSubPlan);
+      assertTrue(unavailable.contains("offDark") && unavailable.contains("rtDark"),
+          "Hybrid best-effort routing should surface unavailable segments from both table types, got: " + unavailable);
+    }
+  }
+
+  /**
+   * Builds a 4-partition OFFLINE {@link TablePartitionReplicatedServersInfo} on a single server. Partition 0 carries an
+   * unavailable segment "dark0"; when {@code partition0FullyDark} is true it has no available segment or server.
+   */
+  private static TablePartitionReplicatedServersInfo buildFourPartitionTpi(String serverId,
+      boolean partition0FullyDark) {
+    TablePartitionReplicatedServersInfo.PartitionInfo[] infos =
+        new TablePartitionReplicatedServersInfo.PartitionInfo[4];
+    infos[0] = partition0FullyDark
+        ? buildPartitionInfo(Set.of(), List.of(), List.of("dark0"))
+        : buildPartitionInfo(Set.of(serverId), List.of("avail0"), List.of("dark0"));
+    infos[1] = buildPartitionInfo(Set.of(serverId), List.of("avail1"), List.of());
+    infos[2] = buildPartitionInfo(Set.of(serverId), List.of("avail2"), List.of());
+    infos[3] = buildPartitionInfo(Set.of(serverId), List.of("avail3"), List.of());
+    return new TablePartitionReplicatedServersInfo("testTable_OFFLINE", "col1", "hashcode", 4, infos, List.of());
+  }
+
+  /**
+   * Builds a {@link QueryEnvironment} for a single OFFLINE table partitioned into one partition whose only available
+   * segment is "availSeg" on server1, with an additional transiently-unavailable segment "darkSeg".
+   */
+  private static QueryEnvironment createPartitionedQueryEnvironment(boolean bestEffortDefault) {
+    ServerInstance server1 = getServerInstance("localhost", 1);
+    Map<String, ServerInstance> serverInstanceMap = Map.of(server1.getInstanceId(), server1);
+    TablePartitionReplicatedServersInfo.PartitionInfo partitionInfo =
+        buildPartitionInfo(Set.of(server1.getInstanceId()), List.of("availSeg"), List.of("darkSeg"));
+    TablePartitionReplicatedServersInfo tpi = new TablePartitionReplicatedServersInfo("testTable_OFFLINE", "col1",
+        "hashcode", 1, new TablePartitionReplicatedServersInfo.PartitionInfo[]{partitionInfo}, List.of());
+    return createQueryEnvironment(serverInstanceMap,
+        new PartitionedRoutingManager(serverInstanceMap, "testTable_OFFLINE", tpi), bestEffortDefault);
+  }
+
+  private static TablePartitionReplicatedServersInfo.PartitionInfo buildPartitionInfo(Set<String> servers,
+      List<String> segments, List<String> unavailableSegments) {
+    return new TablePartitionReplicatedServersInfo.PartitionInfo(new HashSet<>(servers), new ArrayList<>(segments),
+        new ArrayList<>(unavailableSegments));
+  }
+
+  private static QueryEnvironment createQueryEnvironment(Map<String, ServerInstance> serverInstanceMap,
+      RoutingManager routingManager, boolean bestEffortDefault) {
+    Schema schema = getSchemaBuilder("testTable").build();
+    Map<String, String> tableNameMap = new HashMap<>();
+    tableNameMap.put("testTable_OFFLINE", "testTable_OFFLINE");
+    tableNameMap.put("testTable_REALTIME", "testTable_REALTIME");
+    tableNameMap.put("testTable", "testTable");
+    TableCache tableCache = mock(TableCache.class);
+    when(tableCache.getTableNameMap()).thenReturn(tableNameMap);
+    when(tableCache.getActualTableName(anyString())).thenAnswer(inv -> tableNameMap.get(inv.getArgument(0)));
+    when(tableCache.getSchema(anyString())).thenReturn(schema);
+    when(tableCache.getTableConfig("testTable_OFFLINE")).thenReturn(mock(TableConfig.class));
+    when(tableCache.getTableConfig("testTable_REALTIME")).thenReturn(mock(TableConfig.class));
+    WorkerManager workerManager =
+        new WorkerManager("Broker_localhost", "localhost", 3, routingManager, bestEffortDefault);
+    return new QueryEnvironment(CommonConstants.DEFAULT_DATABASE, tableCache, workerManager);
+  }
+
+  private static Set<String> unavailableSegmentsOf(DispatchableSubPlan dispatchableSubPlan) {
+    Set<String> allUnavailable = new HashSet<>();
+    dispatchableSubPlan.getTableToUnavailableSegmentsMap().values().forEach(allUnavailable::addAll);
+    return allUnavailable;
+  }
+
+  private static String flattenMessages(Throwable throwable) {
+    StringBuilder sb = new StringBuilder();
+    for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+      if (cause.getMessage() != null) {
+        sb.append(cause.getMessage()).append('\n');
+      }
+    }
+    return sb.toString();
+  }
+
+  /**
+   * A RoutingManager that serves a single partitioned table via {@link TablePartitionReplicatedServersInfo}, used to
+   * exercise the colocated (partition-based) leaf assignment path.
+   */
+  private static class PartitionedRoutingManager implements RoutingManager {
+    private final Map<String, ServerInstance> _serverInstanceMap;
+    private final String _tableNameWithType;
+    private final TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
+
+    PartitionedRoutingManager(Map<String, ServerInstance> serverInstanceMap, String tableNameWithType,
+        TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo) {
+      _serverInstanceMap = serverInstanceMap;
+      _tableNameWithType = tableNameWithType;
+      _tablePartitionReplicatedServersInfo = tablePartitionReplicatedServersInfo;
+    }
+
+    @Override
+    public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+      return _serverInstanceMap;
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getSegments(BrokerRequest brokerRequest) {
+      return List.of();
+    }
+
+    @Override
+    public boolean routingExists(String tableNameWithType) {
+      return _tableNameWithType.equals(tableNameWithType);
+    }
+
+    @Nullable
+    @Override
+    public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
+      return _tableNameWithType.equals(tableNameWithType) ? _tablePartitionReplicatedServersInfo : null;
+    }
+
+    @Override
+    public Set<String> getServingInstances(String tableNameWithType) {
+      return new HashSet<>(_serverInstanceMap.keySet());
+    }
+
+    @Override
+    public boolean isTableDisabled(String tableNameWithType) {
+      return false;
+    }
+  }
+
+  /**
+   * A RoutingManager that serves a hybrid partitioned table: it returns a {@link TablePartitionReplicatedServersInfo}
+   * for both the OFFLINE and REALTIME table names and a non-null time boundary so the hybrid colocated path is taken.
+   */
+  private static class HybridPartitionedRoutingManager implements RoutingManager {
+    private final Map<String, ServerInstance> _serverInstanceMap;
+    private final Map<String, TablePartitionReplicatedServersInfo> _tpiByTable;
+    private final TimeBoundaryInfo _timeBoundaryInfo;
+
+    HybridPartitionedRoutingManager(Map<String, ServerInstance> serverInstanceMap,
+        Map<String, TablePartitionReplicatedServersInfo> tpiByTable, TimeBoundaryInfo timeBoundaryInfo) {
+      _serverInstanceMap = serverInstanceMap;
+      _tpiByTable = tpiByTable;
+      _timeBoundaryInfo = timeBoundaryInfo;
+    }
+
+    @Override
+    public Map<String, ServerInstance> getEnabledServerInstanceMap() {
+      return _serverInstanceMap;
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, long requestId) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public RoutingTable getRoutingTable(BrokerRequest brokerRequest, String tableNameWithType, long requestId) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public List<String> getSegments(BrokerRequest brokerRequest) {
+      return List.of();
+    }
+
+    @Override
+    public boolean routingExists(String tableNameWithType) {
+      return _tpiByTable.containsKey(tableNameWithType);
+    }
+
+    @Nullable
+    @Override
+    public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
+      return _timeBoundaryInfo;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+      return null;
+    }
+
+    @Nullable
+    @Override
+    public TablePartitionReplicatedServersInfo getTablePartitionReplicatedServersInfo(String tableNameWithType) {
+      return _tpiByTable.get(tableNameWithType);
+    }
+
+    @Override
+    public Set<String> getServingInstances(String tableNameWithType) {
+      return new HashSet<>(_serverInstanceMap.keySet());
+    }
+
+    @Override
+    public boolean isTableDisabled(String tableNameWithType) {
+      return false;
+    }
   }
 
   /**
