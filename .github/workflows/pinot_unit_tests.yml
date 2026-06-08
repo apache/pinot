@@ -164,7 +164,7 @@ jobs:
         run: |
           .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         continue-on-error: true
         timeout-minutes: 5
         with:
