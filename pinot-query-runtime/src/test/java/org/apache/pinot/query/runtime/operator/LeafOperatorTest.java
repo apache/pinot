@@ -54,7 +54,9 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.mockito.Mock;
@@ -146,6 +148,52 @@ public class LeafOperatorTest {
     assertEquals(rows.get(0), new Object[]{"foo", 1});
     assertEquals(rows.get(1), new Object[]{"", 2});
     assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
+
+    operator.close();
+  }
+
+  @Test
+  public void calculateStatsIsIdempotentWhenFoldingPipelineBreaker() {
+    // Regression for a pipeline-breaker leaf whose own operators were duplicated in the flat stats. calculateStats()
+    // runs more than once per opchain (the MailboxSendOperator serializing its EOS stats, then again from the
+    // scheduler completion callback that feeds the stream-stats listener). The folded pipeline-breaker stats are a
+    // shared mutable instance, so LeafOperator.calculateUpstreamStats() must hand back a COPY -- otherwise each call
+    // appends this leaf's own LEAF entry again, inflating the flat operator list and breaking the stats-tree encoder
+    // with a treeSize != flatSize mismatch.
+    DataSchema schema = new DataSchema(new String[]{"intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT intCol FROM tbl");
+    List<BaseResultsBlock> dataBlocks = Collections.singletonList(
+        new SelectionResultsBlock(schema, Collections.singletonList(new Object[]{1}), queryContext));
+    InstanceResponseBlock metadataBlock = new InstanceResponseBlock(new MetadataResultsBlock());
+    QueryExecutor queryExecutor = mockQueryExecutor(dataBlocks, metadataBlock);
+
+    // The leaf folds two operators (MAILBOX_RECEIVE + PIPELINE_BREAKER) ahead of its own LEAF entry.
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
+    MultiStageQueryStats pipelineBreakerStats = new MultiStageQueryStats.Builder(context.getStageId())
+        .customizeOpen(open -> open
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
+                new StatMap<>(BaseMailboxReceiveOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.PIPELINE_BREAKER,
+                new StatMap<>(PipelineBreakerOperator.StatKey.class)))
+        .build();
+
+    LeafOperator operator = new LeafOperator(context, mockQueryRequests(1), schema, queryExecutor, _executorService,
+        pipelineBreakerStats);
+    _operatorRef.set(operator);
+
+    // Drain so the leaf produces its stats.
+    while (!operator.nextBlock().isEos()) {
+      // consume blocks
+    }
+
+    int firstCount = operator.calculateStats().getCurrentStats().getLastOperatorIndex() + 1;
+    int secondCount = operator.calculateStats().getCurrentStats().getLastOperatorIndex() + 1;
+
+    // MAILBOX_RECEIVE + PIPELINE_BREAKER (folded) + LEAF (this operator) = 3. A shared upstream instance would
+    // append LEAF a second time on the second call, yielding 4.
+    assertEquals(firstCount, 3, "Expected MAILBOX_RECEIVE, PIPELINE_BREAKER, LEAF");
+    assertEquals(secondCount, firstCount, "calculateStats() must be idempotent for a pipeline-breaker leaf");
 
     operator.close();
   }

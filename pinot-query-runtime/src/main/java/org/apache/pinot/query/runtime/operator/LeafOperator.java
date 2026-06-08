@@ -169,8 +169,14 @@ public class LeafOperator extends MultiStageOperator {
 
   @Override
   protected MultiStageQueryStats calculateUpstreamStats() {
+    // Return a COPY, not the shared instance. calculateStats() runs more than once per opchain (e.g. when the
+    // MailboxSendOperator serializes its EOS stats and again from the scheduler's completion callback that feeds the
+    // stream-stats listener), and the base calculateStats() appends this operator's entry to the returned object.
+    // Handing back the shared _pipelineBreakerStats would append LEAF (+ the downstream MAILBOX_SEND) once per call,
+    // duplicating the leaf opchain's own operators in the flat stats list. A non-pipeline-breaker leaf is immune
+    // because it returns a fresh emptyStats() each call.
     return _pipelineBreakerStats != null
-        ? _pipelineBreakerStats
+        ? MultiStageQueryStats.copy(_pipelineBreakerStats)
         : MultiStageQueryStats.emptyStats(_context.getStageId());
   }
 
