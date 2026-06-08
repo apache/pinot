@@ -117,12 +117,13 @@ public class MultipleTreesBuilder implements Closeable {
   private static ImmutableSegment loadSegment(File indexDir, @Nullable IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     if (indexLoadingConfig != null && indexLoadingConfig.getTableConfig() != null) {
-      // Minimal IndexLoadingConfig carrying only TableConfig + Schema. Do NOT propagate
+      // Minimal IndexLoadingConfig carrying only TableConfig. Schema is intentionally null so the
+      // segment loader uses the segment's own column set rather than filtering against an in-flight
+      // schema (e.g. one that adds/removes columns during pre-processing). Also do NOT propagate
       // segmentTier/segmentDirectoryLoader from the parent — a tier loader would treat this as a
-      // tier-resolution event and relocate the segment mid-build. The default loader is correct
-      // for this in-place read; TableConfig threads table-level config to downstream readers.
-      IndexLoadingConfig localConfig =
-          new IndexLoadingConfig(indexLoadingConfig.getTableConfig(), indexLoadingConfig.getSchema());
+      // tier-resolution event and relocate the segment mid-build. TableConfig threads table-level
+      // config to downstream readers (e.g. external-storage forward-index readers).
+      IndexLoadingConfig localConfig = new IndexLoadingConfig(indexLoadingConfig.getTableConfig(), null);
       localConfig.setReadMode(ReadMode.mmap);
       return ImmutableSegmentLoader.load(indexDir, localConfig, false);
     }
