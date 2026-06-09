@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
@@ -257,6 +258,46 @@ public class QueryDispatcherTest extends QueryTestSet {
     Mockito.reset(failingQueryServer);
   }
 
+  /**
+   * When no indirect timing is extracted (e.g. reduce phase fails before stats propagate), the
+   * finally block must still decrement in-flight for all submitted servers. With no known timings
+   * and no cancel attempted, all servers fall into Tier 4 (no timing data, server responsive)
+   * and get -1 (decrement only, no EMA update) rather than the contaminated wall-clock.
+   */
+  @Test
+  public void testStatsManagerRecordsSubmissionAndArrivalForDispatchedServers()
+      throws Exception {
+    // Clock ticks by tickMs on each call: submitTimeMs = 1000, then elapsedMs = 1100 - 1000 = 100.
+    final long tickMs = 100L;
+    AtomicLong fakeClockMs = new AtomicLong(1_000L);
+    QueryDispatcher dispatcher = newDispatcher(() -> fakeClockMs.getAndAdd(tickMs));
+
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    Set<String> expectedInstanceIds = getExpectedInstanceIds(plan);
+    try {
+      try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+        dispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
+      } catch (NullPointerException e) {
+        // expected: reduce phase fails with mocked MailboxService
+      }
+      for (String instanceId : expectedInstanceIds) {
+        Mockito.verify(statsManager).recordStatsForQuerySubmission(requestId, instanceId);
+        // No indirect timing was extracted (mocked MailboxService -> no real stats), so
+        // knownTimings is empty -> all servers get -1 (Tier 4: no timing data).
+        Mockito.verify(statsManager).recordStatsUponResponseArrival(
+            Mockito.eq(requestId), Mockito.eq(instanceId), Mockito.eq(-1L));
+      }
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
   @Test
   public void testRealStatsManagerInflightReturnsToZero()
       throws Exception {
@@ -288,14 +329,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     RequestContext context = new DefaultRequestContext();
     context.setRequestId(requestId);
     DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
-
-    Set<String> expectedInstanceIds = new HashSet<>();
-    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
-      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
-        expectedInstanceIds.add(server.getInstanceId());
-      }
-    }
-    Assert.assertFalse(expectedInstanceIds.isEmpty());
+    Set<String> expectedInstanceIds = getExpectedInstanceIds(plan);
 
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), statsManager);
@@ -320,5 +354,106 @@ public class QueryDispatcherTest extends QueryTestSet {
     }
 
     statsManager.shutDown();
+  }
+
+  @Test
+  public void testNoStatsRecordedWhenAdaptiveRoutingDisabled()
+      throws Exception {
+    // When statsManager is null (adaptive routing disabled), submitAndReduce must not
+    // dereference it — the null guards in submitAndReduce must prevent any NPE from the
+    // stats path. Any exception thrown here should come from the mocked MailboxService
+    // (reduce phase), not from a null statsManager dereference.
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      _queryDispatcher.submitAndReduce(context, plan, 10_000L, Map.of(), null);
+    } catch (NullPointerException e) {
+      // Acceptable: reduce phase NPEs because MailboxService is mocked.
+      // Verify the NPE did NOT originate from the stats-manager null-guard path.
+      for (StackTraceElement frame : e.getStackTrace()) {
+        Assert.assertFalse(
+            frame.getMethodName().contains("recordStats") || frame.getMethodName().contains("applyUpstreamTimings"),
+            "NPE must not originate from stats recording path, but got: " + frame);
+      }
+    }
+  }
+
+  /**
+   * When {@code submit()} throws {@link TimeoutException} (one server never ACKs the dispatch),
+   * {@code submitAndReduce()} must catch it via {@code tryRecover()} and return a failed
+   * {@code QueryResult} — not propagate the exception.
+   *
+   * <p>Because {@code submit()} threw before the submission-stats loop ran, {@code incrementedServers}
+   * is empty and the finally block's tiered latency recorder has nothing to update, so
+   * {@code statsManager} receives zero interactions.
+   */
+  @Test
+  public void testSubmitAndReduceReturnsResultWhenSubmitTimesOut()
+      throws Exception {
+    // All servers hang on submit so processResults() times out after the short deadline.
+    CountDownLatch neverClosingLatch = new CountDownLatch(1);
+    List<QueryServer> allServers = new ArrayList<>(_queryServerMap.values());
+    for (QueryServer server : allServers) {
+      Mockito.doAnswer(invocationOnMock -> {
+        neverClosingLatch.await();
+        StreamObserver<Worker.QueryResponse> observer = invocationOnMock.getArgument(1);
+        observer.onCompleted();
+        return null;
+      }).when(server).submit(Mockito.any(), Mockito.any());
+    }
+
+    ServerRoutingStatsManager statsManager = Mockito.mock(ServerRoutingStatsManager.class);
+    String sql = "SELECT * FROM a";
+    long requestId = REQUEST_ID_GEN.getAndIncrement();
+    RequestContext context = new DefaultRequestContext();
+    context.setRequestId(requestId);
+    DispatchableSubPlan plan = _queryEnvironment.planQuery(sql);
+
+    try {
+      try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+        // submit() times out because all servers never ACK -> tryRecover() handles TimeoutException.
+        // Depending on whether cancelWithStats succeeds, this either returns a QueryResult with a
+        // processing exception or throws a RuntimeException wrapping the cancel failure.
+        QueryDispatcher.QueryResult result =
+            _queryDispatcher.submitAndReduce(context, plan, 200L, Map.of(), statsManager);
+        Assert.assertNotNull(result.getProcessingException(),
+            "Expected a processing exception in the result when submit times out");
+      }
+    } catch (RuntimeException e) {
+      // Cancel phase may also throw if the hanging servers don't respond to the cancel RPC.
+      Assert.assertTrue(e.getMessage().contains("Error dispatching query"),
+          "Expected dispatch error from cancel phase, got: " + e.getMessage());
+    } finally {
+      neverClosingLatch.countDown();
+      for (QueryServer server : allServers) {
+        Mockito.reset(server);
+      }
+    }
+
+    // submit() threw before recordStatsForQuerySubmission ran -> incrementedServers is empty.
+    // The finally block's tiered latency recorder iterates an empty incrementedServers set,
+    // so statsManager receives no interactions.
+    Mockito.verifyNoInteractions(statsManager);
+  }
+
+  /** Creates a local {@link QueryDispatcher} wired to the shared query servers with an injected clock. */
+  private QueryDispatcher newDispatcher(LongSupplier clock) {
+    return new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
+        Duration.ofSeconds(1), clock);
+  }
+
+  private Set<String> getExpectedInstanceIds(DispatchableSubPlan plan) {
+    Set<String> expectedInstanceIds = new HashSet<>();
+    for (DispatchablePlanFragment fragment : plan.getQueryStagesWithoutRoot()) {
+      for (QueryServerInstance server : fragment.getServerInstanceToWorkerIdMap().keySet()) {
+        expectedInstanceIds.add(server.getInstanceId());
+      }
+    }
+    Assert.assertFalse(expectedInstanceIds.isEmpty());
+    return expectedInstanceIds;
   }
 }
