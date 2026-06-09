@@ -72,7 +72,7 @@ import org.slf4j.LoggerFactory;
 /// - Sending HTTP refresh requests to instances with their assigned costs.
 /// - Handling workload deletions by propagating delete requests.
 /// - Providing lookup APIs for workload costs per instance.
-public class QueryWorkloadManager implements WorkloadChangeListener {
+public class QueryWorkloadManager implements WorkloadChangeListener, AutoCloseable {
   public static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadManager.class);
 
   private static final String WORKLOAD_EXECUTOR_THREAD_NAME_FORMAT = "workload-propagation-%d";
@@ -565,5 +565,19 @@ public class QueryWorkloadManager implements WorkloadChangeListener {
             tablesAdded, tablesRemoved, e);
       }
     }
+  }
+
+  @Override
+  public void close() {
+    _queryWorkloadExecutor.shutdownNow();
+    try {
+      if (!_queryWorkloadExecutor.awaitTermination(10L, TimeUnit.SECONDS)) {
+        LOGGER.warn("Timed out waiting for workload propagation executor to stop");
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.warn("Interrupted while stopping workload propagation executor", e);
+    }
+    _propagationClient.close();
   }
 }

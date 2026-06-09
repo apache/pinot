@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.controller.dataproviders.ResourceControllerDataProvider;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
@@ -61,6 +62,7 @@ import org.apache.pinot.controller.api.resources.InstanceInfo;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.instance.Instance;
@@ -101,6 +103,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -155,6 +158,31 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, NUM_BROKER_INSTANCES, 0, 0);
     _helixResourceManager.createBrokerTenant(brokerTenant);
     assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), 0);
+  }
+
+  @Test
+  public void testShutdownBrokerExcludedFromScaleUpCandidates() {
+    untagBrokers();
+    List<String> candidates = _helixResourceManager.getOnlineUnTaggedBrokerInstanceList();
+    assertEquals(candidates.size(), NUM_BROKER_INSTANCES);
+    String drainingBroker = candidates.get(0);
+    assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, drainingBroker,
+        instanceConfig -> instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true)));
+
+    try {
+      candidates = _helixResourceManager.getOnlineUnTaggedBrokerInstanceList();
+      assertEquals(candidates.size(), NUM_BROKER_INSTANCES - 1);
+      assertFalse(candidates.contains(drainingBroker));
+
+      Tenant tenant = new Tenant(TenantRole.BROKER, "scaleUpCandidateTenant", NUM_BROKER_INSTANCES, 0, 0);
+      assertFalse(_helixResourceManager.updateBrokerTenant(tenant).isSuccessful());
+      assertTrue(_helixResourceManager.getHelixInstanceConfig(drainingBroker)
+          .containsTag(Helix.UNTAGGED_BROKER_INSTANCE));
+    } finally {
+      assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, drainingBroker,
+          instanceConfig -> instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false)));
+      resetBrokerTags();
+    }
   }
 
   private void untagServers() {
@@ -367,6 +395,43 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     IdealState brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
     assertTrue(brokerResource.getPartitionSet().contains(logicalTableName));
     checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+
+    // Give the same brokers a second tenant tag, then move the logical table to that tenant. The committed broker
+    // assignment is unchanged, so the IdealState listener has no event to observe and the resource manager must
+    // directly trigger exactly one workload refresh.
+    String alternateBrokerTenantName = "alternateBrokerTenant";
+    String alternateBrokerTag = TagNameUtils.getBrokerTagForTenant(alternateBrokerTenantName);
+    for (String broker : taggedBrokers) {
+      assertTrue(_helixResourceManager.updateInstanceTags(broker, brokerTag + "," + alternateBrokerTag, false)
+          .isSuccessful());
+    }
+    int brokerResourceVersion = brokerResource.getRecord().getVersion();
+    QueryWorkloadManager originalQueryWorkloadManager = _helixResourceManager.getQueryWorkloadManager();
+    QueryWorkloadManager queryWorkloadManager = mock(QueryWorkloadManager.class);
+    _helixResourceManager.setQueryWorkloadManager(queryWorkloadManager);
+    try {
+      logicalTableConfig.setBrokerTenant(alternateBrokerTenantName);
+      _helixResourceManager.updateLogicalTableConfig(logicalTableConfig);
+      verify(queryWorkloadManager).onBrokerResourceChanged(List.of(logicalTableName), List.of());
+      brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+      assertEquals(brokerResource.getRecord().getVersion(), brokerResourceVersion);
+      checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+
+      // Retrying the exact same config still reconciles BrokerResource and refreshes workloads. This recovers a
+      // prior attempt that committed the config but failed before the BrokerResource write.
+      clearInvocations(queryWorkloadManager);
+      _helixResourceManager.updateLogicalTableConfig(logicalTableConfig);
+      verify(queryWorkloadManager).onBrokerResourceChanged(List.of(logicalTableName), List.of());
+      brokerResource = HelixHelper.getBrokerIdealStates(_helixAdmin, _clusterName);
+      assertEquals(brokerResource.getRecord().getVersion(), brokerResourceVersion);
+      checkBrokerResourceForPartition(logicalTableName, taggedBrokers);
+    } finally {
+      _helixResourceManager.setQueryWorkloadManager(originalQueryWorkloadManager);
+    }
+
+    // Move back to the original tenant so the add-broker path below continues to exercise the logical table.
+    logicalTableConfig.setBrokerTenant(BROKER_TENANT_NAME);
+    _helixResourceManager.updateLogicalTableConfig(logicalTableConfig);
 
     // Add a new broker instance with same tenant; verify add-broker path updates logical table partition
     Instance newBrokerInstance =
@@ -687,6 +752,69 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(_helixResourceManager.getAllBrokerTenantNames(), Set.of(BROKER_TENANT_NAME));
 
     resetBrokerTags();
+  }
+
+  @Test
+  public void testDrainingBrokerUsesPreviousTagsForTenantMembership() {
+    untagBrokers();
+    Tenant brokerTenant = new Tenant(TenantRole.BROKER, BROKER_TENANT_NAME, 1, 0, 0);
+    assertTrue(_helixResourceManager.createBrokerTenant(brokerTenant).isSuccessful());
+    String brokerTag = TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME);
+    String drainingBroker =
+        _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator().next();
+
+    assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, drainingBroker, instanceConfig -> {
+      List<String> previousTags = new ArrayList<>(instanceConfig.getTags());
+      instanceConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, previousTags);
+      List<String> activeTags = new ArrayList<>(previousTags);
+      activeTags.removeIf(TagNameUtils::isBrokerTag);
+      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), activeTags);
+      instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+    }));
+
+    try {
+      // Updating a draining broker must change its logical tags without restoring active broker tags. This also
+      // directly guards against aliasing PREVIOUS_TAGS to the list from which active broker tags are removed.
+      assertTrue(_helixResourceManager.updateInstanceTags(drainingBroker, brokerTag, false).isSuccessful());
+      InstanceConfig drainingConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
+      assertNotNull(drainingConfig);
+      List<String> activeTags = drainingConfig.getTags();
+      List<String> previousTags = drainingConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+      assertNotSame(activeTags, previousTags);
+      assertFalse(activeTags.contains(brokerTag));
+      assertEquals(previousTags, List.of(brokerTag));
+
+      assertEquals(_helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME), Set.of(drainingBroker));
+      assertEquals(_helixResourceManager.getAllInstancesConfigsForBrokerTenant(BROKER_TENANT_NAME).stream()
+          .map(InstanceConfig::getInstanceName).collect(Collectors.toSet()), Set.of(drainingBroker));
+      assertTrue(_helixResourceManager.getAllBrokerTenantNames().contains(BROKER_TENANT_NAME));
+
+      int untaggedBrokers = _helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size();
+      assertTrue(_helixResourceManager.updateBrokerTenant(brokerTenant).isSuccessful());
+      assertEquals(_helixResourceManager.getOnlineUnTaggedBrokerInstanceList().size(), untaggedBrokers);
+
+      assertTrue(_helixResourceManager.isBrokerTenantDeletable(BROKER_TENANT_NAME));
+      assertTrue(_helixResourceManager.deleteBrokerTenantFor(BROKER_TENANT_NAME).isSuccessful());
+      drainingConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
+      assertNotNull(drainingConfig);
+      assertFalse(drainingConfig.getTags().stream().anyMatch(TagNameUtils::isBrokerTag));
+      assertEquals(drainingConfig.getRecord().getListField(Helix.PREVIOUS_TAGS),
+          List.of(Helix.UNTAGGED_BROKER_INSTANCE));
+      assertTrue(_helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).isEmpty());
+      assertTrue(_helixResourceManager.getAllInstancesConfigsForBrokerTenant(BROKER_TENANT_NAME).isEmpty());
+      assertFalse(_helixResourceManager.getAllBrokerTenantNames().contains(BROKER_TENANT_NAME));
+    } finally {
+      assertTrue(HelixHelper.updateInstanceConfig(_helixDataAccessor, drainingBroker, instanceConfig -> {
+        List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+        if (previousTags != null) {
+          instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
+              new ArrayList<>(previousTags));
+          instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
+        }
+        instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+      }));
+      resetBrokerTags();
+    }
   }
 
   @Test

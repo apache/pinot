@@ -26,6 +26,7 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
@@ -50,14 +51,24 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
   private final AbstractResponseStore _responseStore;
+  private final BrokerDrainManager _brokerDrainManager;
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
       @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore) {
+    this(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler, timeSeriesRequestHandler, responseStore,
+        BrokerDrainManager.noop("unknown"));
+  }
+
+  public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
+      @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
+      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore,
+      BrokerDrainManager brokerDrainManager) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
     _responseStore = responseStore;
+    _brokerDrainManager = brokerDrainManager;
   }
 
   @Nullable
@@ -90,6 +101,22 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
+      throws Exception {
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      requestContext.setErrorCode(QueryErrorCode.BROKER_SHUTTING_DOWN);
+      return new BrokerResponseNative(QueryErrorCode.BROKER_SHUTTING_DOWN, _brokerDrainManager.getRejectMessage());
+    }
+    try (BrokerDrainManager.QueryPermit ignored = queryPermit) {
+      return handleRequestWithPreAcquiredPermit(request, sqlNodeAndOptions, requesterIdentity, requestContext,
+          httpHeaders);
+    }
+  }
+
+  @Override
+  public BrokerResponse handleRequestWithPreAcquiredPermit(JsonNode request,
+      @Nullable SqlNodeAndOptions sqlNodeAndOptions, @Nullable RequesterIdentity requesterIdentity,
+      RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     // Pinot installations may either use PinotClientRequest or this class in order to process a query that
     // arrives via their custom container. The custom code may add its own overhead in either pre-processing
@@ -129,6 +156,20 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
 
   @Override
   public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
+      HttpHeaders httpHeaders) throws QueryException {
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      throw new QueryException(QueryErrorCode.BROKER_SHUTTING_DOWN, _brokerDrainManager.getRejectMessage());
+    }
+    try (BrokerDrainManager.QueryPermit ignored = queryPermit) {
+      return handleTimeSeriesRequestWithPreAcquiredPermit(lang, rawQueryParamString, queryParams, requestContext,
+          requesterIdentity, httpHeaders);
+    }
+  }
+
+  @Override
+  public TimeSeriesBlock handleTimeSeriesRequestWithPreAcquiredPermit(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
       HttpHeaders httpHeaders) throws QueryException {
     if (_timeSeriesRequestHandler != null) {

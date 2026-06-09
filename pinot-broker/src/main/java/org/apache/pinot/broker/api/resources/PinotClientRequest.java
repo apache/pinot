@@ -41,6 +41,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.BadRequestException;
@@ -54,6 +58,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.CompletionCallback;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
@@ -63,6 +68,7 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -129,6 +135,9 @@ public class PinotClientRequest {
   private BrokerMetrics _brokerMetrics;
 
   @Inject
+  private BrokerDrainManager _brokerDrainManager;
+
+  @Inject
   private Executor _executor;
 
   @Inject
@@ -152,22 +161,27 @@ public class PinotClientRequest {
       @ApiParam(value = "Trace enabled") @QueryParam(Request.TRACE) String traceEnabled,
       @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
+      queryAdmission = registerQueryCompletion(asyncResponse);
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
       if (traceEnabled != null) {
         requestJson.put(Request.TRACE, traceEnabled);
       }
-      BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
+      BrokerResponse brokerResponse =
+          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, queryAdmission);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      resumeResponse(asyncResponse, getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics),
+          queryAdmission.getQueryCompletion());
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
-      asyncResponse.resume(wae);
+      resumeException(asyncResponse, wae, queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
-      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
+      resumeException(asyncResponse, new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR),
+          queryAdmission.getQueryCompletion());
     }
   }
 
@@ -189,7 +203,9 @@ public class PinotClientRequest {
       @DefaultValue("0") int numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
+      queryAdmission = registerQueryCompletion(asyncResponse);
       JsonNode requestJson;
       try {
         requestJson = JsonUtils.stringToJsonNode(query);
@@ -201,24 +217,25 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
-              getCursor, numRows);
+              getCursor, numRows, queryAdmission);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      resumeResponse(asyncResponse, getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics),
+          queryAdmission.getQueryCompletion());
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(bre);
+      resumeException(asyncResponse, bre, queryAdmission.getQueryCompletion());
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
-      asyncResponse.resume(wae);
+      resumeException(asyncResponse, wae, queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(
+      resumeException(asyncResponse,
           new WebApplicationException(e,
               Response
                   .status(Response.Status.INTERNAL_SERVER_ERROR)
                   .entity(e.getMessage())
-                  .build()));
+                  .build()), queryAdmission.getQueryCompletion());
     }
   }
 
@@ -319,20 +336,24 @@ public class PinotClientRequest {
       @ApiParam(value = "Query", required = true) @QueryParam("sql") String query,
       @Suspended AsyncResponse asyncResponse, @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
+      queryAdmission = registerQueryCompletion(asyncResponse);
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
-          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true, queryAdmission);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      resumeResponse(asyncResponse, getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics),
+          queryAdmission.getQueryCompletion());
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
-      asyncResponse.resume(wae);
+      resumeException(asyncResponse, wae, queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
-      asyncResponse.resume(new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR));
+      resumeException(asyncResponse, new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR),
+          queryAdmission.getQueryCompletion());
     }
   }
 
@@ -354,7 +375,9 @@ public class PinotClientRequest {
       @DefaultValue("0") int numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
+      queryAdmission = registerQueryCompletion(asyncResponse);
       JsonNode requestJson;
       try {
         requestJson = JsonUtils.stringToJsonNode(query);
@@ -366,24 +389,25 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
-              getCursor, numRows);
+              getCursor, numRows, queryAdmission);
       brokerResponse.emitBrokerResponseMetrics(_brokerMetrics);
-      asyncResponse.resume(getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics));
+      resumeResponse(asyncResponse, getPinotQueryResponse(brokerResponse, httpHeaders, _brokerMetrics),
+          queryAdmission.getQueryCompletion());
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(bre);
+      resumeException(asyncResponse, bre, queryAdmission.getQueryCompletion());
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
-      asyncResponse.resume(wae);
+      resumeException(asyncResponse, wae, queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(
+      resumeException(asyncResponse,
           new WebApplicationException(e,
               Response
                   .status(Response.Status.INTERNAL_SERVER_ERROR)
                   .entity(e.getMessage())
-                  .build()));
+                  .build()), queryAdmission.getQueryCompletion());
     }
   }
 
@@ -400,6 +424,7 @@ public class PinotClientRequest {
   @ManualAuthorization
   public void processTimeSeriesQueryEngine(JsonNode requestJson, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestCtx, @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
       if (!requestJson.has(Request.QUERY)) {
         throw new BadRequestException("Payload is missing the query string field 'query'");
@@ -418,28 +443,31 @@ public class PinotClientRequest {
       if (isExplainMode(requestJson)) {
         BrokerResponse explainResponse = _requestHandler.handleExplainTimeSeriesRequest(language, queryString,
             queryParams);
-        asyncResponse.resume(explainResponse);
+        resumeResponse(asyncResponse, explainResponse, null);
         return;
       }
 
+      queryAdmission = registerQueryCompletion(asyncResponse);
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, queryParams,
-            requestContext, makeHttpIdentity(requestCtx), httpHeaders);
-        asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock));
+            requestContext, makeHttpIdentity(requestCtx), httpHeaders, queryAdmission);
+        resumeResponse(asyncResponse, TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock),
+            queryAdmission.getQueryCompletion());
       }
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(bre);
+      resumeException(asyncResponse, bre, queryAdmission.getQueryCompletion());
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
-      asyncResponse.resume(wae);
+      resumeException(asyncResponse, wae, queryAdmission.getQueryCompletion());
     } catch (QueryException e) {
-      asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
+      resumeResponse(asyncResponse, TimeSeriesResponseMapper.toBrokerResponse(e), queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST timeseries request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(new WebApplicationException(e,
-          Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build()));
+      resumeException(asyncResponse, new WebApplicationException(e,
+          Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build()),
+          queryAdmission.getQueryCompletion());
     }
   }
 
@@ -453,24 +481,29 @@ public class PinotClientRequest {
       @QueryParam("language") String language,
       @Context org.glassfish.grizzly.http.server.Request requestCtx,
       @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
+      queryAdmission = registerQueryCompletion(asyncResponse);
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
         TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, Map.of(), requestContext,
-            makeHttpIdentity(requestCtx), httpHeaders);
+            makeHttpIdentity(requestCtx), httpHeaders, queryAdmission);
         PinotBrokerTimeSeriesResponse response = PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(timeSeriesBlock);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
-          asyncResponse.resume(Response.serverError().entity(response).build());
+          resumeResponse(asyncResponse, Response.serverError().entity(response).build(),
+              queryAdmission.getQueryCompletion());
           return;
         }
-        asyncResponse.resume(response);
+        resumeResponse(asyncResponse, response, queryAdmission.getQueryCompletion());
       }
     } catch (QueryException e) {
-      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
+      resumeResponse(asyncResponse, PinotBrokerTimeSeriesResponse.fromException(e),
+          queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
+      resumeResponse(asyncResponse, PinotBrokerTimeSeriesResponse.fromException(e),
+          queryAdmission.getQueryCompletion());
     }
   }
 
@@ -503,7 +536,9 @@ public class PinotClientRequest {
   public void processSqlQueryWithBothEnginesAndCompareResults(String query, @Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
+    QueryAdmission queryAdmission = QueryAdmission.disabled();
     try {
+      queryAdmission = registerQueryCompletion(asyncResponse);
       JsonNode requestJson;
       try {
         requestJson = JsonUtils.stringToJsonNode(query);
@@ -530,48 +565,49 @@ public class PinotClientRequest {
 
       ObjectNode v1RequestJson = requestJson.deepCopy();
       v1RequestJson.put(Request.SQL, v1Query);
-      CompletableFuture<BrokerResponse> v1Response = CompletableFuture.supplyAsync(
+      QueryAdmission finalQueryAdmission = queryAdmission;
+      CompletableFuture<BrokerResponse> v1Response = submitAsync(
           () -> {
             try {
-              return executeSqlQuery(v1RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, false);
+              return executeSqlQuery(v1RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, false,
+                  finalQueryAdmission);
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
-          },
-          _executor
-      );
+          });
 
       ObjectNode v2RequestJson = requestJson.deepCopy();
       v2RequestJson.put(Request.SQL, v2Query);
-      CompletableFuture<BrokerResponse> v2Response = CompletableFuture.supplyAsync(
+      CompletableFuture<BrokerResponse> v2Response = submitAsync(
           () -> {
             try {
-              return executeSqlQuery(v2RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+              return executeSqlQuery(v2RequestJson, makeHttpIdentity(requestContext), true, httpHeaders, true,
+                  finalQueryAdmission);
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
-          },
-          _executor
-      );
+          });
 
       CompletableFuture.allOf(v1Response, v2Response).join();
 
-      asyncResponse.resume(getPinotQueryComparisonResponse(v1Query, v1Response.get(), v2Response.get()));
+      resumeResponse(asyncResponse,
+          getPinotQueryComparisonResponse(v1Query, v1Response.get(), v2Response.get()),
+          queryAdmission.getQueryCompletion());
     } catch (BadRequestException bre) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
-      asyncResponse.resume(bre);
+      resumeException(asyncResponse, bre, queryAdmission.getQueryCompletion());
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
-      asyncResponse.resume(wae);
+      resumeException(asyncResponse, wae, queryAdmission.getQueryCompletion());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(
+      resumeException(asyncResponse,
           new WebApplicationException(e,
               Response
                   .status(Response.Status.INTERNAL_SERVER_ERROR)
                   .entity(e.getMessage())
-                  .build()));
+                  .build()), queryAdmission.getQueryCompletion());
     }
   }
 
@@ -648,19 +684,21 @@ public class PinotClientRequest {
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders)
+      boolean onlyDql, HttpHeaders httpHeaders, QueryAdmission queryAdmission)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false, queryAdmission);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, QueryAdmission queryAdmission)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0,
+        queryAdmission);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows,
+      QueryAdmission queryAdmission)
       throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
@@ -691,13 +729,27 @@ public class PinotClientRequest {
       case DQL:
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
-          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
-              httpHeaders);
+          if (queryAdmission.isRejected()) {
+            requestContext.setErrorCode(QueryErrorCode.BROKER_SHUTTING_DOWN);
+            return new BrokerResponseNative(QueryErrorCode.BROKER_SHUTTING_DOWN,
+                queryAdmission.getRejectMessage());
+          }
+          if (queryAdmission.isAdmitted()) {
+            return _requestHandler.handleRequestWithPreAcquiredPermit(sqlRequestJson, sqlNodeAndOptions,
+                httpRequesterIdentity, requestContext, httpHeaders);
+          }
+          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
+              requestContext, httpHeaders);
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}", sqlRequestJson, e);
           throw e;
         }
       case DML:
+        if (queryAdmission.isRejected()) {
+          throw brokerShuttingDownException(queryAdmission.getRejectMessage());
+        }
+        BrokerDrainManager.QueryPermit queryPermit =
+            queryAdmission.isAdmitted() ? null : acquireQueryPermitOrThrow();
         try {
           Map<String, String> headers = new HashMap<>();
           httpRequesterIdentity.getHttpHeaders().entries()
@@ -706,6 +758,8 @@ public class PinotClientRequest {
         } catch (Exception e) {
           LOGGER.error("Error handling DML request:\n{}", sqlRequestJson, e);
           throw e;
+        } finally {
+          closeQueryPermit(queryPermit);
         }
       default:
         return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, "Unsupported SQL type - " + sqlType);
@@ -747,13 +801,173 @@ public class PinotClientRequest {
 
   private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) throws QueryException {
+      HttpHeaders httpHeaders, QueryAdmission queryAdmission) throws QueryException {
+    if (queryAdmission.isRejected()) {
+      throw new QueryException(QueryErrorCode.BROKER_SHUTTING_DOWN, queryAdmission.getRejectMessage());
+    }
+    if (queryAdmission.isAdmitted()) {
+      return _requestHandler.handleTimeSeriesRequestWithPreAcquiredPermit(language, queryString, queryParams,
+          requestContext, requesterIdentity, httpHeaders);
+    }
     return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
         requesterIdentity, httpHeaders);
   }
 
   private static boolean isExplainMode(JsonNode requestJson) {
     return requestJson.has("mode") && "explain".equalsIgnoreCase(requestJson.get("mode").asText());
+  }
+
+  @Nullable
+  private BrokerDrainManager.QueryPermit acquireQueryPermitOrThrow() {
+    if (_brokerDrainManager == null) {
+      return null;
+    }
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      throw brokerShuttingDownException(_brokerDrainManager.getRejectMessage());
+    }
+    return queryPermit;
+  }
+
+  private QueryAdmission registerQueryCompletion(AsyncResponse asyncResponse) {
+    if (_brokerDrainManager == null) {
+      return QueryAdmission.disabled();
+    }
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      return QueryAdmission.rejected(_brokerDrainManager.getRejectMessage());
+    }
+    QueryCompletion queryCompletion = new QueryCompletion(queryPermit);
+    try {
+      asyncResponse.register(queryCompletion);
+      return QueryAdmission.admitted(queryCompletion);
+    } catch (RuntimeException | Error e) {
+      queryCompletion.close();
+      throw e;
+    }
+  }
+
+  private static WebApplicationException brokerShuttingDownException(String rejectMessage) {
+    return new WebApplicationException(Response.status(QueryErrorCode.BROKER_SHUTTING_DOWN.getHttpResponseStatus())
+        .entity(rejectMessage).build());
+  }
+
+  private static void closeQueryPermit(@Nullable BrokerDrainManager.QueryPermit queryPermit) {
+    if (queryPermit != null) {
+      queryPermit.close();
+    }
+  }
+
+  private <T> CompletableFuture<T> submitAsync(Supplier<T> supplier) {
+    try {
+      return CompletableFuture.supplyAsync(supplier, _executor);
+    } catch (RejectedExecutionException e) {
+      return CompletableFuture.failedFuture(e);
+    }
+  }
+
+  private static void resumeResponse(AsyncResponse asyncResponse, Object response,
+      @Nullable QueryCompletion queryCompletion) {
+    try {
+      if (!asyncResponse.resume(response)) {
+        closeQueryCompletion(queryCompletion);
+      }
+    } catch (RuntimeException | Error e) {
+      closeQueryCompletion(queryCompletion);
+      throw e;
+    }
+  }
+
+  private static void resumeException(AsyncResponse asyncResponse, Throwable throwable,
+      @Nullable QueryCompletion queryCompletion) {
+    try {
+      if (!asyncResponse.resume(throwable)) {
+        closeQueryCompletion(queryCompletion);
+      }
+    } catch (RuntimeException | Error e) {
+      closeQueryCompletion(queryCompletion);
+      throw e;
+    }
+  }
+
+  private static void closeQueryCompletion(@Nullable QueryCompletion queryCompletion) {
+    if (queryCompletion != null) {
+      queryCompletion.close();
+    }
+  }
+
+  private enum QueryAdmissionState {
+    DISABLED,
+    ADMITTED,
+    REJECTED
+  }
+
+  private static final class QueryAdmission {
+    private static final QueryAdmission DISABLED =
+        new QueryAdmission(QueryAdmissionState.DISABLED, null, null);
+
+    private final QueryAdmissionState _state;
+    @Nullable
+    private final QueryCompletion _queryCompletion;
+    @Nullable
+    private final String _rejectMessage;
+
+    private QueryAdmission(QueryAdmissionState state, @Nullable QueryCompletion queryCompletion,
+        @Nullable String rejectMessage) {
+      _state = state;
+      _queryCompletion = queryCompletion;
+      _rejectMessage = rejectMessage;
+    }
+
+    private static QueryAdmission disabled() {
+      return DISABLED;
+    }
+
+    private static QueryAdmission admitted(QueryCompletion queryCompletion) {
+      return new QueryAdmission(QueryAdmissionState.ADMITTED, queryCompletion, null);
+    }
+
+    private static QueryAdmission rejected(String rejectMessage) {
+      return new QueryAdmission(QueryAdmissionState.REJECTED, null, rejectMessage);
+    }
+
+    private boolean isAdmitted() {
+      return _state == QueryAdmissionState.ADMITTED;
+    }
+
+    private boolean isRejected() {
+      return _state == QueryAdmissionState.REJECTED;
+    }
+
+    @Nullable
+    private QueryCompletion getQueryCompletion() {
+      return _queryCompletion;
+    }
+
+    private String getRejectMessage() {
+      return Objects.requireNonNull(_rejectMessage);
+    }
+  }
+
+  private static final class QueryCompletion implements CompletionCallback, AutoCloseable {
+    private final BrokerDrainManager.QueryPermit _queryPermit;
+    private final AtomicBoolean _completed = new AtomicBoolean();
+
+    private QueryCompletion(BrokerDrainManager.QueryPermit queryPermit) {
+      _queryPermit = queryPermit;
+    }
+
+    @Override
+    public void onComplete(Throwable throwable) {
+      close();
+    }
+
+    @Override
+    public void close() {
+      if (_completed.compareAndSet(false, true)) {
+        _queryPermit.close();
+      }
+    }
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

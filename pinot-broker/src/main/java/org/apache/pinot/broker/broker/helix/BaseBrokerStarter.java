@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -29,6 +30,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
@@ -48,6 +52,7 @@ import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.grpc.BrokerGrpcServer;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -153,6 +158,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected String _instanceId;
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
+  private final AtomicBoolean _stopTriggered = new AtomicBoolean();
   // Dedicated handler for listening to cluster config changes
   protected final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler =
       new DefaultClusterConfigChangeHandler();
@@ -175,6 +181,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerRoutingManager _routingManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
+  protected BrokerDrainManager _brokerDrainManager;
   protected SqlQueryExecutor _sqlQueryExecutor;
   protected BrokerAdminApiApplication _brokerAdminApplication;
   protected ClusterChangeMediator _clusterChangeMediator;
@@ -615,9 +622,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }, cleanupInitialDelayMs, cleanupFrequencyMs, TimeUnit.MILLISECONDS);
 
+    _brokerDrainManager = new BrokerDrainManager(_instanceId, () -> _participantHelixManager, this::markShuttingDown,
+        this::stop,
+        _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS));
+
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler, _responseStore);
+            timeSeriesRequestHandler, _responseStore, _brokerDrainManager);
     _brokerRequestHandler.start();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
@@ -636,7 +647,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     if (BrokerGrpcServer.isEnabled(_brokerConf)) {
       LOGGER.info("Initializing BrokerGrpcServer");
-      _brokerGrpcServer = new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler);
+      _brokerGrpcServer =
+          new BrokerGrpcServer(_brokerConf, brokerId, _brokerMetrics, _brokerRequestHandler, _brokerDrainManager);
       _brokerGrpcServer.start();
     } else {
       LOGGER.info("BrokerGrpcServer is not enabled");
@@ -680,8 +692,27 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(_serverRoutingStatsManager);
 
     NettyInspector.registerMetrics(_brokerMetrics);
+    // The HTTP surface starts before the participant connects. Keep drain gated until startup reconciliation and all
+    // service-status setup have completed so startup cannot clear or re-add after a concurrent drain.
+    if (shouldMarkBrokerStartupReadyAfterBaseStart()) {
+      markBrokerStartupReady();
+    }
 
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /// Returns whether the concrete starter is fully initialized when this base startup method finishes.
+  protected boolean shouldMarkBrokerStartupReadyAfterBaseStart() {
+    return true;
+  }
+
+  /// Opens the drain gate after the concrete starter has completed all startup work.
+  protected final synchronized void markBrokerStartupReady() {
+    if (_stopTriggered.get() || _isShuttingDown) {
+      LOGGER.info("Not opening the drain gate because broker shutdown has already started for {}", _instanceId);
+      return;
+    }
+    _brokerDrainManager.markStartupReady();
   }
 
   protected void initClusterChangeMediator() throws Exception {
@@ -758,78 +789,94 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
   }
 
-  private void updateInstanceConfigAndBrokerResourceIfNeeded() {
-    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_participantHelixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+  @VisibleForTesting
+  void updateInstanceConfigAndBrokerResourceIfNeeded() {
+    AtomicReference<List<String>> instanceTagsRef = new AtomicReference<>();
+    boolean instanceConfigUpdated = HelixHelper.updateInstanceConfig(_participantHelixManager.getHelixDataAccessor(),
+        _instanceId, instanceConfig -> {
+          HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
 
-    ZNRecord znRecord = instanceConfig.getRecord();
-    Map<String, String> simpleFields = znRecord.getSimpleFields();
-    if (_tlsPort > 0) {
-      HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
-    }
+          ZNRecord znRecord = instanceConfig.getRecord();
+          Map<String, String> simpleFields = znRecord.getSimpleFields();
+          if (_tlsPort > 0) {
+            HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+          }
 
-    // Update admin port
-    String adminApiPortString = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
-    if (adminApiPortString != null) {
-      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.ADMIN_PORT_KEY, Integer.parseInt(adminApiPortString));
-    }
-    // Update GRPC query engine port
-    if (BrokerGrpcServer.isEnabled(_brokerConf)) {
-      int grpcPort = BrokerGrpcServer.getGrpcPort(_brokerConf);
-      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, grpcPort);
-    } else {
-      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, -1);
-    }
+          // Update admin port
+          String adminApiPortString = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ADMIN_API_PORT);
+          if (adminApiPortString != null) {
+            updatePortIfNeeded(simpleFields, Helix.Instance.ADMIN_PORT_KEY, Integer.parseInt(adminApiPortString));
+          }
+          // Update GRPC query engine port
+          if (BrokerGrpcServer.isEnabled(_brokerConf)) {
+            updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, BrokerGrpcServer.getGrpcPort(_brokerConf));
+          } else {
+            updatePortIfNeeded(simpleFields, Helix.Instance.GRPC_PORT_KEY, -1);
+          }
 
-    // Update multi-stage query engine ports
-    if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
-          Integer.parseInt(_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT)));
-    } else {
-      updated |= updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
-    }
-    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
-    boolean shouldUpdateBrokerResource = false;
-    List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags.isEmpty()) {
-      // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
-      // tenant isolation mode since it defaults to true and is relatively obscure.
-      String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
-      if (StringUtils.isNotEmpty(instanceTagsConfig)) {
-        for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
-          Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-              instanceTag);
-          instanceConfig.addTag(instanceTag);
-        }
-        shouldUpdateBrokerResource = true;
-      } else if (_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
-          Broker.DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS)) {
-        throw new IllegalStateException(String.format(
-            "Broker instance tags enforcement is enabled ('%s' = true), but '%s' is not configured. "
-                + "Please set it for this broker or disable enforcement to allow startup.",
-            Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
-            Broker.CONFIG_OF_BROKER_INSTANCE_TAGS));
-      } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
-        shouldUpdateBrokerResource = true;
-      } else {
-        instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
-      }
-      instanceTags = instanceConfig.getTags();
-      updated = true;
-    }
-    updated |= HelixHelper.updatePinotVersion(instanceConfig);
-    if (updated) {
-      HelixHelper.updateInstanceConfig(_participantHelixManager, instanceConfig);
-    }
-    if (shouldUpdateBrokerResource) {
-      // Update broker resource to include the new broker
-      long startTimeMs = System.currentTimeMillis();
-      List<String> tablesAdded = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, instanceTags, tablesAdded, null);
-      LOGGER.info("Updated broker resource for new joining broker: {} with instance tags: {} in {}ms, tables added: {}",
-          _instanceId, instanceTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
-    }
+          // Update multi-stage query engine ports
+          if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
+              Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+            updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY,
+                Integer.parseInt(_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT)));
+          } else {
+            updatePortIfNeeded(simpleFields, Helix.Instance.MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY, -1);
+          }
+          HelixHelper.removeDisabledPartitions(instanceConfig);
+
+          List<String> previousTags = znRecord.getListField(Helix.PREVIOUS_TAGS);
+          if (previousTags != null) {
+            LOGGER.info("Restoring pre-drain tags for broker instance: {}", _instanceId);
+            znRecord.setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
+                new ArrayList<>(previousTags));
+            znRecord.getListFields().remove(Helix.PREVIOUS_TAGS);
+          }
+          if (Boolean.parseBoolean(simpleFields.get(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+            LOGGER.info("Clearing {} for broker instance: {}", Helix.IS_SHUTDOWN_IN_PROGRESS, _instanceId);
+            simpleFields.put(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString());
+          }
+
+          List<String> instanceTags = instanceConfig.getTags();
+          if (instanceTags.isEmpty()) {
+            // This is a new broker (first time joining the cluster). We allow configuring initial broker tags
+            // regardless of tenant isolation mode since it defaults to true and is relatively obscure.
+            String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+            if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+              for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+                Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
+                    instanceTag);
+                instanceConfig.addTag(instanceTag);
+              }
+            } else if (_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+                Broker.DEFAULT_BROKER_ENFORCE_INSTANCE_TAGS)) {
+              throw new IllegalStateException(String.format(
+                  "Broker instance tags enforcement is enabled ('%s' = true), but '%s' is not configured. "
+                      + "Please set it for this broker or disable enforcement to allow startup.",
+                  Broker.CONFIG_OF_BROKER_ENFORCE_INSTANCE_TAGS,
+                  Broker.CONFIG_OF_BROKER_INSTANCE_TAGS));
+            } else if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
+              instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
+            } else {
+              instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
+            }
+            instanceTags = instanceConfig.getTags();
+          }
+          HelixHelper.updatePinotVersion(instanceConfig);
+          instanceTagsRef.set(List.copyOf(instanceTags));
+        });
+    Preconditions.checkState(instanceConfigUpdated, "Failed to update instance config for broker: %s", _instanceId);
+    List<String> instanceTags = Preconditions.checkNotNull(instanceTagsRef.get(),
+        "Instance tags were not resolved for broker: %s", _instanceId);
+    List<String> brokerTags =
+        instanceTags.stream().filter(TagNameUtils::isBrokerTag).collect(Collectors.toList());
+    // Always reconcile brokerResource after making the instance eligible. If this write fails after a stale
+    // shutdownInProgress marker was cleared, the next startup must retry even though that marker is already false.
+    // Clearing first also prevents controller validation from excluding this broker between the re-add and the clear.
+    long startTimeMs = System.currentTimeMillis();
+    List<String> tablesAdded = new ArrayList<>();
+    HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, brokerTags, tablesAdded, null);
+    LOGGER.info("Reconciled broker resource for broker: {} with instance tags: {} in {}ms, tables added: {}",
+        _instanceId, instanceTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
   }
 
   /// Fetches the resources to monitor and registers the
@@ -890,9 +937,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   }
 
   @Override
-  public void stop() {
+  public synchronized void stop() {
+    if (!_stopTriggered.compareAndSet(false, true)) {
+      LOGGER.info("Pinot broker shutdown is already in progress or complete for {}", _instanceId);
+      return;
+    }
+    try {
+      stopBrokerComponents();
+    } catch (RuntimeException | Error e) {
+      // Teardown might fail before all components are stopped. Allow an explicit retry, while _isShuttingDown keeps
+      // the drain/startup gate closed for the rest of this process lifetime.
+      _stopTriggered.set(false);
+      throw e;
+    }
+  }
+
+  /// Performs the one-time component teardown after [#stop()] acquires the shutdown guard.
+  void stopBrokerComponents() {
     LOGGER.info("Shutting down Pinot broker");
-    _isShuttingDown = true;
+    markShuttingDown();
 
     LOGGER.info("Disconnecting participant Helix manager");
     _participantHelixManager.disconnect();
@@ -904,8 +967,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     // Delay shutdown of request handler so that the pending queries can be finished. The participant Helix manager has
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
-    long delayShutdownTimeMs =
-        _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
+    long delayShutdownTimeMs = _brokerDrainManager != null && _brokerDrainManager.isDrainComplete() ? 0L
+        : _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     LOGGER.info("Wait for {}ms before shutting down request handler to finish the pending queries",
         delayShutdownTimeMs);
     try {
@@ -972,6 +1035,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _isShuttingDown;
   }
 
+  private void markShuttingDown() {
+    _isShuttingDown = true;
+  }
+
   public HelixManager getSpectatorHelixManager() {
     return _spectatorHelixManager;
   }
@@ -1004,7 +1071,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _threadAccountant, _responseStore);
+            _queryQuotaManager, _threadAccountant, _responseStore, _brokerDrainManager);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);

@@ -242,21 +242,31 @@ public class WorkloadPropagationClient implements AutoCloseable {
   }
 
   private String getServerUrl(String instanceName) {
-    if (_serverHttpSchemeAndPort == null) {
-      _serverHttpSchemeAndPort = discoverHttpSchemesAndPort(NodeConfig.Type.SERVER_NODE)
-          .getOrDefault(NodeConfig.Type.SERVER_NODE, null);
-    }
-    return InstanceUtils.getInstanceBaseUri(instanceName, _serverHttpSchemeAndPort.getKey(),
-        _serverHttpSchemeAndPort.getRight());
+    return getInstanceUrl(instanceName, NodeConfig.Type.SERVER_NODE);
   }
 
   private String getBrokerUrl(String instanceName) {
-    if (_brokerHttpSchemeAndPort == null) {
-      _brokerHttpSchemeAndPort = discoverHttpSchemesAndPort(NodeConfig.Type.BROKER_NODE)
-          .getOrDefault(NodeConfig.Type.BROKER_NODE, null);
+    return getInstanceUrl(instanceName, NodeConfig.Type.BROKER_NODE);
+  }
+
+  private String getInstanceUrl(String instanceName, NodeConfig.Type nodeType) {
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    if (instanceConfig != null) {
+      // Instance ids are user-configurable and are not a reliable source for the host name. Use the authoritative
+      // InstanceConfig for both host and per-instance admin endpoint fields.
+      return InstanceUtils.getInstanceBaseUri(instanceConfig);
     }
-    return InstanceUtils.getInstanceBaseUri(instanceName, _brokerHttpSchemeAndPort.getKey(),
-        _brokerHttpSchemeAndPort.getRight());
+    if (nodeType == NodeConfig.Type.BROKER_NODE && _brokerHttpSchemeAndPort == null) {
+      _brokerHttpSchemeAndPort = discoverHttpSchemesAndPort(nodeType).get(nodeType);
+    } else if (nodeType == NodeConfig.Type.SERVER_NODE && _serverHttpSchemeAndPort == null) {
+      _serverHttpSchemeAndPort = discoverHttpSchemesAndPort(nodeType).get(nodeType);
+    }
+    Pair<String, Integer> httpSchemeAndPort =
+        nodeType == NodeConfig.Type.BROKER_NODE ? _brokerHttpSchemeAndPort : _serverHttpSchemeAndPort;
+    if (httpSchemeAndPort == null) {
+      throw new IllegalStateException("Failed to resolve HTTP endpoint for instance: " + instanceName);
+    }
+    return InstanceUtils.getInstanceBaseUri(instanceName, httpSchemeAndPort.getKey(), httpSchemeAndPort.getRight());
   }
 
   /// Discovers endpoint configurations (protocol scheme and port) for node types.
@@ -450,6 +460,15 @@ public class WorkloadPropagationClient implements AutoCloseable {
       LOGGER.info("Closed WorkloadPropagationClient HTTP client");
     } catch (IOException e) {
       LOGGER.error("Error closing WorkloadPropagationClient HTTP client", e);
+    }
+    _httpCallbackExecutor.shutdownNow();
+    try {
+      if (!_httpCallbackExecutor.awaitTermination(10L, TimeUnit.SECONDS)) {
+        LOGGER.warn("Timed out waiting for workload HTTP callback executor to stop");
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOGGER.warn("Interrupted while stopping workload HTTP callback executor", e);
     }
   }
 
