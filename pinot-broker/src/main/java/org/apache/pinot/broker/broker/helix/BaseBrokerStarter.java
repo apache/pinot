@@ -49,6 +49,7 @@ import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.broker.grpc.BrokerGrpcServer;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -180,6 +181,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerRoutingManager _routingManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
+  protected BrokerDrainManager _brokerDrainManager;
   protected SqlQueryExecutor _sqlQueryExecutor;
   protected BrokerAdminApiApplication _brokerAdminApplication;
   protected ClusterChangeMediator _clusterChangeMediator;
@@ -635,9 +637,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
     }, cleanupInitialDelayMs, cleanupFrequencyMs, TimeUnit.MILLISECONDS);
 
+    _brokerDrainManager = new BrokerDrainManager(_instanceId, () -> _participantHelixManager, this::markShuttingDown,
+        this::stop,
+        _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS));
+
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler, _responseStore);
+            timeSeriesRequestHandler, _responseStore, _brokerDrainManager);
     _brokerRequestHandler.start();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
@@ -813,6 +819,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     boolean shouldUpdateBrokerResource = false;
+    if (Boolean.parseBoolean(simpleFields.get(Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+      LOGGER.info("Clearing {} for broker instance: {}", Helix.IS_SHUTDOWN_IN_PROGRESS, _instanceId);
+      simpleFields.put(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.FALSE.toString());
+      updated = true;
+      shouldUpdateBrokerResource = true;
+    }
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags.isEmpty()) {
       // This is a new broker (first time joining the cluster). We allow configuring initial broker tags regardless of
@@ -917,7 +929,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Override
   public void stop() {
     LOGGER.info("Shutting down Pinot broker");
-    _isShuttingDown = true;
+    markShuttingDown();
 
     LOGGER.info("Disconnecting participant Helix manager");
     _participantHelixManager.disconnect();
@@ -929,8 +941,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     // Delay shutdown of request handler so that the pending queries can be finished. The participant Helix manager has
     // been disconnected, so instance should disappear from ExternalView soon and stop getting new queries.
-    long delayShutdownTimeMs =
-        _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
+    long delayShutdownTimeMs = _brokerDrainManager != null && _brokerDrainManager.isDrainComplete() ? 0L
+        : _brokerConf.getProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     LOGGER.info("Wait for {}ms before shutting down request handler to finish the pending queries",
         delayShutdownTimeMs);
     try {
@@ -997,6 +1009,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     return _isShuttingDown;
   }
 
+  private void markShuttingDown() {
+    _isShuttingDown = true;
+  }
+
   public HelixManager getSpectatorHelixManager() {
     return _spectatorHelixManager;
   }
@@ -1029,7 +1045,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _threadAccountant, _responseStore);
+            _queryQuotaManager, _threadAccountant, _responseStore, _brokerDrainManager);
     brokerAdminApiApplication.register(
         new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole(), _brokerMetrics));
     registerExtraComponents(brokerAdminApiApplication);
