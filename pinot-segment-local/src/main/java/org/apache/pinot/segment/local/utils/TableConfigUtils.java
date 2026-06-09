@@ -668,7 +668,11 @@ public final class TableConfigUtils {
         Set<String> transformInputColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String transformFunction = transformConfig.getTransformFunction();
-          if (transformFunction != null) {
+          // Skip Groovy expressions when Groovy is disabled: do not compile them just to collect arguments (the main
+          // loop below rejects Groovy without compiling). Such a config is rejected anyway, so these columns are not
+          // needed as valid intermediate targets.
+          if (transformFunction != null
+              && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction))) {
             try {
               transformInputColumns.addAll(
                   FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction).getArguments());
