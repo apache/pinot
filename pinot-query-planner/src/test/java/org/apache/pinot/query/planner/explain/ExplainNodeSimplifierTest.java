@@ -30,7 +30,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertSame;
 
 
 /**
@@ -101,14 +100,16 @@ public class ExplainNodeSimplifierTest {
   }
 
   @Test
-  public void allIdenticalSegmentsCollapseIntoOne() {
+  public void allIdenticalSegmentsCollapseIntoOneGroup() {
     PlanNode simplified = ExplainNodeSimplifier.simplifyNode(
         combine(leaf("Scan"), leaf("Scan"), leaf("Scan")));
 
     ExplainedNode combine = (ExplainedNode) simplified;
     assertEquals(combine.getTitle(), COMBINE_TITLE);
     assertEquals(combine.getInputs().size(), 1, "Identical segments must collapse into a single group");
-    assertEquals(((ExplainedNode) combine.getInputs().get(0)).getTitle(), "Scan");
+    // Even a single group is wrapped in an Alternative carrying its segment count; the wrapper is stripped later by
+    // removeRedundantAlternatives.
+    assertEquals(segmentCountFor(combine, "Scan"), 3L);
   }
 
   @Test
@@ -119,7 +120,9 @@ public class ExplainNodeSimplifierTest {
 
     ExplainedNode combine = (ExplainedNode) simplified;
     assertEquals(combine.getInputs().size(), 1);
-    ExplainedNode merged = (ExplainedNode) combine.getInputs().get(0);
+    ExplainedNode alternative = (ExplainedNode) combine.getInputs().get(0);
+    assertEquals(alternative.getTitle(), "Alternative");
+    ExplainedNode merged = (ExplainedNode) alternative.getInputs().get(0);
     assertEquals(merged.getAttributes().get("totalDocs").getLong(), 60L);
   }
 
@@ -187,10 +190,58 @@ public class ExplainNodeSimplifierTest {
   }
 
   @Test
-  public void singleSegmentIsReturnedUnchanged() {
-    ExplainedNode original = combine(leaf("Scan"));
-    PlanNode simplified = ExplainNodeSimplifier.simplifyNode(original);
-    assertSame(simplified, original, "A combine node with a single input is already simplified");
+  public void removeRedundantAlternativesUnwrapsSingleGroup() {
+    // The common case: all segments share a plan, so simplification leaves a single Alternative. After all servers
+    // are merged, the wrapper is redundant and is stripped so the output matches the pre-grouping format exactly.
+    PlanNode simplified = ExplainNodeSimplifier.simplifyNode(
+        combine(leaf("Scan"), leaf("Scan"), leaf("Scan")));
+    PlanNode cleaned = ExplainNodeSimplifier.removeRedundantAlternatives(simplified);
+
+    ExplainedNode combine = (ExplainedNode) cleaned;
+    assertEquals(combine.getInputs().size(), 1);
+    assertEquals(((ExplainedNode) combine.getInputs().get(0)).getTitle(), "Scan",
+        "A combine with a single group must point directly at the plan, with no Alternative wrapper");
+  }
+
+  @Test
+  public void removeRedundantAlternativesKeepsMultipleGroups() {
+    PlanNode simplified = ExplainNodeSimplifier.simplifyNode(
+        combine(leaf("Scan"), leaf("Scan"), leaf("SortedIndexScan")));
+    PlanNode cleaned = ExplainNodeSimplifier.removeRedundantAlternatives(simplified);
+
+    ExplainedNode combine = (ExplainedNode) cleaned;
+    assertEquals(combine.getInputs().size(), 2, "Several distinct plans keep their annotated Alternative groups");
+    assertEquals(segmentCountFor(combine, "Scan"), 2L);
+    assertEquals(segmentCountFor(combine, "SortedIndexScan"), 1L);
+  }
+
+  @Test
+  public void uniformServerFoldsIntoDivergentServerAcrossServers() {
+    // Server A has divergent segment plans, server B's segments are all uniform. Because both servers emit Alternative
+    // wrappers, B's segments fold into A's matching group when the plans are merged across servers, and the redundant
+    // wrappers are then removed. This is the case that was previously left as a bare sibling next to the Alternatives.
+    ExplainedNode serverA = (ExplainedNode) ExplainNodeSimplifier.simplifyNode(
+        combine(leaf("Scan"), leaf("Scan"), leaf("SortedIndexScan")));
+    ExplainedNode serverB = (ExplainedNode) ExplainNodeSimplifier.simplifyNode(
+        combine(leaf("Scan"), leaf("Scan"), leaf("Scan"), leaf("Scan")));
+
+    ExplainedNode merged = (ExplainedNode) PlanNodeMerger.mergePlans(serverA, serverB, false);
+    ExplainedNode cleaned = (ExplainedNode) ExplainNodeSimplifier.removeRedundantAlternatives(merged);
+
+    assertEquals(cleaned.getInputs().size(), 2);
+    assertEquals(segmentCountFor(cleaned, "Scan"), 6L, "2 (server A) + 4 (server B) Scan segments fold together");
+    assertEquals(segmentCountFor(cleaned, "SortedIndexScan"), 1L);
+  }
+
+  @Test
+  public void singleSegmentFoldsAndUnwrapsForBackwardCompatibility() {
+    // A combine with a single segment is also wrapped (segments=1) so it composes across servers, then unwrapped.
+    PlanNode simplified = ExplainNodeSimplifier.simplifyNode(combine(leaf("Scan")));
+    ExplainedNode combine = (ExplainedNode) simplified;
+    assertEquals(segmentCountFor(combine, "Scan"), 1L);
+
+    ExplainedNode cleaned = (ExplainedNode) ExplainNodeSimplifier.removeRedundantAlternatives(simplified);
+    assertEquals(((ExplainedNode) cleaned.getInputs().get(0)).getTitle(), "Scan");
   }
 
   @Test

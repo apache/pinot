@@ -54,14 +54,23 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
  *   <li>Its title must contain the text {@code Combine}</li>
  * </ol>
  *
- * The simplification process groups the inputs of the node by merging the ones that describe an equivalent plan.
- * Inputs that can all be merged collapse into a single input; inputs that cannot be merged (for example because some
- * segments use an index while others do not) are kept as separate groups. As a corollary, nodes with a single input
- * are already simplified by definition.
+ * The simplification process groups the inputs of the node by merging the ones that describe an equivalent plan and
+ * wraps each resulting group in an {@code Alternative} node annotated with the number of segments that fall into it.
+ * Inputs that can all be merged collapse into a single {@code Alternative}; inputs that cannot be merged (for example
+ * because some segments use an index while others do not) produce one {@code Alternative} per distinct plan.
+ *
+ * Every group is wrapped, even when there is a single one, so that the {@code segments} counts compose correctly when
+ * the plans of several servers are later merged (a server whose segments are all uniform still contributes an
+ * {@code Alternative} that folds into the matching group of a server with divergent segments). The redundant single
+ * {@code Alternative} wrappers are removed once all servers have been merged via {@link #removeRedundantAlternatives}.
  */
 public class ExplainNodeSimplifier {
   public static final String COMBINE
       = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
+  /// Title of the synthetic node that wraps each distinct per-segment plan together with its segment count.
+  public static final String ALTERNATIVE = "Alternative";
+  /// Name of the additive attribute holding how many segments fall into an [#ALTERNATIVE] group.
+  public static final String SEGMENTS_ATTRIBUTE = "segments";
 
   private ExplainNodeSimplifier() {
   }
@@ -69,6 +78,36 @@ public class ExplainNodeSimplifier {
   public static PlanNode simplifyNode(PlanNode root) {
     Visitor planNodeMerger = new Visitor();
     return root.visit(planNodeMerger, null);
+  }
+
+  /// Removes the [#ALTERNATIVE] wrappers that are no longer needed once all servers have been merged: a combine node
+  /// whose only child is an [#ALTERNATIVE] is unwrapped so the combine points directly at the single plan. This keeps
+  /// the common case (all segments share a plan) rendered exactly as it was before per-segment grouping was added,
+  /// while combine nodes with several alternatives keep their annotated groups.
+  public static PlanNode removeRedundantAlternatives(PlanNode node) {
+    List<PlanNode> inputs = node.getInputs();
+    List<PlanNode> newInputs = null;
+    for (int i = 0; i < inputs.size(); i++) {
+      PlanNode child = inputs.get(i);
+      PlanNode newChild = removeRedundantAlternatives(child);
+      if (newChild != child) {
+        if (newInputs == null) {
+          newInputs = new ArrayList<>(inputs);
+        }
+        newInputs.set(i, newChild);
+      }
+    }
+    PlanNode result = newInputs != null ? node.withInputs(newInputs) : node;
+    if (result instanceof ExplainedNode) {
+      ExplainedNode explained = (ExplainedNode) result;
+      if (explained.getTitle().contains(COMBINE) && explained.getInputs().size() == 1) {
+        PlanNode onlyChild = explained.getInputs().get(0);
+        if (onlyChild instanceof ExplainedNode && ((ExplainedNode) onlyChild).getTitle().equals(ALTERNATIVE)) {
+          return explained.withInputs(onlyChild.getInputs());
+        }
+      }
+    }
+    return result;
   }
 
   private static class Visitor implements PlanNodeVisitor<PlanNode, Void> {
@@ -145,7 +184,7 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitExplained(ExplainedNode node, Void context) {
-      if (!node.getTitle().contains(COMBINE) || node.getInputs().size() <= 1) {
+      if (!node.getTitle().contains(COMBINE) || node.getInputs().isEmpty()) {
         return defaultNode(node);
       }
       List<PlanNode> simplifiedChildren = simplifyChildren(node.getInputs());
@@ -175,24 +214,19 @@ public class ExplainNodeSimplifier {
         }
       }
 
-      // When every segment shares the same plan there is a single group: keep the compact output (the combine node
-      // with that single plan as its only input) so the common case stays unchanged.
-      if (groups.size() == 1) {
-        return groups.equals(node.getInputs()) ? node : node.withInputs(groups);
-      }
-
-      // Otherwise wrap each distinct plan in an "Alternative" node annotated with the number of segments that fall
-      // into it, so the reader can tell the plans apart and how many segments run each one. The "segments" attribute
-      // uses the default (additive) merge type, so when the same divergence appears on several servers the per-server
-      // counts are summed as the plans are merged across servers. This mirrors how alternatives across servers are
-      // represented (see AskingServerStageExplainer).
+      // Wrap each distinct plan in an "Alternative" node annotated with the number of segments that fall into it, so
+      // the reader can tell the plans apart and how many segments run each one. The "segments" attribute uses the
+      // default (additive) merge type, so when the same divergence appears on several servers the per-server counts
+      // are summed as the plans are merged across servers. Even a single group is wrapped, so that a server whose
+      // segments are all uniform still folds into the matching group of a server with divergent segments; the
+      // redundant single wrappers are stripped afterwards by removeRedundantAlternatives.
       List<PlanNode> alternatives = new ArrayList<>(groups.size());
       for (int i = 0; i < groups.size(); i++) {
         PlanNode group = groups.get(i);
         Map<String, Plan.ExplainNode.AttributeValue> attributes =
-            new ExplainAttributeBuilder().putLong("segments", segmentCounts.get(i)).build();
+            new ExplainAttributeBuilder().putLong(SEGMENTS_ATTRIBUTE, segmentCounts.get(i)).build();
         alternatives.add(new ExplainedNode(node.getStageId(), group.getDataSchema(), null,
-            Collections.singletonList(group), "Alternative", attributes));
+            Collections.singletonList(group), ALTERNATIVE, attributes));
       }
       return node.withInputs(alternatives);
     }
