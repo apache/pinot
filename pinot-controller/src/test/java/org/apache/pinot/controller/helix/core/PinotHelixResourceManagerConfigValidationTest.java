@@ -21,16 +21,21 @@ package org.apache.pinot.controller.helix.core;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.DataUpdater;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.instance.InstanceConfigValidatorRegistry;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.exception.ConfigValidationException;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -58,6 +63,7 @@ public class PinotHelixResourceManagerConfigValidationTest {
     _helixDataAccessor = Mockito.mock(HelixDataAccessor.class);
     _keyBuilder = Mockito.mock(PropertyKey.Builder.class);
     when(_keyBuilder.instanceConfig(any())).thenReturn(Mockito.mock(PropertyKey.class));
+    when(_helixDataAccessor.keyBuilder()).thenReturn(_keyBuilder);
 
     setField("_helixAdmin", _helixAdmin);
     setField("_helixDataAccessor", _helixDataAccessor);
@@ -116,6 +122,8 @@ public class PinotHelixResourceManagerConfigValidationTest {
 
     // Verify config was NOT persisted
     verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
+    verify(_helixDataAccessor, never()).updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class));
   }
 
   @Test
@@ -143,6 +151,63 @@ public class PinotHelixResourceManagerConfigValidationTest {
     }
 
     // Verify config was NOT persisted
+    verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
+    verify(_helixDataAccessor, never()).updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class));
+  }
+
+  @Test
+  public void testUpdateInstancePreservesConcurrentShutdownMarker() {
+    String instanceId = "Broker_localhost_1234";
+    Instance existing =
+        new Instance("localhost", 1234, InstanceType.BROKER, List.of("DefaultTenant_BROKER"), null,
+            0, 0, 0, 0, false);
+    InstanceConfig staleConfig = InstanceUtils.toHelixInstanceConfig(existing);
+    InstanceConfig latestConfig = new InstanceConfig(new ZNRecord(staleConfig.getRecord()));
+    latestConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+    when(_helixDataAccessor.getProperty(any(PropertyKey.class))).thenReturn(staleConfig);
+
+    AtomicReference<ZNRecord> persistedRecord = new AtomicReference<>();
+    mockAtomicInstanceConfigUpdate(latestConfig, persistedRecord);
+
+    Instance updatedInstance =
+        new Instance("updated-host", 4321, InstanceType.BROKER, List.of("OtherTenant_BROKER"), null,
+            0, 0, 0, 0, false);
+    assertTrue(_resourceManager.updateInstance(instanceId, updatedInstance, false).isSuccessful());
+
+    InstanceConfig persistedConfig = new InstanceConfig(persistedRecord.get());
+    assertEquals(persistedConfig.getHostName(), "updated-host");
+    assertEquals(persistedConfig.getPort(), "4321");
+    assertEquals(persistedConfig.getTags(), List.of());
+    assertEquals(persistedConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS),
+        List.of("OtherTenant_BROKER"));
+    assertTrue(persistedConfig.getRecord()
+        .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
+    verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
+  }
+
+  @Test
+  public void testUpdateInstanceTagsPreservesConcurrentShutdownMarker() {
+    String instanceId = "Broker_localhost_1234";
+    Instance existing =
+        new Instance("localhost", 1234, InstanceType.BROKER, List.of("DefaultTenant_BROKER"), null,
+            0, 0, 0, 0, false);
+    InstanceConfig staleConfig = InstanceUtils.toHelixInstanceConfig(existing);
+    InstanceConfig latestConfig = new InstanceConfig(new ZNRecord(staleConfig.getRecord()));
+    latestConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+    when(_helixDataAccessor.getProperty(any(PropertyKey.class))).thenReturn(staleConfig);
+
+    AtomicReference<ZNRecord> persistedRecord = new AtomicReference<>();
+    mockAtomicInstanceConfigUpdate(latestConfig, persistedRecord);
+
+    assertTrue(_resourceManager.updateInstanceTags(instanceId, "OtherTenant_BROKER", false).isSuccessful());
+
+    InstanceConfig persistedConfig = new InstanceConfig(persistedRecord.get());
+    assertEquals(persistedConfig.getTags(), List.of());
+    assertEquals(persistedConfig.getRecord().getListField(CommonConstants.Helix.PREVIOUS_TAGS),
+        List.of("OtherTenant_BROKER"));
+    assertTrue(persistedConfig.getRecord()
+        .getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false));
     verify(_helixDataAccessor, never()).setProperty(any(PropertyKey.class), any(InstanceConfig.class));
   }
 
@@ -173,6 +238,16 @@ public class PinotHelixResourceManagerConfigValidationTest {
       assertTrue(expected.getMessage().contains("not been started"),
           "Unexpected message: " + expected.getMessage());
     }
+  }
+
+  private void mockAtomicInstanceConfigUpdate(InstanceConfig latestConfig,
+      AtomicReference<ZNRecord> persistedRecord) {
+    doAnswer(invocation -> {
+      DataUpdater<ZNRecord> updater = invocation.getArgument(1);
+      persistedRecord.set(updater.update(new ZNRecord(latestConfig.getRecord())));
+      return true;
+    }).when(_helixDataAccessor).updateProperty(any(PropertyKey.class),
+        ArgumentMatchers.<DataUpdater<ZNRecord>>any(), any(InstanceConfig.class));
   }
 
   private void setField(String fieldName, Object value)

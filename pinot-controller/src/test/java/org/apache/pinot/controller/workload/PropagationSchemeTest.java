@@ -46,6 +46,7 @@ import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -89,6 +90,7 @@ public class PropagationSchemeTest {
 
     // Create and mock Broker Resource IdealState
     IdealState brokerIdealState = createBrokerResourceIdealState(offlineTable, realtimeTable, 2);
+    brokerIdealState.setPartitionState("logicalTable", "logical_BROKER_instance_1_9000", "ONLINE");
     mockBrokerResource(brokerIdealState);
 
     // Case 1 : Test for Server instance resolution for table1 (offline) and table2 (realtime)
@@ -100,6 +102,11 @@ public class PropagationSchemeTest {
       assertTableSchemeResponse(entity, expectedInstances, NodeConfig.Type.SERVER_NODE, null, instancePartitions,
           null);
     }
+
+    // Logical tables are stored as raw-name partitions in brokerResource.
+    PropagationEntity logicalTableEntity = new PropagationEntity("logicalTable", 50L, 50L, null);
+    Assert.assertEquals(_tablePropagationScheme.resolveInstances(logicalTableEntity, NodeConfig.Type.BROKER_NODE, null),
+        Set.of("logical_BROKER_instance_1_9000"));
 
     // Case 2 : Test for Broker instance resolution for table1 (offline) and table2 (realtime)
     NodeConfig nodeConfigBroker = new NodeConfig(NodeConfig.Type.BROKER_NODE, profile, propagationScheme);

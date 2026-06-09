@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,6 +130,12 @@ public class PropagationUtils {
     }
     Set<String> helixTags = new HashSet<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null && nodeType == NodeConfig.Type.BROKER_NODE) {
+      LogicalTableConfig logicalTableConfig = pinotResourceManager.getLogicalTableConfig(tableName);
+      if (logicalTableConfig != null) {
+        helixTags.add(TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()));
+      }
+    }
     List<String> tablesWithType = (tableType == null)
         ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
             TableNameBuilder.REALTIME.tableNameWithType(tableName))
@@ -217,6 +224,14 @@ public class PropagationUtils {
         } else if (scheme.getPropagationType() == PropagationScheme.Type.TABLE) {
           for (String tableName : topLevelIds) {
             TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+            if (tableType == null && nodeConfig.getNodeType() == NodeConfig.Type.BROKER_NODE) {
+              LogicalTableConfig logicalTableConfig = pinotHelixResourceManager.getLogicalTableConfig(tableName);
+              if (logicalTableConfig != null && filterTags.contains(
+                  TagNameUtils.getBrokerTagForTenant(logicalTableConfig.getBrokerTenant()))) {
+                matchedConfigs.add(queryWorkloadConfig);
+                break;
+              }
+            }
             List<String> tablesWithType = (tableType == null)
                 ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
                     TableNameBuilder.REALTIME.tableNameWithType(tableName))
