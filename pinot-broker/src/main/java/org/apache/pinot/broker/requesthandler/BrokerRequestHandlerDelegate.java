@@ -26,6 +26,7 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.broker.broker.BrokerDrainManager;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
@@ -52,14 +53,24 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
   private final AbstractResponseStore _responseStore;
+  private final BrokerDrainManager _brokerDrainManager;
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
       @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore) {
+    this(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler, timeSeriesRequestHandler, responseStore,
+        BrokerDrainManager.noop("unknown"));
+  }
+
+  public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
+      @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
+      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler, AbstractResponseStore responseStore,
+      BrokerDrainManager brokerDrainManager) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
     _responseStore = responseStore;
+    _brokerDrainManager = brokerDrainManager;
   }
 
   @Nullable
@@ -93,51 +104,64 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
-    // Pinot installations may either use PinotClientRequest or this class in order to process a query that
-    // arrives via their custom container. The custom code may add its own overhead in either pre-processing
-    // or post-processing stages, and should be measured independently.
-    // In order to accommodate for both code paths, we set the request arrival time only if it is not already set.
-    if (requestContext.getRequestArrivalTimeMillis() <= 0) {
-      requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      requestContext.setErrorCode(QueryErrorCode.BROKER_SHUTTING_DOWN);
+      return new BrokerResponseNative(QueryErrorCode.BROKER_SHUTTING_DOWN, _brokerDrainManager.getRejectMessage());
     }
-    // Parse the query if needed
-    if (sqlNodeAndOptions == null) {
-      try {
-        sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
-      } catch (Exception e) {
-        // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
-        return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+    try (BrokerDrainManager.QueryPermit ignored = queryPermit) {
+      // Pinot installations may either use PinotClientRequest or this class in order to process a query that
+      // arrives via their custom container. The custom code may add its own overhead in either pre-processing
+      // or post-processing stages, and should be measured independently.
+      // In order to accommodate for both code paths, we set the request arrival time only if it is not already set.
+      if (requestContext.getRequestArrivalTimeMillis() <= 0) {
+        requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
       }
-    }
-
-    BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
-    if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
-      if (_multiStageBrokerRequestHandler != null) {
-        requestHandler = _multiStageBrokerRequestHandler;
-      } else {
-        return new BrokerResponseNative(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
+      // Parse the query if needed
+      if (sqlNodeAndOptions == null) {
+        try {
+          sqlNodeAndOptions = RequestUtils.parseQuery(request.get(Request.SQL).asText(), request);
+        } catch (Exception e) {
+          // Do not log or emit metric here because it is pure user error
+          requestContext.setErrorCode(QueryErrorCode.SQL_PARSING);
+          return new BrokerResponseNative(QueryErrorCode.SQL_PARSING, e.getMessage());
+        }
       }
-    }
 
-    BrokerResponse response = requestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-        requestContext, httpHeaders);
+      BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
+      if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
+        if (_multiStageBrokerRequestHandler != null) {
+          requestHandler = _multiStageBrokerRequestHandler;
+        } else {
+          return new BrokerResponseNative(QueryErrorCode.INTERNAL, "V2 Multi-Stage query engine not enabled.");
+        }
+      }
 
-    if (response.getExceptionsSize() == 0 && QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
-      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
+      BrokerResponse response = requestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+          requestContext, httpHeaders);
+
+      if (response.getExceptionsSize() == 0 && QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
+        response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
+      }
+      return response;
     }
-    return response;
   }
 
   @Override
   public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
       HttpHeaders httpHeaders) throws QueryException {
-    if (_timeSeriesRequestHandler != null) {
-      return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, queryParams, requestContext,
-          requesterIdentity, httpHeaders);
+    BrokerDrainManager.QueryPermit queryPermit = _brokerDrainManager.tryAcquireQuery();
+    if (queryPermit == null) {
+      throw new QueryException(QueryErrorCode.BROKER_SHUTTING_DOWN, _brokerDrainManager.getRejectMessage());
     }
-    throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
+    try (BrokerDrainManager.QueryPermit ignored = queryPermit) {
+      if (_timeSeriesRequestHandler != null) {
+        return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, queryParams, requestContext,
+            requesterIdentity, httpHeaders);
+      }
+      throw new QueryException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
+    }
   }
 
   @Override
