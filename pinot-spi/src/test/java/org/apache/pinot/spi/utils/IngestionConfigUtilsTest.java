@@ -182,4 +182,13 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(1), new HashSet<>(Arrays.asList(100, 1)));
     Assert.assertEquals(streamConfigIndexToStreamPartitions.get(3), new HashSet<>(Arrays.asList(400)));
   }
+
+  @Test
+  public void testGetStreamIngestionMetricTableKey() {
+    String tableWithType = "db.myTable_REALTIME";
+    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType, "events", 7, null),
+        "db.myTable_REALTIME-events-7");
+    Assert.assertEquals(IngestionConfigUtils.getStreamIngestionMetricTableKey(tableWithType, "events", 7, "host1"),
+        "db.myTable_REALTIME-events-7-host1");
+  }
 }

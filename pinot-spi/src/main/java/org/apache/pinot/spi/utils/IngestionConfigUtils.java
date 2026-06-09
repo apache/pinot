@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -337,6 +338,23 @@ public final class IngestionConfigUtils {
   public static String getTableTopicUniqueClientId(String className, StreamConfig streamConfig) {
     return StreamConsumerFactory.getUniqueClientId(
         className + "-" + streamConfig.getTableNameWithType() + "-" + streamConfig.getTopicName());
+  }
+
+  /**
+   * Returns the table-key string for realtime stream server metrics: {@code table-topic-partition} and optional
+   * {@code consumerClientIdSuffix} when non-blank.
+   *
+   * @param tableNameWithType table name with type (e.g. {@code myTable_REALTIME})
+   * @param topicName stream topic name
+   * @param streamPartitionId stream partition id
+   * @param consumerClientIdSuffix optional suffix; ignored if null or blank
+   */
+  public static String getStreamIngestionMetricTableKey(String tableNameWithType, String topicName,
+      int streamPartitionId, @Nullable String consumerClientIdSuffix) {
+    if (StringUtils.isNotBlank(consumerClientIdSuffix)) {
+      return tableNameWithType + "-" + topicName + "-" + streamPartitionId + "-" + consumerClientIdSuffix;
+    }
+    return tableNameWithType + "-" + topicName + "-" + streamPartitionId;
   }
 
   /**
