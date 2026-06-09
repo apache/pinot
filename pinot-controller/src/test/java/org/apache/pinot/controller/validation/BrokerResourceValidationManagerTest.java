@@ -20,16 +20,24 @@ package org.apache.pinot.controller.validation;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -41,6 +49,7 @@ public class BrokerResourceValidationManagerTest {
 
   private static final String PHYSICAL_TABLE = "myTable_OFFLINE";
   private static final String LOGICAL_TABLE_PARTITION = "my_logical_table";
+  private static final String BROKER_TENANT = "brokerTenant";
 
   private PinotHelixResourceManager _resourceManager;
   private BrokerResourceValidationManager _validationManager;
@@ -89,5 +98,31 @@ public class BrokerResourceValidationManagerTest {
     List<String> tables = _validationManager.getTablesToProcess(new Properties());
 
     assertEquals(tables, List.of(PHYSICAL_TABLE));
+  }
+
+  @Test
+  public void testProcessTablePassesFullBrokerSetAndInstanceConfigSnapshot() {
+    InstanceConfig activeBroker = new InstanceConfig("Broker_active_1234");
+    InstanceConfig drainingBroker = new InstanceConfig("Broker_draining_1234");
+    drainingBroker.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+    List<InstanceConfig> instanceConfigs = List.of(activeBroker, drainingBroker);
+    Set<String> allTaggedBrokers = Set.of(activeBroker.getInstanceName(), drainingBroker.getInstanceName());
+    when(_resourceManager.getAllHelixInstanceConfigs()).thenReturn(instanceConfigs);
+    when(_resourceManager.getAllInstancesForBrokerTenant(instanceConfigs, BROKER_TENANT))
+        .thenReturn(allTaggedBrokers);
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable")
+        .setBrokerTenant(BROKER_TENANT).build();
+    when(_resourceManager.getTableConfig(PHYSICAL_TABLE)).thenReturn(tableConfig);
+    LogicalTableConfig logicalTableConfig = mock(LogicalTableConfig.class);
+    when(logicalTableConfig.getBrokerTenant()).thenReturn(BROKER_TENANT);
+    when(_resourceManager.getLogicalTableConfig(LOGICAL_TABLE_PARTITION)).thenReturn(logicalTableConfig);
+
+    BrokerResourceValidationManager.Context context = _validationManager.preprocess(new Properties());
+    _validationManager.processTable(PHYSICAL_TABLE, context);
+    _validationManager.processTable(LOGICAL_TABLE_PARTITION, context);
+
+    verify(_resourceManager).rebuildBrokerResource(PHYSICAL_TABLE, allTaggedBrokers, instanceConfigs);
+    verify(_resourceManager).rebuildBrokerResource(LOGICAL_TABLE_PARTITION, allTaggedBrokers, instanceConfigs);
   }
 }
