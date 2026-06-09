@@ -658,6 +658,25 @@ public final class TableConfigUtils {
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
+        // Pre-pass: collect every column referenced as a transform-function argument. A transform whose destination
+        // is not in the schema is still valid when another transform consumes it as an input - i.e. it is an
+        // intermediate ("derived") column. This enables chained / parse-once transforms, e.g.
+        //   message_obj = jsonExtractObject(message)              // intermediate, not in the schema
+        //   level       = JSONPATHSTRING(message_obj, '$.level')  // consumes the intermediate
+        // The intermediate is materialized in the record during transformation and dropped before indexing (only
+        // schema columns are indexed). Unreferenced non-schema destinations still fail below (typo protection).
+        Set<String> transformInputColumns = new HashSet<>();
+        for (TransformConfig transformConfig : transformConfigs) {
+          String transformFunction = transformConfig.getTransformFunction();
+          if (transformFunction != null) {
+            try {
+              transformInputColumns.addAll(
+                  FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction).getArguments());
+            } catch (Exception ignore) {
+              // Invalid functions are reported with a descriptive error in the main loop below.
+            }
+          }
+        }
         Set<String> transformColumns = new HashSet<>();
         for (TransformConfig transformConfig : transformConfigs) {
           String columnName = transformConfig.getColumnName();
@@ -669,10 +688,12 @@ public final class TableConfigUtils {
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
           }
-          Preconditions.checkState(schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName),
+          Preconditions.checkState(
+              schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName)
+                  || transformInputColumns.contains(columnName),
               "The destination column '" + columnName
-                  + "' of the transform function must be present in the schema or as a source column for "
-                  + "aggregations");
+                  + "' of the transform function must be present in the schema, be consumed as the input of another "
+                  + "transform function, or be a source column for aggregations");
           FunctionEvaluator expressionEvaluator;
           if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(

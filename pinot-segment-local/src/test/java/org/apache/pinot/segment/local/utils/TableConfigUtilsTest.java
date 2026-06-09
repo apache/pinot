@@ -513,6 +513,28 @@ public class TableConfigUtilsTest {
         new TransformConfig("myCol", "lower(transformedCol)")));
     TableConfigUtils.validate(tableConfig, schema);
 
+    // intermediate column NOT in the schema but consumed as the input of another transform - should pass.
+    // Enables chained / parse-once transforms (e.g. obj = jsonExtractObject(col); field = JSONPATHSTRING(obj, ...)).
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("intermediateCol", "reverse(anotherCol)"),
+        new TransformConfig("myCol", "lower(intermediateCol)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // same as above but the consumer is listed BEFORE the producer - the check is order-independent, should pass
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("myCol", "lower(intermediateCol)"),
+        new TransformConfig("intermediateCol", "reverse(anotherCol)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // destination column NOT in the schema and NOT consumed by any other transform - should fail (typo protection)
+    ingestionConfig.setTransformConfigs(
+        Collections.singletonList(new TransformConfig("notInSchemaCol", "reverse(anotherCol)")));
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail: destination column not in schema and not consumed by another transform");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+    ingestionConfig.setTransformConfigs(null);
+
     // invalid field name in schema with matching prefix from complexConfigType's prefixesToRename
     ingestionConfig.setTransformConfigs(null);
     ingestionConfig.setComplexTypeConfig(
