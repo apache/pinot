@@ -40,6 +40,7 @@ import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final String _partitionFunctionName;
   private final int _numPartitions;
   private final long _newSegmentExpirationMs;
+  private final boolean _allowPartitionRemapping;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
@@ -73,12 +75,13 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private transient TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions, long newSegmentExpirationMs) {
+      int numPartitions, long newSegmentExpirationMs, boolean allowPartitionRemapping) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
     _newSegmentExpirationMs = newSegmentExpirationMs;
+    _allowPartitionRemapping = allowPartitionRemapping;
   }
 
   @Override
@@ -98,8 +101,11 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private int getPartitionId(String segment, @Nullable ZNRecord znRecord) {
     SegmentPartitionInfo segmentPartitionInfo =
         SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecord);
-    if (segmentPartitionInfo == null || segmentPartitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+    if (segmentPartitionInfo == null) {
       return INVALID_PARTITION_ID;
+    }
+    if (segmentPartitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+      return getPartitionIdFromSegmentName(segment);
     }
     if (!_partitionColumn.equals(segmentPartitionInfo.getPartitionColumn())) {
       return INVALID_PARTITION_ID;
@@ -108,14 +114,43 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     if (!_partitionFunctionName.equalsIgnoreCase(partitionFunction.getName())) {
       return INVALID_PARTITION_ID;
     }
-    if (_numPartitions != partitionFunction.getNumPartitions()) {
+    int numSegmentPartitions = partitionFunction.getNumPartitions();
+    if (_allowPartitionRemapping) {
+      // Ensure segment partitions can be evenly distributed across table partitions.
+      // For example, 8 Kafka partitions can be remapped to 4 Pinot partitions (8 % 4 = 0),
+      // but 8 partitions cannot be remapped to 3 partitions (8 % 3 != 0).
+      if (numSegmentPartitions % _numPartitions != 0) {
+        return INVALID_PARTITION_ID;
+      }
+    } else if (numSegmentPartitions != _numPartitions) {
       return INVALID_PARTITION_ID;
     }
     Set<Integer> partitions = segmentPartitionInfo.getPartitions();
     if (partitions.size() != 1) {
       return INVALID_PARTITION_ID;
     }
-    return partitions.iterator().next();
+    return getValidMetadataPartitionId(partitions.iterator().next(), numSegmentPartitions);
+  }
+
+  private int getValidMetadataPartitionId(int partitionId, int numSegmentPartitions) {
+    if (partitionId < 0 || partitionId >= numSegmentPartitions) {
+      return INVALID_PARTITION_ID;
+    }
+    return _allowPartitionRemapping ? partitionId % _numPartitions : partitionId;
+  }
+
+  private int getPartitionIdFromSegmentName(String segment) {
+    if (!TableNameBuilder.isRealtimeTableResource(_tableNameWithType)) {
+      return INVALID_PARTITION_ID;
+    }
+    Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segment);
+    if (partitionId == null || partitionId < 0) {
+      return INVALID_PARTITION_ID;
+    }
+    if (_allowPartitionRemapping) {
+      return partitionId % _numPartitions;
+    }
+    return partitionId < _numPartitions ? partitionId : INVALID_PARTITION_ID;
   }
 
   private static long getCreationTimeMs(@Nullable ZNRecord znRecord) {

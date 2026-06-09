@@ -813,7 +813,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
                 tableNameWithType, partitionConfig.getKey());
             partitionMetadataManager = new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
                 partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions(),
-                _newSegmentExpirationMs);
+                _newSegmentExpirationMs, partitionConfig.getValue().isAllowPartitionRemapping());
           } else {
             LOGGER.warn(
                 "Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",
