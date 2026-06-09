@@ -156,6 +156,43 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString("{\"foo\": \"null\"}", "$.foo", "default"), "null");
   }
 
+  /**
+   * The default-value {@code jsonPath*} overloads return the caller's default for input that cannot begin a JSON
+   * value (plain text, null, empty) without invoking the parser - this avoids the {@code fillInStackTrace()} cost
+   * of a thrown-and-caught {@link InvalidJsonException} on the ingestion hot path. Behavior is unchanged for valid
+   * JSON and for any input that could begin a JSON value (which is still handed to the parser).
+   */
+  @Test
+  public void testJsonPathDefaultVariantsSkipNonJson() {
+    // Plain-text input (e.g. a raw log line) -> default, no exception thrown.
+    assertEquals(JsonFunctions.jsonPathString("INFO 2026-06-08 request done", "$.level", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("INFO 2026-06-08 request done", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathLong("ERROR boom code", "$.code", -1L), -1L);
+    assertEquals(JsonFunctions.jsonPathDouble("WARN slow request", "$.latency", -1.0), -1.0, 0.0);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty("plain text line", "$.items").length, 0);
+
+    // null input -> default.
+    assertEquals(JsonFunctions.jsonPathString(null, "$.level", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathLong(null, "$.code", -1L), -1L);
+    assertEquals(JsonFunctions.jsonPathArrayDefaultEmpty(null, "$.items").length, 0);
+
+    // Empty / whitespace-only input -> default.
+    assertEquals(JsonFunctions.jsonPathString("", "$.x", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("   ", "$.x", "def"), "def");
+
+    // Valid JSON object/array is still extracted, including with leading whitespace.
+    assertEquals(JsonFunctions.jsonPathString("{\"level\":\"info\"}", "$.level", "def"), "info");
+    assertEquals(JsonFunctions.jsonPathString("  \n {\"level\":\"info\"}", "$.level", "def"), "info");
+    assertEquals(JsonFunctions.jsonPathString("[{\"k\":\"v\"}]", "$[0].k", "def"), "v");
+
+    // Inputs that could begin a JSON value are still handed to the parser, so behavior is unchanged:
+    // "not json" begins with 'n' (the `null` literal) -> parsed, fails, default returned.
+    assertEquals(JsonFunctions.jsonPathString("not json", "$.x", "def"), "def");
+    // Bare JSON scalars are parsed and returned for the whole-document path (preserved behavior).
+    assertEquals(JsonFunctions.jsonPathString("12345", "$", "def"), "12345");
+    assertEquals(JsonFunctions.jsonPathString("\"hello\"", "$", "def"), "hello");
+  }
+
   @Test
   public void testJsonFunctionExtractingArray()
       throws JsonProcessingException {
