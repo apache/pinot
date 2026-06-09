@@ -34,6 +34,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -191,6 +192,55 @@ public class JsonFunctionsTest {
     // Bare JSON scalars are parsed and returned for the whole-document path (preserved behavior).
     assertEquals(JsonFunctions.jsonPathString("12345", "$", "def"), "12345");
     assertEquals(JsonFunctions.jsonPathString("\"hello\"", "$", "def"), "hello");
+
+    // Inputs the fast-path skips that the parser also rejected before -> default (equivalence preserved at the
+    // exact char boundary: these do not begin with {, [, ", -, a digit, or a true/false/null literal).
+    assertEquals(JsonFunctions.jsonPathString("+5", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString(".5", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("NaN", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("Infinity", "$", "def"), "def");
+    assertEquals(JsonFunctions.jsonPathString("'single quoted'", "$.x", "def"), "def");
+  }
+
+  /**
+   * {@code jsonExtractObject} parses a JSON document once into a reusable Map/List (or passes through an
+   * already-parsed container), returns null without throwing for null/scalar/non-JSON input, and the returned object
+   * is navigable by {@code jsonPath*} with results identical to parsing the raw string - enabling parse-once
+   * transform configs.
+   */
+  @Test
+  public void testJsonExtractObject()
+      throws Exception {
+    // JSON object -> reusable Map, navigable by jsonPath without re-parsing.
+    Object obj = JsonFunctions.jsonExtractObject("{\"level\":\"info\",\"log\":{\"msg\":\"hi\"}}");
+    assertTrue(obj instanceof Map);
+    assertEquals(JsonFunctions.jsonPathString(obj, "$.log.msg", "def"), "hi");
+    assertEquals(JsonFunctions.jsonPathString(obj, "$.level", "def"), "info");
+
+    // JSON array -> reusable List.
+    Object arr = JsonFunctions.jsonExtractObject("[{\"k\":\"v\"}]");
+    assertTrue(arr instanceof List);
+    assertEquals(JsonFunctions.jsonPathString(arr, "$[0].k", "def"), "v");
+
+    // null / scalar / plain-text / empty -> null, no exception.
+    assertNull(JsonFunctions.jsonExtractObject(null));
+    assertNull(JsonFunctions.jsonExtractObject("INFO 2026-06-08 plain text log line"));
+    assertNull(JsonFunctions.jsonExtractObject("12345"));
+    assertNull(JsonFunctions.jsonExtractObject(""));
+
+    // Already-parsed container -> passed through unchanged (Map and Object[]), still navigable by jsonPath.
+    Map<String, Object> map = Map.of("a", "b");
+    assertEquals(JsonFunctions.jsonExtractObject(map), map);
+    Object[] preParsed = new Object[]{Map.of("k", "v")};
+    assertSame(JsonFunctions.jsonExtractObject(preParsed), preParsed);
+    assertEquals(JsonFunctions.jsonPathString(preParsed, "$[0].k", "def"), "v");
+
+    // Parse-once equivalence: extracting through the parsed object matches extracting from the raw string.
+    String json = "{\"labels\":{\"service_name\":\"svc-1\",\"environment\":\"prod\"},\"id\":\"abc\"}";
+    Object parsed = JsonFunctions.jsonExtractObject(json);
+    assertEquals(JsonFunctions.jsonPathString(parsed, "$.labels.service_name", "def"),
+        JsonFunctions.jsonPathString(json, "$.labels.service_name", "def"));
+    assertEquals(JsonFunctions.jsonPathString(parsed, "$.id", "def"), "abc");
   }
 
   @Test

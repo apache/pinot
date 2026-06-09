@@ -367,6 +367,33 @@ public class JsonFunctions {
     return null;
   }
 
+  /**
+   * Parse a JSON document into a reusable {@code Map}/{@code List}, or pass through an already-parsed container,
+   * returning {@code null} for null, scalar, or non-JSON input <b>without throwing</b>.
+   * <p>Intended for "parse-once" ingestion transforms: materialize an intermediate object column once and point
+   * multiple {@code jsonPath*} extractions at it, instead of re-parsing the same source document for every extracted
+   * field. {@link #jsonPath} navigates the returned object directly (no re-parse), and because this never throws it
+   * is safe for columns that are sometimes structured JSON and sometimes plain text (e.g. a log {@code message}
+   * field) - the plain-text rows simply yield {@code null} and fall through to the default of the downstream
+   * extraction. Example transform configs:
+   * <pre>
+   *   {"columnName": "message_obj", "transformFunction": "jsonExtractObject(message)"}
+   *   {"columnName": "level",       "transformFunction": "JSONPATHSTRING(message_obj, '$.level', null)"}
+   * </pre>
+   */
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object jsonExtractObject(@Nullable Object object) {
+    if (object instanceof String) {
+      return jsonStringToListOrMap((String) object);
+    }
+    if (object instanceof Map || object instanceof List || object instanceof Object[]) {
+      // Already parsed (e.g. a nested object surfaced by the decoder or an upstream transform) - reuse as-is.
+      return object;
+    }
+    return null;
+  }
+
   private static void setValuesToMap(String keyColumnName, String valueColumnName, Object obj,
       Map<String, String> result) {
     if (obj instanceof Map) {
