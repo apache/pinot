@@ -297,6 +297,11 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   @Override
+  public boolean shouldCreateIndex(IndexCreationContext context, ForwardIndexConfig indexConfig) {
+    return context.getFieldSpec().getDataType() != FieldSpec.DataType.OPEN_STRUCT;
+  }
+
+  @Override
   public ForwardIndexCreator createIndexCreator(IndexCreationContext context, ForwardIndexConfig indexConfig)
       throws Exception {
     return ForwardIndexCreatorFactory.createIndexCreator(context, indexConfig);
