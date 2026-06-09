@@ -125,17 +125,16 @@ public class OpenStructIndexType
 
   @Override
   public boolean shouldCreateIndex(IndexCreationContext context, OpenStructIndexConfig indexConfig) {
-    // The default OpenStructIndexConfig is auto-applied to every column; only build a creator for
-    // OPEN_STRUCT columns. Non-OPEN_STRUCT columns cannot meaningfully host this index.
-    return context.getFieldSpec().getDataType() == FieldSpec.DataType.OPEN_STRUCT;
+    // Creator is wired in the storage-layer PR (PR 2b); returning true here with a null creator
+    // would NPE in SegmentColumnarIndexCreator.add(). Keep false until the real creator lands.
+    return false;
   }
 
   @Override
   public ColumnarOpenStructIndexCreator createIndexCreator(IndexCreationContext context,
       OpenStructIndexConfig indexConfig) {
-    // Creator is wired in the storage-layer PR (PR 2b); this infra PR registers the index type
-    // but does not yet support segment creation for OPEN_STRUCT columns.
-    return null;
+    throw new UnsupportedOperationException(
+        "OPEN_STRUCT index creator is not yet available; shouldCreateIndex() must return false");
   }
 
   @Override
