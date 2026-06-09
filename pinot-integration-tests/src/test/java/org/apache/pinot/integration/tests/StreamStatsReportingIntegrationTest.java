@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -291,6 +293,96 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
   }
 
   /**
+   * Multiple build sides — two dynamic-broadcast semi-joins on the same leaf stage produce one
+   * {@code PipelineBreakerOperator} with two {@code MAILBOX_RECEIVE} children. The fold collapses same-stage receives
+   * ({@code PipelineBreakerOperator.calculateUpstreamStats} → {@code mergeUpstream}), so the leaf's flat stats keep
+   * fewer receive entries than the live breaker has children. The stream encoder must trim the graft to the receives
+   * the fold kept; an untrimmed graft makes {@code treeSize > flatSize}, the encoder throws, and the leaf stage's
+   * stats are silently dropped (coverage still reports {@code missing=0}). Assert no drop: full coverage AND the leaf
+   * still carries the folded pipeline-breaker subtree.
+   */
+  @Test
+  public void testSemiJoinWithMultipleBuildSides()
+      throws Exception {
+    // Two IN semi-joins, kept distinct (the trivial dayId predicate prevents the planner from de-duplicating the two
+    // identical sub-queries) so the planner emits two PIPELINE_BREAKER build sides feeding the one mytable leaf.
+    @Language("sql")
+    String sql = "SELECT * FROM mytable "
+        + "WHERE DayOfWeek IN (SELECT dayId FROM daysOfWeek) "
+        + "AND DayOfWeek IN (SELECT dayId FROM daysOfWeek WHERE dayId >= 1)";
+    JsonNode response = postWithStreamStats(sql);
+
+    assertFalse(hasExceptions(response), "Multi-build-side semi-join should succeed without exceptions");
+    assertNotNull(response.get("resultTable"), "Result table must be present");
+    assertFullCoverage(response);
+
+    JsonNode stageStats = response.get("stageStats");
+    assertNotNull(stageStats, "stageStats tree must be present");
+    assertTrue(hasLeafWithPipelineBreaker(stageStats),
+        "leaf stage must still carry the folded pipeline-breaker subtree with multiple build sides; its absence "
+            + "means the multi-receive graft overshot the flat list and the leaf stats were dropped. Actual tree: "
+            + stageStats.toPrettyString());
+  }
+
+  /**
+   * {@code skip.pipeline.breaker.stats=true} — the leaf opchain does NOT fold the pipeline breaker, so its flat stats
+   * are just {@code [LEAF, MAILBOX_SEND]}. The pipeline-breaker opchain still runs and is stashed server-side; the
+   * fix gates the graft on {@code isKeepPipelineBreakerStats()} so nothing is grafted here. Without that gate the
+   * graft would overshoot the flat list, the encoder would throw {@code treeSize != flatSize}, and the leaf stage's
+   * stats would be silently dropped ({@link #assertFullCoverage} cannot catch it — the broker still sees
+   * {@code missing=0}). So we assert both full coverage AND that the leaf stage reports its own stats with no
+   * pipeline-breaker child.
+   */
+  @Test
+  public void testSemiJoinPipelineBreakerWithoutKeepingStats()
+      throws Exception {
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    @Language("sql")
+    String sql = "SELECT * FROM mytable WHERE DayOfWeek IN (SELECT dayId FROM daysOfWeek)";
+    try {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "true");
+      // Wait for the cluster-config change to propagate to the server: once it has, the leaf no longer folds the
+      // pipeline breaker (no MAILBOX_RECEIVE child under the LEAF).
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          JsonNode r = postWithStreamStats(sql);
+          return !hasExceptions(r) && r.get("stageStats") != null && !hasLeafWithPipelineBreaker(r.get("stageStats"));
+        } catch (Exception e) {
+          return false;
+        }
+      }, 200L, 30_000L, "skip.pipeline.breaker.stats=true did not propagate to the server");
+
+      // With skipping active, the leaf stage's own stats must still be present (the graft must NOT fire) and
+      // coverage must reconcile. A dropped leaf (the bug) would render the stage empty: no LEAF node, no coverage.
+      JsonNode response = postWithStreamStats(sql);
+      assertFalse(hasExceptions(response), "Semi-join should succeed with pipeline-breaker stats skipped");
+      assertFullCoverage(response);
+      JsonNode stageStats = response.get("stageStats");
+      assertNotNull(stageStats, "stageStats tree must be present");
+      assertFalse(hasLeafWithPipelineBreaker(stageStats),
+          "with skip.pipeline.breaker.stats=true the leaf must NOT carry a pipeline-breaker subtree");
+      assertTrue(hasLeaf(stageStats),
+          "the leaf stage's own stats must still be reported (not dropped) when the pipeline breaker is skipped");
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "false");
+      // Wait for the reset to propagate back so other tests (TestNG order is not guaranteed) see the default
+      // keep-pipeline-breaker-stats behavior again rather than a leaked skip=true.
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          JsonNode r = postWithStreamStats(sql);
+          return !hasExceptions(r) && r.get("stageStats") != null && hasLeafWithPipelineBreaker(r.get("stageStats"));
+        } catch (Exception e) {
+          return false;
+        }
+      }, 200L, 30_000L, "skip.pipeline.breaker.stats=false did not propagate back after the test");
+    }
+  }
+
+  /**
    * Recursively searches the stats tree for a {@code LEAF} node that has at least one {@code MAILBOX_RECEIVE} child —
    * the signature of a dynamic-broadcast build side that executed as a pipeline breaker and had its stats folded into
    * the leaf opchain's tree.
@@ -312,6 +404,25 @@ public class StreamStatsReportingIntegrationTest extends BaseClusterIntegrationT
     if (children != null) {
       for (JsonNode child : children) {
         if (hasLeafWithPipelineBreaker(child)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Recursively searches the stats tree for any {@code LEAF} node — i.e. the leaf stage's own stats are present. */
+  private static boolean hasLeaf(JsonNode node) {
+    if (node == null || node.isNull()) {
+      return false;
+    }
+    if ("LEAF".equals(node.path("type").asText())) {
+      return true;
+    }
+    JsonNode children = node.get("children");
+    if (children != null) {
+      for (JsonNode child : children) {
+        if (hasLeaf(child)) {
           return true;
         }
       }

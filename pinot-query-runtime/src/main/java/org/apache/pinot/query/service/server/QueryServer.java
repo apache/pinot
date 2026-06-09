@@ -653,7 +653,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       // Claim any stashed pipeline-breaker root for this stage (remove() so the stash self-cleans, even on the
       // leaf-error path below where it is unused). The PB always completed before this leaf opchain (see
       // _pipelineBreakerRoots), so it is already present when the stage folded one.
-      MultiStageOperator pipelineBreakerRoot = _pipelineBreakerRoots.remove(opChainId);
+      // Only graft it when this stage actually folded the breaker into its flat stats. The fold is gated on
+      // isKeepPipelineBreakerStats() (PlanNodeToOpChain); when that is off the breaker still ran (and was stashed)
+      // but its operators are absent from the leaf's flat stats, so grafting would overshoot the flat list and throw
+      // treeSize != flatSize -- dropping the leaf's stats entirely.
+      MultiStageOperator stashedPipelineBreakerRoot = _pipelineBreakerRoots.remove(opChainId);
+      MultiStageOperator pipelineBreakerRoot =
+          context.isKeepPipelineBreakerStats() ? stashedPipelineBreakerRoot : null;
       if (stats != null) {
         // If this stage folded a pipeline breaker, graft its stashed operator subtree onto the leaf so the encoder's
         // tree walk realigns with the leaf opchain's folded flat stats.

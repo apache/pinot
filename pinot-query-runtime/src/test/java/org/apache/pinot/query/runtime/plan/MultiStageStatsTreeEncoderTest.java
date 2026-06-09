@@ -260,6 +260,66 @@ public class MultiStageStatsTreeEncoderTest {
     Assert.assertEquals(deserialize(receiveNode.getStatMap(), BaseMailboxReceiveOperator.StatKey.class), receiveStat);
   }
 
+  /**
+   * Multiple build sides: the live pipeline breaker has TWO {@code MAILBOX_RECEIVE} children, but the fold collapses
+   * same-stage receives ({@code PipelineBreakerOperator.calculateUpstreamStats} -> {@code mergeUpstream}), so the
+   * leaf's folded flat stats keep only ONE receive entry. The graft must trim to the kept receive (1), not the live
+   * count (2); otherwise {@code treeSize(5) != flatSize(4)} throws and the whole leaf stage's stats are dropped.
+   */
+  @Test
+  public void testPipelineBreakerGraftTrimsCollapsedReceives()
+      throws IOException {
+    MultiStageOperator pbReceive1 = mockOperator();
+    MultiStageOperator pbReceive2 = mockOperator();
+    MultiStageOperator pbRoot =
+        mockOperator(MultiStageOperator.Type.PIPELINE_BREAKER, pbReceive1, pbReceive2);  // TWO live receives
+    MultiStageOperator leaf = mockOperator(MultiStageOperator.Type.LEAF);
+    MultiStageOperator send = mockOperator(leaf);
+
+    // The fold kept ONE receive entry (mergeUpstream collapsed the second same-stage receive).
+    MultiStageQueryStats stats = new MultiStageQueryStats.Builder(1)
+        .customizeOpen(open -> open
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE,
+                new StatMap<>(BaseMailboxReceiveOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.PIPELINE_BREAKER,
+                new StatMap<>(PipelineBreakerOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class)))
+        .build();
+
+    Worker.MultiStageStatsTree tree = MultiStageStatsTreeEncoder.encode(send, stats, op -> List.of(), pbRoot);
+
+    Worker.StageStatsNode leafNode = tree.getCurrentStage().getChildren(0);
+    Worker.StageStatsNode pbNode = leafNode.getChildren(0);
+    Assert.assertEquals(pbNode.getOperatorTypeId(), MultiStageOperator.Type.PIPELINE_BREAKER.getId());
+    Assert.assertEquals(pbNode.getChildrenCount(), 1, "graft must trim to the single receive the fold kept");
+    Assert.assertEquals(pbNode.getChildren(0).getOperatorTypeId(), MultiStageOperator.Type.MAILBOX_RECEIVE.getId());
+  }
+
+  /**
+   * When the stage did not fold the pipeline breaker (e.g. {@code skip.pipeline.breaker.stats=true}), the leaf's flat
+   * stats are just {@code [LEAF, MAILBOX_SEND]} — no breaker prefix. Passing a non-null {@code pipelineBreakerRoot}
+   * anyway (i.e. the caller failed to gate on {@code isKeepPipelineBreakerStats()}) must fail loudly rather than
+   * silently mis-encode. This is why {@code QueryServer} nulls the stashed root when the fold is off.
+   */
+  @Test
+  public void testPipelineBreakerGraftThrowsWhenStageDidNotFold() {
+    MultiStageOperator pbRoot =
+        mockOperator(MultiStageOperator.Type.PIPELINE_BREAKER, mockOperator());
+    MultiStageOperator leaf = mockOperator(MultiStageOperator.Type.LEAF);
+    MultiStageOperator send = mockOperator(leaf);
+
+    // No breaker prefix: the leaf did not fold it.
+    MultiStageQueryStats stats = new MultiStageQueryStats.Builder(1)
+        .customizeOpen(open -> open
+            .addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafOperator.StatKey.class))
+            .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND, new StatMap<>(MailboxSendOperator.StatKey.class)))
+        .build();
+
+    Assert.assertThrows(IllegalStateException.class,
+        () -> MultiStageStatsTreeEncoder.encode(send, stats, op -> List.of(), pbRoot));
+  }
+
   // ---- helpers ----
 
   private static MultiStageOperator mockOperator(MultiStageOperator... children) {
