@@ -71,14 +71,14 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask<Brok
     if (tableConfig != null) {
       Set<String> brokerInstances = _pinotHelixResourceManager
           .getAllInstancesForBrokerTenant(context._instanceConfigs, tableConfig.getTenantConfig().getBroker());
-      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
+      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances, context._instanceConfigs);
       return;
     }
     LogicalTableConfig logicalTableConfig = _pinotHelixResourceManager.getLogicalTableConfig(tableNameWithType);
     if (logicalTableConfig != null) {
       Set<String> brokerInstances = _pinotHelixResourceManager
           .getAllInstancesForBrokerTenant(context._instanceConfigs, logicalTableConfig.getBrokerTenant());
-      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
+      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances, context._instanceConfigs);
       return;
     }
     LOGGER.warn("No table config or logical table config found for: {}, skipping broker resource validation",

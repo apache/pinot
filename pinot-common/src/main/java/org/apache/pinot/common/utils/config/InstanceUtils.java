@@ -215,6 +215,15 @@ public class InstanceUtils {
   public static String getInstanceBaseUri(InstanceConfig instanceConfig) {
     Map<String, String> fieldMap = instanceConfig.getRecord().getSimpleFields();
     String hostName = instanceConfig.getHostName();
+    String instanceName = instanceConfig.getInstanceName();
+    // Backward-compatible with legacy hostName fields that included the Pinot role prefix.
+    if (instanceName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)
+        && hostName.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      hostName = hostName.substring(Helix.SERVER_INSTANCE_PREFIX_LENGTH);
+    } else if (instanceName.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)
+        && hostName.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      hostName = hostName.substring(Helix.BROKER_INSTANCE_PREFIX_LENGTH);
+    }
     String adminPort;
     String scheme;
     if (fieldMap.containsKey(CommonConstants.Helix.Instance.ADMIN_HTTPS_PORT_KEY)) {

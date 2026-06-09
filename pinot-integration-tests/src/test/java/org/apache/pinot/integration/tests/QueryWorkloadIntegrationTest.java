@@ -25,7 +25,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -44,7 +48,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -57,6 +60,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_OFFLINE_SEGMENTS = 8;
@@ -64,6 +68,12 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_SERVERS = 2;
   private static final int NUM_BROKERS = 2;
   private int _brokerAdminApiPort = 8079;
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
+    properties.put(ControllerConf.CONTROLLER_ENABLE_BROKER_CHANGE_PROPAGATION, true);
+  }
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
@@ -197,6 +207,89 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
+  @Test
+  public void testBrokerDrainUpdatesWorkloadBudgetAndRestoresOnRestart() throws Exception {
+    long totalCpuBudgetNs = 2_000_000L;
+    long totalMemoryBudgetBytes = 4_000_000L;
+    EnforcementProfile enforcementProfile = new EnforcementProfile(Long.MAX_VALUE, Long.MAX_VALUE);
+    PropagationEntity entity =
+        new PropagationEntity(DEFAULT_TABLE_NAME, totalCpuBudgetNs, totalMemoryBudgetBytes, null);
+    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
+    NodeConfig brokerNode = new NodeConfig(NodeConfig.Type.BROKER_NODE, enforcementProfile, propagationScheme);
+    String workloadName = "brokerDrainWorkload";
+    QueryWorkloadConfig workloadConfig = new QueryWorkloadConfig(workloadName, List.of(brokerNode));
+
+    Set<String> initialBrokers =
+        getBrokerResourceInstances(TableNameBuilder.OFFLINE.tableNameWithType(DEFAULT_TABLE_NAME));
+    assertEquals(initialBrokers.size(), NUM_BROKERS, "Unexpected initial BrokerResource assignment");
+    assertEquals(getBrokerResourceInstances(TableNameBuilder.REALTIME.tableNameWithType(DEFAULT_TABLE_NAME)),
+        initialBrokers, "Offline and realtime tables have different initial BrokerResource assignments");
+    BaseBrokerStarter brokerToDrain = _brokerStarters.get(0);
+    String drainedBroker = brokerToDrain.getInstanceId();
+    assertTrue(initialBrokers.contains(drainedBroker), "Broker selected for drain is not in BrokerResource");
+    String survivingBroker = initialBrokers.stream().filter(instance -> !instance.equals(drainedBroker)).findFirst()
+        .orElseThrow(() -> new IllegalStateException("No surviving broker found"));
+
+    try {
+      updateAndValidateWorkloadConfigPropagation(workloadConfig);
+      long splitCpuBudgetNs = totalCpuBudgetNs / NUM_BROKERS;
+      long splitMemoryBudgetBytes = totalMemoryBudgetBytes / NUM_BROKERS;
+      for (String broker : initialBrokers) {
+        validateCostPropagationOnInstances(broker, workloadName, splitCpuBudgetNs, splitMemoryBudgetBytes);
+      }
+
+      boolean restartRequired = false;
+      try {
+        restartRequired = true;
+        sendPostRequest(getAdminBaseUrl(drainedBroker) + "/drain?shutdown=false");
+
+        JsonNode rejectedResponse = postQueryToBroker(drainedBroker, "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME);
+        JsonNode exceptions = rejectedResponse.path("exceptions");
+        assertFalse(exceptions.isEmpty(), "Expected the drained broker to reject direct queries");
+        assertEquals(exceptions.get(0).path("errorCode").asInt(), QueryErrorCode.BROKER_SHUTTING_DOWN.getId(),
+            "Unexpected error from drained broker: " + exceptions);
+
+        TestUtils.waitForCondition(aVoid -> {
+          try {
+            return hasBrokerResourceAssignments(DEFAULT_TABLE_NAME, Set.of(survivingBroker));
+          } catch (Exception e) {
+            return false;
+          }
+        }, 60_000L, "Failed to remove drained broker from BrokerResource");
+        waitForCostPropagationOnInstance(survivingBroker, workloadName, totalCpuBudgetNs, totalMemoryBudgetBytes);
+      } finally {
+        if (restartRequired) {
+          _brokerStarters.set(0, restartBroker(brokerToDrain));
+        }
+      }
+
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          return hasBrokerResourceAssignments(DEFAULT_TABLE_NAME, initialBrokers);
+        } catch (Exception e) {
+          return false;
+        }
+      }, 60_000L, "Failed to restore restarted broker to BrokerResource");
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          JsonNode queryResponse =
+              postQueryToBroker(drainedBroker, "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME);
+          JsonNode exceptions = queryResponse.get("exceptions");
+          return exceptions != null && exceptions.isArray() && exceptions.isEmpty()
+              && getLongCellValue(queryResponse, 0, 0) == getCountStarResult();
+        } catch (Exception e) {
+          return false;
+        }
+      }, 60_000L, "Restarted broker did not resume query admission");
+      for (String broker : initialBrokers) {
+        waitForCostPropagationOnInstance(broker, workloadName, totalCpuBudgetNs / NUM_BROKERS,
+            totalMemoryBudgetBytes / NUM_BROKERS);
+      }
+    } finally {
+      cleanupWorkload(workloadName);
+    }
+  }
+
   @DataProvider(name = "instanceTypeProvider")
   public Object[][] instanceTypeProvider() {
     return new Object[][]{
@@ -216,14 +309,14 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
 
     // Post the workload request to all instances
     for (String instance : instances) {
-      String url = getBaseUrl(instance) + "/queryWorkloadConfigs";
+      String url = getAdminBaseUrl(instance) + "/queryWorkloadConfigs";
       sendPostRequest(url, JsonUtils.objectToString(workloadToCostMap));
     }
 
     try {
       // Validate that the workloads are present on all instances
       for (String instance : instances) {
-        String url = getBaseUrl(instance) + "/queryWorkloadConfigs";
+        String url = getAdminBaseUrl(instance) + "/queryWorkloadConfigs";
         String response = sendGetRequest(url);
         JsonNode responseJson = JsonUtils.stringToJsonNode(response);
         assertNotNull(responseJson);
@@ -244,7 +337,7 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
       // Clean up the workloads
       String workloadNames = String.join(",", workloadToCostMap.keySet());
       for (String instance : instances) {
-        String url = getBaseUrl(instance) + "/queryWorkloadConfigs" + "?workloadNames=" + workloadNames;
+        String url = getAdminBaseUrl(instance) + "/queryWorkloadConfigs" + "?workloadNames=" + workloadNames;
         sendDeleteRequest(url);
       }
     }
@@ -333,24 +426,57 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   private void validateCostPropagationOnInstances(String instance, String workloadName,
                                                   long expectedCpuBudgetNs, long expectedMemoryBudgetBytes)
       throws Exception {
-    // Extract host from server instance name (format: Server_hostname_port)
-    String getWorkloadUrl = getBaseUrl(instance) + "/queryWorkloadConfigs?workloadNames=" + workloadName;
+    String getWorkloadUrl = getAdminBaseUrl(instance) + "/queryWorkloadConfigs?workloadNames=" + workloadName;
     String workloadResponse = sendGetRequest(getWorkloadUrl);
 
     // Verify response is valid JSON and contains InstanceCost structure
     JsonNode workloadResponseJson = JsonUtils.stringToJsonNode(workloadResponse);
     assertNotNull(workloadResponseJson);
-    for (JsonNode workloadNode : workloadResponseJson) {
-      String retrievedWorkloadName = workloadNode.get("workloadName").asText();
-      assertEquals(retrievedWorkloadName, workloadName, "Unexpected workload name on instance: " + instance);
-      long actualCpuCostNs = workloadNode.get("cpuBudgetNs").asLong();
-      long actualMemoryCostBytes = workloadNode.get("memoryBudgetBytes").asLong();
-      assertEquals(actualCpuCostNs, expectedCpuBudgetNs,
-          "Unexpected CPU budget for workload: " + workloadName + " on instance: " + instance);
-      assertEquals(actualMemoryCostBytes, expectedMemoryBudgetBytes,
-          "Unexpected Memory budget for workload: " + workloadName + " on instance: " + instance);
-      return;
+    assertTrue(workloadResponseJson.isArray(), "Expected workload response array from instance: " + instance);
+    assertEquals(workloadResponseJson.size(), 1,
+        "Expected exactly one workload named " + workloadName + " on instance: " + instance);
+    JsonNode workloadNode = workloadResponseJson.get(0);
+    String retrievedWorkloadName = workloadNode.get("workloadName").asText();
+    assertEquals(retrievedWorkloadName, workloadName, "Unexpected workload name on instance: " + instance);
+    long actualCpuCostNs = workloadNode.get("cpuBudgetNs").asLong();
+    long actualMemoryCostBytes = workloadNode.get("memoryBudgetBytes").asLong();
+    assertEquals(actualCpuCostNs, expectedCpuBudgetNs,
+        "Unexpected CPU budget for workload: " + workloadName + " on instance: " + instance);
+    assertEquals(actualMemoryCostBytes, expectedMemoryBudgetBytes,
+        "Unexpected Memory budget for workload: " + workloadName + " on instance: " + instance);
+  }
+
+  private void waitForCostPropagationOnInstance(String instance, String workloadName, long expectedCpuBudgetNs,
+      long expectedMemoryBudgetBytes) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        validateCostPropagationOnInstances(instance, workloadName, expectedCpuBudgetNs, expectedMemoryBudgetBytes);
+        return true;
+      } catch (Exception | AssertionError e) {
+        return false;
+      }
+    }, 60_000L, "Failed to propagate workload " + workloadName + " to instance " + instance);
+  }
+
+  private JsonNode postQueryToBroker(String brokerInstance, String query) throws Exception {
+    String queryApiUrl = ClusterIntegrationTestUtils.getBrokerQueryApiUrl(getQueryBaseUrl(brokerInstance),
+        useMultiStageQueryEngine());
+    return postQuery(query, queryApiUrl, null, getExtraQueryProperties());
+  }
+
+  private boolean hasBrokerResourceAssignments(String tableName, Set<String> expectedBrokers) {
+    return getBrokerResourceInstances(TableNameBuilder.OFFLINE.tableNameWithType(tableName)).equals(expectedBrokers)
+        && getBrokerResourceInstances(TableNameBuilder.REALTIME.tableNameWithType(tableName)).equals(expectedBrokers);
+  }
+
+  private Set<String> getBrokerResourceInstances(String tableNameWithType) {
+    IdealState brokerResource = _helixAdmin.getResourceIdealState(getHelixClusterName(),
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    if (brokerResource == null) {
+      return Set.of();
     }
+    Map<String, String> assignment = brokerResource.getRecord().getMapField(tableNameWithType);
+    return assignment != null ? Set.copyOf(assignment.keySet()) : Set.of();
   }
 
   /// Get the definitive list of instances that serve a specific table
@@ -414,19 +540,23 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
         null, instanceReplicaGroupPartitionConfig, null, false);
   }
 
-  private String getBaseUrl(String instance) {
-    // Extract host from server instance name (format: Server_hostname_port)
-    String[] parts = instance.split("_");
-    String host = parts[1];
-    String baseUrl;
-
-    if (InstanceTypeUtils.isServer(instance)) {
-      baseUrl = "http://" + host + ":" + getServerAdminApiPort();
-    } else if (InstanceTypeUtils.isBroker(instance)) {
-      baseUrl = "http://" + host + ":" + parts[2];
-    } else {
-      throw new IllegalArgumentException("Instance is neither server nor broker: " + instance);
+  private String getAdminBaseUrl(String instance) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), instance);
+    if (instanceConfig == null) {
+      throw new IllegalArgumentException("Instance not found: " + instance);
     }
-    return baseUrl;
+    int adminPort = instanceConfig.getRecord().getIntField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, -1);
+    if (adminPort <= 0) {
+      throw new IllegalStateException("Admin port is not configured for instance: " + instance);
+    }
+    return "http://" + instanceConfig.getHostName() + ":" + adminPort;
+  }
+
+  private String getQueryBaseUrl(String brokerInstance) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(getHelixClusterName(), brokerInstance);
+    if (instanceConfig == null) {
+      throw new IllegalArgumentException("Broker instance not found: " + brokerInstance);
+    }
+    return "http://" + instanceConfig.getHostName() + ":" + instanceConfig.getPort();
   }
 }

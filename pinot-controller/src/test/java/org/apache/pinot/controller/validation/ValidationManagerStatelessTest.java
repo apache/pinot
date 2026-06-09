@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -29,6 +32,7 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -154,6 +158,111 @@ public class ValidationManagerStatelessTest extends ControllerTest {
         TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
     instanceConfig.setInstanceEnabled(false);
     helixAdmin.dropInstance(getHelixClusterName(), instanceConfig);
+  }
+
+  @Test
+  public void testBrokerResourceExcludesShuttingDownBrokerWithStaleSnapshot()
+      throws Exception {
+    String rawTableName = "brokerDrainValidationTable";
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    String logicalTableName = "broker_drain_validation_logical";
+    Set<String> allBrokerInstances =
+        _helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME);
+    String drainingBroker = allBrokerInstances.iterator().next();
+    List<InstanceConfig> staleInstanceConfigs =
+        allBrokerInstances.stream().map(InstanceConfig::new).toList();
+
+    InstanceConfig drainingBrokerConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
+    Assert.assertNotNull(drainingBrokerConfig);
+    List<String> previousTags = new ArrayList<>(drainingBrokerConfig.getTags());
+    drainingBrokerConfig.getRecord().setListField(Helix.PREVIOUS_TAGS, previousTags);
+    List<String> activeTags = new ArrayList<>(previousTags);
+    activeTags.removeIf(TagNameUtils::isBrokerTag);
+    drainingBrokerConfig.getRecord()
+        .setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), activeTags);
+    drainingBrokerConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+    HelixHelper.updateInstanceConfig(_helixManager, drainingBrokerConfig);
+    Assert.assertEquals(
+        _helixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME), allBrokerInstances);
+    List<InstanceConfig> staleDrainingInstanceConfigs = _helixResourceManager.getAllHelixInstanceConfigs();
+
+    boolean rawSchemaAdded = false;
+    boolean logicalSchemaAdded = false;
+    boolean offlineTableAdded = false;
+    boolean logicalTableAdded = false;
+    try {
+      addDummySchema(rawTableName);
+      rawSchemaAdded = true;
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).build();
+      _helixResourceManager.addTable(tableConfig);
+      offlineTableAdded = true;
+
+      addDummySchema(logicalTableName);
+      logicalSchemaAdded = true;
+      LogicalTableConfig logicalTableConfig = ControllerTest.getDummyLogicalTableConfig(logicalTableName,
+          List.of(offlineTableName), TagNameUtils.DEFAULT_TENANT_NAME);
+      _helixResourceManager.addLogicalTableConfig(logicalTableConfig);
+      logicalTableAdded = true;
+
+      Set<String> expectedBrokerInstances = new HashSet<>(allBrokerInstances);
+      expectedBrokerInstances.remove(drainingBroker);
+      IdealState idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, getHelixClusterName());
+      Assert.assertEquals(idealState.getInstanceSet(offlineTableName), expectedBrokerInstances);
+      Assert.assertEquals(idealState.getInstanceSet(logicalTableName), expectedBrokerInstances);
+
+      // A periodic validation snapshot captured before the drain still contains the broker. The live check inside the
+      // brokerResource CAS must keep it excluded for physical and logical tables.
+      _helixResourceManager.rebuildBrokerResource(offlineTableName, allBrokerInstances, staleInstanceConfigs);
+      _helixResourceManager.rebuildBrokerResource(logicalTableName, allBrokerInstances, staleInstanceConfigs);
+      HelixHelper.updateBrokerResource(_helixManager, drainingBroker, drainingBrokerConfig.getTags(), null, null);
+      idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, getHelixClusterName());
+      Assert.assertEquals(idealState.getInstanceSet(offlineTableName), expectedBrokerInstances);
+      Assert.assertEquals(idealState.getInstanceSet(logicalTableName), expectedBrokerInstances);
+
+      restoreDrainingBrokerTags(drainingBrokerConfig);
+      HelixHelper.updateInstanceConfig(_helixManager, drainingBrokerConfig);
+      // A snapshot captured while the broker was draining must not trigger an early return after the live marker is
+      // cleared. The IdealState CAS must re-read live configs and restore the broker to both assignments.
+      _helixResourceManager.rebuildBrokerResource(offlineTableName, allBrokerInstances,
+          staleDrainingInstanceConfigs);
+      _helixResourceManager.rebuildBrokerResource(logicalTableName, allBrokerInstances,
+          staleDrainingInstanceConfigs);
+      idealState = HelixHelper.getBrokerIdealStates(_helixAdmin, getHelixClusterName());
+      Assert.assertEquals(idealState.getInstanceSet(offlineTableName), allBrokerInstances);
+      Assert.assertEquals(idealState.getInstanceSet(logicalTableName), allBrokerInstances);
+    } finally {
+      InstanceConfig latestDrainingBrokerConfig = _helixResourceManager.getHelixInstanceConfig(drainingBroker);
+      if (latestDrainingBrokerConfig != null) {
+        restoreDrainingBrokerTags(latestDrainingBrokerConfig);
+        HelixHelper.updateInstanceConfig(_helixManager, latestDrainingBrokerConfig);
+        // The direct update above removes the draining broker from every matching table partition. Restore those
+        // pre-existing partitions as part of test cleanup, not only the tables created by this test.
+        HelixHelper.updateBrokerResource(_helixManager, drainingBroker, latestDrainingBrokerConfig.getTags(), null,
+            null);
+      }
+      if (logicalTableAdded) {
+        _helixResourceManager.deleteLogicalTableConfig(logicalTableName);
+      }
+      if (offlineTableAdded) {
+        _helixResourceManager.deleteOfflineTable(rawTableName);
+      }
+      if (logicalSchemaAdded) {
+        deleteSchema(logicalTableName);
+      }
+      if (rawSchemaAdded) {
+        deleteSchema(rawTableName);
+      }
+    }
+  }
+
+  private static void restoreDrainingBrokerTags(InstanceConfig instanceConfig) {
+    List<String> previousTags = instanceConfig.getRecord().getListField(Helix.PREVIOUS_TAGS);
+    if (previousTags != null) {
+      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(),
+          new ArrayList<>(previousTags));
+      instanceConfig.getRecord().getListFields().remove(Helix.PREVIOUS_TAGS);
+    }
+    instanceConfig.getRecord().setBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
   }
 
   @AfterClass
