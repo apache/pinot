@@ -2023,29 +2023,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         ColumnPartitionConfig columnPartitionConfig = entry.getValue();
         String partitionFunctionName = columnPartitionConfig.getFunctionName();
 
-        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning and emit a
-        //       metric when they don't match, but use the one from the stream. The mismatch could happen when the
-        //       stream partitions are changed, but the table config has not been updated to reflect the change.
-        //       In such case, picking the number of partitions from the stream can keep the segment properly
-        //       partitioned as long as the partition function is not changed.
+        // NOTE: Here we compare the number of partitions from the config and the stream, and log a warning when they
+        //       don't match, but use the one from the stream. The mismatch could happen when the stream partitions are
+        //       changed, but the table config has not been updated to reflect the change. In such case, picking the
+        //       number of partitions from the stream can keep the segment properly partitioned as long as the
+        //       partition function is not changed.
         int numPartitions = columnPartitionConfig.getNumPartitions();
         try {
-          // TODO: currentPartitionGroupConsumptionStatus should be fetched from idealState + segmentZkMetadata,
-          //  so that we get back accurate partitionGroups info
-          //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
-          //  a single partition
-          //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
+          // Use the total stream partition count as the partition function divisor. The upstream producer hashed each
+          // key over the full partition count, so the divisor must match that count for the per-segment partition
+          // metadata (and the partition pruning that relies on it) to be correct. fetchPartitionCount() returns that
+          // full count; computePartitionGroupMetadata().size() does not - when the table consumes only a subset of
+          // stream partitions it returns the subset size, which is wrong here.
+          // TODO: This is correct for Kafka, where partition ids are a stable contiguous range. It does not make
+          //   partitioning work for Kinesis, where shards split/merge and ids are not a contiguous 0..N range -
+          //   fetchPartitionCount() returns the total shard count there. Fix this before opening support for
+          //   partitioning in Kinesis.
+          int numStreamPartitions = _partitionMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/10_000);
 
-          if (numPartitionGroups != numPartitions) {
-            _segmentLogger.info(
+          if (numStreamPartitions != numPartitions) {
+            _segmentLogger.warn(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
-                    + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            numPartitions = numPartitionGroups;
+                    + "using number of stream " + "partitions", numStreamPartitions, numPartitions);
+            numPartitions = numStreamPartitions;
           }
         } catch (Exception e) {
-          _segmentLogger.warn("Failed to get number of stream partitions in 5s, "
+          _segmentLogger.error("Failed to get number of stream partitions in 10s, "
               + "using number of partitions in the partition config: {}", numPartitions, e);
           createPartitionMetadataProvider("Timeout getting number of stream partitions");
         }
