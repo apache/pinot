@@ -99,6 +99,49 @@ public class WorkloadPropagationClientTest {
   }
 
   @Test
+  public void testUsesEachInstanceConfigForHostAndAdminPort()
+      throws Exception {
+    AtomicInteger firstRequests = new AtomicInteger();
+    AtomicInteger secondRequests = new AtomicInteger();
+    HttpServer firstServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    HttpServer secondServer = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+    firstServer.createContext("/queryWorkloadConfigs", exchange -> {
+      firstRequests.incrementAndGet();
+      exchange.sendResponseHeaders(200, -1);
+      exchange.close();
+    });
+    secondServer.createContext("/queryWorkloadConfigs", exchange -> {
+      secondRequests.incrementAndGet();
+      exchange.sendResponseHeaders(200, -1);
+      exchange.close();
+    });
+    firstServer.start();
+    secondServer.start();
+
+    // These ids deliberately do not encode the hostname. Routing must use each InstanceConfig instead of parsing ids.
+    String firstBroker = "Broker_custom_id_1234";
+    String secondServerInstance = "Server_another_custom_id_5678";
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllInstances()).thenReturn(List.of(firstBroker, secondServerInstance));
+    when(resourceManager.getHelixInstanceConfig(firstBroker))
+        .thenReturn(instanceConfig(firstBroker, "Broker_localhost", firstServer.getAddress().getPort()));
+    when(resourceManager.getHelixInstanceConfig(secondServerInstance))
+        .thenReturn(instanceConfig(secondServerInstance, "Server_localhost", secondServer.getAddress().getPort()));
+
+    try (WorkloadPropagationClient client = new WorkloadPropagationClient(resourceManager, new ControllerConf(),
+        mock(ControllerMetrics.class))) {
+      client.sendQueryWorkloadMessage(Map.of(
+          firstBroker, new QueryWorkloadRequest("first", new InstanceCost(1L, 2L)),
+          secondServerInstance, new QueryWorkloadRequest("second", new InstanceCost(3L, 4L))));
+      Assert.assertEquals(firstRequests.get(), 1);
+      Assert.assertEquals(secondRequests.get(), 1);
+    } finally {
+      firstServer.stop(0);
+      secondServer.stop(0);
+    }
+  }
+
+  @Test
   public void testRequestConstructionFailureIsRetried()
       throws Exception {
     AtomicInteger receivedRequests = new AtomicInteger();
@@ -133,8 +176,12 @@ public class WorkloadPropagationClientTest {
   }
 
   private static InstanceConfig instanceConfig(String instanceName, int adminPort) {
+    return instanceConfig(instanceName, "localhost", adminPort);
+  }
+
+  private static InstanceConfig instanceConfig(String instanceName, String hostName, int adminPort) {
     InstanceConfig instanceConfig = new InstanceConfig(instanceName);
-    instanceConfig.setHostName("localhost");
+    instanceConfig.setHostName(hostName);
     instanceConfig.getRecord().setIntField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, adminPort);
     return instanceConfig;
   }
