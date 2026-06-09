@@ -409,8 +409,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
       if (checkRealtime && TableNameBuilder.isRealtimeTableResource(resourceName)) {
         for (String partitionName : idealState.getPartitionSet()) {
-          if (StateModel.SegmentStateModel.CONSUMING.equals(
-              idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+          Map<String, String> instanceStateMap = idealState.getInstanceStateMap(partitionName);
+          if (instanceStateMap != null && StateModel.SegmentStateModel.CONSUMING.equals(
+              instanceStateMap.get(_instanceId))) {
             consumingSegments.computeIfAbsent(resourceName, k -> new HashSet<>()).add(partitionName);
           }
         }
@@ -473,8 +474,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     Set<String> consumingSegments = new HashSet<>();
     for (String partitionName : idealState.getPartitionSet()) {
-      if (StateModel.SegmentStateModel.CONSUMING.equals(
-          idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(partitionName);
+      if (instanceStateMap != null && StateModel.SegmentStateModel.CONSUMING.equals(
+          instanceStateMap.get(_instanceId))) {
         consumingSegments.add(partitionName);
       }
     }
