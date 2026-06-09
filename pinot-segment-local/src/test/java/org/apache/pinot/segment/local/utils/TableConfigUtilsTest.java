@@ -513,6 +513,47 @@ public class TableConfigUtilsTest {
         new TransformConfig("myCol", "lower(transformedCol)")));
     TableConfigUtils.validate(tableConfig, schema);
 
+    // intermediate column NOT in the schema but consumed as the input of another transform - should pass.
+    // Enables chained / parse-once transforms (e.g. obj = jsonExtractObject(col); field = JSONPATHSTRING(obj, ...)).
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("intermediateCol", "reverse(anotherCol)"),
+        new TransformConfig("myCol", "lower(intermediateCol)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // same as above but the consumer is listed BEFORE the producer - the check is order-independent, should pass
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("myCol", "lower(intermediateCol)"),
+        new TransformConfig("intermediateCol", "reverse(anotherCol)")));
+    TableConfigUtils.validate(tableConfig, schema);
+
+    // destination column NOT in the schema and NOT consumed by any other transform - should fail (typo protection)
+    ingestionConfig.setTransformConfigs(
+        Collections.singletonList(new TransformConfig("notInSchemaCol", "reverse(anotherCol)")));
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail: destination column not in schema and not consumed by another transform");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // multi-hop chain whose LEAF is a non-schema column consumed by nothing - still fails. Typo protection holds
+    // across a chain: 'intermediateCol' is allowed (consumed by 'danglingLeaf'), but 'danglingLeaf' itself is not in
+    // the schema and is referenced by nothing, so validation fails on it.
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("intermediateCol", "reverse(anotherCol)"),
+        new TransformConfig("danglingLeaf", "lower(intermediateCol)")));
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail: chain leaf 'danglingLeaf' is not in the schema and is consumed by nothing");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // a 2-node cycle among non-schema columns passes this validation (each is referenced by the other), consistent
+    // with cycles among schema columns - TableConfigUtils does not do cycle detection; a cycle is caught later by
+    // ExpressionTransformer's topological sort at ingestion time.
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("cycleA", "reverse(cycleB)"),
+        new TransformConfig("cycleB", "lower(cycleA)")));
+    TableConfigUtils.validate(tableConfig, schema);
+    ingestionConfig.setTransformConfigs(null);
+
     // invalid field name in schema with matching prefix from complexConfigType's prefixesToRename
     ingestionConfig.setTransformConfigs(null);
     ingestionConfig.setComplexTypeConfig(
