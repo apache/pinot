@@ -157,8 +157,8 @@ public class OpenStructIndexType
   @Nullable
   @Override
   public MutableIndex createMutableIndex(MutableIndexContext context, OpenStructIndexConfig config) {
-    throw new UnsupportedOperationException("Mutable OPEN_STRUCT index is constructed by MutableSegmentImpl, "
-        + "not via this SPI path");
+    // Mutable OPEN_STRUCT index is constructed by MutableSegmentImpl, not via this SPI path.
+    return null;
   }
 
   @Override
