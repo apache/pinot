@@ -41,6 +41,7 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.In
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
@@ -142,6 +143,21 @@ public class MultipleTreesBuilder implements Closeable {
       File indexDir, BuildMode buildMode)
       throws Exception {
     this(indexConfigs, enableDefaultStarTree, indexDir, buildMode, null);
+  }
+
+  /**
+   * Constructor for star-tree build invoked during segment creation. Derives the star-tree index
+   * configs, enable-default flag, build mode, and (optional) IndexLoadingConfig from the supplied
+   * {@link SegmentGeneratorConfig} so downstream readers (e.g. external-table forward-index readers
+   * backed by remote storage) can resolve table-level configs during the in-place segment load.
+   */
+  public MultipleTreesBuilder(File indexDir, SegmentGeneratorConfig segmentGeneratorConfig)
+      throws Exception {
+    this(segmentGeneratorConfig.getStarTreeIndexConfigs(), segmentGeneratorConfig.isEnableDefaultStarTree(), indexDir,
+        segmentGeneratorConfig.isOnHeap() ? BuildMode.ON_HEAP : BuildMode.OFF_HEAP,
+        (segmentGeneratorConfig.getTableConfig() != null && segmentGeneratorConfig.getSchema() != null)
+            ? new IndexLoadingConfig(segmentGeneratorConfig.getTableConfig(), segmentGeneratorConfig.getSchema())
+            : null);
   }
 
   public MultipleTreesBuilder(@Nullable List<StarTreeIndexConfig> indexConfigs, boolean enableDefaultStarTree,

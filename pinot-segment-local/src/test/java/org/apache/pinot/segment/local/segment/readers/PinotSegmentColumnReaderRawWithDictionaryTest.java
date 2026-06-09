@@ -95,7 +95,7 @@ public class PinotSegmentColumnReaderRawWithDictionaryTest {
         throw new IllegalArgumentException("Unexpected type: " + type);
     }
 
-    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(fiReader, dictionary, null, 0);
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader("testColumn", fiReader, dictionary, null, 0);
     assertEquals(reader.getDictId(0), expectedDictId);
   }
 
@@ -114,7 +114,7 @@ public class PinotSegmentColumnReaderRawWithDictionaryTest {
     when(fiReader.getBytes(eq(0), any())).thenReturn(raw);
     when(dictionary.indexOf(new ByteArray(raw))).thenReturn(expectedDictId);
 
-    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(fiReader, dictionary, null, 0);
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader("testColumn", fiReader, dictionary, null, 0);
     assertEquals(reader.getDictId(0), expectedDictId);
   }
 
@@ -128,7 +128,7 @@ public class PinotSegmentColumnReaderRawWithDictionaryTest {
     when(dictionary.getValueType()).thenReturn(DataType.INT);
     when(fiReader.getDictId(eq(3), any())).thenReturn(99);
 
-    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(fiReader, dictionary, null, 0);
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader("testColumn", fiReader, dictionary, null, 0);
     assertEquals(reader.getDictId(3), 99);
     verify(fiReader).getDictId(eq(3), any());
     // No raw-value lookup should be attempted in the dictionary-encoded path.
@@ -142,7 +142,7 @@ public class PinotSegmentColumnReaderRawWithDictionaryTest {
     when(fiReader.isDictionaryEncoded()).thenReturn(false);
     when(fiReader.getStoredType()).thenReturn(DataType.INT);
 
-    PinotSegmentColumnReader reader = new PinotSegmentColumnReader(fiReader, null, null, 0);
+    PinotSegmentColumnReader reader = new PinotSegmentColumnReader("testColumn", fiReader, null, null, 0);
     assertThrows(UnsupportedOperationException.class, () -> reader.getDictId(0));
   }
 }

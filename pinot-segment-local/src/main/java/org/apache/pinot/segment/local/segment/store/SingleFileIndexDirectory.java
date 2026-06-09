@@ -347,9 +347,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     // Propagate segment-level custom metadata so downstream readers can read it
     if (_segmentMetadata != null && _segmentMetadata.getCustomMap() != null) {
-      for (Map.Entry<String, String> e : _segmentMetadata.getCustomMap().entrySet()) {
-        properties.setProperty(e.getKey(), e.getValue());
-      }
+      properties.putAll(_segmentMetadata.getCustomMap());
     }
 
     // Propagate the table's task config (serialized as JSON) to remote/empty index buffers so that

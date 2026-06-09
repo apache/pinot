@@ -2297,8 +2297,9 @@ public class ForwardIndexHandlerTest {
       if (expectDictionary && forwardIndexReader.isDictionaryEncoded()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);
       }
-      PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndexReader, dictionary, null,
-          columnMetadata.getMaxNumberOfMultiValues());
+      PinotSegmentColumnReader columnReader =
+          new PinotSegmentColumnReader(columnMetadata.getColumnName(), forwardIndexReader, dictionary, null,
+              columnMetadata.getMaxNumberOfMultiValues());
 
       if (expectDictionary && !forwardIndexReader.isDictionaryEncoded()) {
         try (Dictionary loadedDictionary = DictionaryIndexType.read(reader, columnMetadata)) {

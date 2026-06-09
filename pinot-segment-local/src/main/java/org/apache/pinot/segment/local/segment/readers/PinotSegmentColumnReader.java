@@ -63,14 +63,14 @@ public class PinotSegmentColumnReader implements Closeable {
     }
   }
 
-  public PinotSegmentColumnReader(ForwardIndexReader forwardIndexReader, @Nullable Dictionary dictionary,
+  public PinotSegmentColumnReader(String column, ForwardIndexReader forwardIndexReader, @Nullable Dictionary dictionary,
       @Nullable NullValueVectorReader nullValueVectorReader, int maxNumValuesPerMVEntry) {
     _forwardIndexReader = forwardIndexReader;
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dictionary;
     _nullValueVectorReader = nullValueVectorReader;
     _valueType = _dictionary != null ? _dictionary.getValueType() : _forwardIndexReader.getStoredType();
-    _columnName = null;
+    _columnName = column;
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
