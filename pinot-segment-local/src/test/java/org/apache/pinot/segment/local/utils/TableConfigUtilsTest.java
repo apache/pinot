@@ -533,6 +533,25 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // expected
     }
+
+    // multi-hop chain whose LEAF is a non-schema column consumed by nothing - still fails. Typo protection holds
+    // across a chain: 'intermediateCol' is allowed (consumed by 'danglingLeaf'), but 'danglingLeaf' itself is not in
+    // the schema and is referenced by nothing, so validation fails on it.
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("intermediateCol", "reverse(anotherCol)"),
+        new TransformConfig("danglingLeaf", "lower(intermediateCol)")));
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      fail("Should fail: chain leaf 'danglingLeaf' is not in the schema and is consumed by nothing");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    // a 2-node cycle among non-schema columns passes this validation (each is referenced by the other), consistent
+    // with cycles among schema columns - TableConfigUtils does not do cycle detection; a cycle is caught later by
+    // ExpressionTransformer's topological sort at ingestion time.
+    ingestionConfig.setTransformConfigs(Arrays.asList(new TransformConfig("cycleA", "reverse(cycleB)"),
+        new TransformConfig("cycleB", "lower(cycleA)")));
+    TableConfigUtils.validate(tableConfig, schema);
     ingestionConfig.setTransformConfigs(null);
 
     // invalid field name in schema with matching prefix from complexConfigType's prefixesToRename
