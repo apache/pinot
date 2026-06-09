@@ -63,6 +63,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final String _partitionColumn;
   private final String _partitionFunctionName;
   private final int _numPartitions;
+  private final long _newSegmentExpirationMs;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
@@ -72,11 +73,12 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private transient TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions) {
+      int numPartitions, long newSegmentExpirationMs) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
+    _newSegmentExpirationMs = newSegmentExpirationMs;
   }
 
   @Override
@@ -215,7 +217,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         continue;
       }
       // Process new segments in the end
-      if (InstanceSelector.isNewSegment(segmentInfo._creationTimeMs, currentTimeMs)) {
+      if (InstanceSelector.isNewSegment(segmentInfo._creationTimeMs, currentTimeMs, _newSegmentExpirationMs)) {
         newSegmentInfoEntries.add(entry);
         continue;
       }

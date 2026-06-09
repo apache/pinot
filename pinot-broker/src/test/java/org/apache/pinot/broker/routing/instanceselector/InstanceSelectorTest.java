@@ -59,7 +59,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.broker.routing.instanceselector.InstanceSelector.NEW_SEGMENT_EXPIRATION_MILLIS;
 import static org.apache.pinot.spi.config.table.RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.config.table.RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING;
@@ -70,7 +69,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -109,7 +110,10 @@ public class InstanceSelectorTest {
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
-  private final static InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG = new InstanceSelectorConfig(false, 300, false);
+  private static final long NEW_SEGMENT_EXPIRATION_SECONDS = 300;
+  private static final long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.SECONDS.toMillis(NEW_SEGMENT_EXPIRATION_SECONDS);
+  private final static InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG =
+      new InstanceSelectorConfig(false, NEW_SEGMENT_EXPIRATION_SECONDS, false);
 
   private void createSegments(List<Pair<String, Long>> segmentCreationTimeMsPairs) {
     List<String> segmentZKMetadataPaths = new ArrayList<>();
