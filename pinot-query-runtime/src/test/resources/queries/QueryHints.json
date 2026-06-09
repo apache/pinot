@@ -659,6 +659,18 @@
     {
       "description": "Local replicated JOIN with partition hint and parallelism",
       "sql": "SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'local') */ {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(is_replicated='true') */ ON {tbl1}.num = {tbl2}.num"
+    },
+    {
+      "description": "Window PARTITION BY the table's partition column with is_partitioned_by_window_keys hint forces a pre-partitioned (direct) exchange; tbl1 is partitioned by num so results stay correct",
+      "sql": "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ {tbl1}.num, SUM({tbl1}.num) OVER (PARTITION BY {tbl1}.num) FROM {tbl1}"
+    },
+    {
+      "description": "Window PARTITION BY + ORDER BY on different keys with is_partitioned_by_window_keys hint forces a pre-partitioned sort exchange; tbl1 is partitioned by num so results stay correct",
+      "sql": "SELECT /*+ windowOptions(is_partitioned_by_window_keys='true') */ {tbl1}.num, {tbl1}.name, SUM({tbl1}.num) OVER (PARTITION BY {tbl1}.num ORDER BY {tbl1}.name) FROM {tbl1}"
+    },
+    {
+      "description": "Window with is_partitioned_by_window_keys='false' disables the auto-detected pre-partitioning (tbl1 is partitioned by num) and falls back to a shuffle; results stay correct",
+      "sql": "SELECT /*+ windowOptions(is_partitioned_by_window_keys='false') */ {tbl1}.num, SUM({tbl1}.num) OVER (PARTITION BY {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */"
     }
   ]}
 }
