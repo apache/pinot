@@ -180,9 +180,10 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
     List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       String segmentName = segmentZKMetadata.getSegmentName();
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
       if (idealStateSegments.contains(segmentName)
           && segmentZKMetadata.getStatus().isCompleted() // skip consuming segments
-          && !idealState.getInstanceStateMap(segmentName).containsValue(SegmentStateModel.CONSUMING)) {
+          && (instanceStateMap == null || !instanceStateMap.containsValue(SegmentStateModel.CONSUMING))) {
         // The last check is for an edge case where
         //   1. SegmentZKMetadata was updated to DONE in segment commit protocol, but
         //   2. IdealState for the segment was not updated to ONLINE due to some issue in the controller.
