@@ -30,8 +30,10 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,6 +49,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -137,6 +140,7 @@ import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.controller.validation.UtilizationChecker;
+import org.apache.pinot.controller.workload.BrokerResourceIdealStateChangeListener;
 import org.apache.pinot.controller.workload.QueryWorkloadManager;
 import org.apache.pinot.core.instance.context.ControllerContext;
 import org.apache.pinot.core.periodictask.PeriodicTask;
@@ -224,6 +228,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
   protected SegmentCompletionManager _segmentCompletionManager;
   protected LeadControllerManager _leadControllerManager;
+  protected BrokerResourceIdealStateChangeListener _brokerResourceIdealStateChangeListener;
   protected List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
@@ -691,8 +696,28 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _rebalancePreChecker.init(_helixResourceManager, _executorService, _config.getRebalanceDiskUtilizationThreshold());
     _rebalancerExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
         "rebalance-thread-%d");
-    _helixResourceManager.setQueryWorkloadManager(new QueryWorkloadManager(_helixResourceManager, _config,
-        _controllerMetrics));
+    QueryWorkloadManager queryWorkloadManager =
+        new QueryWorkloadManager(_helixResourceManager, _config, _controllerMetrics);
+    _helixResourceManager.setQueryWorkloadManager(queryWorkloadManager);
+    if (_config.enableBrokerChangePropagation()) {
+      HelixDataAccessor helixDataAccessor = _helixParticipantManager.getHelixDataAccessor();
+      _brokerResourceIdealStateChangeListener = new BrokerResourceIdealStateChangeListener(queryWorkloadManager,
+          _leadControllerManager, () -> helixDataAccessor.getProperty(
+              helixDataAccessor.keyBuilder().idealStates(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)), () -> {
+                Set<String> tableNames = new HashSet<>(_helixResourceManager.getAllTables());
+                tableNames.addAll(_helixResourceManager.getBrokerResourceLogicalTables());
+                return tableNames;
+              });
+      _leadControllerManager.registerLeadershipAcquiredCallback(
+          _brokerResourceIdealStateChangeListener::onLeadershipAcquired);
+      try {
+        _helixParticipantManager.addIdealStateChangeListener(_brokerResourceIdealStateChangeListener);
+      } catch (Exception e) {
+        _leadControllerManager.unregisterLeadershipAcquiredCallback();
+        _brokerResourceIdealStateChangeListener = null;
+        throw new RuntimeException("Failed to register BrokerResource IdealState change listener", e);
+      }
+    }
     _tableRebalanceManager =
         new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
             _rebalancerExecutorService);
@@ -1195,6 +1220,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // scheduler of its own, which is separate from the periodic task scheduler stopped above.
       LOGGER.info("Stopping task scheduler");
       _taskManager.stopScheduler();
+
+      if (_brokerResourceIdealStateChangeListener != null) {
+        _leadControllerManager.unregisterLeadershipAcquiredCallback();
+        LOGGER.info("Removing BrokerResource IdealState change listener");
+        _helixParticipantManager.removeListener(
+            _helixParticipantManager.getHelixDataAccessor().keyBuilder().idealStates(),
+            _brokerResourceIdealStateChangeListener);
+        _brokerResourceIdealStateChangeListener = null;
+      }
 
       LOGGER.info("Stopping lead controller manager");
       _leadControllerManager.stop();
