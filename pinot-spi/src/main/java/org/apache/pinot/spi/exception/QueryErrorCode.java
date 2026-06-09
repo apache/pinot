@@ -43,6 +43,7 @@ public enum QueryErrorCode {
   QUERY_EXECUTION(200, "QueryExecutionError", Response.Status.INTERNAL_SERVER_ERROR),
   SERVER_SHUTTING_DOWN(210, "ServerShuttingDown", Response.Status.SERVICE_UNAVAILABLE),
   SERVER_OUT_OF_CAPACITY(211, "ServerOutOfCapacity", Response.Status.SERVICE_UNAVAILABLE),
+  BROKER_SHUTTING_DOWN(212, "BrokerShuttingDown", Response.Status.SERVICE_UNAVAILABLE),
   SERVER_TABLE_MISSING(230, "ServerTableMissing", Response.Status.NOT_FOUND),
   SERVER_SEGMENT_MISSING(235, "ServerSegmentMissing", Response.Status.NOT_FOUND),
   QUERY_SCHEDULING_TIMEOUT(240, "QuerySchedulingTimeoutError", Response.Status.REQUEST_TIMEOUT),
@@ -85,6 +86,7 @@ public enum QueryErrorCode {
       MERGE_RESPONSE,
       QUERY_CANCELLATION,
       SERVER_SHUTTING_DOWN,
+      BROKER_SHUTTING_DOWN,
       QUERY_PLANNING
   );
 
