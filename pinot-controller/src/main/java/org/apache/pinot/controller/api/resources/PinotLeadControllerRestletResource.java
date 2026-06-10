@@ -172,6 +172,11 @@ public class PinotLeadControllerRestletResource {
     Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
 
     // Gets master host from partition map. Returns null if no master found.
+    if (partitionStateMap == null) {
+      LOGGER.warn("Partition state map for partition: {} is null in lead controller resource external view",
+          partitionName);
+      return null;
+    }
     for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
       if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
         // Found the controller in master state.
