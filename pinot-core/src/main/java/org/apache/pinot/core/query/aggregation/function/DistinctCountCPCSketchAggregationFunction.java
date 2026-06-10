@@ -147,11 +147,12 @@ public class DistinctCountCPCSketchAggregationFunction
     // DISTINCTCOUNTCPC(CAST(uuidCol AS STRING)).
     if (dataType == DataType.UUID) {
       byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
+      // Leave the updated CpcSketch in the holder; extractAggregationResult converts it to an accumulator.
+      // Calling getAccumulator here would read the holder slot already occupied by the sketch and fail.
       CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
         cpcSketch.update(UuidUtils.toString(uuidBytesValues[i]));
       }
-      getAccumulator(aggregationResultHolder).apply(cpcSketch);
       return;
     }
 
@@ -216,8 +217,9 @@ public class DistinctCountCPCSketchAggregationFunction
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
     }
-    CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
-    cpcSketchAccumulator.apply(cpcSketch);
+    // The updated CpcSketch already lives in the holder (getCpcSketch stored it); extractAggregationResult
+    // converts it to a CpcSketchAccumulator. Reading the holder as an accumulator here would
+    // ClassCastException — the holder slot contains the sketch, not an accumulator.
   }
 
   @Override

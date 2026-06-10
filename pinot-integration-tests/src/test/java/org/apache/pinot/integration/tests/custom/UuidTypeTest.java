@@ -371,21 +371,31 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
    * DISTINCTCOUNTX(uuidCol) == DISTINCTCOUNTX(CAST(uuidCol AS STRING)) end-to-end on real segments —
    * a parity that silently breaks if any branch falls back to the projection string path.
    */
-  @Test
-  public void testDistinctCountFamilyUuidMatchesCastStringParity()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDistinctCountFamilyUuidMatchesCastStringParity(boolean useMultiStageQueryEngine)
       throws Exception {
     for (String function : List.of("DISTINCTCOUNT", "DISTINCTCOUNTBITMAP", "DISTINCTCOUNTHLL",
         "DISTINCTCOUNTHLLPLUS", "DISTINCTCOUNTULL", "DISTINCTCOUNTCPCSKETCH", "DISTINCTCOUNTTHETASKETCH")) {
       String onUuid = String.format("SELECT %s(%s) FROM %s", function, UUID_FROM_STRING_COLUMN, getTableName());
       String onCastString = String.format("SELECT %s(CAST(%s AS STRING)) FROM %s", function,
           UUID_FROM_STRING_COLUMN, getTableName());
-      JsonNode uuidRows = postRows(false, onUuid);
-      JsonNode castRows = postRows(false, onCastString);
+      JsonNode uuidRows = postRows(useMultiStageQueryEngine, onUuid);
+      JsonNode castRows = postRows(useMultiStageQueryEngine, onCastString);
       assertEquals(uuidRows.get(0).get(0).asLong(), castRows.get(0).get(0).asLong(),
           function + " on UUID column must match the same function on CAST(uuidCol AS STRING)");
       assertEquals(uuidRows.get(0).get(0).asLong(), DISTINCT_UUID_VALUES.size(),
           function + " on UUID column must count the distinct UUID values");
     }
+
+    // Also pin the filterless dictionary-based plan (NonScanBasedAggregationOperator): a WHERE clause forces the
+    // scan path above on some engines, while the bare aggregates here may be served purely from the dictionary.
+    // Both shapes must agree for UUID columns.
+    JsonNode filteredRows = postRows(useMultiStageQueryEngine, String.format(
+        "SELECT DISTINCTCOUNTHLL(%s) FROM %s WHERE %s >= 0", UUID_FROM_STRING_COLUMN, getTableName(), ID_COLUMN));
+    JsonNode unfilteredRows = postRows(useMultiStageQueryEngine, String.format(
+        "SELECT DISTINCTCOUNTHLL(%s) FROM %s", UUID_FROM_STRING_COLUMN, getTableName()));
+    assertEquals(unfilteredRows.get(0).get(0).asLong(), filteredRows.get(0).get(0).asLong(),
+        "Dictionary-based (filterless) and scan-based DISTINCTCOUNTHLL must agree on UUID columns");
   }
 
   @Test(dataProvider = "useV2QueryEngine")
