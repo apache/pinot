@@ -34,7 +34,11 @@ import org.apache.helix.model.IdealState;
  * partition are never served from multiple different instances. The instances in a replica-group should have all the
  * online segments (segments with ONLINE/CONSUMING instances in the ideal state and selected by the pre-selector)
  * available (ONLINE/CONSUMING in the external view) in order to serve queries. If any segment is unavailable in the
- * replica-group, we mark the whole replica-group down and not serve queries with this replica-group.
+ * replica-group, we mark the whole replica-group down and not serve queries with this replica-group. As an exception,
+ * a segment that is unavailable in every replica-group (e.g. being loaded on all the new instances right after tier
+ * relocation/rebalance moved it) does not mark any replica-group down because no routing choice can serve it; it is
+ * reported as unavailable individually instead, so that it doesn't take down all the other segments sharing the same
+ * instances.
  *
  * The selection algorithm is the same as {@link ReplicaGroupInstanceSelector}, and will always evenly distribute the
  * traffic to all replica-groups that have all online segments available.

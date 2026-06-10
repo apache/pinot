@@ -187,6 +187,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
    *   2. Compare online instances for old segments with instances in ideal state and gather the unavailable instances
    *   for each set of instances
    *   3. Exclude the unavailable instances from the online instances map for both old and new segment map
+   *
+   * As an exception, an old segment that is not online on any instance in the ideal state (e.g. it was just moved to
+   * a new set of instances by tier relocation/rebalance and is still being loaded on all of them) does not contribute
+   * to the unavailable instances because no instance selection can serve it; it is reported as unavailable
+   * individually instead, so that it doesn't take down all the other segments sharing the same instances.
    * </pre>
    */
   void updateSegmentMapsForUpsertTable(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
@@ -222,10 +227,28 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     // Calculate the unavailable instances based on the old segments' online instances for each combination of instances
     // in the ideal state
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
+    List<String> segmentsNotOnlineAnywhere = null;
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      // When a segment is not online on any instance in the ideal state (e.g. it was just moved to a new set of
+      // instances by tier relocation/rebalance and is still being loaded on all of them), no instance selection can
+      // serve it, so excluding instances for the whole group cannot help consistency. Marking all its instances
+      // unavailable would instead take down every other segment sharing the same instances (a production incident
+      // showed a whole tier of ~30k segments reported unavailable due to a few relocating segments). Skip it here;
+      // it gets an empty candidate list below and is reported unavailable individually.
+      if (onlineInstances.isEmpty()) {
+        if (segmentsNotOnlineAnywhere == null) {
+          segmentsNotOnlineAnywhere = new ArrayList<>();
+        }
+        segmentsNotOnlineAnywhere.add(segment);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Found old segment: {} in table: {} not online on any instance (IS: {}, EV: {})", segment,
+              _tableNameWithType, idealStateInstanceStateMap, externalViewAssignment.get(segment));
+        }
+        continue;
+      }
       Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
       Set<String> unavailableInstances =
           unavailableInstancesMap.computeIfAbsent(instancesInIdealState, k -> new HashSet<>());
@@ -240,6 +263,13 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
       }
     }
+    if (segmentsNotOnlineAnywhere != null) {
+      int numSegmentsNotOnlineAnywhere = segmentsNotOnlineAnywhere.size();
+      LOGGER.warn("Found {} old segments not online on any instance in table: {}, sampling {}: {}, counting them as "
+              + "unavailable without excluding instances for their groups", numSegmentsNotOnlineAnywhere,
+          _tableNameWithType, Math.min(numSegmentsNotOnlineAnywhere, 10),
+          segmentsNotOnlineAnywhere.subList(0, Math.min(numSegmentsNotOnlineAnywhere, 10)));
+    }
 
     // Iterate over the maps and exclude the unavailable instances
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
@@ -248,7 +278,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
 
-      Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
+      Set<String> unavailableInstances =
+          unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       int idealStateReplicaId = 0;
       for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {

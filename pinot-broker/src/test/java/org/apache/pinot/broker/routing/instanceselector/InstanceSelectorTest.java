@@ -1218,8 +1218,8 @@ public class InstanceSelectorTest {
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
 
       // Change the ERROR instance of segment0 to ONLINE, segment0 should be available
-      // (Note that for StrictReplicaGroupInstanceSelector, segment1 but it is old so it will mark instance down for
-      // segment0)
+      // (Note that for StrictReplicaGroupInstanceSelector, segment1 is old but it is not online on any instance, so
+      // it is counted as unavailable individually without marking instances down for segment0)
       // {
       //   segment0: {
       //     (disabled) instance: OFFLINE,
@@ -1237,8 +1237,8 @@ public class InstanceSelectorTest {
       assertEquals(selectionResult.getSegmentToInstanceMap().size(), 1);
       assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment1));
       selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
-      assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
-      assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
+      assertEquals(selectionResult.getSegmentToInstanceMap().size(), 1);
+      assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(segment1));
 
       // Disable the ONLINE instance, both segments should be unavailable
       // {
@@ -1285,6 +1285,85 @@ public class InstanceSelectorTest {
       assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
       assertEquals(selectionResult.getUnavailableSegments(), Arrays.asList(segment0, segment1));
     }
+  }
+
+  /**
+   * Regression test for a segment relocation scenario: an old segment that just got moved to a new set of instances
+   * (e.g. by tier relocation) is not ONLINE on any of them yet. Such a segment cannot be served from anywhere, so it
+   * should be reported as unavailable individually instead of marking the instances unavailable for the whole group,
+   * which would take down all the other segments hosted by the same instances.
+   */
+  @Test
+  public void testStrictReplicaGroupSegmentNotOnlineAnywhereDoesNotMarkGroupDown() {
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector = new StrictReplicaGroupInstanceSelector();
+
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    Set<String> enabledInstances = new HashSet<>(Arrays.asList(instance0, instance1));
+
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String relocatedSegment = "segment2";
+    List<String> segments = Arrays.asList(segment0, segment1, relocatedSegment);
+
+    // All the segments are assigned to the same instances in the ideal state. The external view shows segment0 and
+    // segment1 ONLINE on instance0 only (instance1 is restarting and has no entries), and the relocated segment not
+    // ONLINE anywhere (still being loaded on both instances).
+    IdealState idealState = new IdealState(TABLE_NAME);
+    Map<String, Map<String, String>> idealStateSegmentAssignment = idealState.getRecord().getMapFields();
+    Map<String, String> idealStateInstanceStateMap = new TreeMap<>();
+    idealStateInstanceStateMap.put(instance0, ONLINE);
+    idealStateInstanceStateMap.put(instance1, ONLINE);
+    for (String segment : segments) {
+      idealStateSegmentAssignment.put(segment, idealStateInstanceStateMap);
+    }
+    ExternalView externalView = new ExternalView(TABLE_NAME);
+    Map<String, Map<String, String>> externalViewSegmentAssignment = externalView.getRecord().getMapFields();
+    Map<String, String> externalViewInstanceStateMap = new TreeMap<>();
+    externalViewInstanceStateMap.put(instance0, ONLINE);
+    externalViewSegmentAssignment.put(segment0, externalViewInstanceStateMap);
+    externalViewSegmentAssignment.put(segment1, externalViewInstanceStateMap);
+    Set<String> onlineSegments = new HashSet<>(segments);
+
+    strictReplicaGroupInstanceSelector.init(_tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+        INSTANCE_SELECTOR_CONFIG, enabledInstances, EMPTY_SERVER_MAP, idealState, externalView, onlineSegments);
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    PinotQuery pinotQuery = mock(PinotQuery.class);
+    when(brokerRequest.getPinotQuery()).thenReturn(pinotQuery);
+    when(pinotQuery.getQueryOptions()).thenReturn(null);
+
+    // The relocated segment should be unavailable, but segment0 and segment1 should still be served from instance0
+    InstanceSelector.SelectionResult selectionResult =
+        strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
+    Map<String, String> expectedSegmentToInstanceMap = new HashMap<>();
+    expectedSegmentToInstanceMap.put(segment0, instance0);
+    expectedSegmentToInstanceMap.put(segment1, instance0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSegmentToInstanceMap);
+    assertEquals(selectionResult.getUnavailableSegments(), Collections.singletonList(relocatedSegment));
+
+    // Once the relocated segment is loaded on instance0, all the segments should be served from instance0
+    Map<String, String> relocatedSegmentExternalViewInstanceStateMap = new TreeMap<>();
+    relocatedSegmentExternalViewInstanceStateMap.put(instance0, ONLINE);
+    externalViewSegmentAssignment.put(relocatedSegment, relocatedSegmentExternalViewInstanceStateMap);
+    strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
+    expectedSegmentToInstanceMap.put(relocatedSegment, instance0);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSegmentToInstanceMap);
+    assertTrue(selectionResult.getUnavailableSegments().isEmpty());
+
+    // If a segment is ONLINE on some instance (instance1 here) but missing on another (instance0), the strict
+    // replica-group guarantee should still mark the instance missing the segment as unavailable for the whole group
+    Map<String, String> partiallyOnlineExternalViewInstanceStateMap = new TreeMap<>();
+    partiallyOnlineExternalViewInstanceStateMap.put(instance1, ONLINE);
+    externalViewSegmentAssignment.put(relocatedSegment, partiallyOnlineExternalViewInstanceStateMap);
+    strictReplicaGroupInstanceSelector.onAssignmentChange(idealState, externalView, onlineSegments);
+    selectionResult = strictReplicaGroupInstanceSelector.select(brokerRequest, segments, 0);
+    // instance0 is unavailable because it misses the relocated segment, and instance1 is unavailable because it
+    // misses segment0 and segment1, so all the segments should be unavailable
+    assertTrue(selectionResult.getSegmentToInstanceMap().isEmpty());
+    assertEquals(new HashSet<>(selectionResult.getUnavailableSegments()), new HashSet<>(segments));
   }
 
   @Test(dataProvider = "selectorType")
@@ -1443,15 +1522,12 @@ public class InstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Advance the clock to make newSeg to old segment and we see newSeg is reported as unavailable segment.
+    // Note that even for strict replica-group routing, newSeg is not online on any instance, so it doesn't mark
+    // instances unavailable for the whole group, and oldSeg is still served.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     selector = createTestInstanceSelector(selectorType, enabledInstances, idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    if (STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equals(selectorType)) {
-      expectedResult = Map.of();
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg, oldSeg));
-    } else {
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
-    }
+    assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
     assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
   }
@@ -1511,12 +1587,9 @@ public class InstanceSelectorTest {
     externalView = createExternalView(externalViewMap);
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      expectedResult = Map.of();
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg, newSeg));
-    } else {
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
-    }
+    // Note that even for strict replica-group routing, segment1 is not online on any instance, so it doesn't mark
+    // instances unavailable for the whole group, and segment0 is still served.
+    assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
 
     // Get segment1 back online in instance1
@@ -1602,12 +1675,9 @@ public class InstanceSelectorTest {
 
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      expectedBalancedInstanceSelectorResult = Map.of();
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg, newSeg));
-    } else {
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
-    }
+    // Note that even for strict replica-group routing, segment1 is not online on any instance, so it doesn't mark
+    // instances unavailable for the whole group, and segment0 is still served.
+    assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedBalancedInstanceSelectorResult);
   }
 
@@ -1680,15 +1750,13 @@ public class InstanceSelectorTest {
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Advance the clock to make newSeg to old segment.
-    // On state update, all segments become unavailable.
+    // On state update, newSeg becomes unavailable. Note that even for strict replica-group routing, newSeg is not
+    // online on any instance, so it doesn't mark instances unavailable for the whole group, and the old segments are
+    // still served.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     selector.onAssignmentChange(idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(oldSeg0, oldSeg1, newSeg));
-    } else {
-      assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
-    }
+    assertEquals(selectionResult.getUnavailableSegments(), List.of(newSeg));
   }
 
   // Test that on instance change, we exclude not enabled instance from serving for new segments.
