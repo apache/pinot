@@ -834,7 +834,7 @@ public class TableRebalancer {
     tableRebalanceLogger.info("Fetching the table size");
     try {
       TableSizeReader.TableSubTypeSizeDetails sizeDetails =
-          _tableSizeReader.getTableSubtypeSize(tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS, true);
+          _tableSizeReader.getTableSubtypeSize(tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS, true, false);
       tableRebalanceLogger.info("Fetched the table size details");
       return sizeDetails;
     } catch (InvalidConfigException e) {

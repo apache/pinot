@@ -198,7 +198,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private void updateTableSizeMetrics(String tableNameWithType)
       throws InvalidConfigException {
-    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true);
+    _tableSizeReader.getTableSizeDetails(tableNameWithType, TABLE_CHECKER_TIMEOUT_MS, true, false);
   }
 
   /**

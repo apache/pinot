@@ -50,7 +50,7 @@ public class ServerTableSizeReader {
   }
 
   public Map<String, List<SegmentSizeInfo>> getSegmentSizeInfoFromServers(BiMap<String, String> serverEndPoints,
-      String tableNameWithType, int timeoutMs) {
+      String tableNameWithType, int timeoutMs, boolean includeColumnStats) {
     int numServers = serverEndPoints.size();
     LOGGER.info("Reading segment sizes from {} servers for table: {} with timeout: {}ms", numServers, tableNameWithType,
         timeoutMs);
@@ -58,7 +58,8 @@ public class ServerTableSizeReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = endpoint + "/table/" + tableNameWithType + "/size";
+      String tableSizeUri = endpoint + "/table/" + tableNameWithType + "/size"
+          + (includeColumnStats ? "?includeColumnStats=true" : "");
       serverUrls.add(tableSizeUri);
     }
 

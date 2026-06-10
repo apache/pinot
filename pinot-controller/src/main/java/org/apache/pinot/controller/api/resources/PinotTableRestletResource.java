@@ -1257,6 +1257,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @ApiParam(value = "Include per-column compression stats in response (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
@@ -1270,7 +1272,7 @@ public class PinotTableRestletResource {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     int numReplica = tableConfig == null ? 1 : tableConfig.getReplication();
 
-    // Check feature flag — suppress columnCompressionStats when disabled
+    // compressionStatsEnabled gates server-side collection; includeColumnStats controls per-column list in response.
     boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
         && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
 
@@ -1278,6 +1280,10 @@ public class PinotTableRestletResource {
     try {
       JsonNode segmentsMetadataJson =
           getAggregateMetadataFromServer(tableNameWithType, columns, numReplica, compressionStatsEnabled);
+      // Suppress per-column list when not requested — compressionStats summary is always returned
+      if (!includeColumnStats && segmentsMetadataJson.has("columnCompressionStats")) {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) segmentsMetadataJson).remove("columnCompressionStats");
+      }
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
@@ -1298,6 +1304,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table with type suffix", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
       @ApiParam(value = "Comma separated list of columns") @QueryParam("columns") @Nullable String columns,
+      @ApiParam(value = "Include per-column compression stats in response (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableNameWithType);
@@ -1327,7 +1335,6 @@ public class PinotTableRestletResource {
       }
     }
 
-    // Check feature flag — suppress columnCompressionStats when disabled
     boolean compressionStatsEnabled = tableConfig != null && tableConfig.getIndexingConfig() != null
         && tableConfig.getIndexingConfig().isCompressionStatsEnabled();
 
@@ -1335,6 +1342,9 @@ public class PinotTableRestletResource {
       JsonNode segmentsMetadataJson =
           getAggregateMetadataFromServer(existingTableNameWithType, columnsList, numReplica,
               compressionStatsEnabled);
+      if (!includeColumnStats && segmentsMetadataJson.has("columnCompressionStats")) {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) segmentsMetadataJson).remove("columnCompressionStats");
+      }
       return JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);

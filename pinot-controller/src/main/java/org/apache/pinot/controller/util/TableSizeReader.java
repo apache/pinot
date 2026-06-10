@@ -89,7 +89,7 @@ public class TableSizeReader {
    */
   @Nullable
   public TableSizeDetails getTableSizeDetails(String tableName, @Nonnegative int timeoutMsec,
-      boolean includeReplacedSegments)
+      boolean includeReplacedSegments, boolean includeColumnStats)
       throws InvalidConfigException {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
@@ -110,7 +110,7 @@ public class TableSizeReader {
     TableSizeDetails tableSizeDetails = new TableSizeDetails(tableName);
     if (hasRealtimeTableConfig) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec, includeReplacedSegments);
+      tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec, includeReplacedSegments, includeColumnStats);
       // taking max(0,value) as values as set to -1 if all the segments are in error
       tableSizeDetails._reportedSizeInBytes += Math.max(tableSizeDetails._realtimeSegments._reportedSizeInBytes, 0L);
       tableSizeDetails._estimatedSizeInBytes += Math.max(tableSizeDetails._realtimeSegments._estimatedSizeInBytes, 0L);
@@ -141,10 +141,13 @@ public class TableSizeReader {
         tableSizeDetails._realtimeSegments._compressionStats = null;
         tableSizeDetails._realtimeSegments._columnCompressionStats = null;
       }
+      if (!includeColumnStats) {
+        tableSizeDetails._realtimeSegments._columnCompressionStats = null;
+      }
     }
     if (hasOfflineTableConfig) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec, includeReplacedSegments);
+      tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec, includeReplacedSegments, includeColumnStats);
       // taking max(0,value) as values as set to -1 if all the segments are in error
       tableSizeDetails._reportedSizeInBytes += Math.max(tableSizeDetails._offlineSegments._reportedSizeInBytes, 0L);
       tableSizeDetails._estimatedSizeInBytes += Math.max(tableSizeDetails._offlineSegments._estimatedSizeInBytes, 0L);
@@ -173,6 +176,9 @@ public class TableSizeReader {
       } else {
         clearCompressionMetrics(offlineTableName);
         tableSizeDetails._offlineSegments._compressionStats = null;
+        tableSizeDetails._offlineSegments._columnCompressionStats = null;
+      }
+      if (!includeColumnStats) {
         tableSizeDetails._offlineSegments._columnCompressionStats = null;
       }
     }
@@ -404,14 +410,14 @@ public class TableSizeReader {
   }
 
   public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs,
-      boolean includeReplacedSegments)
+      boolean includeReplacedSegments, boolean includeColumnStats)
       throws InvalidConfigException {
     Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType,
         null, includeReplacedSegments);
     ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap =
-        serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs);
+        serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs, includeColumnStats);
 
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;

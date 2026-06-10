@@ -155,7 +155,7 @@ public class ServerTableSizeReaderTest {
     }
     endpoints.put(_serverList.get(5), _endpointList.get(5));
     Map<String, List<SegmentSizeInfo>> serverSizes =
-        reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC, false);
     assertEquals(serverSizes.size(), 3);
     assertTrue(serverSizes.containsKey(_serverList.get(0)));
     assertTrue(serverSizes.containsKey(_serverList.get(1)));
@@ -174,7 +174,7 @@ public class ServerTableSizeReaderTest {
       endpoints.put(_serverList.get(i), _endpointList.get(i));
     }
     Map<String, List<SegmentSizeInfo>> serverSizes =
-        reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC, false);
     assertEquals(serverSizes.size(), 3);
     assertTrue(serverSizes.containsKey(_serverList.get(0)));
     assertTrue(serverSizes.containsKey(_serverList.get(1)));

@@ -95,6 +95,8 @@ public class TableSizeResource {
   public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Include per-column compression stats (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -109,8 +111,9 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    // Check feature flag — only collect per-column compression stats if enabled
     Pair<TableConfig, ?> cachedPair = tableDataManager.getCachedTableConfigAndSchema();
+    // compressionStatsEnabled gates segment-level aggregate sizes (rawFwdIndexSize/compressedFwdIndexSize)
+    // and always-on compressionStats summary. includeColumnStats additionally gates the per-column map.
     boolean compressionStatsEnabled = cachedPair != null && cachedPair.getLeft() != null
         && cachedPair.getLeft().getIndexingConfig() != null
         && cachedPair.getLeft().getIndexingConfig().isCompressionStatsEnabled();
@@ -164,13 +167,15 @@ public class TableSizeResource {
                 for (int i = 0, n = colMeta.getNumIndexes(); i < n; i++) {
                   indexNames.add(indexService.get(colMeta.getIndexType(i)).getId());
                 }
-                if (columnCompressionStats == null) {
-                  columnCompressionStats = new HashMap<>();
+                if (includeColumnStats) {
+                  if (columnCompressionStats == null) {
+                    columnCompressionStats = new HashMap<>();
+                  }
+                  columnCompressionStats.put(colMeta.getColumnName(),
+                      new ColumnCompressionStatsInfo(colMeta.getColumnName(),
+                          rawIngestSize, onDiskSize, ratio, codec,
+                          indexNames.isEmpty() ? null : indexNames, null));
                 }
-                columnCompressionStats.put(colMeta.getColumnName(),
-                    new ColumnCompressionStatsInfo(colMeta.getColumnName(),
-                        rawIngestSize, onDiskSize, ratio, codec,
-                        indexNames.isEmpty() ? null : indexNames, null));
               }
               segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes,
                   rawFwdIndexSize, compressedFwdIndexSize, immutableSegment.getTier(), columnCompressionStats));
@@ -212,8 +217,10 @@ public class TableSizeResource {
   public String getTableSizeOld(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed,
+      @ApiParam(value = "Include per-column compression stats (default false to avoid large responses)")
+      @DefaultValue("false") @QueryParam("includeColumnStats") boolean includeColumnStats,
       @Context HttpHeaders headers)
       throws WebApplicationException {
-    return this.getTableSize(tableName, detailed, headers);
+    return this.getTableSize(tableName, detailed, includeColumnStats, headers);
   }
 }
