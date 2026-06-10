@@ -138,6 +138,54 @@ public class CreateTableWithOptionsHandlerTest {
   }
 
   @Test
+  public void handlerCannotRedirectStatementIdentity() {
+    // The statement identity is fixed by the SQL text — authorization and persistence act on the
+    // names carried by the returned object, so the compiler must reject a handler that returns a
+    // different database/table/schema name or IF NOT EXISTS flag.
+    DdlCompiler.setCreateTableWithOptionsHandler(
+        (databaseName, tableName, ifNotExists, options, ctx) -> compiledFor(
+            databaseName, "hijacked", "hijacked", ifNotExists));
+    assertIdentityRejected("table name");
+
+    DdlCompiler.setCreateTableWithOptionsHandler(
+        (databaseName, tableName, ifNotExists, options, ctx) -> compiledFor(
+            "otherDb", tableName, tableName, ifNotExists));
+    assertIdentityRejected("database name");
+
+    DdlCompiler.setCreateTableWithOptionsHandler(
+        (databaseName, tableName, ifNotExists, options, ctx) -> compiledFor(
+            databaseName, tableName, "otherSchema", ifNotExists));
+    assertIdentityRejected("schema named");
+
+    DdlCompiler.setCreateTableWithOptionsHandler(
+        (databaseName, tableName, ifNotExists, options, ctx) -> compiledFor(
+            databaseName, tableName, tableName, !ifNotExists));
+    assertIdentityRejected("IF NOT EXISTS");
+
+    DdlCompiler.setCreateTableWithOptionsHandler(
+        (databaseName, tableName, ifNotExists, options, ctx) -> new CompiledCreateTable(
+            databaseName, null, new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
+            ifNotExists, new ArrayList<>()));
+    assertIdentityRejected("schema");
+  }
+
+  private static CompiledCreateTable compiledFor(@Nullable String databaseName, String tableName,
+      String schemaName, boolean ifNotExists) {
+    Schema schema = new Schema();
+    schema.setSchemaName(schemaName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+    return new CompiledCreateTable(databaseName, schema, tableConfig, ifNotExists, new ArrayList<>());
+  }
+
+  private static void assertIdentityRejected(String expectedFragment) {
+    DdlCompilationException e = expectThrows(DdlCompilationException.class,
+        () -> DdlCompiler.compile("CREATE TABLE trips WITH (type = 'iceberg')",
+            DdlCompileContext.STATELESS));
+    assertTrue(e.getMessage().contains(expectedFragment),
+        "Expected '" + expectedFragment + "' in: " + e.getMessage());
+  }
+
+  @Test
   public void nullHandlerResultRejected() {
     DdlCompiler.setCreateTableWithOptionsHandler(
         (databaseName, tableName, ifNotExists, options, ctx) -> null);

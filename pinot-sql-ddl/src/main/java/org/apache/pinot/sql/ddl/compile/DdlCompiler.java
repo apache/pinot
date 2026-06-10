@@ -45,6 +45,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.ddl.inferer.MaterializedViewInferenceInput;
 import org.apache.pinot.sql.ddl.inferer.MaterializedViewSchemaInferer;
 import org.apache.pinot.sql.ddl.resolved.ColumnRole;
@@ -310,6 +311,46 @@ public final class DdlCompiler {
     if (compiled == null) {
       throw new DdlCompilationException(
           "The options-defined CREATE TABLE handler returned no result for table: " + name._tableName);
+    }
+    return validateHandlerResult(compiled, name, node.isIfNotExists());
+  }
+
+  /// The statement identity comes from the SQL text, not from the handler: downstream
+  /// authorization and persistence act on the names carried by the returned
+  /// [CompiledCreateTable], so a buggy or malicious handler must not be able to redirect the
+  /// DDL to a different database/table than the one the user named (and authorization was
+  /// checked against). Rejects any mismatch instead of silently correcting it, so handler bugs
+  /// surface immediately.
+  private static CompiledCreateTable validateHandlerResult(CompiledCreateTable compiled,
+      QualifiedName name, boolean ifNotExists) {
+    if (compiled.getSchema() == null || compiled.getTableConfig() == null) {
+      throw new DdlCompilationException(
+          "The options-defined CREATE TABLE handler returned a result without a "
+              + (compiled.getSchema() == null ? "schema" : "table config")
+              + " for table: " + name._tableName);
+    }
+    if (!Objects.equals(compiled.getDatabaseName(), name._databaseName)) {
+      throw new DdlCompilationException(
+          "The options-defined CREATE TABLE handler changed the database name: expected '"
+              + name._databaseName + "' from the SQL text, got '" + compiled.getDatabaseName() + "'.");
+    }
+    String rawTableName =
+        TableNameBuilder.extractRawTableName(compiled.getTableConfig().getTableName());
+    if (!name._tableName.equals(rawTableName)) {
+      throw new DdlCompilationException(
+          "The options-defined CREATE TABLE handler changed the table name: expected '"
+              + name._tableName + "' from the SQL text, got '" + rawTableName + "'.");
+    }
+    if (!name._tableName.equals(compiled.getSchema().getSchemaName())) {
+      throw new DdlCompilationException(
+          "The options-defined CREATE TABLE handler returned a schema named '"
+              + compiled.getSchema().getSchemaName() + "'; the schema name must match the table"
+              + " name from the SQL text: '" + name._tableName + "'.");
+    }
+    if (compiled.isIfNotExists() != ifNotExists) {
+      throw new DdlCompilationException(
+          "The options-defined CREATE TABLE handler changed the IF NOT EXISTS flag: expected "
+              + ifNotExists + " from the SQL text, got " + compiled.isIfNotExists() + ".");
     }
     return compiled;
   }

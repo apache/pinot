@@ -54,7 +54,10 @@ public interface CreateTableWithOptionsHandler {
   ///                literal strings as written (no placeholder or environment substitution)
   /// @param ctx side-channel collaborators (table cache, request database); never null, but may
   ///            be [DdlCompileContext#STATELESS] for callers without cluster state
-  /// @return the compiled schema + table config; never null
+  /// @return the compiled schema + table config; never null. The statement identity is fixed by
+  ///         the SQL text: the returned database name, raw table-config name, schema name, and
+  ///         `IF NOT EXISTS` flag must echo the supplied arguments — [DdlCompiler] rejects any
+  ///         mismatch, since downstream authorization and persistence act on the returned names.
   /// @throws DdlCompilationException when the options are invalid or the form is unsupported
   CompiledCreateTable compile(@Nullable String databaseName, String tableName, boolean ifNotExists,
       Map<String, String> options, DdlCompileContext ctx);
