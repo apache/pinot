@@ -148,6 +148,13 @@ public class GroupByDataTableReducer implements DataTableReducer {
       Collection<DataTable> dataTables = dataTableMap.values();
       // Reuse the regular reduce's merge: builds the IndexedTable of group keys + intermediate agg state.
       IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+      // Sort/top-K only; keep aggregate values as intermediates (NOT extractFinalResult). storeFinalResult=true
+      // would mutate _dataSchema.getColumnDataTypes() OBJECT→final-type in place and replace each row's value
+      // with extractFinalResult(...); _storedColumnDataTypes (populated lazily on the pre-finalize schema and
+      // never invalidated by finish) still says OBJECT, so the subsequent buildIntermediateDataTable would
+      // hand a finalized scalar (e.g. Integer for DISTINCTCOUNT) into serializeIntermediateResult(Set) and
+      // throw ClassCastException.
+      indexedTable.finish(true, false);
       DataTable mergedDataTable = buildIntermediateDataTable(dataSchema, indexedTable);
       if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
         mergedDataTable.getMetadata().put(MetadataKey.GROUPS_TRIMMED.getName(), "true");
@@ -176,6 +183,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
       BrokerMetrics brokerMetrics) {
     // NOTE: This step will modify the data schema and also return final aggregate results.
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+    // Sort + finalize: mutate _dataSchema column types to final-result types and replace each row's value
+    // with extractFinalResult(...). Required by the regular reduce path: the downstream consumers
+    // (PostAggregationHandler, HavingFilterHandler, ResultTable serialization) expect final scalars.
+    indexedTable.finish(true, true);
     if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
       brokerResponseNative.setGroupsTrimmed(true);
     }
@@ -409,7 +420,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
       }
     }
 
-    indexedTable.finish(true, true);
+    // NOTE: finish(...) is invoked by the caller, not here. The two callers want different semantics:
+    //   - reduceResult (regular reduce → ResultTable) needs finish(true, true) to extract final results.
+    //   - mergeDataTablesOnly (merge-only intermediate output) needs finish(true, false) so the aggregate
+    //     values stay as intermediates (e.g. Set for DISTINCTCOUNT, not Integer); otherwise the next
+    //     buildIntermediateDataTable's serializeIntermediateResult(...) call casts the final scalar back to
+    //     the intermediate type and throws ClassCastException.
     return indexedTable;
   }
 
