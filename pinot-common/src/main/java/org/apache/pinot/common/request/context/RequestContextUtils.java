@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.common.request.context;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.request.Expression;
@@ -140,14 +142,47 @@ public class RequestContextUtils {
 
   /**
    * Returns {@code true} when the expression can be reduced to a literal value without accessing columns.
+   *
+   * <p>Implementation note: the shape check below runs for every comparison predicate of every query, so it must
+   * not be exception-driven — identifiers and unsupported functions (the overwhelmingly common case) return
+   * {@code false} without constructing a throwable. Only expressions that pass the shape check (literals composed
+   * through the foldable function set) are actually evaluated, where a failure means invalid literal values
+   * (e.g., {@code TO_UUID('garbage')}) rather than a non-literal expression.
    */
   public static boolean canEvaluateLiteral(Expression thriftExpression) {
+    if (!isFoldableLiteralShape(thriftExpression)) {
+      return false;
+    }
     try {
       evaluateLiteralValue(thriftExpression);
       return true;
     } catch (BadQueryRequestException e) {
       return false;
     }
+  }
+
+  /**
+   * Cheap, non-throwing structural check: literals are foldable; function calls are foldable only when the
+   * canonical operator is in {@link #FOLDABLE_RHS_FUNCTIONS} and all operands are recursively foldable.
+   * Identifiers (and anything else) are not.
+   */
+  private static boolean isFoldableLiteralShape(Expression thriftExpression) {
+    if (thriftExpression.getLiteral() != null) {
+      return true;
+    }
+    Function function = thriftExpression.getFunctionCall();
+    if (function == null) {
+      return false;
+    }
+    if (!FOLDABLE_RHS_FUNCTIONS.contains(FunctionRegistry.canonicalize(function.getOperator()))) {
+      return false;
+    }
+    for (Expression operand : function.getOperands()) {
+      if (!isFoldableLiteralShape(operand)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static FilterContext getFilterInner(Function thriftFunction) {
@@ -529,9 +564,16 @@ public class RequestContextUtils {
     throw new BadQueryRequestException(UNSUPPORTED_RHS_MESSAGE);
   }
 
-  // NOTE: This method hard-codes the set of functions that can appear on the RHS of a predicate literal
-  // (e.g., WHERE col = TO_UUID('...')). If new UUID-related or other constant-folding functions are added
-  // (see ToUuidScalarFunction, UuidConversionFunctions in pinot-common), add the corresponding case here.
+  // NOTE: This set and the switch in evaluateFunctionLiteral together hard-code the functions that can appear on
+  // the RHS of a predicate literal (e.g., WHERE col = TO_UUID('...')). If new UUID-related or other
+  // constant-folding functions are added (see ToUuidScalarFunction, UuidConversionFunctions in pinot-common),
+  // add the canonical name here AND the corresponding case to the switch. RequestContextUtilsTest's drift guard
+  // asserts this set stays in sync with the registered deterministic UUID scalar functions.
+  @VisibleForTesting
+  static final Set<String> FOLDABLE_RHS_FUNCTIONS =
+      Set.of("cast", "touuid", "uuidtobytes", "bytestouuid", "uuidtostring", "isuuid", "uuidversion",
+          "uuidtimestamp");
+
   private static <T> EvaluatedLiteralValue evaluateFunctionLiteral(String functionName, List<T> operands,
       java.util.function.Function<T, EvaluatedLiteralValue> evaluator) {
     String canonicalName = FunctionRegistry.canonicalize(functionName);

@@ -140,11 +140,14 @@ public class RequestContextUtilsTest {
    */
   @Test
   public void testEvaluateFunctionLiteralCoversAllDeterministicUuidScalarFunctions() {
-    // Canonical names that the RHS-literal switch in RequestContextUtils#evaluateFunctionLiteral handles today.
-    // Keep this list in lock-step with that switch — adding a name here without updating the switch (or vice versa)
-    // is the drift this test is designed to catch.
-    Set<String> supportedByRhsEvaluator = Set.of(
-        "touuid", "uuidtobytes", "bytestouuid", "uuidtostring", "isuuid", "uuidversion", "uuidtimestamp");
+    // The production shape pre-filter (canEvaluateLiteral) and the evaluateFunctionLiteral switch are both driven
+    // by FOLDABLE_RHS_FUNCTIONS. Validate against the production set directly so drift between the set and the
+    // registered scalar functions is caught here.
+    Set<String> supportedByRhsEvaluator = RequestContextUtils.FOLDABLE_RHS_FUNCTIONS;
+    Assert.assertTrue(supportedByRhsEvaluator.containsAll(
+        Set.of("cast", "touuid", "uuidtobytes", "bytestouuid", "uuidtostring", "isuuid", "uuidversion",
+            "uuidtimestamp")),
+        "FOLDABLE_RHS_FUNCTIONS lost a name the evaluateFunctionLiteral switch handles");
 
     // Sweep var-arg plus arities 0..8 so a higher-arity UUID function added in future (e.g., UUID_FROM_PARTS(msb,
     // lsb, version)) still gets considered by the drift guard. UUID_V4/UUID_V7 are registered with

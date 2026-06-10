@@ -34,6 +34,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.create;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -363,6 +364,30 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
+  /**
+   * Regression for the DISTINCTCOUNT-family canonical-string contract: for identifier expressions the
+   * aggregation receives a ProjectionBlockValSet whose getStringValuesSV() renders stored BYTES as bare hex,
+   * so the UUID branches must fetch raw bytes and canonicalize themselves. Asserts
+   * DISTINCTCOUNTX(uuidCol) == DISTINCTCOUNTX(CAST(uuidCol AS STRING)) end-to-end on real segments —
+   * a parity that silently breaks if any branch falls back to the projection string path.
+   */
+  @Test
+  public void testDistinctCountFamilyUuidMatchesCastStringParity()
+      throws Exception {
+    for (String function : List.of("DISTINCTCOUNT", "DISTINCTCOUNTBITMAP", "DISTINCTCOUNTHLL",
+        "DISTINCTCOUNTHLLPLUS", "DISTINCTCOUNTULL", "DISTINCTCOUNTCPCSKETCH", "DISTINCTCOUNTTHETASKETCH")) {
+      String onUuid = String.format("SELECT %s(%s) FROM %s", function, UUID_FROM_STRING_COLUMN, getTableName());
+      String onCastString = String.format("SELECT %s(CAST(%s AS STRING)) FROM %s", function,
+          UUID_FROM_STRING_COLUMN, getTableName());
+      JsonNode uuidRows = postRows(false, onUuid);
+      JsonNode castRows = postRows(false, onCastString);
+      assertEquals(uuidRows.get(0).get(0).asLong(), castRows.get(0).get(0).asLong(),
+          function + " on UUID column must match the same function on CAST(uuidCol AS STRING)");
+      assertEquals(uuidRows.get(0).get(0).asLong(), DISTINCT_UUID_VALUES.size(),
+          function + " on UUID column must count the distinct UUID values");
+    }
+  }
+
   @Test(dataProvider = "useV2QueryEngine")
   public void testUuidEqualityJoinWithExpressionKey(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -384,6 +409,64 @@ public class UuidTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(rows.get(1).get(0).asInt(), 1);
     assertEquals(rows.get(1).get(1).asInt(), 4);
     assertEquals(rows.get(1).get(2).asText(), DISTINCT_UUID_VALUES.get(1));
+  }
+
+  /**
+   * LEFT JOIN on a UUID key with unmatched left rows: ids 0 and 2 carry the only UUID (…440000) absent from the
+   * right side (id >= 3), so they must surface with a NULL right id while every other row matches. Locks in
+   * UuidLookupTable/HashJoinOperator key normalization for the non-INNER join paths.
+   */
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testUuidLeftJoin(boolean useMultiStageQueryEngine)
+      throws Exception {
+    JsonNode rows = postRows(useMultiStageQueryEngine, String.format(
+        "SELECT a.%s, b.%s "
+            + "FROM (SELECT %s, %s FROM %s) a "
+            + "LEFT JOIN (SELECT %s, %s FROM %s WHERE %s >= 3) b "
+            + "ON a.%s = b.%s "
+            + "ORDER BY a.%s, b.%s",
+        ID_COLUMN, ID_COLUMN,
+        ID_COLUMN, UUID_FROM_STRING_COLUMN, getTableName(),
+        ID_COLUMN, UUID_FROM_STRING_COLUMN, getTableName(), ID_COLUMN,
+        UUID_FROM_STRING_COLUMN, UUID_FROM_STRING_COLUMN,
+        ID_COLUMN, ID_COLUMN));
+
+    // Left ids 0 and 2 (uuid …440000) have no right match; 1 and 4 match right id 4 (…440001); 3 matches 3;
+    // 5 matches 5.
+    assertEquals(rows.size(), 6);
+    assertEquals(rows.get(0).get(0).asInt(), 0);
+    assertTrue(rows.get(0).get(1).isNull(), "Left row with unmatched UUID must produce NULL right id");
+    assertEquals(rows.get(1).get(0).asInt(), 1);
+    assertEquals(rows.get(1).get(1).asInt(), 4);
+    assertEquals(rows.get(2).get(0).asInt(), 2);
+    assertTrue(rows.get(2).get(1).isNull(), "Left row with unmatched UUID must produce NULL right id");
+    assertEquals(rows.get(3).get(0).asInt(), 3);
+    assertEquals(rows.get(3).get(1).asInt(), 3);
+    assertEquals(rows.get(4).get(0).asInt(), 4);
+    assertEquals(rows.get(4).get(1).asInt(), 4);
+    assertEquals(rows.get(5).get(0).asInt(), 5);
+    assertEquals(rows.get(5).get(1).asInt(), 5);
+  }
+
+  /**
+   * SEMI and ANTI joins on a UUID key (planned from IN / NOT IN subqueries in the multi-stage engine). The right
+   * side carries UUIDs of ids >= 3 ({…440001, …440002, …440003}); ids 1/3/4/5 are semi-matched and ids 0/2
+   * (uuid …440000) are anti-matched.
+   */
+  @Test(dataProvider = "useV2QueryEngine")
+  public void testUuidSemiAndAntiJoin(boolean useMultiStageQueryEngine)
+      throws Exception {
+    JsonNode semiRows = postRows(useMultiStageQueryEngine, String.format(
+        "SELECT %s FROM %s WHERE %s IN (SELECT %s FROM %s WHERE %s >= 3) ORDER BY %s",
+        ID_COLUMN, getTableName(), UUID_FROM_STRING_COLUMN,
+        UUID_FROM_STRING_COLUMN, getTableName(), ID_COLUMN, ID_COLUMN));
+    assertIdRows(semiRows, 1, 3, 4, 5);
+
+    JsonNode antiRows = postRows(useMultiStageQueryEngine, String.format(
+        "SELECT %s FROM %s WHERE %s NOT IN (SELECT %s FROM %s WHERE %s >= 3) ORDER BY %s",
+        ID_COLUMN, getTableName(), UUID_FROM_STRING_COLUMN,
+        UUID_FROM_STRING_COLUMN, getTableName(), ID_COLUMN, ID_COLUMN));
+    assertIdRows(antiRows, 0, 2);
   }
 
   private JsonNode postRows(boolean useMultiStageQueryEngine, String query)
