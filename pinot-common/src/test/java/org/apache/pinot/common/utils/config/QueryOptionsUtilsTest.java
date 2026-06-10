@@ -343,4 +343,20 @@ public class QueryOptionsUtilsTest {
         throw new IllegalArgumentException("Unexpected key!");
     }
   }
+
+  @Test
+  public void testGetLiteModeImplicitLeafStageLimit() {
+    Map<String, String> queryOptions = new HashMap<>();
+
+    // Absent → null
+    assertNull(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions));
+
+    // Present → parsed value
+    queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "42");
+    assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(42));
+
+    // Zero
+    queryOptions.put(LITE_MODE_IMPLICIT_LEAF_STAGE_LIMIT, "0");
+    assertEquals(QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(queryOptions), Integer.valueOf(0));
+  }
 }

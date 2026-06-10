@@ -277,7 +277,15 @@ public class QueryEnvironment {
       extraFields.put(RuleTimingPlannerListener.RULE_TIMINGS,
           plannerContext.getPlannerOutput().get(RuleTimingPlannerListener.RULE_TIMINGS));
     }
-    return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields);
+    boolean liteModeImplicitSortApplied = false;
+    int liteModeEffectiveSortLimit = -1;
+    PhysicalPlannerContext physicalPlannerContext = plannerContext.getPhysicalPlannerContext();
+    if (physicalPlannerContext != null && physicalPlannerContext.isLiteModeImplicitSortApplied()) {
+      liteModeImplicitSortApplied = true;
+      liteModeEffectiveSortLimit = physicalPlannerContext.getLiteModeEffectiveSortLimit();
+    }
+    return new QueryPlannerResult(dispatchableSubPlan, explainStr, tableNames, extraFields,
+        liteModeImplicitSortApplied, liteModeEffectiveSortLimit);
   }
 
   /// @deprecated Use [#compile] and then [explain][CompiledQuery#explain(long) ] the returned query instead
@@ -354,13 +362,18 @@ public class QueryEnvironment {
     private final String _explainPlan;
     private final Set<String> _tableNames;
     private final Map<String, String> _extraFields;
+    private final boolean _liteModeImplicitSortApplied;
+    private final int _liteModeEffectiveSortLimit;
 
     QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan,
-        Set<String> tableNames, Map<String, String> extraFields) {
+        Set<String> tableNames, Map<String, String> extraFields, boolean liteModeImplicitSortApplied,
+        int liteModeEffectiveSortLimit) {
       _dispatchableSubPlan = dispatchableSubPlan;
       _explainPlan = explainPlan;
       _tableNames = tableNames;
       _extraFields = extraFields;
+      _liteModeImplicitSortApplied = liteModeImplicitSortApplied;
+      _liteModeEffectiveSortLimit = liteModeEffectiveSortLimit;
     }
 
     public String getExplainPlan() {
@@ -377,6 +390,14 @@ public class QueryEnvironment {
 
     public Map<String, String> getExtraFields() {
       return _extraFields;
+    }
+
+    public boolean isLiteModeImplicitSortApplied() {
+      return _liteModeImplicitSortApplied;
+    }
+
+    public int getLiteModeEffectiveSortLimit() {
+      return _liteModeEffectiveSortLimit;
     }
   }
 
