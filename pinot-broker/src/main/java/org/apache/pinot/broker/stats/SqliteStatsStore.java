@@ -106,6 +106,9 @@ public class SqliteStatsStore implements StatsStore {
       "SELECT total_docs,start_time_ms,end_time_ms "
           + "FROM segment_stats WHERE table_name=? AND consuming=0";
 
+  private static final String SQL_HAS_CONSUMING =
+      "SELECT 1 FROM segment_stats WHERE table_name=? AND consuming=1 LIMIT 1";
+
   private static final String SQL_PURGE_TABLE_SEG =
       "DELETE FROM segment_stats WHERE table_name=?";
 
@@ -331,6 +334,25 @@ public class SqliteStatsStore implements StatsStore {
         rollbackQuietly(_writeConn);
         throw new StatsStoreException("removeSegments failed for " + tableNameWithType, e);
       }
+    }
+  }
+
+  @Override
+  public boolean hasConsumingSegments(String tableNameWithType)
+      throws StatsStoreException {
+    checkOpen();
+    Connection conn = borrowReadConn();
+    try {
+      try (PreparedStatement ps = conn.prepareStatement(SQL_HAS_CONSUMING)) {
+        ps.setString(1, tableNameWithType);
+        try (ResultSet rs = ps.executeQuery()) {
+          return rs.next();
+        }
+      }
+    } catch (SQLException e) {
+      throw new StatsStoreException("hasConsumingSegments failed for " + tableNameWithType, e);
+    } finally {
+      returnReadConn(conn);
     }
   }
 

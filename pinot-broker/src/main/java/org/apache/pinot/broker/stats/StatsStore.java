@@ -148,4 +148,16 @@ public interface StatsStore extends Closeable {
    */
   void purgeAll()
       throws StatsStoreException;
+
+  /**
+   * Returns {@code true} if the given table has at least one consuming (REALTIME IN_PROGRESS)
+   * segment in the store.
+   *
+   * <p>Used to detect whether realtime row counts may undercount fresh, un-committed data.
+   *
+   * @param tableNameWithType fully-qualified table name including type suffix
+   * @throws StatsStoreException if the read fails
+   */
+  boolean hasConsumingSegments(String tableNameWithType)
+      throws StatsStoreException;
 }

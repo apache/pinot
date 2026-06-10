@@ -245,9 +245,7 @@ public class BrokerTableStatsManagerTest {
   @Test
   public void testListenerDoesNotThrowOnStoreError() {
     StatsStore throwingStore = new ThrowingStatsStore();
-    BrokerTableStatsManager mgr = new BrokerTableStatsManager(throwingStore);
-    // Bypass init() — manager stays disabled; createListener returns no-op
-    // We test the listener directly via TableStatsZkListener
+    // Test the listener directly via TableStatsZkListener
     TableStatsZkListener listener = new TableStatsZkListener(TABLE, throwingStore);
 
     List<String> segments = Collections.singletonList("seg1");
@@ -460,6 +458,12 @@ public class BrokerTableStatsManagerTest {
     public OptionalLong estimateRowsInTimeRange(String tableNameWithType, long startMs, long endMs)
         throws StatsStoreException {
       throw new StatsStoreException("estimateRows failed (stub)");
+    }
+
+    @Override
+    public boolean hasConsumingSegments(String tableNameWithType)
+        throws StatsStoreException {
+      throw new StatsStoreException("hasConsumingSegments failed (stub)");
     }
 
     @Override

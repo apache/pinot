@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -32,6 +33,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.query.planner.spi.stats.TableStatistics;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +69,7 @@ public class BrokerTableStatsManager implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerTableStatsManager.class);
 
   private final StatsStore _statsStore;
+  private final LogicalTableStatsResolver _resolver;
   /** False when init() failed; all operations become no-ops in that state. */
   private volatile boolean _enabled = false;
 
@@ -78,6 +81,35 @@ public class BrokerTableStatsManager implements Closeable {
    */
   public BrokerTableStatsManager(StatsStore statsStore) {
     _statsStore = statsStore;
+    _resolver = new LogicalTableStatsResolver(statsStore);
+  }
+
+  /**
+   * Sets the provider used to look up the time boundary (epoch-milliseconds) for a raw table
+   * name. Call this after the routing manager is fully initialized.
+   *
+   * <p>A {@code null} return value from {@code provider} means no boundary is available for
+   * that table, which causes the resolver to fall back to a plain sum of offline + realtime rows
+   * with {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#ESTIMATED} confidence.
+   *
+   * @param provider function from raw table name → time boundary in epoch-milliseconds, nullable
+   */
+  public void setTimeBoundaryMsProvider(@Nullable Function<String, Long> provider) {
+    _resolver.setTimeBoundaryMsProvider(provider);
+  }
+
+  /**
+   * Sets the provider used to look up the {@link TableConfig} for a fully-qualified
+   * (type-suffixed) table name. Call this after the table cache is initialized.
+   *
+   * <p>Required for upsert/dedup detection; without this, upsert/dedup tables will report
+   * {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#EXACT} rather than
+   * {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#LOW}.
+   *
+   * @param provider function from suffixed table name → TableConfig, nullable
+   */
+  public void setTableConfigProvider(@Nullable Function<String, TableConfig> provider) {
+    _resolver.setTableConfigProvider(provider);
   }
 
   /**
@@ -129,43 +161,48 @@ public class BrokerTableStatsManager implements Closeable {
   }
 
   /**
-   * Returns aggregated table-level statistics from the backing store, or {@code null} if
-   * unavailable. Any store error is logged at WARN and {@code null} is returned.
+   * Returns logical table statistics for the given table name, or {@code null} if unavailable.
    *
-   * @param tableNameWithType fully-qualified table name
+   * <p>Accepts both suffixed physical names ({@code foo_OFFLINE} / {@code foo_REALTIME}) and raw
+   * logical names ({@code foo}):
+   * <ul>
+   *   <li>Suffixed names: returns physical stats with per-type confidence adjustments (upsert,
+   *       dedup, consuming-segment detection).</li>
+   *   <li>Raw names: returns a logical hybrid view merging offline and realtime stats at the
+   *       time boundary; if no boundary is available, returns a plain sum with
+   *       {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#ESTIMATED}
+   *       confidence.</li>
+   * </ul>
+   *
+   * <p>Any store error is logged at WARN and {@code null} is returned.
+   *
+   * @param tableName raw table name or fully-qualified name with type suffix
    */
   @Nullable
-  public TableStatistics getTableStats(String tableNameWithType) {
+  public TableStatistics getTableStats(String tableName) {
     if (!_enabled) {
       return null;
     }
-    try {
-      return _statsStore.getTableStats(tableNameWithType);
-    } catch (StatsStoreException e) {
-      LOGGER.warn("Failed to read table stats for {}: {}", tableNameWithType, e.getMessage());
-      return null;
-    }
+    return _resolver.getTableStats(tableName);
   }
 
   /**
    * Returns an estimate of the number of rows in the given time range, or an empty optional if
    * unavailable. Any store error is logged at WARN and an empty optional is returned.
    *
-   * @param tableNameWithType fully-qualified table name
-   * @param startMs           inclusive range start in epoch milliseconds
-   * @param endMs             exclusive range end in epoch milliseconds
+   * <p>For hybrid (raw) table names, the estimate is split at the time boundary:
+   * offline rows are counted for {@code [startMs, boundary)} and realtime rows for
+   * {@code [boundary, endMs)}.
+   *
+   * @param tableName raw table name or fully-qualified name with type suffix
+   * @param startMs   inclusive range start in epoch milliseconds
+   * @param endMs     exclusive range end in epoch milliseconds
    */
-  public OptionalLong estimateRowsInTimeRange(String tableNameWithType, long startMs, long endMs) {
+  public OptionalLong estimateRowsInTimeRange(String tableName, long startMs, long endMs) {
     if (!_enabled) {
       return OptionalLong.empty();
     }
-    try {
-      return _statsStore.estimateRowsInTimeRange(tableNameWithType, startMs, endMs);
-    } catch (StatsStoreException e) {
-      LOGGER.warn("Failed to estimate rows in time range for {}: {}", tableNameWithType,
-          e.getMessage());
-      return OptionalLong.empty();
-    }
+    return _resolver.estimateRowsInTimeRange(tableName, startMs, endMs);
   }
 
   @Override

@@ -99,6 +99,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.routing.MultiClusterRoutingContext;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.NettyInspector;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -115,6 +116,9 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.DateTimeFormatSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -130,6 +134,7 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.PinotMd5Mode;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
@@ -449,6 +454,51 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
     _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
+
+    // Wire the stats-manager providers that require both the routing manager and the table cache.
+    // Both are now available: _routingManager was built in initRoutingManager() and _tableCache
+    // was just created above. The setters are no-ops if _statsManager is null (stats disabled).
+    if (_statsManager != null) {
+      _statsManager.setTimeBoundaryMsProvider(rawTableName -> {
+        String offlineTable = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+        TimeBoundaryInfo tbi = _routingManager.getTimeBoundaryInfo(offlineTable);
+        if (tbi == null) {
+          return null;
+        }
+        // Convert the formatted time-boundary value to epoch-milliseconds using the offline
+        // table's DateTimeFormatSpec, falling back to a direct Long parse when no schema is found.
+        try {
+          Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, offlineTable);
+          if (schema != null) {
+            org.apache.pinot.spi.config.table.TableConfig tc =
+                _tableCache.getTableConfig(offlineTable);
+            if (tc != null) {
+              String timeCol = tc.getValidationConfig().getTimeColumnName();
+              if (timeCol != null) {
+                DateTimeFieldSpec fieldSpec = schema.getSpecForTimeColumn(timeCol);
+                if (fieldSpec != null) {
+                  DateTimeFormatSpec fmtSpec = fieldSpec.getFormatSpec();
+                  return fmtSpec.fromFormatToMillis(tbi.getTimeValue());
+                }
+              }
+            }
+          }
+        } catch (Exception e) {
+          LOGGER.debug("Could not convert time boundary to millis for {}; falling back to "
+              + "Long.parseLong: {}", rawTableName, e.getMessage());
+        }
+        // Fallback: parse directly (works when time unit is MILLISECONDS)
+        try {
+          return Long.parseLong(tbi.getTimeValue());
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Cannot parse time boundary value '{}' for table {} as long",
+              tbi.getTimeValue(), rawTableName);
+          return null;
+        }
+      });
+      _statsManager.setTableConfigProvider(tableNameWithType -> _tableCache.getTableConfig(
+          tableNameWithType));
+    }
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
