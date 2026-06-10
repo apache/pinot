@@ -19,31 +19,25 @@
 package org.apache.pinot.broker.stats;
 
 
-/**
- * Checked exception thrown by {@link StatsStore} operations when a storage error occurs.
- *
- * <p>Callers of {@link StatsStore} should catch this exception and degrade gracefully to a
- * no-stats path rather than failing the query.
- *
- * <p>Thread-safety: exception objects are not shared; no concurrency requirements.
- */
+/// Checked exception thrown by [StatsStore] operations when a storage error occurs.
+///
+/// Callers of [StatsStore] should catch this exception and degrade gracefully to a
+/// no-stats path rather than failing the query.
+///
+/// Thread-safety: exception objects are not shared; no concurrency requirements.
 public class StatsStoreException extends Exception {
 
-  /**
-   * Constructs a new {@link StatsStoreException} with the given message.
-   *
-   * @param message description of the error
-   */
+  /// Constructs a new [StatsStoreException] with the given message.
+  ///
+  /// @param message description of the error
   public StatsStoreException(String message) {
     super(message);
   }
 
-  /**
-   * Constructs a new {@link StatsStoreException} with the given message and cause.
-   *
-   * @param message description of the error
-   * @param cause   the underlying cause
-   */
+  /// Constructs a new [StatsStoreException] with the given message and cause.
+  ///
+  /// @param message description of the error
+  /// @param cause   the underlying cause
   public StatsStoreException(String message, Throwable cause) {
     super(message, cause);
   }

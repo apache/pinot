@@ -141,7 +141,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final QueryDispatcher _queryDispatcher;
   @Nullable
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
-  /** Statistics provider for cost-based planning. Never {@code null}; defaults to NoOp when not configured. */
+  /// Statistics provider for cost-based planning. Never `null`; defaults to NoOp when not configured.
   private final PinotStatisticsProvider _pinotStatisticsProvider;
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;

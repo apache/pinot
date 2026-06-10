@@ -53,12 +53,10 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests for {@link PinotRelMdSelectivity}.
- *
- * <p>Tests are structured as unit tests that build {@link RelNode} trees directly using Calcite
- * APIs, plugging in mock {@link PinotStatisticsProvider}s for fine-grained control.
- */
+/// Tests for [PinotRelMdSelectivity].
+///
+/// Tests are structured as unit tests that build [RelNode] trees directly using Calcite
+/// APIs, plugging in mock [PinotStatisticsProvider]s for fine-grained control.
 public class PinotRelMdSelectivityTest {
 
   private static final String TABLE_NAME = "myTable";
@@ -71,7 +69,7 @@ public class PinotRelMdSelectivityTest {
   // Fixture helpers
   // --------------------------------------------------------------------------
 
-  /** Schema with a millisecond time column and an integer non-time column. */
+  /// Schema with a millisecond time column and an integer non-time column.
   private static Schema buildSchema() {
     return new Schema.SchemaBuilder()
         .addSingleValueDimension(NON_TIME_COL, FieldSpec.DataType.INT, 0)
@@ -80,7 +78,7 @@ public class PinotRelMdSelectivityTest {
         .build();
   }
 
-  /** Schema with a seconds-granularity time column (should fall back to default selectivity). */
+  /// Schema with a seconds-granularity time column (should fall back to default selectivity).
   private static Schema buildSecondsSchema() {
     return new Schema.SchemaBuilder()
         .addSingleValueDimension(NON_TIME_COL, FieldSpec.DataType.INT, 0)
@@ -89,7 +87,7 @@ public class PinotRelMdSelectivityTest {
         .build();
   }
 
-  /** Build a QueryEnvironment backed by the given schema and statistics provider. */
+  /// Build a QueryEnvironment backed by the given schema and statistics provider.
   private static QueryEnvironment buildEnv(Schema schema, PinotStatisticsProvider statsProvider) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
     factory.registerTable(schema, TABLE_NAME);
@@ -110,7 +108,7 @@ public class PinotRelMdSelectivityTest {
         .build());
   }
 
-  /** Build a mock statistics provider: tableStats with given rowCount, time range returns estimate. */
+  /// Build a mock statistics provider: tableStats with given rowCount, time range returns estimate.
   private static PinotStatisticsProvider mockProviderWithTimeRange(
       long rowCount, long estimatedRows) {
     PinotStatisticsProvider provider = mock(PinotStatisticsProvider.class);
@@ -121,7 +119,7 @@ public class PinotRelMdSelectivityTest {
     return provider;
   }
 
-  /** Find the first Filter node in the RelNode tree (DFS). */
+  /// Find the first Filter node in the RelNode tree (DFS).
   @Nullable
   private static Filter findFirstFilter(RelNode node) {
     if (node instanceof Filter) {
@@ -136,7 +134,7 @@ public class PinotRelMdSelectivityTest {
     return null;
   }
 
-  /** Find the first TableScan in the RelNode tree (DFS). */
+  /// Find the first TableScan in the RelNode tree (DFS).
   @Nullable
   private static TableScan findFirstTableScan(RelNode node) {
     if (node instanceof TableScan) {
@@ -155,10 +153,8 @@ public class PinotRelMdSelectivityTest {
   // Tests: time-range selectivity
   // --------------------------------------------------------------------------
 
-  /**
-   * A time-range predicate {@code ts >= ? AND ts < ?} where the provider returns 10 rows out of
-   * 1000 should yield selectivity = 10/1000 = 0.01.
-   */
+  /// A time-range predicate `ts >= ? AND ts < ?` where the provider returns 10 rows out of
+  /// 1000 should yield selectivity = 10/1000 = 0.01.
   @Test
   public void testTimeRangeSelectivity() {
     long estimatedRows = 10L;
@@ -183,12 +179,10 @@ public class PinotRelMdSelectivityTest {
     }
   }
 
-  /**
-   * Time bounds are tracked internally as inclusive but {@code estimateRowsInTimeRange} takes a
-   * half-open {@code [start, end)} interval. An equality predicate {@code ts = X} must therefore
-   * query {@code [X, X+1)} — NOT the empty {@code [X, X)}. This pins the exact bounds passed to
-   * the provider (regression test: equality used to yield selectivity 0).
-   */
+  /// Time bounds are tracked internally as inclusive but `estimateRowsInTimeRange` takes a
+  /// half-open `[start, end)` interval. An equality predicate `ts = X` must therefore
+  /// query `[X, X+1)` — NOT the empty `[X, X)`. This pins the exact bounds passed to
+  /// the provider (regression test: equality used to yield selectivity 0).
   @Test
   public void testEqualityPredicateBoundsConversion() {
     long ts = 1_000_000L;
@@ -217,10 +211,8 @@ public class PinotRelMdSelectivityTest {
     }
   }
 
-  /**
-   * A time-column with seconds granularity (non-millis) should fall back to Calcite's default
-   * selectivity guess rather than using estimateRowsInTimeRange.
-   */
+  /// A time-column with seconds granularity (non-millis) should fall back to Calcite's default
+  /// selectivity guess rather than using estimateRowsInTimeRange.
   @Test
   public void testNonMillisTimeColumnFallsBackToDefault() {
     PinotStatisticsProvider provider = mockProviderWithTimeRange(ROW_COUNT, 10L);
@@ -250,10 +242,8 @@ public class PinotRelMdSelectivityTest {
   // Tests: NDV equality selectivity
   // --------------------------------------------------------------------------
 
-  /**
-   * An equality predicate on a non-time column with NDV=50 (EXACT confidence) should yield
-   * selectivity = 1/50 = 0.02.
-   */
+  /// An equality predicate on a non-time column with NDV=50 (EXACT confidence) should yield
+  /// selectivity = 1/50 = 0.02.
   @Test
   public void testNdvEqualitySelectivity() {
     long ndv = 50L;
@@ -283,10 +273,8 @@ public class PinotRelMdSelectivityTest {
     }
   }
 
-  /**
-   * An equality predicate on a column where getColumnStatistics returns null should fall back
-   * to the Calcite default guess.
-   */
+  /// An equality predicate on a column where getColumnStatistics returns null should fall back
+  /// to the Calcite default guess.
   @Test
   public void testNdvFallsBackToDefaultWhenNoColumnStats() {
     PinotStatisticsProvider provider = mock(PinotStatisticsProvider.class);
@@ -315,10 +303,8 @@ public class PinotRelMdSelectivityTest {
   // Tests: NoOp provider parity with Calcite default
   // --------------------------------------------------------------------------
 
-  /**
-   * With NoOpStatisticsProvider, selectivity must equal Calcite's own defaults — no behavior
-   * change from adding the Pinot metadata provider when stats are absent.
-   */
+  /// With NoOpStatisticsProvider, selectivity must equal Calcite's own defaults — no behavior
+  /// change from adding the Pinot metadata provider when stats are absent.
   @Test
   public void testNoOpProviderSelectivityEqualsCalciteDefault() {
     QueryEnvironment noOpEnv = buildEnv(buildSchema(), NoOpStatisticsProvider.INSTANCE);
@@ -348,10 +334,8 @@ public class PinotRelMdSelectivityTest {
   // Tests: end-to-end compile with mock stats provider
   // --------------------------------------------------------------------------
 
-  /**
-   * Verifies that a real query compiles successfully end-to-end when a non-trivial statistics
-   * provider is configured — no exceptions means the metadata chain is correctly integrated.
-   */
+  /// Verifies that a real query compiles successfully end-to-end when a non-trivial statistics
+  /// provider is configured — no exceptions means the metadata chain is correctly integrated.
   @Test
   public void testEndToEndCompileWithStatsProvider() {
     PinotStatisticsProvider provider = mockProviderWithTimeRange(ROW_COUNT, 10L);

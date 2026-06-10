@@ -25,25 +25,21 @@ import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.planner.spi.stats.TableStatistics;
 
 
-/**
- * {@link PinotStatisticsProvider} backed by the broker's {@link BrokerTableStatsManager}.
- *
- * <p>All calls delegate directly to the manager. The manager already handles the
- * disabled/error cases by returning {@code null} or empty, so this class is a
- * thin adapter with no additional logic.
- *
- * <p>Thread-safety: unconditionally thread-safe. All state is held in the immutable
- * reference to {@code _statsManager}, which is itself thread-safe.
- */
+/// [PinotStatisticsProvider] backed by the broker's [BrokerTableStatsManager].
+///
+/// All calls delegate directly to the manager. The manager already handles the
+/// disabled/error cases by returning `null` or empty, so this class is a
+/// thin adapter with no additional logic.
+///
+/// Thread-safety: unconditionally thread-safe. All state is held in the immutable
+/// reference to `_statsManager`, which is itself thread-safe.
 public class BrokerStatisticsProvider implements PinotStatisticsProvider {
 
   private final BrokerTableStatsManager _statsManager;
 
-  /**
-   * Constructs a provider backed by the given {@link BrokerTableStatsManager}.
-   *
-   * @param statsManager the broker stats manager; must not be {@code null}
-   */
+  /// Constructs a provider backed by the given [BrokerTableStatsManager].
+  ///
+  /// @param statsManager the broker stats manager; must not be `null`
   public BrokerStatisticsProvider(BrokerTableStatsManager statsManager) {
     _statsManager = statsManager;
   }
@@ -54,10 +50,8 @@ public class BrokerStatisticsProvider implements PinotStatisticsProvider {
     return _statsManager.getTableStats(tableName);
   }
 
-  /**
-   * Column-level statistics are not yet collected in T1 of the CBO initiative.
-   * Returns {@code null} unconditionally; will be implemented in a future task.
-   */
+  /// Column-level statistics are not yet collected in T1 of the CBO initiative.
+  /// Returns `null` unconditionally; will be implemented in a future task.
   @Nullable
   @Override
   public ColumnStatistics getColumnStatistics(String tableName, String columnName) {

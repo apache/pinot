@@ -23,37 +23,34 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptCostFactory;
 
 
-/**
- * Pinot-specific implementation of {@link RelOptCost} for the multi-stage query engine (MSE).
- *
- * <h3>Ordering semantics (rows-dominated lexicographic)</h3>
- * <p>Cost comparison uses a strict (rows, cpu, io) lexicographic order:
- * <ol>
- *   <li>Row count is the primary key — plans that process fewer rows are cheaper.</li>
- *   <li>CPU cost breaks ties when row counts are equal.</li>
- *   <li>IO cost breaks ties when both rows and CPU are equal.</li>
- * </ol>
- *
- * <h3>Deliberate difference from Calcite's {@code VolcanoCost}</h3>
- * <p>Calcite's {@code VolcanoCost.isLe} compares <em>only</em> row count: two costs with the same
- * number of rows are considered equal regardless of their cpu or io values.  This means
- * {@code VolcanoCost} has no way to break ties when row counts match, which can leave join-order
- * choices arbitrary.
- * <p>Pinot's MSE cost model instead applies a full lexicographic tie-break: equal rows →
- * compare cpu; equal rows+cpu → compare io.  This gives the planner a deterministic total order
- * over all finite cost triples and lets CPU/IO estimates (however coarse) influence join ordering
- * when row counts happen to match.
- *
- * <h3>Thread safety</h3>
- * <p>Instances are immutable; all fields are set in the constructor and never modified.
- * The class is therefore inherently thread-safe.
- */
+/// Pinot-specific implementation of [RelOptCost] for the multi-stage query engine (MSE).
+///
+/// ### Ordering semantics (rows-dominated lexicographic)
+/// Cost comparison uses a strict (rows, cpu, io) lexicographic order:
+/// 1. Row count is the primary key — plans that process fewer rows are cheaper.
+/// 1. CPU cost breaks ties when row counts are equal.
+/// 1. IO cost breaks ties when both rows and CPU are equal.
+///
+/// ### Deliberate difference from Calcite's `VolcanoCost`
+/// Calcite's `VolcanoCost.isLe` compares *only* row count: two costs with the same
+/// number of rows are considered equal regardless of their cpu or io values. This means
+/// `VolcanoCost` has no way to break ties when row counts match, which can leave join-order
+/// choices arbitrary.
+///
+/// Pinot's MSE cost model instead applies a full lexicographic tie-break: equal rows →
+/// compare cpu; equal rows+cpu → compare io. This gives the planner a deterministic total order
+/// over all finite cost triples and lets CPU/IO estimates (however coarse) influence join ordering
+/// when row counts happen to match.
+///
+/// ### Thread safety
+/// Instances are immutable; all fields are set in the constructor and never modified.
+/// The class is therefore inherently thread-safe.
 public class PinotRelOptCost implements RelOptCost {
 
-  /** Epsilon used by {@link #isEqWithEpsilon} — mirrors {@code VolcanoCost}'s value. */
+  /// Epsilon used by [#isEqWithEpsilon] — mirrors `VolcanoCost`'s value.
   static final double EPSILON = 1.0e-5;
 
-  /** Cost representing an infeasible / infinite plan. */
+  /// Cost representing an infeasible / infinite plan.
   public static final PinotRelOptCost INFINITY =
       new PinotRelOptCost(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
           Double.POSITIVE_INFINITY) {
@@ -63,10 +60,8 @@ public class PinotRelOptCost implements RelOptCost {
         }
       };
 
-  /**
-   * A very large but finite cost (uses {@code Double.MAX_VALUE} for each component),
-   * analogous to {@code VolcanoCost.HUGE}.
-   */
+  /// A very large but finite cost (uses `Double.MAX_VALUE` for each component),
+  /// analogous to `VolcanoCost.HUGE`.
   public static final PinotRelOptCost HUGE =
       new PinotRelOptCost(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE) {
         @Override
@@ -75,7 +70,7 @@ public class PinotRelOptCost implements RelOptCost {
         }
       };
 
-  /** Zero cost — the cheapest possible plan. */
+  /// Zero cost — the cheapest possible plan.
   public static final PinotRelOptCost ZERO = new PinotRelOptCost(0.0, 0.0, 0.0) {
     @Override
     public String toString() {
@@ -83,10 +78,7 @@ public class PinotRelOptCost implements RelOptCost {
     }
   };
 
-  /**
-   * A very small but non-zero cost (rows=1, cpu=1, io=0),
-   * analogous to {@code VolcanoCost.TINY}.
-   */
+  /// A very small but non-zero cost (rows=1, cpu=1, io=0), analogous to `VolcanoCost.TINY`.
   public static final PinotRelOptCost TINY = new PinotRelOptCost(1.0, 1.0, 0.0) {
     @Override
     public String toString() {
@@ -98,13 +90,11 @@ public class PinotRelOptCost implements RelOptCost {
   private final double _cpu;
   private final double _io;
 
-  /**
-   * Constructs a {@code PinotRelOptCost} with the given component values.
-   *
-   * @param rows estimated number of output rows (primary ordering key)
-   * @param cpu  estimated CPU cost (first tiebreaker)
-   * @param io   estimated IO cost (second tiebreaker)
-   */
+  /// Constructs a `PinotRelOptCost` with the given component values.
+  ///
+  /// @param rows estimated number of output rows (primary ordering key)
+  /// @param cpu  estimated CPU cost (first tiebreaker)
+  /// @param io   estimated IO cost (second tiebreaker)
   public PinotRelOptCost(double rows, double cpu, double io) {
     _rows = rows;
     _cpu = cpu;
@@ -134,13 +124,11 @@ public class PinotRelOptCost implements RelOptCost {
         || Double.isInfinite(_io);
   }
 
-  /**
-   * Returns {@code true} if this cost is less than or equal to {@code other} under the
-   * rows-dominated lexicographic order: rows first, then cpu, then io.
-   *
-   * <p>This differs from {@code VolcanoCost.isLe}, which returns {@code true} whenever
-   * {@code this.rows <= other.rows}, ignoring cpu and io entirely.
-   */
+  /// Returns `true` if this cost is less than or equal to `other` under the
+  /// rows-dominated lexicographic order: rows first, then cpu, then io.
+  ///
+  /// This differs from `VolcanoCost.isLe`, which returns `true` whenever
+  /// `this.rows <= other.rows`, ignoring cpu and io entirely.
   @Override
   public boolean isLe(RelOptCost other) {
     PinotRelOptCost that = (PinotRelOptCost) other;
@@ -164,19 +152,15 @@ public class PinotRelOptCost implements RelOptCost {
     return _io <= that._io;
   }
 
-  /**
-   * Returns {@code true} if this cost is strictly less than {@code other}.
-   * Defined as {@code isLe(other) && !equals(other)}.
-   */
+  /// Returns `true` if this cost is strictly less than `other`.
+  /// Defined as `isLe(other) && !equals(other)`.
   @Override
   public boolean isLt(RelOptCost other) {
     return isLe(other) && !equals(other);
   }
 
-  /**
-   * Returns {@code true} if all three components are exactly equal (bitwise double equality).
-   * For approximate equality see {@link #isEqWithEpsilon}.
-   */
+  /// Returns `true` if all three components are exactly equal (bitwise double equality).
+  /// For approximate equality see [#isEqWithEpsilon].
   @Override
   public boolean equals(RelOptCost other) {
     if (this == other) {
@@ -191,10 +175,8 @@ public class PinotRelOptCost implements RelOptCost {
         && Double.compare(_io, that._io) == 0;
   }
 
-  /**
-   * Returns {@code true} if all three components are within {@link #EPSILON} of each other.
-   * Mirrors the epsilon used by {@code VolcanoCost} (1e-5).
-   */
+  /// Returns `true` if all three components are within [#EPSILON] of each other.
+  /// Mirrors the epsilon used by `VolcanoCost` (1e-5).
   @Override
   public boolean isEqWithEpsilon(RelOptCost other) {
     if (!(other instanceof PinotRelOptCost)) {
@@ -222,10 +204,8 @@ public class PinotRelOptCost implements RelOptCost {
     return Objects.hash(_rows, _cpu, _io);
   }
 
-  /**
-   * Returns the component-wise sum. If either operand is {@link #INFINITY}, returns
-   * {@link #INFINITY} — mirroring {@code VolcanoCost.plus}.
-   */
+  /// Returns the component-wise sum. If either operand is [#INFINITY], returns
+  /// [#INFINITY] — mirroring `VolcanoCost.plus`.
   @Override
   public RelOptCost plus(RelOptCost other) {
     PinotRelOptCost that = (PinotRelOptCost) other;
@@ -235,10 +215,8 @@ public class PinotRelOptCost implements RelOptCost {
     return new PinotRelOptCost(_rows + that._rows, _cpu + that._cpu, _io + that._io);
   }
 
-  /**
-   * Returns the component-wise difference. If {@code this} is {@link #INFINITY}, returns
-   * {@link #INFINITY} — mirroring {@code VolcanoCost.minus}.
-   */
+  /// Returns the component-wise difference. If `this` is [#INFINITY], returns
+  /// [#INFINITY] — mirroring `VolcanoCost.minus`.
   @Override
   public RelOptCost minus(RelOptCost other) {
     if (this == INFINITY) {
@@ -248,10 +226,8 @@ public class PinotRelOptCost implements RelOptCost {
     return new PinotRelOptCost(_rows - that._rows, _cpu - that._cpu, _io - that._io);
   }
 
-  /**
-   * Returns this cost scaled by {@code factor}. If {@code this} is {@link #INFINITY}, returns
-   * {@link #INFINITY} — mirroring {@code VolcanoCost.multiplyBy}.
-   */
+  /// Returns this cost scaled by `factor`. If `this` is [#INFINITY], returns
+  /// [#INFINITY] — mirroring `VolcanoCost.multiplyBy`.
   @Override
   public RelOptCost multiplyBy(double factor) {
     if (this == INFINITY) {
@@ -260,14 +236,12 @@ public class PinotRelOptCost implements RelOptCost {
     return new PinotRelOptCost(_rows * factor, _cpu * factor, _io * factor);
   }
 
-  /**
-   * Returns the geometric mean of non-trivial (non-zero, non-infinite) per-component ratios of
-   * {@code this / other}, exactly mirroring {@code VolcanoCost.divideBy}.
-   *
-   * <p>Each component contributes to the product only when both {@code this} and {@code other}
-   * have a non-zero, non-infinite value for that component; the exponent equals the number of
-   * contributing components.
-   */
+  /// Returns the geometric mean of non-trivial (non-zero, non-infinite) per-component ratios of
+  /// `this / other`, exactly mirroring `VolcanoCost.divideBy`.
+  ///
+  /// Each component contributes to the product only when both `this` and `other`
+  /// have a non-zero, non-infinite value for that component; the exponent equals the number of
+  /// contributing components.
   @Override
   public double divideBy(RelOptCost other) {
     PinotRelOptCost that = (PinotRelOptCost) other;
@@ -303,14 +277,12 @@ public class PinotRelOptCost implements RelOptCost {
   // Inner factory
   // ---------------------------------------------------------------------------
 
-  /**
-   * {@link RelOptCostFactory} that creates {@link PinotRelOptCost} instances.
-   *
-   * <p>Use {@link #INSTANCE} to avoid repeated allocations of the factory itself.
-   */
+  /// [RelOptCostFactory] that creates [PinotRelOptCost] instances.
+  ///
+  /// Use [#INSTANCE] to avoid repeated allocations of the factory itself.
   public static final class Factory implements RelOptCostFactory {
 
-    /** Singleton instance. */
+    /// Singleton instance.
     public static final Factory INSTANCE = new Factory();
 
     private Factory() {

@@ -827,10 +827,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _routingManager.init(_spectatorHelixManager);
   }
 
-  /**
-   * Creates and initializes the {@link BrokerTableStatsManager}. Returns {@code null} if the
-   * manager cannot be started (error is logged; broker startup continues normally).
-   */
+  /// Creates and initializes the [BrokerTableStatsManager]. Returns `null` if the
+  /// manager cannot be started (error is logged; broker startup continues normally).
   @Nullable
   private BrokerTableStatsManager createStatsManager() {
     Path statsDir = resolveStatsDir();
@@ -852,11 +850,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  /**
-   * Resolves the directory for the stats store. Uses {@link Broker#CONFIG_OF_STATS_DIR} when
-   * set; otherwise falls back to {@code <pinot.broker.instance.dataDir>/broker-stats} or
-   * {@code <java.io.tmpdir>/broker-stats} when no data dir is configured.
-   */
+  /// Resolves the directory for the stats store. Uses [Broker#CONFIG_OF_STATS_DIR] when
+  /// set; otherwise falls back to `<pinot.broker.instance.dataDir>/broker-stats` or
+  /// `<java.io.tmpdir>/broker-stats` when no data dir is configured.
   private Path resolveStatsDir() {
     String configured = _brokerConf.getProperty(Broker.CONFIG_OF_STATS_DIR);
     if (configured != null && !configured.isEmpty()) {

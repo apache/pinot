@@ -593,27 +593,23 @@ public class CommonConstants {
     // Cost-based optimizer (CBO) stats store — EXPERIMENTAL
     // ---------------------------------------------------------------------------
 
-    /**
-     * [EXPERIMENTAL] When {@code true}, the broker collects per-segment statistics into a local
-     * SQLite store ({@link #CONFIG_OF_STATS_DIR}) and exposes them to the multi-stage query
-     * planner. Disabled by default.
-     *
-     * <p>Note: enabling this changes the row-count and selectivity ESTIMATES the planner sees for
-     * ALL multi-stage queries (any planner rule consulting cardinality metadata observes the
-     * statistics-backed numbers instead of Calcite defaults). It never affects query correctness,
-     * but plans — and therefore performance characteristics — may change. The cost-based join
-     * reorder phase is additionally gated by its own option
-     * ({@link Request.QueryOptionKey#USE_JOIN_REORDER}).
-     */
+    /// [EXPERIMENTAL] When `true`, the broker collects per-segment statistics into a local
+    /// SQLite store ([#CONFIG_OF_STATS_DIR]) and exposes them to the multi-stage query
+    /// planner. Disabled by default.
+    ///
+    /// Note: enabling this changes the row-count and selectivity ESTIMATES the planner sees for
+    /// ALL multi-stage queries (any planner rule consulting cardinality metadata observes the
+    /// statistics-backed numbers instead of Calcite defaults). It never affects query correctness,
+    /// but plans — and therefore performance characteristics — may change. The cost-based join
+    /// reorder phase is additionally gated by its own option
+    /// ([Request.QueryOptionKey#USE_JOIN_REORDER]).
     public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
     public static final boolean DEFAULT_STATS_ENABLED = false;
 
-    /**
-     * [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
-     * ({@code broker-stats.sqlite}). Defaults to {@code <java.io.tmpdir>/<instanceId>/broker-stats}
-     * (per-instance so multiple brokers on one host do not share a database). Configure a path on
-     * a persistent volume to preserve collected statistics across restarts.
-     */
+    /// [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
+    /// (`broker-stats.sqlite`). Defaults to `<java.io.tmpdir>/<instanceId>/broker-stats`
+    /// (per-instance so multiple brokers on one host do not share a database). Configure a path on
+    /// a persistent volume to preserve collected statistics across restarts.
     public static final String CONFIG_OF_STATS_DIR = "pinot.broker.stats.dir";
 
     // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
@@ -634,19 +630,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.multistage.use.physical.optimizer";
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
 
-    /**
-     * Whether to run the cost-based join-reordering phase by default.
-     * This value can always be overridden by {@link Request.QueryOptionKey#USE_JOIN_REORDER} query option.
-     */
+    /// Whether to run the cost-based join-reordering phase by default.
+    /// This value can always be overridden by [Request.QueryOptionKey#USE_JOIN_REORDER] query option.
     public static final String CONFIG_OF_USE_JOIN_REORDER = "pinot.broker.multistage.use.join.reorder";
     public static final boolean DEFAULT_USE_JOIN_REORDER = false;
 
-    /**
-     * Maximum number of joins in a plan for which the cost-based join-reordering phase will run.
-     * Plans with more joins than this cap skip the reorder phase to avoid excessive planning time.
-     * This value can always be overridden by
-     * {@link Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS} query option.
-     */
+    /// Maximum number of joins in a plan for which the cost-based join-reordering phase will run.
+    /// Plans with more joins than this cap skip the reorder phase to avoid excessive planning time.
+    /// This value can always be overridden by
+    /// [Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS] query option.
     public static final String CONFIG_OF_JOIN_REORDER_MAX_JOINS =
         "pinot.broker.multistage.join.reorder.max.joins";
     public static final int DEFAULT_JOIN_REORDER_MAX_JOINS = 10;
@@ -857,10 +849,8 @@ public class CommonConstants {
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         public static final String USE_JOIN_REORDER = "useJoinReorder";
-        /**
-         * Maximum number of joins that the cost-based join-reordering phase will handle.
-         * Plans with more joins than this cap are left unchanged.
-         */
+        /// Maximum number of joins that the cost-based join-reordering phase will handle.
+        /// Plans with more joins than this cap are left unchanged.
         public static final String JOIN_REORDER_MAX_JOINS = "joinReorderMaxJoins";
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,

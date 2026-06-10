@@ -39,13 +39,11 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Unit tests for {@link LogicalTableStatsResolver}.
- *
- * <p>Each test method gets a fresh temporary directory and a new {@link SqliteStatsStore} and
- * {@link LogicalTableStatsResolver}. Table configs and time boundaries are injected as simple
- * lambdas.
- */
+/// Unit tests for [LogicalTableStatsResolver].
+///
+/// Each test method gets a fresh temporary directory and a new [SqliteStatsStore] and
+/// [LogicalTableStatsResolver]. Table configs and time boundaries are injected as simple
+/// lambdas.
 public class LogicalTableStatsResolverTest {
 
   private static final String RAW_TABLE = "myTable";

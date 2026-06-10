@@ -47,31 +47,27 @@ import org.apache.pinot.query.planner.spi.stats.StatConfidence;
 import org.apache.pinot.query.planner.spi.stats.TableStatistics;
 
 
-/**
- * Metadata handler that improves selectivity estimation for Pinot tables using
- * {@link PinotStatisticsProvider}.
- *
- * <h3>Handled cases</h3>
- * <ul>
- *   <li><b>Time-range selectivity</b>: conjuncts that compare the primary millisecond time column
- *       against literal values using {@code >}, {@code >=}, {@code <}, {@code <=}, {@code =},
- *       or BETWEEN (expressed as two conjuncts) are evaluated via
- *       {@link PinotStatisticsProvider#estimateRowsInTimeRange}.</li>
- *   <li><b>NDV equality selectivity</b>: equality predicates on non-time columns with known NDV
- *       (EXACT or ESTIMATED confidence) yield {@code 1/ndv}.</li>
- *   <li><b>Everything else</b>: falls back to {@link RelMdUtil#guessSelectivity}.</li>
- * </ul>
- *
- * <h3>Column-index remapping</h3>
- * <p>When the parent {@link Filter} sits directly on a {@link TableScan} or on a trivial
- * {@link Project} (all projections are plain {@link RexInputRef} with no reordering), column
- * indices referenced in the predicate match scan columns directly. Deeper stacks fall back to the
- * default guess.
- *
- * <h3>Thread-safety</h3>
- * <p>Instances are stateless apart from the injected {@link PinotStatisticsProvider}, which must
- * itself be thread-safe. This handler is safe for concurrent use once constructed.
- */
+/// Metadata handler that improves selectivity estimation for Pinot tables using
+/// [PinotStatisticsProvider].
+///
+/// ### Handled cases
+/// - **Time-range selectivity**: conjuncts that compare the primary millisecond time column
+///   against literal values using `>`, `>=`, `<`, `<=`, `=`,
+///   or BETWEEN (expressed as two conjuncts) are evaluated via
+///   [PinotStatisticsProvider#estimateRowsInTimeRange].
+/// - **NDV equality selectivity**: equality predicates on non-time columns with known NDV
+///   (EXACT or ESTIMATED confidence) yield `1/ndv`.
+/// - **Everything else**: falls back to [RelMdUtil#guessSelectivity].
+///
+/// ### Column-index remapping
+/// When the parent [Filter] sits directly on a [TableScan] or on a trivial
+/// [Project] (all projections are plain [RexInputRef] with no reordering), column
+/// indices referenced in the predicate match scan columns directly. Deeper stacks fall back to the
+/// default guess.
+///
+/// ### Thread-safety
+/// Instances are stateless apart from the injected [PinotStatisticsProvider], which must
+/// itself be thread-safe. This handler is safe for concurrent use once constructed.
 public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Selectivity> {
 
   private static final double FALLBACK_RANGE_SELECTIVITY = 0.25;
@@ -85,13 +81,11 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
   // Handler entry-points (dispatched by Calcite via reflection)
   // --------------------------------------------------------------------------
 
-  /**
-   * Selectivity for a {@link Filter} whose predicate may reference a Pinot time column or NDV
-   * statistics.
-   *
-   * <p>Only predicates that can be traced directly to a Pinot scan (Filter-on-Scan or
-   * Filter-on-trivial-Project-on-Scan) are enhanced; all other shapes delegate to the default.
-   */
+  /// Selectivity for a [Filter] whose predicate may reference a Pinot time column or NDV
+  /// statistics.
+  ///
+  /// Only predicates that can be traced directly to a Pinot scan (Filter-on-Scan or
+  /// Filter-on-trivial-Project-on-Scan) are enhanced; all other shapes delegate to the default.
   public Double getSelectivity(Filter rel, RelMetadataQuery mq, @Nullable RexNode predicate) {
     // Calcite contract (see RelMdSelectivity#getSelectivity(Filter, ...)): when a predicate is
     // passed in, subtract the filter's own condition first — its selectivity is already reflected
@@ -111,10 +105,8 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     return computeSelectivity(effectivePred, ctx, mq);
   }
 
-  /**
-   * Selectivity for a bare {@link TableScan} — used when selectivity is requested directly
-   * on the scan (no enclosing Filter).
-   */
+  /// Selectivity for a bare [TableScan] — used when selectivity is requested directly
+  /// on the scan (no enclosing Filter).
   public Double getSelectivity(TableScan rel, RelMetadataQuery mq, @Nullable RexNode predicate) {
     if (predicate == null) {
       return 1.0;
@@ -249,20 +241,16 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
   // Time-bound extraction
   // --------------------------------------------------------------------------
 
-  /**
-   * Tries to extract a time bound from a comparison conjunct.  Returns {@code null} if this
-   * conjunct is not a recognized time comparison.
-   *
-   * <p>Supported patterns (both orientations):
-   * <ul>
-   *   <li>{@code timeCol > literal}  → lower bound (exclusive), stored as {@code literal + 1}</li>
-   *   <li>{@code timeCol >= literal} → lower bound (inclusive), stored as {@code literal}</li>
-   *   <li>{@code timeCol < literal}  → upper bound (exclusive), stored as {@code literal - 1}</li>
-   *   <li>{@code timeCol <= literal} → upper bound (inclusive), stored as {@code literal}</li>
-   *   <li>{@code timeCol = literal}  → both bounds, returned as lower bound ({@code hi} resolved
-   *       separately via the same call with flipped bound flag)</li>
-   * </ul>
-   */
+  /// Tries to extract a time bound from a comparison conjunct. Returns `null` if this
+  /// conjunct is not a recognized time comparison.
+  ///
+  /// Supported patterns (both orientations):
+  /// - `timeCol > literal`  → lower bound (exclusive), stored as `literal + 1`
+  /// - `timeCol >= literal` → lower bound (inclusive), stored as `literal`
+  /// - `timeCol < literal`  → upper bound (exclusive), stored as `literal - 1`
+  /// - `timeCol <= literal` → upper bound (inclusive), stored as `literal`
+  /// - `timeCol = literal`  → both bounds, returned as lower bound (`hi` resolved
+  ///   separately via the same call with flipped bound flag)
   @Nullable
   private TimeBound extractTimeBound(RexNode conjunct, String timeCol, ScanContext ctx) {
     SqlKind kind = conjunct.getKind();
@@ -322,16 +310,14 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     }
   }
 
-  /**
-   * Tries to extract a single consolidated time range from a Calcite {@code SEARCH(col, Sarg)}
-   * conjunct.  This handles the case where Calcite rewrites {@code col >= A AND col < B} into a
-   * single {@code SEARCH} call.
-   *
-   * <p>Only single-range Sargs over the time column are handled; multi-range Sargs (OR of ranges)
-   * fall back to the default guess.
-   *
-   * @return combined time bounds, or {@code null} if not applicable
-   */
+  /// Tries to extract a single consolidated time range from a Calcite `SEARCH(col, Sarg)`
+  /// conjunct. This handles the case where Calcite rewrites `col >= A AND col < B` into a
+  /// single `SEARCH` call.
+  ///
+  /// Only single-range Sargs over the time column are handled; multi-range Sargs (OR of ranges)
+  /// fall back to the default guess.
+  ///
+  /// @return combined time bounds, or `null` if not applicable
   @Nullable
   @SuppressWarnings("unchecked")
   private SearchTimeBounds extractSearchTimeBounds(RexNode conjunct, String timeCol,
@@ -377,16 +363,13 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     return new SearchTimeBounds(lo, hi);
   }
 
-  /**
-   * Converts a range endpoint to an INCLUSIVE epoch-millisecond bound, adjusting OPEN (exclusive)
-   * endpoints by one millisecond in the appropriate direction.
-   *
-   * @param endpoint        the comparable endpoint value (expected to be a {@link BigDecimal} or
-   *                        Number)
-   * @param boundType       Guava {@link com.google.common.collect.BoundType}
-   * @param isLowerEndpoint {@code true} when converting the lower endpoint of the range
-   * @return inclusive millisecond bound, or {@link Long#MIN_VALUE} if not convertible
-   */
+  /// Converts a range endpoint to an INCLUSIVE epoch-millisecond bound, adjusting OPEN (exclusive)
+  /// endpoints by one millisecond in the appropriate direction.
+  ///
+  /// @param endpoint        the comparable endpoint value (expected to be a [BigDecimal] or Number)
+  /// @param boundType       Guava [com.google.common.collect.BoundType]
+  /// @param isLowerEndpoint `true` when converting the lower endpoint of the range
+  /// @return inclusive millisecond bound, or [Long#MIN_VALUE] if not convertible
   private static long toInclusiveMillis(Comparable<?> endpoint,
       com.google.common.collect.BoundType boundType, boolean isLowerEndpoint) {
     long millis;
@@ -405,7 +388,7 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     return millis;
   }
 
-  /** Flips a comparison operator (for when the literal is on the left). */
+  /// Flips a comparison operator (for when the literal is on the left).
   private static SqlKind flipComparison(SqlKind kind) {
     switch (kind) {
       case GREATER_THAN:
@@ -421,11 +404,9 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     }
   }
 
-  /**
-   * Extracts the millisecond value from a {@link RexLiteral}.  Supports BIGINT/INTEGER numerics
-   * and TIMESTAMP literals (stored as epoch-ms in Calcite).  Returns {@link Long#MIN_VALUE} if
-   * the literal cannot be interpreted as epoch milliseconds.
-   */
+  /// Extracts the millisecond value from a [RexLiteral]. Supports BIGINT/INTEGER numerics
+  /// and TIMESTAMP literals (stored as epoch-ms in Calcite). Returns [Long#MIN_VALUE] if
+  /// the literal cannot be interpreted as epoch milliseconds.
   private static long extractMillis(RexLiteral literal) {
     switch (literal.getType().getSqlTypeName()) {
       case BIGINT:
@@ -448,10 +429,8 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
   // Column-name resolution
   // --------------------------------------------------------------------------
 
-  /**
-   * For an equality call, returns the referenced column name if one operand is a scan column
-   * reference and the other is a literal; otherwise returns {@code null}.
-   */
+  /// For an equality call, returns the referenced column name if one operand is a scan column
+  /// reference and the other is a literal; otherwise returns `null`.
   @Nullable
   private String extractColumnRef(RexNode conjunct, ScanContext ctx) {
     if (!(conjunct instanceof RexCall)) {
@@ -476,16 +455,14 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     return resolveColName(ref, ctx);
   }
 
-  /**
-   * Resolves a {@link RexInputRef} index to the scan's column name, applying any trivial project
-   * remapping stored in the {@link ScanContext}.
-   *
-   * <p>Column indices are resolved against {@link ScanContext#_scanFieldNames}, which reflects
-   * the ordered field list of the underlying {@link TableScan}'s {@code RelDataType} — matching
-   * exactly how Calcite assigns {@link RexInputRef} indices.
-   *
-   * @return column name, or {@code null} if the index cannot be resolved
-   */
+  /// Resolves a [RexInputRef] index to the scan's column name, applying any trivial project
+  /// remapping stored in the [ScanContext].
+  ///
+  /// Column indices are resolved against [ScanContext#_scanFieldNames], which reflects
+  /// the ordered field list of the underlying [TableScan]'s `RelDataType` — matching
+  /// exactly how Calcite assigns [RexInputRef] indices.
+  ///
+  /// @return column name, or `null` if the index cannot be resolved
   @Nullable
   private String resolveColName(RexInputRef ref, ScanContext ctx) {
     int scanIdx = ref.getIndex();
@@ -509,13 +486,11 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
   // Scan-context resolution
   // --------------------------------------------------------------------------
 
-  /**
-   * Walks from {@code input} downward through trivial {@link Project}s (all projections are plain
-   * {@link RexInputRef}) to find the underlying {@link TableScan}.
-   *
-   * @return scan context, or {@code null} if the input is not a Pinot scan or the projection
-   *         is non-trivial
-   */
+  /// Walks from `input` downward through trivial [Project]s (all projections are plain
+  /// [RexInputRef]) to find the underlying [TableScan].
+  ///
+  /// @return scan context, or `null` if the input is not a Pinot scan or the projection
+  ///         is non-trivial
   @Nullable
   private ScanContext resolveScan(RelNode input) {
     if (input instanceof TableScan) {
@@ -570,17 +545,15 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
   // Internal data classes
   // --------------------------------------------------------------------------
 
-  /**
-   * Snapshot of scan context: the underlying {@link PinotTable}, the ordered field names from the
-   * scan's row type, and an optional index remapping that translates predicate input-ref indices
-   * to scan-field indices.
-   *
-   * <p>When {@code _projectMapping} is {@code null}, no remapping is needed (predicate refs go
-   * directly to scan fields).
-   */
+  /// Snapshot of scan context: the underlying [PinotTable], the ordered field names from the
+  /// scan's row type, and an optional index remapping that translates predicate input-ref indices
+  /// to scan-field indices.
+  ///
+  /// When `_projectMapping` is `null`, no remapping is needed (predicate refs go
+  /// directly to scan fields).
   private static final class ScanContext {
     final PinotTable _table;
-    /** Field names of the underlying TableScan's row type, in order. */
+    /// Field names of the underlying TableScan's row type, in order.
     final List<String> _scanFieldNames;
     @Nullable
     final List<Integer> _projectMapping;
@@ -593,13 +566,11 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     }
   }
 
-  /**
-   * Combined lower and upper time bounds extracted from a single SEARCH/Sarg conjunct.
-   */
+  /// Combined lower and upper time bounds extracted from a single SEARCH/Sarg conjunct.
   private static final class SearchTimeBounds {
-    /** Inclusive lower epoch-millisecond bound; {@link Long#MIN_VALUE} if unbounded. */
+    /// Inclusive lower epoch-millisecond bound; [Long#MIN_VALUE] if unbounded.
     final long _lo;
-    /** Inclusive upper epoch-millisecond bound; {@link Long#MAX_VALUE} if unbounded. */
+    /// Inclusive upper epoch-millisecond bound; [Long#MAX_VALUE] if unbounded.
     final long _hi;
 
     SearchTimeBounds(long lo, long hi) {
@@ -608,14 +579,12 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
     }
   }
 
-  /**
-   * A single time bound extracted from a comparison conjunct.
-   *
-   * @param _millis      epoch-millisecond value of the bound
-   * @param _isLowerBound {@code true} for a lower (start) bound; {@code false} for an upper (end)
-   * @param _isEquality  {@code true} if this bound came from an {@code =} predicate and both
-   *                     lower AND upper should be set to {@code _millis}
-   */
+  /// A single time bound extracted from a comparison conjunct.
+  ///
+  /// @param _millis      epoch-millisecond value of the bound
+  /// @param _isLowerBound `true` for a lower (start) bound; `false` for an upper (end)
+  /// @param _isEquality  `true` if this bound came from an `=` predicate and both
+  ///                     lower AND upper should be set to `_millis`
   private static final class TimeBound {
     final long _millis;
     final boolean _isLowerBound;

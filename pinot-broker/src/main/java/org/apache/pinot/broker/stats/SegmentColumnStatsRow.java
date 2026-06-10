@@ -21,15 +21,13 @@ package org.apache.pinot.broker.stats;
 import javax.annotation.Nullable;
 
 
-/**
- * Immutable value object holding per-column statistics for a single segment, as persisted in the
- * broker-local {@link StatsStore}.
- *
- * <p>Min/max values are serialized as strings to allow storage of heterogeneous column types
- * without type-specific schema. Unknown numeric fields are represented by {@code -1}.
- *
- * <p>Thread-safety: immutable; safe for concurrent access.
- */
+/// Immutable value object holding per-column statistics for a single segment, as persisted in the
+/// broker-local [StatsStore].
+///
+/// Min/max values are serialized as strings to allow storage of heterogeneous column types
+/// without type-specific schema. Unknown numeric fields are represented by `-1`.
+///
+/// Thread-safety: immutable; safe for concurrent access.
 public class SegmentColumnStatsRow {
   private final String _segmentName;
   private final String _columnName;
@@ -55,48 +53,46 @@ public class SegmentColumnStatsRow {
     _nullFraction = nullFraction;
   }
 
-  /** Returns the segment name. */
+  /// Returns the segment name.
   public String getSegmentName() {
     return _segmentName;
   }
 
-  /** Returns the column name. */
+  /// Returns the column name.
   public String getColumnName() {
     return _columnName;
   }
 
-  /** Returns the estimated number of distinct values (NDV), or {@code -1} if unknown. */
+  /// Returns the estimated number of distinct values (NDV), or `-1` if unknown.
   public long getNdv() {
     return _ndv;
   }
 
-  /** Returns the string-serialized minimum value for the column, or {@code null} if unknown. */
+  /// Returns the string-serialized minimum value for the column, or `null` if unknown.
   @Nullable
   public String getMinValue() {
     return _minValue;
   }
 
-  /** Returns the string-serialized maximum value for the column, or {@code null} if unknown. */
+  /// Returns the string-serialized maximum value for the column, or `null` if unknown.
   @Nullable
   public String getMaxValue() {
     return _maxValue;
   }
 
-  /**
-   * Returns {@code false} when the minimum value is polluted by the numeric null-sentinel default
-   * (i.e. the column is nullable and its stored min equals the type's minimum representable
-   * value). When {@code false}, segment pruning must never use this bound.
-   */
+  /// Returns `false` when the minimum value is polluted by the numeric null-sentinel default
+  /// (i.e. the column is nullable and its stored min equals the type's minimum representable
+  /// value). When `false`, segment pruning must never use this bound.
   public boolean isMinTrusted() {
     return _minTrusted;
   }
 
-  /** Returns the average number of bytes per stored value, or {@code -1} if unknown. */
+  /// Returns the average number of bytes per stored value, or `-1` if unknown.
   public double getAvgBytesPerValue() {
     return _avgBytesPerValue;
   }
 
-  /** Returns the fraction of null values in {@code [0.0, 1.0]}, or {@code -1} if unknown. */
+  /// Returns the fraction of null values in `[0.0, 1.0]`, or `-1` if unknown.
   public double getNullFraction() {
     return _nullFraction;
   }

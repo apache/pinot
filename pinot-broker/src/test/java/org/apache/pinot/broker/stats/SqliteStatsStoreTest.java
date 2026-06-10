@@ -36,11 +36,9 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Unit tests for {@link SqliteStatsStore}.
- *
- * <p>Each test method gets a fresh temporary directory and a new store instance.
- */
+/// Unit tests for [SqliteStatsStore].
+///
+/// Each test method gets a fresh temporary directory and a new store instance.
 public class SqliteStatsStoreTest {
   private static final String TABLE_A = "myTable_OFFLINE";
   private static final String TABLE_B = "otherTable_REALTIME";
@@ -444,7 +442,7 @@ public class SqliteStatsStoreTest {
         nullFrac);
   }
 
-  /** Recursively deletes a directory tree. */
+  /// Recursively deletes a directory tree.
   private static void deleteRecursively(Path dir)
       throws IOException {
     if (dir == null || !Files.exists(dir)) {

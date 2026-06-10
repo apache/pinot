@@ -19,14 +19,12 @@
 package org.apache.pinot.query.planner.spi.stats;
 
 
-/**
- * Immutable aggregate statistics for a table, used by the cost-based query planner.
- *
- * <p>Instances are created via {@link #builder()}. Unknown numeric fields are represented
- * by {@code -1}; unknown timestamp fields by {@code 0}.
- *
- * <p>Thread-safety: immutable; safe for concurrent access.
- */
+/// Immutable aggregate statistics for a table, used by the cost-based query planner.
+///
+/// Instances are created via [#builder()]. Unknown numeric fields are represented
+/// by `-1`; unknown timestamp fields by `0`.
+///
+/// Thread-safety: immutable; safe for concurrent access.
 public class TableStatistics {
   private final long _rowCount;
   private final StatConfidence _rowCountConfidence;
@@ -42,58 +40,44 @@ public class TableStatistics {
     _updatedAtMs = builder._updatedAtMs;
   }
 
-  /**
-   * Returns a new {@link Builder} for constructing {@link TableStatistics} instances.
-   */
+  /// Returns a new [Builder] for constructing [TableStatistics] instances.
   public static Builder builder() {
     return new Builder();
   }
 
-  /**
-   * Returns the estimated number of rows in the table, or {@code -1} if unknown.
-   */
+  /// Returns the estimated number of rows in the table, or `-1` if unknown.
   public long getRowCount() {
     return _rowCount;
   }
 
-  /**
-   * Returns the confidence level of the {@link #getRowCount()} value.
-   */
+  /// Returns the confidence level of the [#getRowCount()] value.
   public StatConfidence getRowCountConfidence() {
     return _rowCountConfidence;
   }
 
-  /**
-   * Returns the estimated total size of the table in bytes, or {@code -1} if unknown.
-   */
+  /// Returns the estimated total size of the table in bytes, or `-1` if unknown.
   public long getTableSizeBytes() {
     return _tableSizeBytes;
   }
 
-  /**
-   * Returns the confidence level of the {@link #getTableSizeBytes()} value.
-   */
+  /// Returns the confidence level of the [#getTableSizeBytes()] value.
   public StatConfidence getSizeConfidence() {
     return _sizeConfidence;
   }
 
-  /**
-   * Returns the epoch-millisecond timestamp at which these statistics were last updated,
-   * or {@code 0} if unknown.
-   */
+  /// Returns the epoch-millisecond timestamp at which these statistics were last updated,
+  /// or `0` if unknown.
   public long getUpdatedAtMs() {
     return _updatedAtMs;
   }
 
-  /**
-   * Builder for {@link TableStatistics}.
-   *
-   * <p>Default values: numeric fields default to {@code -1} (unknown),
-   * confidence fields default to {@link StatConfidence#UNKNOWN},
-   * timestamp fields default to {@code 0} (unknown).
-   *
-   * <p>Thread-safety: not thread-safe; use from a single thread.
-   */
+  /// Builder for [TableStatistics].
+  ///
+  /// Default values: numeric fields default to `-1` (unknown),
+  /// confidence fields default to [StatConfidence#UNKNOWN],
+  /// timestamp fields default to `0` (unknown).
+  ///
+  /// Thread-safety: not thread-safe; use from a single thread.
   public static class Builder {
     private long _rowCount = -1;
     private StatConfidence _rowCountConfidence = StatConfidence.UNKNOWN;
@@ -104,27 +88,27 @@ public class TableStatistics {
     private Builder() {
     }
 
-    /** Sets the row count and its confidence level. */
+    /// Sets the row count and its confidence level.
     public Builder rowCount(long rowCount, StatConfidence confidence) {
       _rowCount = rowCount;
       _rowCountConfidence = confidence;
       return this;
     }
 
-    /** Sets the table size in bytes and its confidence level. */
+    /// Sets the table size in bytes and its confidence level.
     public Builder tableSizeBytes(long tableSizeBytes, StatConfidence confidence) {
       _tableSizeBytes = tableSizeBytes;
       _sizeConfidence = confidence;
       return this;
     }
 
-    /** Sets the epoch-millisecond timestamp of the last statistics update. */
+    /// Sets the epoch-millisecond timestamp of the last statistics update.
     public Builder updatedAtMs(long updatedAtMs) {
       _updatedAtMs = updatedAtMs;
       return this;
     }
 
-    /** Builds the immutable {@link TableStatistics} instance. */
+    /// Builds the immutable [TableStatistics] instance.
     public TableStatistics build() {
       return new TableStatistics(this);
     }

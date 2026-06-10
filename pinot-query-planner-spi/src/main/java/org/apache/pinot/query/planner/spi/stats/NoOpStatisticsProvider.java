@@ -22,18 +22,16 @@ import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 
-/**
- * No-op implementation of {@link PinotStatisticsProvider} that returns {@code null} or empty
- * for all queries.
- *
- * <p>Used as a safe default when no statistics back-end is configured, allowing the planner to
- * fall back to heuristic cost estimation.
- *
- * <p>Thread-safety: stateless singleton; unconditionally thread-safe.
- */
+/// No-op implementation of [PinotStatisticsProvider] that returns `null` or empty
+/// for all queries.
+///
+/// Used as a safe default when no statistics back-end is configured, allowing the planner to
+/// fall back to heuristic cost estimation.
+///
+/// Thread-safety: stateless singleton; unconditionally thread-safe.
 public final class NoOpStatisticsProvider implements PinotStatisticsProvider {
 
-  /** Singleton instance. */
+  /// Singleton instance.
   public static final NoOpStatisticsProvider INSTANCE = new NoOpStatisticsProvider();
 
   private NoOpStatisticsProvider() {

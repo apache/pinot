@@ -44,15 +44,13 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-/**
- * Tests that row-count statistics flow from {@link PinotStatisticsProvider} through
- * {@link org.apache.pinot.query.catalog.PinotTable#getStatistic()} and into
- * {@link RelMetadataQuery#getRowCount}.
- *
- * <p>These tests verify the end-to-end path that does NOT require a custom RelMdRowCount handler —
- * the default Calcite handler already picks up the statistic via TableScan.estimateRowCount(mq) →
- * RelOptTableImpl.getRowCount() → PinotTable.getStatistic().getRowCount().
- */
+/// Tests that row-count statistics flow from [PinotStatisticsProvider] through
+/// [org.apache.pinot.query.catalog.PinotTable#getStatistic()] and into
+/// [RelMetadataQuery#getRowCount].
+///
+/// These tests verify the end-to-end path that does NOT require a custom RelMdRowCount handler —
+/// the default Calcite handler already picks up the statistic via TableScan.estimateRowCount(mq) →
+/// RelOptTableImpl.getRowCount() → PinotTable.getStatistic().getRowCount().
 public class PinotRelMdRowCountTest {
 
   private static final String TABLE_NAME = "a";
@@ -62,7 +60,7 @@ public class PinotRelMdRowCountTest {
   // Helpers
   // --------------------------------------------------------------------------
 
-  /** Build a minimal QueryEnvironment with the given statistics provider. */
+  /// Build a minimal QueryEnvironment with the given statistics provider.
   private static QueryEnvironment buildEnv(PinotStatisticsProvider statsProvider) {
     Schema schema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
@@ -90,10 +88,8 @@ public class PinotRelMdRowCountTest {
   // Tests
   // --------------------------------------------------------------------------
 
-  /**
-   * Verifies that when a statistics provider returns an EXACT row count, the value flows into
-   * RelMetadataQuery.getRowCount() for a TableScan through the default Calcite machinery.
-   */
+  /// Verifies that when a statistics provider returns an EXACT row count, the value flows into
+  /// RelMetadataQuery.getRowCount() for a TableScan through the default Calcite machinery.
   @Test
   public void testScanRowCountFlowsFromStatisticsProvider() {
     long expectedRowCount = 12_345L;
@@ -109,10 +105,8 @@ public class PinotRelMdRowCountTest {
     assertNotNull(env.compile("SELECT col1 FROM " + TABLE_NAME));
   }
 
-  /**
-   * Directly tests that {@link RelMetadataQuery#getRowCount} on a {@link TableScan} built from
-   * a {@link org.apache.pinot.query.catalog.PinotTable} with a known row count returns that count.
-   */
+  /// Directly tests that [RelMetadataQuery#getRowCount] on a [TableScan] built from
+  /// a [org.apache.pinot.query.catalog.PinotTable] with a known row count returns that count.
   @Test
   public void testDirectRelMetadataQueryRowCount() {
     long expectedRowCount = 9_999L;
@@ -148,10 +142,8 @@ public class PinotRelMdRowCountTest {
     }
   }
 
-  /**
-   * With NoOpStatisticsProvider, row count should be null (unknown) from the statistic, and
-   * Calcite falls back to its heuristic default (non-null but non-zero).
-   */
+  /// With NoOpStatisticsProvider, row count should be null (unknown) from the statistic, and
+  /// Calcite falls back to its heuristic default (non-null but non-zero).
   @Test
   public void testNoOpProviderFallsBackToCalciteDefault() {
     QueryEnvironment env = buildEnv(NoOpStatisticsProvider.INSTANCE);

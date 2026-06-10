@@ -19,14 +19,12 @@
 package org.apache.pinot.broker.stats;
 
 
-/**
- * Immutable value object holding aggregate statistics for a single segment, as persisted in the
- * broker-local {@link StatsStore}.
- *
- * <p>Unknown numeric fields are represented by {@code -1}.
- *
- * <p>Thread-safety: immutable; safe for concurrent access.
- */
+/// Immutable value object holding aggregate statistics for a single segment, as persisted in the
+/// broker-local [StatsStore].
+///
+/// Unknown numeric fields are represented by `-1`.
+///
+/// Thread-safety: immutable; safe for concurrent access.
 public class SegmentStatsRow {
   private final String _segmentName;
   private final long _crc;
@@ -47,42 +45,37 @@ public class SegmentStatsRow {
     _consuming = consuming;
   }
 
-  /** Returns the segment name. */
+  /// Returns the segment name.
   public String getSegmentName() {
     return _segmentName;
   }
 
-  /** Returns the CRC checksum of the segment, or {@code -1} if unknown. */
+  /// Returns the CRC checksum of the segment, or `-1` if unknown.
   public long getCrc() {
     return _crc;
   }
 
-  /** Returns the total number of documents in the segment, or {@code -1} if unknown. */
+  /// Returns the total number of documents in the segment, or `-1` if unknown.
   public long getTotalDocs() {
     return _totalDocs;
   }
 
-  /** Returns the on-disk size of the segment in bytes, or {@code -1} if unknown. */
+  /// Returns the on-disk size of the segment in bytes, or `-1` if unknown.
   public long getSizeBytes() {
     return _sizeBytes;
   }
 
-  /**
-   * Returns the start of the segment's time range in epoch milliseconds, or {@code -1} if
-   * unknown.
-   */
+  /// Returns the start of the segment's time range in epoch milliseconds, or `-1` if unknown.
   public long getStartTimeMs() {
     return _startTimeMs;
   }
 
-  /**
-   * Returns the end of the segment's time range in epoch milliseconds, or {@code -1} if unknown.
-   */
+  /// Returns the end of the segment's time range in epoch milliseconds, or `-1` if unknown.
   public long getEndTimeMs() {
     return _endTimeMs;
   }
 
-  /** Returns {@code true} if this segment is a consuming (REALTIME) segment. */
+  /// Returns `true` if this segment is a consuming (REALTIME) segment.
   public boolean isConsuming() {
     return _consuming;
   }

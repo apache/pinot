@@ -32,10 +32,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-/**
- * Unit tests for {@link PinotTable#getStatistic()} — verifies that row-count statistics are
- * surfaced to the Calcite planner correctly based on provider output and confidence level.
- */
+/// Unit tests for [PinotTable#getStatistic()] — verifies that row-count statistics are
+/// surfaced to the Calcite planner correctly based on provider output and confidence level.
 public class PinotTableStatisticTest {
 
   private static final String TABLE_NAME = "myTable";

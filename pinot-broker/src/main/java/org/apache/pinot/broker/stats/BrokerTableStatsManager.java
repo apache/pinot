@@ -40,85 +40,72 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Broker-wide singleton that owns one {@link StatsStore} and produces per-table
- * {@link SegmentZkMetadataFetchListener} instances that populate it.
- *
- * <h3>Usage</h3>
- * <ol>
- *   <li>Construct with a pre-created (but not yet init()d) {@link StatsStore}.</li>
- *   <li>Call {@link #init()} — on failure the manager disables itself; broker startup is not
- *       affected.</li>
- *   <li>For each table, call {@link #createListener(String)} and register the result on that
- *       table's {@link org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher}
- *       <em>before</em> the fetcher's own {@code init()} call.</li>
- *   <li>On table removal, call {@link #onTableRemoved(String)}.</li>
- *   <li>Close the manager when the broker shuts down.</li>
- * </ol>
- *
- * <h3>Thread-safety</h3>
- * <p>Read methods ({@link #getTableStats}, {@link #estimateRowsInTimeRange}) are safe for
- * concurrent access by any number of reader threads. {@link #createListener} and
- * {@link #onTableRemoved} are called from the routing-manager's table-build thread; the store
- * itself handles single-writer / multi-reader concurrency internally.
- *
- * <h3>Failure isolation</h3>
- * <p>All {@link StatsStoreException} escapes are suppressed here — callers on the query path
- * will receive {@code null} / empty rather than a propagated exception.
- */
+/// Broker-wide singleton that owns one [StatsStore] and produces per-table
+/// [SegmentZkMetadataFetchListener] instances that populate it.
+///
+/// ### Usage
+/// 1. Construct with a pre-created (but not yet init()d) [StatsStore].
+/// 1. Call [#init()] — on failure the manager disables itself; broker startup is not affected.
+/// 1. For each table, call [#createListener(String)] and register the result on that
+///    table's [org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher]
+///    *before* the fetcher's own `init()` call.
+/// 1. On table removal, call [#onTableRemoved(String)].
+/// 1. Close the manager when the broker shuts down.
+///
+/// ### Thread-safety
+/// Read methods ([#getTableStats], [#estimateRowsInTimeRange]) are safe for
+/// concurrent access by any number of reader threads. [#createListener] and
+/// [#onTableRemoved] are called from the routing-manager's table-build thread; the store
+/// itself handles single-writer / multi-reader concurrency internally.
+///
+/// ### Failure isolation
+/// All [StatsStoreException] escapes are suppressed here — callers on the query path
+/// will receive `null` / empty rather than a propagated exception.
 public class BrokerTableStatsManager implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerTableStatsManager.class);
 
   private final StatsStore _statsStore;
   private final LogicalTableStatsResolver _resolver;
-  /** False when init() failed; all operations become no-ops in that state. */
+  /// False when init() failed; all operations become no-ops in that state.
   private volatile boolean _enabled = false;
 
-  /**
-   * Constructs a new manager backed by the given {@link StatsStore}.
-   * The store must not have been opened yet; {@link #init()} will call {@link StatsStore#init()}.
-   *
-   * @param statsStore backing store; owned by this manager
-   */
+  /// Constructs a new manager backed by the given [StatsStore].
+  /// The store must not have been opened yet; [#init()] will call [StatsStore#init()].
+  ///
+  /// @param statsStore backing store; owned by this manager
   public BrokerTableStatsManager(StatsStore statsStore) {
     _statsStore = statsStore;
     _resolver = new LogicalTableStatsResolver(statsStore);
   }
 
-  /**
-   * Sets the provider used to look up the time boundary (epoch-milliseconds) for a raw table
-   * name. Call this after the routing manager is fully initialized.
-   *
-   * <p>A {@code null} return value from {@code provider} means no boundary is available for
-   * that table, which causes the resolver to fall back to a plain sum of offline + realtime rows
-   * with {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#ESTIMATED} confidence.
-   *
-   * @param provider function from raw table name → time boundary in epoch-milliseconds, nullable
-   */
+  /// Sets the provider used to look up the time boundary (epoch-milliseconds) for a raw table
+  /// name. Call this after the routing manager is fully initialized.
+  ///
+  /// A `null` return value from `provider` means no boundary is available for
+  /// that table, which causes the resolver to fall back to a plain sum of offline + realtime rows
+  /// with [org.apache.pinot.query.planner.spi.stats.StatConfidence#ESTIMATED] confidence.
+  ///
+  /// @param provider function from raw table name → time boundary in epoch-milliseconds, nullable
   public void setTimeBoundaryMsProvider(@Nullable Function<String, Long> provider) {
     _resolver.setTimeBoundaryMsProvider(provider);
   }
 
-  /**
-   * Sets the provider used to look up the {@link TableConfig} for a fully-qualified
-   * (type-suffixed) table name. Call this after the table cache is initialized.
-   *
-   * <p>Required for upsert/dedup detection; without this, upsert/dedup tables will report
-   * {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#EXACT} rather than
-   * {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#LOW}.
-   *
-   * @param provider function from suffixed table name → TableConfig, nullable
-   */
+  /// Sets the provider used to look up the [TableConfig] for a fully-qualified
+  /// (type-suffixed) table name. Call this after the table cache is initialized.
+  ///
+  /// Required for upsert/dedup detection; without this, upsert/dedup tables will report
+  /// [org.apache.pinot.query.planner.spi.stats.StatConfidence#EXACT] rather than
+  /// [org.apache.pinot.query.planner.spi.stats.StatConfidence#LOW].
+  ///
+  /// @param provider function from suffixed table name → TableConfig, nullable
   public void setTableConfigProvider(@Nullable Function<String, TableConfig> provider) {
     _resolver.setTableConfigProvider(provider);
   }
 
-  /**
-   * Opens the backing store. On failure, logs an error and sets the manager to disabled; the
-   * broker should still start normally.
-   *
-   * @throws StatsStoreException if the store cannot be opened (callers may log and ignore)
-   */
+  /// Opens the backing store. On failure, logs an error and sets the manager to disabled; the
+  /// broker should still start normally.
+  ///
+  /// @throws StatsStoreException if the store cannot be opened (callers may log and ignore)
   public void init()
       throws StatsStoreException {
     _statsStore.init();
@@ -126,17 +113,15 @@ public class BrokerTableStatsManager implements Closeable {
     LOGGER.info("BrokerTableStatsManager initialized");
   }
 
-  /**
-   * Creates a listener that will maintain stats for {@code tableNameWithType} in the backing
-   * store. Must be registered on the table's
-   * {@link org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher} before the
-   * fetcher is initialized.
-   *
-   * <p>If the manager is disabled (init failed), returns a no-op listener.
-   *
-   * @param tableNameWithType fully-qualified table name (e.g. {@code myTable_OFFLINE})
-   * @return a new listener instance for that table
-   */
+  /// Creates a listener that will maintain stats for `tableNameWithType` in the backing
+  /// store. Must be registered on the table's
+  /// [org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetcher] before the
+  /// fetcher is initialized.
+  ///
+  /// If the manager is disabled (init failed), returns a no-op listener.
+  ///
+  /// @param tableNameWithType fully-qualified table name (e.g. `myTable_OFFLINE`)
+  /// @return a new listener instance for that table
   public SegmentZkMetadataFetchListener createListener(String tableNameWithType) {
     if (!_enabled) {
       return NoOpListener.INSTANCE;
@@ -144,12 +129,10 @@ public class BrokerTableStatsManager implements Closeable {
     return new TableStatsZkListener(tableNameWithType, _statsStore);
   }
 
-  /**
-   * Removes all persisted stats for the given table. Called when the routing entry for a table
-   * is removed. Any store error is logged at WARN and ignored.
-   *
-   * @param tableNameWithType fully-qualified table name
-   */
+  /// Removes all persisted stats for the given table. Called when the routing entry for a table
+  /// is removed. Any store error is logged at WARN and ignored.
+  ///
+  /// @param tableNameWithType fully-qualified table name
   public void onTableRemoved(String tableNameWithType) {
     if (!_enabled) {
       return;
@@ -161,24 +144,19 @@ public class BrokerTableStatsManager implements Closeable {
     }
   }
 
-  /**
-   * Returns logical table statistics for the given table name, or {@code null} if unavailable.
-   *
-   * <p>Accepts both suffixed physical names ({@code foo_OFFLINE} / {@code foo_REALTIME}) and raw
-   * logical names ({@code foo}):
-   * <ul>
-   *   <li>Suffixed names: returns physical stats with per-type confidence adjustments (upsert,
-   *       dedup, consuming-segment detection).</li>
-   *   <li>Raw names: returns a logical hybrid view merging offline and realtime stats at the
-   *       time boundary; if no boundary is available, returns a plain sum with
-   *       {@link org.apache.pinot.query.planner.spi.stats.StatConfidence#ESTIMATED}
-   *       confidence.</li>
-   * </ul>
-   *
-   * <p>Any store error is logged at WARN and {@code null} is returned.
-   *
-   * @param tableName raw table name or fully-qualified name with type suffix
-   */
+  /// Returns logical table statistics for the given table name, or `null` if unavailable.
+  ///
+  /// Accepts both suffixed physical names (`foo_OFFLINE` / `foo_REALTIME`) and raw
+  /// logical names (`foo`):
+  /// - Suffixed names: returns physical stats with per-type confidence adjustments (upsert,
+  ///   dedup, consuming-segment detection).
+  /// - Raw names: returns a logical hybrid view merging offline and realtime stats at the
+  ///   time boundary; if no boundary is available, returns a plain sum with
+  ///   [org.apache.pinot.query.planner.spi.stats.StatConfidence#ESTIMATED] confidence.
+  ///
+  /// Any store error is logged at WARN and `null` is returned.
+  ///
+  /// @param tableName raw table name or fully-qualified name with type suffix
   @Nullable
   public TableStatistics getTableStats(String tableName) {
     if (!_enabled) {
@@ -187,18 +165,16 @@ public class BrokerTableStatsManager implements Closeable {
     return _resolver.getTableStats(tableName);
   }
 
-  /**
-   * Returns an estimate of the number of rows in the given time range, or an empty optional if
-   * unavailable. Any store error is logged at WARN and an empty optional is returned.
-   *
-   * <p>For hybrid (raw) table names, the estimate is split at the time boundary:
-   * offline rows are counted for {@code [startMs, boundary)} and realtime rows for
-   * {@code [boundary, endMs)}.
-   *
-   * @param tableName raw table name or fully-qualified name with type suffix
-   * @param startMs   inclusive range start in epoch milliseconds
-   * @param endMs     exclusive range end in epoch milliseconds
-   */
+  /// Returns an estimate of the number of rows in the given time range, or an empty optional if
+  /// unavailable. Any store error is logged at WARN and an empty optional is returned.
+  ///
+  /// For hybrid (raw) table names, the estimate is split at the time boundary:
+  /// offline rows are counted for `[startMs, boundary)` and realtime rows for
+  /// `[boundary, endMs)`.
+  ///
+  /// @param tableName raw table name or fully-qualified name with type suffix
+  /// @param startMs   inclusive range start in epoch milliseconds
+  /// @param endMs     exclusive range end in epoch milliseconds
   public OptionalLong estimateRowsInTimeRange(String tableName, long startMs, long endMs) {
     if (!_enabled) {
       return OptionalLong.empty();
@@ -224,30 +200,27 @@ public class BrokerTableStatsManager implements Closeable {
   // Inner class: TableStatsZkListener
   // ---------------------------------------------------------------------------
 
-  /**
-   * {@link SegmentZkMetadataFetchListener} that maintains segment-level statistics for a single
-   * table in a {@link StatsStore}.
-   *
-   * <h3>Thread-safety</h3>
-   * <p>Instances are called sequentially from the routing manager's per-table lock, so no
-   * additional synchronization is needed inside this class.
-   *
-   * <h3>Failure isolation</h3>
-   * <p>All {@link StatsStoreException} are caught; errors are logged at WARN and the listener
-   * never throws back into the routing manager.
-   */
+  /// [SegmentZkMetadataFetchListener] that maintains segment-level statistics for a single
+  /// table in a [StatsStore].
+  ///
+  /// ### Thread-safety
+  /// Instances are called sequentially from the routing manager's per-table lock, so no
+  /// additional synchronization is needed inside this class.
+  ///
+  /// ### Failure isolation
+  /// All [StatsStoreException] are caught; errors are logged at WARN and the listener
+  /// never throws back into the routing manager.
   static final class TableStatsZkListener implements SegmentZkMetadataFetchListener {
     private static final Logger LOG = LoggerFactory.getLogger(TableStatsZkListener.class);
 
     private final String _tableNameWithType;
     private final StatsStore _statsStore;
-    /**
-     * In-memory mirror of the segments currently persisted in the store for this table.
-     * Maintained after {@link #init} so that {@link #onAssignmentChange} can compute
-     * removals without a full DB round-trip.
-     * <p>Accessed only from the routing-manager's per-table lock — no additional
-     * synchronization needed.
-     */
+    /// In-memory mirror of the segments currently persisted in the store for this table.
+    /// Maintained after [#init] so that [#onAssignmentChange] can compute
+    /// removals without a full DB round-trip.
+    ///
+    /// Accessed only from the routing-manager's per-table lock — no additional
+    /// synchronization needed.
     private final Set<String> _persistedSegments = new HashSet<>();
 
     TableStatsZkListener(String tableNameWithType, StatsStore statsStore) {
@@ -389,12 +362,10 @@ public class BrokerTableStatsManager implements Closeable {
       }
     }
 
-    /**
-     * Converts a {@link SegmentZKMetadata} into a {@link SegmentStatsRow}.
-     * A segment is considered consuming when it is a realtime segment whose status is
-     * {@link Status#IN_PROGRESS}.
-     * For non-consuming segments, negative totalDocs is stored as 0.
-     */
+    /// Converts a [SegmentZKMetadata] into a [SegmentStatsRow].
+    /// A segment is considered consuming when it is a realtime segment whose status is
+    /// [Status#IN_PROGRESS].
+    /// For non-consuming segments, negative totalDocs is stored as 0.
     private static SegmentStatsRow buildRow(String segmentName, SegmentZKMetadata meta) {
       boolean consuming = meta.getStatus() == Status.IN_PROGRESS;
       long totalDocs = meta.getTotalDocs();
@@ -414,7 +385,7 @@ public class BrokerTableStatsManager implements Closeable {
   // Inner class: NoOpListener
   // ---------------------------------------------------------------------------
 
-  /** No-op listener returned when the manager is disabled. */
+  /// No-op listener returned when the manager is disabled.
   private static final class NoOpListener implements SegmentZkMetadataFetchListener {
     static final NoOpListener INSTANCE = new NoOpListener();
 

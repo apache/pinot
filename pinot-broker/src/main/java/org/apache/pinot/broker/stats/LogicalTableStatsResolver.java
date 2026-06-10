@@ -30,67 +30,55 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Turns raw physical {@link StatsStore} data into honest logical statistics for the
- * cost-based query planner.
- *
- * <h3>Name semantics</h3>
- * <ul>
- *   <li>A <em>suffixed</em> name ({@code foo_OFFLINE} / {@code foo_REALTIME}) requests the
- *       physical view for that specific table type, with per-type confidence adjustments.
- *   <li>A <em>raw</em> name ({@code foo}) requests the logical hybrid view: stats from both
- *       physical tables are merged at the time boundary, avoiding double-counting.
- * </ul>
- *
- * <h3>Per-type confidence adjustments</h3>
- * <ol>
- *   <li><strong>Upsert / dedup tables (REALTIME):</strong> physical doc count over-counts
- *       logical rows → row-count confidence downgraded to {@link StatConfidence#LOW}.</li>
- *   <li><strong>Consuming segments:</strong> realtime row count excludes in-progress rows →
- *       row-count confidence downgraded to {@link StatConfidence#ESTIMATED} (not LOW: bias is
- *       bounded). LOW wins over ESTIMATED if both apply.</li>
- * </ol>
- *
- * <h3>Hybrid merge</h3>
- * <p>Row count is split at the time boundary:
- * {@code offline.estimateRows([MIN, boundary)) + realtime.estimateRows([boundary, MAX))}.
- * If no boundary is available, a plain sum is used with {@link StatConfidence#ESTIMATED}
- * (may double-count the overlap window — acceptable for cost purposes).
- * Table size is always a plain sum (bytes double-count is acceptable for cost purposes).
- * Merged confidence is the weakest of the two sides
- * (LOW &gt; ESTIMATED &gt; EXACT in weakness order).
- *
- * <h3>Thread-safety</h3>
- * <p>Read methods are safe for concurrent access. The two setters
- * ({@link #setTimeBoundaryMsProvider} and {@link #setTableConfigProvider}) are intended to be
- * called once during broker startup, before any query traffic, from a single thread.
- */
+/// Turns raw physical [StatsStore] data into honest logical statistics for the
+/// cost-based query planner.
+///
+/// ### Name semantics
+/// - A *suffixed* name (`foo_OFFLINE` / `foo_REALTIME`) requests the physical view for that
+///   specific table type, with per-type confidence adjustments.
+/// - A *raw* name (`foo`) requests the logical hybrid view: stats from both physical tables
+///   are merged at the time boundary, avoiding double-counting.
+///
+/// ### Per-type confidence adjustments
+/// 1. **Upsert / dedup tables (REALTIME):** physical doc count over-counts logical rows →
+///    row-count confidence downgraded to [StatConfidence#LOW].
+/// 1. **Consuming segments:** realtime row count excludes in-progress rows → row-count
+///    confidence downgraded to [StatConfidence#ESTIMATED] (not LOW: bias is bounded).
+///    LOW wins over ESTIMATED if both apply.
+///
+/// ### Hybrid merge
+/// Row count is split at the time boundary:
+/// `offline.estimateRows([MIN, boundary)) + realtime.estimateRows([boundary, MAX))`.
+/// If no boundary is available, a plain sum is used with [StatConfidence#ESTIMATED]
+/// (may double-count the overlap window — acceptable for cost purposes).
+/// Table size is always a plain sum (bytes double-count is acceptable for cost purposes).
+/// Merged confidence is the weakest of the two sides
+/// (LOW > ESTIMATED > EXACT in weakness order).
+///
+/// ### Thread-safety
+/// Read methods are safe for concurrent access. The two setters
+/// ([#setTimeBoundaryMsProvider] and [#setTableConfigProvider]) are intended to be
+/// called once during broker startup, before any query traffic, from a single thread.
 public class LogicalTableStatsResolver {
   private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableStatsResolver.class);
 
   private final StatsStore _statsStore;
 
-  /**
-   * Optional provider of the time-boundary in epoch milliseconds for a raw table name.
-   * Returns {@code null} when no boundary is available for the given table.
-   * Injected after the routing manager is fully initialized.
-   */
+  /// Optional provider of the time-boundary in epoch milliseconds for a raw table name.
+  /// Returns `null` when no boundary is available for the given table.
+  /// Injected after the routing manager is fully initialized.
   @Nullable
   private volatile Function<String, Long> _timeBoundaryMsProvider;
 
-  /**
-   * Optional provider of the {@link TableConfig} for a fully-qualified (suffixed) table name.
-   * Returns {@code null} when the config is not available.
-   * Injected after the table cache is initialized.
-   */
+  /// Optional provider of the [TableConfig] for a fully-qualified (suffixed) table name.
+  /// Returns `null` when the config is not available.
+  /// Injected after the table cache is initialized.
   @Nullable
   private volatile Function<String, TableConfig> _tableConfigProvider;
 
-  /**
-   * Constructs a new resolver backed by the given {@link StatsStore}.
-   *
-   * @param statsStore the physical stats store to read from
-   */
+  /// Constructs a new resolver backed by the given [StatsStore].
+  ///
+  /// @param statsStore the physical stats store to read from
   public LogicalTableStatsResolver(StatsStore statsStore) {
     _statsStore = statsStore;
   }
@@ -99,26 +87,22 @@ public class LogicalTableStatsResolver {
   // Post-construction wiring
   // ---------------------------------------------------------------------------
 
-  /**
-   * Sets the provider used to look up the time boundary (in epoch milliseconds) for a raw table
-   * name. A {@code null} return value means no boundary is available.
-   *
-   * <p>Must be called at most once, before query traffic starts.
-   *
-   * @param provider function from raw table name to boundary epoch-milliseconds, or {@code null}
-   */
+  /// Sets the provider used to look up the time boundary (in epoch milliseconds) for a raw table
+  /// name. A `null` return value means no boundary is available.
+  ///
+  /// Must be called at most once, before query traffic starts.
+  ///
+  /// @param provider function from raw table name to boundary epoch-milliseconds, or `null`
   public void setTimeBoundaryMsProvider(@Nullable Function<String, Long> provider) {
     _timeBoundaryMsProvider = provider;
   }
 
-  /**
-   * Sets the provider used to look up the {@link TableConfig} for a fully-qualified
-   * (type-suffixed) table name. A {@code null} return value means the config is unavailable.
-   *
-   * <p>Must be called at most once, before query traffic starts.
-   *
-   * @param provider function from suffixed table name to TableConfig, or {@code null}
-   */
+  /// Sets the provider used to look up the [TableConfig] for a fully-qualified
+  /// (type-suffixed) table name. A `null` return value means the config is unavailable.
+  ///
+  /// Must be called at most once, before query traffic starts.
+  ///
+  /// @param provider function from suffixed table name to TableConfig, or `null`
   public void setTableConfigProvider(@Nullable Function<String, TableConfig> provider) {
     _tableConfigProvider = provider;
   }
@@ -127,12 +111,10 @@ public class LogicalTableStatsResolver {
   // Public API
   // ---------------------------------------------------------------------------
 
-  /**
-   * Returns aggregate statistics for the given table, applying all logical adjustments.
-   * Returns {@code null} if no statistics are available.
-   *
-   * @param tableName raw (logical hybrid) or suffixed (physical) table name
-   */
+  /// Returns aggregate statistics for the given table, applying all logical adjustments.
+  /// Returns `null` if no statistics are available.
+  ///
+  /// @param tableName raw (logical hybrid) or suffixed (physical) table name
   @Nullable
   public TableStatistics getTableStats(String tableName) {
     TableType type = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -144,15 +126,13 @@ public class LogicalTableStatsResolver {
     return getHybridTableStats(tableName);
   }
 
-  /**
-   * Returns an estimate of the number of rows whose time column falls in
-   * {@code [startMs, endMs)}, applying the time-boundary split for hybrid tables.
-   * Returns an empty optional if the estimate cannot be produced.
-   *
-   * @param tableName raw or suffixed table name
-   * @param startMs   inclusive start in epoch milliseconds
-   * @param endMs     exclusive end in epoch milliseconds
-   */
+  /// Returns an estimate of the number of rows whose time column falls in
+  /// `[startMs, endMs)`, applying the time-boundary split for hybrid tables.
+  /// Returns an empty optional if the estimate cannot be produced.
+  ///
+  /// @param tableName raw or suffixed table name
+  /// @param startMs   inclusive start in epoch milliseconds
+  /// @param endMs     exclusive end in epoch milliseconds
   public OptionalLong estimateRowsInTimeRange(String tableName, long startMs, long endMs) {
     TableType type = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (type != null) {
@@ -191,9 +171,7 @@ public class LogicalTableStatsResolver {
   // Internal helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Returns physical stats for a suffixed table name, applying confidence adjustments.
-   */
+  /// Returns physical stats for a suffixed table name, applying confidence adjustments.
   @Nullable
   private TableStatistics getPhysicalTableStats(String tableNameWithType, TableType type) {
     TableStatistics raw;
@@ -220,9 +198,7 @@ public class LogicalTableStatsResolver {
         .build();
   }
 
-  /**
-   * Returns the logical hybrid stats for a raw (un-suffixed) table name.
-   */
+  /// Returns the logical hybrid stats for a raw (un-suffixed) table name.
   @Nullable
   private TableStatistics getHybridTableStats(String rawTableName) {
     String offlineTable = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -289,10 +265,8 @@ public class LogicalTableStatsResolver {
         .build();
   }
 
-  /**
-   * Applies REALTIME-specific confidence adjustments (upsert/dedup → LOW; consuming → ESTIMATED).
-   * LOW wins over ESTIMATED.
-   */
+  /// Applies REALTIME-specific confidence adjustments (upsert/dedup → LOW; consuming → ESTIMATED).
+  /// LOW wins over ESTIMATED.
   private StatConfidence applyRealtimeAdjustments(String realtimeTableName,
       StatConfidence baseConf) {
     StatConfidence conf = baseConf;
@@ -310,7 +284,7 @@ public class LogicalTableStatsResolver {
     return conf;
   }
 
-  /** Returns true when the table has upsert or dedup enabled. */
+  /// Returns true when the table has upsert or dedup enabled.
   private boolean isUpsertOrDedup(String realtimeTableName) {
     Function<String, TableConfig> provider = _tableConfigProvider;
     if (provider == null) {
@@ -338,7 +312,7 @@ public class LogicalTableStatsResolver {
     return false;
   }
 
-  /** Returns true when the store has at least one consuming segment for this table. */
+  /// Returns true when the store has at least one consuming segment for this table.
   private boolean hasConsumingSegments(String tableNameWithType) {
     try {
       return _statsStore.hasConsumingSegments(tableNameWithType);
@@ -349,7 +323,7 @@ public class LogicalTableStatsResolver {
     }
   }
 
-  /** Returns the time boundary in epoch-milliseconds for {@code rawTableName}, or {@code null}. */
+  /// Returns the time boundary in epoch-milliseconds for `rawTableName`, or `null`.
   @Nullable
   private Long timeBoundaryMs(String rawTableName) {
     Function<String, Long> provider = _timeBoundaryMsProvider;
@@ -364,7 +338,7 @@ public class LogicalTableStatsResolver {
     }
   }
 
-  /** Reads raw physical stats from the store, suppressing errors. */
+  /// Reads raw physical stats from the store, suppressing errors.
   @Nullable
   private TableStatistics readPhysicalRaw(String tableNameWithType) {
     try {
@@ -375,7 +349,7 @@ public class LogicalTableStatsResolver {
     }
   }
 
-  /** Delegates to store.estimateRowsInTimeRange, suppressing errors. */
+  /// Delegates to store.estimateRowsInTimeRange, suppressing errors.
   private OptionalLong storeEstimate(String tableNameWithType, long startMs, long endMs) {
     try {
       return _statsStore.estimateRowsInTimeRange(tableNameWithType, startMs, endMs);
@@ -386,10 +360,8 @@ public class LogicalTableStatsResolver {
     }
   }
 
-  /**
-   * Rebuilds a {@link TableStatistics} with potentially updated row-count confidence.
-   * Returns the original instance unchanged when the confidence is already correct.
-   */
+  /// Rebuilds a [TableStatistics] with potentially updated row-count confidence.
+  /// Returns the original instance unchanged when the confidence is already correct.
   private static TableStatistics rebuildWithConf(TableStatistics original,
       StatConfidence rowConf, StatConfidence sizeConf) {
     if (rowConf == original.getRowCountConfidence() && sizeConf == original.getSizeConfidence()) {
@@ -402,10 +374,8 @@ public class LogicalTableStatsResolver {
         .build();
   }
 
-  /**
-   * Returns the weaker of two confidence levels.
-   * Weakness order (strongest→weakest): EXACT, ESTIMATED, LOW, UNKNOWN.
-   */
+  /// Returns the weaker of two confidence levels.
+  /// Weakness order (strongest→weakest): EXACT, ESTIMATED, LOW, UNKNOWN.
   static StatConfidence weakest(StatConfidence a, StatConfidence b) {
     return weaknessOrdinal(a) >= weaknessOrdinal(b) ? a : b;
   }
@@ -425,10 +395,8 @@ public class LogicalTableStatsResolver {
     }
   }
 
-  /**
-   * Adds two row/byte counts, treating {@code -1} (unknown) as 0 for the purposes of summation.
-   * Returns -1 only when both inputs are -1.
-   */
+  /// Adds two row/byte counts, treating `-1` (unknown) as 0 for the purposes of summation.
+  /// Returns -1 only when both inputs are -1.
   private static long safeAdd(long a, long b) {
     if (a < 0 && b < 0) {
       return -1;

@@ -19,39 +19,29 @@
 package org.apache.pinot.query.planner.spi.stats;
 
 
-/**
- * Indicates how trustworthy a statistics value is for cost-based query planning.
- *
- * <p>Callers should treat {@link #LOW} statistics the same as {@link #UNKNOWN} for
- * cost-based decisions because LOW values are known to be systematically biased.
- *
- * <p>This enum is append-only — new confidence levels may be added without breaking
- * code compiled against an older version. Existing constants must never be reordered
- * or removed.
- *
- * <p>Thread-safety: enum constants are inherently thread-safe.
- */
+/// Indicates how trustworthy a statistics value is for cost-based query planning.
+///
+/// Callers should treat [#LOW] statistics the same as [#UNKNOWN] for
+/// cost-based decisions because LOW values are known to be systematically biased.
+///
+/// This enum is append-only — new confidence levels may be added without breaking
+/// code compiled against an older version. Existing constants must never be reordered
+/// or removed.
+///
+/// Thread-safety: enum constants are inherently thread-safe.
 public enum StatConfidence {
-  /**
-   * Derived from authoritative metadata (e.g. sum of committed segments' totalDocs for an
-   * OFFLINE table).
-   */
+  /// Derived from authoritative metadata (e.g. sum of committed segments' totalDocs for an
+  /// OFFLINE table).
   EXACT,
 
-  /**
-   * Derived via approximation (e.g. clamped NDV merge, interpolated time ranges).
-   */
+  /// Derived via approximation (e.g. clamped NDV merge, interpolated time ranges).
   ESTIMATED,
 
-  /**
-   * Known to be systematically biased (e.g. upsert tables where physical doc count over-counts
-   * logical rows; tables with consuming segments). Planner must treat LOW like absent stats for
-   * cost-based decisions.
-   */
+  /// Known to be systematically biased (e.g. upsert tables where physical doc count over-counts
+  /// logical rows; tables with consuming segments). Planner must treat LOW like absent stats for
+  /// cost-based decisions.
   LOW,
 
-  /**
-   * No information available.
-   */
+  /// No information available.
   UNKNOWN
 }

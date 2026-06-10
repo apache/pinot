@@ -21,14 +21,12 @@ package org.apache.pinot.query.planner.spi.stats;
 import javax.annotation.Nullable;
 
 
-/**
- * Immutable per-column statistics for a table, used by the cost-based query planner.
- *
- * <p>Instances are created via {@link #builder()}. Unknown numeric fields are represented
- * by {@code -1}. Min/max values may be {@code null} when unknown.
- *
- * <p>Thread-safety: immutable; safe for concurrent access.
- */
+/// Immutable per-column statistics for a table, used by the cost-based query planner.
+///
+/// Instances are created via [#builder()]. Unknown numeric fields are represented
+/// by `-1`. Min/max values may be `null` when unknown.
+///
+/// Thread-safety: immutable; safe for concurrent access.
 public class ColumnStatistics {
   private final String _columnName;
   private final long _ndv;
@@ -52,86 +50,64 @@ public class ColumnStatistics {
     _nullFraction = builder._nullFraction;
   }
 
-  /**
-   * Returns a new {@link Builder} for constructing {@link ColumnStatistics} instances.
-   */
+  /// Returns a new [Builder] for constructing [ColumnStatistics] instances.
   public static Builder builder() {
     return new Builder();
   }
 
-  /**
-   * Returns the name of the column these statistics describe.
-   */
+  /// Returns the name of the column these statistics describe.
   public String getColumnName() {
     return _columnName;
   }
 
-  /**
-   * Returns the estimated number of distinct values (NDV) for the column,
-   * or {@code -1} if unknown.
-   */
+  /// Returns the estimated number of distinct values (NDV) for the column, or `-1` if unknown.
   public long getNdv() {
     return _ndv;
   }
 
-  /**
-   * Returns the confidence level of the {@link #getNdv()} value.
-   */
+  /// Returns the confidence level of the [#getNdv()] value.
   public StatConfidence getNdvConfidence() {
     return _ndvConfidence;
   }
 
-  /**
-   * Returns the minimum observed value for the column, or {@code null} if unknown.
-   */
+  /// Returns the minimum observed value for the column, or `null` if unknown.
   @Nullable
   public Comparable<?> getMinValue() {
     return _minValue;
   }
 
-  /**
-   * Returns the maximum observed value for the column, or {@code null} if unknown.
-   */
+  /// Returns the maximum observed value for the column, or `null` if unknown.
   @Nullable
   public Comparable<?> getMaxValue() {
     return _maxValue;
   }
 
-  /**
-   * Returns {@code false} when the minimum value is polluted by the numeric null-sentinel default
-   * (i.e. the column is nullable and its stored min equals the type's minimum representable value).
-   * When {@code false}, estimation may assume the range {@code [-max..max]}, and segment pruning
-   * must never use this bound.
-   */
+  /// Returns `false` when the minimum value is polluted by the numeric null-sentinel default
+  /// (i.e. the column is nullable and its stored min equals the type's minimum representable value).
+  /// When `false`, estimation may assume the range `[-max..max]`, and segment pruning
+  /// must never use this bound.
   public boolean isMinTrusted() {
     return _minTrusted;
   }
 
-  /**
-   * Returns the average number of bytes per stored value for the column,
-   * or {@code -1} if unknown.
-   */
+  /// Returns the average number of bytes per stored value for the column, or `-1` if unknown.
   public double getAvgBytesPerValue() {
     return _avgBytesPerValue;
   }
 
-  /**
-   * Returns the fraction of rows where the column value is null (in the range {@code [0.0, 1.0]}),
-   * or {@code -1} if unknown.
-   */
+  /// Returns the fraction of rows where the column value is null (in the range `[0.0, 1.0]`),
+  /// or `-1` if unknown.
   public double getNullFraction() {
     return _nullFraction;
   }
 
-  /**
-   * Builder for {@link ColumnStatistics}.
-   *
-   * <p>Default values: string fields default to {@code null}, numeric fields to {@code -1}
-   * (unknown), confidence fields to {@link StatConfidence#UNKNOWN}, and {@code minTrusted}
-   * defaults to {@code true}.
-   *
-   * <p>Thread-safety: not thread-safe; use from a single thread.
-   */
+  /// Builder for [ColumnStatistics].
+  ///
+  /// Default values: string fields default to `null`, numeric fields to `-1`
+  /// (unknown), confidence fields to [StatConfidence#UNKNOWN], and `minTrusted`
+  /// defaults to `true`.
+  ///
+  /// Thread-safety: not thread-safe; use from a single thread.
   public static class Builder {
     @Nullable
     private String _columnName;
@@ -148,53 +124,51 @@ public class ColumnStatistics {
     private Builder() {
     }
 
-    /** Sets the column name. */
+    /// Sets the column name.
     public Builder columnName(String columnName) {
       _columnName = columnName;
       return this;
     }
 
-    /** Sets the number of distinct values (NDV) and its confidence level. */
+    /// Sets the number of distinct values (NDV) and its confidence level.
     public Builder ndv(long ndv, StatConfidence confidence) {
       _ndv = ndv;
       _ndvConfidence = confidence;
       return this;
     }
 
-    /** Sets the minimum observed value. */
+    /// Sets the minimum observed value.
     public Builder minValue(@Nullable Comparable<?> minValue) {
       _minValue = minValue;
       return this;
     }
 
-    /** Sets the maximum observed value. */
+    /// Sets the maximum observed value.
     public Builder maxValue(@Nullable Comparable<?> maxValue) {
       _maxValue = maxValue;
       return this;
     }
 
-    /**
-     * Sets whether the minimum value is trustworthy (i.e. not polluted by a null-sentinel
-     * default).
-     */
+    /// Sets whether the minimum value is trustworthy (i.e. not polluted by a null-sentinel
+    /// default).
     public Builder minTrusted(boolean minTrusted) {
       _minTrusted = minTrusted;
       return this;
     }
 
-    /** Sets the average number of bytes per stored value. */
+    /// Sets the average number of bytes per stored value.
     public Builder avgBytesPerValue(double avgBytesPerValue) {
       _avgBytesPerValue = avgBytesPerValue;
       return this;
     }
 
-    /** Sets the null fraction (proportion of null values in {@code [0.0, 1.0]}). */
+    /// Sets the null fraction (proportion of null values in `[0.0, 1.0]`).
     public Builder nullFraction(double nullFraction) {
       _nullFraction = nullFraction;
       return this;
     }
 
-    /** Builds the immutable {@link ColumnStatistics} instance. */
+    /// Builds the immutable [ColumnStatistics] instance.
     public ColumnStatistics build() {
       return new ColumnStatistics(this);
     }

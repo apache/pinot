@@ -42,25 +42,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * SQLite-backed implementation of {@link StatsStore}.
- *
- * <h3>Threading model</h3>
- * <p>Uses a single shared writer {@link Connection} guarded by {@code synchronized} on
- * {@code _writeLock}, plus a small pool ({@value #READ_POOL_SIZE}) of read-only connections
- * served via a blocking queue. Reads from multiple threads proceed concurrently (each
- * borrows a connection from the pool, uses it, then returns it). The writer connection sets
- * {@code PRAGMA journal_mode=WAL} so readers never block writers.
- *
- * <h3>Corruption handling</h3>
- * <p>{@link #init()} attempts to open and migrate the database. On any failure it logs a
- * warning, deletes the DB file and its WAL/SHM siblings, then retries once from scratch.
- * Only a second consecutive failure is propagated as {@link StatsStoreException}.
- */
+/// SQLite-backed implementation of [StatsStore].
+///
+/// ### Threading model
+/// Uses a single shared writer [Connection] guarded by `synchronized` on
+/// `_writeLock`, plus a small pool ([#READ_POOL_SIZE]) of read-only connections
+/// served via a blocking queue. Reads from multiple threads proceed concurrently (each
+/// borrows a connection from the pool, uses it, then returns it). The writer connection sets
+/// `PRAGMA journal_mode=WAL` so readers never block writers.
+///
+/// ### Corruption handling
+/// [#init()] attempts to open and migrate the database. On any failure it logs a
+/// warning, deletes the DB file and its WAL/SHM siblings, then retries once from scratch.
+/// Only a second consecutive failure is propagated as [StatsStoreException].
 public class SqliteStatsStore implements StatsStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(SqliteStatsStore.class);
 
-  /** Number of read connections in the shared pool. */
+  /// Number of read connections in the shared pool.
   static final int READ_POOL_SIZE = 4;
 
   private static final String DB_FILE_NAME = "broker-stats.sqlite";
@@ -121,25 +119,21 @@ public class SqliteStatsStore implements StatsStore {
   private final Path _dbDirectory;
   private final Path _dbPath;
 
-  /** Write connection — all mutations go through this; guarded by _writeLock. */
+  /// Write connection — all mutations go through this; guarded by _writeLock.
   private Connection _writeConn;
   private final Object _writeLock = new Object();
 
-  /**
-   * Pool of read-only connections. Each reader borrows a connection, uses it,
-   * then returns it via {@code offer()}. Sized at {@value #READ_POOL_SIZE}.
-   */
+  /// Pool of read-only connections. Each reader borrows a connection, uses it,
+  /// then returns it via `offer()`. Sized at [#READ_POOL_SIZE].
   private final java.util.concurrent.ArrayBlockingQueue<Connection> _readPool =
       new java.util.concurrent.ArrayBlockingQueue<>(READ_POOL_SIZE);
 
   private volatile boolean _closed = false;
 
-  /**
-   * Constructs a new {@code SqliteStatsStore} that stores its database in the given directory.
-   * The database file will be {@code <dbDirectory>/broker-stats.sqlite}.
-   *
-   * @param dbDirectory directory in which to store the database file; created if absent
-   */
+  /// Constructs a new `SqliteStatsStore` that stores its database in the given directory.
+  /// The database file will be `<dbDirectory>/broker-stats.sqlite`.
+  ///
+  /// @param dbDirectory directory in which to store the database file; created if absent
   public SqliteStatsStore(Path dbDirectory) {
     _dbDirectory = dbDirectory;
     _dbPath = dbDirectory.resolve(DB_FILE_NAME);
@@ -203,7 +197,7 @@ public class SqliteStatsStore implements StatsStore {
     }
   }
 
-  /** Deletes the SQLite DB file and its WAL / SHM siblings if they exist. */
+  /// Deletes the SQLite DB file and its WAL / SHM siblings if they exist.
   private void deleteDbFiles() {
     tryDelete(_dbPath);
     tryDelete(_dbDirectory.resolve(DB_FILE_NAME + "-wal"));
@@ -456,19 +450,17 @@ public class SqliteStatsStore implements StatsStore {
     }
   }
 
-  /**
-   * Returns per-column statistics aggregated across all non-consuming segments for the given
-   * table and column, or {@code null} if no rows exist.
-   *
-   * <h4>NDV</h4>
-   * <p>Returned as {@code MAX(ndv)} over segments with {@link StatConfidence#ESTIMATED}. The
-   * true value lies in {@code [MAX(ndv), min(SUM(ndv), tableRowCount)]}; we report the lower
-   * bound (MAX) because the upper bound is not representable as a single value in the contract.
-   *
-   * <h4>Min/Max</h4>
-   * <p>Compared numerically when both values parse as {@link Double}, else lexically. Comparison
-   * is done in Java (not SQL) to avoid SQLite TEXT-affinity ordering issues (e.g. "9" &gt; "10").
-   */
+  /// Returns per-column statistics aggregated across all non-consuming segments for the given
+  /// table and column, or `null` if no rows exist.
+  ///
+  /// #### NDV
+  /// Returned as `MAX(ndv)` over segments with [StatConfidence#ESTIMATED]. The
+  /// true value lies in `[MAX(ndv), min(SUM(ndv), tableRowCount)]`; we report the lower
+  /// bound (MAX) because the upper bound is not representable as a single value in the contract.
+  ///
+  /// #### Min/Max
+  /// Compared numerically when both values parse as [Double], else lexically. Comparison
+  /// is done in Java (not SQL) to avoid SQLite TEXT-affinity ordering issues (e.g. "9" > "10").
   @Override
   @Nullable
   public ColumnStatistics getColumnStats(String tableNameWithType, String columnName)
@@ -667,10 +659,8 @@ public class SqliteStatsStore implements StatsStore {
     }
   }
 
-  /**
-   * Returns the numerically-or-lexically smaller of {@code a} and {@code b}.
-   * {@code null} is treated as "unknown" — the other value wins.
-   */
+  /// Returns the numerically-or-lexically smaller of `a` and `b`.
+  /// `null` is treated as "unknown" — the other value wins.
   @Nullable
   private static String minOf(@Nullable String a, @Nullable String b) {
     if (a == null) {
@@ -682,10 +672,8 @@ public class SqliteStatsStore implements StatsStore {
     return compareValues(a, b) <= 0 ? a : b;
   }
 
-  /**
-   * Returns the numerically-or-lexically larger of {@code a} and {@code b}.
-   * {@code null} is treated as "unknown" — the other value wins.
-   */
+  /// Returns the numerically-or-lexically larger of `a` and `b`.
+  /// `null` is treated as "unknown" — the other value wins.
   @Nullable
   private static String maxOf(@Nullable String a, @Nullable String b) {
     if (a == null) {
@@ -697,11 +685,9 @@ public class SqliteStatsStore implements StatsStore {
     return compareValues(a, b) >= 0 ? a : b;
   }
 
-  /**
-   * Compares two string-serialized values. If both parse as {@link Double}, uses numeric
-   * comparison; otherwise falls back to lexical comparison. This avoids TEXT-affinity
-   * ordering issues in SQLite (e.g. "9" &gt; "10" lexically but "9" &lt; "10" numerically).
-   */
+  /// Compares two string-serialized values. If both parse as [Double], uses numeric
+  /// comparison; otherwise falls back to lexical comparison. This avoids TEXT-affinity
+  /// ordering issues in SQLite (e.g. "9" > "10" lexically but "9" < "10" numerically).
   private static int compareValues(String a, String b) {
     try {
       double da = Double.parseDouble(a);
@@ -712,11 +698,9 @@ public class SqliteStatsStore implements StatsStore {
     }
   }
 
-  /**
-   * Converts a string-serialized value to a {@link Comparable} for use in
-   * {@link ColumnStatistics}. Returns a {@link Double} if the string parses as a number,
-   * otherwise returns the original {@link String}.
-   */
+  /// Converts a string-serialized value to a [Comparable] for use in
+  /// [ColumnStatistics]. Returns a [Double] if the string parses as a number,
+  /// otherwise returns the original [String].
   @Nullable
   private static Comparable<?> toComparable(@Nullable String value) {
     if (value == null) {

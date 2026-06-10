@@ -25,43 +25,37 @@ import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 
 
-/**
- * Metadata provider for Pinot query planning that places Pinot-aware handlers ahead of Calcite's
- * {@link DefaultRelMetadataProvider}.
- *
- * <h3>Provider chain</h3>
- * <ol>
- *   <li>{@link PinotRelMdSelectivity} — time-range and NDV-based selectivity estimation.</li>
- *   <li>{@link DefaultRelMetadataProvider#INSTANCE} — Calcite's built-in fallback for all other
- *       metadata (including row counts, collation, uniqueness, etc.).</li>
- * </ol>
- *
- * <h3>Row-count</h3>
- * <p>No custom {@code RelMdRowCount} is needed: Calcite's default
- * {@code RelMdRowCount.getRowCount(TableScan, mq)} calls {@code TableScan.estimateRowCount(mq)}
- * → {@code RelOptTableImpl.getRowCount()} → {@code PinotTable.getStatistic().getRowCount()},
- * which already surfaces the statistics-provider value.
- *
- * <h3>NoOp guard</h3>
- * <p>When the provider is a no-op (methods return {@code null} / empty), all enhanced paths fall
- * back to Calcite defaults — there is no behavior change compared to using
- * {@link DefaultRelMetadataProvider#INSTANCE} alone.
- *
- * <h3>Janino / caching notes</h3>
- * <p>The {@link PinotRelMdSelectivity} handler is stateless; its {@link PinotStatisticsProvider}
- * is resolved at call time via {@link org.apache.pinot.query.catalog.PinotTable}, which is
- * obtained from the scan's {@link org.apache.calcite.plan.RelOptTable}. Accordingly a single
- * {@link #INSTANCE} is safe to share globally, and Janino only compiles handler classes once.
- *
- * <h3>Thread-safety</h3>
- * <p>The singleton instance is effectively immutable once constructed. Safe for concurrent use.
- */
+/// Metadata provider for Pinot query planning that places Pinot-aware handlers ahead of Calcite's
+/// [DefaultRelMetadataProvider].
+///
+/// ### Provider chain
+/// 1. [PinotRelMdSelectivity] — time-range and NDV-based selectivity estimation.
+/// 1. [DefaultRelMetadataProvider#INSTANCE] — Calcite's built-in fallback for all other
+///    metadata (including row counts, collation, uniqueness, etc.).
+///
+/// ### Row-count
+/// No custom `RelMdRowCount` is needed: Calcite's default
+/// `RelMdRowCount.getRowCount(TableScan, mq)` calls `TableScan.estimateRowCount(mq)`
+/// → `RelOptTableImpl.getRowCount()` → `PinotTable.getStatistic().getRowCount()`,
+/// which already surfaces the statistics-provider value.
+///
+/// ### NoOp guard
+/// When the provider is a no-op (methods return `null` / empty), all enhanced paths fall
+/// back to Calcite defaults — there is no behavior change compared to using
+/// [DefaultRelMetadataProvider#INSTANCE] alone.
+///
+/// ### Janino / caching notes
+/// The [PinotRelMdSelectivity] handler is stateless; its [PinotStatisticsProvider]
+/// is resolved at call time via [org.apache.pinot.query.catalog.PinotTable], which is
+/// obtained from the scan's [org.apache.calcite.plan.RelOptTable]. Accordingly a single
+/// [#INSTANCE] is safe to share globally, and Janino only compiles handler classes once.
+///
+/// ### Thread-safety
+/// The singleton instance is effectively immutable once constructed. Safe for concurrent use.
 public final class PinotDefaultRelMetadataProvider extends ChainedRelMetadataProvider {
 
-  /**
-   * Global singleton. Because {@link PinotRelMdSelectivity} is stateless, all query environments
-   * share this single provider — Janino compiles the handler bytecode only once.
-   */
+  /// Global singleton. Because [PinotRelMdSelectivity] is stateless, all query environments
+  /// share this single provider — Janino compiles the handler bytecode only once.
   public static final PinotDefaultRelMetadataProvider INSTANCE =
       new PinotDefaultRelMetadataProvider();
 

@@ -23,32 +23,28 @@ import java.util.Map;
 import java.util.Set;
 
 
-/**
- * Source of per-segment column statistics fetched on behalf of the broker (e.g. via server
- * fan-out, push, or a vendor-specific metadata service).
- *
- * <p>Implementations own their own bounding strategy (rate limits, jitter, debounce) and are
- * responsible for not overwhelming downstream services.
- *
- * <p>The result is keyed by segment name; segments for which statistics could not be obtained
- * may be absent from the returned map.
- *
- * <p>Thread-safety: implementations must be thread-safe.
- */
+/// Source of per-segment column statistics fetched on behalf of the broker (e.g. via server
+/// fan-out, push, or a vendor-specific metadata service).
+///
+/// Implementations own their own bounding strategy (rate limits, jitter, debounce) and are
+/// responsible for not overwhelming downstream services.
+///
+/// The result is keyed by segment name; segments for which statistics could not be obtained
+/// may be absent from the returned map.
+///
+/// Thread-safety: implementations must be thread-safe.
 public interface ColumnStatsSource {
 
-  /**
-   * Fetches per-column statistics for the specified segments of the given table.
-   *
-   * <p>Segments for which statistics are unavailable may be absent from the result map.
-   * Implementations may return a partial result on partial failure.
-   *
-   * @param tableNameWithType fully-qualified table name including type suffix
-   * @param segmentNames      names of the segments for which statistics are requested
-   * @return map from segment name to a list of per-column statistics rows; missing segments are
-   *         absent from the map
-   * @throws Exception if fetching fails and no partial result can be returned
-   */
+  /// Fetches per-column statistics for the specified segments of the given table.
+  ///
+  /// Segments for which statistics are unavailable may be absent from the result map.
+  /// Implementations may return a partial result on partial failure.
+  ///
+  /// @param tableNameWithType fully-qualified table name including type suffix
+  /// @param segmentNames      names of the segments for which statistics are requested
+  /// @return map from segment name to a list of per-column statistics rows; missing segments are
+  ///         absent from the map
+  /// @throws Exception if fetching fails and no partial result can be returned
   Map<String, List<SegmentColumnStatsRow>> fetchColumnStats(String tableNameWithType,
       Set<String> segmentNames)
       throws Exception;

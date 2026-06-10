@@ -27,7 +27,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.schema.Statistic;
 import org.apache.pinot.calcite.plan.PinotRelOptCost;
@@ -37,115 +36,105 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * A scoped, gated, cost-based join-reordering phase for the multi-stage query planner.
- *
- * <h3>Scope</h3>
- * <p>This phase runs after the existing logical {@code HepPlanner} programs and before the trait /
- * {@code POST_LOGICAL} / physical phases. It reorders inner-join trees using cardinality estimates
- * sourced from the {@link RelMetadataQuery} that is already backed by
- * {@code org.apache.pinot.calcite.rel.metadata.PinotDefaultRelMetadataProvider} (statistics-driven
- * row counts). The phase is off by default and has zero impact when disabled.
- *
- * <h3>Strategy</h3>
- * <p>Reordering is performed with the canonical Calcite {@code Programs.heuristicJoinOrder} design:
- * a dedicated {@link HepPlanner} runs {@link CoreRules#JOIN_TO_MULTI_JOIN} to collect an inner-join
- * tree into a single {@code MultiJoin}, then {@link CoreRules#MULTI_JOIN_OPTIMIZE}
- * ({@code LoptOptimizeJoinRule}) to re-derive the join order from {@code mq.getRowCount()} estimates.
- * The {@link HepPlanner} is created over the SAME {@link RelOptCluster} as the input tree (via the
- * cluster's planner-agnostic factories), so the statistics-backed metadata provider installed on the
- * cluster is reused directly — no cross-cluster tree copy is needed.
- *
- * <p>A true scoped {@code VolcanoPlanner} (with a deep cross-cluster tree copy) was considered but
- * rejected: a {@link RelNode} tree is bound to its originating cluster, that cluster is bound to the
- * logical {@code HepPlanner}, and Calcite 1.42 offers no clean, supported utility to re-host an
- * arbitrary rel tree in a fresh cluster owned by a second planner. The Hep + {@code MultiJoin} path
- * is the documented, well-tested approach and keeps the cost signal (our row counts) intact. This
- * class is a facade ({@link #maybeReorder(RelNode, int)}) so the internal strategy can be swapped
- * later without touching callers.
- *
- * <h3>Eligibility gates</h3>
- * <p>The phase is skipped (the input tree is returned unchanged) unless ALL of the following hold:
- * <ul>
- *   <li>The tree contains at least one {@link Join} (fast path: no join ⇒ nothing to do).</li>
- *   <li>There are at least two joins (a single join only swaps sides; v1 keeps the bar at two).</li>
- *   <li>The join count does not exceed the configured {@code maxJoins} cap. Plans beyond the cap
- *       skip the phase to bound planning time.</li>
- *   <li>Every {@link Join} in the tree is an {@link JoinRelType#INNER} join (v1 scope).</li>
- *   <li>No {@link Join} carries a Pinot {@code joinOptions} hint — a hint signals explicit user
- *       intent, so the whole phase is skipped in v1 (per-join veto is a later task).</li>
- *   <li>Every {@link TableScan} in the tree has a known row count. This is checked by unwrapping
- *       the scan's {@code RelOptTable} to {@link PinotTable} and asking its
- *       {@link Statistic#getRowCount()} (which returns {@code null} when statistics are absent or
- *       LOW-confidence) — {@code RelOptTable.getRowCount()} cannot be used because it returns a
- *       primitive that silently falls back to a Calcite default. Mixed known/guessed cardinalities
- *       are the dangerous case, so ALL scans must be known; otherwise reorder is noise and skipped.</li>
- * </ul>
- *
- * <h3>Skip-reason visibility</h3>
- * <p>Each skip path is identified by a {@link SkipReason} value that is logged at DEBUG. This makes
- * it straightforward to trace why a particular query was not reordered without enabling verbose
- * logging in production.
- *
- * <h3>Wall-clock observability</h3>
- * <p>The Hep + {@code LoptOptimizeJoinRule} strategy is a single, deterministic pass — it is not
- * an exponential search — so a hard mid-flight timeout is not required. Instead, elapsed time is
- * measured around the reorder call and a WARN is emitted when it exceeds
- * {@link #SLOW_REORDER_WARN_THRESHOLD_MS} (100 ms). This is the canary that signals when a
- * budget / interrupt mechanism becomes necessary.
- *
- * <h3>Fallback / robustness</h3>
- * <p>{@link #maybeReorder(RelNode, int)} never throws: any unexpected error is caught, logged at
- * WARN, and the original (un-reordered) plan is returned. The reorder phase must never fail a query.
- *
- * <h3>Thread-safety</h3>
- * <p>Stateless aside from a static {@link Logger}. A new {@link HepPlanner} is created per
- * invocation on the planner thread, so the class is safe for concurrent use across queries.
- */
+/// A scoped, gated, cost-based join-reordering phase for the multi-stage query planner.
+///
+/// ### Scope
+/// This phase runs after the existing logical `HepPlanner` programs and before the trait /
+/// `POST_LOGICAL` / physical phases. It reorders inner-join trees using cardinality estimates
+/// sourced from the [RelMetadataQuery] that is already backed by
+/// `org.apache.pinot.calcite.rel.metadata.PinotDefaultRelMetadataProvider` (statistics-driven
+/// row counts). The phase is off by default and has zero impact when disabled.
+///
+/// ### Strategy
+/// Reordering is performed with the canonical Calcite `Programs.heuristicJoinOrder` design:
+/// a dedicated [HepPlanner] runs [CoreRules#JOIN_TO_MULTI_JOIN] to collect an inner-join
+/// tree into a single `MultiJoin`, then [CoreRules#MULTI_JOIN_OPTIMIZE]
+/// (`LoptOptimizeJoinRule`) to re-derive the join order from `mq.getRowCount()` estimates.
+/// The [HepPlanner] is created over the SAME [RelOptCluster] as the input tree (via the
+/// cluster's planner-agnostic factories), so the statistics-backed metadata provider installed on the
+/// cluster is reused directly — no cross-cluster tree copy is needed.
+///
+/// A true scoped `VolcanoPlanner` (with a deep cross-cluster tree copy) was considered but
+/// rejected: a [RelNode] tree is bound to its originating cluster, that cluster is bound to the
+/// logical `HepPlanner`, and Calcite 1.42 offers no clean, supported utility to re-host an
+/// arbitrary rel tree in a fresh cluster owned by a second planner. The Hep + `MultiJoin` path
+/// is the documented, well-tested approach and keeps the cost signal (our row counts) intact. This
+/// class is a facade ([#maybeReorder(RelNode, int)]) so the internal strategy can be swapped
+/// later without touching callers.
+///
+/// ### Eligibility gates
+/// The phase is skipped (the input tree is returned unchanged) unless ALL of the following hold:
+/// - The tree contains at least one [Join] (fast path: no join => nothing to do).
+/// - There are at least two joins (a single join only swaps sides; v1 keeps the bar at two).
+/// - The join count does not exceed the configured `maxJoins` cap. Plans beyond the cap
+///   skip the phase to bound planning time.
+/// - Every [Join] in the tree is an [JoinRelType#INNER] join (v1 scope).
+/// - No [Join] carries a Pinot `joinOptions` hint — a hint signals explicit user
+///   intent, so the whole phase is skipped in v1 (per-join veto is a later task).
+/// - Every [TableScan] in the tree has a known row count. This is checked by unwrapping
+///   the scan's `RelOptTable` to [PinotTable] and asking its
+///   [Statistic#getRowCount()] (which returns `null` when statistics are absent or
+///   LOW-confidence) — `RelOptTable.getRowCount()` cannot be used because it returns a
+///   primitive that silently falls back to a Calcite default. Mixed known/guessed cardinalities
+///   are the dangerous case, so ALL scans must be known; otherwise reorder is noise and skipped.
+///
+/// ### Skip-reason visibility
+/// Each skip path is identified by a [SkipReason] value that is logged at DEBUG. This makes
+/// it straightforward to trace why a particular query was not reordered without enabling verbose
+/// logging in production.
+///
+/// ### Wall-clock observability
+/// The Hep + `LoptOptimizeJoinRule` strategy is a single, deterministic pass — it is not
+/// an exponential search — so a hard mid-flight timeout is not required. Instead, elapsed time is
+/// measured around the reorder call and a WARN is emitted when it exceeds
+/// [#SLOW_REORDER_WARN_THRESHOLD_MS] (100 ms). This is the canary that signals when a
+/// budget / interrupt mechanism becomes necessary.
+///
+/// ### Fallback / robustness
+/// [#maybeReorder(RelNode, int)] never throws: any unexpected error is caught, logged at
+/// WARN, and the original (un-reordered) plan is returned. The reorder phase must never fail a query.
+///
+/// ### Thread-safety
+/// Stateless aside from a static [Logger]. A new [HepPlanner] is created per
+/// invocation on the planner thread, so the class is safe for concurrent use across queries.
 public final class JoinReorderOptimizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(JoinReorderOptimizer.class);
 
-  /**
-   * If a reorder takes longer than this threshold (in milliseconds), a WARN is logged. The
-   * Hep + LoptOptimizeJoinRule strategy is a single deterministic pass, so this threshold is a
-   * canary rather than a hard limit: if it fires regularly, a proper budget/interrupt mechanism
-   * should be introduced.
-   */
+  /// If a reorder takes longer than this threshold (in milliseconds), a WARN is logged. The
+  /// Hep + LoptOptimizeJoinRule strategy is a single deterministic pass, so this threshold is a
+  /// canary rather than a hard limit: if it fires regularly, a proper budget/interrupt mechanism
+  /// should be introduced.
   static final long SLOW_REORDER_WARN_THRESHOLD_MS = 100L;
 
   private JoinReorderOptimizer() {
   }
 
-  /**
-   * Reason why the join-reorder phase was skipped for a given plan. Logged at DEBUG on skip so
-   * that operators can trace non-obvious skip decisions without enabling verbose logging.
-   */
+  /// Reason why the join-reorder phase was skipped for a given plan. Logged at DEBUG on skip so
+  /// that operators can trace non-obvious skip decisions without enabling verbose logging.
   enum SkipReason {
-    /** Plan has fewer than 2 joins — nothing useful to reorder. */
+    /// Plan has fewer than 2 joins — nothing useful to reorder.
     NO_JOINS,
-    /** Plan contains a non-INNER join; v1 scope restricts to inner joins only. */
+    /// Plan contains a non-INNER join; v1 scope restricts to inner joins only.
     NON_INNER_JOIN,
-    /** A join carries an explicit hint; user intent takes precedence. */
+    /// A join carries an explicit hint; user intent takes precedence.
     HINTED_JOIN,
-    /** At least one table scan has no known row count; the cost signal is unreliable. */
+    /// At least one table scan has no known row count; the cost signal is unreliable.
     UNKNOWN_ROW_COUNT,
-    /** Join count exceeds the configured cap; skipping to bound planning time. */
+    /// Join count exceeds the configured cap; skipping to bound planning time.
     TOO_MANY_JOINS,
-    /** An unexpected error occurred; the original plan was returned as a fallback. */
+    /// An unexpected error occurred; the original plan was returned as a fallback.
     ERROR
   }
 
-  /**
-   * Reorders the inner-join tree of {@code logicalPlan} when the eligibility gates pass, otherwise
-   * returns {@code logicalPlan} unchanged. Never throws — on any error the original plan is returned.
-   *
-   * @param logicalPlan the logical plan emitted by the preceding {@code HepPlanner} phases; must
-   *                    belong to a cluster whose metadata provider supplies statistics-backed row
-   *                    counts
-   * @param maxJoins    maximum number of joins allowed in the plan for the reorder phase to run;
-   *                    plans with more joins are returned unchanged
-   * @return the (possibly) reordered plan, or {@code logicalPlan} when the phase is skipped or fails
-   */
+  /// Reorders the inner-join tree of `logicalPlan` when the eligibility gates pass, otherwise
+  /// returns `logicalPlan` unchanged. Never throws — on any error the original plan is returned.
+  ///
+  /// @param logicalPlan the logical plan emitted by the preceding `HepPlanner` phases; must
+  ///                    belong to a cluster whose metadata provider supplies statistics-backed row
+  ///                    counts
+  /// @param maxJoins    maximum number of joins allowed in the plan for the reorder phase to run;
+  ///                    plans with more joins are returned unchanged
+  /// @return the (possibly) reordered plan, or `logicalPlan` when the phase is skipped or fails
   public static RelNode maybeReorder(RelNode logicalPlan, int maxJoins) {
     try {
       GateVisitor visitor = new GateVisitor(maxJoins);
@@ -196,11 +185,9 @@ public final class JoinReorderOptimizer {
     return planner.findBestExp();
   }
 
-  /**
-   * Returns the {@link SkipReason} if the plan should be skipped, or {@code null} if all gates
-   * pass and the reorder phase should run, based on a {@link GateVisitor} that has already walked
-   * the plan.
-   */
+  /// Returns the [SkipReason] if the plan should be skipped, or `null` if all gates
+  /// pass and the reorder phase should run, based on a [GateVisitor] that has already walked
+  /// the plan.
   private static SkipReason skipReason(GateVisitor visitor) {
     if (visitor._disqualified) {
       return visitor._disqualifyReason;
@@ -214,10 +201,8 @@ public final class JoinReorderOptimizer {
     return null;
   }
 
-  /**
-   * Single-pass collector for the eligibility gates. Not thread-safe; a fresh instance is used per
-   * {@link #skipReason} call.
-   */
+  /// Single-pass collector for the eligibility gates. Not thread-safe; a fresh instance is used per
+  /// [#skipReason] call.
   private static final class GateVisitor {
     private final int _maxJoins;
     private int _joinCount;
@@ -268,11 +253,9 @@ public final class JoinReorderOptimizer {
       }
     }
 
-    /**
-     * Returns {@code true} if the scan's backing table is a {@link PinotTable} whose
-     * {@link Statistic#getRowCount()} is non-null (statistics present and at least ESTIMATED
-     * confidence). A non-Pinot table or an absent/LOW-confidence row count counts as unknown.
-     */
+    /// Returns `true` if the scan's backing table is a [PinotTable] whose
+    /// [Statistic#getRowCount()] is non-null (statistics present and at least ESTIMATED
+    /// confidence). A non-Pinot table or an absent/LOW-confidence row count counts as unknown.
     private static boolean hasKnownRowCount(TableScan scan) {
       PinotTable pinotTable = scan.getTable().unwrap(PinotTable.class);
       if (pinotTable == null) {

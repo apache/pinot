@@ -47,14 +47,12 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-/**
- * Tests for {@link JoinReorderOptimizer}, the scoped cost-based join-reordering phase.
- *
- * <p>The fixture follows {@code PinotRelMdSelectivityTest}: a {@link MockRoutingManagerFactory}
- * registers three tables (a large fact table and two small dimension tables), a mock
- * {@link PinotStatisticsProvider} supplies their row counts, and the {@link TableConfig} is
- * re-stubbed with a real config so planning can resolve table metadata.
- */
+/// Tests for [JoinReorderOptimizer], the scoped cost-based join-reordering phase.
+///
+/// The fixture follows `PinotRelMdSelectivityTest`: a [MockRoutingManagerFactory]
+/// registers three tables (a large fact table and two small dimension tables), a mock
+/// [PinotStatisticsProvider] supplies their row counts, and the [TableConfig] is
+/// re-stubbed with a real config so planning can resolve table metadata.
 public class JoinReorderOptimizerTest {
 
   private static final String FACT = "fact";
@@ -68,7 +66,7 @@ public class JoinReorderOptimizerTest {
   // Fixture helpers
   // --------------------------------------------------------------------------
 
-  /** A table with an {@code id} key column and a {@code val} payload column. */
+  /// A table with an `id` key column and a `val` payload column.
   private static Schema schema(String name) {
     return new Schema.SchemaBuilder()
         .addSingleValueDimension("id", FieldSpec.DataType.INT, 0)
@@ -77,7 +75,7 @@ public class JoinReorderOptimizerTest {
         .build();
   }
 
-  /** Build a QueryEnvironment with the three tables registered and the given stats provider. */
+  /// Build a QueryEnvironment with the three tables registered and the given stats provider.
   private static QueryEnvironment buildEnv(PinotStatisticsProvider statsProvider) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(1, 2);
     for (String table : new String[]{FACT, DIM1, DIM2}) {
@@ -98,7 +96,7 @@ public class JoinReorderOptimizerTest {
         .build());
   }
 
-  /** A provider returning EXACT row counts for all three tables. */
+  /// A provider returning EXACT row counts for all three tables.
   private static PinotStatisticsProvider statsProvider() {
     PinotStatisticsProvider provider = mock(PinotStatisticsProvider.class);
     when(provider.getTableStatistics(FACT)).thenReturn(
@@ -110,14 +108,12 @@ public class JoinReorderOptimizerTest {
     return provider;
   }
 
-  /** Prefix the query with the {@code useJoinReorder} option via the {@code SET ...;} syntax. */
+  /// Prefix the query with the `useJoinReorder` option via the `SET ...;` syntax.
   private static String withOption(String sql, boolean useJoinReorder) {
     return "SET " + QueryOptionKey.USE_JOIN_REORDER + "='" + useJoinReorder + "';\n" + sql;
   }
 
-  /**
-   * Prefix the query with both the {@code useJoinReorder} and {@code joinReorderMaxJoins} options.
-   */
+  /// Prefix the query with both the `useJoinReorder` and `joinReorderMaxJoins` options.
   private static String withOptions(String sql, boolean useJoinReorder, int maxJoins) {
     return "SET " + QueryOptionKey.USE_JOIN_REORDER + "='" + useJoinReorder + "';\n"
         + "SET " + QueryOptionKey.JOIN_REORDER_MAX_JOINS + "='" + maxJoins + "';\n"
@@ -130,7 +126,7 @@ public class JoinReorderOptimizerTest {
     }
   }
 
-  /** Compiles an EXPLAIN query and returns its explain plan text (non-deprecated API path). */
+  /// Compiles an EXPLAIN query and returns its explain plan text (non-deprecated API path).
   private static String explain(QueryEnvironment env, String explainSql) {
     try (QueryEnvironment.CompiledQuery compiled = env.compile(explainSql)) {
       return compiled.explain(0L, null).getExplainPlan();
@@ -147,10 +143,8 @@ public class JoinReorderOptimizerTest {
   // Tests
   // --------------------------------------------------------------------------
 
-  /**
-   * With the option enabled and statistics present, the reorder phase must change the join order so
-   * that the top join produces fewer rows than the disabled (default) plan's top join.
-   */
+  /// With the option enabled and statistics present, the reorder phase must change the join order so
+  /// that the top join produces fewer rows than the disabled (default) plan's top join.
   @Test
   public void testReorderChangesPlanAndReducesIntermediateRows() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -188,7 +182,7 @@ public class JoinReorderOptimizerTest {
             + "disabled=" + disabledTopRows + " enabled=" + enabledTopRows);
   }
 
-  /** Option disabled (the default) must leave the plan exactly as it is today. */
+  /// Option disabled (the default) must leave the plan exactly as it is today.
   @Test
   public void testDisabledLeavesPlanUnchanged() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -199,7 +193,7 @@ public class JoinReorderOptimizerTest {
     assertEquals(first, second, "Default-off plan must be deterministic and unchanged");
   }
 
-  /** An outer join anywhere in the tree disqualifies the whole phase: plan must be unchanged. */
+  /// An outer join anywhere in the tree disqualifies the whole phase: plan must be unchanged.
   @Test
   public void testOuterJoinSkipsPhase() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -210,7 +204,7 @@ public class JoinReorderOptimizerTest {
         "An outer join must cause the reorder phase to be skipped");
   }
 
-  /** A join hint signals user intent and disqualifies the whole phase. */
+  /// A join hint signals user intent and disqualifies the whole phase.
   @Test
   public void testJoinHintSkipsPhase() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -221,7 +215,7 @@ public class JoinReorderOptimizerTest {
         "A join hint must cause the reorder phase to be skipped");
   }
 
-  /** With no statistics (NoOp provider) the row-count gate fails: plan must be unchanged. */
+  /// With no statistics (NoOp provider) the row-count gate fails: plan must be unchanged.
   @Test
   public void testNoStatsSkipsPhase() {
     QueryEnvironment env = buildEnv(NoOpStatisticsProvider.INSTANCE);
@@ -229,14 +223,12 @@ public class JoinReorderOptimizerTest {
         "Absent statistics must cause the reorder phase to be skipped");
   }
 
-  /**
-   * The reorder phase must never throw: {@link JoinReorderOptimizer#maybeReorder(RelNode, int)}
-   * catches any internal error and returns the original (un-reordered) plan. We cover the try/catch
-   * with a direct unit call using a {@link RelNode} that throws while the phase inspects it — this
-   * is the documented fallback path. (Simulating a failure end-to-end is not possible because
-   * Calcite calls {@code PinotTable.getStatistic()} during validation, well before the reorder
-   * phase, so a throwing statistics provider would fail the query for an unrelated reason.)
-   */
+  /// The reorder phase must never throw: [JoinReorderOptimizer#maybeReorder(RelNode, int)]
+  /// catches any internal error and returns the original (un-reordered) plan. We cover the try/catch
+  /// with a direct unit call using a [RelNode] that throws while the phase inspects it — this
+  /// is the documented fallback path. (Simulating a failure end-to-end is not possible because
+  /// Calcite calls `PinotTable.getStatistic()` during validation, well before the reorder
+  /// phase, so a throwing statistics provider would fail the query for an unrelated reason.)
   @Test
   public void testReorderFailureFallsBackToInputPlan() {
     RelNode exploding = mock(RelNode.class);
@@ -251,11 +243,9 @@ public class JoinReorderOptimizerTest {
   // T2.3 / T2.4 — guardrail and plan-level tests
   // --------------------------------------------------------------------------
 
-  /**
-   * When the join count in the plan exceeds the configured cap the phase must be skipped and the
-   * plan returned unchanged. The PESSIMAL_JOIN_SQL has exactly 2 joins; setting maxJoins=1 means
-   * the count (2) exceeds the cap (1) so the phase must be skipped.
-   */
+  /// When the join count in the plan exceeds the configured cap the phase must be skipped and the
+  /// plan returned unchanged. The PESSIMAL_JOIN_SQL has exactly 2 joins; setting maxJoins=1 means
+  /// the count (2) exceeds the cap (1) so the phase must be skipped.
   @Test
   public void testExceedingCapSkipsPhase() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -274,10 +264,8 @@ public class JoinReorderOptimizerTest {
         "A plan whose join count exceeds the cap must be returned unchanged (TOO_MANY_JOINS)");
   }
 
-  /**
-   * When the join count equals the cap the phase must still run and produce a different (reordered)
-   * plan than the disabled baseline.
-   */
+  /// When the join count equals the cap the phase must still run and produce a different (reordered)
+  /// plan than the disabled baseline.
   @Test
   public void testAtCapBoundaryReorderRuns() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -296,11 +284,9 @@ public class JoinReorderOptimizerTest {
         "A plan whose join count equals the cap must still be reordered");
   }
 
-  /**
-   * EXPLAIN output for the 3-table skewed-stats query must differ between the enabled and disabled
-   * reorder cases, and the disabled plan must list the tables in the original syntactic order
-   * (fact, dim1, dim2).
-   */
+  /// EXPLAIN output for the 3-table skewed-stats query must differ between the enabled and disabled
+  /// reorder cases, and the disabled plan must list the tables in the original syntactic order
+  /// (fact, dim1, dim2).
   @Test
   public void testExplainSurfacesDiffersBetweenEnabledAndDisabled() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -324,11 +310,9 @@ public class JoinReorderOptimizerTest {
             + explainDisabled);
   }
 
-  /**
-   * The {@code useJoinReorder=true} query option (passed via SET in the SQL text) must enable the
-   * reorder phase for the query. This tests that the option is correctly threaded from the SQL
-   * SET syntax all the way through to the optimizer.
-   */
+  /// The `useJoinReorder=true` query option (passed via SET in the SQL text) must enable the
+  /// reorder phase for the query. This tests that the option is correctly threaded from the SQL
+  /// SET syntax all the way through to the optimizer.
   @Test
   public void testQueryOptionPlumbingEnablesPhase() {
     QueryEnvironment env = buildEnv(statsProvider());
@@ -347,7 +331,7 @@ public class JoinReorderOptimizerTest {
   // helpers
   // --------------------------------------------------------------------------
 
-  /** Estimated row count of the top-most join in the tree. */
+  /// Estimated row count of the top-most join in the tree.
   private static double topJoinRowCount(RelNode root) {
     Join topJoin = findTopJoin(root);
     assertNotNull(topJoin, "Plan must contain a join");

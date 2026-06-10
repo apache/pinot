@@ -28,9 +28,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Unit tests for {@link PinotRelOptCost} and {@link PinotRelOptCost.Factory}.
- */
+/// Unit tests for [PinotRelOptCost] and [PinotRelOptCost.Factory].
 public class PinotRelOptCostTest {
 
   // ---------------------------------------------------------------------------

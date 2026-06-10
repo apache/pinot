@@ -44,13 +44,10 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-/**
- * Unit tests for {@link BrokerTableStatsManager} and its inner
- * {@link TableStatsZkListener}.
- *
- * <p>Tests use a real {@link SqliteStatsStore} on a temporary directory; no mock store is
- * needed for behaviour tests. A minimal throwing-stub is used only for failure-isolation tests.
- */
+/// Unit tests for [BrokerTableStatsManager] and its inner [TableStatsZkListener].
+///
+/// Tests use a real [SqliteStatsStore] on a temporary directory; no mock store is
+/// needed for behaviour tests. A minimal throwing-stub is used only for failure-isolation tests.
 public class BrokerTableStatsManagerTest {
 
   private static final String TABLE = "myTable_OFFLINE";
@@ -333,9 +330,7 @@ public class BrokerTableStatsManagerTest {
   // Factory helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Builds a ZNRecord simulating an offline (committed) segment with the given fields.
-   */
+  /// Builds a ZNRecord simulating an offline (committed) segment with the given fields.
   private static ZNRecord offlineRecord(String segName, long crc, long totalDocs, long sizeBytes,
       long startMs, long endMs) {
     SegmentZKMetadata meta = new SegmentZKMetadata(segName);
@@ -357,9 +352,7 @@ public class BrokerTableStatsManagerTest {
     return meta.toZNRecord();
   }
 
-  /**
-   * Builds a ZNRecord simulating a realtime segment with the given status.
-   */
+  /// Builds a ZNRecord simulating a realtime segment with the given status.
   private static ZNRecord realtimeRecord(String segName, long crc, long totalDocs, long sizeBytes,
       long startMs, long endMs, Status status) {
     SegmentZKMetadata meta = new SegmentZKMetadata(segName);
@@ -382,7 +375,7 @@ public class BrokerTableStatsManagerTest {
     return meta.toZNRecord();
   }
 
-  /** Recursively deletes a directory tree. */
+  /// Recursively deletes a directory tree.
   private static void deleteRecursively(Path dir)
       throws IOException {
     if (dir == null || !Files.exists(dir)) {
@@ -404,10 +397,8 @@ public class BrokerTableStatsManagerTest {
   // Stub: store that always throws
   // ---------------------------------------------------------------------------
 
-  /**
-   * Minimal {@link StatsStore} stub whose every method throws {@link StatsStoreException}.
-   * Used to verify that listeners and the manager degrade gracefully.
-   */
+  /// Minimal [StatsStore] stub whose every method throws [StatsStoreException].
+  /// Used to verify that listeners and the manager degrade gracefully.
   private static final class ThrowingStatsStore implements StatsStore {
 
     @Override

@@ -215,13 +215,11 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
     _serverReenableCallback = callback;
   }
 
-  /**
-   * Installs the optional CBO stats manager. Must be called before routing entries are built
-   * (i.e. before any {@link #buildRouting(String)} call). When {@code null}, stats collection
-   * is disabled and all related code paths are skipped.
-   *
-   * @param statsManager the stats manager to use, or {@code null} to disable stats
-   */
+  /// Installs the optional CBO stats manager. Must be called before routing entries are built
+  /// (i.e. before any [#buildRouting(String)] call). When `null`, stats collection
+  /// is disabled and all related code paths are skipped.
+  ///
+  /// @param statsManager the stats manager to use, or `null` to disable stats
   public void setStatsManager(@Nullable BrokerTableStatsManager statsManager) {
     _statsManager = statsManager;
   }

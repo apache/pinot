@@ -22,57 +22,46 @@ import java.util.OptionalLong;
 import javax.annotation.Nullable;
 
 
-/**
- * Planner-facing read API for table and column statistics.
- *
- * <p>Implementations MUST be cheap — this interface is called multiple times per query on the
- * planning hot path. Implementations MUST be thread-safe; they expose the merged logical view
- * of a table.
- *
- * <p>Table name semantics:
- * <ul>
- *   <li>A raw table name (no type suffix) requests the logical hybrid view: implementations must
- *       merge OFFLINE and REALTIME statistics at the time boundary without double-counting rows.
- *   <li>A name with a type suffix (e.g. {@code myTable_OFFLINE}) requests the physical view for
- *       that specific table type.
- * </ul>
- *
- * <p>Thread-safety: implementations must be thread-safe.
- */
+/// Planner-facing read API for table and column statistics.
+///
+/// Implementations MUST be cheap — this interface is called multiple times per query on the
+/// planning hot path. Implementations MUST be thread-safe; they expose the merged logical view
+/// of a table.
+///
+/// Table name semantics:
+/// - A raw table name (no type suffix) requests the logical hybrid view: implementations must
+///   merge OFFLINE and REALTIME statistics at the time boundary without double-counting rows.
+/// - A name with a type suffix (e.g. `myTable_OFFLINE`) requests the physical view for
+///   that specific table type.
+///
+/// Thread-safety: implementations must be thread-safe.
 public interface PinotStatisticsProvider {
 
-  /**
-   * Returns aggregate statistics for the given table, or {@code null} if no statistics are
-   * available.
-   *
-   * @param tableName raw table name (logical hybrid view) or a name with type suffix (physical
-   *                  view)
-   */
+  /// Returns aggregate statistics for the given table, or `null` if no statistics are available.
+  ///
+  /// @param tableName raw table name (logical hybrid view) or a name with type suffix (physical
+  ///                  view)
   @Nullable
   TableStatistics getTableStatistics(String tableName);
 
-  /**
-   * Returns per-column statistics for the given table and column, or {@code null} if no statistics
-   * are available.
-   *
-   * @param tableName  raw table name (logical hybrid view) or a name with type suffix (physical
-   *                   view)
-   * @param columnName name of the column
-   */
+  /// Returns per-column statistics for the given table and column, or `null` if no statistics
+  /// are available.
+  ///
+  /// @param tableName  raw table name (logical hybrid view) or a name with type suffix (physical
+  ///                   view)
+  /// @param columnName name of the column
   @Nullable
   ColumnStatistics getColumnStatistics(String tableName, String columnName);
 
-  /**
-   * Returns an estimate of the number of rows whose time column falls in the half-open interval
-   * {@code [startMs, endMs)}, or an empty optional if the estimate cannot be produced.
-   *
-   * <p>Used for time-predicate selectivity estimation. Implementations may return an empty
-   * optional when time-range metadata is not available.
-   *
-   * @param tableName raw table name or name with type suffix
-   * @param startMs   start of the time range, inclusive, in epoch milliseconds
-   * @param endMs     end of the time range, exclusive, in epoch milliseconds
-   */
+  /// Returns an estimate of the number of rows whose time column falls in the half-open interval
+  /// `[startMs, endMs)`, or an empty optional if the estimate cannot be produced.
+  ///
+  /// Used for time-predicate selectivity estimation. Implementations may return an empty
+  /// optional when time-range metadata is not available.
+  ///
+  /// @param tableName raw table name or name with type suffix
+  /// @param startMs   start of the time range, inclusive, in epoch milliseconds
+  /// @param endMs     end of the time range, exclusive, in epoch milliseconds
   default OptionalLong estimateRowsInTimeRange(String tableName, long startMs, long endMs) {
     return OptionalLong.empty();
   }
