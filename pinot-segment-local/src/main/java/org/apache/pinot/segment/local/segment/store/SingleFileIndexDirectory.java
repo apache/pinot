@@ -345,6 +345,11 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       properties.putAll(_segmentDirectoryLoaderContext.getSegmentCustomConfigs());
     }
 
+    // Propagate segment-level custom metadata so downstream readers can read it
+    if (_segmentMetadata != null && _segmentMetadata.getCustomMap() != null) {
+      properties.putAll(_segmentMetadata.getCustomMap());
+    }
+
     // Propagate the table's task config (serialized as JSON) to remote/empty index buffers so that
     // downstream readers backed by external storage can resolve any configuration they require
     // (e.g. credentials, regions, endpoints) from the ingestion task config rather than relying

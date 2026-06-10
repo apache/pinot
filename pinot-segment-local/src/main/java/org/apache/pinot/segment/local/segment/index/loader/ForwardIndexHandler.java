@@ -874,7 +874,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       SegmentDictionaryCreator dictionaryCreator) {
     boolean isSVColumn = reader.isSingleValue();
     int maxNumValuesPerEntry = existingColumnMetadata.getMaxNumberOfMultiValues();
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null, maxNumValuesPerEntry);
+    PinotSegmentColumnReader columnReader =
+        new PinotSegmentColumnReader(column, reader, null, null, maxNumValuesPerEntry);
 
     for (int i = 0; i < numDocs; i++) {
       Object obj = columnReader.getValue(i);
@@ -936,7 +937,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       //   Special null handling is not necessary here. This is because, the existing default null value in the raw
       //   forwardIndex will be retained as such while created the dictionary and dict-based forward index. Also, null
       //   value vectors maintain a bitmap of docIds. No handling is necessary there.
-      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
+      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(column, reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < numDocs; i++) {
           statsCollector.collect(columnReader.getValue(i));
@@ -1017,7 +1018,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         .createIndexReader(segmentWriter, _fieldIndexConfigs.get(column), existingColMetadata)) {
       AbstractColumnStatisticsCollector statsCollector =
           getStatsCollector(column, fieldSpec.getDataType().getStoredType(), true);
-      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(reader, null, null,
+      try (PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(column, reader, null, null,
           existingColMetadata.getMaxNumberOfMultiValues())) {
         for (int i = 0; i < existingColMetadata.getTotalDocs(); i++) {
           statsCollector.collect(columnReader.getValue(i));
@@ -1212,7 +1213,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       }
       boolean dictionaryEncoded = forwardIndex.isDictionaryEncoded();
       try (Dictionary dictionary = dictionaryEncoded ? DictionaryIndexType.read(segmentWriter, columnMetadata) : null;
-          PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(forwardIndex, dictionary, null,
+          PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(column, forwardIndex, dictionary, null,
               columnMetadata.getMaxNumberOfMultiValues())) {
         AbstractColumnStatisticsCollector statsCollector = getStatsCollector(column, storedType, false);
         int numDocs = columnMetadata.getTotalDocs();
