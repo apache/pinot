@@ -544,6 +544,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultUsePhysicalOptimizer = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_PHYSICAL_OPTIMIZER,
         CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER);
+    boolean defaultUseJoinReorder = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_JOIN_REORDER,
+        CommonConstants.Broker.DEFAULT_USE_JOIN_REORDER);
     boolean defaultUseLiteMode = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_USE_LITE_MODE,
         CommonConstants.Broker.DEFAULT_USE_LITE_MODE);
@@ -590,6 +593,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
         .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
+        .defaultUseJoinReorder(defaultUseJoinReorder)
         .defaultUseLiteMode(defaultUseLiteMode)
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)

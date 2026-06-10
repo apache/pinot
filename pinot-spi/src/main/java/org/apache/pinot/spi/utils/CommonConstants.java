@@ -628,6 +628,13 @@ public class CommonConstants {
     public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = false;
 
     /**
+     * Whether to run the cost-based join-reordering phase by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_JOIN_REORDER} query option.
+     */
+    public static final String CONFIG_OF_USE_JOIN_REORDER = "pinot.broker.multistage.use.join.reorder";
+    public static final boolean DEFAULT_USE_JOIN_REORDER = false;
+
+    /**
      * Whether to use lite mode by default.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_LITE_MODE} query option
      */
@@ -832,6 +839,7 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        public static final String USE_JOIN_REORDER = "useJoinReorder";
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
          * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The
