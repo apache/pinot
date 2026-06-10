@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -96,6 +97,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
         String.valueOf(_threadMemAllocatedBytes));
     instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
         String.valueOf(_systemActivitiesCpuTimeNs));
+    Integer implicitLimit = QueryOptionsUtils.getLiteModeImplicitLeafStageLimit(
+        _queryContext.getQueryOptions());
+    // false-positive when table has exactly implicitLimit rows
+    if (implicitLimit != null && baseResultsBlock.getNumRows() >= implicitLimit) {
+      instanceResponseBlock.addMetadata(
+          MetadataKey.LITE_MODE_LEAF_STAGE_LIMIT_REACHED.getName(), "true");
+    }
     return instanceResponseBlock;
   }
 
