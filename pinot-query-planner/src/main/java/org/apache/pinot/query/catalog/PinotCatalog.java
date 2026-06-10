@@ -33,6 +33,8 @@ import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -48,6 +50,7 @@ public class PinotCatalog implements Schema {
 
   private final TableCache _tableCache;
   private final String _databaseName;
+  private final PinotStatisticsProvider _statisticsProvider;
   private boolean _excludeVirtualColumns = false;
 
   /**
@@ -55,8 +58,22 @@ public class PinotCatalog implements Schema {
    * table available for query and processes table/segment metadata updates when cluster status changes.
    */
   public PinotCatalog(TableCache tableCache, String databaseName) {
+    this(tableCache, databaseName, NoOpStatisticsProvider.INSTANCE);
+  }
+
+  /**
+   * Constructs a catalog backed by the given {@link TableCache} and {@link PinotStatisticsProvider}.
+   *
+   * @param tableCache        the table cache backing this catalog
+   * @param databaseName      the database to scope table lookups against
+   * @param statisticsProvider the provider that supplies row-count statistics to the planner;
+   *                          {@code null} is treated as {@link NoOpStatisticsProvider#INSTANCE}
+   */
+  public PinotCatalog(TableCache tableCache, String databaseName,
+      @Nullable PinotStatisticsProvider statisticsProvider) {
     _tableCache = tableCache;
     _databaseName = databaseName;
+    _statisticsProvider = statisticsProvider != null ? statisticsProvider : NoOpStatisticsProvider.INSTANCE;
   }
 
   /**
@@ -92,7 +109,7 @@ public class PinotCatalog implements Schema {
       return null;
     }
 
-    return new PinotTable(schema, _excludeVirtualColumns);
+    return new PinotTable(schema, _excludeVirtualColumns, tableName, _statisticsProvider);
   }
 
   /**

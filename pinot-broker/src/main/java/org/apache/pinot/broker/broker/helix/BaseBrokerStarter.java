@@ -63,6 +63,7 @@ import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandl
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
+import org.apache.pinot.broker.stats.BrokerStatisticsProvider;
 import org.apache.pinot.broker.stats.BrokerTableStatsManager;
 import org.apache.pinot.broker.stats.SqliteStatsStore;
 import org.apache.pinot.broker.stats.StatsStoreException;
@@ -324,10 +325,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       ThreadAccountant threadAccountant, MultiClusterRoutingContext multiClusterRoutingContext,
       WorkerManager workerManager, WorkerManager multiClusterWorkerManager,
       ServerRoutingStatsManager serverRoutingStatsManager) {
+    BrokerStatisticsProvider statisticsProvider =
+        _statsManager != null ? new BrokerStatisticsProvider(_statsManager) : null;
     return new MultiStageBrokerRequestHandler(config, brokerId, requestIdGenerator, routingManager,
         accessControlFactory, queryQuotaManager, tableCache, multiStageQueryThrottler, failureDetector,
         threadAccountant, multiClusterRoutingContext, workerManager, multiClusterWorkerManager,
-        serverRoutingStatsManager);
+        serverRoutingStatsManager, statisticsProvider);
   }
 
   private void setupHelixSystemProperties() {

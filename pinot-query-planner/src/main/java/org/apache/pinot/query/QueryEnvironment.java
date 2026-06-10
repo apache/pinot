@@ -92,6 +92,8 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.rules.PinotRuleSet;
 import org.apache.pinot.query.planner.spi.Phase;
 import org.apache.pinot.query.planner.spi.RuleSetCustomizer;
+import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
+import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
@@ -159,7 +161,7 @@ public class QueryEnvironment {
   public QueryEnvironment(Config config, MultiClusterRoutingContext multiClusterRoutingContext) {
     _envConfig = config;
     String database = config.getDatabase();
-    _catalog = new PinotCatalog(config.getTableCache(), database);
+    _catalog = new PinotCatalog(config.getTableCache(), database, config.getStatisticsProvider());
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     _config = Frameworks.newConfigBuilder()
         .traitDefs()
@@ -899,6 +901,18 @@ public class QueryEnvironment {
      */
     @Nullable
     WorkerManager getWorkerManager();
+
+    /**
+     * Returns the statistics provider used to supply row-count and column statistics to the
+     * Calcite planner. Defaults to {@link NoOpStatisticsProvider#INSTANCE}, which causes the
+     * planner to fall back to heuristic cost estimation as before this field was introduced.
+     *
+     * <p>A {@code null} value is treated the same as {@link NoOpStatisticsProvider#INSTANCE}.
+     */
+    @Value.Default
+    default PinotStatisticsProvider getStatisticsProvider() {
+      return NoOpStatisticsProvider.INSTANCE;
+    }
 
     /// See [CommonConstants.Broker#CONFIG_OF_SORT_EXCHANGE_COPY_THRESHOLD]
     @Value.Default
