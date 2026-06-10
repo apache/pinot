@@ -59,15 +59,26 @@ public class StreamingDispatchObserver
   private final BiConsumer<Worker.QueryResponse, Throwable> _ackCallback;
   private final int _expectedOpChainsForThisServer;
   private final AtomicBoolean _ackReceived = new AtomicBoolean(false);
+  /**
+   * Guards {@link #onError} against double invocation. gRPC guarantees at most one terminal callback per stream,
+   * but {@code DispatchClient.submitWithStream} also invokes {@link #onError} manually when opening the stream or
+   * sending the submit fails — and in the send-failure case a gRPC-initiated {@code onError} for the same (started)
+   * call can follow. Without this guard the second invocation would drain the session latch a second time, making
+   * {@code awaitCompletion} return before other servers' reports arrived.
+   */
+  private final AtomicBoolean _errorHandled = new AtomicBoolean(false);
 
   /**
    * Counts how many opchains we've already drained from the session for this server, so an onError doesn't
    * double-drain after some opchains already reported successfully.
    *
-   * <p>Accessed only from gRPC inbound callbacks ({@code onNext}, {@code onError}, {@code onCompleted}), which gRPC
-   * serializes per stream — no additional synchronization is needed. {@link #cancel} is the one method on this class
-   * that may be called from a different thread (via {@link StreamingQuerySession#fanOutCancel}), but it only touches
-   * {@link #_outbound} (which is {@code volatile}) and never reads or writes this field.
+   * <p>Written only from gRPC inbound callbacks ({@code onNext}), which gRPC serializes per stream — no additional
+   * synchronization is needed. {@link #cancel} may be called from a different thread (via
+   * {@link StreamingQuerySession#fanOutCancel}) but only touches {@link #_outbound} (which is {@code volatile}).
+   * {@link #onError} can additionally be invoked manually from the dispatcher thread when
+   * {@code DispatchClient.submitWithStream} fails to open the stream or send the submit; in that scenario no
+   * inbound callback has run yet (the counter is still 0, its initial value, visible to any thread) and the
+   * {@link #_errorHandled} CAS picks a single winner between the manual and any later gRPC-initiated invocation.
    */
   private int _opChainsReportedForThisServer = 0;
 
@@ -77,6 +88,16 @@ public class StreamingDispatchObserver
    * for the duration of the call.
    */
   private volatile StreamObserver<Worker.BrokerToServer> _outbound;
+
+  /**
+   * Serializes every {@code onNext} call on {@link #_outbound}. gRPC {@code StreamObserver}s are not thread-safe,
+   * and the two outbound writers can genuinely overlap: the dispatcher thread calls {@link #sendSubmit} while a
+   * fan-out cancel triggered by another server's failure calls {@link #cancel} from that stream's gRPC inbound
+   * thread (the session registers this observer before the submit is sent, so it is already visible to
+   * {@link StreamingQuerySession#fanOutCancel}). Two concurrent {@code fanOutCancel} invocations (peer error +
+   * recovery path) can also overlap on the same handle.
+   */
+  private final Object _outboundLock = new Object();
 
   public StreamingDispatchObserver(QueryServerInstance server, StreamingQuerySession session,
       int expectedOpChainsForThisServer, BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
@@ -101,7 +122,9 @@ public class StreamingDispatchObserver
     if (outbound == null) {
       throw new IllegalStateException("attachOutboundStream must be called before sendSubmit");
     }
-    outbound.onNext(Worker.BrokerToServer.newBuilder().setSubmit(request).build());
+    synchronized (_outboundLock) {
+      outbound.onNext(Worker.BrokerToServer.newBuilder().setSubmit(request).build());
+    }
   }
 
   @Override
@@ -115,6 +138,15 @@ public class StreamingDispatchObserver
         }
         break;
       case OPCHAIN:
+        // Bound by the expected count: each recordOpChainComplete counts down the session's GLOBAL latch, so a
+        // buggy/misbehaving server sending more OpChainCompletes than expected would over-drain it, ending
+        // awaitCompletion before other servers' reports arrived (and silently dropping their stats).
+        if (_opChainsReportedForThisServer >= _expectedOpChainsForThisServer) {
+          LOGGER.warn("Ignoring unexpected extra OpChainComplete (stage={}, worker={}) from {}: already received "
+              + "the {} expected reports", message.getOpchain().getStageId(), message.getOpchain().getWorkerId(),
+              _server, _expectedOpChainsForThisServer);
+          break;
+        }
         _session.recordOpChainComplete(message.getOpchain());
         _opChainsReportedForThisServer++;
         break;
@@ -142,6 +174,9 @@ public class StreamingDispatchObserver
 
   @Override
   public void onError(@Nullable Throwable t) {
+    if (!_errorHandled.compareAndSet(false, true)) {
+      return;
+    }
     if (t != null && Status.fromThrowable(t).getCode() == Status.Code.UNIMPLEMENTED) {
       // Stream-stats mode has no automatic fallback to the unary Submit path (by design). A server that does not
       // implement the SubmitWithStream RPC fails every MSE query while the flag is on, so surface why loudly: this
@@ -170,8 +205,9 @@ public class StreamingDispatchObserver
   /**
    * Sends a cancel message on the outbound stream. May be called from any thread — in particular from the
    * {@link StreamingQuerySession#fanOutCancel} path, which runs on whichever thread first observes a peer error and
-   * iterates {@code _openStreams}. Thread-safety is achieved solely via the {@code volatile} read of
-   * {@link #_outbound}; this method must not access any other mutable state of this instance.
+   * iterates {@code _openStreams} — and may overlap with {@link #sendSubmit} on the dispatcher thread or with
+   * another concurrent fan-out. All sends are serialized on {@link #_outboundLock}; beyond the {@code volatile}
+   * read of {@link #_outbound}, this method must not access any other mutable state of this instance.
    */
   @Override
   public void cancel(long requestId) {
@@ -180,9 +216,11 @@ public class StreamingDispatchObserver
       return;
     }
     try {
-      outbound.onNext(Worker.BrokerToServer.newBuilder()
-          .setCancel(Worker.CancelRequest.newBuilder().setRequestId(requestId).build())
-          .build());
+      synchronized (_outboundLock) {
+        outbound.onNext(Worker.BrokerToServer.newBuilder()
+            .setCancel(Worker.CancelRequest.newBuilder().setRequestId(requestId).build())
+            .build());
+      }
     } catch (Throwable t) {
       LOGGER.debug("Cancel send failed on already-closed stream to {}: {}", _server, t.getMessage());
     }

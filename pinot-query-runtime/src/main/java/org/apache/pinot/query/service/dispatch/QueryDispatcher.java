@@ -208,8 +208,7 @@ public class QueryDispatcher {
       Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
       throws Exception {
     if (QueryOptionsUtils.isStreamStats(queryOptions, _streamStatsDefault)) {
-      // TODO: The streaming path does not record per-server in-flight stats for the adaptive query router yet.
-      return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions);
+      return submitAndReduceWithStream(context, dispatchableSubPlan, timeoutMs, queryOptions, statsManager);
     }
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
@@ -270,11 +269,14 @@ public class QueryDispatcher {
   /// transport error during dispatch, {@link #submitWithStream} surfaces the throwable through the ack queue,
   /// {@link #processResults} throws, and this method fans out cancel via the session before propagating the failure.
   private QueryResult submitAndReduceWithStream(RequestContext context, DispatchableSubPlan dispatchableSubPlan,
-      long timeoutMs, Map<String, String> queryOptions)
+      long timeoutMs, Map<String, String> queryOptions, @Nullable ServerRoutingStatsManager statsManager)
       throws Exception {
     long requestId = context.getRequestId();
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     Set<QueryServerInstance> servers = new HashSet<>();
+    // Tracks servers where recordStatsForQuerySubmission was actually called, so the finally block only decrements
+    // servers that were incremented — same contract as the legacy submitAndReduce path, see its Javadoc.
+    Set<QueryServerInstance> incrementedServers = new HashSet<>();
 
     // The session's expected-opchain count must equal the total number of opchains across every (server, non-root
     // stage) pair — that's how many OpChainComplete messages we expect to receive.
@@ -294,7 +296,22 @@ public class QueryDispatcher {
 
     try {
       submitWithStream(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions, session);
+      // Increment after submitWithStream populates the server list, mirroring the legacy path (which increments
+      // after submit for the same reason).
+      if (statsManager != null) {
+        for (QueryServerInstance server : servers) {
+          statsManager.recordStatsForQuerySubmission(requestId, server.getInstanceId());
+          incrementedServers.add(server);
+        }
+      }
       QueryResult brokerResult = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+
+      // If the reducer surfaced an error, cancel the still-running opchains BEFORE waiting for stats: they won't
+      // complete (and report) until cancelled, so waiting first would burn the drain window on reports that cannot
+      // arrive and delay the cancel by up to that window. Mirrors the tryRecoverWithStream ordering.
+      if (brokerResult.getProcessingException() != null) {
+        session.fanOutCancel();
+      }
 
       // Receiving mailbox finished — data is ready. Wait for stats on a best-effort basis; cap at
       // _statsDrainMs so a single slow opchain cannot delay the client response.
@@ -304,10 +321,6 @@ public class QueryDispatcher {
         LOGGER.warn("Stream-mode request {} timed out waiting for stats after mailbox EOS; coverage may be partial",
             requestId);
       }
-
-      if (brokerResult.getProcessingException() != null) {
-        session.fanOutCancel();
-      }
       return mergeSessionStatsIntoResult(brokerResult, session, expectedByStage);
     } catch (Exception ex) {
       return tryRecoverWithStream(session, expectedByStage, deadlineMs, ex);
@@ -315,6 +328,11 @@ public class QueryDispatcher {
       session.fanOutCancel();
       throw e;
     } finally {
+      if (statsManager != null) {
+        for (QueryServerInstance server : incrementedServers) {
+          statsManager.recordStatsUponResponseArrival(requestId, server.getInstanceId(), -1);
+        }
+      }
       if (isQueryCancellationEnabled()) {
         _serversByQuery.remove(requestId);
       }
@@ -358,8 +376,11 @@ public class QueryDispatcher {
         client.submitWithStream(request, server, deadline, session, expectedForServer,
             (resp, err) -> ackQueue.offer(new AsyncResponse<>(server, resp, err)));
       } catch (Throwable t) {
+        // The error ack was already delivered through the observer's onError inside submitWithStream (CAS-deduped
+        // against a later gRPC-initiated onError). Offering another one here could double-fill the ack queue —
+        // it is sized exactly serversOut.size() and offer() drops silently — losing a healthy server's ack and
+        // stalling processResults until the deadline. Only log and mark the server unhealthy.
         LOGGER.warn("Caught exception while opening stream to server: {}", server, t);
-        ackQueue.offer(new AsyncResponse<>(server, null, t));
         _failureDetector.markServerUnhealthy(server.getInstanceId(), server.getHostname());
       }
     }

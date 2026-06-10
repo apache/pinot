@@ -166,10 +166,19 @@ class DispatchClient {
       BiConsumer<Worker.QueryResponse, Throwable> ackCallback) {
     StreamingDispatchObserver observer = new StreamingDispatchObserver(virtualServer, session,
         expectedOpChainsForThisServer, ackCallback);
-    StreamObserver<Worker.BrokerToServer> outbound = _dispatchStub.withDeadline(deadline).submitWithStream(observer);
-    observer.attachOutboundStream(outbound);
-    session.registerStream(observer);
-    observer.sendSubmit(request);
+    try {
+      StreamObserver<Worker.BrokerToServer> outbound = _dispatchStub.withDeadline(deadline).submitWithStream(observer);
+      observer.attachOutboundStream(outbound);
+      session.registerStream(observer);
+      observer.sendSubmit(request);
+    } catch (Throwable t) {
+      // Deliver the failure through the observer so the ack callback fires exactly once (its CAS dedupes against a
+      // later gRPC-initiated onError for the same stream) and the session latch is drained for this server's
+      // opchains. The caller must NOT offer its own error ack — doing so could double-fill the (exactly server-count
+      // sized) ack queue and silently drop another server's ack.
+      observer.onError(t);
+      throw t;
+    }
     return observer;
   }
 

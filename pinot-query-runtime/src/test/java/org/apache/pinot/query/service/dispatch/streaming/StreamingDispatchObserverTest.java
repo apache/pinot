@@ -24,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Worker;
@@ -274,6 +275,63 @@ public class StreamingDispatchObserverTest {
     // gRPC calls onCompleted after DONE; must not throw or change state.
     observer.onCompleted();
     Assert.assertEquals(session.getOutstandingCount(), 0L);
+  }
+
+  /**
+   * A misbehaving server sending more OpChainCompletes than expected must not over-drain the session's global
+   * latch: in a multi-server query that would end awaitCompletion before the other servers' reports arrived,
+   * silently dropping their stats. Extras beyond the per-server expected count are ignored.
+   */
+  @Test
+  public void testExtraOpChainCompletesDoNotOverDrainLatch()
+      throws Exception {
+    // Two servers expected: 1 opchain from this one, 1 from another that never reports.
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 1, (resp, err) -> { });
+    StreamObserver<Worker.BrokerToServer> outbound = Mockito.mock(StreamObserver.class);
+    observer.attachOutboundStream(outbound);
+    session.registerStream(observer);
+
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 0, 5)).build());
+    // Buggy extra report — must be dropped, not forwarded to the session.
+    observer.onNext(Worker.ServerToBroker.newBuilder().setOpchain(buildOpChainComplete(1, 1, 7)).build());
+
+    Assert.assertEquals(session.getOutstandingCount(), 1,
+        "the extra OpChainComplete must not count down the other server's slot");
+    Assert.assertFalse(session.awaitCompletion(10, TimeUnit.MILLISECONDS),
+        "session must keep waiting for the other server");
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    Assert.assertEquals((int) coverage.getRespondedByStage().get(1), 1,
+        "only the expected report should be recorded");
+  }
+
+  /**
+   * onError must be idempotent. gRPC guarantees at most one terminal callback per stream, but
+   * {@code DispatchClient.submitWithStream} also invokes onError manually when opening the stream or sending the
+   * submit fails — and in the send-failure case a gRPC-initiated onError for the same (started) call can follow.
+   * Without the dedupe, the second invocation would drain the session latch a second time (over-draining the other
+   * servers' slots) and could deliver a second error ack into the exactly-server-count-sized ack queue.
+   */
+  @Test
+  public void testOnErrorIsIdempotent()
+      throws Exception {
+    // Two servers: 1 opchain from this one, 1 from another that never reports.
+    StreamingQuerySession session = new StreamingQuerySession(1L, 2);
+    AtomicInteger ackCallbacks = new AtomicInteger();
+    StreamingDispatchObserver observer = new StreamingDispatchObserver(mockServer(), session, 1,
+        (resp, err) -> ackCallbacks.incrementAndGet());
+    StreamObserver<Worker.BrokerToServer> outbound = Mockito.mock(StreamObserver.class);
+    observer.attachOutboundStream(outbound);
+    session.registerStream(observer);
+
+    observer.onError(new RuntimeException("submit send failed"));
+    observer.onError(new RuntimeException("grpc-initiated error for the same call"));
+
+    Assert.assertEquals(ackCallbacks.get(), 1, "the ack callback must fire exactly once");
+    Assert.assertEquals(session.getOutstandingCount(), 1,
+        "the second onError must not drain the other server's slot");
+    Assert.assertFalse(session.awaitCompletion(10, TimeUnit.MILLISECONDS),
+        "session must keep waiting for the other server");
   }
 
   // ---- helpers ----
