@@ -203,10 +203,14 @@ public abstract class QuickStartBase {
         quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
       }
     } else {
-      String tableName = getTableName();
-      File baseDir = new File(quickstartTmpDir, tableName);
-      copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
-      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
+      // -bootstrapTableDir accepts multiple directories (arity 1..*); bootstrap each of them.
+      for (String bootstrapDataDir : _bootstrapDataDirs) {
+        String tableName = getTableName(bootstrapDataDir);
+        File baseDir = new File(quickstartTmpDir, tableName);
+        copyFilesystemTableToTmpDirectory(bootstrapDataDir, tableName, baseDir);
+        quickstartTableRequests.add(
+            new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
+      }
     }
     return quickstartTableRequests;
   }
