@@ -635,6 +635,16 @@ public class CommonConstants {
     public static final boolean DEFAULT_USE_JOIN_REORDER = false;
 
     /**
+     * Maximum number of joins in a plan for which the cost-based join-reordering phase will run.
+     * Plans with more joins than this cap skip the reorder phase to avoid excessive planning time.
+     * This value can always be overridden by
+     * {@link Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS} query option.
+     */
+    public static final String CONFIG_OF_JOIN_REORDER_MAX_JOINS =
+        "pinot.broker.multistage.join.reorder.max.joins";
+    public static final int DEFAULT_JOIN_REORDER_MAX_JOINS = 10;
+
+    /**
      * Whether to use lite mode by default.
      * This value can always be overridden by {@link Request.QueryOptionKey#USE_LITE_MODE} query option
      */
@@ -840,6 +850,11 @@ public class CommonConstants {
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         public static final String USE_JOIN_REORDER = "useJoinReorder";
+        /**
+         * Maximum number of joins that the cost-based join-reordering phase will handle.
+         * Plans with more joins than this cap are left unchanged.
+         */
+        public static final String JOIN_REORDER_MAX_JOINS = "joinReorderMaxJoins";
         /**
          * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
          * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The

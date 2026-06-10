@@ -512,7 +512,9 @@ public class QueryEnvironment {
       // it returns the plan unchanged. It never throws — see JoinReorderOptimizer.maybeReorder.
       if (QueryOptionsUtils.isUseJoinReorder(plannerContext.getOptions(),
           _envConfig.defaultUseJoinReorder())) {
-        optimized = JoinReorderOptimizer.maybeReorder(optimized);
+        int maxJoins = QueryOptionsUtils.getJoinReorderMaxJoins(plannerContext.getOptions(),
+            _envConfig.defaultJoinReorderMaxJoins());
+        optimized = JoinReorderOptimizer.maybeReorder(optimized, maxJoins);
       }
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
@@ -820,6 +822,19 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultUseJoinReorder() {
       return CommonConstants.Broker.DEFAULT_USE_JOIN_REORDER;
+    }
+
+    /**
+     * Maximum number of joins a plan may contain for the cost-based join-reordering phase to run.
+     * Plans that exceed this cap skip the reorder phase.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#JOIN_REORDER_MAX_JOINS}.
+     */
+    @Value.Default
+    default int defaultJoinReorderMaxJoins() {
+      return CommonConstants.Broker.DEFAULT_JOIN_REORDER_MAX_JOINS;
     }
 
     /**

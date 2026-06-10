@@ -115,9 +115,25 @@ public class JoinReorderOptimizerTest {
     return "SET " + QueryOptionKey.USE_JOIN_REORDER + "='" + useJoinReorder + "';\n" + sql;
   }
 
+  /**
+   * Prefix the query with both the {@code useJoinReorder} and {@code joinReorderMaxJoins} options.
+   */
+  private static String withOptions(String sql, boolean useJoinReorder, int maxJoins) {
+    return "SET " + QueryOptionKey.USE_JOIN_REORDER + "='" + useJoinReorder + "';\n"
+        + "SET " + QueryOptionKey.JOIN_REORDER_MAX_JOINS + "='" + maxJoins + "';\n"
+        + sql;
+  }
+
   private static String compileToPlan(QueryEnvironment env, String sql, boolean useJoinReorder) {
     try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(sql, useJoinReorder))) {
       return RelOptUtil.toString(compiled.getRelNode());
+    }
+  }
+
+  /** Compiles an EXPLAIN query and returns its explain plan text (non-deprecated API path). */
+  private static String explain(QueryEnvironment env, String explainSql) {
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(explainSql)) {
+      return compiled.explain(0L, null).getExplainPlan();
     }
   }
 
@@ -214,20 +230,117 @@ public class JoinReorderOptimizerTest {
   }
 
   /**
-   * The reorder phase must never throw: {@link JoinReorderOptimizer#maybeReorder(RelNode)} catches
-   * any internal error and returns the original (un-reordered) plan. We cover the try/catch with a
-   * direct unit call using a {@link RelNode} that throws while the phase inspects it — this is the
-   * documented fallback path. (Simulating a failure end-to-end is not possible because Calcite calls
-   * {@code PinotTable.getStatistic()} during validation, well before the reorder phase, so a throwing
-   * statistics provider would fail the query for an unrelated reason.)
+   * The reorder phase must never throw: {@link JoinReorderOptimizer#maybeReorder(RelNode, int)}
+   * catches any internal error and returns the original (un-reordered) plan. We cover the try/catch
+   * with a direct unit call using a {@link RelNode} that throws while the phase inspects it — this
+   * is the documented fallback path. (Simulating a failure end-to-end is not possible because
+   * Calcite calls {@code PinotTable.getStatistic()} during validation, well before the reorder
+   * phase, so a throwing statistics provider would fail the query for an unrelated reason.)
    */
   @Test
   public void testReorderFailureFallsBackToInputPlan() {
     RelNode exploding = mock(RelNode.class);
     when(exploding.getInputs()).thenThrow(new RuntimeException("boom"));
     // maybeReorder must swallow the error and return the exact same instance it was given.
-    assertEquals(JoinReorderOptimizer.maybeReorder(exploding), exploding,
+    assertEquals(JoinReorderOptimizer.maybeReorder(exploding, CommonConstants.Broker.DEFAULT_JOIN_REORDER_MAX_JOINS),
+        exploding,
         "A failing reorder must fall back to the original plan instance");
+  }
+
+  // --------------------------------------------------------------------------
+  // T2.3 / T2.4 — guardrail and plan-level tests
+  // --------------------------------------------------------------------------
+
+  /**
+   * When the join count in the plan exceeds the configured cap the phase must be skipped and the
+   * plan returned unchanged. The PESSIMAL_JOIN_SQL has exactly 2 joins; setting maxJoins=1 means
+   * the count (2) exceeds the cap (1) so the phase must be skipped.
+   */
+  @Test
+  public void testExceedingCapSkipsPhase() {
+    QueryEnvironment env = buildEnv(statsProvider());
+
+    // With cap=1 and a 2-join query: count > cap → skip → plan equals disabled plan.
+    String disabledPlan;
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(PESSIMAL_JOIN_SQL, false))) {
+      disabledPlan = RelOptUtil.toString(compiled.getRelNode());
+    }
+    String cappedPlan;
+    try (QueryEnvironment.CompiledQuery compiled =
+        env.compile(withOptions(PESSIMAL_JOIN_SQL, true, 1))) {
+      cappedPlan = RelOptUtil.toString(compiled.getRelNode());
+    }
+    assertEquals(cappedPlan, disabledPlan,
+        "A plan whose join count exceeds the cap must be returned unchanged (TOO_MANY_JOINS)");
+  }
+
+  /**
+   * When the join count equals the cap the phase must still run and produce a different (reordered)
+   * plan than the disabled baseline.
+   */
+  @Test
+  public void testAtCapBoundaryReorderRuns() {
+    QueryEnvironment env = buildEnv(statsProvider());
+
+    // PESSIMAL_JOIN_SQL has exactly 2 joins; cap=2 means count == cap → phase runs.
+    String disabledPlan;
+    try (QueryEnvironment.CompiledQuery compiled = env.compile(withOption(PESSIMAL_JOIN_SQL, false))) {
+      disabledPlan = RelOptUtil.toString(compiled.getRelNode());
+    }
+    String atCapPlan;
+    try (QueryEnvironment.CompiledQuery compiled =
+        env.compile(withOptions(PESSIMAL_JOIN_SQL, true, 2))) {
+      atCapPlan = RelOptUtil.toString(compiled.getRelNode());
+    }
+    assertNotEquals(atCapPlan, disabledPlan,
+        "A plan whose join count equals the cap must still be reordered");
+  }
+
+  /**
+   * EXPLAIN output for the 3-table skewed-stats query must differ between the enabled and disabled
+   * reorder cases, and the disabled plan must list the tables in the original syntactic order
+   * (fact, dim1, dim2).
+   */
+  @Test
+  public void testExplainSurfacesDiffersBetweenEnabledAndDisabled() {
+    QueryEnvironment env = buildEnv(statsProvider());
+
+    String explainSql = "EXPLAIN PLAN FOR " + PESSIMAL_JOIN_SQL;
+    String explainDisabled = explain(env, withOption(explainSql, false));
+    String explainEnabled = explain(env, withOption(explainSql, true));
+
+    assertNotEquals(explainEnabled, explainDisabled,
+        "EXPLAIN output must differ when join reorder is enabled vs disabled for the skewed-stats query");
+
+    // The disabled plan must preserve the syntactic join order: fact joined with dim1 before dim2.
+    int factPos = explainDisabled.indexOf(FACT);
+    int dim1Pos = explainDisabled.indexOf(DIM1);
+    int dim2Pos = explainDisabled.indexOf(DIM2);
+    assertTrue(factPos >= 0 && dim1Pos >= 0 && dim2Pos >= 0,
+        "Disabled plan must mention all three tables");
+    // In the original syntactic order dim1 appears before dim2 in the first join (closer to the root).
+    assertTrue(dim1Pos < dim2Pos,
+        "Disabled plan must list dim1 before dim2 (syntactic join order preserved);\nexplain:\n"
+            + explainDisabled);
+  }
+
+  /**
+   * The {@code useJoinReorder=true} query option (passed via SET in the SQL text) must enable the
+   * reorder phase for the query. This tests that the option is correctly threaded from the SQL
+   * SET syntax all the way through to the optimizer.
+   */
+  @Test
+  public void testQueryOptionPlumbingEnablesPhase() {
+    QueryEnvironment env = buildEnv(statsProvider());
+
+    // Baseline: reorder disabled via query option.
+    String baseline = compileToPlan(env, PESSIMAL_JOIN_SQL, false);
+
+    // Enabled via query option: the plan must differ from the baseline.
+    String reordered = compileToPlan(env, PESSIMAL_JOIN_SQL, true);
+
+    assertNotEquals(reordered, baseline,
+        "Setting useJoinReorder=true via query option must enable the reorder phase and change the plan");
   }
 
   // --------------------------------------------------------------------------

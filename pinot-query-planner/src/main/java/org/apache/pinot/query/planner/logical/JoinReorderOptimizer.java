@@ -61,14 +61,16 @@ import org.slf4j.LoggerFactory;
  * logical {@code HepPlanner}, and Calcite 1.42 offers no clean, supported utility to re-host an
  * arbitrary rel tree in a fresh cluster owned by a second planner. The Hep + {@code MultiJoin} path
  * is the documented, well-tested approach and keeps the cost signal (our row counts) intact. This
- * class is a facade ({@link #maybeReorder(RelNode)}) so the internal strategy can be swapped later
- * without touching callers.
+ * class is a facade ({@link #maybeReorder(RelNode, int)}) so the internal strategy can be swapped
+ * later without touching callers.
  *
  * <h3>Eligibility gates</h3>
  * <p>The phase is skipped (the input tree is returned unchanged) unless ALL of the following hold:
  * <ul>
  *   <li>The tree contains at least one {@link Join} (fast path: no join ⇒ nothing to do).</li>
  *   <li>There are at least two joins (a single join only swaps sides; v1 keeps the bar at two).</li>
+ *   <li>The join count does not exceed the configured {@code maxJoins} cap. Plans beyond the cap
+ *       skip the phase to bound planning time.</li>
  *   <li>Every {@link Join} in the tree is an {@link JoinRelType#INNER} join (v1 scope).</li>
  *   <li>No {@link Join} carries a Pinot {@code joinOptions} hint — a hint signals explicit user
  *       intent, so the whole phase is skipped in v1 (per-join veto is a later task).</li>
@@ -80,18 +82,57 @@ import org.slf4j.LoggerFactory;
  *       are the dangerous case, so ALL scans must be known; otherwise reorder is noise and skipped.</li>
  * </ul>
  *
+ * <h3>Skip-reason visibility</h3>
+ * <p>Each skip path is identified by a {@link SkipReason} value that is logged at DEBUG. This makes
+ * it straightforward to trace why a particular query was not reordered without enabling verbose
+ * logging in production.
+ *
+ * <h3>Wall-clock observability</h3>
+ * <p>The Hep + {@code LoptOptimizeJoinRule} strategy is a single, deterministic pass — it is not
+ * an exponential search — so a hard mid-flight timeout is not required. Instead, elapsed time is
+ * measured around the reorder call and a WARN is emitted when it exceeds
+ * {@link #SLOW_REORDER_WARN_THRESHOLD_MS} (100 ms). This is the canary that signals when a
+ * budget / interrupt mechanism becomes necessary.
+ *
  * <h3>Fallback / robustness</h3>
- * <p>{@link #maybeReorder(RelNode)} never throws: any unexpected error is caught, logged at WARN,
- * and the original (un-reordered) plan is returned. The reorder phase must never fail a query.
+ * <p>{@link #maybeReorder(RelNode, int)} never throws: any unexpected error is caught, logged at
+ * WARN, and the original (un-reordered) plan is returned. The reorder phase must never fail a query.
  *
  * <h3>Thread-safety</h3>
- * <p>Stateless aside from a static {@link Logger}. A new {@link HepPlanner} is created per invocation
- * on the planner thread, so the class is safe for concurrent use across queries.
+ * <p>Stateless aside from a static {@link Logger}. A new {@link HepPlanner} is created per
+ * invocation on the planner thread, so the class is safe for concurrent use across queries.
  */
 public final class JoinReorderOptimizer {
   private static final Logger LOGGER = LoggerFactory.getLogger(JoinReorderOptimizer.class);
 
+  /**
+   * If a reorder takes longer than this threshold (in milliseconds), a WARN is logged. The
+   * Hep + LoptOptimizeJoinRule strategy is a single deterministic pass, so this threshold is a
+   * canary rather than a hard limit: if it fires regularly, a proper budget/interrupt mechanism
+   * should be introduced.
+   */
+  static final long SLOW_REORDER_WARN_THRESHOLD_MS = 100L;
+
   private JoinReorderOptimizer() {
+  }
+
+  /**
+   * Reason why the join-reorder phase was skipped for a given plan. Logged at DEBUG on skip so
+   * that operators can trace non-obvious skip decisions without enabling verbose logging.
+   */
+  enum SkipReason {
+    /** Plan has fewer than 2 joins — nothing useful to reorder. */
+    NO_JOINS,
+    /** Plan contains a non-INNER join; v1 scope restricts to inner joins only. */
+    NON_INNER_JOIN,
+    /** A join carries an explicit hint; user intent takes precedence. */
+    HINTED_JOIN,
+    /** At least one table scan has no known row count; the cost signal is unreliable. */
+    UNKNOWN_ROW_COUNT,
+    /** Join count exceeds the configured cap; skipping to bound planning time. */
+    TOO_MANY_JOINS,
+    /** An unexpected error occurred; the original plan was returned as a fallback. */
+    ERROR
   }
 
   /**
@@ -101,17 +142,31 @@ public final class JoinReorderOptimizer {
    * @param logicalPlan the logical plan emitted by the preceding {@code HepPlanner} phases; must
    *                    belong to a cluster whose metadata provider supplies statistics-backed row
    *                    counts
+   * @param maxJoins    maximum number of joins allowed in the plan for the reorder phase to run;
+   *                    plans with more joins are returned unchanged
    * @return the (possibly) reordered plan, or {@code logicalPlan} when the phase is skipped or fails
    */
-  public static RelNode maybeReorder(RelNode logicalPlan) {
+  public static RelNode maybeReorder(RelNode logicalPlan, int maxJoins) {
     try {
-      if (!isEligible(logicalPlan)) {
+      GateVisitor visitor = new GateVisitor(maxJoins);
+      visitor.visit(logicalPlan);
+      SkipReason skipReason = skipReason(visitor);
+      if (skipReason != null) {
+        LOGGER.debug("Join reorder phase skipped: {}", skipReason);
         return logicalPlan;
       }
-      return reorder(logicalPlan);
+      long startMs = System.currentTimeMillis();
+      RelNode result = reorder(logicalPlan);
+      long elapsedMs = System.currentTimeMillis() - startMs;
+      if (elapsedMs > SLOW_REORDER_WARN_THRESHOLD_MS) {
+        LOGGER.warn("Join reorder phase took {}ms (join count: {}); consider a budget/interrupt "
+            + "mechanism if this fires regularly.", elapsedMs, visitor._joinCount);
+      }
+      return result;
     } catch (Throwable t) {
       // Robustness: a failed reorder must never fail the query. Fall back to the original plan.
-      LOGGER.warn("Join reorder phase failed; continuing with the un-reordered plan", t);
+      LOGGER.warn("Join reorder phase failed ({}: {}); continuing with the un-reordered plan",
+          SkipReason.ERROR, t.getMessage(), t);
       return logicalPlan;
     }
   }
@@ -140,35 +195,38 @@ public final class JoinReorderOptimizer {
   }
 
   /**
-   * Walks the plan once and evaluates every eligibility gate. See the class Javadoc for the full
-   * list. Returns {@code true} only when reordering is both safe and useful.
+   * Returns the {@link SkipReason} if the plan should be skipped, or {@code null} if all gates
+   * pass and the reorder phase should run, based on a {@link GateVisitor} that has already walked
+   * the plan.
    */
-  private static boolean isEligible(RelNode root) {
-    GateVisitor visitor = new GateVisitor();
-    visitor.visit(root);
+  private static SkipReason skipReason(GateVisitor visitor) {
     if (visitor._disqualified) {
-      return false;
+      return visitor._disqualifyReason;
     }
     if (visitor._joinCount < 2) {
-      // No join, or a single join (which would only swap sides): nothing useful to reorder in v1.
-      return false;
+      return SkipReason.NO_JOINS;
     }
     if (!visitor._sawTableScan || !visitor._allScansHaveKnownRowCount) {
-      // Without a known row count on every scan, the row-count signal is unreliable.
-      return false;
+      return SkipReason.UNKNOWN_ROW_COUNT;
     }
-    return true;
+    return null;
   }
 
   /**
    * Single-pass collector for the eligibility gates. Not thread-safe; a fresh instance is used per
-   * {@link #isEligible(RelNode)} call.
+   * {@link #skipReason} call.
    */
   private static final class GateVisitor {
+    private final int _maxJoins;
     private int _joinCount;
     private boolean _disqualified;
+    private SkipReason _disqualifyReason;
     private boolean _sawTableScan;
     private boolean _allScansHaveKnownRowCount = true;
+
+    GateVisitor(int maxJoins) {
+      _maxJoins = maxJoins;
+    }
 
     private void visit(RelNode node) {
       if (_disqualified) {
@@ -177,14 +235,21 @@ public final class JoinReorderOptimizer {
       if (node instanceof Join) {
         Join join = (Join) node;
         _joinCount++;
+        if (_joinCount > _maxJoins) {
+          _disqualified = true;
+          _disqualifyReason = SkipReason.TOO_MANY_JOINS;
+          return;
+        }
         if (join.getJoinType() != JoinRelType.INNER) {
           // v1 scope: any non-inner join in the tree disqualifies the whole phase.
           _disqualified = true;
+          _disqualifyReason = SkipReason.NON_INNER_JOIN;
           return;
         }
         if (PinotHintOptions.JoinHintOptions.getJoinHintOptions(join) != null) {
           // A join hint signals explicit user intent; skip the whole phase in v1.
           _disqualified = true;
+          _disqualifyReason = SkipReason.HINTED_JOIN;
           return;
         }
       } else if (node instanceof TableScan) {
