@@ -81,6 +81,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     File file = new File(_tempDir, "fixedInt_" + compressionType.name());
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, compressionType, NUM_DOCS, DOCS_PER_CHUNK, Integer.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < NUM_DOCS; i++) {
         writer.putInt(i);
       }
@@ -97,6 +98,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     File file = new File(_tempDir, "fixedLong_" + compressionType.name());
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, compressionType, NUM_DOCS, DOCS_PER_CHUNK, Long.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < NUM_DOCS; i++) {
         writer.putLong(i * 1000L);
       }
@@ -112,6 +114,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     File file = new File(_tempDir, "fixedDouble_" + compressionType.name());
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, compressionType, NUM_DOCS, DOCS_PER_CHUNK, Double.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < NUM_DOCS; i++) {
         writer.putDouble(i * 0.5);
       }
@@ -134,6 +137,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
 
     try (VarByteChunkForwardIndexWriterV4 writer =
         new VarByteChunkForwardIndexWriterV4(file, compressionType, 1024)) {
+      writer.setTrackUncompressedSize(true);
       for (String value : values) {
         writer.putString(value);
       }
@@ -160,6 +164,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
       File file = new File(_tempDir, "consistency_" + types[t].name());
       try (FixedByteChunkForwardIndexWriter writer =
           new FixedByteChunkForwardIndexWriter(file, types[t], NUM_DOCS, DOCS_PER_CHUNK, Integer.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
         for (int i = 0; i < NUM_DOCS; i++) {
           writer.putInt(i * 7);
         }
@@ -191,6 +196,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
       File file = new File(_tempDir, "varByteConsistency_" + types[t].name());
       try (VarByteChunkForwardIndexWriterV4 writer =
           new VarByteChunkForwardIndexWriterV4(file, types[t], 1024)) {
+      writer.setTrackUncompressedSize(true);
         for (String value : values) {
           writer.putString(value);
         }
@@ -212,6 +218,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.PASS_THROUGH, NUM_DOCS,
             DOCS_PER_CHUNK, Integer.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < NUM_DOCS; i++) {
         writer.putInt(i);
       }
@@ -230,6 +237,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     File file = new File(_tempDir, "empty");
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, 0, DOCS_PER_CHUNK, Integer.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       assertEquals(writer.getUncompressedSize(), 0, "Empty writer should have 0 uncompressed size");
     }
   }
@@ -242,6 +250,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     File file = new File(_tempDir, "singleDoc");
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, 1, 1, Integer.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       writer.putInt(42);
       assertEquals(writer.getUncompressedSize(), Integer.BYTES,
           "Single INT doc should have uncompressed size = 4");
@@ -258,6 +267,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     try (FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, totalDocs,
             docsPerChunk, Integer.BYTES, 4)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < totalDocs; i++) {
         writer.putInt(i);
         // After each full chunk, verify accumulated size
@@ -277,6 +287,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     File file = new File(_tempDir, "varByteMV");
     try (VarByteChunkForwardIndexWriterV4 writer =
         new VarByteChunkForwardIndexWriterV4(file, ChunkCompressionType.LZ4, 4096)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < 100; i++) {
         String[] mvValues = {"value_" + i + "_a", "value_" + i + "_b", "value_" + i + "_c"};
         writer.putStringMV(mvValues);
@@ -300,6 +311,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
     FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, totalDocs,
             requestedDocsPerChunk, Integer.BYTES, 4);
+    writer.setTrackUncompressedSize(true);
     for (int i = 0; i < totalDocs; i++) {
       writer.putInt(i);
     }

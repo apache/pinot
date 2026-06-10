@@ -82,7 +82,7 @@ public class CLPForwardIndexCreatorV2StatsTest {
   }
 
   /**
-   * Verifies that with default tracking enabled on a {@link FixedByteChunkForwardIndexWriter},
+   * Verifies that with tracking explicitly enabled on a {@link FixedByteChunkForwardIndexWriter},
    * {@code getUncompressedSize()} returns a value greater than 0 after writing data.
    */
   @Test
@@ -91,11 +91,12 @@ public class CLPForwardIndexCreatorV2StatsTest {
     File outputFile = new File(_tempDir, "fixed_byte_tracking_enabled.raw");
     try (FixedByteChunkForwardIndexWriter writer = new FixedByteChunkForwardIndexWriter(
         outputFile, COMPRESSION_TYPE, TOTAL_DOCS, NUM_DOCS_PER_CHUNK, SIZE_OF_INT_ENTRY, WRITER_VERSION)) {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < NUM_ENTRIES_TO_WRITE; i++) {
         writer.putInt(i);
       }
       assertTrue(writer.getUncompressedSize() > 0,
-          "Uncompressed size should be greater than 0 when tracking is enabled (default)");
+          "Uncompressed size should be greater than 0 when tracking is enabled");
     }
   }
 
@@ -126,7 +127,7 @@ public class CLPForwardIndexCreatorV2StatsTest {
   }
 
   /**
-   * Verifies that with default tracking enabled on a {@link VarByteChunkForwardIndexWriterV5},
+   * Verifies that with tracking explicitly enabled on a {@link VarByteChunkForwardIndexWriterV5},
    * {@code getUncompressedSize()} returns a value greater than 0 after writing and closing.
    *
    * <p>The VarByte V4/V5 writer only records uncompressed size when a chunk is flushed
@@ -140,6 +141,7 @@ public class CLPForwardIndexCreatorV2StatsTest {
     VarByteChunkForwardIndexWriterV5 writer = new VarByteChunkForwardIndexWriterV5(
         outputFile, COMPRESSION_TYPE, VAR_BYTE_CHUNK_SIZE);
     try {
+      writer.setTrackUncompressedSize(true);
       for (int i = 0; i < NUM_ENTRIES_TO_WRITE; i++) {
         writer.putString("test-string-value-" + i);
       }
@@ -147,6 +149,6 @@ public class CLPForwardIndexCreatorV2StatsTest {
       writer.close();
     }
     assertTrue(writer.getUncompressedSize() > 0,
-        "Uncompressed size should be greater than 0 when tracking is enabled (default)");
+        "Uncompressed size should be greater than 0 when tracking is enabled");
   }
 }
