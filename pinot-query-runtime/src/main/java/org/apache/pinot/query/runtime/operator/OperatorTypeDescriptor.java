@@ -48,6 +48,14 @@ public interface OperatorTypeDescriptor {
    * descriptors loaded in the same JVM.
    *
    * <p>Built-in types use ids 0–255. Plugin types must use ids &ge; {@value #PLUGIN_ID_FLOOR}.
+   *
+   * <p><b>Plugin ids and the legacy format:</b> the legacy binary stat format (mailbox EOS path,
+   * {@code MultiStageQueryStats.StageStats#serialize}) encodes this id as a single unsigned byte, so it can only
+   * represent ids 0–255. Plugin-defined operator types therefore can only report stats in stream-mode stats
+   * reporting ({@code SubmitWithStream}), whose proto carries the id as an int32. The legacy serializer rejects
+   * out-of-range ids with an {@code IllegalStateException} rather than truncating them; the mailbox send path
+   * catches that and degrades to sending empty stats with a warning, so a plugin operator running in legacy mode
+   * keeps its queries working but loses its stats (and logs one warning per EOS).
    */
   int getId();
 

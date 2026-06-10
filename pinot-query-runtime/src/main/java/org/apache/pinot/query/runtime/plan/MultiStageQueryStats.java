@@ -517,7 +517,17 @@ public class MultiStageQueryStats {
       // TODO: we can serialize with short or variable size
       output.writeInt(_operatorTypes.size());
       for (int i = 0; i < _operatorTypes.size(); i++) {
-        output.writeByte(_operatorTypes.get(i).getId());
+        OperatorTypeDescriptor type = _operatorTypes.get(i);
+        int id = type.getId();
+        // This legacy binary format encodes the operator type id as a single unsigned byte, so it cannot represent
+        // plugin-defined operator types (ids >= OperatorTypeDescriptor.PLUGIN_ID_FLOOR). Fail loudly instead of
+        // letting writeByte truncate the id and have the receiver silently decode the wrong built-in type.
+        if (id < 0 || id > 0xFF) {
+          throw new IllegalStateException("Operator type " + type.name() + " has id " + id + ", which does not fit "
+              + "in the single-byte legacy stat format. Plugin-defined operator types can only report stats via "
+              + "stream-mode stats reporting (SubmitWithStream), which carries the id as an int32.");
+        }
+        output.writeByte(id);
         StatMap<?> statMap = _operatorStats.get(i);
         statMap.serialize(output);
       }
@@ -599,7 +609,9 @@ public class MultiStageQueryStats {
               + ". Deserialized stats: " + deserialized);
         }
         for (int i = 0; i < numOperators; i++) {
-          int typeId = input.readByte();
+          // Unsigned read: the writer emits the low 8 bits of the id, so a signed readByte would map ids 128-255 to
+          // negative values and never match.
+          int typeId = input.readByte() & 0xFF;
           if (typeId != _operatorTypes.get(i).getId()) {
             throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
                 + " operator " + _operatorTypes.get(i) + " at index " + i + ", got id " + typeId);
@@ -625,7 +637,9 @@ public class MultiStageQueryStats {
 
       try {
         for (int i = 0; i < numOperators; i++) {
-          int typeId = input.readByte();
+          // Unsigned read: the writer emits the low 8 bits of the id, so a signed readByte would map ids 128-255 to
+          // negative values and fail the registry look-up.
+          int typeId = input.readByte() & 0xFF;
           OperatorTypeDescriptor type = OperatorTypeRegistry.fromId(typeId);
           if (type == null) {
             throw new IllegalStateException(

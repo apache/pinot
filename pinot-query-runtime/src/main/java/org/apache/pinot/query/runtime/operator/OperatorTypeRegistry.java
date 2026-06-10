@@ -45,6 +45,15 @@ public final class OperatorTypeRegistry {
       map.put(builtIn.getId(), builtIn);
     }
     for (OperatorTypeDescriptor plugin : ServiceLoader.load(OperatorTypeDescriptor.class)) {
+      // Enforce the documented id contract: ids below PLUGIN_ID_FLOOR are reserved for built-ins (current and
+      // future). Without this check a plugin could squat on a reserved id and work until a built-in claims it —
+      // and ids that fit in the legacy single-byte stat format would be silently emitted there, defeating the
+      // plugin-ids-are-stream-mode-only guarantee (see OperatorTypeDescriptor#getId).
+      if (plugin.getId() < OperatorTypeDescriptor.PLUGIN_ID_FLOOR) {
+        throw new IllegalStateException("Plugin operator type " + plugin.name() + " uses id " + plugin.getId()
+            + ", which is reserved for built-in types. Plugin ids must be >= "
+            + OperatorTypeDescriptor.PLUGIN_ID_FLOOR);
+      }
       OperatorTypeDescriptor prev = map.put(plugin.getId(), plugin);
       if (prev != null) {
         throw new IllegalStateException(
