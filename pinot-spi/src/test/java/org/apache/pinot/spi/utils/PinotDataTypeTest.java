@@ -35,6 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.utils.PinotDataType.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -230,6 +231,14 @@ public class PinotDataTypeTest {
     assertEquals(UUID.convert(uuidBytes, BYTES), uuid);
     assertEquals(STRING.convert(uuid, UUID), UUID_VALUE);
     assertEquals(BYTES.convert(uuid, UUID), uuidBytes);
+    // Single-element collection/object/array sources carry a UUID (FunctionInvoker argument resolution and MV
+    // sources feeding SV UUID columns)
+    assertEquals(UUID.convert(Arrays.asList(UUID_VALUE), COLLECTION), uuid);
+    assertEquals(UUID.convert(UUID_VALUE, OBJECT), uuid);
+    assertEquals(UUID.convert(new Object[]{UUID_VALUE}, OBJECT_ARRAY), uuid);
+    // Sources with no UUID interpretation fail with an explicit message
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1, INTEGER));
+    assertThrows(UnsupportedOperationException.class, () -> UUID.convert(1.0, DOUBLE));
   }
 
   @Test

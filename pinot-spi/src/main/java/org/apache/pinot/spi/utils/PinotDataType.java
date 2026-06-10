@@ -1031,12 +1031,14 @@ public enum PinotDataType {
         case BYTES:
           return UuidUtils.toUUID(value);
         case OBJECT:
+        case COLLECTION:
         case UUID_ARRAY:
         case BYTES_ARRAY:
         case STRING_ARRAY:
         case OBJECT_ARRAY:
-          // OBJECT and single-element arrays can carry a UUID (e.g., scalar-function results or an MV source
-          // feeding an SV UUID column); these types have meaningful toUUID implementations.
+          // OBJECT, collections and single-element arrays can carry a UUID (e.g., scalar-function arguments
+          // resolved by FunctionInvoker, or an MV source feeding an SV UUID column); these types have meaningful
+          // toUUID implementations.
           return sourceType.toUUID(value);
         default:
           // Numeric and other types have no meaningful UUID interpretation; fail with an explicit message instead

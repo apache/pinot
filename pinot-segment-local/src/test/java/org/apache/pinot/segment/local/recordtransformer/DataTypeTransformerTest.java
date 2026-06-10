@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -275,5 +276,16 @@ public class DataTypeTransformerTest {
     disabledUpsertUppercaseRow.putValue(uuidCol, uppercaseUuid);
     disabledUpsertUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
     disabledUpsertTransformer.transform(disabledUpsertUppercaseRow); // must not throw
+
+    // A present-but-disabled dedup config must not enforce the canonical-PK restriction either
+    TableConfig disabledDedupTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testDisabledDedupUuid")
+        .setDedupConfig(new DedupConfig(false, null))
+        .build();
+    DataTypeTransformer disabledDedupTransformer = new DataTypeTransformer(disabledDedupTableConfig, schema);
+    GenericRow disabledDedupUppercaseRow = new GenericRow();
+    disabledDedupUppercaseRow.putValue(uuidCol, uppercaseUuid);
+    disabledDedupUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
+    disabledDedupTransformer.transform(disabledDedupUppercaseRow); // must not throw
   }
 }
