@@ -567,8 +567,10 @@ public class QueryRunner {
    *       with no benefit.</li>
    * </ul>
    * Stats on the error path are now collected out-of-band via the {@code SubmitWithStream} stream in stream mode:
-   * servers push {@code OpChainComplete} messages independently and the broker drains whatever arrives within the
-   * configured timeout window.
+   * servers push {@code OpChainComplete} messages independently and the broker drains whatever arrived before the
+   * cancel within the configured timeout window. Note that a cancel received over the stream promptly completes the
+   * stream ({@code QueryServer.handleCancel}), so stats from opchains finishing <em>after</em> the cancel are not
+   * delivered — error-path coverage is whatever was already reported or in flight when the cancel landed.
    */
   public void cancel(long requestId) {
     _opChainScheduler.cancel(requestId);

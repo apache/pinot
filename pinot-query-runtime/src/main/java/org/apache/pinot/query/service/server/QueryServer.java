@@ -459,11 +459,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// with a {@code submit_ack} as the first message and (in subsequent commits) per-opchain
   /// {@link Worker.OpChainComplete} messages followed by a final {@link Worker.ServerDone}.
   ///
-  /// This skeleton wires up the gRPC mechanics + plan submission via the existing submission path. It does NOT yet
-  /// emit OpChainComplete / ServerDone — those need a per-opchain completion hook on
-  /// {@link org.apache.pinot.query.runtime.executor.OpChainSchedulerService}, which is layered on next.
-  /// Cancel still routes through the existing unary {@link #cancel(Worker.CancelRequest, StreamObserver)} RPC; broker
-  /// stream-close also triggers a cancel here.
+  /// Wires up the gRPC mechanics + plan submission via the existing submission path. A per-opchain completion
+  /// listener registered on {@link org.apache.pinot.query.runtime.executor.OpChainSchedulerService} emits one
+  /// {@link Worker.OpChainComplete} per finished opchain and {@link Worker.ServerDone} once all have reported.
+  /// Cancel is accepted both via the in-stream {@code BrokerToServer.cancel} message and via the legacy unary
+  /// {@link #cancel(Worker.CancelRequest, StreamObserver)} RPC; broker stream-close also triggers a cancel here.
   @Override
   public StreamObserver<Worker.BrokerToServer> submitWithStream(
       StreamObserver<Worker.ServerToBroker> responseObserver) {
@@ -511,6 +511,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     /// waits for this future via {@code thenRun} instead of calling {@link #sendDoneAndComplete} immediately,
     /// ensuring the broker always receives the {@code submit_ack} before {@code ServerDone}.
     private final CompletableFuture<Void> _ackSentFuture = new CompletableFuture<>();
+    /// True once a {@code submit_ack} has been emitted on the response stream. Unlike {@link #_ackSentFuture}
+    /// (completed outside the lock, after the fact), this flag is set under {@link #_streamLock} at the moment of
+    /// emission, so {@link #sendErrorAndComplete} can reliably decide whether an error may still be delivered as
+    /// the (single allowed) submit_ack or would be a duplicate the broker ignores. Guarded by {@link #_streamLock}.
+    private boolean _ackEmitted;
 
     SubmitWithStreamObserver(StreamObserver<Worker.ServerToBroker> responseObserver) {
       _responseObserver = responseObserver;
@@ -585,6 +590,16 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         opChainCount += stagePlan.getStageMetadata().getWorkerMetadataCount();
       }
       final int expected = opChainCount;
+      // Parse the timeout BEFORE registering the completion listener: a missing/garbled value throws, and throwing
+      // after registration would leak the listener entry (nothing would unregister it until the stream deadline).
+      long timeoutMs;
+      try {
+        timeoutMs = Long.parseLong(reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
+      } catch (Exception e) {
+        sendErrorAndComplete("Missing or invalid " + QueryOptionKey.TIMEOUT_MS + " in request metadata: "
+            + reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
+        return;
+      }
       // Must set _expectedOpChains BEFORE registerOpChainCompletionListener. The AtomicInteger.set is a volatile
       // write; ConcurrentHashMap.put (inside registerOpChainCompletionListener) provides a subsequent happens-before
       // edge, so any thread that reads via ConcurrentHashMap.get (the listener callback) is guaranteed to observe
@@ -597,27 +612,32 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         _queryRunner.registerOpChainCompletionListener(_requestId, this::onOpChainComplete);
       }
 
-      long timeoutMs = Long.parseLong(reqMetadata.get(QueryOptionKey.TIMEOUT_MS));
       CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
           .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
           .whenComplete((result, error) -> {
-            if (error != null) {
-              LOGGER.error("Caught exception while submitting request: {}", _requestId, error);
-              sendSubmitAck(buildErrorResponse("Caught exception while submitting request: " + error.getMessage()));
-              // Submission failed — no opchains will run, so emit ServerDone immediately and clean up.
-              cleanupListener();
-              sendDoneAndComplete();
-            } else {
-              sendSubmitAck(buildOkResponse());
-              // If for some reason expected was 0 (empty plan), close the stream now.
-              if (expected == 0) {
+            try {
+              if (error != null) {
+                LOGGER.error("Caught exception while submitting request: {}", _requestId, error);
+                sendSubmitAck(buildErrorResponse("Caught exception while submitting request: " + error.getMessage()));
+                // Submission failed — no opchains will run, so emit ServerDone immediately and clean up.
                 cleanupListener();
                 sendDoneAndComplete();
+              } else {
+                sendSubmitAck(buildOkResponse());
+                // If for some reason expected was 0 (empty plan), close the stream now.
+                if (expected == 0) {
+                  cleanupListener();
+                  sendDoneAndComplete();
+                }
               }
+            } finally {
+              // Signal that the ack has been sent (regardless of success/error) — in a finally so that an onNext
+              // throwing inside sendSubmitAck (e.g. the broker already cancelled the call) cannot leave the future
+              // incomplete, which would permanently block every thenRun hook gated on it (ServerDone emission in
+              // onOpChainComplete, prompt stream close in handleCancel). Any onOpChainComplete invocation that
+              // raced ahead of this whenComplete callback is unblocked via thenRun.
+              _ackSentFuture.complete(null);
             }
-            // Signal that the ack has been sent (regardless of success/error). Any onOpChainComplete invocation
-            // that raced ahead of this whenComplete callback will be unblocked via thenRun.
-            _ackSentFuture.complete(null);
           });
     }
 
@@ -743,10 +763,19 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
     private void sendSubmitAck(Worker.QueryResponse ack) {
       synchronized (_streamLock) {
-        if (_completed.get()) {
+        if (_completed.get() || _ackEmitted) {
           return;
         }
-        _responseObserver.onNext(Worker.ServerToBroker.newBuilder().setSubmitAck(ack).build());
+        // Mark before sending: even if onNext throws (broker already cancelled the call), we must not retry the
+        // ack later — and sendErrorAndComplete must not emit an error styled as a submit_ack after this point.
+        _ackEmitted = true;
+        try {
+          _responseObserver.onNext(Worker.ServerToBroker.newBuilder().setSubmitAck(ack).build());
+        } catch (Throwable t) {
+          // Transport-level failure; the stream is gone and gRPC will deliver onError to this observer, which
+          // cancels the query. Swallow so the caller's cleanup (listener removal, ServerDone attempt) still runs.
+          LOGGER.warn("Failed to send submit ack for request {}", _requestId, t);
+        }
       }
     }
 
@@ -772,12 +801,29 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
 
     private void sendErrorAndComplete(String errorMsg) {
+      LOGGER.warn("Failing SubmitWithStream stream for request {}: {}", _requestId, errorMsg);
       synchronized (_streamLock) {
         if (_completed.compareAndSet(false, true)) {
-          _responseObserver.onNext(Worker.ServerToBroker.newBuilder()
-              .setSubmitAck(buildErrorResponse(errorMsg))
-              .build());
-          _responseObserver.onCompleted();
+          try {
+            // Only emit the error as a submit_ack if the real ack has not been sent yet (checked via _ackEmitted,
+            // set under this same lock at the moment of emission). The broker treats the first submit_ack as
+            // authoritative and logs any later one as a duplicate, so a second ack would just bury this error.
+            if (!_ackEmitted) {
+              _ackEmitted = true;
+              _responseObserver.onNext(Worker.ServerToBroker.newBuilder()
+                  .setSubmitAck(buildErrorResponse(errorMsg))
+                  .build());
+            }
+          } catch (Throwable t) {
+            LOGGER.warn("Failed to send error ack for request {}", _requestId, t);
+          }
+          // Always attempt onCompleted, even if the error send failed, so the stream is half-closed on our side
+          // (mirrors sendDoneAndComplete). _completed is already set, so this runs at most once.
+          try {
+            _responseObserver.onCompleted();
+          } catch (Throwable t) {
+            LOGGER.warn("Failed to complete response stream for request {}", _requestId, t);
+          }
         }
       }
     }
