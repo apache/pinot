@@ -62,6 +62,7 @@ public class ColumnMinMaxValueGeneratorTest {
       new File(FileUtils.getTempDirectory(), ColumnMinMaxValueGeneratorTest.class.getSimpleName());
   private static final String SEGMENT_NAME = "testSegment";
   private static final String BYTES_COLUMN = "bytesCol";
+  private static final String BYTES_MV_COLUMN = "bytesMvCol";
   private static final String UUID_COLUMN = "uuidCol";
 
   // Ordered ascending by unsigned byte-wise comparison
@@ -78,10 +79,11 @@ public class ColumnMinMaxValueGeneratorTest {
       throws Exception {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(BYTES_COLUMN, DataType.BYTES)
+        .addMultiValueDimension(BYTES_MV_COLUMN, DataType.BYTES)
         .addSingleValueDimension(UUID_COLUMN, DataType.UUID)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
-        .setNoDictionaryColumns(List.of(BYTES_COLUMN, UUID_COLUMN))
+        .setNoDictionaryColumns(List.of(BYTES_COLUMN, BYTES_MV_COLUMN, UUID_COLUMN))
         .build();
 
     File indexDir = buildSegment(tableConfig, schema);
@@ -113,6 +115,14 @@ public class ColumnMinMaxValueGeneratorTest {
         "UUID min must be the smallest canonical UUID");
     assertEquals(uuidMax, new ByteArray(UuidUtils.toBytes(UUID_LARGE)),
         "UUID max must be the largest canonical UUID");
+
+    // The raw-BYTES MV loop is a distinct code path sharing the comparator with the SV loop
+    Comparable<?> bytesMvMin = reloaded.getColumnMetadataFor(BYTES_MV_COLUMN).getMinValue();
+    Comparable<?> bytesMvMax = reloaded.getColumnMetadataFor(BYTES_MV_COLUMN).getMaxValue();
+    assertNotNull(bytesMvMin);
+    assertNotNull(bytesMvMax);
+    assertEquals(bytesMvMin, new ByteArray(BYTES_SMALL), "Raw MV BYTES min must be the smallest unsigned value");
+    assertEquals(bytesMvMax, new ByteArray(BYTES_LARGE), "Raw MV BYTES max must be the largest unsigned value");
   }
 
   private static File buildSegment(TableConfig tableConfig, Schema schema)
@@ -131,6 +141,8 @@ public class ColumnMinMaxValueGeneratorTest {
     }) {
       GenericRow row = new GenericRow();
       row.putValue(BYTES_COLUMN, values[0]);
+      // Each MV row carries two values so the inner per-value loop is exercised as well
+      row.putValue(BYTES_MV_COLUMN, new Object[]{values[0], BYTES_MID});
       row.putValue(UUID_COLUMN, values[1]);
       rows.add(row);
     }
