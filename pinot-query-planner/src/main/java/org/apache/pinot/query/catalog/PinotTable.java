@@ -19,6 +19,7 @@
 package org.apache.pinot.query.catalog;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.calcite.DataContext;
 import org.apache.calcite.linq4j.Enumerable;
@@ -34,6 +35,7 @@ import org.apache.pinot.query.planner.spi.stats.StatConfidence;
 import org.apache.pinot.query.planner.spi.stats.TableStatistics;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.Validator;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -57,6 +59,8 @@ public class PinotTable extends AbstractTable implements ScannableTable {
   private boolean _excludeVirtualColumns = false;
   private final String _tableName;
   private final PinotStatisticsProvider _statisticsProvider;
+  @Nullable
+  private final String _timeColumnName;
 
   public PinotTable(Schema schema) {
     this(schema, false);
@@ -68,7 +72,15 @@ public class PinotTable extends AbstractTable implements ScannableTable {
    * should not participate in join condition matching.
    */
   public PinotTable(Schema schema, boolean excludeVirtualColumns) {
-    this(schema, excludeVirtualColumns, null, NoOpStatisticsProvider.INSTANCE);
+    this(schema, excludeVirtualColumns, null, NoOpStatisticsProvider.INSTANCE, null);
+  }
+
+  /**
+   * Constructor without a time column; segment time boundaries cannot be used for selectivity.
+   */
+  public PinotTable(Schema schema, boolean excludeVirtualColumns, @Nullable String tableName,
+      PinotStatisticsProvider statisticsProvider) {
+    this(schema, excludeVirtualColumns, tableName, statisticsProvider, null);
   }
 
   /**
@@ -79,13 +91,17 @@ public class PinotTable extends AbstractTable implements ScannableTable {
    * @param tableName            the resolved logical table name passed to the statistics provider;
    *                             may be {@code null} when statistics are not needed
    * @param statisticsProvider   the provider that supplies row-count statistics to the planner
+   * @param timeColumnName       the table's primary time column (from the table config validation
+   *                             config) that segment time boundaries are organized by; may be
+   *                             {@code null} when unknown
    */
   public PinotTable(Schema schema, boolean excludeVirtualColumns, @Nullable String tableName,
-      PinotStatisticsProvider statisticsProvider) {
+      PinotStatisticsProvider statisticsProvider, @Nullable String timeColumnName) {
     _schema = schema;
     _excludeVirtualColumns = excludeVirtualColumns;
     _tableName = tableName;
     _statisticsProvider = statisticsProvider;
+    _timeColumnName = timeColumnName;
   }
 
   /**
@@ -132,6 +148,52 @@ public class PinotTable extends AbstractTable implements ScannableTable {
     } else {
       return typeFactory.createRelDataTypeFromSchema(_schema);
     }
+  }
+
+  /**
+   * Returns the Pinot schema backing this table.
+   */
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  /**
+   * Returns the logical table name passed to the statistics provider, or {@code null} when
+   * statistics are not needed.
+   */
+  @Nullable
+  public String getTableName() {
+    return _tableName;
+  }
+
+  /**
+   * Returns the statistics provider bound to this table.
+   */
+  public PinotStatisticsProvider getStatisticsProvider() {
+    return _statisticsProvider;
+  }
+
+  /**
+   * Returns the name of this table's PRIMARY time column (the one segment time boundaries are
+   * organized by, per the table config) if and only if it stores values in epoch milliseconds;
+   * {@code null} otherwise.
+   *
+   * <p>Time-range selectivity estimates compare predicate literals against segment time
+   * boundaries, which are derived from the primary time column — so only that column qualifies,
+   * and only when its unit is {@link TimeUnit#MILLISECONDS} (other units would need a conversion
+   * that is not implemented yet).
+   */
+  @Nullable
+  public String getMillisTimeColumnName() {
+    if (_timeColumnName == null) {
+      return null;
+    }
+    DateTimeFieldSpec spec = _schema.getSpecForTimeColumn(_timeColumnName);
+    if (spec == null) {
+      return null;
+    }
+    TimeUnit unit = spec.getFormatSpec().getColumnUnit();
+    return unit == TimeUnit.MILLISECONDS ? _timeColumnName : null;
   }
 
   @Override

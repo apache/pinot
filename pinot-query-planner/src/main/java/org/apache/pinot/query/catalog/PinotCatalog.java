@@ -35,6 +35,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.query.planner.spi.stats.NoOpStatisticsProvider;
 import org.apache.pinot.query.planner.spi.stats.PinotStatisticsProvider;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -109,7 +110,30 @@ public class PinotCatalog implements Schema {
       return null;
     }
 
-    return new PinotTable(schema, _excludeVirtualColumns, tableName, _statisticsProvider);
+    return new PinotTable(schema, _excludeVirtualColumns, tableName, _statisticsProvider,
+        resolveTimeColumnName(tableName));
+  }
+
+  /**
+   * Resolves the table's primary time column from its table config (segment time boundaries are
+   * organized by this column). For hybrid tables the OFFLINE and REALTIME configs share the time
+   * column; the first available config wins.
+   */
+  @Nullable
+  private String resolveTimeColumnName(String tableName) {
+    for (String tableNameWithType : new String[] {
+        TableNameBuilder.OFFLINE.tableNameWithType(tableName),
+        TableNameBuilder.REALTIME.tableNameWithType(tableName)
+    }) {
+      TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+      if (tableConfig != null && tableConfig.getValidationConfig() != null) {
+        String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
+        if (timeColumnName != null) {
+          return timeColumnName;
+        }
+      }
+    }
+    return null;
   }
 
   /**

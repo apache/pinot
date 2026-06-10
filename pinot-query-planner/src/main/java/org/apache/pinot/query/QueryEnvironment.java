@@ -43,6 +43,7 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlExplain;
@@ -56,6 +57,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.metadata.PinotDefaultRelMetadataProvider;
 import org.apache.pinot.calcite.rel.rules.ImmutablePinotSortExchangeCopyRule;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -444,6 +446,12 @@ public class QueryEnvironment {
     try {
       RexBuilder rexBuilder = new RexBuilder(_typeFactory);
       RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
+      // Install the Pinot metadata provider so that selectivity estimates use statistics.
+      // PinotDefaultRelMetadataProvider.INSTANCE is a global singleton — Janino compiles
+      // handler classes only once regardless of how many QueryEnvironment instances exist.
+      cluster.setMetadataProvider(
+          JaninoRelMetadataProvider.of(PinotDefaultRelMetadataProvider.INSTANCE));
+      cluster.invalidateMetadataQuery();
       SqlToRelConverter converter =
           new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
               PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
