@@ -264,5 +264,16 @@ public class DataTypeTransformerTest {
     offlineUppercaseRow.putValue(uuidCol, uppercaseUuid);
     offlineUppercaseRow.putValue(nonPkUuidCol, uppercaseUuid);
     offlineTransformer.transform(offlineUppercaseRow); // must not throw
+
+    // A present-but-disabled upsert config (Mode.NONE) must not enforce the canonical-PK restriction
+    TableConfig disabledUpsertTableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName("testDisabledUpsertUuid")
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.NONE))
+        .build();
+    DataTypeTransformer disabledUpsertTransformer = new DataTypeTransformer(disabledUpsertTableConfig, schema);
+    GenericRow disabledUpsertUppercaseRow = new GenericRow();
+    disabledUpsertUppercaseRow.putValue(uuidCol, uppercaseUuid);
+    disabledUpsertUppercaseRow.putValue(nonPkUuidCol, canonicalUuid);
+    disabledUpsertTransformer.transform(disabledUpsertUppercaseRow); // must not throw
   }
 }

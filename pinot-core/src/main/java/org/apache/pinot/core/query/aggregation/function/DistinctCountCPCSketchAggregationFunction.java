@@ -41,6 +41,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -145,10 +146,10 @@ public class DistinctCountCPCSketchAggregationFunction
     // the sketch with the canonical UUID string so DISTINCTCOUNTCPC(uuidCol) matches
     // DISTINCTCOUNTCPC(CAST(uuidCol AS STRING)).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       CpcSketch cpcSketch = getCpcSketch(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        cpcSketch.update(uuidStringValues[i]);
+        cpcSketch.update(UuidUtils.toString(uuidBytesValues[i]));
       }
       getAccumulator(aggregationResultHolder).apply(cpcSketch);
       return;
@@ -227,11 +228,11 @@ public class DistinctCountCPCSketchAggregationFunction
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: update with canonical UUID strings (see aggregate() for rationale).
+    // UUID columns: update with canonical UUID strings converted from raw bytes (see aggregate() for rationale).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(uuidStringValues[i]);
+        getCpcSketch(groupByResultHolder, groupKeyArray[i]).update(UuidUtils.toString(uuidBytesValues[i]));
       }
       return;
     }
@@ -310,12 +311,13 @@ public class DistinctCountCPCSketchAggregationFunction
     DataType storedType = dataType.getStoredType();
     boolean singleValue = blockValSet.isSingleValue();
 
-    // UUID columns: update with canonical UUID strings (see aggregate() for rationale).
+    // UUID columns: update with canonical UUID strings converted from raw bytes (see aggregate() for rationale).
     if (dataType == DataType.UUID && singleValue) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
+        String canonical = UuidUtils.toString(uuidBytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {
-          getCpcSketch(groupByResultHolder, groupKey).update(uuidStringValues[i]);
+          getCpcSketch(groupByResultHolder, groupKey).update(canonical);
         }
       }
       return;

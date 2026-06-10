@@ -1030,8 +1030,19 @@ public enum PinotDataType {
           }
         case BYTES:
           return UuidUtils.toUUID(value);
-        default:
+        case OBJECT:
+        case UUID_ARRAY:
+        case BYTES_ARRAY:
+        case STRING_ARRAY:
+        case OBJECT_ARRAY:
+          // OBJECT and single-element arrays can carry a UUID (e.g., scalar-function results or an MV source
+          // feeding an SV UUID column); these types have meaningful toUUID implementations.
           return sourceType.toUUID(value);
+        default:
+          // Numeric and other types have no meaningful UUID interpretation; fail with an explicit message instead
+          // of the confusing "There is no single-value type ..." from the generic single-value fallback.
+          throw new UnsupportedOperationException(
+              "Cannot convert value from " + sourceType + " to UUID. Input value: " + value);
       }
     }
 

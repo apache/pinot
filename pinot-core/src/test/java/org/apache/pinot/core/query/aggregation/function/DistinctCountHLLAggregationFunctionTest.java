@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -80,9 +81,15 @@ public class DistinctCountHLLAggregationFunctionTest {
         "9c5e1f24-0b8e-4c9d-87f1-0aa64a3b9d12"
     };
 
+    // Stub the BYTES fetch (raw 16-byte values) — the production path converts bytes to canonical strings
+    // itself because ProjectionBlockValSet.getStringValuesSV() would render stored BYTES as bare hex.
+    byte[][] uuidBytes = new byte[uuidStrings.length][];
+    for (int i = 0; i < uuidStrings.length; i++) {
+      uuidBytes[i] = UuidUtils.toBytes(uuidStrings[i]);
+    }
     BlockValSet uuidBlockValSet = mock(BlockValSet.class);
     when(uuidBlockValSet.getValueType()).thenReturn(DataType.UUID);
-    when(uuidBlockValSet.getStringValuesSV()).thenReturn(uuidStrings);
+    when(uuidBlockValSet.getBytesValuesSV()).thenReturn(uuidBytes);
     when(uuidBlockValSet.isSingleValue()).thenReturn(true);
     when(uuidBlockValSet.getDictionary()).thenReturn(null);
 
@@ -126,7 +133,16 @@ public class DistinctCountHLLAggregationFunctionTest {
 
     BlockValSet blockValSet = mock(BlockValSet.class);
     when(blockValSet.getValueType()).thenReturn(valueType);
-    when(blockValSet.getStringValuesSV()).thenReturn(values);
+    if (valueType == DataType.UUID) {
+      // UUID path fetches raw bytes and converts to canonical form itself (projection string fetch returns hex)
+      byte[][] uuidBytes = new byte[values.length][];
+      for (int i = 0; i < values.length; i++) {
+        uuidBytes[i] = UuidUtils.toBytes(values[i]);
+      }
+      when(blockValSet.getBytesValuesSV()).thenReturn(uuidBytes);
+    } else {
+      when(blockValSet.getStringValuesSV()).thenReturn(values);
+    }
     when(blockValSet.isSingleValue()).thenReturn(true);
     when(blockValSet.getDictionary()).thenReturn(null);
 

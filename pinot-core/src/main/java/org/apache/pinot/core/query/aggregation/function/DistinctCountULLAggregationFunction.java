@@ -38,6 +38,7 @@ import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -88,10 +89,10 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     // UUID values are logical scalars (stored as 16-byte BYTES) — not serialized UltraLogLog state. Hash the
     // canonical UUID string so DISTINCTCOUNTULL(uuidCol) matches DISTINCTCOUNTULL(CAST(uuidCol AS STRING)).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       UltraLogLog ull = getULL(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        UltraLogLogUtils.hashObject(uuidStringValues[i]).ifPresent(ull::add);
+        UltraLogLogUtils.hashObject(UuidUtils.toString(uuidBytesValues[i])).ifPresent(ull::add);
       }
       return;
     }
@@ -171,12 +172,12 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: hash canonical UUID strings (see aggregate() for rationale).
+    // UUID columns: hash canonical UUID strings converted from raw bytes (see aggregate() for rationale).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
         UltraLogLog ull = getULL(groupByResultHolder, groupKeyArray[i]);
-        UltraLogLogUtils.hashObject(uuidStringValues[i]).ifPresent(ull::add);
+        UltraLogLogUtils.hashObject(UuidUtils.toString(uuidBytesValues[i])).ifPresent(ull::add);
       }
       return;
     }
@@ -262,13 +263,14 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
     DataType dataType = blockValSet.getValueType();
     DataType storedType = dataType.getStoredType();
 
-    // UUID columns: hash canonical UUID strings (see aggregate() for rationale).
+    // UUID columns: hash canonical UUID strings converted from raw bytes (see aggregate() for rationale).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
+        String canonical = UuidUtils.toString(uuidBytesValues[i]);
         for (int groupKey : groupKeysArray[i]) {
           UltraLogLog ull = getULL(groupByResultHolder, groupKey);
-          UltraLogLogUtils.hashObject(uuidStringValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(canonical).ifPresent(ull::add);
         }
       }
       return;

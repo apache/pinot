@@ -34,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -80,10 +81,10 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
     // hashCode of the canonical UUID string so DISTINCTCOUNTBITMAP(uuidCol) matches
     // DISTINCTCOUNTBITMAP(CAST(uuidCol AS STRING)).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       RoaringBitmap bitmap = getValueBitmap(aggregationResultHolder);
       for (int i = 0; i < length; i++) {
-        bitmap.add(uuidStringValues[i].hashCode());
+        bitmap.add(UuidUtils.toString(uuidBytesValues[i]).hashCode());
       }
       return;
     }
@@ -230,9 +231,10 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
     // UUID columns: add hashCode of canonical UUID string (see aggregate() for rationale).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        getValueBitmap(groupByResultHolder, groupKeyArray[i]).add(uuidStringValues[i].hashCode());
+        getValueBitmap(groupByResultHolder, groupKeyArray[i])
+            .add(UuidUtils.toString(uuidBytesValues[i]).hashCode());
       }
       return;
     }
@@ -382,9 +384,9 @@ public class DistinctCountBitmapAggregationFunction extends BaseSingleInputAggre
 
     // UUID columns: add hashCode of canonical UUID string (see aggregate() for rationale).
     if (dataType == DataType.UUID) {
-      String[] uuidStringValues = blockValSet.getStringValuesSV();
+      byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
       for (int i = 0; i < length; i++) {
-        int hash = uuidStringValues[i].hashCode();
+        int hash = UuidUtils.toString(uuidBytesValues[i]).hashCode();
         for (int groupKey : groupKeysArray[i]) {
           getValueBitmap(groupByResultHolder, groupKey).add(hash);
         }
