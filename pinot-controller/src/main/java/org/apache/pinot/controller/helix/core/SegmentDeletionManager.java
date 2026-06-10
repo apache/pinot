@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -252,7 +253,9 @@ public class SegmentDeletionManager {
   /// Removes the property-store znodes for the given segments
   /// Returns the set of segments that were successfully deleted.
   protected Set<String> deleteSegmentsFromPropertyStore(String tableName, List<String> segmentsToDelete) {
-    Set<String> deletedSegments = new HashSet<>(segmentsToDelete.size());
+    // Use a LinkedHashSet so deep-store deletion preserves the input order (deterministic) rather
+    // than HashSet bucket order, while keeping the Set semantics callers rely on.
+    Set<String> deletedSegments = new LinkedHashSet<>(segmentsToDelete.size());
     List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
     for (String segmentId : segmentsToDelete) {
       String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
