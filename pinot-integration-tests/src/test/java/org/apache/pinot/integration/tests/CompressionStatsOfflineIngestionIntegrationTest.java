@@ -203,7 +203,7 @@ public class CompressionStatsOfflineIngestionIntegrationTest extends BaseCluster
       throws Exception {
     // Call table size API with verbose=true (default) to get per-segment details
     String response = sendGetRequest(
-        controllerUrl("/tables/" + getTableName() + "/size?verbose=true"));
+        controllerUrl("/tables/" + getTableName() + "/size?verbose=true&includeColumnStats=true"));
     JsonNode tableSizeJson = JsonUtils.stringToJsonNode(response);
 
     JsonNode offlineSegments = tableSizeJson.get("offlineSegments");

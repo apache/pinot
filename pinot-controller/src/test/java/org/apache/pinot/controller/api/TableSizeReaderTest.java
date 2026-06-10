@@ -228,7 +228,7 @@ public class TableSizeReaderTest {
       throws InvalidConfigException {
     TableSizeReader reader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
-    assertNull(reader.getTableSizeDetails("mytable", 5000, true));
+    assertNull(reader.getTableSizeDetails("mytable", 5000, true, false));
   }
 
   private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
@@ -249,7 +249,7 @@ public class TableSizeReaderTest {
 
     TableSizeReader reader = new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix,
         _leadControllerManager);
-    return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true);
+    return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true, false);
   }
 
   private Map<String, List<String>> segmentToServers(final String... servers) {

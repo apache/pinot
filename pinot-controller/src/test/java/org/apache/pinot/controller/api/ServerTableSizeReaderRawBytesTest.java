@@ -107,7 +107,7 @@ public class ServerTableSizeReaderRawBytesTest {
     endpoints.put("server0", "http://localhost:" + PORT_WITH_STATS);
 
     Map<String, List<SegmentSizeInfo>> result =
-        reader.getSegmentSizeInfoFromServers(endpoints, "testTable", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "testTable", TIMEOUT_MSEC, true);
     assertEquals(result.size(), 1);
 
     List<SegmentSizeInfo> segments = result.get("server0");
@@ -144,7 +144,7 @@ public class ServerTableSizeReaderRawBytesTest {
     endpoints.put("server1", "http://localhost:" + PORT_WITHOUT_STATS);
 
     Map<String, List<SegmentSizeInfo>> result =
-        reader.getSegmentSizeInfoFromServers(endpoints, "testTable", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "testTable", TIMEOUT_MSEC, true);
     assertEquals(result.size(), 1);
 
     List<SegmentSizeInfo> segments = result.get("server1");
@@ -167,7 +167,7 @@ public class ServerTableSizeReaderRawBytesTest {
     endpoints.put("server_err", "http://localhost:" + PORT_ERROR);
 
     Map<String, List<SegmentSizeInfo>> result =
-        reader.getSegmentSizeInfoFromServers(endpoints, "testTable", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "testTable", TIMEOUT_MSEC, true);
     // Error server should be excluded
     assertTrue(result.containsKey("server0"));
     assertFalse(result.containsKey("server_err"));

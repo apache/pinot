@@ -105,7 +105,7 @@ public class ServerSegmentMetadataReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint);
+      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint, compressionStatsEnabled);
       serverUrls.add(serverUrl);
     }
 
@@ -573,11 +573,20 @@ public class ServerSegmentMetadataReader {
   }
 
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, @Nullable List<String> columns,
-      String endpoint) {
+      String endpoint, boolean includeColumnStats) {
     tableNameWithType = encode(tableNameWithType);
     String columnsParam = UrlBuilderUtils.generateColumnsParam(columns);
     String url = String.format("%s/tables/%s/metadata", endpoint, tableNameWithType);
-    return columnsParam != null ? url + "?" + columnsParam : url;
+    StringBuilder sb = new StringBuilder(url);
+    if (columnsParam != null) {
+      sb.append("?").append(columnsParam);
+      if (includeColumnStats) {
+        sb.append("&includeColumnStats=true");
+      }
+    } else if (includeColumnStats) {
+      sb.append("?includeColumnStats=true");
+    }
+    return sb.toString();
   }
 
   public String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName,

@@ -197,7 +197,7 @@ public class TableSizeReaderCompressionStatsTest {
 
     TableSizeReader reader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
-    return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true);
+    return reader.getTableSizeDetails(table, TIMEOUT_MSEC, true, true);
   }
 
   @Test
