@@ -19,6 +19,7 @@
 package org.apache.pinot.common.evaluator;
 
 import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.common.function.FunctionUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.PinotDataType;
@@ -28,6 +29,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 
@@ -41,6 +43,31 @@ public class InbuiltFunctionEvaluatorTest {
     checkBooleanLiteralExpression("False", 0);
     checkBooleanLiteralExpression("1", 1);
     checkBooleanLiteralExpression("0", 0);
+  }
+
+  @Test
+  public void testJsonPathParsesDocumentOncePerRecord() {
+    // A JSON-string column read by several jsonPath* transforms is parsed once and the parsed document is stashed on
+    // the record (GenericRow scratch), so subsequent extractions reuse it instead of re-parsing.
+    String message = "{\"a\": \"x\", \"b\": {\"c\": 2}}";
+    GenericRow row = new GenericRow();
+    row.putValue("message", message);
+    assertNull(row.getScratchValue(message));
+
+    assertEquals(new InbuiltFunctionEvaluator("jsonPathString(message, '$.a')").evaluate(row), "x");
+    Object cached = row.getScratchValue(message);
+    assertTrue(cached instanceof Map);
+
+    // subsequent extractions reuse the same parsed document and remain correct
+    assertEquals(new InbuiltFunctionEvaluator("jsonPathString(message, '$.b.c')").evaluate(row), "2");
+    assertEquals(new InbuiltFunctionEvaluator("jsonPathLong(message, '$.b.c')").evaluate(row), 2L);
+    assertSame(row.getScratchValue(message), cached);
+
+    // a non-JSON string column is passed through unchanged (no parse), and cached as itself
+    String plain = "INFO plain text log line";
+    row.putValue("msg", plain);
+    assertEquals(new InbuiltFunctionEvaluator("jsonPathString(msg, '$.level', 'def')").evaluate(row), "def");
+    assertSame(row.getScratchValue(plain), plain);
   }
 
   @Test

@@ -243,6 +243,31 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonPathString(parsed, "$.id", "def"), "abc");
   }
 
+  /**
+   * {@code parseDocOrSelf} parses a JSON object/array string into a reusable Map/List once, and returns the input
+   * unchanged for everything else (non-container/invalid string, scalar, already-parsed value, null) so it is
+   * behavior-preserving when fed to a downstream {@code jsonPath*} call.
+   */
+  @Test
+  public void testParseDocOrSelf() {
+    // Object/array strings -> reusable parsed container, navigable by jsonPath without re-parsing.
+    Object obj = JsonFunctions.parseDocOrSelf("{\"level\": \"info\", \"n\": 1}");
+    assertTrue(obj instanceof Map);
+    assertEquals(JsonFunctions.jsonPathString(obj, "$.level", "def"), "info");
+    assertTrue(JsonFunctions.parseDocOrSelf("[1, 2, 3]") instanceof List);
+
+    // Anything that is not a JSON container is returned unchanged (same instance), so behavior is preserved.
+    String plain = "INFO plain text";
+    assertSame(JsonFunctions.parseDocOrSelf(plain), plain);
+    String scalar = "12345";
+    assertSame(JsonFunctions.parseDocOrSelf(scalar), scalar);
+    String invalid = "{not valid";
+    assertSame(JsonFunctions.parseDocOrSelf(invalid), invalid);
+    assertNull(JsonFunctions.parseDocOrSelf(null));
+    Map<String, Object> alreadyParsed = Map.of("a", "b");
+    assertSame(JsonFunctions.parseDocOrSelf(alreadyParsed), alreadyParsed);
+  }
+
   @Test
   public void testJsonFunctionExtractingArray()
       throws JsonProcessingException {

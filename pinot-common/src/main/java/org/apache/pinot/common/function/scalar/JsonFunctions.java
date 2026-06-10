@@ -368,6 +368,25 @@ public class JsonFunctions {
   }
 
   /**
+   * Parse a JSON object/array string into a reusable {@code Map}/{@code List} once, or return the input
+   * <b>unchanged</b> for anything else (a non-container or invalid string, a scalar, an already-parsed value, null).
+   * <p>Used by the ingestion evaluator to parse a JSON column once per record and feed the parsed form to the many
+   * {@code jsonPath*} extractions on that record, instead of re-parsing the document once per extracted field.
+   * Because non-container input is returned unchanged, the downstream {@code jsonPath*} call behaves exactly as if it
+   * received the raw value (it does its own scalar parse / non-JSON fast-path / exception), so this is
+   * behavior-preserving. The returned container is a live model that {@code jsonPath} navigates without re-parsing;
+   * callers must treat it as read-only (same contract as {@code jsonExtractObject}).
+   */
+  @Nullable
+  public static Object parseDocOrSelf(@Nullable Object object) {
+    if (object instanceof String) {
+      Object parsed = jsonStringToListOrMap((String) object);
+      return parsed != null ? parsed : object;
+    }
+    return object;
+  }
+
+  /**
    * Parse a JSON document into a reusable {@code Map}/{@code List}, or pass through an already-parsed container,
    * returning {@code null} for null, scalar, or non-JSON input <b>without throwing</b>.
    * <p>Intended for "parse-once" ingestion transforms: materialize an intermediate object column once and point

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.evaluator;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -255,11 +257,18 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
     final ExecutableNode[] _argumentNodes;
     final Object[] _arguments;
 
+    // True when this is a JsonFunctions.jsonPath* function whose first argument is parsed as a JSON document. For
+    // these, a JSON-string first argument is parsed once per record and reused via the record's scratch cache, so
+    // multiple extractions from the same column (e.g. several JSONPATHSTRING(message, ...) transforms) do not
+    // re-parse the document once per field.
+    final boolean _parseFirstArgAsJson;
+
     FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentNodes) {
       _functionInvoker = new FunctionInvoker(functionInfo);
       _functionInfo = functionInfo;
       _argumentNodes = argumentNodes;
       _arguments = new Object[_argumentNodes.length];
+      _parseFirstArgAsJson = isJsonDocumentFunction(_functionInvoker.getMethod());
     }
 
     @Override
@@ -268,6 +277,17 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
         int numArguments = _argumentNodes.length;
         for (int i = 0; i < numArguments; i++) {
           _arguments[i] = _argumentNodes[i].execute(row);
+        }
+        if (_parseFirstArgAsJson && _arguments[0] instanceof String) {
+          // Parse the JSON document once per record and stash the parsed form on the record, so the other jsonPath*
+          // extractions on the same column reuse it instead of re-parsing. Non-JSON / scalar input is returned
+          // unchanged by parseDocOrSelf, so behavior is preserved.
+          Object parsed = row.getScratchValue(_arguments[0]);
+          if (parsed == null) {
+            parsed = JsonFunctions.parseDocOrSelf(_arguments[0]);
+            row.putScratchValue(_arguments[0], parsed);
+          }
+          _arguments[0] = parsed;
         }
         if (!_functionInfo.hasNullableParameters()) {
           // Preserve null values during ingestion transformation if function is an inbuilt
@@ -312,6 +332,14 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while executing function: " + this + ": " + e.getMessage(), e);
       }
+    }
+
+    // The JsonFunctions.jsonPath* family (jsonPath, jsonPathString, jsonPathLong, jsonPathDouble, jsonPathArray,
+    // jsonPathArrayDefaultEmpty, jsonPathExists) all take the JSON document as their first argument. Recognizing them
+    // lets the evaluator parse that document once per record (see execute(GenericRow)).
+    private static boolean isJsonDocumentFunction(Method method) {
+      return method.getParameterCount() >= 1 && method.getDeclaringClass() == JsonFunctions.class
+          && method.getName().startsWith("jsonPath");
     }
 
     @Override

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -68,6 +69,12 @@ public class GenericRow implements Serializable {
   private final Set<String> _nullValueFields = new HashSet<>();
   private boolean _incomplete;
   private boolean _sanitized;
+  // Transient, per-record scratch used to memoize an expensive per-record derivation that several transform
+  // functions share within one record - currently parsing a JSON-string column once that is then read by multiple
+  // jsonPath* extractions. It is NOT record data: not serialized, not indexed, not copied by init(), and reset by
+  // clear(). Keyed by reference identity (the same column resolves to the same value instance within a record), so
+  // it is created lazily only when used and freed with the record.
+  private transient IdentityHashMap<Object, Object> _scratch;
 
   /**
    * Initializes the generic row from the given generic row (shallow copy). The row should be new created or cleared
@@ -105,6 +112,23 @@ public class GenericRow implements Serializable {
    */
   public Object getValue(String fieldName) {
     return _fieldToValueMap.get(fieldName);
+  }
+
+  /// Returns a previously memoized derivation for the given key from the transient per-record scratch, or `null` if
+  /// absent. See [#_scratch]. Keyed by reference identity.
+  @Nullable
+  public Object getScratchValue(Object key) {
+    return _scratch != null ? _scratch.get(key) : null;
+  }
+
+  /// Memoizes a derivation in the transient per-record scratch under the given key (reference identity). The scratch
+  /// is created lazily on first use and reset by [#clear()]; it is never serialized, indexed, or copied. See
+  /// [#_scratch].
+  public void putScratchValue(Object key, Object value) {
+    if (_scratch == null) {
+      _scratch = new IdentityHashMap<>();
+    }
+    _scratch.put(key, value);
   }
 
   /// Constructs a [PrimaryKey] from the given list of primary key columns.
@@ -263,6 +287,9 @@ public class GenericRow implements Serializable {
     _nullValueFields.clear();
     _incomplete = false;
     _sanitized = false;
+    if (_scratch != null) {
+      _scratch.clear();
+    }
   }
 
   @Override
