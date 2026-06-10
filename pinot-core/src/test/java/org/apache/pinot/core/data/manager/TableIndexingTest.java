@@ -160,8 +160,9 @@ public class TableIndexingTest {
     for (DataType type : DataType.values()) {
       if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT
           || type == DataType.OPEN_STRUCT || type == DataType.UUID) {
-        // UUID v1 is SV-only and its supported behavior is covered by dedicated UUID tests rather than this static
-        // all-type/all-index expectation matrix.
+        // UUID is excluded because this static expectation matrix (TableIndexingTest.csv) has no UUID rows.
+        // UUID-specific index behavior (inverted, bloom, range, dictionary/no-dictionary, SV and MV) is covered by
+        // the dedicated UUID tests (UuidTypeTest, UuidTypeRealtimeTest and the UUID segment/index unit tests).
         continue;
       }
 

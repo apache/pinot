@@ -56,6 +56,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.UuidUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -195,7 +196,7 @@ public class DistinctCountThetaSketchAggregationFunction
     boolean[] singleValues = new boolean[numExpressions];
     DataType[] valueTypes = new DataType[numExpressions];
     Object[] valueArrays = new Object[numExpressions];
-    extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
+    extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0
@@ -444,7 +445,7 @@ public class DistinctCountThetaSketchAggregationFunction
     boolean[] singleValues = new boolean[numExpressions];
     DataType[] valueTypes = new DataType[numExpressions];
     Object[] valueArrays = new Object[numExpressions];
-    extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
+    extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0
@@ -668,7 +669,7 @@ public class DistinctCountThetaSketchAggregationFunction
     boolean[] singleValues = new boolean[numExpressions];
     DataType[] valueTypes = new DataType[numExpressions];
     Object[] valueArrays = new Object[numExpressions];
-    extractValues(blockValSetMap, singleValues, valueTypes, valueArrays);
+    extractValues(length, blockValSetMap, singleValues, valueTypes, valueArrays);
     int numFilters = _filterEvaluators.size();
 
     // Main expression is always index 0
@@ -1243,7 +1244,7 @@ public class DistinctCountThetaSketchAggregationFunction
   /**
    * Extracts values from the BlockValSet map.
    */
-  private void extractValues(Map<ExpressionContext, BlockValSet> blockValSetMap, boolean[] singleValues,
+  private void extractValues(int length, Map<ExpressionContext, BlockValSet> blockValSetMap, boolean[] singleValues,
       DataType[] valueTypes, Object[] valueArrays) {
     int numExpressions = _inputExpressions.size();
     for (int i = 0; i < numExpressions; i++) {
@@ -1256,9 +1257,30 @@ public class DistinctCountThetaSketchAggregationFunction
       // theta sketch. Surface UUID as STRING (canonical UUID form) so the downstream update-sketch path
       // matches DISTINCTCOUNTTHETASKETCH(CAST(uuidCol AS STRING)). Without this branch, the function would
       // take the serialized-sketch path below and Sketch.wrap would fail on raw 16-byte UUID content.
+      // NOTE: fetch raw bytes and convert explicitly — for identifier expressions the BlockValSet is a
+      // ProjectionBlockValSet whose getStringValuesSV() renders stored BYTES as bare hex, not canonical form.
       if (dataType == DataType.UUID) {
         valueTypes[i] = DataType.STRING;
-        valueArrays[i] = singleValue ? blockValSet.getStringValuesSV() : blockValSet.getStringValuesMV();
+        if (singleValue) {
+          byte[][] uuidBytesValues = blockValSet.getBytesValuesSV();
+          String[] canonicalValues = new String[length];
+          for (int j = 0; j < length; j++) {
+            canonicalValues[j] = UuidUtils.toString(uuidBytesValues[j]);
+          }
+          valueArrays[i] = canonicalValues;
+        } else {
+          byte[][][] uuidBytesValuesMV = blockValSet.getBytesValuesMV();
+          String[][] canonicalValuesMV = new String[length][];
+          for (int j = 0; j < length; j++) {
+            byte[][] row = uuidBytesValuesMV[j];
+            String[] canonicalRow = new String[row.length];
+            for (int k = 0; k < row.length; k++) {
+              canonicalRow[k] = UuidUtils.toString(row[k]);
+            }
+            canonicalValuesMV[j] = canonicalRow;
+          }
+          valueArrays[i] = canonicalValuesMV;
+        }
         continue;
       }
       valueTypes[i] = storedType;

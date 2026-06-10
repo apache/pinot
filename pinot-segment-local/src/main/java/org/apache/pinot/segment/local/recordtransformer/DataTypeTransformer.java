@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ThrottledLogger;
 import org.apache.pinot.segment.local.utils.DataTypeTransformerUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -80,7 +81,12 @@ public class DataTypeTransformer implements RecordTransformer {
     _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
     _throttledLogger = new ThrottledLogger(LOGGER, ingestionConfig);
 
-    if (tableConfig.getUpsertConfig() != null || tableConfig.getDedupConfig() != null) {
+    // Enforce canonical-form UUID PKs only when upsert/dedup is actually enabled — a present-but-disabled config
+    // (e.g., UpsertConfig with Mode.NONE) must not reject otherwise-valid rows.
+    boolean upsertEnabled =
+        tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() != UpsertConfig.Mode.NONE;
+    boolean dedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
+    if (upsertEnabled || dedupEnabled) {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       if (primaryKeyColumns != null && !primaryKeyColumns.isEmpty()) {
         Set<String> uuidPkCols = new HashSet<>();

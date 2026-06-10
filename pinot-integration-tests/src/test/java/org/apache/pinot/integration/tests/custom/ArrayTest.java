@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.annotations.Test;
 
@@ -1378,7 +1379,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     record.put(LONG_COLUMN, i);
     record.put(FLOAT_COLUMN, i + RANDOM.nextFloat());
     record.put(DOUBLE_COLUMN, i + RANDOM.nextDouble());
-    record.put(STRING_COLUMN, String.format("string-%03d", i));
+    record.put(STRING_COLUMN, RandomStringUtils.secure().next(i));
     record.put(TIMESTAMP_COLUMN, i);
     record.put(GROUP_BY_COLUMN, String.valueOf(i % 10));
     record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));

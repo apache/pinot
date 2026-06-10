@@ -26,6 +26,12 @@ import java.util.function.ToIntFunction;
 import org.apache.pinot.spi.utils.UuidUtils.UuidKey;
 
 
+/**
+ * Group-id generator for a single UUID group-by key in the multi-stage engine. Normalizes every incoming key
+ * ({@code byte[]}, {@code ByteArray}, {@code String} or {@code UuidKey}) to {@link UuidKey} — two primitive longs —
+ * so map probing avoids byte-array hashing/equality on the hot path. Not thread-safe; each instance is owned by a
+ * single operator thread, matching the other {@link GroupIdGenerator} implementations.
+ */
 public class OneUuidKeyGroupIdGenerator implements GroupIdGenerator {
   private final Object2IntOpenHashMap<Object> _groupIdMap;
   private final int _numGroupsLimit;
