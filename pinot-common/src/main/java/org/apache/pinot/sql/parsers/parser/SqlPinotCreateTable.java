@@ -35,7 +35,7 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 
 /// Pinot-native `CREATE TABLE` DDL statement.
 ///
-/// Syntax:
+/// Syntax (column-list form):
 /// ```
 ///   CREATE TABLE [IF NOT EXISTS] [db.]name (
 ///     col TYPE [NULL | NOT NULL] [DEFAULT literal] [DIMENSION | METRIC],
@@ -50,6 +50,19 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 ///   )
 /// ```
 ///
+/// or the options-defined form, where the schema and table config are derived entirely from the
+/// WITH options by a pluggable handler in the DDL compiler:
+/// ```
+///   CREATE TABLE [IF NOT EXISTS] [db.]name WITH (
+///     key = value,
+///     ...
+///   )
+/// ```
+///
+/// The two forms are mutually exclusive: [#getWithOptions] is non-null exactly for the
+/// options-defined form, in which case [#getColumns] / [#getProperties] are empty and
+/// [#getTableType] / [#getPrimaryKeyColumns] are null.
+///
 /// This is a parse-time AST node only. Semantic validation (data type recognition, role
 /// inference, property mapping) happens in `DdlCompiler` in the `pinot-sql-ddl` module.
 ///
@@ -62,11 +75,23 @@ public class SqlPinotCreateTable extends SqlCall {
   private final boolean _ifNotExists;
   private final SqlNodeList _columns;
   @Nullable private final SqlNodeList _primaryKeyColumns;
-  private final SqlLiteral _tableType;
+  @Nullable private final SqlLiteral _tableType;
   private final SqlNodeList _properties;
+  @Nullable private final SqlNodeList _withOptions;
 
   public SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList columns,
       @Nullable SqlNodeList primaryKeyColumns, SqlLiteral tableType, @Nullable SqlNodeList properties) {
+    this(pos, name, ifNotExists, columns, primaryKeyColumns, tableType, properties, null);
+  }
+
+  /// Options-defined form: `CREATE TABLE [IF NOT EXISTS] [db.]name WITH (key = value, ...)`.
+  public SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList withOptions) {
+    this(pos, name, ifNotExists, SqlNodeList.EMPTY, null, null, null, withOptions);
+  }
+
+  private SqlPinotCreateTable(SqlParserPos pos, SqlIdentifier name, boolean ifNotExists, SqlNodeList columns,
+      @Nullable SqlNodeList primaryKeyColumns, @Nullable SqlLiteral tableType, @Nullable SqlNodeList properties,
+      @Nullable SqlNodeList withOptions) {
     super(pos);
     _name = name;
     _ifNotExists = ifNotExists;
@@ -74,6 +99,7 @@ public class SqlPinotCreateTable extends SqlCall {
     _primaryKeyColumns = primaryKeyColumns;
     _tableType = tableType;
     _properties = properties == null ? SqlNodeList.EMPTY : properties;
+    _withOptions = withOptions;
   }
 
   public SqlIdentifier getName() {
@@ -93,12 +119,21 @@ public class SqlPinotCreateTable extends SqlCall {
     return _primaryKeyColumns;
   }
 
+  /// Null only for the options-defined (`WITH`) form.
+  @Nullable
   public SqlLiteral getTableType() {
     return _tableType;
   }
 
   public SqlNodeList getProperties() {
     return _properties;
+  }
+
+  /// The `WITH (key = value, ...)` option list, or null for the column-list form. Non-null (even
+  /// when empty) means the statement was written in the options-defined form.
+  @Nullable
+  public SqlNodeList getWithOptions() {
+    return _withOptions;
   }
 
   @Override
@@ -109,7 +144,7 @@ public class SqlPinotCreateTable extends SqlCall {
   @Override
   public List<SqlNode> getOperandList() {
     // Fixed-arity list with null placeholder for absent optional operand, per Calcite SqlCall contract.
-    return Arrays.asList(_name, _columns, _primaryKeyColumns, _tableType, _properties);
+    return Arrays.asList(_name, _columns, _primaryKeyColumns, _tableType, _properties, _withOptions);
   }
 
   @Override
@@ -119,6 +154,16 @@ public class SqlPinotCreateTable extends SqlCall {
       writer.keyword("IF NOT EXISTS");
     }
     _name.unparse(writer, leftPrec, rightPrec);
+    if (_withOptions != null) {
+      writer.keyword("WITH");
+      SqlWriter.Frame withFrame = writer.startList("(", ")");
+      for (SqlNode option : _withOptions) {
+        writer.sep(",");
+        option.unparse(writer, 0, 0);
+      }
+      writer.endList(withFrame);
+      return;
+    }
     SqlWriter.Frame columnFrame = writer.startList("(", ")");
     for (SqlNode column : _columns) {
       writer.sep(",");

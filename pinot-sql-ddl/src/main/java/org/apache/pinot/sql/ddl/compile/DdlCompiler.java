@@ -96,6 +96,16 @@ public final class DdlCompiler {
   private static volatile MaterializedViewDdlHandler _materializedViewDdlHandler =
       new DefaultMaterializedViewDdlHandler();
 
+  /// Pluggable handler for the options-defined `CREATE TABLE ... WITH (key = value, ...)` form
+  /// (no column list — the schema and table config are derived from the options, e.g. by
+  /// connecting to an external catalog named by the options). OSS Pinot has no built-in
+  /// options-defined table type, so the default rejects the form with an actionable error; a
+  /// distribution that supports it installs its own handler via
+  /// [#setCreateTableWithOptionsHandler] once at controller startup, before any DDL is served.
+  /// Volatile for the same reason as [#_materializedViewDdlHandler].
+  private static volatile CreateTableWithOptionsHandler _createTableWithOptionsHandler =
+      new DefaultCreateTableWithOptionsHandler();
+
   private DdlCompiler() {
   }
 
@@ -108,6 +118,18 @@ public final class DdlCompiler {
   /// Returns the active materialized-view DDL handler (never null; defaults to single-source SSE).
   public static MaterializedViewDdlHandler getMaterializedViewDdlHandler() {
     return _materializedViewDdlHandler;
+  }
+
+  /// Installs the [CreateTableWithOptionsHandler] used for all subsequent options-defined
+  /// `CREATE TABLE ... WITH (...)` compilations. Call once at controller startup; defaults to
+  /// [DefaultCreateTableWithOptionsHandler], which rejects the form.
+  public static void setCreateTableWithOptionsHandler(CreateTableWithOptionsHandler handler) {
+    _createTableWithOptionsHandler = handler;
+  }
+
+  /// Returns the active options-defined CREATE TABLE handler (never null; defaults to rejecting).
+  public static CreateTableWithOptionsHandler getCreateTableWithOptionsHandler() {
+    return _createTableWithOptionsHandler;
   }
 
   /// Parses and compiles a DDL statement using a stateless {@link DdlCompileContext}.
@@ -157,7 +179,7 @@ public final class DdlCompiler {
       return compileShowMaterializedViews((SqlPinotShowMaterializedViews) node);
     }
     if (node instanceof SqlPinotCreateTable) {
-      return compileCreate((SqlPinotCreateTable) node);
+      return compileCreate((SqlPinotCreateTable) node, ctx);
     }
     if (node instanceof SqlPinotShowCreateTable) {
       return compileShowCreate((SqlPinotShowCreateTable) node);
@@ -216,7 +238,10 @@ public final class DdlCompiler {
   // Table DDL: CREATE TABLE
   // -------------------------------------------------------------------------------------------
 
-  private static CompiledCreateTable compileCreate(SqlPinotCreateTable node) {
+  private static CompiledCreateTable compileCreate(SqlPinotCreateTable node, DdlCompileContext ctx) {
+    if (node.getWithOptions() != null) {
+      return compileCreateWithOptions(node, ctx);
+    }
     QualifiedName name = parseQualifiedName(node.getName());
     TableType tableType = parseTableType(node.getTableType().toValue());
 
@@ -259,6 +284,25 @@ public final class DdlCompiler {
 
     return new CompiledCreateTable(resolved.getDatabaseName(), schema, tableConfig,
         resolved.isIfNotExists(), warnings);
+  }
+
+  /// Compiles the options-defined `CREATE TABLE ... WITH (key = value, ...)` form by delegating
+  /// to the registered [CreateTableWithOptionsHandler]. The compiler owns the parts common to
+  /// both CREATE TABLE forms — name/database resolution and option de-duplication — and the
+  /// handler owns everything the options mean (schema derivation, table-config construction).
+  private static CompiledCreateTable compileCreateWithOptions(SqlPinotCreateTable node, DdlCompileContext ctx) {
+    QualifiedName name = parseQualifiedName(node.getName());
+    Map<String, String> options = resolveProperties(node.getWithOptions().getList());
+    if (options.isEmpty()) {
+      throw new DdlCompilationException("CREATE TABLE ... WITH requires at least one option.");
+    }
+    CompiledCreateTable compiled = _createTableWithOptionsHandler.compile(
+        name._databaseName, name._tableName, node.isIfNotExists(), options, ctx);
+    if (compiled == null) {
+      throw new DdlCompilationException(
+          "The options-defined CREATE TABLE handler returned no result for table: " + name._tableName);
+    }
+    return compiled;
   }
 
   private static List<ResolvedColumnDefinition> resolveColumns(List<SqlNode> columnNodes,
