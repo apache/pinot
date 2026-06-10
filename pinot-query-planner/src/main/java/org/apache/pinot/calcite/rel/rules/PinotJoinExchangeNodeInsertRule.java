@@ -91,6 +91,14 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       // Broadcast-right join: broadcast the entire right side to every worker; left side is hash/random-distributed.
       // This eliminates the right-side network shuffle for star-schema patterns where the right table is small
       // enough to fit in memory but is not pre-replicated as a dimension table.
+      //
+      // RIGHT and FULL outer joins are not supported: HashJoinOperator tracks matched-right rows locally, so
+      // broadcasting the right table to multiple workers would cause each worker to independently emit unmatched
+      // right rows, resulting in duplicate null-extended rows in the output.
+      JoinRelType joinType = join.getJoinType();
+      Preconditions.checkArgument(joinType != JoinRelType.RIGHT && joinType != JoinRelType.FULL,
+          "broadcast_right join hint is not supported for RIGHT or FULL OUTER joins (would produce duplicate "
+              + "null-extended rows). Use the default hash join instead.");
       if (leftDistributionType == null) {
         leftDistributionType = joinInfo.leftKeys.isEmpty()
             ? PinotHintOptions.DistributionType.RANDOM : PinotHintOptions.DistributionType.HASH;
