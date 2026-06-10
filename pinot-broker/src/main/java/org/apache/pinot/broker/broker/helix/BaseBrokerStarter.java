@@ -63,6 +63,9 @@ import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandl
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.manager.BrokerRoutingManager;
 import org.apache.pinot.broker.routing.tablesampler.TableSamplerFactory;
+import org.apache.pinot.broker.stats.BrokerTableStatsManager;
+import org.apache.pinot.broker.stats.SqliteStatsStore;
+import org.apache.pinot.broker.stats.StatsStoreException;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditServiceBinder;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
@@ -178,6 +181,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected PinotMetricsRegistry _metricsRegistry;
   protected BrokerMetrics _brokerMetrics;
   protected BrokerRoutingManager _routingManager;
+  @Nullable
+  protected BrokerTableStatsManager _statsManager;
   protected AccessControlFactory _accessControlFactory;
   protected BrokerRequestHandler _brokerRequestHandler;
   protected SqlQueryExecutor _sqlQueryExecutor;
@@ -750,9 +755,59 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
   }
 
-  protected void initRoutingManager() throws Exception {
+  protected void initRoutingManager()
+      throws Exception {
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
+    boolean statsEnabled =
+        _brokerConf.getProperty(Broker.CONFIG_OF_STATS_ENABLED, Broker.DEFAULT_STATS_ENABLED);
+    if (statsEnabled) {
+      BrokerTableStatsManager statsManager = createStatsManager();
+      if (statsManager != null) {
+        _statsManager = statsManager;
+        _routingManager.setStatsManager(_statsManager);
+      }
+    }
     _routingManager.init(_spectatorHelixManager);
+  }
+
+  /**
+   * Creates and initializes the {@link BrokerTableStatsManager}. Returns {@code null} if the
+   * manager cannot be started (error is logged; broker startup continues normally).
+   */
+  @Nullable
+  private BrokerTableStatsManager createStatsManager() {
+    java.nio.file.Path statsDir = resolveStatsDir();
+    LOGGER.info("Initializing BrokerTableStatsManager at {}", statsDir);
+    SqliteStatsStore statsStore = new SqliteStatsStore(statsDir);
+    BrokerTableStatsManager statsManager = new BrokerTableStatsManager(statsStore);
+    try {
+      statsManager.init();
+      return statsManager;
+    } catch (StatsStoreException e) {
+      LOGGER.error("Failed to initialize BrokerTableStatsManager; stats collection disabled: {}",
+          e.getMessage(), e);
+      try {
+        statsManager.close();
+      } catch (java.io.IOException closeEx) {
+        LOGGER.warn("Error closing failed stats manager: {}", closeEx.getMessage());
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Resolves the directory for the stats store. Uses {@link Broker#CONFIG_OF_STATS_DIR} when
+   * set; otherwise falls back to {@code <pinot.broker.instance.dataDir>/broker-stats} or
+   * {@code <java.io.tmpdir>/broker-stats} when no data dir is configured.
+   */
+  private java.nio.file.Path resolveStatsDir() {
+    String configured = _brokerConf.getProperty(Broker.CONFIG_OF_STATS_DIR);
+    if (configured != null && !configured.isEmpty()) {
+      return java.nio.file.Paths.get(configured);
+    }
+    // Broker has no standard INSTANCE_DATA_DIR; use tmpdir/<instanceId>/broker-stats so that
+    // multiple broker instances on the same host do not share the same SQLite file.
+    return java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), _instanceId, "broker-stats");
   }
 
   protected void initSpectatorHelixManager() throws Exception {
@@ -971,6 +1026,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Stopping the broker routing manager");
     _routingManager.stop();
+
+    if (_statsManager != null) {
+      LOGGER.info("Closing BrokerTableStatsManager");
+      try {
+        _statsManager.close();
+      } catch (IOException e) {
+        LOGGER.warn("Error closing BrokerTableStatsManager: {}", e.getMessage());
+      }
+    }
 
     LOGGER.info("Close PinotFs");
     try {

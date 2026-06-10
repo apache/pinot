@@ -589,6 +589,26 @@ public class CommonConstants {
     public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
     public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
 
+    // ---------------------------------------------------------------------------
+    // Cost-based optimizer (CBO) stats store — EXPERIMENTAL
+    // ---------------------------------------------------------------------------
+
+    /**
+     * [EXPERIMENTAL] When {@code true}, the broker collects per-segment statistics into a local
+     * SQLite store ({@link #CONFIG_OF_STATS_DIR}) and exposes them to the cost-based query
+     * planner.  Disabled by default; enabling has no effect on query correctness.
+     */
+    public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
+    public static final boolean DEFAULT_STATS_ENABLED = false;
+
+    /**
+     * [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
+     * ({@code broker-stats.sqlite}).  Defaults to
+     * {@code <pinot.broker.instance.dataDir>/broker-stats} when {@code dataDir} is configured,
+     * or {@code <java.io.tmpdir>/broker-stats} otherwise.
+     */
+    public static final String CONFIG_OF_STATS_DIR = "pinot.broker.stats.dir";
+
     // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
     // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
