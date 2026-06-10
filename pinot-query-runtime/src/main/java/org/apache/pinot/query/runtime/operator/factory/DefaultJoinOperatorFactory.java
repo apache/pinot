@@ -42,6 +42,7 @@ public class DefaultJoinOperatorFactory implements JoinOperatorFactory {
     DataSchema leftSchema = leftPlanNode.getDataSchema();
     switch (joinStrategy) {
       case HASH:
+      case BROADCAST_RIGHT:
         if (joinNode.getLeftKeys().isEmpty()) {
           // TODO: Consider adding non-equi as a separate join strategy.
           return new NonEquiJoinOperator(context, leftOperator, leftSchema, rightOperator, joinNode);

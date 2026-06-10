@@ -138,7 +138,11 @@ public class TraitAssignment {
       return join;
     }
     // Case-1b: Broadcast-right join — broadcast the right input to all workers; left is hash/random-distributed.
+    // Not supported for RIGHT/FULL outer joins: would produce duplicate null-extended rows.
     if (PinotHintOptions.JoinHintOptions.useBroadcastRightJoinStrategy(join)) {
+      JoinRelType joinType = join.getJoinType();
+      Preconditions.checkArgument(joinType != JoinRelType.RIGHT && joinType != JoinRelType.FULL,
+          "broadcast_right join hint is not supported for RIGHT or FULL OUTER joins");
       JoinInfo broadcastJoinInfo = join.analyzeCondition();
       RelDistribution leftDistribution = broadcastJoinInfo.leftKeys.isEmpty()
           ? RelDistributions.RANDOM_DISTRIBUTED : RelDistributions.hash(broadcastJoinInfo.leftKeys);

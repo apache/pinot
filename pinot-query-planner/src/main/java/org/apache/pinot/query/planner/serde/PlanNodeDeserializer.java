@@ -378,6 +378,8 @@ public class PlanNodeDeserializer {
         return JoinNode.JoinStrategy.LOOKUP;
       case AS_OF:
         return JoinNode.JoinStrategy.ASOF;
+      case BROADCAST_RIGHT:
+        return JoinNode.JoinStrategy.BROADCAST_RIGHT;
       default:
         throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }
