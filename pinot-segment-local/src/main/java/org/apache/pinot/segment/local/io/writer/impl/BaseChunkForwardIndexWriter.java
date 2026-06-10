@@ -70,7 +70,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected int _chunkSize;
   protected long _dataOffset;
   protected long _uncompressedSize;
-  protected boolean _trackUncompressedSize = true;
+  protected boolean _trackUncompressedSize = false;
 
   private final int _headerEntryChunkOffsetSize;
 
