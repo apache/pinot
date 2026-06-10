@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
@@ -111,8 +112,12 @@ public final class DdlCompiler {
 
   /// Installs the [MaterializedViewDdlHandler] used for all subsequent `CREATE MATERIALIZED VIEW`
   /// compilations. Call once at controller startup; defaults to [DefaultMaterializedViewDdlHandler].
+  /// The handler must not be null — the getter guarantees never-null, so a null installation
+  /// fails fast here instead of surfacing as a confusing NPE on the next DDL compilation.
   public static void setMaterializedViewDdlHandler(MaterializedViewDdlHandler handler) {
-    _materializedViewDdlHandler = handler;
+    _materializedViewDdlHandler = Objects.requireNonNull(handler,
+        "MaterializedViewDdlHandler must not be null; to restore default behavior install a new "
+            + "DefaultMaterializedViewDdlHandler instead");
   }
 
   /// Returns the active materialized-view DDL handler (never null; defaults to single-source SSE).
@@ -123,8 +128,12 @@ public final class DdlCompiler {
   /// Installs the [CreateTableWithOptionsHandler] used for all subsequent options-defined
   /// `CREATE TABLE ... WITH (...)` compilations. Call once at controller startup; defaults to
   /// [DefaultCreateTableWithOptionsHandler], which rejects the form.
+  /// The handler must not be null — the getter guarantees never-null, so a null installation
+  /// fails fast here instead of surfacing as a confusing NPE on the next DDL compilation.
   public static void setCreateTableWithOptionsHandler(CreateTableWithOptionsHandler handler) {
-    _createTableWithOptionsHandler = handler;
+    _createTableWithOptionsHandler = Objects.requireNonNull(handler,
+        "CreateTableWithOptionsHandler must not be null; to restore default behavior install a "
+            + "new DefaultCreateTableWithOptionsHandler instead");
   }
 
   /// Returns the active options-defined CREATE TABLE handler (never null; defaults to rejecting).

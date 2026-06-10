@@ -55,6 +55,18 @@ public class CreateTableWithOptionsHandlerTest {
   }
 
   @Test
+  public void nullHandlerInstallationFailsFast() {
+    // The getters are documented never-null; a null installation must fail at the setter rather
+    // than as a confusing NPE on the next DDL compilation.
+    expectThrows(NullPointerException.class,
+        () -> DdlCompiler.setCreateTableWithOptionsHandler(null));
+    expectThrows(NullPointerException.class,
+        () -> DdlCompiler.setMaterializedViewDdlHandler(null));
+    // The previously installed handlers survive the rejected installation.
+    assertTrue(DdlCompiler.getCreateTableWithOptionsHandler() instanceof DefaultCreateTableWithOptionsHandler);
+  }
+
+  @Test
   public void defaultHandlerRejectsWithGuidance() {
     DdlCompilationException e = expectThrows(DdlCompilationException.class,
         () -> DdlCompiler.compile("CREATE TABLE trips WITH (type = 'iceberg')", DdlCompileContext.STATELESS));
