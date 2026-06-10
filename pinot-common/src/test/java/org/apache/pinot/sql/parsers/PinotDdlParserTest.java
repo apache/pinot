@@ -21,6 +21,7 @@ package org.apache.pinot.sql.parsers;
 import java.util.Locale;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.dialect.CalciteSqlDialect;
 import org.apache.pinot.sql.parsers.parser.SqlPinotColumnDeclaration;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateMaterializedView;
 import org.apache.pinot.sql.parsers.parser.SqlPinotCreateTable;
@@ -152,6 +153,159 @@ public class PinotDdlParserTest {
             + "  'kafka.client-id' = 'pinot-events'"
             + ")");
     assertEquals(node.getProperties().size(), 3);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // CREATE TABLE ... WITH (options) — the options-defined form
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  public void createTableWithOptionsMinimal() {
+    SqlPinotCreateTable node = parseCreate("CREATE TABLE trips WITH ('type' = 'iceberg')");
+    assertNotNull(node.getWithOptions());
+    assertEquals(node.getWithOptions().size(), 1);
+    SqlPinotProperty option = (SqlPinotProperty) node.getWithOptions().get(0);
+    assertEquals(option.getKeyString(), "type");
+    assertEquals(option.getValueString(), "iceberg");
+    // The options-defined form carries no column-list-form clauses.
+    assertTrue(node.getColumns().isEmpty());
+    assertNull(node.getPrimaryKeyColumns());
+    assertNull(node.getTableType());
+    assertTrue(node.getProperties().isEmpty());
+  }
+
+  @Test
+  public void classicCreateTableHasNullWithOptions() {
+    // getWithOptions() is the form discriminator: null means column-list form, non-null (even
+    // empty) means the WITH form was written.
+    SqlPinotCreateTable node = parseCreate("CREATE TABLE events (id INT) TABLE_TYPE = OFFLINE");
+    assertNull(node.getWithOptions());
+  }
+
+  @Test
+  public void createTableWithOptionsFullIcebergSample() {
+    // The motivating external-table DDL shape: unquoted snake_case keys, dotted keys, string /
+    // boolean values, and ${...} placeholder values passed through verbatim.
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE trips_analytics WITH ("
+            + "  type = 'iceberg',"
+            + "  catalog_type = 'rest',"
+            + "  catalog_uri = 'https://unity-catalog.company.com/api/2.1/unity-catalog/iceberg',"
+            + "  catalog_name = 'main',"
+            + "  schema_name = 'transportation',"
+            + "  table_name = 'nyc_taxi_trips',"
+            + "  auth_type = 'oauth',"
+            + "  client_id = '${UC_CLIENT_ID}',"
+            + "  client_secret = '${UC_CLIENT_SECRET}',"
+            + "  oauth_scope = 'all-apis',"
+            + "  storage.provider = 's3',"
+            + "  storage.region = 'us-west-2',"
+            + "  storage.access_key = '${AWS_ACCESS_KEY_ID}',"
+            + "  storage.secret_key = '${AWS_SECRET_ACCESS_KEY}',"
+            + "  refresh_interval = '5m',"
+            + "  snapshot_mode = 'latest',"
+            + "  enable_schema_evolution = true,"
+            + "  enable_partition_pruning = true,"
+            + "  enable_metadata_caching = true"
+            + ")");
+    assertEquals(node.getName().getSimple(), "trips_analytics");
+    assertNotNull(node.getWithOptions());
+    assertEquals(node.getWithOptions().size(), 19);
+
+    SqlPinotProperty type = (SqlPinotProperty) node.getWithOptions().get(0);
+    assertEquals(type.getKeyString(), "type");
+    assertEquals(type.getValueString(), "iceberg");
+
+    // Unquoted identifier keys are case-preserved verbatim.
+    SqlPinotProperty catalogType = (SqlPinotProperty) node.getWithOptions().get(1);
+    assertEquals(catalogType.getKeyString(), "catalog_type");
+    assertEquals(catalogType.getValueString(), "rest");
+
+    // ${...} placeholders are opaque string values; no substitution at parse time.
+    SqlPinotProperty clientId = (SqlPinotProperty) node.getWithOptions().get(7);
+    assertEquals(clientId.getKeyString(), "client_id");
+    assertEquals(clientId.getValueString(), "${UC_CLIENT_ID}");
+
+    // Dotted identifier keys join with '.'.
+    SqlPinotProperty storageProvider = (SqlPinotProperty) node.getWithOptions().get(10);
+    assertEquals(storageProvider.getKeyString(), "storage.provider");
+    assertEquals(storageProvider.getValueString(), "s3");
+
+    // Boolean values normalize to lower-case string form.
+    SqlPinotProperty schemaEvolution = (SqlPinotProperty) node.getWithOptions().get(16);
+    assertEquals(schemaEvolution.getKeyString(), "enable_schema_evolution");
+    assertEquals(schemaEvolution.getValueString(), "true");
+  }
+
+  @Test
+  public void createTableWithOptionsIfNotExistsAndQualifiedName() {
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE IF NOT EXISTS myDb.trips WITH ('type' = 'iceberg')");
+    assertTrue(node.isIfNotExists());
+    assertEquals(node.getName().names.size(), 2);
+    assertEquals(node.getName().names.get(0), "myDb");
+    assertEquals(node.getName().names.get(1), "trips");
+  }
+
+  @Test
+  public void createTableWithOptionsKeyQuotingAndValueTypes() {
+    // Quoted and unquoted keys are interchangeable; values may be strings, booleans, or numbers
+    // — all normalized to plain string pairs.
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE t WITH ("
+            + "  'quoted.key' = 'v1',"
+            + "  unquoted_key = 'v2',"
+            + "  bool_key = false,"
+            + "  int_key = 100,"
+            + "  decimal_key = 2.5"
+            + ")");
+    assertNotNull(node.getWithOptions());
+    assertEquals(node.getWithOptions().size(), 5);
+    assertEquals(((SqlPinotProperty) node.getWithOptions().get(0)).getKeyString(), "quoted.key");
+    assertEquals(((SqlPinotProperty) node.getWithOptions().get(1)).getKeyString(), "unquoted_key");
+    assertEquals(((SqlPinotProperty) node.getWithOptions().get(2)).getValueString(), "false");
+    assertEquals(((SqlPinotProperty) node.getWithOptions().get(3)).getValueString(), "100");
+    assertEquals(((SqlPinotProperty) node.getWithOptions().get(4)).getValueString(), "2.5");
+  }
+
+  @Test
+  public void createTableWithOptionsEmptyListParses() {
+    // Parse-level permissive (mirrors PROPERTIES ()); the DDL compiler rejects empty options.
+    SqlPinotCreateTable node = parseCreate("CREATE TABLE t WITH ()");
+    assertNotNull(node.getWithOptions());
+    assertTrue(node.getWithOptions().isEmpty());
+  }
+
+  @Test
+  public void createTableWithOptionsUnparseRoundTrips() {
+    SqlPinotCreateTable node = parseCreate(
+        "CREATE TABLE trips WITH (type = 'iceberg', storage.region = 'us-west-2', enabled = true)");
+    // Unparse emits the canonical quoted-key form; re-parsing it must preserve the options. The
+    // Calcite dialect double-quotes identifiers, matching the parser's DQID lexical state.
+    SqlPinotCreateTable reparsed = parseCreate(node.toSqlString(CalciteSqlDialect.DEFAULT).getSql());
+    assertNotNull(reparsed.getWithOptions());
+    assertEquals(reparsed.getWithOptions().size(), 3);
+    SqlPinotProperty type = (SqlPinotProperty) reparsed.getWithOptions().get(0);
+    assertEquals(type.getKeyString(), "type");
+    assertEquals(type.getValueString(), "iceberg");
+    SqlPinotProperty region = (SqlPinotProperty) reparsed.getWithOptions().get(1);
+    assertEquals(region.getKeyString(), "storage.region");
+    assertEquals(region.getValueString(), "us-west-2");
+    SqlPinotProperty enabled = (SqlPinotProperty) reparsed.getWithOptions().get(2);
+    assertEquals(enabled.getKeyString(), "enabled");
+    assertEquals(enabled.getValueString(), "true");
+  }
+
+  @Test
+  public void createTableWithOptionsRejectsColumnListFormClauses() {
+    // The two forms are mutually exclusive: no TABLE_TYPE / PROPERTIES after WITH (...), and no
+    // WITH (...) after a column list.
+    expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions(
+            "CREATE TABLE t WITH ('k' = 'v') TABLE_TYPE = OFFLINE"));
+    expectThrows(SqlCompilationException.class,
+        () -> CalciteSqlParser.compileToSqlNodeAndOptions(
+            "CREATE TABLE t (id INT) WITH ('k' = 'v')"));
   }
 
   // -------------------------------------------------------------------------------------------

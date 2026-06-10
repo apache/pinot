@@ -224,6 +224,15 @@ SqlLiteral PinotRefreshEveryPeriod() :
 /// )
 /// TABLE_TYPE = OFFLINE | REALTIME
 /// [ PROPERTIES ( 'k' = 'v', ... ) ]
+///
+/// or the options-defined form, with no column list and no TABLE_TYPE:
+///
+/// CREATE TABLE [IF NOT EXISTS] [db.]name WITH ( key = value, ... )
+///
+/// In the options-defined form the schema and table config are derived entirely from the WITH
+/// options by a pluggable handler in the DDL compiler (e.g. a handler that connects to an
+/// external catalog named by the options and infers the schema from it). The two forms are
+/// disambiguated by the token after the table name: `WITH` vs `(`.
 SqlNode SqlPinotCreateTable() :
 {
     SqlParserPos pos;
@@ -233,21 +242,29 @@ SqlNode SqlPinotCreateTable() :
     SqlNodeList primaryKeyColumns = null;
     SqlLiteral tableType;
     SqlNodeList properties = null;
+    SqlNodeList withOptions;
 }
 {
     <CREATE> { pos = getPos(); }
     <TABLE>
     [ LOOKAHEAD(3) <IF> <NOT> <EXISTS> { ifNotExists = true; } ]
     name = CompoundIdentifier()
-    columns = PinotColumnList()
-    [ LOOKAHEAD(2) primaryKeyColumns = PinotPrimaryKeyList() ]
-    <TABLE_TYPE> <EQ>
-    tableType = PinotTableTypeLiteral()
-    [ <PROPERTIES> properties = PinotPropertyList() ]
-    {
-        return new SqlPinotCreateTable(pos, name, ifNotExists, columns, primaryKeyColumns,
-            tableType, properties);
-    }
+    (
+        <WITH> withOptions = PinotWithOptionList()
+        {
+            return new SqlPinotCreateTable(pos, name, ifNotExists, withOptions);
+        }
+    |
+        columns = PinotColumnList()
+        [ LOOKAHEAD(2) primaryKeyColumns = PinotPrimaryKeyList() ]
+        <TABLE_TYPE> <EQ>
+        tableType = PinotTableTypeLiteral()
+        [ <PROPERTIES> properties = PinotPropertyList() ]
+        {
+            return new SqlPinotCreateTable(pos, name, ifNotExists, columns, primaryKeyColumns,
+                tableType, properties);
+        }
+    )
 }
 
 SqlNodeList PinotColumnList() :
@@ -365,6 +382,77 @@ SqlPinotProperty PinotProperty() :
     <EQ> valueNode = StringLiteral()
     {
         return new SqlPinotProperty(pos, (SqlLiteral) keyNode, (SqlLiteral) valueNode);
+    }
+}
+
+/// Parenthesized, comma-separated option list for the options-defined CREATE TABLE form.
+/// Unlike PROPERTIES (whose keys and values are always quoted string literals), WITH options
+/// accept the option shape common to external-table DDL in other engines: unquoted — possibly
+/// dotted — identifier keys and typed literal values, e.g. `catalog_type = 'rest'`,
+/// `storage.region = 'us-west-2'`, `enable_schema_evolution = true`. Quoted keys remain
+/// accepted, so the PROPERTIES style also works. Keys and values are normalized to character
+/// literals at parse time so downstream consumers uniformly see string pairs
+/// ([SqlPinotProperty]).
+SqlNodeList PinotWithOptionList() :
+{
+    SqlParserPos pos;
+    SqlPinotProperty option;
+    List<SqlNode> list = new ArrayList<SqlNode>();
+}
+{
+    <LPAREN> { pos = getPos(); }
+    [
+        option = PinotWithOption() { list.add(option); }
+        ( <COMMA> option = PinotWithOption() { list.add(option); } )*
+    ]
+    <RPAREN>
+    {
+        return new SqlNodeList(list, pos.plus(getPos()));
+    }
+}
+
+/// A single `key = value` WITH option. Key: quoted string literal or (dotted) compound
+/// identifier — identifier keys are case-preserved (the parser runs with unquoted casing
+/// UNCHANGED) and joined with `.`. Value: quoted string literal, TRUE / FALSE, or an unsigned
+/// numeric literal.
+SqlPinotProperty PinotWithOption() :
+{
+    SqlParserPos pos;
+    SqlNode keyNode;
+    SqlIdentifier keyId;
+    SqlLiteral key;
+    SqlNode valueNode;
+    SqlLiteral value;
+}
+{
+    (
+        keyNode = StringLiteral()
+        {
+            pos = getPos();
+            key = (SqlLiteral) keyNode;
+        }
+    |
+        keyId = CompoundIdentifier()
+        {
+            pos = getPos();
+            key = SqlLiteral.createCharString(String.join(".", keyId.names), keyId.getParserPosition());
+        }
+    )
+    <EQ>
+    (
+        valueNode = StringLiteral() { value = (SqlLiteral) valueNode; }
+    |
+        <TRUE> { value = SqlLiteral.createCharString("true", getPos()); }
+    |
+        <FALSE> { value = SqlLiteral.createCharString("false", getPos()); }
+    |
+        valueNode = UnsignedNumericLiteral()
+        {
+            value = SqlLiteral.createCharString(((SqlLiteral) valueNode).toValue(), getPos());
+        }
+    )
+    {
+        return new SqlPinotProperty(pos, key, value);
     }
 }
 
