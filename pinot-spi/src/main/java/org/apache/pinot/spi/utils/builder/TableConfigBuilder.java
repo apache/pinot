@@ -79,8 +79,8 @@ public class TableConfigBuilder {
   private String _lineageEntryCleanupRetentionPeriod;
   @Deprecated
   private String _segmentPushFrequency;
-
-  // TODO: Remove 'DEFAULT_SEGMENT_PUSH_TYPE' in the future major release.
+  // Written to validationConfig for backward compat: IngestionConfigUtils still falls back to this field.
+  // Remove once the IngestionConfigUtils fallback is removed.
   @Deprecated
   private String _segmentPushType = DEFAULT_SEGMENT_PUSH_TYPE;
   private String _peerSegmentDownloadScheme;
@@ -226,6 +226,7 @@ public class TableConfigBuilder {
   /**
    * @deprecated Use {@code segmentIngestionType} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
+  @Deprecated
   public TableConfigBuilder setSegmentPushType(String segmentPushType) {
     if (REFRESH_SEGMENT_PUSH_TYPE.equalsIgnoreCase(segmentPushType)) {
       _segmentPushType = REFRESH_SEGMENT_PUSH_TYPE;
@@ -238,6 +239,7 @@ public class TableConfigBuilder {
   /**
    * @deprecated Use {@code segmentIngestionFrequency} from {@link IngestionConfig#getBatchIngestionConfig()}
    */
+  @Deprecated
   public TableConfigBuilder setSegmentPushFrequency(String segmentPushFrequency) {
     _segmentPushFrequency = segmentPushFrequency;
     return this;
@@ -513,6 +515,8 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @SuppressWarnings("deprecation") // intentionally calls deprecated setters on SegmentsValidationAndRetentionConfig
+  // and IndexingConfig; those calls are required to keep the IngestionConfigUtils legacy fallback working.
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
