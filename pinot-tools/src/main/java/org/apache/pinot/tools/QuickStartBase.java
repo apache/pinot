@@ -134,11 +134,6 @@ public abstract class QuickStartBase {
     return _bootstrapDataDirs != null && _bootstrapDataDirs.length == 1 ? _bootstrapDataDirs[0] : null;
   }
 
-  /** @return Table name specified by command line argument -bootstrapTableDir */
-  public String getTableName() {
-    return Paths.get(getBootstrapDataDir()).getFileName().toString();
-  }
-
   /** @return Table name if specified by input bootstrap directory. */
   public String getTableName(String bootstrapDataDir) {
     return Paths.get(bootstrapDataDir).getFileName().toString();

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 /// ### Scope
 /// This phase runs after the existing logical `HepPlanner` programs and before the trait /
 /// `POST_LOGICAL` / physical phases. It reorders inner-join trees using cardinality estimates
-/// sourced from the [RelMetadataQuery] that is already backed by
+/// sourced from the `RelMetadataQuery` that is already backed by
 /// `org.apache.pinot.calcite.rel.metadata.PinotDefaultRelMetadataProvider` (statistics-driven
 /// row counts). The phase is off by default and has zero impact when disabled.
 ///

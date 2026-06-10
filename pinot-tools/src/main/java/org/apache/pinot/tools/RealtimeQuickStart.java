@@ -48,8 +48,11 @@ public class RealtimeQuickStart extends QuickStartBase {
 
   @Override
   protected Map<String, Object> getConfigOverrides() {
+    // Merge the base overrides so a -configFile passed on the command line is honored (the base
+    // implementation reads it); entries here act as defaults that the config file can override.
     Map<String, Object> configOverrides = new HashMap<>();
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.putAll(super.getConfigOverrides());
     return configOverrides;
   }
 
