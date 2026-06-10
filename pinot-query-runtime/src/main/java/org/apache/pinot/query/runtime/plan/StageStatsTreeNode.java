@@ -161,6 +161,7 @@ public class StageStatsTreeNode {
 
   @Override
   public int hashCode() {
-    return Objects.hash(_type, _planNodeIds, _statMap, _children);
+    // Hash the type by id, not by instance, to stay consistent with equals() (which compares _type.getId()).
+    return Objects.hash(_type.getId(), _planNodeIds, _statMap, _children);
   }
 }

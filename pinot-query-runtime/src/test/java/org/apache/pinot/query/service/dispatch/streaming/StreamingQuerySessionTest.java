@@ -258,11 +258,13 @@ public class StreamingQuerySessionTest {
    * When two workers report the same stage with incompatible tree shapes (different operator types), the second
    * merge throws {@link StageStatsTreeNode.ShapeMismatchException}. Because {@code StageStatsTreeNode.merge}
    * mutates the existing node before recursing into children, the partially-merged node is discarded from the
-   * accumulator (it may be corrupt), the stage is marked merge-failed, and the query still completes.
+   * accumulator (it may be corrupt), the stage is poisoned, and the query still completes.
    *
-   * <p>Note: the second worker is counted as {@code mergeFailed} and NOT as {@code responded}, even though its payload
-   * decoded successfully — counting it as both would make {@code responded + mergeFailed} exceed the expected opchain
-   * count for the stage, so the coverage triple would not reconcile.
+   * <p>A shape mismatch means the workers of the stage disagree on the tree shape (typically version skew), so no
+   * merged result for the stage can be trusted: the first worker's report — whose data was dropped along with the
+   * tree — is reclassified from {@code responded} to {@code mergeFailed}, and any later report for the stage also
+   * counts as {@code mergeFailed} instead of re-seeding the accumulator. {@code responded + mergeFailed} still
+   * reconciles with the expected opchain count, and {@code responded} never overstates what the response contains.
    */
   @Test
   public void testShapeMismatchDoesNotAbortQuery()
@@ -280,13 +282,41 @@ public class StreamingQuerySessionTest {
     Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS),
         "query should complete despite shape mismatch");
     StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
-    // Only worker 0 merged cleanly; worker 1's merge failed, so responded + mergeFailed = 2 = expected (reconciles).
-    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 1,
-        "only the cleanly-merged worker counts as responded");
-    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 1,
-        "second worker's shape-mismatched opchain should be counted as merge-failed");
+    // The mismatch drops the stage tree, so worker 0's cleanly-merged data is gone too: both workers count as
+    // merge-failed and none as responded. responded + mergeFailed = 2 = expected (reconciles).
+    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 0,
+        "no worker counts as responded once the stage tree is dropped");
+    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 2,
+        "both the pre-mismatch and the mismatching worker should be counted as merge-failed");
     Assert.assertNull(coverage.getStageAccumulator().get(0),
         "the partially-merged stage entry should be discarded from the accumulator after the failed merge");
+  }
+
+  /**
+   * After a shape mismatch poisons a stage, a later report that decodes cleanly must NOT re-seed the accumulator:
+   * its data alone would misrepresent the stage (the pre-mismatch merges were already dropped), so it is counted as
+   * merge-failed and the stage stays absent from the accumulator.
+   */
+  @Test
+  public void testPoisonedStageIgnoresLaterReports()
+      throws Exception {
+    StreamingQuerySession session = new StreamingQuerySession(1L, 3);
+
+    // Worker 0 merges cleanly; worker 1 mismatches (HASH_JOIN vs AGGREGATE) and poisons the stage.
+    session.recordOpChainComplete(buildOpChainComplete(0, 0, 1, 5));
+    session.recordOpChainComplete(
+        buildOpChainCompleteWithTypeId(0, 1, MultiStageOperator.Type.HASH_JOIN.getId(), emptyStatBytes()));
+    // Worker 2 decodes cleanly, but the stage is poisoned.
+    session.recordOpChainComplete(buildOpChainComplete(0, 2, 1, 15));
+
+    Assert.assertTrue(session.awaitCompletion(1, TimeUnit.SECONDS));
+    StreamingQuerySession.Coverage coverage = session.snapshotCoverage();
+    Assert.assertEquals((int) coverage.getRespondedByStage().getOrDefault(0, 0), 0,
+        "no worker counts as responded for a poisoned stage");
+    Assert.assertEquals((int) coverage.getMergeFailedByStage().getOrDefault(0, 0), 3,
+        "all reports for a poisoned stage count as merge-failed");
+    Assert.assertNull(coverage.getStageAccumulator().get(0),
+        "a poisoned stage must not be re-seeded by a later clean report");
   }
 
   /**

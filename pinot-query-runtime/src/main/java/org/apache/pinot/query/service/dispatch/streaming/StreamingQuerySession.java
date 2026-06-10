@@ -20,6 +20,7 @@ package org.apache.pinot.query.service.dispatch.streaming;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -74,6 +75,14 @@ public class StreamingQuerySession {
   private final Map<Integer, Integer> _respondedByStage = new HashMap<>();
   /** Per-stage count of opchains that responded but the broker couldn't merge their payload. */
   private final Map<Integer, Integer> _mergeFailedByStage = new HashMap<>();
+  /**
+   * Stages whose accumulator hit a shape mismatch. A mismatch means the workers of this stage disagree on the tree
+   * shape (typically version skew), so no merged result for the stage can be trusted: the partially-merged tree is
+   * dropped, and every subsequent report for the stage is counted as {@code mergeFailed} rather than being allowed
+   * to silently re-seed the accumulator with just its own numbers (which would make {@code responded} overstate
+   * what the final tree actually contains). Guarded by {@link #_lock}.
+   */
+  private final Set<Integer> _poisonedStages = new HashSet<>();
 
   /** Set of open server streams. Iteration order is insertion order so cancel fan-out is deterministic. */
   private final Set<StreamingServerHandle> _openStreams = new LinkedHashSet<>();
@@ -176,9 +185,13 @@ public class StreamingQuerySession {
             stageId, message.getWorkerId(), _requestId, decodeError.getMessage());
         incrementLocked(_mergeFailedByStage, stageId);
       } else if (decoded != null) {
-        boolean currentMerged = mergeIntoAccumulatorLocked(decoded.getCurrentStageId(), decoded.getCurrentStage());
+        boolean currentMerged =
+            mergeIntoAccumulatorLocked(decoded.getCurrentStageId(), decoded.getCurrentStage(), true);
         for (Map.Entry<Integer, StageStatsTreeNode> upstream : decoded.getUpstreamStages().entrySet()) {
-          mergeIntoAccumulatorLocked(upstream.getKey(), upstream.getValue());
+          // Upstream trees belong to a DIFFERENT stage than the reporting opchain: merge (or poison) them, but do
+          // not touch that stage's coverage counters — those count the stage's own opchain reports, and crediting
+          // or blaming them for another stage's payload would break responded + mergeFailed + missing == expected.
+          mergeIntoAccumulatorLocked(upstream.getKey(), upstream.getValue(), false);
         }
         // Count this opchain as responded only when its current-stage merge succeeded. On a shape mismatch,
         // mergeIntoAccumulatorLocked already recorded mergeFailed for the stage; counting it as responded too would
@@ -201,10 +214,22 @@ public class StreamingQuerySession {
 
   /**
    * Merges {@code incoming} into the accumulator for {@code stageId}. Returns {@code true} if it was stored or merged
-   * cleanly, {@code false} if the merge hit a {@link StageStatsTreeNode.ShapeMismatchException} (in which case the
-   * stage is recorded as merge-failed).
+   * cleanly, {@code false} if the merge hit a {@link StageStatsTreeNode.ShapeMismatchException} or the stage is
+   * already poisoned.
+   *
+   * @param countInCoverage whether a failure should be recorded in the stage's coverage counters. {@code true} for
+   *                        the reporting opchain's own (current) stage; {@code false} for upstream trees, which
+   *                        belong to a different stage whose counters track that stage's own reports.
    */
-  private boolean mergeIntoAccumulatorLocked(int stageId, StageStatsTreeNode incoming) {
+  private boolean mergeIntoAccumulatorLocked(int stageId, StageStatsTreeNode incoming, boolean countInCoverage) {
+    if (_poisonedStages.contains(stageId)) {
+      // A previous report for this stage hit a shape mismatch, so no merged result can be trusted (see
+      // _poisonedStages). Count this report as merge-failed instead of letting it re-seed the accumulator.
+      if (countInCoverage) {
+        incrementLocked(_mergeFailedByStage, stageId);
+      }
+      return false;
+    }
     StageStatsTreeNode existing = _stageAccumulator.get(stageId);
     if (existing == null) {
       _stageAccumulator.put(stageId, incoming);
@@ -215,11 +240,18 @@ public class StreamingQuerySession {
       return true;
     } catch (StageStatsTreeNode.ShapeMismatchException e) {
       // StageStatsTreeNode.merge mutates _statMap before recursing into children, so a ShapeMismatchException
-      // thrown during child recursion leaves the existing node in a partially-accumulated state. Remove it so
-      // subsequent opchains for this stage do not merge into corrupt state.
+      // thrown during child recursion leaves the existing node in a partially-accumulated state. Remove it and
+      // poison the stage so subsequent opchains neither merge into corrupt state nor re-seed the accumulator.
+      // Reports that merged cleanly BEFORE the mismatch are reclassified as merge-failed too: their data is dropped
+      // along with the tree, and leaving them in `responded` would overstate what the response actually contains.
       _stageAccumulator.remove(stageId);
+      _poisonedStages.add(stageId);
       LOGGER.warn("Shape mismatch merging stage {} on request {}: {}", stageId, _requestId, e.getMessage());
-      incrementLocked(_mergeFailedByStage, stageId);
+      Integer previouslyResponded = _respondedByStage.remove(stageId);
+      int delta = (previouslyResponded == null ? 0 : previouslyResponded) + (countInCoverage ? 1 : 0);
+      if (delta > 0) {
+        _mergeFailedByStage.merge(stageId, delta, Integer::sum);
+      }
       return false;
     }
   }
