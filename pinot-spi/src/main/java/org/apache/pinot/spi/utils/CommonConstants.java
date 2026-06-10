@@ -1092,7 +1092,6 @@ public class CommonConstants {
         PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN,
         PlannerRuleNames.AGGREGATE_FUNCTION_REWRITE,
-        PlannerRuleNames.JOIN_PUSH_TRANSITIVE_PREDICATES,
         // Stock Calcite rule kept opt-in via usePlannerRules — see SORT_PROJECT_TRANSPOSE javadoc
         // above for the rationale (firing in BASIC_RULES disrupts ProjectToSemiJoinRule on
         // partition-hinted IN(SELECT) queries, breaking colocated broadcast semi-joins).
