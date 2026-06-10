@@ -37,7 +37,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -109,6 +108,22 @@ public class MaterializedViewPartitionManagerTest {
     new MaterializedViewPartitionManager(store, null).appendValid(TABLE, W0, W1, FP1);
   }
 
+  @Test
+  public void testAppendValidIdempotentOnLostAckReplay() {
+    // Lost-ack replay: ZK committed our appendValid write but the client saw a connection drop,
+    // so the CAS loop re-runs the mutator against our own committed state (bucket VALID, same
+    // fingerprint, watermark already advanced).  Must no-op successfully — NOT throw the strict
+    // "bucket already present" violation, which would hard-fail a minion task that succeeded.
+    HelixPropertyStore<ZNRecord> store = mock(HelixPropertyStore.class);
+    Map<Long, PartitionInfo> existing = new HashMap<>();
+    existing.put(W0, new PartitionInfo(PartitionState.VALID, FP1, 1L));
+    stubFetch(store, runtime(W1, existing), 3);
+
+    new MaterializedViewPartitionManager(store, null).appendValid(TABLE, W0, W1, FP1);
+
+    verify(store, never()).set(anyString(), any(ZNRecord.class), anyInt(), anyInt());
+  }
+
   @Test(expectedExceptions = IllegalStateException.class)
   public void testAppendValidThrowsWhenRuntimeMissing() {
     HelixPropertyStore<ZNRecord> store = mock(HelixPropertyStore.class);
@@ -148,13 +163,28 @@ public class MaterializedViewPartitionManagerTest {
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
-  public void testRefreshValidStrictRejectsValidBucket() {
+  public void testRefreshValidStrictRejectsValidBucketWithDifferentFingerprint() {
+    // VALID with a DIFFERENT fingerprint is a genuine dispatch-invariant violation (not a
+    // lost-ack replay of our own write) and must still fail loud.
     HelixPropertyStore<ZNRecord> store = mock(HelixPropertyStore.class);
     Map<Long, PartitionInfo> existing = new HashMap<>();
     existing.put(W0, new PartitionInfo(PartitionState.VALID, FP2, 1L));
     stubFetch(store, runtime(W0, existing), 0);
 
     new MaterializedViewPartitionManager(store, null).refreshValid(TABLE, W0, FP1);
+  }
+
+  @Test
+  public void testRefreshValidIdempotentOnLostAckReplay() {
+    // Same lost-ack shape as testAppendValidIdempotentOnLostAckReplay, for OVERWRITE commits.
+    HelixPropertyStore<ZNRecord> store = mock(HelixPropertyStore.class);
+    Map<Long, PartitionInfo> existing = new HashMap<>();
+    existing.put(W0, new PartitionInfo(PartitionState.VALID, FP1, 1L));
+    stubFetch(store, runtime(W1, existing), 5);
+
+    new MaterializedViewPartitionManager(store, null).refreshValid(TABLE, W0, FP1);
+
+    verify(store, never()).set(anyString(), any(ZNRecord.class), anyInt(), anyInt());
   }
 
   // ─────────────────────────────────────────────────────────────────────────────────────
@@ -243,6 +273,26 @@ public class MaterializedViewPartitionManagerTest {
     // Strict precondition (present & STALE) is checked before the emptiness guard, so an absent
     // bucket still throws regardless of the supplied fingerprint.
     new MaterializedViewPartitionManager(store, null).clearValid(TABLE, W0, () -> PartitionFingerprint.EMPTY);
+  }
+
+  @Test
+  public void testClearValidIdempotentOnLostAckReplay() {
+    // Lost-ack replay of a committed VALID-empty write: must no-op without re-invoking the
+    // source-emptiness supplier (a backfill landing after the committed write is the periodic
+    // sweep's responsibility, not this replay's).
+    HelixPropertyStore<ZNRecord> store = mock(HelixPropertyStore.class);
+    Map<Long, PartitionInfo> existing = new HashMap<>();
+    existing.put(W0, new PartitionInfo(PartitionState.VALID, PartitionFingerprint.EMPTY, 1L));
+    stubFetch(store, runtime(W0, existing), 4);
+
+    AtomicInteger supplierCalls = new AtomicInteger(0);
+    new MaterializedViewPartitionManager(store, null).clearValid(TABLE, W0, () -> {
+      supplierCalls.incrementAndGet();
+      return PartitionFingerprint.EMPTY;
+    });
+
+    assertEquals(supplierCalls.get(), 0, "idempotent replay must not re-read the source");
+    verify(store, never()).set(anyString(), any(ZNRecord.class), anyInt(), anyInt());
   }
 
   // ─────────────────────────────────────────────────────────────────────────────────────
@@ -470,20 +520,28 @@ public class MaterializedViewPartitionManagerTest {
   }
 
   @Test
-  public void testValidateForPersistFailureFailsFast() {
-    // Inject a non-CAS error from set() to verify other ZkException variants are retried.
-    // For validateForPersist failure we'd need to corrupt the metadata — covered indirectly
-    // by addPartitionInfo's strict invariant tests above.  This test guards against an
-    // accidental retry on transport ZkException being treated as a no-op.
+  public void testMutatorPreconditionViolationFailsFastWithoutRetry() {
+    // The retry-classification contract: an IllegalStateException thrown by the mutator (a
+    // precondition violation — same fail-fast class as a validateForPersist rejection, which is
+    // currently a documented no-op) must propagate on the FIRST attempt.  Burning the critical
+    // retry budget (128 attempts x backoff) on a deterministic violation would mask the
+    // actionable error for ~25 s and hammer ZK with useless re-fetches.
     HelixPropertyStore<ZNRecord> store = mock(HelixPropertyStore.class);
     Map<Long, PartitionInfo> existing = new HashMap<>();
-    existing.put(W0, new PartitionInfo(PartitionState.STALE, FP2, 1L));
-    stubFetch(store, runtime(W1, existing), 0);
-    stubSet(store, true);
+    existing.put(W0, new PartitionInfo(PartitionState.VALID, FP2, 1L));
+    stubFetch(store, runtime(W0, existing), 0);
 
-    // Sanity: revertValid succeeds in the happy path.
-    new MaterializedViewPartitionManager(store, null).revertValid(TABLE, W0);
-    verify(store, atLeastOnce()).set(anyString(), any(ZNRecord.class), anyInt(), anyInt());
+    try {
+      // VALID bucket with a different fingerprint => strict refreshValid violation.
+      new MaterializedViewPartitionManager(store, null).refreshValid(TABLE, W0, FP1);
+      fail("Expected IllegalStateException for the strict precondition violation");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("STALE"),
+          "message should describe the violated precondition; got: " + e.getMessage());
+    }
+    // Exactly one fetch (no retry burn) and no write.
+    verify(store, times(1)).get(anyString(), any(Stat.class), anyInt());
+    verify(store, never()).set(anyString(), any(ZNRecord.class), anyInt(), anyInt());
   }
 
   @Test

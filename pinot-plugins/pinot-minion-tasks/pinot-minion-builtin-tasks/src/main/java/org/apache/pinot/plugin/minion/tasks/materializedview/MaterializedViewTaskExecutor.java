@@ -48,6 +48,8 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.materializedview.executor.MaterializedViewQueryExecutor;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
 import org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
@@ -562,19 +564,45 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
 
   /// Computes the current source-table [PartitionFingerprint] for `[windowStartMs, windowEndMs)`
   /// from live ZK segment metadata.  Shared by the APPEND / OVERWRITE commit-time fingerprint
-  /// validation and the DELETE commit-time emptiness re-check.  Requires
-  /// [MaterializedViewTask#SOURCE_TABLE_NAME_KEY] in the task config (the scheduler sets it for
-  /// every task mode); fails loud if absent so a malformed / pre-upgrade task cannot silently
-  /// skip the validation.
-  private PartitionFingerprint computeSourceWindowFingerprint(Map<String, String> configs, String tableName,
+  /// validation and the DELETE commit-time emptiness re-check.  The source table normally comes
+  /// from [MaterializedViewTask#SOURCE_TABLE_NAME_KEY] in the task config; when the key is absent
+  /// (a DELETE task dispatched by a pre-upgrade controller that did not yet carry it), the
+  /// executor falls back to the authoritative source-table reference in
+  /// [MaterializedViewDefinitionMetadata] so a mixed-version rollout cannot strand legacy DELETE
+  /// tasks in a fail-retry loop.  Fails loud only when neither source is available.
+  @VisibleForTesting
+  PartitionFingerprint computeSourceWindowFingerprint(Map<String, String> configs, String tableName,
       long windowStartMs, long windowEndMs) {
     String sourceTableName = configs.get(MaterializedViewTask.SOURCE_TABLE_NAME_KEY);
-    Preconditions.checkState(sourceTableName != null && !sourceTableName.isEmpty(),
-        "Missing source table name for MV task table %s window [%s, %s)", tableName, windowStartMs, windowEndMs);
+    if (sourceTableName == null || sourceTableName.isEmpty()) {
+      sourceTableName = resolveSourceTableNameFromDefinition(tableName, windowStartMs, windowEndMs);
+    }
     String sourceTableWithType = resolveSourceTableNameWithType(sourceTableName);
     return MaterializedViewTaskUtils.computeWindowFingerprint(
         ZKMetadataProvider.getSegmentsZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), sourceTableWithType),
         windowStartMs, windowEndMs);
+  }
+
+  /// Backward-compatible fallback for task configs missing
+  /// [MaterializedViewTask#SOURCE_TABLE_NAME_KEY]: reads the source table from the MV's
+  /// definition znode, which the scheduler's cold-start path creates before dispatching any
+  /// task and which carries the same source-table reference the task config would.
+  /// Time-windowed MVs (the only shape in V1) have exactly one base table; fail loud on any
+  /// other shape rather than guessing.
+  private String resolveSourceTableNameFromDefinition(String tableName, long windowStartMs, long windowEndMs) {
+    MaterializedViewDefinitionMetadata definition =
+        MaterializedViewDefinitionMetadataUtils.fetch(MINION_CONTEXT.getHelixPropertyStore(), tableName);
+    Preconditions.checkState(definition != null,
+        "Missing source table name for MV task table %s window [%s, %s) and no definition znode "
+            + "to fall back to", tableName, windowStartMs, windowEndMs);
+    List<String> baseTables = definition.getBaseTables();
+    Preconditions.checkState(baseTables != null && baseTables.size() == 1,
+        "Missing source table name for MV task table %s window [%s, %s); definition fallback "
+            + "requires exactly one base table, got: %s", tableName, windowStartMs, windowEndMs, baseTables);
+    LOGGER.info("MV task config for table: {} window [{}, {}) carries no sourceTableName "
+            + "(pre-upgrade controller?); falling back to definition base table: {}",
+        tableName, windowStartMs, windowEndMs, baseTables.get(0));
+    return baseTables.get(0);
   }
 
   /// Returns `true` when a DELETE task must abort because the source window is no longer empty
@@ -601,20 +629,11 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
   }
 
   private String resolveSourceTableNameWithType(String sourceTableName) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(sourceTableName);
-    if (tableType != null) {
-      return sourceTableName;
-    }
-    String rawSourceTableName = TableNameBuilder.extractRawTableName(sourceTableName);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawSourceTableName);
-    if (ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), offlineTableName) != null) {
-      return offlineTableName;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawSourceTableName);
-    Preconditions.checkState(
-        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), realtimeTableName) != null,
-        "Source table config not found for: %s", sourceTableName);
-    return realtimeTableName;
+    String resolved = MaterializedViewTaskUtils.resolveTableNameWithType(
+        tableName -> ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableName),
+        sourceTableName);
+    Preconditions.checkState(resolved != null, "Source table config not found for: %s", sourceTableName);
+    return resolved;
   }
 
   @Override

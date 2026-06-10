@@ -32,7 +32,9 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
 import org.apache.pinot.materializedview.metadata.PartitionState;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,5 +233,30 @@ public final class MaterializedViewTaskUtils {
       hasher.putByte((byte) '\n');
     }
     return new PartitionFingerprint(overlapping.size(), hasher.hash().asLong());
+  }
+
+  /// Resolves a source-table reference to its type-suffixed form (`_OFFLINE` / `_REALTIME`)
+  /// using the supplied table-config lookup.  Single source of truth for the probe order —
+  /// the scheduler, the minion executor, and the consistency manager all resolve through this
+  /// method so the OFFLINE-first convention cannot drift between sites.
+  ///
+  /// A reference that already carries a type suffix is returned as-is (no probe).  Otherwise
+  /// OFFLINE is probed first, then REALTIME; returns `null` when neither table config exists —
+  /// callers that require a resolution fail loud with their own context-specific message.
+  @Nullable
+  public static String resolveTableNameWithType(Function<String, TableConfig> tableConfigProvider,
+      String sourceTableName) {
+    if (TableNameBuilder.getTableTypeFromTableName(sourceTableName) != null) {
+      return sourceTableName;
+    }
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(sourceTableName);
+    if (tableConfigProvider.apply(offlineTableName) != null) {
+      return offlineTableName;
+    }
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(sourceTableName);
+    if (tableConfigProvider.apply(realtimeTableName) != null) {
+      return realtimeTableName;
+    }
+    return null;
   }
 }

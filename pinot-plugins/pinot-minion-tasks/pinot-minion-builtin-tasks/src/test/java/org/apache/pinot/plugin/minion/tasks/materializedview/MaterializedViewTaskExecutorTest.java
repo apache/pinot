@@ -24,23 +24,31 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
 import org.apache.pinot.materializedview.metadata.PartitionState;
 import org.apache.pinot.materializedview.scheduler.MaterializedViewTaskUtils;
 import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -344,6 +352,63 @@ public class MaterializedViewTaskExecutorTest {
     } catch (IllegalStateException e) {
       assertTrue(e.getMessage().contains(TABLE),
           "message should name the table; got: " + e.getMessage());
+    } finally {
+      MinionContext.getInstance().setHelixPropertyStore(previous);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  //  Legacy task-config fallback: a DELETE task dispatched by a pre-upgrade controller carries
+  //  no SOURCE_TABLE_NAME_KEY; the executor must resolve the source from the definition znode
+  //  instead of failing the task for the whole mixed-version rollout.
+  // -----------------------------------------------------------------------
+
+  @Test
+  public void testComputeSourceWindowFingerprintFallsBackToDefinitionForLegacyTask()
+      throws Exception {
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    String mvTable = TABLE + "_OFFLINE";
+    String sourceTable = "orders";
+    String definitionPath =
+        ZKMetadataProvider.constructPropertyStorePathForMaterializedViewDefinition(mvTable);
+    MaterializedViewDefinitionMetadata definition = new MaterializedViewDefinitionMetadata(
+        mvTable, List.of(sourceTable), "SELECT count(*) FROM orders", Map.of(), null);
+    when(store.get(eq(definitionPath), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(definition.toZNRecord());
+    // The shared OFFLINE-first probe resolves the raw base table to orders_OFFLINE; its segment
+    // list stays unmocked (null children), so the recomputed window fingerprint is EMPTY.
+    String tableConfigPath =
+        ZKMetadataProvider.constructPropertyStorePathForResourceConfig(sourceTable + "_OFFLINE");
+    TableConfig sourceConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(sourceTable).build();
+    when(store.get(eq(tableConfigPath), any(), eq(AccessOption.PERSISTENT)))
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(sourceConfig));
+
+    ZkHelixPropertyStore<ZNRecord> previous = MinionContext.getInstance().getHelixPropertyStore();
+    try {
+      MinionContext.getInstance().setHelixPropertyStore(store);
+      // Legacy task config: no SOURCE_TABLE_NAME_KEY.
+      PartitionFingerprint fingerprint = new MaterializedViewTaskExecutor(null, null, null)
+          .computeSourceWindowFingerprint(new HashMap<>(), mvTable, WINDOW_START, WINDOW_END);
+      assertEquals(fingerprint, PartitionFingerprint.EMPTY,
+          "legacy task must resolve the source via the definition znode and recompute the fingerprint");
+    } finally {
+      MinionContext.getInstance().setHelixPropertyStore(previous);
+    }
+  }
+
+  @Test
+  public void testComputeSourceWindowFingerprintFailsLoudWithoutConfigOrDefinition() {
+    // Neither the task config nor ZK carries a source-table reference: fail loud (never guess).
+    ZkHelixPropertyStore<ZNRecord> store = mock(ZkHelixPropertyStore.class);
+    ZkHelixPropertyStore<ZNRecord> previous = MinionContext.getInstance().getHelixPropertyStore();
+    try {
+      MinionContext.getInstance().setHelixPropertyStore(store);
+      new MaterializedViewTaskExecutor(null, null, null)
+          .computeSourceWindowFingerprint(new HashMap<>(), TABLE + "_OFFLINE", WINDOW_START, WINDOW_END);
+      fail("Expected IllegalStateException when no source table reference is available");
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("definition"),
+          "message should point at the missing definition fallback; got: " + e.getMessage());
     } finally {
       MinionContext.getInstance().setHelixPropertyStore(previous);
     }

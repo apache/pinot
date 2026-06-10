@@ -305,6 +305,48 @@ public class MaterializedViewTaskSchedulerTest {
   }
 
   // ---------------------------------------------------------------------------
+  //  resolveAppendCutoffMs — converts the inclusive max source endTimeMs into the exclusive
+  //  windowEndMs convention the scheduling-loop gate (`windowEndMs > cutoffMs → break`) uses.
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testResolveAppendCutoffAdmitsExactlyCoveredBucket() {
+    // A day-aligned batch segment covering [0, bucketEnd - 1] (inclusive end) fully covers the
+    // bucket ending at bucketEnd.  The +1 conversion must admit that bucket: without it, a
+    // complete static dataset would never materialize its final bucket and `watermarkMs` would
+    // stall one bucket short of the data.
+    long bucketEndMs = 86_400_000L;
+    long roughCutoffMs = 10 * bucketEndMs;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, bucketEndMs - 1),
+        bucketEndMs, "inclusive segment end exactly covering the bucket must admit it");
+  }
+
+  @Test
+  public void testResolveAppendCutoffKeepsRoughCutoffWhenDataIsAhead() {
+    // Source data extends past the wall-clock buffer: the rough cutoff (now - bufferMs) must
+    // win, preserving the buffer semantics for late-arriving data.
+    long roughCutoffMs = 1_000_000L;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, 5_000_000L),
+        roughCutoffMs);
+  }
+
+  @Test
+  public void testResolveAppendCutoffFallsBackWhenNoUsableEndTime() {
+    long roughCutoffMs = 1_000_000L;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, Long.MIN_VALUE),
+        roughCutoffMs, "no usable source end time falls back to the rough cutoff");
+  }
+
+  @Test
+  public void testResolveAppendCutoffClampsCorruptMaxValueEndTime() {
+    // A corrupt Long.MAX_VALUE end time must not overflow `+ 1` into Long.MIN_VALUE (which
+    // would freeze APPEND scheduling forever); it clamps to the rough cutoff instead.
+    long roughCutoffMs = 1_000_000L;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, Long.MAX_VALUE),
+        roughCutoffMs);
+  }
+
+  // ---------------------------------------------------------------------------
   //  generateTasks DELETE path: a STALE partition whose source was retention-deleted must
   //  produce a DELETE task that carries SOURCE_TABLE_NAME_KEY, so the executor can recompute
   //  the source fingerprint at commit and leave the bucket STALE if a backfill landed.

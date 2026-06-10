@@ -213,6 +213,47 @@ public class MaterializedViewConsistencyManagerTest {
     assertEquals(updated.getPartitions().get(6 * BUCKET_MS).getState(), PartitionState.STALE);
   }
 
+  @Test
+  public void testAboveWatermarkValidBucketIsMarkedStale()
+      throws Exception {
+    // Out-of-order batch APPEND completion (or a mid-batch failure) can leave VALID buckets
+    // ABOVE the watermark — the scheduler's contiguous-VALID-upper handling exists precisely for
+    // that shape.  A base-table change landing in such a bucket must still mark it STALE: capping
+    // the affected range at the watermark would silently drop the mark, and once the gap below
+    // filled and the watermark advanced over the bucket, it would serve stale data with nothing
+    // left to re-mark it.
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    String runtimePath = ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(MV_TABLE);
+    // Bucket #0 covered (watermark = 1 bucket); bucket #2 VALID but above the watermark
+    // because bucket #1 failed mid-batch and is absent.
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(
+        MV_TABLE, BUCKET_MS,
+        Map.of(
+            0L, validInfo(),
+            2 * BUCKET_MS, validInfo()));
+    when(propertyStore.get(eq(runtimePath), any(Stat.class), eq(AccessOption.PERSISTENT)))
+        .thenReturn(runtime.toZNRecord());
+    when(propertyStore.set(eq(runtimePath), any(ZNRecord.class), eq(0), eq(AccessOption.PERSISTENT)))
+        .thenReturn(true);
+
+    MaterializedViewConsistencyManager manager = new MaterializedViewConsistencyManager();
+    manager.init(propertyStore);
+    manager.onMaterializedViewTableCreated(MV_TABLE, List.of(BASE_TABLE));
+    manager.onBaseTableDataChange(BASE_TABLE, 2 * BUCKET_MS, 3 * BUCKET_MS - 1);
+
+    manager.flush(BASE_TABLE);
+    manager.stop();
+
+    ArgumentCaptor<ZNRecord> recordCaptor = ArgumentCaptor.forClass(ZNRecord.class);
+    verify(propertyStore).set(eq(runtimePath), recordCaptor.capture(), eq(0), eq(AccessOption.PERSISTENT));
+    MaterializedViewRuntimeMetadata updated =
+        MaterializedViewRuntimeMetadata.fromZNRecord(recordCaptor.getValue());
+    assertEquals(updated.getPartitions().get(2 * BUCKET_MS).getState(), PartitionState.STALE,
+        "above-watermark VALID bucket must be marked STALE");
+    assertEquals(updated.getPartitions().get(0L).getState(), PartitionState.VALID,
+        "bucket outside the affected range stays VALID");
+  }
+
   /// Regression test for M3 + the typed-exception narrowing on persist(): a CAS conflict
   /// during STALE marking is silently retried; the retry succeeds.
   @Test

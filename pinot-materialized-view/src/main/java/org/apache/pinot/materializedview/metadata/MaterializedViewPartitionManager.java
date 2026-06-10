@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
@@ -102,8 +103,8 @@ import org.slf4j.LoggerFactory;
 /// This class manages exactly the partition map and `watermarkMs` field of
 /// [MaterializedViewRuntimeMetadata].  It MUST NOT acquire other znodes
 /// (e.g. [MaterializedViewDefinitionMetadata]), call source-table or table-config services,
-/// or grow a method count beyond the public DSL listed below.  See `red lines` in the PR
-/// description.
+/// or grow a method count beyond the public DSL listed below — callers that need source-side
+/// data pass it in (see the `Supplier` parameter on `clearValid`).
 public final class MaterializedViewPartitionManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(MaterializedViewPartitionManager.class);
 
@@ -166,11 +167,15 @@ public final class MaterializedViewPartitionManager {
   /// Splitting them across two CAS writes would create a transient window where the map
   /// has the new bucket but the watermark is stale.
   ///
-  /// Strict precondition: `windowStartMs` must NOT be present in the map.  A violation
-  /// (raced double-dispatch from the scheduler, mid-flight task replay) throws
-  /// [IllegalStateException] inside the CAS loop, which propagates without retry — the
-  /// scheduler dispatch invariant guarantees one APPEND per bucket per cycle, so this
-  /// firing indicates a real bug, not transient contention.
+  /// Strict precondition: `windowStartMs` must NOT be present in the map — with one
+  /// idempotency carve-out.  If the bucket is already `VALID` with the **same** fingerprint,
+  /// the call is a no-op: ZK's client-side `retryUntilConnected` can commit a write and then
+  /// replay it after a connection drop, so the replay's CAS conflict re-runs this mutator
+  /// against the manager's own committed write.  Failing there would hard-fail a minion task
+  /// that actually succeeded.  Any **other** existing entry (different fingerprint, non-VALID
+  /// state) still throws [IllegalStateException] inside the CAS loop, which propagates without
+  /// retry — the scheduler dispatch invariant guarantees one APPEND per bucket per cycle, so
+  /// that firing indicates a real bug, not transient contention.
   ///
   /// Retry profile: critical (cluster-tunable budget).
   public void appendValid(String tableNameWithType, long windowStartMs, long windowEndMs,
@@ -184,6 +189,13 @@ public final class MaterializedViewPartitionManager {
       Preconditions.checkState(current != null,
           "appendValid called before MV runtime znode was initialized for table: %s "
               + "(cold-start path skipped?)", tableNameWithType);
+      if (isAlreadyValidWithFingerprint(current, windowStartMs, fingerprint)) {
+        // Lost-ack replay: our own committed write (bucket VALID, same fingerprint, watermark
+        // already advanced in that same write) is being re-applied.  No-op, success.
+        LOGGER.info("appendValid: bucket {} for table {} already VALID with the same fingerprint; "
+            + "treating as an idempotent replay", windowStartMs, tableNameWithType);
+        return null;
+      }
       Map<Long, PartitionInfo> updated = new HashMap<>(current.getPartitions());
       addPartitionInfo(updated, windowStartMs,
           new PartitionInfo(PartitionState.VALID, fingerprint, System.currentTimeMillis()));
@@ -201,8 +213,10 @@ public final class MaterializedViewPartitionManager {
   /// changed.  Updates the in-place fingerprint and refreshes `lastRefreshTime`; watermark
   /// is unchanged because OVERWRITE only refreshes existing coverage.
   ///
-  /// Strict precondition: `windowStartMs` must be present and STALE.  A non-STALE entry
-  /// indicates the scheduler dispatch invariant was violated and throws
+  /// Strict precondition: `windowStartMs` must be present and STALE — with the same
+  /// idempotency carve-out as [#appendValid]: a bucket already `VALID` with the same
+  /// fingerprint is a lost-ack replay of our own committed write and no-ops.  Any other
+  /// non-STALE entry indicates the scheduler dispatch invariant was violated and throws
   /// [IllegalStateException] without retry.
   ///
   /// Retry profile: critical.
@@ -213,6 +227,11 @@ public final class MaterializedViewPartitionManager {
       Preconditions.checkState(current != null,
           "refreshValid called before MV runtime znode was initialized for table: %s",
           tableNameWithType);
+      if (isAlreadyValidWithFingerprint(current, windowStartMs, fingerprint)) {
+        LOGGER.info("refreshValid: bucket {} for table {} already VALID with the same fingerprint; "
+            + "treating as an idempotent replay", windowStartMs, tableNameWithType);
+        return null;
+      }
       Map<Long, PartitionInfo> updated = new HashMap<>(current.getPartitions());
       PartitionInfo existing = updated.get(windowStartMs);
       Preconditions.checkState(existing != null && existing.getState() == PartitionState.STALE,
@@ -275,8 +294,12 @@ public final class MaterializedViewPartitionManager {
   /// Until that design lands, this method preserves today's `VALID-empty` semantics so the
   /// scheduler's contiguous-VALID watermark walk continues to work without modification.
   ///
-  /// Strict precondition: `windowStartMs` must be present and STALE.  Non-STALE entries
-  /// indicate the scheduler dispatch invariant was violated; fail-loud surfaces the bug.
+  /// Strict precondition: `windowStartMs` must be present and STALE — with the same
+  /// idempotency carve-out as [#appendValid]: a bucket already `VALID` with the
+  /// [PartitionFingerprint#EMPTY] fingerprint is a lost-ack replay of our own committed
+  /// write and no-ops (a backfill landing after that committed write is the periodic
+  /// sweep's job, not this replay's).  Any other non-STALE entry indicates the scheduler
+  /// dispatch invariant was violated; fail-loud surfaces the bug.
   ///
   /// Retry profile: critical.
   public void clearValid(String tableNameWithType, long windowStartMs,
@@ -287,6 +310,11 @@ public final class MaterializedViewPartitionManager {
       Preconditions.checkState(current != null,
           "clearValid called before MV runtime znode was initialized for table: %s",
           tableNameWithType);
+      if (isAlreadyValidWithFingerprint(current, windowStartMs, PartitionFingerprint.EMPTY)) {
+        LOGGER.info("clearValid: bucket {} for table {} already VALID-empty; "
+            + "treating as an idempotent replay", windowStartMs, tableNameWithType);
+        return null;
+      }
       Map<Long, PartitionInfo> updated = new HashMap<>(current.getPartitions());
       PartitionInfo existing = updated.get(windowStartMs);
       Preconditions.checkState(existing != null && existing.getState() == PartitionState.STALE,
@@ -363,7 +391,7 @@ public final class MaterializedViewPartitionManager {
   ///
   /// Retry profile: critical.
   public void markStale(String tableNameWithType, long windowStartMs) {
-    markStale(tableNameWithType, java.util.Collections.singletonList(windowStartMs));
+    markStale(tableNameWithType, List.of(windowStartMs));
   }
 
   /// MARK_STALE op (batch): for each bucket in the input collection, flip VALID → STALE.
@@ -437,6 +465,19 @@ public final class MaterializedViewPartitionManager {
   // ─────────────────────────────────────────────────────────────────────────────────────
   //  Private CRUD primitives — fail-loud invariant checks on the in-memory map
   // ─────────────────────────────────────────────────────────────────────────────────────
+
+  /// True when the bucket already carries `VALID` with exactly the given fingerprint — the
+  /// signature of a lost-ack replay of this manager's own committed write (ZK's client-side
+  /// `retryUntilConnected` can commit a `set` and then replay it after a connection drop;
+  /// the replay fails with a version conflict and the CAS loop re-runs the mutator against
+  /// the already-committed state).  The strict ops treat this shape as an idempotent no-op
+  /// instead of a precondition violation.
+  private static boolean isAlreadyValidWithFingerprint(MaterializedViewRuntimeMetadata current,
+      long windowStartMs, PartitionFingerprint fingerprint) {
+    PartitionInfo existing = current.getPartitions().get(windowStartMs);
+    return existing != null && existing.getState() == PartitionState.VALID
+        && fingerprint.equals(existing.getFingerprint());
+  }
 
   /// Adds an entry that the caller asserts is currently absent.  Throws on violation —
   /// silent overwrite would mask races (e.g. a double-dispatched APPEND for the same

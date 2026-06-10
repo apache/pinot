@@ -370,6 +370,13 @@ public class MaterializedViewConsistencyManager {
   /// are enforced inside [MaterializedViewPartitionManager#markStale] under the CAS lock, so a
   /// concurrent executor's APPEND/OVERWRITE between our snapshot read and the manager's CAS
   /// read cannot cause us to over-mark.
+  ///
+  /// Worst-case latency note: the manager's critical profile can block for up to
+  /// ~25 s (128 attempts x 50–200 ms backoff) under sustained CAS contention, and this method
+  /// runs on the single-threaded scheduler shared with other tables' debounce flushes and the
+  /// periodic sweep.  That trade is deliberate — a dropped STALE mark is silent wrong data,
+  /// while a delayed flush for another table only extends its (already-debounced) staleness
+  /// window; reaching the budget cap requires pathological contention in the first place.
   private void markStaleThroughManager(String viewTableName, long affectedStartMs, long affectedEndMs) {
     List<Long> candidateBuckets;
     try {
@@ -573,29 +580,31 @@ public class MaterializedViewConsistencyManager {
     return stranded;
   }
 
-  /// Resolves the source base table to its `_OFFLINE` / `_REALTIME` form by probing which table
-  /// config exists (OFFLINE first, then REALTIME), returning `null` when neither is present.
+  /// Resolves the source base table to its `_OFFLINE` / `_REALTIME` form via the shared
+  /// OFFLINE-first probe in [MaterializedViewTaskUtils#resolveTableNameWithType], returning
+  /// `null` when neither table config is present.
   private String resolveSourceTableWithType(String rawBaseTableName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawBaseTableName);
-    if (ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName) != null) {
-      return offlineTableName;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawBaseTableName);
-    if (ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName) != null) {
-      return realtimeTableName;
-    }
-    return null;
+    return MaterializedViewTaskUtils.resolveTableNameWithType(
+        tableName -> ZKMetadataProvider.getTableConfig(_propertyStore, tableName), rawBaseTableName);
   }
 
   /// Returns the existing partition keys whose bucket overlaps
-  /// `[floorDiv(affectedStartMs, bucketMs) * bucketMs, cappedEnd]` — the candidates the manager
-  /// should consider marking STALE.  The manager filters this list down to entries that are still
-  /// VALID inside its CAS loop; this method's job is to (a) bound the range by the current
-  /// watermark (so a `Long.MAX_VALUE` full-invalidation does not iterate past real partitions) and
-  /// (b) restrict to buckets that actually exist in the partition map.
+  /// `[floorDiv(affectedStartMs, bucketMs) * bucketMs, affectedEndMs]` — the candidates the
+  /// manager should consider marking STALE.  The manager filters this list down to entries that
+  /// are still VALID inside its CAS loop; this method's job is to restrict the affected range to
+  /// buckets that actually exist in the partition map.
   ///
-  /// Returns an empty list when the runtime znode is missing or the affected range falls
-  /// entirely past the watermark.
+  /// The range is deliberately NOT capped at `watermarkMs`: VALID buckets above the watermark do
+  /// exist (out-of-order batch APPEND completion, mid-batch failure — see the scheduler's
+  /// contiguous-VALID-upper handling), and skipping them would silently drop the STALE mark for a
+  /// base-table change landing in such a bucket.  Once the gap below filled and the watermark
+  /// advanced over it, the bucket would serve stale data with nothing left to re-mark it.
+  /// Over-marking is harmless: above-watermark buckets are routed to the base table by V1
+  /// routing anyway, a STALE entry correctly blocks the contiguous-VALID watermark walk until
+  /// OVERWRITE re-materializes it, and the candidate list stays bounded by the partition count
+  /// because it iterates existing keys (so an unbounded `affectedEndMs` cannot blow it up).
+  ///
+  /// Returns an empty list when the runtime znode is missing.
   private List<Long> enumerateCandidateBuckets(String viewTableName, long affectedStartMs, long affectedEndMs) {
     Stat stat = new Stat();
     MaterializedViewRuntimeMetadata runtime =
@@ -613,31 +622,20 @@ public class MaterializedViewConsistencyManager {
             + "mark partitions without a bucket size.  Repair the MV table config.",
         viewTableName, bucketMs);
 
-    // Cap affectedEndMs at watermarkMs.  No partition with partStart > watermarkMs can exist
-    // (the writer invariant), so any bucket beyond that cannot be marked STALE anyway.  This
-    // bounds the candidate range for a caller passing Long.MAX_VALUE (full-range invalidation from
-    // notifyMaterializedViewConsistencyManager paths when segment startTime/endTime is unknown).
-    long cappedEnd = Math.min(affectedEndMs, runtime.getWatermarkMs());
-    if (cappedEnd < affectedStartMs) {
-      LOGGER.debug("Affected range [{}, {}] is past watermarkMs ({}) for MV table: {}; nothing to mark",
-          affectedStartMs, affectedEndMs, runtime.getWatermarkMs(), viewTableName);
-      return Collections.emptyList();
-    }
-
     // Select the EXISTING partition keys whose bucket [partStart, partStart+bucketMs) overlaps the
-    // affected range [affectedStartMs, cappedEnd] — i.e. partStart in
-    // [floorDiv(affectedStartMs, bucketMs) * bucketMs, cappedEnd].  Iterating the existing keys
-    // (rather than enumerating every slot in the range) bounds this list to the partition count,
-    // so a full-range invalidation with a small bucketMs and a large watermark horizon cannot
-    // allocate a list proportional to watermarkMs/bucketMs.  Absent buckets are intentionally NOT
-    // synthesized: under Design C a bucket's absence already means "MV does not cover this range"
-    // and the broker routes those queries to the base; the manager's markStale would no-op them
-    // anyway, so they are simply not candidates.  floorDiv (instead of /) defends a future caller
-    // passing a negative affectedStartMs.
+    // affected range [affectedStartMs, affectedEndMs] — i.e. partStart in
+    // [floorDiv(affectedStartMs, bucketMs) * bucketMs, affectedEndMs].  Iterating the existing
+    // keys (rather than enumerating every slot in the range) bounds this list to the partition
+    // count, so a full-range invalidation (affectedEndMs = Long.MAX_VALUE) cannot allocate a list
+    // proportional to range/bucketMs.  Absent buckets are intentionally NOT synthesized: under
+    // Design C a bucket's absence already means "MV does not cover this range" and the broker
+    // routes those queries to the base; the manager's markStale would no-op them anyway, so they
+    // are simply not candidates.  floorDiv (instead of /) defends a future caller passing a
+    // negative affectedStartMs.
     long firstBucketStartMs = Math.floorDiv(affectedStartMs, bucketMs) * bucketMs;
     List<Long> buckets = new ArrayList<>();
     for (long partStart : runtime.getPartitions().keySet()) {
-      if (partStart >= firstBucketStartMs && partStart <= cappedEnd) {
+      if (partStart >= firstBucketStartMs && partStart <= affectedEndMs) {
         buckets.add(partStart);
       }
     }

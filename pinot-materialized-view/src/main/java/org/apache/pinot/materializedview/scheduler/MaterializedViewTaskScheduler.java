@@ -265,12 +265,13 @@ public class MaterializedViewTaskScheduler {
       // it, no scheduling work is possible regardless of source state, so we fall through to
       // the loop where the first iteration breaks immediately — and the source-segment
       // fetch below is skipped. Stage 2: when stage 1 admits at least one candidate bucket,
-      // fetch source segments once and tighten the cutoff by `max(source segment endTimeMs)`.
-      // The tighter cap matters because without it the scheduler would walk past the actual
-      // data tail (each empty bucket completes with zero rows, executor persists a VALID-empty
-      // partition + advances watermark), so `watermarkMs` would drift toward `now - bufferMs`
-      // even when source ingestion has stalled — defeating the staleness-threshold contract
-      // the broker uses in `now - watermarkMs <= stalenessThresholdMs`. See
+      // fetch source segments once and tighten the cutoff by the end of the source data
+      // (see resolveAppendCutoffMs). The tighter cap matters because without it the scheduler
+      // would walk past the actual data tail (each empty bucket completes with zero rows,
+      // executor persists a VALID-empty partition + advances watermark), so `watermarkMs`
+      // would drift toward `now - bufferMs` even when source ingestion has stalled —
+      // defeating the staleness-threshold contract the broker uses in
+      // `now - watermarkMs <= stalenessThresholdMs`. See
       // `MaterializedViewQueryRewriteEngine#isEligible`.
       long roughCutoffMs = System.currentTimeMillis() - bufferMs;
       long cutoffMs;
@@ -281,8 +282,7 @@ public class MaterializedViewTaskScheduler {
       } else {
         long maxSourceEndMs =
             computeMaxSourceEndTimeMs(_context.getSegmentsZKMetadata(sourceTableWithType));
-        cutoffMs =
-            (maxSourceEndMs == Long.MIN_VALUE) ? roughCutoffMs : Math.min(roughCutoffMs, maxSourceEndMs);
+        cutoffMs = resolveAppendCutoffMs(roughCutoffMs, maxSourceEndMs);
       }
       int scheduled = 0;
 
@@ -937,16 +937,13 @@ public class MaterializedViewTaskScheduler {
     return watermarkMs;
   }
 
-  /// Resolves the source table name with type suffix. Tries OFFLINE first, then REALTIME.
+  /// Resolves the source table name with type suffix via the shared OFFLINE-first probe in
+  /// [MaterializedViewTaskUtils#resolveTableNameWithType]; fails loud when neither table
+  /// config exists (the scheduler cannot generate tasks against a missing source).
   private String resolveSourceTableNameWithType(String rawSourceTableName) {
-    String sourceTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawSourceTableName);
-    TableConfig sourceTableConfig = _context.getTableConfig(sourceTableWithType);
-    if (sourceTableConfig != null) {
-      return sourceTableWithType;
-    }
-    sourceTableWithType = TableNameBuilder.REALTIME.tableNameWithType(rawSourceTableName);
-    sourceTableConfig = _context.getTableConfig(sourceTableWithType);
-    Preconditions.checkState(sourceTableConfig != null,
+    String sourceTableWithType = MaterializedViewTaskUtils.resolveTableNameWithType(
+        _context::getTableConfig, rawSourceTableName);
+    Preconditions.checkState(sourceTableWithType != null,
         "Source table config not found for: %s", rawSourceTableName);
     return sourceTableWithType;
   }
@@ -974,5 +971,25 @@ public class MaterializedViewTaskScheduler {
       }
     }
     return maxEndMs;
+  }
+
+  /// Tightens the wall-clock APPEND cutoff (`now - bufferMs`) by the end of the source data,
+  /// so the scheduler never materializes buckets past the data tail (see the stage-2 comment
+  /// in [#generateTasks]).
+  ///
+  /// `maxSourceEndMs` is the **inclusive** maximum `endTimeMs` across source segments (the
+  /// same convention `computeWindowFingerprint`'s overlap filter relies on), while the loop
+  /// gate compares against the bucket's **exclusive** `windowEndMs`.  The `+ 1` converts
+  /// between the two: a segment ending at `windowEndMs - 1` fully covers the bucket and must
+  /// admit it — without the adjustment, a complete day-aligned batch segment would never
+  /// admit its own final bucket, and a static historical dataset would never materialize its
+  /// last window.  `Long.MIN_VALUE` (no usable end time) falls back to the rough cutoff, and
+  /// a corrupt `Long.MAX_VALUE` end time is clamped rather than overflowed.
+  @VisibleForTesting
+  static long resolveAppendCutoffMs(long roughCutoffMs, long maxSourceEndMs) {
+    if (maxSourceEndMs == Long.MIN_VALUE || maxSourceEndMs == Long.MAX_VALUE) {
+      return roughCutoffMs;
+    }
+    return Math.min(roughCutoffMs, maxSourceEndMs + 1);
   }
 }
