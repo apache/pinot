@@ -21,6 +21,8 @@ package org.apache.pinot.broker.broker.helix;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -116,6 +118,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountantUtils;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManagerFactory;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -470,11 +473,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         }
         // Convert the formatted time-boundary value to epoch-milliseconds using the offline
         // table's DateTimeFormatSpec, falling back to a direct Long parse when no schema is found.
+        // Read schema and config from the TableCache: this lambda runs on the query planning path,
+        // so it must never touch ZooKeeper synchronously.
         try {
-          Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, offlineTable);
+          Schema schema = _tableCache.getSchema(rawTableName);
           if (schema != null) {
-            org.apache.pinot.spi.config.table.TableConfig tc =
-                _tableCache.getTableConfig(offlineTable);
+            TableConfig tc = _tableCache.getTableConfig(offlineTable);
             if (tc != null) {
               String timeCol = tc.getValidationConfig().getTimeColumnName();
               if (timeCol != null) {
@@ -829,7 +833,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    */
   @Nullable
   private BrokerTableStatsManager createStatsManager() {
-    java.nio.file.Path statsDir = resolveStatsDir();
+    Path statsDir = resolveStatsDir();
     LOGGER.info("Initializing BrokerTableStatsManager at {}", statsDir);
     SqliteStatsStore statsStore = new SqliteStatsStore(statsDir);
     BrokerTableStatsManager statsManager = new BrokerTableStatsManager(statsStore);
@@ -841,7 +845,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
           e.getMessage(), e);
       try {
         statsManager.close();
-      } catch (java.io.IOException closeEx) {
+      } catch (IOException closeEx) {
         LOGGER.warn("Error closing failed stats manager: {}", closeEx.getMessage());
       }
       return null;
@@ -853,14 +857,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * set; otherwise falls back to {@code <pinot.broker.instance.dataDir>/broker-stats} or
    * {@code <java.io.tmpdir>/broker-stats} when no data dir is configured.
    */
-  private java.nio.file.Path resolveStatsDir() {
+  private Path resolveStatsDir() {
     String configured = _brokerConf.getProperty(Broker.CONFIG_OF_STATS_DIR);
     if (configured != null && !configured.isEmpty()) {
-      return java.nio.file.Paths.get(configured);
+      return Paths.get(configured);
     }
     // Broker has no standard INSTANCE_DATA_DIR; use tmpdir/<instanceId>/broker-stats so that
     // multiple broker instances on the same host do not share the same SQLite file.
-    return java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), _instanceId, "broker-stats");
+    return Paths.get(System.getProperty("java.io.tmpdir"), _instanceId, "broker-stats");
   }
 
   protected void initSpectatorHelixManager() throws Exception {

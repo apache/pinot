@@ -61,6 +61,9 @@ public class PinotTable extends AbstractTable implements ScannableTable {
   private final PinotStatisticsProvider _statisticsProvider;
   @Nullable
   private final String _timeColumnName;
+  /** Memoized result of {@link #getStatistic()}; Calcite may call it many times per planning. */
+  @Nullable
+  private Statistic _statistic;
 
   public PinotTable(Schema schema) {
     this(schema, false);
@@ -119,6 +122,15 @@ public class PinotTable extends AbstractTable implements ScannableTable {
    */
   @Override
   public Statistic getStatistic() {
+    Statistic statistic = _statistic;
+    if (statistic == null) {
+      statistic = computeStatistic();
+      _statistic = statistic;
+    }
+    return statistic;
+  }
+
+  private Statistic computeStatistic() {
     if (_tableName == null) {
       return Statistics.UNKNOWN;
     }

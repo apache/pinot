@@ -333,6 +333,9 @@
     <testcontainers.version>2.0.5</testcontainers.version>
     <h2.version>2.4.240</h2.version>
     <sqlite-jdbc.version>3.46.1.3</sqlite-jdbc.version>
+    <!-- Flyway 8.x is used intentionally: it is the last major line with SQLite support built into
+         flyway-core (Flyway 10+ split database support into separate modules). Only used for the
+         broker-local stats DB schema. -->
     <flyway-core.version>8.5.13</flyway-core.version>
     <jnr-posix.version>3.1.22</jnr-posix.version>
     <scalatest.version>3.2.20</scalatest.version>

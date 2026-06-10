@@ -93,15 +93,21 @@ public class PinotRelMdSelectivity implements MetadataHandler<BuiltInMetadata.Se
    * Filter-on-trivial-Project-on-Scan) are enhanced; all other shapes delegate to the default.
    */
   public Double getSelectivity(Filter rel, RelMetadataQuery mq, @Nullable RexNode predicate) {
+    // Calcite contract (see RelMdSelectivity#getSelectivity(Filter, ...)): when a predicate is
+    // passed in, subtract the filter's own condition first — its selectivity is already reflected
+    // in the filter's row count, and estimating it again would double-apply it. A null predicate
+    // means "apply the filter's own condition".
+    RexNode effectivePred = predicate != null
+        ? RelMdUtil.minusPreds(rel.getCluster().getRexBuilder(), predicate, rel.getCondition())
+        : rel.getCondition();
+
     // Resolve the scan and column-index mapping (null if the chain is too deep).
     ScanContext ctx = resolveScan(rel.getInput());
     if (ctx == null) {
-      // Fall back: delegate to the scan's row-count-weighted path.
-      return RelMdUtil.guessSelectivity(predicate != null ? predicate : rel.getCondition());
+      // Not a recognizable Pinot scan chain: delegate to the input like the default handler so
+      // Calcite's input-specific handlers (Project/Aggregate/Union) still apply.
+      return mq.getSelectivity(rel.getInput(), effectivePred);
     }
-
-    // The predicate passed in may be null, meaning "apply the filter's own condition".
-    RexNode effectivePred = predicate != null ? predicate : rel.getCondition();
     return computeSelectivity(effectivePred, ctx, mq);
   }
 

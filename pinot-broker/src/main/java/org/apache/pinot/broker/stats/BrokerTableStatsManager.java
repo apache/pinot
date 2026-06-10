@@ -21,6 +21,7 @@ package org.apache.pinot.broker.stats;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
@@ -247,7 +248,7 @@ public class BrokerTableStatsManager implements Closeable {
      * <p>Accessed only from the routing-manager's per-table lock — no additional
      * synchronization needed.
      */
-    private final Set<String> _persistedSegments = new java.util.HashSet<>();
+    private final Set<String> _persistedSegments = new HashSet<>();
 
     TableStatsZkListener(String tableNameWithType, StatsStore statsStore) {
       _tableNameWithType = tableNameWithType;
@@ -401,7 +402,10 @@ public class BrokerTableStatsManager implements Closeable {
         LOG.debug("Segment {} has negative totalDocs ({}); storing 0", segmentName, totalDocs);
         totalDocs = 0;
       }
-      return new SegmentStatsRow(segmentName, meta.getCrc(), totalDocs, meta.getSizeInBytes(),
+      // Size is -1 when unknown in ZK metadata; clamp so SUM(size_bytes) is not skewed downwards
+      // by sentinel values.
+      long sizeBytes = Math.max(meta.getSizeInBytes(), 0);
+      return new SegmentStatsRow(segmentName, meta.getCrc(), totalDocs, sizeBytes,
           meta.getStartTimeMs(), meta.getEndTimeMs(), consuming);
     }
   }

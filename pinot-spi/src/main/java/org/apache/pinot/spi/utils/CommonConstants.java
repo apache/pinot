@@ -595,17 +595,24 @@ public class CommonConstants {
 
     /**
      * [EXPERIMENTAL] When {@code true}, the broker collects per-segment statistics into a local
-     * SQLite store ({@link #CONFIG_OF_STATS_DIR}) and exposes them to the cost-based query
-     * planner.  Disabled by default; enabling has no effect on query correctness.
+     * SQLite store ({@link #CONFIG_OF_STATS_DIR}) and exposes them to the multi-stage query
+     * planner. Disabled by default.
+     *
+     * <p>Note: enabling this changes the row-count and selectivity ESTIMATES the planner sees for
+     * ALL multi-stage queries (any planner rule consulting cardinality metadata observes the
+     * statistics-backed numbers instead of Calcite defaults). It never affects query correctness,
+     * but plans — and therefore performance characteristics — may change. The cost-based join
+     * reorder phase is additionally gated by its own option
+     * ({@link Request.QueryOptionKey#USE_JOIN_REORDER}).
      */
     public static final String CONFIG_OF_STATS_ENABLED = "pinot.broker.stats.enabled";
     public static final boolean DEFAULT_STATS_ENABLED = false;
 
     /**
      * [EXPERIMENTAL] Directory in which the broker stores the CBO statistics database file
-     * ({@code broker-stats.sqlite}).  Defaults to
-     * {@code <pinot.broker.instance.dataDir>/broker-stats} when {@code dataDir} is configured,
-     * or {@code <java.io.tmpdir>/broker-stats} otherwise.
+     * ({@code broker-stats.sqlite}). Defaults to {@code <java.io.tmpdir>/<instanceId>/broker-stats}
+     * (per-instance so multiple brokers on one host do not share a database). Configure a path on
+     * a persistent volume to preserve collected statistics across restarts.
      */
     public static final String CONFIG_OF_STATS_DIR = "pinot.broker.stats.dir";
 

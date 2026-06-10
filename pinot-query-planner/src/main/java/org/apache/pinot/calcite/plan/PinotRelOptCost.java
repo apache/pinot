@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.plan;
 
+import java.util.Objects;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptCostFactory;
 
@@ -218,7 +219,7 @@ public class PinotRelOptCost implements RelOptCost {
 
   @Override
   public int hashCode() {
-    return java.util.Objects.hash(_rows, _cpu, _io);
+    return Objects.hash(_rows, _cpu, _io);
   }
 
   /**

@@ -163,8 +163,10 @@ public final class JoinReorderOptimizer {
             + "mechanism if this fires regularly.", elapsedMs, visitor._joinCount);
       }
       return result;
-    } catch (Throwable t) {
-      // Robustness: a failed reorder must never fail the query. Fall back to the original plan.
+    } catch (Exception | StackOverflowError t) {
+      // Robustness: a failed reorder must never fail the query (StackOverflowError covers very
+      // deep join trees). Other Errors (OOM etc.) propagate — swallowing them would hide real
+      // JVM-level problems. Fall back to the original plan.
       LOGGER.warn("Join reorder phase failed ({}: {}); continuing with the un-reordered plan",
           SkipReason.ERROR, t.getMessage(), t);
       return logicalPlan;
