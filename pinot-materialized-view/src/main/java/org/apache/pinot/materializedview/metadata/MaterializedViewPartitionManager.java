@@ -192,7 +192,7 @@ public final class MaterializedViewPartitionManager {
       if (isAlreadyValidWithFingerprint(current, windowStartMs, fingerprint)) {
         // Lost-ack replay: our own committed write (bucket VALID, same fingerprint, watermark
         // already advanced in that same write) is being re-applied.  No-op, success.
-        LOGGER.info("appendValid: bucket {} for table {} already VALID with the same fingerprint; "
+        LOGGER.warn("appendValid: bucket {} for table {} already VALID with the same fingerprint; "
             + "treating as an idempotent replay", windowStartMs, tableNameWithType);
         return null;
       }
@@ -228,7 +228,7 @@ public final class MaterializedViewPartitionManager {
           "refreshValid called before MV runtime znode was initialized for table: %s",
           tableNameWithType);
       if (isAlreadyValidWithFingerprint(current, windowStartMs, fingerprint)) {
-        LOGGER.info("refreshValid: bucket {} for table {} already VALID with the same fingerprint; "
+        LOGGER.warn("refreshValid: bucket {} for table {} already VALID with the same fingerprint; "
             + "treating as an idempotent replay", windowStartMs, tableNameWithType);
         return null;
       }
@@ -311,7 +311,7 @@ public final class MaterializedViewPartitionManager {
           "clearValid called before MV runtime znode was initialized for table: %s",
           tableNameWithType);
       if (isAlreadyValidWithFingerprint(current, windowStartMs, PartitionFingerprint.EMPTY)) {
-        LOGGER.info("clearValid: bucket {} for table {} already VALID-empty; "
+        LOGGER.warn("clearValid: bucket {} for table {} already VALID-empty; "
             + "treating as an idempotent replay", windowStartMs, tableNameWithType);
         return null;
       }
@@ -471,7 +471,16 @@ public final class MaterializedViewPartitionManager {
   /// `retryUntilConnected` can commit a `set` and then replay it after a connection drop;
   /// the replay fails with a version conflict and the CAS loop re-runs the mutator against
   /// the already-committed state).  The strict ops treat this shape as an idempotent no-op
-  /// instead of a precondition violation.
+  /// instead of a precondition violation.  The same shape also absorbs a crash-then-Helix-retry
+  /// re-commit of an identical task attempt.
+  ///
+  /// Known residual: the carve-out cannot distinguish those benign replays from a *concurrent*
+  /// duplicate attempt (a zombie minion task still running after a Helix timeout re-dispatch —
+  /// there is no fencing), whose metadata commit now succeeds silently instead of throwing.
+  /// Two live attempts for the same window compute identical fingerprints, but their disjoint
+  /// segment-lineage replaces can both survive, duplicating segments without a failure signal.
+  /// Callers log this path at WARN so an unexpected carve-out frequency is operator-visible;
+  /// commit-time verification of the window's live segment set is the stronger follow-up.
   private static boolean isAlreadyValidWithFingerprint(MaterializedViewRuntimeMetadata current,
       long windowStartMs, PartitionFingerprint fingerprint) {
     PartitionInfo existing = current.getPartitions().get(windowStartMs);

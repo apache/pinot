@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -48,6 +49,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -394,5 +396,72 @@ public class MaterializedViewTaskSchedulerTest {
     assertEquals(configs.get(MaterializedViewTask.TASK_MODE_KEY), MaterializedViewTask.TASK_MODE_DELETE);
     assertEquals(configs.get(MaterializedViewTask.SOURCE_TABLE_NAME_KEY), sourceTable,
         "DELETE task must carry the source table so the executor can re-validate emptiness at commit");
+  }
+
+  // ---------------------------------------------------------------------------
+  //  APPEND loop must fill ABSENT buckets only.  Since the consistency manager marks
+  //  above-watermark VALID buckets STALE (the watermark cap was removed), a STALE bucket can
+  //  sit inside the APPEND scheduling range; dispatching an APPEND for it would race the
+  //  in-flight / upcoming OVERWRITE on the same window (concurrent segment-replace =>
+  //  potentially duplicated rows with no failure signal).
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testAppendLoopSkipsAboveWatermarkStaleBucket() {
+    String sourceTable = "orders";
+    String sourceTableOffline = "orders_OFFLINE";
+    String mvTableOffline = "mv_OFFLINE";
+    long bucketMs = 86_400_000L;
+    long b0 = 1_700_006_400_000L;
+    long b1 = b0 + bucketMs;
+    long b2 = b0 + 2 * bucketMs;
+    long b3 = b0 + 3 * bucketMs;
+
+    HelixPropertyStore<ZNRecord> store = mockPropertyStore();
+    MaterializedViewTaskGeneratorContext context = mock(MaterializedViewTaskGeneratorContext.class);
+    when(context.getPropertyStore()).thenReturn(store);
+    when(context.getVipUrl()).thenReturn("http://controller:9000");
+    when(context.getTableConfig(sourceTableOffline)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(sourceTable).build());
+    // Source data ends exactly at the STALE bucket's inclusive end, so the stage-2 cutoff
+    // admits [b2, b3) and nothing beyond — the STALE bucket is the only candidate slot.
+    // (Built before the when() below: stubbing a mock inside another stubbing trips Mockito.)
+    SegmentZKMetadata sourceTail = segmentWithEndMs(b3 - 1);
+    when(context.getSegmentsZKMetadata(sourceTableOffline)).thenReturn(
+        Collections.singletonList(sourceTail));
+    // One in-flight OVERWRITE for [b2, b3) — the step-1 dispatch from the previous cycle —
+    // so step 1 is skipped this cycle and only the APPEND loop runs.
+    doAnswer(inv -> {
+      Consumer<Map<String, String>> consumer = inv.getArgument(2);
+      consumer.accept(Map.of(
+          MaterializedViewTask.TASK_MODE_KEY, MaterializedViewTask.TASK_MODE_OVERWRITE,
+          MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(b2),
+          MaterializedViewTask.WINDOW_END_MS_KEY, String.valueOf(b3)));
+      return null;
+    }).when(context).forRunningTasks(eq(mvTableOffline), eq(MaterializedViewTask.TASK_TYPE), any());
+
+    // Contiguous VALID chain up to the watermark (b2); b2 itself is STALE above the frontier
+    // (the consistency manager marked it after an out-of-order completion).
+    Map<Long, PartitionInfo> partitions = new HashMap<>();
+    partitions.put(b0, PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(1, 1L), 1L));
+    partitions.put(b1, PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(1, 2L), 1L));
+    partitions.put(b2, PartitionInfo.forTesting(PartitionState.STALE, new PartitionFingerprint(1, 3L), 1L));
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(mvTableOffline, b2, partitions);
+    when(store.get(
+        eq(ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(mvTableOffline)),
+        any(Stat.class), eq(AccessOption.PERSISTENT))).thenReturn(runtime.toZNRecord());
+
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(MaterializedViewTask.TASK_TYPE, Map.of(
+        MaterializedViewTask.DEFINED_SQL_KEY, "SELECT city, COUNT(*) FROM " + sourceTable + " GROUP BY city",
+        MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, "1d")));
+    TableConfig mvConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("mv").setIsMaterializedView(true).setTaskConfig(taskConfig).build();
+
+    List<PinotTaskConfig> tasks =
+        new MaterializedViewTaskScheduler(context).generateTasks(Collections.singletonList(mvConfig));
+
+    assertTrue(tasks.isEmpty(), "the STALE bucket is the exclusive (OVERWRITE/DELETE) step's "
+        + "responsibility; the APPEND loop must skip it instead of double-dispatching the same "
+        + "window, got: " + tasks);
   }
 }

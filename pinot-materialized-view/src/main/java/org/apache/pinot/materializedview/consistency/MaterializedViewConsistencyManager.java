@@ -601,8 +601,11 @@ public class MaterializedViewConsistencyManager {
   /// advanced over it, the bucket would serve stale data with nothing left to re-mark it.
   /// Over-marking is harmless: above-watermark buckets are routed to the base table by V1
   /// routing anyway, a STALE entry correctly blocks the contiguous-VALID watermark walk until
-  /// OVERWRITE re-materializes it, and the candidate list stays bounded by the partition count
-  /// because it iterates existing keys (so an unbounded `affectedEndMs` cannot blow it up).
+  /// OVERWRITE re-materializes it, the scheduler's APPEND loop skips ANY present entry (so an
+  /// above-watermark STALE bucket is handled exclusively by the OVERWRITE/DELETE step and can
+  /// never be double-dispatched as an APPEND), and the candidate list stays bounded by the
+  /// partition count because it iterates existing keys (so an unbounded `affectedEndMs` cannot
+  /// blow it up).
   ///
   /// Returns an empty list when the runtime znode is missing.
   private List<Long> enumerateCandidateBuckets(String viewTableName, long affectedStartMs, long affectedEndMs) {

@@ -304,10 +304,16 @@ public class MaterializedViewTaskScheduler {
         if (windowEndMs > cutoffMs) {
           break;
         }
-        // Skip already-VALID slots from a prior partial batch (mid-batch failure recovery).
-        // Re-running an APPEND for a VALID partition would produce duplicate segments.
+        // Skip any bucket that already has an entry — APPEND only fills ABSENT buckets.
+        // VALID slots come from a prior partial batch (mid-batch failure recovery);
+        // re-running APPEND for one would produce duplicate segments.  STALE slots can
+        // appear above the watermark too (the consistency manager marks out-of-order
+        // VALID buckets STALE wherever they sit); those are exclusively step 1's
+        // responsibility (OVERWRITE / DELETE) — dispatching an APPEND for one would race
+        // the in-flight or upcoming exclusive task on the same window, risking concurrent
+        // segment-replace on the same window and duplicated rows.
         PartitionInfo existing = partitionInfos.get(nextWindowStartMs);
-        if (existing != null && existing.getState() == PartitionState.VALID) {
+        if (existing != null) {
           nextWindowStartMs = windowEndMs;
           continue;
         }

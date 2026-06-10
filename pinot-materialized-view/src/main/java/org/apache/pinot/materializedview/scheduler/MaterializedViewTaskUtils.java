@@ -240,9 +240,11 @@ public final class MaterializedViewTaskUtils {
   /// the scheduler, the minion executor, and the consistency manager all resolve through this
   /// method so the OFFLINE-first convention cannot drift between sites.
   ///
-  /// A reference that already carries a type suffix is returned as-is (no probe).  Otherwise
-  /// OFFLINE is probed first, then REALTIME; returns `null` when neither table config exists —
-  /// callers that require a resolution fail loud with their own context-specific message.
+  /// A reference that already carries a type suffix is returned as-is — WITHOUT verifying that
+  /// its table config exists; callers needing existence pair this with their own check.  An
+  /// untyped reference probes OFFLINE first, then REALTIME; returns `null` when neither table
+  /// config exists — callers that require a resolution fail loud with their own
+  /// context-specific message.
   @Nullable
   public static String resolveTableNameWithType(Function<String, TableConfig> tableConfigProvider,
       String sourceTableName) {

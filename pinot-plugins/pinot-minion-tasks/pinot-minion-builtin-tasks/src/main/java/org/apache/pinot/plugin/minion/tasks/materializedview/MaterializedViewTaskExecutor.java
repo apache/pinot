@@ -589,6 +589,10 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
   /// task and which carries the same source-table reference the task config would.
   /// Time-windowed MVs (the only shape in V1) have exactly one base table; fail loud on any
   /// other shape rather than guessing.
+  ///
+  /// TODO: remove this shim once every controller in supported rolling-upgrade paths sets
+  /// SOURCE_TABLE_NAME_KEY on DELETE tasks (i.e. the first release containing this PR is the
+  /// minimum supported version).
   private String resolveSourceTableNameFromDefinition(String tableName, long windowStartMs, long windowEndMs) {
     MaterializedViewDefinitionMetadata definition =
         MaterializedViewDefinitionMetadataUtils.fetch(MINION_CONTEXT.getHelixPropertyStore(), tableName);
