@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
 
@@ -572,6 +573,18 @@ public class TableConfigBuilder {
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
+    }
+
+    // Propagate deprecated push-type/frequency into BatchIngestionConfig (the correct storage location)
+    // if not already configured, so consumers reading BatchIngestionConfig see the same values.
+    if (_segmentPushType != null || _segmentPushFrequency != null) {
+      if (_ingestionConfig == null) {
+        _ingestionConfig = new IngestionConfig();
+      }
+      if (_ingestionConfig.getBatchIngestionConfig() == null) {
+        _ingestionConfig.setBatchIngestionConfig(
+            new BatchIngestionConfig(null, _segmentPushType, _segmentPushFrequency));
+      }
     }
 
     TableConfig tableConfig =
