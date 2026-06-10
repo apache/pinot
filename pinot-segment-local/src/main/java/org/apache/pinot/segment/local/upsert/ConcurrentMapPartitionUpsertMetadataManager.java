@@ -378,6 +378,19 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           if (currentRecordLocation != null) {
             // Existing primary key
             IndexSegment currentSegment = currentRecordLocation.getSegment();
+
+            // If existing metadata is expired per TTL, treat as new key
+            if (_metadataTTL > 0 && isOutOfMetadataTTL(
+                ((Number) currentRecordLocation.getComparisonValue()).doubleValue())) {
+              int currentDocId = currentRecordLocation.getDocId();
+              if (segment == currentSegment) {
+                replaceDocId(segment, validDocIds, queryableDocIds, currentDocId, newDocId, recordInfo);
+              } else {
+                replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
+              }
+              return new RecordLocation(segment, newDocId, newComparisonValue);
+            }
+
             // Update the record location when the new comparison value is greater than or equal to the current value.
             // Update the record location when there is a tie to keep the newer record.
             if (newComparisonValue.compareTo(currentRecordLocation.getComparisonValue()) >= 0) {
@@ -423,7 +436,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           // - New record is not out-of-order
           // - Previous record is not deleted
           if (!recordInfo.isDeleteRecord()
-              && recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0) {
+              && recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) >= 0
+              && !(_metadataTTL > 0 && isOutOfMetadataTTL(
+                  ((Number) recordLocation.getComparisonValue()).doubleValue()))) {
             IndexSegment currentSegment = recordLocation.getSegment();
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
