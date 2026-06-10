@@ -1077,8 +1077,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     initRealtimeOffsetAutoResetManager(periodicTasks);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
-    _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-        brokerServiceHelper);
+    _retentionManager = createRetentionManager(brokerServiceHelper);
     periodicTasks.add(_retentionManager);
     _offlineSegmentValidationManager =
         new OfflineSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
@@ -1134,6 +1133,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
             _pinotLLCRealtimeSegmentManager, _controllerMetrics);
     periodicTasks.add(_realtimeOffsetAutoResetManager);
+  }
+
+  /**
+   * Factory hook for the controller's {@link RetentionManager}. Subclasses override to install a
+   * deployment-specific retention manager (e.g. to extend the untracked-segment sweep with names
+   * tracked outside the standard per-segment ZK znodes). The default constructs the stock
+   * {@link RetentionManager}.
+   */
+  protected RetentionManager createRetentionManager(BrokerServiceHelper brokerServiceHelper) {
+    return new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        brokerServiceHelper);
   }
 
   /**
