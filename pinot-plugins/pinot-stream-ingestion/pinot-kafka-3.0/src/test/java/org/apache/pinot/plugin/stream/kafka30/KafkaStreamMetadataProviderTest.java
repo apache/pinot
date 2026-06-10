@@ -1,0 +1,188 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.plugin.stream.kafka30;
+
+import java.time.Duration;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+
+
+public class KafkaStreamMetadataProviderTest {
+  private static final ThreadLocal<Consumer<Bytes, Bytes>> MOCK_CONSUMER = new ThreadLocal<>();
+
+  @Test
+  public void testComputePartitionGroupMetadataRecoversMissingLowPartitionId()
+      throws Exception {
+    String topicName = "asset";
+    Consumer<Bytes, Bytes> consumer = mockConsumer(topicName, 8);
+    MOCK_CONSUMER.set(consumer);
+    try {
+      StreamConfig streamConfig = getStreamConfig(topicName);
+      List<PartitionGroupConsumptionStatus> currentStatuses = List.of(
+          new PartitionGroupConsumptionStatus(0, 0, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+          new PartitionGroupConsumptionStatus(1, 1, new LongMsgOffset(0), new LongMsgOffset(11), "DONE"),
+          new PartitionGroupConsumptionStatus(3, 3, new LongMsgOffset(0), new LongMsgOffset(13), "DONE"),
+          new PartitionGroupConsumptionStatus(4, 4, new LongMsgOffset(0), new LongMsgOffset(14), "DONE"),
+          new PartitionGroupConsumptionStatus(5, 5, new LongMsgOffset(0), new LongMsgOffset(15), "DONE"),
+          new PartitionGroupConsumptionStatus(6, 6, new LongMsgOffset(0), new LongMsgOffset(16), "DONE"),
+          new PartitionGroupConsumptionStatus(7, 7, new LongMsgOffset(0), new LongMsgOffset(17), "DONE"));
+
+      assertEquals(computePartitionIdsWithSizeBasedAlgorithm(currentStatuses, 8), List.of(0, 1, 3, 4, 5, 6, 7, 7));
+
+      try (KafkaStreamMetadataProvider streamMetadataProvider =
+          new MockKafkaStreamMetadataProvider("client", streamConfig)) {
+        List<PartitionGroupMetadata> partitionGroupMetadataList =
+            streamMetadataProvider.computePartitionGroupMetadata("client", streamConfig, currentStatuses, 10000);
+
+        assertEquals(partitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
+            .collect(Collectors.toList()), List.of(0, 1, 2, 3, 4, 5, 6, 7));
+        assertEquals(partitionGroupMetadataList.get(2).getStartOffset().toString(), "1002");
+        assertEquals(partitionGroupMetadataList.get(3).getStartOffset().toString(), "13");
+      }
+    } finally {
+      MOCK_CONSUMER.remove();
+    }
+  }
+
+  @Test
+  public void testComputePartitionGroupMetadataHandlesTopicExpansion()
+      throws Exception {
+    String topicName = "asset";
+    Consumer<Bytes, Bytes> consumer = mockConsumer(topicName, 8);
+    MOCK_CONSUMER.set(consumer);
+    try {
+      StreamConfig streamConfig = getStreamConfig(topicName);
+      List<PartitionGroupConsumptionStatus> currentStatuses = List.of(
+          new PartitionGroupConsumptionStatus(0, 0, new LongMsgOffset(0), new LongMsgOffset(10), "DONE"),
+          new PartitionGroupConsumptionStatus(1, 1, new LongMsgOffset(0), new LongMsgOffset(11), "DONE"),
+          new PartitionGroupConsumptionStatus(2, 2, new LongMsgOffset(0), new LongMsgOffset(12), "DONE"),
+          new PartitionGroupConsumptionStatus(3, 3, new LongMsgOffset(0), new LongMsgOffset(13), "DONE"));
+
+      try (KafkaStreamMetadataProvider streamMetadataProvider =
+          new MockKafkaStreamMetadataProvider("client", streamConfig)) {
+        List<PartitionGroupMetadata> partitionGroupMetadataList =
+            streamMetadataProvider.computePartitionGroupMetadata("client", streamConfig, currentStatuses, 10000);
+
+        assertEquals(partitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
+            .collect(Collectors.toList()), List.of(0, 1, 2, 3, 4, 5, 6, 7));
+        assertEquals(partitionGroupMetadataList.stream().map(metadata -> metadata.getStartOffset().toString())
+            .collect(Collectors.toList()), List.of("10", "11", "12", "13", "1004", "1005", "1006", "1007"));
+      }
+    } finally {
+      MOCK_CONSUMER.remove();
+    }
+  }
+
+  private static StreamConfig getStreamConfig(String topicName) {
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", topicName);
+    streamConfigMap.put("stream.kafka.broker.list", "unused:9092");
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", MockKafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka." + StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "smallest");
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    return new StreamConfig("tableName_REALTIME", streamConfigMap);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Consumer<Bytes, Bytes> mockConsumer(String topicName, int partitionCount) {
+    Consumer<Bytes, Bytes> consumer = mock(Consumer.class);
+    List<PartitionInfo> partitionInfos = IntStream.range(0, partitionCount)
+        .mapToObj(partitionId -> new PartitionInfo(topicName, partitionId, null, null, null))
+        .collect(Collectors.toList());
+    when(consumer.partitionsFor(eq(topicName), any(Duration.class))).thenReturn(partitionInfos);
+    when(consumer.beginningOffsets(any(Collection.class), any(Duration.class))).thenAnswer(invocation -> {
+      Collection<TopicPartition> topicPartitions = invocation.getArgument(0);
+      Map<TopicPartition, Long> offsets = new HashMap<>();
+      for (TopicPartition topicPartition : topicPartitions) {
+        offsets.put(topicPartition, 1000L + topicPartition.partition());
+      }
+      return offsets;
+    });
+    when(consumer.endOffsets(any(Collection.class), any(Duration.class))).thenAnswer(invocation -> {
+      Collection<TopicPartition> topicPartitions = invocation.getArgument(0);
+      Map<TopicPartition, Long> offsets = new HashMap<>();
+      for (TopicPartition topicPartition : topicPartitions) {
+        offsets.put(topicPartition, 2000L + topicPartition.partition());
+      }
+      return offsets;
+    });
+    return consumer;
+  }
+
+  private static List<Integer> computePartitionIdsWithSizeBasedAlgorithm(
+      List<PartitionGroupConsumptionStatus> currentStatuses, int partitionCount) {
+    List<Integer> partitionIds = currentStatuses.stream()
+        .map(PartitionGroupConsumptionStatus::getStreamPartitionGroupId)
+        .collect(Collectors.toList());
+    for (int partitionId = currentStatuses.size(); partitionId < partitionCount; partitionId++) {
+      partitionIds.add(partitionId);
+    }
+    return partitionIds;
+  }
+
+  public static class MockKafkaConsumerFactory extends KafkaConsumerFactory {
+    @Override
+    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+      return new MockKafkaStreamMetadataProvider(clientId, _streamConfig, partition);
+    }
+
+    @Override
+    public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+      return new MockKafkaStreamMetadataProvider(clientId, _streamConfig);
+    }
+  }
+
+  private static class MockKafkaStreamMetadataProvider extends KafkaStreamMetadataProvider {
+    MockKafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
+      super(clientId, streamConfig);
+    }
+
+    MockKafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
+      super(clientId, streamConfig, partition);
+    }
+
+    @Override
+    protected Consumer<Bytes, Bytes> createConsumer(Properties consumerProp) {
+      return MOCK_CONSUMER.get();
+    }
+  }
+}

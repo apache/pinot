@@ -96,7 +96,7 @@ public class AskingServerStageExplainer {
           attributes.putLong("servers", entry.getValue());
 
           inputs.add(new ExplainedNode(stageId, entry.getKey().getDataSchema(), null,
-              Collections.singletonList(entry.getKey()), "Alternative", attributes.build()));
+              Collections.singletonList(entry.getKey()), ExplainNodeSimplifier.ALTERNATIVE, attributes.build()));
         }
 
         mergedNode = new ExplainedNode(stageId, schema, null, inputs, "IntermediateCombine",
@@ -104,6 +104,10 @@ public class AskingServerStageExplainer {
         break;
       }
     }
+
+    // Now that the plans of all servers have been merged, drop the per-segment "Alternative" wrappers that turned out
+    // to hold a single group, so combine nodes where all segments share a plan render exactly as before.
+    mergedNode = ExplainNodeSimplifier.removeRedundantAlternatives(mergedNode);
 
     return PlanNodeToRelConverter.convert(_relBuilder, mergedNode);
   }
