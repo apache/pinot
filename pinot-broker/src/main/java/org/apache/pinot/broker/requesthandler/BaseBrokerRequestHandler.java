@@ -64,6 +64,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -412,6 +413,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   @Override
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr)
+      throws Exception {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    return null;
+  }
+
+  @Override
   public boolean cancelQuery(long queryId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
       Map<String, Integer> serverResponses)
       throws Exception {
@@ -439,6 +449,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public OptionalLong getRequestIdByClientId(String clientQueryId) {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
     return _clientQueryIds.entrySet().stream()
         .filter(e -> clientQueryId.equals(e.getValue()))
         .mapToLong(Map.Entry::getKey)

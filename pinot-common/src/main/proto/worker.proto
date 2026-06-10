@@ -29,6 +29,8 @@ service PinotQueryWorker {
 
   rpc Cancel(CancelRequest) returns (CancelResponse);
 
+  rpc Progress(QueryProgressRequest) returns (QueryProgressResponse);
+
   rpc Explain(QueryRequest) returns (stream ExplainResponse);
 }
 
@@ -39,6 +41,21 @@ message CancelRequest {
 
 message CancelResponse {
   map<int32, bytes> statsByStage = 1; // stageId -> serialized MultiStageQueryStats.StageStats.Closed
+}
+
+message QueryProgressRequest {
+  int64 requestId = 1;
+}
+
+message QueryProgressResponse {
+  bool found = 1;
+  int64 processedWorkUnits = 2;
+  int64 totalWorkUnits = 3;
+  int64 processedSegments = 4;
+  int64 totalSegmentsToProcess = 5;
+  bool estimated = 6;
+  string label = 7;
+  repeated QueryProgressResponse details = 8;
 }
 
 // QueryRequest is the dispatched content for all query stages to a physical worker.

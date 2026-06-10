@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -64,6 +65,10 @@ public class QueryExecutionContext {
   private final List<Future<?>> _tasks = new ArrayList<>();
 
   private volatile TerminationException _terminateException;
+  private final AtomicLong _processedWorkUnits = new AtomicLong();
+  private final AtomicLong _totalWorkUnits = new AtomicLong(-1);
+  private final AtomicLong _processedSegments = new AtomicLong();
+  private final AtomicLong _totalSegmentsToProcess = new AtomicLong(-1);
 
   public QueryExecutionContext(QueryType queryType, long requestId, String cid, String workloadName, long startTimeMs,
       long activeDeadlineMs, long passiveDeadlineMs, String brokerId, String instanceId, String queryHash) {
@@ -163,6 +168,30 @@ public class QueryExecutionContext {
 
   public String getQueryHash() {
     return _queryHash;
+  }
+
+  public void addTotalSegmentsToProcess(long totalSegmentsToProcess) {
+    _totalSegmentsToProcess.updateAndGet(
+        currentTotal -> currentTotal < 0 ? totalSegmentsToProcess : currentTotal + totalSegmentsToProcess);
+    addTotalWorkUnits(totalSegmentsToProcess);
+  }
+
+  public void incrementProcessedSegments() {
+    _processedSegments.incrementAndGet();
+    incrementProcessedWorkUnits();
+  }
+
+  public void addTotalWorkUnits(long totalWorkUnits) {
+    _totalWorkUnits.updateAndGet(currentTotal -> currentTotal < 0 ? totalWorkUnits : currentTotal + totalWorkUnits);
+  }
+
+  public void incrementProcessedWorkUnits() {
+    _processedWorkUnits.incrementAndGet();
+  }
+
+  public QueryProgressStats getProgressStats() {
+    return new QueryProgressStats(_processedWorkUnits.get(), _totalWorkUnits.get(), _processedSegments.get(),
+        _totalSegmentsToProcess.get(), _queryType != QueryType.SSE);
   }
 
   /// Adds a task to the execution context. If the query has been terminated, cancels the task immediately without

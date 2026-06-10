@@ -90,6 +90,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -595,6 +596,84 @@ public class QueryDispatcher {
 
   private static String toHostnamePortKey(String hostname, int port) {
     return String.format("%s_%d", hostname, port);
+  }
+
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long requestId, int timeoutMs) {
+    if (!isQueryCancellationEnabled()) {
+      return null;
+    }
+    Set<QueryServerInstance> servers = _serversByQuery.get(requestId);
+    if (servers == null || servers.isEmpty()) {
+      return null;
+    }
+
+    Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+    SendRequest<Long, Worker.QueryProgressResponse> sendRequest = DispatchClient::progress;
+    BlockingQueue<AsyncResponse<Worker.QueryProgressResponse>> dispatchCallbacks =
+        dispatch(sendRequest, new HashSet<>(servers), deadline, serverInstance -> requestId);
+    Set<QueryServerInstance> pendingServers = new HashSet<>(servers);
+    List<QueryProgressStats> details = new ArrayList<>(servers.size());
+    int numResponses = 0;
+    while (!deadline.isExpired() && numResponses < servers.size()) {
+      try {
+        AsyncResponse<Worker.QueryProgressResponse> response =
+            dispatchCallbacks.poll(Math.max(1, deadline.timeRemaining(TimeUnit.MILLISECONDS)), TimeUnit.MILLISECONDS);
+        if (response == null) {
+          LOGGER.debug("No progress response from server for query: {}", requestId);
+          continue;
+        }
+        numResponses++;
+        QueryServerInstance serverInstance = response.getServerInstance();
+        pendingServers.remove(serverInstance);
+        if (response.getThrowable() != null) {
+          LOGGER.debug("Failed to get progress for query: {} from server: {}", requestId, serverInstance,
+              response.getThrowable());
+          details.add(unknownServerProgress(serverInstance));
+          continue;
+        }
+        Worker.QueryProgressResponse queryProgressResponse = response.getResponse();
+        if (queryProgressResponse != null && queryProgressResponse.getFound()) {
+          details.add(toProgressStats(queryProgressResponse, getServerProgressLabel(serverInstance)));
+        } else {
+          details.add(unknownServerProgress(serverInstance));
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOGGER.debug("Interrupted while getting progress for query: {}", requestId, e);
+        break;
+      }
+    }
+    if (deadline.isExpired()) {
+      LOGGER.debug("Timed out waiting for progress response for query: {}", requestId);
+    }
+    for (QueryServerInstance serverInstance : pendingServers) {
+      details.add(unknownServerProgress(serverInstance));
+    }
+    return details.isEmpty() ? null : QueryProgressStats.aggregate(details).withLabel("Servers").withDetails(details);
+  }
+
+  private static QueryProgressStats unknownServerProgress(QueryServerInstance serverInstance) {
+    return QueryProgressStats.unknown(getServerProgressLabel(serverInstance), true);
+  }
+
+  private static String getServerProgressLabel(QueryServerInstance serverInstance) {
+    String instanceId = serverInstance.getInstanceId();
+    if (instanceId != null && !instanceId.isEmpty()) {
+      return "Server " + instanceId;
+    }
+    return String.format("Server %s:%d", serverInstance.getHostname(), serverInstance.getQueryServicePort());
+  }
+
+  private static QueryProgressStats toProgressStats(Worker.QueryProgressResponse queryProgressResponse,
+      @Nullable String label) {
+    List<QueryProgressStats> details = new ArrayList<>(queryProgressResponse.getDetailsCount());
+    for (Worker.QueryProgressResponse detail : queryProgressResponse.getDetailsList()) {
+      details.add(toProgressStats(detail, detail.getLabel().isEmpty() ? null : detail.getLabel()));
+    }
+    return new QueryProgressStats(label, queryProgressResponse.getProcessedWorkUnits(),
+        queryProgressResponse.getTotalWorkUnits(), queryProgressResponse.getProcessedSegments(),
+        queryProgressResponse.getTotalSegmentsToProcess(), queryProgressResponse.getEstimated(), details);
   }
 
   @Nullable

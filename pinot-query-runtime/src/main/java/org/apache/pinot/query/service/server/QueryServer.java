@@ -64,6 +64,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.MetricsExecutor;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -312,6 +313,11 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     long requestId = executionContext.getRequestId();
     List<CompletableFuture<Void>> startedWorkers = new ArrayList<>();
     List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+    int opChainCount = protoStagePlans.stream()
+        .mapToInt(stagePlan -> stagePlan.getStageMetadata().getWorkerMetadataCount())
+        .sum();
+    executionContext.addTotalWorkUnits(opChainCount);
+    _queryRunner.trackExecutionContext(executionContext);
     for (Worker.StagePlan protoStagePlan : protoStagePlans) {
       StagePlan stagePlan = deserializePlan(requestId, protoStagePlan);
       StageMetadata stageMetadata = stagePlan.getStageMetadata();
@@ -480,6 +486,41 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
+  }
+
+  @Override
+  public void progress(Worker.QueryProgressRequest request,
+      StreamObserver<Worker.QueryProgressResponse> responseObserver) {
+    long requestId = request.getRequestId();
+    Worker.QueryProgressResponse.Builder builder = Worker.QueryProgressResponse.newBuilder();
+    try {
+      QueryProgressStats progressStats = _queryRunner.getQueryProgressStats(requestId);
+      if (progressStats != null) {
+        builder.setFound(true);
+        setProgressStats(builder, progressStats);
+      }
+    } catch (Throwable t) {
+      LOGGER.error("Caught exception while getting progress for request: {}", requestId, t);
+    }
+    responseObserver.onNext(builder.build());
+    responseObserver.onCompleted();
+  }
+
+  private static void setProgressStats(Worker.QueryProgressResponse.Builder builder,
+      QueryProgressStats progressStats) {
+    builder.setProcessedWorkUnits(progressStats.getProcessedWorkUnits())
+        .setTotalWorkUnits(progressStats.getTotalWorkUnits())
+        .setProcessedSegments(progressStats.getProcessedSegments())
+        .setTotalSegmentsToProcess(progressStats.getTotalSegmentsToProcess())
+        .setEstimated(progressStats.isEstimated());
+    if (progressStats.getLabel() != null) {
+      builder.setLabel(progressStats.getLabel());
+    }
+    for (QueryProgressStats detail : progressStats.getDetails()) {
+      Worker.QueryProgressResponse.Builder detailBuilder = Worker.QueryProgressResponse.newBuilder().setFound(true);
+      setProgressStats(detailBuilder, detail);
+      builder.addDetails(detailBuilder);
+    }
   }
 
   // Collects sender stage IDs from all MailboxReceiveNodes in the plan tree via BFS,

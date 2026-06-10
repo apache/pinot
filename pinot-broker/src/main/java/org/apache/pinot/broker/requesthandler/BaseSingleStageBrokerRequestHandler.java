@@ -123,6 +123,7 @@ import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -130,6 +131,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -336,6 +338,76 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throw new Exception("Unexpected responses from servers: " + StringUtils.join(errMsgs, ","));
     }
     return true;
+  }
+
+  @Override
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(long queryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr)
+      throws Exception {
+    Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
+    QueryServers queryServers = _serversById.get(queryId);
+    if (queryServers == null) {
+      return null;
+    }
+
+    // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
+    //       details.
+    String globalQueryId = getGlobalQueryId(queryId);
+    List<String> serverUrls = new ArrayList<>(queryServers._servers.size());
+    for (ServerInstance serverInstance : queryServers._servers) {
+      serverUrls.add(String.format("%s/query/%s/progress", serverInstance.getAdminEndpoint(), globalQueryId));
+    }
+    if (serverUrls.isEmpty()) {
+      return null;
+    }
+
+    CompletionService<MultiHttpRequestResponse> completionService =
+        new MultiHttpRequest(executor, connMgr).executeGet(serverUrls, null, timeoutMs);
+    List<QueryProgressStats> serverProgressStats = new ArrayList<>(serverUrls.size());
+    List<String> errMsgs = new ArrayList<>(serverUrls.size());
+    for (int i = 0; i < serverUrls.size(); i++) {
+      MultiHttpRequestResponse httpRequestResponse = null;
+      URI uri = null;
+      try {
+        httpRequestResponse = completionService.take().get();
+        uri = httpRequestResponse.getURI();
+        int status = httpRequestResponse.getResponse().getCode();
+        if (status == 200) {
+          String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
+          serverProgressStats.add(JsonUtils.stringToObject(responseString, QueryProgressStats.class));
+        } else if (status != 404) {
+          String responseString = EntityUtils.toString(httpRequestResponse.getResponse().getEntity());
+          throw new Exception(
+              String.format("Unexpected status=%d and response='%s' from uri='%s'", status, responseString, uri));
+        }
+      } catch (Exception e) {
+        LOGGER.debug("Failed to get progress for query id: {} from uri: {}", queryId, uri, e);
+        errMsgs.add(e.getMessage());
+      } finally {
+        if (httpRequestResponse != null) {
+          httpRequestResponse.close();
+        }
+      }
+    }
+    return aggregateSingleStageProgressStats(serverProgressStats, serverUrls.size(), errMsgs);
+  }
+
+  @Nullable
+  static QueryProgressStats aggregateSingleStageProgressStats(List<QueryProgressStats> serverProgressStats,
+      int numServers, List<String> errMsgs)
+      throws Exception {
+    if (!serverProgressStats.isEmpty()) {
+      List<QueryProgressStats> progressStats = new ArrayList<>(serverProgressStats);
+      for (int i = serverProgressStats.size(); i < numServers; i++) {
+        progressStats.add(QueryProgressStats.unknown("Server", true));
+      }
+      return QueryProgressStats.aggregate(progressStats);
+    }
+    if (!errMsgs.isEmpty()) {
+      throw new Exception("Unexpected responses from servers: " + StringUtils.join(errMsgs, ","));
+    }
+    return null;
   }
 
   @Override

@@ -89,6 +89,7 @@ pinot-clients/pinot-cli/target/pinot-cli-*-executable.jar \
 - `--history-file` Path to history file for interactive mode (default: `~/.pinot_history`)
 - `--config` Path to a properties file with defaults (see Configuration below)
 - `--debug` Print stack traces and timing diagnostics to stderr
+- `--progress-interval-ms` Query progress polling interval in milliseconds. Use `0` to disable progress polling (default: `1000`)
 
 ### Output formats
 
@@ -114,7 +115,7 @@ Supported keys in the properties file (CLI flags take precedence):
 - `server` (maps to `--url`)
 - `user`, `password`
 - `output-format`, `output-format-interactive`, `output`
-- `pager`, `history-file`, `debug`
+- `pager`, `history-file`, `debug`, `progress-interval-ms`
 - `headers.*` (e.g., `headers.Authorization=Bearer <token>`) -> becomes extra headers
 - Any other key is forwarded as a session option (equivalent to `--set key=value`)
 
@@ -128,6 +129,7 @@ pager=less -SRFXK
 history-file=/Users/alice/.pinot_history
 headers.Authorization=Bearer abc123
 debug=true
+progress-interval-ms=1000
 timeoutMs=60000
 ```
 
@@ -163,8 +165,65 @@ pinot-clients/pinot-cli/target/pinot-cli-*-executable.jar \
   --execute "SELECT col1, col2 FROM myTable LIMIT 3;"
 ```
 
+## Query progress
+
+Pinot exposes query progress for long-running queries through the controller, and
+both the query console and CLI can show the progress while the query is in the
+`RUNNING` state.
+
+The query console automatically attaches a client query id, polls query progress,
+and shows a numeric progress bar while the query is running. The percentage is
+derived from processed work units divided by total work units. For V1 queries,
+work units are based on server segment processing. For V2 queries, work units are
+estimated from the multi-stage operators and stage progress.
+
+The CLI enables progress polling by default for interactive terminals. It updates
+the status at the bottom of the terminal and clears it before printing query
+results. Single-stage queries render one compact progress line. Multi-stage
+queries render the aggregate query progress plus component progress rows when
+the progress response includes them. Redirected output does not print progress
+updates.
+
+Tune the refresh interval:
+
+```bash
+pinot-clients/pinot-cli/target/pinot-cli-*-executable.jar \
+  -u jdbc:pinot://localhost:9000 \
+  --progress-interval-ms=2000 \
+  --execute "SELECT COUNT(*) FROM baseballStats"
+```
+
+Disable CLI progress polling:
+
+```bash
+pinot-clients/pinot-cli/target/pinot-cli-*-executable.jar \
+  -u jdbc:pinot://localhost:9000 \
+  --progress-interval-ms=0 \
+  --execute "SELECT COUNT(*) FROM baseballStats"
+```
+
+Sample V1 query using the quickstart `baseballStats` table:
+
+```sql
+SELECT playerName, SUM(runs), SUM(hits), SUM(homeRuns)
+FROM baseballStats
+GROUP BY playerName
+ORDER BY SUM(hits) DESC
+LIMIT 1000;
+```
+
+Sample V2 query using the quickstart `baseballStats` table:
+
+```bash
+pinot-clients/pinot-cli/target/pinot-cli-*-executable.jar \
+  -u jdbc:pinot://localhost:9000 \
+  --set useMultistageEngine=true \
+  --set maxRowsInJoin=10000000 \
+  --progress-interval-ms=1000 \
+  --execute "SELECT COUNT(*) FROM baseballStats a JOIN baseballStats b ON a.yearID = b.yearID"
+```
+
 ## Notes
 
 - CLI arguments take precedence over config file values.
 - Pager is only used in interactive mode. Batch mode prints directly to stdout.
-

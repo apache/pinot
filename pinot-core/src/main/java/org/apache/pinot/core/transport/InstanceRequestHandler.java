@@ -20,6 +20,8 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -52,6 +54,7 @@ import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryProgressStats;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
@@ -73,6 +76,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   // TODO: make it configurable
   private static final int SLOW_QUERY_LATENCY_THRESHOLD_MS = 100;
   private static final int LARGE_RESPONSE_SIZE_THRESHOLD_BYTES = 100 * 1024 * 1024; // 100 MB
+  private static final int COMPLETED_PROGRESS_STATS_CACHE_SIZE = 10_000;
+  private static final int COMPLETED_PROGRESS_STATS_CACHE_EXPIRATION_MINUTES = 10;
 
   // TDeserializer currently is not thread safe, must be put into a ThreadLocal.
   private static final ThreadLocal<TDeserializer> THREAD_LOCAL_T_DESERIALIZER = ThreadLocal.withInitial(() -> {
@@ -88,6 +93,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   private final AccessControl _accessControl;
   private final ThreadAccountant _threadAccountant;
   private final ConcurrentHashMap<String, QueryExecutionContext> _executionContexts;
+  private final Cache<String, QueryProgressStats> _completedProgressStats;
   private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   public InstanceRequestHandler(String instanceName, PinotConfiguration config, QueryScheduler queryScheduler,
@@ -99,9 +105,12 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
     if (config.getProperty(Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, Server.DEFAULT_ENABLE_QUERY_CANCELLATION)) {
       _executionContexts = new ConcurrentHashMap<>();
+      _completedProgressStats = CacheBuilder.newBuilder().maximumSize(COMPLETED_PROGRESS_STATS_CACHE_SIZE)
+          .expireAfterWrite(COMPLETED_PROGRESS_STATS_CACHE_EXPIRATION_MINUTES, TimeUnit.MINUTES).build();
       LOGGER.info("Enable query cancellation");
     } else {
       _executionContexts = null;
+      _completedProgressStats = null;
     }
   }
 
@@ -155,7 +164,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
    */
   @VisibleForTesting
   void submitQuery(ServerQueryRequest queryRequest, ChannelHandlerContext ctx, long queryArrivalTimeMs) {
-    QueryExecutionContext executionContext = queryRequest.toExecutionContext(_instanceName);
+    QueryExecutionContext executionContext = queryRequest.getOrCreateExecutionContext(_instanceName);
     try (QueryThreadContext ignore = QueryThreadContext.open(executionContext, _threadAccountant)) {
       ListenableFuture<byte[]> future = _queryScheduler.submit(queryRequest);
       if (_executionContexts != null) {
@@ -164,15 +173,16 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Keep track of running query: {}", queryId);
         }
+        _completedProgressStats.invalidate(queryId);
         _executionContexts.put(queryId, executionContext);
       }
-      Futures.addCallback(future, createCallback(queryRequest, ctx, queryArrivalTimeMs),
+      Futures.addCallback(future, createCallback(queryRequest, executionContext, ctx, queryArrivalTimeMs),
           MoreExecutors.directExecutor());
     }
   }
 
-  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, ChannelHandlerContext ctx,
-      long queryArrivalTimeMs) {
+  private FutureCallback<byte[]> createCallback(ServerQueryRequest queryRequest, QueryExecutionContext executionContext,
+      ChannelHandlerContext ctx, long queryArrivalTimeMs) {
     return new FutureCallback<>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
@@ -181,6 +191,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on success", queryId);
           }
+          retainCompletedProgressStats(queryId, executionContext, responseBytes != null);
           _executionContexts.remove(queryId);
         }
         long requestId = queryRequest.getRequestId();
@@ -202,6 +213,7 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
           if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Remove track of running query: {} on failure", queryId);
           }
+          retainCompletedProgressStats(queryId, executionContext, false);
           _executionContexts.remove(queryId);
         }
         // Send exception response.
@@ -263,6 +275,38 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
   public Set<String> getRunningQueryIds() {
     Preconditions.checkState(_executionContexts != null, "Query cancellation is not enabled on server");
     return new HashSet<>(_executionContexts.keySet());
+  }
+
+  @Nullable
+  public QueryProgressStats getQueryProgressStats(String queryId) {
+    Preconditions.checkState(_executionContexts != null && _completedProgressStats != null,
+        "Query cancellation is not enabled on server");
+    QueryExecutionContext executionContext = _executionContexts.get(queryId);
+    return executionContext != null ? executionContext.getProgressStats()
+        : _completedProgressStats.getIfPresent(queryId);
+  }
+
+  private void retainCompletedProgressStats(String queryId, QueryExecutionContext executionContext,
+      boolean successful) {
+    QueryProgressStats progressStats = executionContext.getProgressStats();
+    if (progressStats == null) {
+      return;
+    }
+    if (successful) {
+      progressStats = getCompletedProgressStats(progressStats);
+    }
+    _completedProgressStats.put(queryId, progressStats);
+  }
+
+  private static QueryProgressStats getCompletedProgressStats(QueryProgressStats progressStats) {
+    long totalWorkUnits = progressStats.getTotalWorkUnits();
+    long processedWorkUnits = totalWorkUnits >= 0 ? Math.max(progressStats.getProcessedWorkUnits(), totalWorkUnits)
+        : progressStats.getProcessedWorkUnits();
+    long totalSegmentsToProcess = progressStats.getTotalSegmentsToProcess();
+    long processedSegments = totalSegmentsToProcess >= 0
+        ? Math.max(progressStats.getProcessedSegments(), totalSegmentsToProcess) : progressStats.getProcessedSegments();
+    return new QueryProgressStats(processedWorkUnits, totalWorkUnits, processedSegments, totalSegmentsToProcess,
+        progressStats.isEstimated());
   }
 
   /**
