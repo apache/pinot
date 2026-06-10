@@ -164,7 +164,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
       File file = new File(_tempDir, "consistency_" + types[t].name());
       try (FixedByteChunkForwardIndexWriter writer =
           new FixedByteChunkForwardIndexWriter(file, types[t], NUM_DOCS, DOCS_PER_CHUNK, Integer.BYTES, 4)) {
-      writer.setTrackUncompressedSize(true);
+        writer.setTrackUncompressedSize(true);
         for (int i = 0; i < NUM_DOCS; i++) {
           writer.putInt(i * 7);
         }
@@ -196,7 +196,7 @@ public class ForwardIndexWriterUncompressedSizeTest {
       File file = new File(_tempDir, "varByteConsistency_" + types[t].name());
       try (VarByteChunkForwardIndexWriterV4 writer =
           new VarByteChunkForwardIndexWriterV4(file, types[t], 1024)) {
-      writer.setTrackUncompressedSize(true);
+        writer.setTrackUncompressedSize(true);
         for (String value : values) {
           writer.putString(value);
         }
