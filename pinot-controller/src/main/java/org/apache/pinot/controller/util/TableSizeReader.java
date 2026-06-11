@@ -110,7 +110,8 @@ public class TableSizeReader {
     TableSizeDetails tableSizeDetails = new TableSizeDetails(tableName);
     if (hasRealtimeTableConfig) {
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-      tableSizeDetails._realtimeSegments = getTableSubtypeSize(realtimeTableName, timeoutMsec, includeReplacedSegments, includeColumnStats);
+      tableSizeDetails._realtimeSegments =
+          getTableSubtypeSize(realtimeTableName, timeoutMsec, includeReplacedSegments, includeColumnStats);
       // taking max(0,value) as values as set to -1 if all the segments are in error
       tableSizeDetails._reportedSizeInBytes += Math.max(tableSizeDetails._realtimeSegments._reportedSizeInBytes, 0L);
       tableSizeDetails._estimatedSizeInBytes += Math.max(tableSizeDetails._realtimeSegments._estimatedSizeInBytes, 0L);
@@ -147,7 +148,8 @@ public class TableSizeReader {
     }
     if (hasOfflineTableConfig) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-      tableSizeDetails._offlineSegments = getTableSubtypeSize(offlineTableName, timeoutMsec, includeReplacedSegments, includeColumnStats);
+      tableSizeDetails._offlineSegments =
+          getTableSubtypeSize(offlineTableName, timeoutMsec, includeReplacedSegments, includeColumnStats);
       // taking max(0,value) as values as set to -1 if all the segments are in error
       tableSizeDetails._reportedSizeInBytes += Math.max(tableSizeDetails._offlineSegments._reportedSizeInBytes, 0L);
       tableSizeDetails._estimatedSizeInBytes += Math.max(tableSizeDetails._offlineSegments._estimatedSizeInBytes, 0L);
@@ -417,7 +419,8 @@ public class TableSizeReader {
     ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap =
-        serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs, includeColumnStats);
+        serverTableSizeReader.getSegmentSizeInfoFromServers(endpoints, tableNameWithType, timeoutMs,
+            includeColumnStats);
 
     TableSubTypeSizeDetails subTypeSizeDetails = new TableSubTypeSizeDetails();
     Map<String, SegmentSizeDetails> segmentToSizeDetailsMap = subTypeSizeDetails._segments;
