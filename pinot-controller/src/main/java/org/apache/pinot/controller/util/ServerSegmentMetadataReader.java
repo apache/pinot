@@ -105,7 +105,8 @@ public class ServerSegmentMetadataReader {
     List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String serverUrl = generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint, compressionStatsEnabled);
+      String serverUrl =
+          generateAggregateSegmentMetadataServerURL(tableNameWithType, columns, endpoint, compressionStatsEnabled);
       serverUrls.add(serverUrl);
     }
 
