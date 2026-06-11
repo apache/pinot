@@ -89,6 +89,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.StageStatsTreeNode;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
@@ -815,7 +816,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan,
-          queryResults.getStageCoverage());
+          queryResults.getStageCoverage(), queryResults.getStageStatsTrees());
 
       if (QueryOptionsUtils.isStreamStats(query.getOptions(), _streamStatsDefault)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MSE_STREAM_STATS_QUERIES, 1);
@@ -919,11 +920,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan,
-      @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage) {
+      @Nullable List<QueryDispatcher.QueryResult.StageCoverage> stageCoverage,
+      @Nullable Map<Integer, StageStatsTreeNode> stageStatsTrees) {
     try {
       Map<Integer, DispatchablePlanFragment> queryStageMap = dispatchableSubPlan.getQueryStageMap();
 
-      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats);
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(queryStageMap, queryStats,
+          stageStatsTrees);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
         if (stageStats != null) { // for example pipeline breaker may not have stats
