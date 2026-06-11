@@ -94,6 +94,12 @@ public class GenericRowFileRecordReader implements RecordReader {
     return _fileReader.compare(_sortedRowIds[rowId1], _sortedRowIds[rowId2]);
   }
 
+  /// Compares the records at the given row ids. Only compare the values for the first `numFieldsToCompare` fields.
+  public int compare(int rowId1, int rowId2, int numFieldsToCompare) {
+    assert _sortedRowIds != null;
+    return _fileReader.compare(_sortedRowIds[rowId1], _sortedRowIds[rowId2], numFieldsToCompare);
+  }
+
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
     throw new UnsupportedOperationException();
