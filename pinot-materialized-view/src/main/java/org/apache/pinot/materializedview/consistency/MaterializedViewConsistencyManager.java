@@ -30,9 +30,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.helix.AccessOption;
@@ -41,7 +41,9 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.materializedview.metadata.PartitionInfo;
@@ -61,15 +63,22 @@ import org.slf4j.LoggerFactory;
 ///
 /// When segments are added, replaced, or deleted in a base table, this manager
 /// identifies which MV partitions overlap with the changed time range and marks
-/// them as [PartitionState#STALE] in [MaterializedViewRuntimeMetadata].
+/// them as STALE in [MaterializedViewRuntimeMetadata].
 ///
 /// Events are accumulated per base table using a debounce window ([#DEFAULT_DEBOUNCE_DELAY_MS]ms).
 /// Multiple segment changes within the window are merged into a single time range and
 /// processed as one ZK read-modify-write operation, avoiding excessive ZK traffic during
 /// batch ingestion or bulk segment operations.
 ///
-/// Thread-safety: all public methods are thread-safe. The internal flush runs on a
-/// single-threaded scheduler to serialize ZK writes per base table.
+/// In addition to this event-driven path, a low-frequency periodic sweep
+/// ([#sweepStrandedEmptyPartitions], every [#DEFAULT_EMPTY_SWEEP_INTERVAL_MS]ms by default)
+/// re-evaluates in-coverage `VALID-empty` partitions against the current source and re-marks any
+/// whose source window has regained segments STALE.  This backstops the narrow DELETE-vs-backfill
+/// race the executor's commit guard ([MaterializedViewPartitionManager#clearValid]) cannot fully
+/// close, so a stranded empty partition self-heals without waiting for a fresh base-table change.
+///
+/// Thread-safety: all public methods are thread-safe. The internal flush and the periodic sweep
+/// both run on the same single-threaded scheduler, so ZK writes are serialized per base table.
 ///
 /// <h3>Partition model (TIME-WINDOWED ONLY in PR 1)</h3>
 ///
@@ -93,18 +102,17 @@ public class MaterializedViewConsistencyManager {
   /// Compile-time default debounce window for the consistency manager. Overridable per cluster
   /// (no restart) via `MaterializedViewTask.CLUSTER_CONFIG_KEY_CONSISTENCY_DEBOUNCE_MS`.
   static final long DEFAULT_DEBOUNCE_DELAY_MS = 5000;
+
+  /// Compile-time default interval for the periodic VALID-empty re-evaluation sweep (5 minutes).
+  /// Overridable per cluster (no restart) via
+  /// `MaterializedViewTask.CLUSTER_CONFIG_KEY_CONSISTENCY_EMPTY_SWEEP_INTERVAL_MS`.  The sweep is a
+  /// low-frequency safety net (the DELETE commit guard already handles the dominant race), so a
+  /// coarse cadence keeps overhead negligible while still bounding stranded-bucket recovery time.
+  static final long DEFAULT_EMPTY_SWEEP_INTERVAL_MS = 300_000;
   private static final String MATERIALIZED_VIEW_DEFINITION_PARENT_PATH =
       ZKMetadataProvider.getPropertyStorePathForMaterializedViewDefinitionPrefix();
   private static final String MATERIALIZED_VIEW_DEFINITION_PATH_PREFIX =
       MATERIALIZED_VIEW_DEFINITION_PARENT_PATH + "/";
-  /// CAS retry budget for STALE-marking writes on the runtime znode. Sized to match the executor's
-  /// `MAX_RUNTIME_UPDATE_ATTEMPTS` so a STALE marking is never silently dropped in favor of
-  /// an executor's coverage advance under contention from up to `maxTasksPerBatch` (default 4,
-  /// cap 1000) parallel completions. With ~5–25 ms jittered backoff per retry, 128 attempts cap
-  /// total wait near 25 s.
-  private static final int MAX_MARK_RETRIES = 128;
-
-
 
   /// Reverse index: rawBaseTableName → list of viewTableNameWithType.
   private final ConcurrentHashMap<String, List<String>> _baseTableToMaterializedViewTables = new ConcurrentHashMap<>();
@@ -124,6 +132,11 @@ public class MaterializedViewConsistencyManager {
   /// overridden at runtime without restart. Null in unit tests; null lookup falls back to the
   /// compile-time defaults.
   private volatile Function<String, String> _clusterConfigReader;
+  /// Centralized partition state-change DSL. Created once in [#init] with a config-reader
+  /// indirection so a later [#setClusterConfigReader] call still propagates to the manager
+  /// (the manager holds a final reference, but we close over the `_clusterConfigReader`
+  /// field rather than its current value).
+  private volatile MaterializedViewPartitionManager _partitionManager;
 
   public MaterializedViewConsistencyManager() {
     _scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -142,9 +155,17 @@ public class MaterializedViewConsistencyManager {
   /// Must be called after the PropertyStore is ready (after Controller startup).
   public void init(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _propertyStore = propertyStore;
+    // The lambda dereferences `_clusterConfigReader` on every call, so a later
+    // setClusterConfigReader (controller wires this AFTER init in BaseControllerStarter)
+    // takes effect for the manager's CAS-budget lookup without recreating the manager.
+    _partitionManager = new MaterializedViewPartitionManager(propertyStore, configKey -> {
+      Function<String, String> reader = _clusterConfigReader;
+      return reader == null ? null : reader.apply(configKey);
+    });
     _propertyStore.subscribeChildChanges(MATERIALIZED_VIEW_DEFINITION_PARENT_PATH, _definitionChangeListener);
     syncDefinitionDataSubscriptions(null);
     rebuildReverseIndex();
+    scheduleNextEmptyPartitionSweep();
     LOGGER.info("MaterializedViewConsistencyManager initialized with {} base table mappings",
         _baseTableToMaterializedViewTables.size());
   }
@@ -313,7 +334,7 @@ public class MaterializedViewConsistencyManager {
         + "affected MV tables: {}", baseTableName, range[0], range[1], materializedViewTables);
 
     for (String viewTableName : materializedViewTables) {
-      markPartitionsDirtyWithRetry(viewTableName, range[0], range[1]);
+      markStaleThroughManager(viewTableName, range[0], range[1]);
     }
   }
 
@@ -335,73 +356,267 @@ public class MaterializedViewConsistencyManager {
     return drained[0];
   }
 
-  private void markPartitionsDirtyWithRetry(String viewTableName, long affectedStartMs, long affectedEndMs) {
-    // Retry only on CAS conflict (markPartitionsDirty returns false). Any thrown exception
-    // is a real error (corrupt znode, ZK unavailability, serialization bug, etc.) — retrying
-    // 128× burns ~3 s of scheduler thread time and the operator never learns about the bug.
-    // Fail loud after one occurrence so monitoring picks it up; the next base-table change
-    // for the same MV will re-trigger this code path and try again from a known-bad-state log.
-    for (int attempt = 0; attempt < MAX_MARK_RETRIES; attempt++) {
-      try {
-        if (markPartitionsDirty(viewTableName, affectedStartMs, affectedEndMs)) {
-          return;
-        }
-        LOGGER.debug("CAS conflict on attempt {} for MV table: {}, retrying", attempt + 1, viewTableName);
-      } catch (Exception e) {
-        LOGGER.error("Failed to mark dirty partitions for MV table: {} on attempt {} due to a "
-                + "non-CAS exception. Aborting retries — investigate the underlying ZK/serialization "
-                + "issue. MV may serve stale data until the next base-table change re-triggers "
-                + "consistency.", viewTableName, attempt + 1, e);
-        return;
-      }
-      // Jittered backoff: 5–25 ms × 128 attempts ≤ ~3 s total. Prevents tight CAS-loop livelock
-      // against the executor (which uses the same backoff window).
-      try {
-        Thread.sleep(5L + ThreadLocalRandom.current().nextInt(20));
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        LOGGER.warn("Interrupted while marking dirty for MV table: {}", viewTableName);
-        return;
-      }
+  /// Computes which buckets in `[affectedStartMs, affectedEndMs]` should be marked STALE for the
+  /// given MV, then routes the flip through [MaterializedViewPartitionManager#markStale].
+  ///
+  /// Why two ZK reads: this method does one read-only snapshot fetch to derive `bucketMs` and
+  /// the watermark cap (data the consistency manager owns the inference logic for); the manager
+  /// does a second versioned fetch under its own CAS loop.  The cost is one extra GET per flush
+  /// in exchange for routing every STALE-marking write through the same retry/backoff/budget
+  /// engine the executor uses for APPEND/OVERWRITE — so a STALE marking can never be silently
+  /// out-retried by a concurrent executor.
+  ///
+  /// VALID-only filtering (already-STALE buckets are no-ops) and absent-bucket-skip semantics
+  /// are enforced inside [MaterializedViewPartitionManager#markStale] under the CAS lock, so a
+  /// concurrent executor's APPEND/OVERWRITE between our snapshot read and the manager's CAS
+  /// read cannot cause us to over-mark.
+  ///
+  /// Worst-case latency note: the manager's critical profile can block for up to
+  /// ~25 s (128 attempts x 50–200 ms backoff) under sustained CAS contention, and this method
+  /// runs on the single-threaded scheduler shared with other tables' debounce flushes and the
+  /// periodic sweep.  That trade is deliberate — a dropped STALE mark is silent wrong data,
+  /// while a delayed flush for another table only extends its (already-debounced) staleness
+  /// window; reaching the budget cap requires pathological contention in the first place.
+  private void markStaleThroughManager(String viewTableName, long affectedStartMs, long affectedEndMs) {
+    List<Long> candidateBuckets;
+    try {
+      candidateBuckets = enumerateCandidateBuckets(viewTableName, affectedStartMs, affectedEndMs);
+    } catch (Exception e) {
+      LOGGER.error("Failed to enumerate candidate buckets for MV table: {} (range [{}, {}]); "
+              + "MV may serve stale data until the next base-table change re-triggers consistency.",
+          viewTableName, affectedStartMs, affectedEndMs, e);
+      return;
     }
-    LOGGER.error("Failed to mark dirty partitions for MV table: {} after {} CAS retries. "
-        + "MV may serve stale data until the next base-table change re-triggers consistency.",
-        viewTableName, MAX_MARK_RETRIES);
+    if (candidateBuckets.isEmpty()) {
+      return;
+    }
+
+    try {
+      _partitionManager.markStale(viewTableName, candidateBuckets);
+      LOGGER.info("Marked partitions STALE for MV table: {} (range [{}, {}], {} candidate bucket(s))",
+          viewTableName, affectedStartMs, affectedEndMs, candidateBuckets.size());
+    } catch (RuntimeException e) {
+      // Includes CAS-budget exhaustion (manager wraps the last CasConflictException in a
+      // RuntimeException) and validation failures.  Either way, log loud and move on — the next
+      // base-table change for this MV will re-trigger this code path with a fresh snapshot.
+      LOGGER.error("Failed to mark partitions STALE for MV table: {} (range [{}, {}]); "
+              + "MV may serve stale data until the next base-table change re-triggers consistency.",
+          viewTableName, affectedStartMs, affectedEndMs, e);
+    }
   }
 
-  /// Marks overlapping VALID partitions as STALE in the MV runtime metadata.
+  // ─────────────────────────────────────────────────────────────────────────────────────
+  //  Periodic VALID-empty re-evaluation sweep
+  // ─────────────────────────────────────────────────────────────────────────────────────
+
+  /// Self-rescheduling driver for the periodic VALID-empty sweep.  The interval is read lazily on
+  /// every cycle (the cluster-config reader is wired AFTER [#init], so reading it here rather than
+  /// at schedule-setup time honors live overrides) and the next cycle is rescheduled in a
+  /// `finally` so a sweep that throws still keeps the cadence going.  No-op once the scheduler is
+  /// shut down.
+  private void scheduleNextEmptyPartitionSweep() {
+    if (_scheduler.isShutdown()) {
+      return;
+    }
+    long intervalMs = MaterializedViewTaskUtils.readPositiveLongClusterConfigOrDefault(
+        _clusterConfigReader,
+        CommonConstants.MaterializedViewTask.CLUSTER_CONFIG_KEY_CONSISTENCY_EMPTY_SWEEP_INTERVAL_MS,
+        DEFAULT_EMPTY_SWEEP_INTERVAL_MS);
+    try {
+      _scheduler.schedule(() -> {
+        try {
+          sweepStrandedEmptyPartitions();
+        } catch (Throwable t) {
+          LOGGER.error("MV VALID-empty sweep failed; will retry on the next cycle", t);
+        } finally {
+          scheduleNextEmptyPartitionSweep();
+        }
+      }, intervalMs, TimeUnit.MILLISECONDS);
+    } catch (RejectedExecutionException e) {
+      LOGGER.debug("MV VALID-empty sweep not rescheduled; consistency manager is shutting down");
+    }
+  }
+
+  /// One pass of the VALID-empty re-evaluation sweep across every registered MV.
   ///
-  /// @return true if succeeded or nothing to mark; false if CAS failed (caller should retry)
-  private boolean markPartitionsDirty(String viewTableName, long affectedStartMs, long affectedEndMs) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(viewTableName);
+  /// The DELETE commit guard ([MaterializedViewPartitionManager#clearValid]) re-reads the source
+  /// inside its CAS loop and leaves a bucket STALE when a backfill is detected, closing the
+  /// dominant race.  A vanishingly narrow residual remains: if a backfill's debounced STALE mark
+  /// fires (as a no-op, while the bucket is still STALE) strictly between that read and the
+  /// VALID-empty write, the bucket is stranded as a permanently-empty in-coverage partition that
+  /// nothing re-marks until an unrelated later base-table change.  This sweep is the backstop — it
+  /// re-evaluates in-coverage `VALID-empty` buckets against the current source and re-marks any
+  /// whose source window has regained segments STALE, so the scheduler re-materializes them via
+  /// OVERWRITE without waiting for a fresh base-table event.
+  ///
+  /// Runs on the same single-threaded scheduler as [#flush], so it never writes concurrently with
+  /// a debounce flush; per-MV failures are isolated so one bad MV cannot abort the whole pass.
+  @VisibleForTesting
+  void sweepStrandedEmptyPartitions() {
+    if (_propertyStore == null) {
+      return;
+    }
+    // Snapshot (rawBaseTable, viewTableNameWithType) pairs under the lock, then process outside it
+    // so the ZK reads below do not hold _reverseIndexLock.  Each pair maps an MV to one of its
+    // source base tables; time-windowed MVs (the only shape in PR 1) have exactly one.
+    List<String[]> baseTableAndViewPairs = new ArrayList<>();
+    synchronized (_reverseIndexLock) {
+      for (Map.Entry<String, List<String>> entry : _baseTableToMaterializedViewTables.entrySet()) {
+        for (String viewTableName : entry.getValue()) {
+          baseTableAndViewPairs.add(new String[]{entry.getKey(), viewTableName});
+        }
+      }
+    }
+    for (String[] pair : baseTableAndViewPairs) {
+      String rawBaseTableName = pair[0];
+      String viewTableName = pair[1];
+      try {
+        sweepStrandedEmptyPartitionsForView(viewTableName, rawBaseTableName);
+      } catch (Exception e) {
+        LOGGER.error("MV VALID-empty sweep failed for MV table: {} (base table: {}); "
+            + "will retry on the next cycle", viewTableName, rawBaseTableName, e);
+      }
+    }
+  }
+
+  /// Re-evaluates one MV's in-coverage `VALID-empty` buckets against the current source and
+  /// re-marks the stranded ones STALE.  Skips the (relatively expensive) source-segment read
+  /// entirely when the MV has no in-coverage `VALID-empty` buckets — the common case.
+  @VisibleForTesting
+  void sweepStrandedEmptyPartitionsForView(String viewTableName, String rawBaseTableName) {
     Stat stat = new Stat();
-    ZNRecord znRecord = _propertyStore.get(path, stat, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return true;
+    MaterializedViewRuntimeMetadata runtime =
+        MaterializedViewRuntimeMetadataUtils.fetchWithVersion(_propertyStore, viewTableName, stat);
+    if (runtime == null) {
+      return;
+    }
+    Map<Long, PartitionInfo> partitions = runtime.getPartitions();
+    long watermarkMs = runtime.getWatermarkMs();
+    if (!hasInCoverageValidEmptyBucket(partitions, watermarkMs)) {
+      return;
     }
 
-    MaterializedViewRuntimeMetadata runtime = MaterializedViewRuntimeMetadata.fromZNRecord(znRecord);
-    Map<Long, PartitionInfo> partitionInfos = runtime.getPartitions();
-
-    long bucketMs = inferBucketMs(viewTableName, partitionInfos);
-
-    // Cap affectedEndMs at watermarkMs.  No partition with partStart > watermarkMs can exist
-    // (the writer invariant), so any bucket beyond that cannot be marked STALE anyway.  This
-    // protects the bucket-known iteration loop below from a caller passing Long.MAX_VALUE
-    // (full-range invalidation from notifyMaterializedViewConsistencyManager paths when
-    // segment startTime/endTime is unknown), which would otherwise loop ~watermarkMs/bucketMs
-    // times — orders of magnitude more than the number of real partitions.
-    affectedEndMs = Math.min(affectedEndMs, runtime.getWatermarkMs());
-    if (affectedEndMs < affectedStartMs) {
-      LOGGER.debug("Affected range [{}, {}] is past watermarkMs ({}) for MV table: {}; nothing to mark",
-          affectedStartMs, affectedEndMs, runtime.getWatermarkMs(), viewTableName);
-      return true;
+    long bucketMs = inferBucketMs(viewTableName, partitions);
+    if (bucketMs <= 0) {
+      LOGGER.warn("MV table {}: cannot infer bucketMs for VALID-empty sweep; skipping this cycle",
+          viewTableName);
+      return;
+    }
+    String sourceTableWithType = resolveSourceTableWithType(rawBaseTableName);
+    if (sourceTableWithType == null) {
+      LOGGER.debug("MV table {}: source base table {} not found as OFFLINE or REALTIME; "
+          + "skipping VALID-empty sweep this cycle", viewTableName, rawBaseTableName);
+      return;
     }
 
-    Map<Long, PartitionInfo> updatedInfos = new HashMap<>(partitionInfos);
-    boolean anyChanged = false;
-    int markedCount = 0;
+    List<SegmentZKMetadata> sourceSegments =
+        ZKMetadataProvider.getSegmentsZKMetadata(_propertyStore, sourceTableWithType);
+    List<Long> stranded = findStrandedEmptyBuckets(partitions, watermarkMs, sourceSegments, bucketMs);
+    if (stranded.isEmpty()) {
+      return;
+    }
 
+    LOGGER.info("MV table {}: re-marking {} stranded VALID-empty bucket(s) STALE — their source "
+            + "window regained segments since the empty materialization: {}",
+        viewTableName, stranded.size(), stranded);
+    // The runtime + source reads above are an advisory snapshot; markStale re-fetches the runtime
+    // under its own CAS loop and only flips buckets that are still VALID, so a concurrent executor
+    // commit between our snapshot and the write cannot mismark — at worst a bucket already
+    // re-materialized gets a redundant, idempotent OVERWRITE on the next scheduling cycle.
+    try {
+      _partitionManager.markStale(viewTableName, stranded);
+    } catch (RuntimeException e) {
+      LOGGER.error("MV table {}: failed to re-mark stranded VALID-empty buckets STALE; "
+          + "will retry on the next sweep", viewTableName, e);
+    }
+  }
+
+  /// True when at least one bucket is an in-coverage `VALID-empty` partition.  Cheap pre-filter so
+  /// the sweep skips the source-segment read for MVs with nothing to re-evaluate.
+  private static boolean hasInCoverageValidEmptyBucket(Map<Long, PartitionInfo> partitions, long watermarkMs) {
+    for (Map.Entry<Long, PartitionInfo> entry : partitions.entrySet()) {
+      if (isInCoverageValidEmpty(entry.getKey(), entry.getValue(), watermarkMs)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// A bucket is an in-coverage `VALID-empty` partition iff it is VALID with a zero-segment
+  /// fingerprint and starts strictly below the watermark (so it is genuinely covered, not the
+  /// not-yet-materialized frontier).  `segmentCount == 0` is the canonical "empty" criterion used
+  /// across the scheduler's DELETE dispatch and the executor's commit guard.
+  private static boolean isInCoverageValidEmpty(long bucketStartMs, PartitionInfo info, long watermarkMs) {
+    return info.getState() == PartitionState.VALID
+        && info.getFingerprint().getSegmentCount() == 0
+        && bucketStartMs < watermarkMs;
+  }
+
+  /// Returns the in-coverage `VALID-empty` buckets whose source window currently has overlapping
+  /// segments — stranded empties that must be re-marked STALE so the scheduler re-materializes
+  /// them.  Pure function of the snapshot inputs (no ZK), so the decision is unit-testable in
+  /// isolation.  Buckets whose source is still empty are intentionally left untouched (re-marking
+  /// them STALE would churn a no-op DELETE task every sweep).
+  ///
+  /// Reuses [MaterializedViewTaskUtils#computeWindowFingerprint] so this emptiness re-check is
+  /// byte-for-byte the same overlap algorithm the scheduler's DELETE dispatch and the executor's
+  /// commit guard use — there is deliberately no second overlap implementation to drift from.
+  /// Cost is O(emptyBuckets * sourceSegments); the in-coverage `VALID-empty` set is expected to be
+  /// small (gap windows + retention deletions), and the sweep is a low-frequency safety net.
+  @VisibleForTesting
+  static List<Long> findStrandedEmptyBuckets(Map<Long, PartitionInfo> partitions, long watermarkMs,
+      List<SegmentZKMetadata> sourceSegments, long bucketMs) {
+    List<Long> stranded = new ArrayList<>();
+    for (Map.Entry<Long, PartitionInfo> entry : partitions.entrySet()) {
+      long bucketStartMs = entry.getKey();
+      if (!isInCoverageValidEmpty(bucketStartMs, entry.getValue(), watermarkMs)) {
+        continue;
+      }
+      if (MaterializedViewTaskUtils.computeWindowFingerprint(
+          sourceSegments, bucketStartMs, bucketStartMs + bucketMs).getSegmentCount() != 0) {
+        stranded.add(bucketStartMs);
+      }
+    }
+    return stranded;
+  }
+
+  /// Resolves the source base table to its `_OFFLINE` / `_REALTIME` form via the shared
+  /// OFFLINE-first probe in [MaterializedViewTaskUtils#resolveTableNameWithType], returning
+  /// `null` when neither table config is present.
+  private String resolveSourceTableWithType(String rawBaseTableName) {
+    return MaterializedViewTaskUtils.resolveTableNameWithType(
+        tableName -> ZKMetadataProvider.getTableConfig(_propertyStore, tableName), rawBaseTableName);
+  }
+
+  /// Returns the existing partition keys whose bucket overlaps
+  /// `[floorDiv(affectedStartMs, bucketMs) * bucketMs, affectedEndMs]` — the candidates the
+  /// manager should consider marking STALE.  The manager filters this list down to entries that
+  /// are still VALID inside its CAS loop; this method's job is to restrict the affected range to
+  /// buckets that actually exist in the partition map.
+  ///
+  /// The range is deliberately NOT capped at `watermarkMs`: VALID buckets above the watermark do
+  /// exist (out-of-order batch APPEND completion, mid-batch failure — see the scheduler's
+  /// contiguous-VALID-upper handling), and skipping them would silently drop the STALE mark for a
+  /// base-table change landing in such a bucket.  Once the gap below filled and the watermark
+  /// advanced over it, the bucket would serve stale data with nothing left to re-mark it.
+  /// Over-marking is harmless: above-watermark buckets are routed to the base table by V1
+  /// routing anyway, a STALE entry correctly blocks the contiguous-VALID watermark walk until
+  /// OVERWRITE re-materializes it, the scheduler's APPEND loop skips ANY present entry (so an
+  /// above-watermark STALE bucket is handled exclusively by the OVERWRITE/DELETE step and can
+  /// never be double-dispatched as an APPEND), and the candidate list stays bounded by the
+  /// partition count because it iterates existing keys (so an unbounded `affectedEndMs` cannot
+  /// blow it up).
+  ///
+  /// Returns an empty list when the runtime znode is missing.
+  private List<Long> enumerateCandidateBuckets(String viewTableName, long affectedStartMs, long affectedEndMs) {
+    Stat stat = new Stat();
+    MaterializedViewRuntimeMetadata runtime =
+        MaterializedViewRuntimeMetadataUtils.fetchWithVersion(_propertyStore, viewTableName, stat);
+    if (runtime == null) {
+      return Collections.emptyList();
+    }
+
+    long bucketMs = inferBucketMs(viewTableName, runtime.getPartitions());
     // bucketMs is required by the analyzer at MV-table creation, so it should always be > 0
     // here.  Fail loud if not — a missing bucket config means MV state is unrecoverable
     // without operator intervention; silent over-marking would only make it worse.
@@ -410,55 +625,24 @@ public class MaterializedViewConsistencyManager {
             + "mark partitions without a bucket size.  Repair the MV table config.",
         viewTableName, bucketMs);
 
-    // Iterate every bucket [partStart, partStart+bucketMs) that overlaps the affected range
-    // [affectedStartMs, affectedEndMs]. Two ranges overlap when start1 <= end2 AND end1 >= start2.
-    // The first overlapping bucket has partStart = floorDiv(affectedStartMs, bucketMs) * bucketMs;
-    // the last has partStart <= affectedEndMs (any bucket whose start is past affectedEndMs
-    // cannot overlap because partStart > affectedEndMs >= affectedStartMs implies the bucket
-    // starts after the affected range ends). floorDiv (instead of /) is used defensively so a
-    // future caller passing negative affectedStartMs would still produce the correct floor.
-    // Only flip existing VALID entries to STALE.  Absent buckets are NOT synthesized — under
-    // Design C, a bucket's absence from the partition map already means "MV does not cover this
-    // range", so the broker rewrite (PR 2) routes those queries to the base table.  Synthesizing
-    // STALE entries for every uncovered bucket below `watermarkMs` would explode the znode size
-    // on a full-range invalidation (~watermarkMs / bucketMs entries) without affecting routing
-    // correctness — the bucket-iteration loop below stays O(affectedRange / bucketMs) but the
-    // persisted map grows only with real partitions.
-    long partStart = Math.floorDiv(affectedStartMs, bucketMs) * bucketMs;
-    while (partStart <= affectedEndMs) {
-      PartitionInfo info = updatedInfos.get(partStart);
-      if (info != null && info.getState() == PartitionState.VALID) {
-        updatedInfos.put(partStart, info.withState(PartitionState.STALE));
-        anyChanged = true;
-        markedCount++;
+    // Select the EXISTING partition keys whose bucket [partStart, partStart+bucketMs) overlaps the
+    // affected range [affectedStartMs, affectedEndMs] — i.e. partStart in
+    // [floorDiv(affectedStartMs, bucketMs) * bucketMs, affectedEndMs].  Iterating the existing
+    // keys (rather than enumerating every slot in the range) bounds this list to the partition
+    // count, so a full-range invalidation (affectedEndMs = Long.MAX_VALUE) cannot allocate a list
+    // proportional to range/bucketMs.  Absent buckets are intentionally NOT synthesized: under
+    // Design C a bucket's absence already means "MV does not cover this range" and the broker
+    // routes those queries to the base; the manager's markStale would no-op them anyway, so they
+    // are simply not candidates.  floorDiv (instead of /) defends a future caller passing a
+    // negative affectedStartMs.
+    long firstBucketStartMs = Math.floorDiv(affectedStartMs, bucketMs) * bucketMs;
+    List<Long> buckets = new ArrayList<>();
+    for (long partStart : runtime.getPartitions().keySet()) {
+      if (partStart >= firstBucketStartMs && partStart <= affectedEndMs) {
+        buckets.add(partStart);
       }
-      partStart += bucketMs;
     }
-
-    if (!anyChanged) {
-      LOGGER.debug("No VALID partitions to mark STALE for MV table: {} in range [{}, {}]",
-          viewTableName, affectedStartMs, affectedEndMs);
-      return true;
-    }
-
-    MaterializedViewRuntimeMetadata updated = new MaterializedViewRuntimeMetadata(
-        runtime.getMaterializedViewTableNameWithType(), runtime.getWatermarkMs(), updatedInfos);
-
-    // Route through `persist()` so every writer site is funnelled through the same
-    // `validateForPersist` gate. Translate ONLY `CasConflictException` into the retry-loop
-    // boolean — real validation failures (IllegalStateException / IllegalArgumentException
-    // from validateForPersist) and underlying ZK errors propagate so they surface at the
-    // task / log level rather than being silently retried 128×.
-    try {
-      MaterializedViewRuntimeMetadataUtils.persist(_propertyStore, updated, stat.getVersion());
-      LOGGER.info("Marked {} partition(s) STALE for MV table: {} (range [{}, {}])",
-          markedCount, viewTableName, affectedStartMs, affectedEndMs);
-      return true;
-    } catch (MaterializedViewRuntimeMetadataUtils.CasConflictException e) {
-      LOGGER.debug("CAS conflict marking partitions STALE for MV table: {} (range [{}, {}]); will retry",
-          viewTableName, affectedStartMs, affectedEndMs);
-      return false;
-    }
+    return buckets;
   }
 
   /// Infers the bucket size in millis for the given MV table. First tries to read it from

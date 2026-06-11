@@ -20,22 +20,16 @@ package org.apache.pinot.plugin.minion.tasks.materializedview;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.Hashing;
 import java.io.File;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.NameValuePair;
@@ -44,10 +38,8 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.DataSchema;
@@ -56,6 +48,9 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.materializedview.executor.MaterializedViewQueryExecutor;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
+import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
+import org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
@@ -138,18 +133,33 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
             "Overwrite target partition %d should exist and be STALE for table %s",
             windowStartMs, tableName);
       } else if (MaterializedViewTask.TASK_MODE_DELETE.equals(taskMode)) {
-        // DELETE is now an executor-internal cleanup triggered when an OVERWRITE finds the
-        // source data has been retention-deleted (empty result + zero source segments).  The
-        // partition must exist and be STALE; the executor will remove it from the map and
-        // drop the corresponding MV segments.
+        // DELETE is an executor-internal cleanup triggered when the scheduler finds the source
+        // data for a STALE partition has been retention-deleted (zero overlapping segments).
+        // The partition must exist and be STALE; the executor drops the corresponding MV
+        // segments and rewrites the entry to `VALID + PartitionFingerprint.EMPTY` so the
+        // partition stays "tracked but empty" instead of disappearing from the map.  Keeping
+        // the entry around removes `absent` as a runtime state, so a later backfill into the
+        // same window flips VALID → STALE → OVERWRITE through the normal path; if we removed
+        // the entry, the consistency manager (which only flips existing VALID entries) would
+        // not re-mark it and the backfill would not propagate.  The VALID-empty write is itself
+        // guarded by a commit-time emptiness re-check (see executeDeleteTask / clearValid): if a
+        // backfill landed between dispatch and commit, the bucket is left STALE for OVERWRITE.
         PartitionInfo partitionInfo = runtime.getPartitions().get(windowStartMs);
         Preconditions.checkState(partitionInfo != null && partitionInfo.getState() == PartitionState.STALE,
             "Delete target partition %d should exist and be STALE for table %s",
             windowStartMs, tableName);
       }
     } else {
-      LOGGER.warn("MaterializedViewRuntimeMetadata for table: {} not found; will be initialized in postProcess",
-          tableName);
+      // No runtime znode: the scheduler's cold-start path (which creates the runtime metadata
+      // before dispatching any task) has not run, or the znode was deleted (e.g. DROP MV).  All
+      // commit-time ops (appendValid / refreshValid / clearValid) REQUIRE an existing runtime
+      // znode and would throw at postProcess — but only AFTER executeTask has run the query and
+      // committed segment lineage, leaving MV segments active yet untracked by the partition-state
+      // engine.  Fail fast here, before any side effects, so Helix retries cleanly once the runtime
+      // exists (or surfaces a real missing-runtime fault to the operator).
+      throw new IllegalStateException("MaterializedViewRuntimeMetadata for table: " + tableName
+          + " not found; the scheduler must initialize the runtime znode before tasks run. "
+          + "Failing fast before query execution and segment-lineage mutation.");
     }
   }
 
@@ -173,7 +183,9 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     String taskMode = configs.getOrDefault(MaterializedViewTask.TASK_MODE_KEY,
         MaterializedViewTask.TASK_MODE_APPEND);
 
-    // DELETE mode: skip query execution, only remove existing MV segments
+    // DELETE mode: skip query execution; remove existing MV segments and rewrite the runtime
+    // PartitionInfo to VALID-empty (see executeDeleteTask / postProcess), unless a commit-time
+    // re-check finds the source window was backfilled — in which case the bucket is left STALE.
     if (MaterializedViewTask.TASK_MODE_DELETE.equals(taskMode)) {
       return executeDeleteTask(pinotTaskConfig, eventObserver, tableName, windowStartMs, windowEndMs);
     }
@@ -392,14 +404,42 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
   }
 
   /// Handles DELETE mode: removes all existing MV segments for the given time window
-  /// via segment lineage replace (segmentsFrom=[old segments], segmentsTo=[]).
-  /// No query is executed and no new segments are created.
+  /// via segment lineage replace (segmentsFrom=[old segments], segmentsTo=[]).  No query
+  /// is executed and no new MV segments are created; the runtime PartitionInfo is rewritten
+  /// to `VALID + PartitionFingerprint.EMPTY` by [#postProcess], so the partition stays
+  /// tracked-but-empty rather than disappearing.
+  ///
+  /// A commit-time emptiness re-check guards both the segment delete (here) and the VALID-empty
+  /// write ([#postProcess] / [MaterializedViewPartitionManager#clearValid]): if the source window
+  /// was backfilled after the scheduler dispatched DELETE, this method aborts without mutating MV
+  /// segments or partition state, leaving the bucket STALE so the next scheduling cycle
+  /// re-materializes it via OVERWRITE.
   private SegmentConversionResult executeDeleteTask(PinotTaskConfig pinotTaskConfig,
       MinionEventObserver eventObserver, String tableName, long windowStartMs, long windowEndMs)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     AuthProvider authProvider = resolveAuthProvider(configs);
+
+    // Commit-time backfill guard: the scheduler dispatched DELETE because the source window had
+    // zero overlapping segments, but a backfill may have landed since.  If the source is no
+    // longer empty, abort before touching MV segments or partition state — leaving the bucket
+    // STALE so the next scheduling cycle re-materializes it via OVERWRITE.  Skipping the
+    // segment-replace delete here also avoids a transient empty-results window: the existing
+    // (stale) MV segments keep serving until OVERWRITE replaces them — the normal STALE contract —
+    // instead of the bucket briefly going empty.  postProcess() re-checks the same condition right
+    // before the VALID-empty write (see clearValid) to close the narrow window where a backfill
+    // lands during the delete below.
+    PartitionFingerprint sourceFingerprint =
+        computeSourceWindowFingerprint(configs, tableName, windowStartMs, windowEndMs);
+    if (shouldAbortDeleteForBackfill(sourceFingerprint)) {
+      LOGGER.warn("DELETE aborted for MV table: {}, window: [{}, {}): source backfilled with {} "
+              + "overlapping segment(s) after dispatch. Leaving partition STALE for OVERWRITE.",
+          tableName, windowStartMs, windowEndMs, sourceFingerprint.getSegmentCount());
+      return new SegmentConversionResult.Builder()
+          .setTableNameWithType(tableName)
+          .build();
+    }
 
     LOGGER.info("DELETE task for table: {}, window: [{}, {}). Removing MV segments.",
         tableName, windowStartMs, windowEndMs);
@@ -449,22 +489,45 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     long windowStartMs = Long.parseLong(configs.get(MaterializedViewTask.WINDOW_START_MS_KEY));
     long windowEndMs = Long.parseLong(configs.get(MaterializedViewTask.WINDOW_END_MS_KEY));
 
-    updateMaterializedViewRuntime(configs, tableName, taskMode, windowStartMs, windowEndMs);
-  }
+    MaterializedViewPartitionManager partitionManager = new MaterializedViewPartitionManager(
+        MINION_CONTEXT.getHelixPropertyStore(),
+        MaterializedViewTaskExecutor::readMinionClusterConfig);
 
-  /// Updates [MaterializedViewRuntimeMetadata] in a single CAS write, combining:
-  ///
-  ///   - partitions: set VALID with new fingerprint (APPEND/OVERWRITE) or remove (DELETE)
-  ///   - watermarkMs: advance on APPEND only (drives both scheduler dispatch and the
-  ///       broker's SPLIT_REWRITE boundary)
-  ///
-  // Compile-time default for the CAS retry budget when racing to update MaterializedViewRuntimeMetadata.
-  // Up to maxTasksPerBatch executors can contend per batch completion; each retry re-fetches the
-  // latest version with jittered backoff (Thread.sleep below). 128 is well above any realistic
-  // maxTasksPerBatch and stays low enough that genuinely pathological contention still surfaces as
-  // a task failure (caught by Helix and retried at the task level). Overridable per cluster via
-  // `MaterializedViewTask.CLUSTER_CONFIG_KEY_MAX_RUNTIME_UPDATE_ATTEMPTS` (no minion restart).
-  private static final int DEFAULT_MAX_RUNTIME_UPDATE_ATTEMPTS = 128;
+    if (MaterializedViewTask.TASK_MODE_DELETE.equals(taskMode)) {
+      // DELETE writes `VALID + PartitionFingerprint.EMPTY` rather than removing the entry, but
+      // only after a commit-time re-check that the source window is still empty.  The scheduler
+      // dispatched DELETE because the source had zero overlapping segments; a backfill may have
+      // landed since.  The supplier recomputes the source fingerprint from live ZK metadata and
+      // is invoked inside clearValid's CAS loop, so the source is re-read on every attempt
+      // immediately before the write; clearValid leaves the bucket STALE (so the next scheduling
+      // cycle re-materializes it via OVERWRITE) when the source is no longer empty — see
+      // `MaterializedViewPartitionManager#clearValid`.
+      partitionManager.clearValid(tableName, windowStartMs,
+          () -> computeSourceWindowFingerprint(configs, tableName, windowStartMs, windowEndMs));
+      return;
+    }
+
+    // Compute and validate the source fingerprint ONCE before mutating the runtime znode.
+    // Both operations are deterministic given the source-side ZK state: if validation fails
+    // on this attempt (real source drift), the manager's CAS retry cannot succeed and would
+    // mask the actionable error.  The CAS retry that lives inside the manager exists only
+    // to absorb concurrent ConsistencyManager STALE markings on the runtime znode itself.
+    PartitionFingerprint newFingerprint = getTaskFingerprint(configs, tableName, windowStartMs);
+    validateSourceFingerprintAtCommit(configs, tableName, windowStartMs, windowEndMs, newFingerprint);
+
+    if (MaterializedViewTask.TASK_MODE_APPEND.equals(taskMode)) {
+      // APPEND advances watermarkMs through the manager's contiguous-VALID walk over the
+      // resulting map.  Watermark advancement is bundled with the bucket transition because
+      // both flow from the same map snapshot; splitting them would create a transient window
+      // where the bucket is VALID but the watermark hasn't caught up.
+      partitionManager.appendValid(tableName, windowStartMs, windowEndMs, newFingerprint);
+    } else if (MaterializedViewTask.TASK_MODE_OVERWRITE.equals(taskMode)) {
+      partitionManager.refreshValid(tableName, windowStartMs, newFingerprint);
+    } else {
+      throw new IllegalStateException(
+          "Unknown MV task mode '" + taskMode + "' for table: " + tableName);
+    }
+  }
 
   /// Reads a single Helix CLUSTER-scope config value via the minion's `HelixManager`. Returns
   /// `null` when the key is unset or the Helix manager has not yet been initialized. Used by
@@ -488,109 +551,6 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     }
   }
 
-  private void updateMaterializedViewRuntime(Map<String, String> configs, String tableName,
-      String taskMode, long windowStartMs, long windowEndMs) {
-    HelixPropertyStore<ZNRecord> propertyStore = MINION_CONTEXT.getHelixPropertyStore();
-    int maxRuntimeUpdateAttempts = MaterializedViewTaskUtils.readPositiveIntClusterConfigOrDefault(
-        MaterializedViewTaskExecutor::readMinionClusterConfig,
-        MaterializedViewTask.CLUSTER_CONFIG_KEY_MAX_RUNTIME_UPDATE_ATTEMPTS,
-        DEFAULT_MAX_RUNTIME_UPDATE_ATTEMPTS);
-
-    // Compute the new fingerprint and validate against the source ONCE, outside the CAS loop.
-    // Both operations are deterministic given the source-side ZK state: if validation fails on
-    // attempt 1 (real source drift), retrying cannot succeed and would mask the actionable error
-    // behind a generic "Failed after N attempts" message. The CAS retry only exists to absorb
-    // concurrent ConsistencyManager STALE markings on the runtime znode itself.
-    PartitionFingerprint newFingerprint = null;
-    if (!MaterializedViewTask.TASK_MODE_DELETE.equals(taskMode)) {
-      newFingerprint = getTaskFingerprint(configs, tableName, windowStartMs);
-      validateSourceFingerprintAtCommit(configs, tableName, windowStartMs, windowEndMs, newFingerprint);
-    }
-
-    ZkException lastCasException = null;
-    for (int attempt = 0; attempt < maxRuntimeUpdateAttempts; attempt++) {
-      if (attempt > 0) {
-        // Jittered backoff to avoid thundering herd against ZK when batched APPEND tasks
-        // race for the same MaterializedViewRuntimeMetadata znode (see maxRuntimeUpdateAttempts comment).
-        try {
-          Thread.sleep(50L + ThreadLocalRandom.current().nextInt(150));
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-          throw new RuntimeException("Interrupted while retrying MV runtime update for table: " + tableName, ie);
-        }
-        LOGGER.warn("Retrying MV runtime update for table: {} (attempt {}/{})", tableName, attempt + 1,
-            maxRuntimeUpdateAttempts);
-      }
-      try {
-        // Re-fetch with version on every attempt to pick up concurrent ConsistencyManager
-        // updates (e.g. STALE markings) that may have arrived since the previous attempt.
-        Stat freshStat = new Stat();
-        MaterializedViewRuntimeMetadata existing =
-            MaterializedViewRuntimeMetadataUtils.fetchWithVersion(propertyStore, tableName, freshStat);
-        int writeVersion = (existing != null) ? freshStat.getVersion() : -1;
-
-        Map<Long, PartitionInfo> mergedInfos;
-        long existingWatermarkMs;
-
-        if (existing != null) {
-          mergedInfos = new HashMap<>(existing.getPartitions());
-          existingWatermarkMs = existing.getWatermarkMs();
-        } else {
-          mergedInfos = new HashMap<>();
-          existingWatermarkMs = 0L;
-        }
-
-        long newWatermarkMs;
-
-        if (MaterializedViewTask.TASK_MODE_DELETE.equals(taskMode)) {
-          mergedInfos.remove(windowStartMs);
-          newWatermarkMs = existingWatermarkMs;
-          LOGGER.info("DELETE mode: removed partition {} from MV runtime for table: {}", windowStartMs, tableName);
-        } else {
-          long nowMs = System.currentTimeMillis();
-          PartitionInfo completedInfo = new PartitionInfo(PartitionState.VALID, newFingerprint, nowMs);
-          mergedInfos.put(windowStartMs, completedInfo);
-          LOGGER.info("Set partition {} to VALID (lastRefreshTime={}) for table: {}", windowStartMs, nowMs, tableName);
-
-          if (MaterializedViewTask.TASK_MODE_APPEND.equals(taskMode)) {
-            // Advance to the highest contiguous VALID block starting from the existing watermark.
-            // Concurrent batch tasks may complete out of order; only advancing to windowEndMs would
-            // leave gaps when an earlier window hasn't finished yet.  bucketMs is derived from the
-            // task's window length (one bucket per APPEND task by construction).
-            long bucketMs = windowEndMs - windowStartMs;
-            Preconditions.checkState(bucketMs > 0,
-                "Invalid window: windowEndMs (%s) <= windowStartMs (%s) for table %s",
-                windowEndMs, windowStartMs, tableName);
-            newWatermarkMs = MaterializedViewTaskUtils.computeContiguousUpperMs(existingWatermarkMs, mergedInfos,
-                bucketMs);
-            LOGGER.info("APPEND mode: advancing watermarkMs from {} to {} for table: {}",
-                existingWatermarkMs, newWatermarkMs, tableName);
-          } else {
-            newWatermarkMs = existingWatermarkMs;
-            LOGGER.info("OVERWRITE mode: keeping watermarkMs at {} for table: {}", newWatermarkMs, tableName);
-          }
-        }
-
-        MaterializedViewRuntimeMetadata updated = new MaterializedViewRuntimeMetadata(
-            tableName, newWatermarkMs, mergedInfos);
-        MaterializedViewRuntimeMetadataUtils.persist(propertyStore, updated, writeVersion);
-
-        LOGGER.info("Updated MV runtime for table: {} (partitions={}, watermarkMs={})",
-            tableName, mergedInfos.size(), newWatermarkMs);
-        return;
-      } catch (ZkException e) {
-        // Only ZK CAS conflicts and transient ZK errors are retried. Non-ZK failures (e.g.
-        // IllegalStateException from invariant checks, NullPointerException) are programming
-        // bugs that retrying cannot resolve — let them propagate so the operator sees the real cause.
-        lastCasException = e;
-        LOGGER.warn("ZK conflict while updating MV runtime for table: {} on attempt {}", tableName, attempt + 1, e);
-      }
-    }
-    throw new RuntimeException(
-        "Failed to update MV runtime for table: " + tableName + " after " + maxRuntimeUpdateAttempts + " attempts",
-        lastCasException);
-  }
-
   private PartitionFingerprint getTaskFingerprint(Map<String, String> configs, String tableName, long windowStartMs) {
     String fingerprintStr = configs.get(MaterializedViewTask.PARTITION_FINGERPRINTS_KEY);
     Preconditions.checkState(fingerprintStr != null && !fingerprintStr.isEmpty(),
@@ -602,80 +562,82 @@ public class MaterializedViewTaskExecutor extends BaseTaskExecutor {
     return fingerprint;
   }
 
-  private void validateSourceFingerprintAtCommit(Map<String, String> configs, String tableName, long windowStartMs,
-      long windowEndMs, PartitionFingerprint taskFingerprint) {
+  /// Computes the current source-table [PartitionFingerprint] for `[windowStartMs, windowEndMs)`
+  /// from live ZK segment metadata.  Shared by the APPEND / OVERWRITE commit-time fingerprint
+  /// validation and the DELETE commit-time emptiness re-check.  The source table normally comes
+  /// from [MaterializedViewTask#SOURCE_TABLE_NAME_KEY] in the task config; when the key is absent
+  /// (a DELETE task dispatched by a pre-upgrade controller that did not yet carry it), the
+  /// executor falls back to the authoritative source-table reference in
+  /// [MaterializedViewDefinitionMetadata] so a mixed-version rollout cannot strand legacy DELETE
+  /// tasks in a fail-retry loop.  Fails loud only when neither source is available.
+  @VisibleForTesting
+  PartitionFingerprint computeSourceWindowFingerprint(Map<String, String> configs, String tableName,
+      long windowStartMs, long windowEndMs) {
     String sourceTableName = configs.get(MaterializedViewTask.SOURCE_TABLE_NAME_KEY);
-    Preconditions.checkState(sourceTableName != null && !sourceTableName.isEmpty(),
-        "Missing source table name for MV task table %s window [%s, %s)", tableName, windowStartMs, windowEndMs);
+    if (sourceTableName == null || sourceTableName.isEmpty()) {
+      sourceTableName = resolveSourceTableNameFromDefinition(tableName, windowStartMs, windowEndMs);
+    }
     String sourceTableWithType = resolveSourceTableNameWithType(sourceTableName);
-    PartitionFingerprint currentFingerprint = computeWindowFingerprint(
+    return MaterializedViewTaskUtils.computeWindowFingerprint(
         ZKMetadataProvider.getSegmentsZKMetadata(MINION_CONTEXT.getHelixPropertyStore(), sourceTableWithType),
         windowStartMs, windowEndMs);
+  }
+
+  /// Backward-compatible fallback for task configs missing
+  /// [MaterializedViewTask#SOURCE_TABLE_NAME_KEY]: reads the source table from the MV's
+  /// definition znode, which the scheduler's cold-start path creates before dispatching any
+  /// task and which carries the same source-table reference the task config would.
+  /// Time-windowed MVs (the only shape in V1) have exactly one base table; fail loud on any
+  /// other shape rather than guessing.
+  ///
+  /// TODO: remove this shim once every controller in supported rolling-upgrade paths sets
+  /// SOURCE_TABLE_NAME_KEY on DELETE tasks (i.e. the first release containing this PR is the
+  /// minimum supported version).
+  private String resolveSourceTableNameFromDefinition(String tableName, long windowStartMs, long windowEndMs) {
+    MaterializedViewDefinitionMetadata definition =
+        MaterializedViewDefinitionMetadataUtils.fetch(MINION_CONTEXT.getHelixPropertyStore(), tableName);
+    Preconditions.checkState(definition != null,
+        "Missing source table name for MV task table %s window [%s, %s) and no definition znode "
+            + "to fall back to", tableName, windowStartMs, windowEndMs);
+    List<String> baseTables = definition.getBaseTables();
+    Preconditions.checkState(baseTables != null && baseTables.size() == 1,
+        "Missing source table name for MV task table %s window [%s, %s); definition fallback "
+            + "requires exactly one base table, got: %s", tableName, windowStartMs, windowEndMs, baseTables);
+    LOGGER.info("MV task config for table: {} window [{}, {}) carries no sourceTableName "
+            + "(pre-upgrade controller?); falling back to definition base table: {}",
+        tableName, windowStartMs, windowEndMs, baseTables.get(0));
+    return baseTables.get(0);
+  }
+
+  /// Returns `true` when a DELETE task must abort because the source window is no longer empty
+  /// (a backfill landed after the scheduler dispatched DELETE on a then-empty source).  A
+  /// non-zero `segmentCount` is the canonical "non-empty source window" criterion — identical to
+  /// the scheduler's DELETE dispatch test (MaterializedViewTaskScheduler computes the same
+  /// fingerprint and dispatches DELETE only when `segmentCount == 0`) and equivalent to comparing
+  /// against [PartitionFingerprint#EMPTY], since `computeWindowFingerprint` maps an empty overlap
+  /// to `EMPTY`.  Aborting leaves the bucket STALE for OVERWRITE rather than deleting MV segments
+  /// or writing VALID-empty over live source data.
+  @VisibleForTesting
+  static boolean shouldAbortDeleteForBackfill(PartitionFingerprint sourceWindowFingerprint) {
+    return sourceWindowFingerprint.getSegmentCount() != 0;
+  }
+
+  private void validateSourceFingerprintAtCommit(Map<String, String> configs, String tableName, long windowStartMs,
+      long windowEndMs, PartitionFingerprint taskFingerprint) {
+    PartitionFingerprint currentFingerprint =
+        computeSourceWindowFingerprint(configs, tableName, windowStartMs, windowEndMs);
     Preconditions.checkState(taskFingerprint.equals(currentFingerprint),
-        "Source table %s changed while refreshing MV table %s window [%s, %s): taskFingerprint=%s, "
+        "Source table changed while refreshing MV table %s window [%s, %s): taskFingerprint=%s, "
             + "currentFingerprint=%s. Leaving MV partition stale for retry.",
-        sourceTableWithType, tableName, windowStartMs, windowEndMs, taskFingerprint, currentFingerprint);
+        tableName, windowStartMs, windowEndMs, taskFingerprint, currentFingerprint);
   }
 
   private String resolveSourceTableNameWithType(String sourceTableName) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(sourceTableName);
-    if (tableType != null) {
-      return sourceTableName;
-    }
-    String rawSourceTableName = TableNameBuilder.extractRawTableName(sourceTableName);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawSourceTableName);
-    if (ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), offlineTableName) != null) {
-      return offlineTableName;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawSourceTableName);
-    Preconditions.checkState(
-        ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), realtimeTableName) != null,
-        "Source table config not found for: %s", sourceTableName);
-    return realtimeTableName;
-  }
-
-  /// Computes a [PartitionFingerprint] for the segments that overlap [windowStartMs, windowEndMs).
-  ///
-  /// The fingerprint is `Hashing.farmHashFingerprint64` over the sorted concatenation of
-  /// `<segmentName>\0<crc>\n` lines. Sorting by segment name makes the hash insensitive to
-  /// listing order. FarmHash64 is non-cryptographic but collision-resistant for non-adversarial
-  /// inputs; in particular it avoids the cancellation pathology of XOR-CRC (where swapping
-  /// one segment for another with the same XOR contribution produces an identical fingerprint).
-  @VisibleForTesting
-  static PartitionFingerprint computeWindowFingerprint(List<SegmentZKMetadata> allSegments,
-      long windowStartMs, long windowEndMs) {
-    List<SegmentZKMetadata> overlapping = new ArrayList<>();
-    for (SegmentZKMetadata seg : allSegments) {
-      long segStartMs = seg.getStartTimeMs();
-      long segEndMs = seg.getEndTimeMs();
-      if (segStartMs < windowEndMs && segEndMs >= windowStartMs) {
-        overlapping.add(seg);
-      }
-    }
-    overlapping.sort(Comparator.comparing(SegmentZKMetadata::getSegmentName));
-
-    Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
-    for (SegmentZKMetadata seg : overlapping) {
-      hasher.putString(seg.getSegmentName(), StandardCharsets.UTF_8);
-      hasher.putByte((byte) 0);
-      hasher.putLong(seg.getCrc());
-      hasher.putByte((byte) '\n');
-    }
-    return new PartitionFingerprint(overlapping.size(), hasher.hash().asLong());
-  }
-
-  /// Returns the highest contiguous VALID upper boundary starting from `fromMs`.
-  ///
-  /// When batch APPEND tasks run concurrently, windows may complete out of order.
-  /// Advancing `watermarkMs` only to the just-completed `windowEndMs` would
-  /// regress coverage if an earlier window hasn't finished yet. This method scans
-  /// `partitions` for an unbroken chain of VALID windows beginning at `fromMs`
-  /// and returns the end of the last VALID window in that chain.
-  ///
-  /// Bounded by `partitions.size()` iterations to defend against pathological maps.
-  @VisibleForTesting
-  static long computeContiguousUpperMs(long fromMs, Map<Long, PartitionInfo> partitions, long bucketMs) {
-    return MaterializedViewTaskUtils.computeContiguousUpperMs(fromMs, partitions, bucketMs);
+    String resolved = MaterializedViewTaskUtils.resolveTableNameWithType(
+        tableName -> ZKMetadataProvider.getTableConfig(MINION_CONTEXT.getHelixPropertyStore(), tableName),
+        sourceTableName);
+    Preconditions.checkState(resolved != null, "Source table config not found for: %s", sourceTableName);
+    return resolved;
   }
 
   @Override

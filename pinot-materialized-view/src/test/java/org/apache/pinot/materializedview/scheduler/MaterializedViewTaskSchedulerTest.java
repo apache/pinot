@@ -18,16 +18,30 @@
  */
 package org.apache.pinot.materializedview.scheduler;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.materializedview.analysis.MaterializedViewAnalyzer;
 import org.apache.pinot.materializedview.context.MaterializedViewTaskGeneratorContext;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
+import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
+import org.apache.pinot.materializedview.metadata.PartitionInfo;
+import org.apache.pinot.materializedview.metadata.PartitionState;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.MaterializedViewTask;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.testng.annotations.Test;
 
@@ -35,6 +49,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -234,5 +249,219 @@ public class MaterializedViewTaskSchedulerTest {
   @SuppressWarnings("unchecked")
   private static HelixPropertyStore<ZNRecord> mockPropertyStore() {
     return mock(HelixPropertyStore.class);
+  }
+
+  // ---------------------------------------------------------------------------
+  //  computeMaxSourceEndTimeMs — caps the APPEND scheduler cutoff at the latest
+  //  known source-segment endTime so watermark advance cannot outrun real data
+  //  (see MaterializedViewQueryRewriteEngine#isEligible: a watermark that drifts
+  //  to `now - bufferMs` while source ingestion has stalled would silently
+  //  defeat the staleness-threshold contract).
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testComputeMaxSourceEndTimeMsEmptyList() {
+    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(Collections.emptyList());
+    assertEquals(max, Long.MIN_VALUE,
+        "Empty list should return MIN_VALUE so the caller falls back to roughCutoffMs");
+  }
+
+  @Test
+  public void testComputeMaxSourceEndTimeMsPicksMaximum() {
+    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(
+        Arrays.asList(segmentWithEndMs(100L), segmentWithEndMs(500L), segmentWithEndMs(300L)));
+    assertEquals(max, 500L);
+  }
+
+  @Test
+  public void testComputeMaxSourceEndTimeMsSkipsNegativeEndTimes() {
+    // SegmentZKMetadata returns -1 for legacy znodes without TIME_UNIT; those entries must
+    // not poison the maximum and must not be returned as the "tip of source data".
+    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(
+        Arrays.asList(segmentWithEndMs(-1L), segmentWithEndMs(250L), segmentWithEndMs(-1L)));
+    assertEquals(max, 250L);
+  }
+
+  @Test
+  public void testComputeMaxSourceEndTimeMsAllNegativeReturnsMinValue() {
+    // When every segment has an unset end time the caller must fall back to roughCutoffMs;
+    // returning a negative value would freeze the scheduler.
+    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(
+        Arrays.asList(segmentWithEndMs(-1L), segmentWithEndMs(-1L)));
+    assertEquals(max, Long.MIN_VALUE);
+  }
+
+  @Test
+  public void testComputeMaxSourceEndTimeMsZeroIsValid() {
+    // endMs == 0 is the epoch boundary, not "unset" — the >= 0 filter must admit it so
+    // a synthetic test/source carrying epoch-zero segments still produces a real max.
+    long max = MaterializedViewTaskScheduler.computeMaxSourceEndTimeMs(
+        Collections.singletonList(segmentWithEndMs(0L)));
+    assertEquals(max, 0L);
+  }
+
+  private static SegmentZKMetadata segmentWithEndMs(long endTimeMs) {
+    SegmentZKMetadata seg = mock(SegmentZKMetadata.class);
+    when(seg.getEndTimeMs()).thenReturn(endTimeMs);
+    return seg;
+  }
+
+  // ---------------------------------------------------------------------------
+  //  resolveAppendCutoffMs — converts the inclusive max source endTimeMs into the exclusive
+  //  windowEndMs convention the scheduling-loop gate (`windowEndMs > cutoffMs → break`) uses.
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testResolveAppendCutoffAdmitsExactlyCoveredBucket() {
+    // A day-aligned batch segment covering [0, bucketEnd - 1] (inclusive end) fully covers the
+    // bucket ending at bucketEnd.  The +1 conversion must admit that bucket: without it, a
+    // complete static dataset would never materialize its final bucket and `watermarkMs` would
+    // stall one bucket short of the data.
+    long bucketEndMs = 86_400_000L;
+    long roughCutoffMs = 10 * bucketEndMs;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, bucketEndMs - 1),
+        bucketEndMs, "inclusive segment end exactly covering the bucket must admit it");
+  }
+
+  @Test
+  public void testResolveAppendCutoffKeepsRoughCutoffWhenDataIsAhead() {
+    // Source data extends past the wall-clock buffer: the rough cutoff (now - bufferMs) must
+    // win, preserving the buffer semantics for late-arriving data.
+    long roughCutoffMs = 1_000_000L;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, 5_000_000L),
+        roughCutoffMs);
+  }
+
+  @Test
+  public void testResolveAppendCutoffFallsBackWhenNoUsableEndTime() {
+    long roughCutoffMs = 1_000_000L;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, Long.MIN_VALUE),
+        roughCutoffMs, "no usable source end time falls back to the rough cutoff");
+  }
+
+  @Test
+  public void testResolveAppendCutoffClampsCorruptMaxValueEndTime() {
+    // A corrupt Long.MAX_VALUE end time must not overflow `+ 1` into Long.MIN_VALUE (which
+    // would freeze APPEND scheduling forever); it clamps to the rough cutoff instead.
+    long roughCutoffMs = 1_000_000L;
+    assertEquals(MaterializedViewTaskScheduler.resolveAppendCutoffMs(roughCutoffMs, Long.MAX_VALUE),
+        roughCutoffMs);
+  }
+
+  // ---------------------------------------------------------------------------
+  //  generateTasks DELETE path: a STALE partition whose source was retention-deleted must
+  //  produce a DELETE task that carries SOURCE_TABLE_NAME_KEY, so the executor can recompute
+  //  the source fingerprint at commit and leave the bucket STALE if a backfill landed.
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testStaleDeletedSourceGeneratesDeleteTaskCarryingSourceTable() {
+    String sourceTable = "orders";
+    String sourceTableOffline = "orders_OFFLINE";
+    String mvTableOffline = "mv_OFFLINE";
+    long staleBucketMs = 1_700_000_000_000L;
+
+    HelixPropertyStore<ZNRecord> store = mockPropertyStore();
+    MaterializedViewTaskGeneratorContext context = mock(MaterializedViewTaskGeneratorContext.class);
+    when(context.getPropertyStore()).thenReturn(store);
+    when(context.getVipUrl()).thenReturn("http://controller:9000");
+    // Source table resolves as OFFLINE.
+    when(context.getTableConfig(sourceTableOffline)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(sourceTable).build());
+    // Source has zero overlapping segments => scheduler picks DELETE for the STALE bucket.
+    when(context.getSegmentsZKMetadata(sourceTableOffline)).thenReturn(Collections.emptyList());
+    // No in-flight tasks (forRunningTasks is a no-op mock, so all per-mode counts stay 0).
+
+    // Runtime carries one STALE partition at staleBucketMs; the watermark sits at the same bucket.
+    Map<Long, PartitionInfo> partitions = new HashMap<>();
+    partitions.put(staleBucketMs,
+        PartitionInfo.forTesting(PartitionState.STALE, new PartitionFingerprint(2, 0xABCDL), 1L));
+    MaterializedViewRuntimeMetadata runtime =
+        new MaterializedViewRuntimeMetadata(mvTableOffline, staleBucketMs, partitions);
+    when(store.get(
+        eq(ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(mvTableOffline)),
+        any(Stat.class), eq(AccessOption.PERSISTENT))).thenReturn(runtime.toZNRecord());
+
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(MaterializedViewTask.TASK_TYPE, Map.of(
+        MaterializedViewTask.DEFINED_SQL_KEY, "SELECT city, COUNT(*) FROM " + sourceTable + " GROUP BY city",
+        MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, "1d")));
+    TableConfig mvConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("mv").setIsMaterializedView(true).setTaskConfig(taskConfig).build();
+
+    List<PinotTaskConfig> tasks =
+        new MaterializedViewTaskScheduler(context).generateTasks(Collections.singletonList(mvConfig));
+
+    assertEquals(tasks.size(), 1, "expected exactly one DELETE task");
+    Map<String, String> configs = tasks.get(0).getConfigs();
+    assertEquals(configs.get(MaterializedViewTask.TASK_MODE_KEY), MaterializedViewTask.TASK_MODE_DELETE);
+    assertEquals(configs.get(MaterializedViewTask.SOURCE_TABLE_NAME_KEY), sourceTable,
+        "DELETE task must carry the source table so the executor can re-validate emptiness at commit");
+  }
+
+  // ---------------------------------------------------------------------------
+  //  APPEND loop must fill ABSENT buckets only.  Since the consistency manager marks
+  //  above-watermark VALID buckets STALE (the watermark cap was removed), a STALE bucket can
+  //  sit inside the APPEND scheduling range; dispatching an APPEND for it would race the
+  //  in-flight / upcoming OVERWRITE on the same window (concurrent segment-replace =>
+  //  potentially duplicated rows with no failure signal).
+  // ---------------------------------------------------------------------------
+
+  @Test
+  public void testAppendLoopSkipsAboveWatermarkStaleBucket() {
+    String sourceTable = "orders";
+    String sourceTableOffline = "orders_OFFLINE";
+    String mvTableOffline = "mv_OFFLINE";
+    long bucketMs = 86_400_000L;
+    long b0 = 1_700_006_400_000L;
+    long b1 = b0 + bucketMs;
+    long b2 = b0 + 2 * bucketMs;
+    long b3 = b0 + 3 * bucketMs;
+
+    HelixPropertyStore<ZNRecord> store = mockPropertyStore();
+    MaterializedViewTaskGeneratorContext context = mock(MaterializedViewTaskGeneratorContext.class);
+    when(context.getPropertyStore()).thenReturn(store);
+    when(context.getVipUrl()).thenReturn("http://controller:9000");
+    when(context.getTableConfig(sourceTableOffline)).thenReturn(
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(sourceTable).build());
+    // Source data ends exactly at the STALE bucket's inclusive end, so the stage-2 cutoff
+    // admits [b2, b3) and nothing beyond — the STALE bucket is the only candidate slot.
+    // (Built before the when() below: stubbing a mock inside another stubbing trips Mockito.)
+    SegmentZKMetadata sourceTail = segmentWithEndMs(b3 - 1);
+    when(context.getSegmentsZKMetadata(sourceTableOffline)).thenReturn(
+        Collections.singletonList(sourceTail));
+    // One in-flight OVERWRITE for [b2, b3) — the step-1 dispatch from the previous cycle —
+    // so step 1 is skipped this cycle and only the APPEND loop runs.
+    doAnswer(inv -> {
+      Consumer<Map<String, String>> consumer = inv.getArgument(2);
+      consumer.accept(Map.of(
+          MaterializedViewTask.TASK_MODE_KEY, MaterializedViewTask.TASK_MODE_OVERWRITE,
+          MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(b2),
+          MaterializedViewTask.WINDOW_END_MS_KEY, String.valueOf(b3)));
+      return null;
+    }).when(context).forRunningTasks(eq(mvTableOffline), eq(MaterializedViewTask.TASK_TYPE), any());
+
+    // Contiguous VALID chain up to the watermark (b2); b2 itself is STALE above the frontier
+    // (the consistency manager marked it after an out-of-order completion).
+    Map<Long, PartitionInfo> partitions = new HashMap<>();
+    partitions.put(b0, PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(1, 1L), 1L));
+    partitions.put(b1, PartitionInfo.forTesting(PartitionState.VALID, new PartitionFingerprint(1, 2L), 1L));
+    partitions.put(b2, PartitionInfo.forTesting(PartitionState.STALE, new PartitionFingerprint(1, 3L), 1L));
+    MaterializedViewRuntimeMetadata runtime = new MaterializedViewRuntimeMetadata(mvTableOffline, b2, partitions);
+    when(store.get(
+        eq(ZKMetadataProvider.constructPropertyStorePathForMaterializedViewRuntime(mvTableOffline)),
+        any(Stat.class), eq(AccessOption.PERSISTENT))).thenReturn(runtime.toZNRecord());
+
+    TableTaskConfig taskConfig = new TableTaskConfig(Map.of(MaterializedViewTask.TASK_TYPE, Map.of(
+        MaterializedViewTask.DEFINED_SQL_KEY, "SELECT city, COUNT(*) FROM " + sourceTable + " GROUP BY city",
+        MaterializedViewTask.BUCKET_TIME_PERIOD_KEY, "1d")));
+    TableConfig mvConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("mv").setIsMaterializedView(true).setTaskConfig(taskConfig).build();
+
+    List<PinotTaskConfig> tasks =
+        new MaterializedViewTaskScheduler(context).generateTasks(Collections.singletonList(mvConfig));
+
+    assertTrue(tasks.isEmpty(), "the STALE bucket is the exclusive (OVERWRITE/DELETE) step's "
+        + "responsibility; the APPEND loop must skip it instead of double-dispatching the same "
+        + "window, got: " + tasks);
   }
 }

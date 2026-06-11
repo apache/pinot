@@ -20,18 +20,13 @@ package org.apache.pinot.materializedview.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.Hashing;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
@@ -45,6 +40,7 @@ import org.apache.pinot.materializedview.context.MaterializedViewTaskGeneratorCo
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadata.MaterializedViewSplitSpec;
 import org.apache.pinot.materializedview.metadata.MaterializedViewDefinitionMetadataUtils;
+import org.apache.pinot.materializedview.metadata.MaterializedViewPartitionManager;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadata;
 import org.apache.pinot.materializedview.metadata.MaterializedViewRuntimeMetadataUtils;
 import org.apache.pinot.materializedview.metadata.PartitionFingerprint;
@@ -220,8 +216,9 @@ public class MaterializedViewTaskScheduler {
       // ── Step 1: Handle STALE partitions ──
       // Under Design C there is no separate EXPIRED state.  When the scheduler finds a STALE
       // partition it re-computes the source fingerprint and dispatches one of:
-      //   - DELETE task: source data is gone (segmentCount == 0) — drop MV segments + remove the
-      //     partition entry from the runtime metadata
+      //   - DELETE task: source data is gone (segmentCount == 0) — drop MV segments and rewrite
+      //     the entry to VALID-empty (the executor re-checks emptiness at commit and leaves the
+      //     entry STALE if the source was backfilled in the meantime)
       //   - revert to VALID: fingerprint matches the stored value (false positive STALE marking)
       //   - OVERWRITE task: source changed — re-materialize the partition
       if (counts.exclusiveModeCount() > 0) {
@@ -262,7 +259,31 @@ public class MaterializedViewTaskScheduler {
       // bucketTimePeriod (operator changed config mid-flight); the partition map is keyed by
       // aligned starts, so a misaligned nextWindowStartMs would miss VALID-skip lookups.
       long nextWindowStartMs = Math.floorDiv(maxInFlightAppendWindowEndMs, bucketMs) * bucketMs;
-      long cutoffMs = System.currentTimeMillis() - bufferMs;
+
+      // Resolve the APPEND cutoff in two stages so steady-state cycles do not pay a ZK list
+      // call. Stage 1: rough cutoff = `now - bufferMs`. If the next window already lies past
+      // it, no scheduling work is possible regardless of source state, so we fall through to
+      // the loop where the first iteration breaks immediately — and the source-segment
+      // fetch below is skipped. Stage 2: when stage 1 admits at least one candidate bucket,
+      // fetch source segments once and tighten the cutoff by the end of the source data
+      // (see resolveAppendCutoffMs). The tighter cap matters because without it the scheduler
+      // would walk past the actual data tail (each empty bucket completes with zero rows,
+      // executor persists a VALID-empty partition + advances watermark), so `watermarkMs`
+      // would drift toward `now - bufferMs` even when source ingestion has stalled —
+      // defeating the staleness-threshold contract the broker uses in
+      // `now - watermarkMs <= stalenessThresholdMs`. See
+      // `MaterializedViewQueryRewriteEngine#isEligible`.
+      long roughCutoffMs = System.currentTimeMillis() - bufferMs;
+      long cutoffMs;
+      if (nextWindowStartMs + bucketMs > roughCutoffMs) {
+        // No bucket can fit before the rough cutoff. Skip the ZK fetch — the loop below
+        // will break on its first iteration and the caught-up log will fire.
+        cutoffMs = roughCutoffMs;
+      } else {
+        long maxSourceEndMs =
+            computeMaxSourceEndTimeMs(_context.getSegmentsZKMetadata(sourceTableWithType));
+        cutoffMs = resolveAppendCutoffMs(roughCutoffMs, maxSourceEndMs);
+      }
       int scheduled = 0;
 
       // Hard cap on iterations to defend against pathological partition maps. The loop
@@ -283,10 +304,16 @@ public class MaterializedViewTaskScheduler {
         if (windowEndMs > cutoffMs) {
           break;
         }
-        // Skip already-VALID slots from a prior partial batch (mid-batch failure recovery).
-        // Re-running an APPEND for a VALID partition would produce duplicate segments.
+        // Skip any bucket that already has an entry — APPEND only fills ABSENT buckets.
+        // VALID slots come from a prior partial batch (mid-batch failure recovery);
+        // re-running APPEND for one would produce duplicate segments.  STALE slots can
+        // appear above the watermark too (the consistency manager marks out-of-order
+        // VALID buckets STALE wherever they sit); those are exclusively step 1's
+        // responsibility (OVERWRITE / DELETE) — dispatching an APPEND for one would race
+        // the in-flight or upcoming exclusive task on the same window, risking concurrent
+        // segment-replace on the same window and duplicated rows.
         PartitionInfo existing = partitionInfos.get(nextWindowStartMs);
-        if (existing != null && existing.getState() == PartitionState.VALID) {
+        if (existing != null) {
           nextWindowStartMs = windowEndMs;
           continue;
         }
@@ -317,8 +344,8 @@ public class MaterializedViewTaskScheduler {
   /// Step 1: Finds the earliest STALE partition and dispatches the appropriate task.
   ///
   /// Re-computes the source fingerprint and picks one of:
-  ///   - DELETE task: source data is gone (segmentCount == 0) — task will drop MV segments
-  ///     and remove the partition entry from runtime metadata
+  ///   - DELETE task: source data is gone (segmentCount == 0) — task will drop MV segments and
+  ///     rewrite the entry to VALID-empty (or leave it STALE if a backfill is detected at commit)
   ///   - revert to VALID in place: fingerprint matches stored value (false positive)
   ///   - OVERWRITE task: fingerprint differs — re-materialize the partition
   ///
@@ -343,7 +370,8 @@ public class MaterializedViewTaskScheduler {
     long windowEndMs = windowStartMs + bucketMs;
     PartitionInfo staleInfo = partitionInfos.get(earliestStaleMs);
 
-    PartitionFingerprint currentFp = computeWindowFingerprint(sourceTableWithType, windowStartMs, windowEndMs);
+    PartitionFingerprint currentFp = MaterializedViewTaskUtils.computeWindowFingerprint(
+        _context.getSegmentsZKMetadata(sourceTableWithType), windowStartMs, windowEndMs);
 
     if (currentFp.getSegmentCount() == 0) {
       LOGGER.info("STALE partition [{}, {}) base data deleted for table: {}. Generating DELETE task.",
@@ -353,6 +381,11 @@ public class MaterializedViewTaskScheduler {
       configs.put(MaterializedViewTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
       configs.put(MaterializedViewTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
       configs.put(MaterializedViewTask.TASK_MODE_KEY, MaterializedViewTask.TASK_MODE_DELETE);
+      // Carry the source table so the executor can recompute the source fingerprint at commit
+      // time and re-confirm the window is still empty before writing VALID-empty.  Without this,
+      // a backfill landing between dispatch and commit would be silently dropped (see
+      // MaterializedViewTaskExecutor#executeDeleteTask and MaterializedViewPartitionManager#clearValid).
+      configs.put(MaterializedViewTask.SOURCE_TABLE_NAME_KEY, sourceTableName);
       configs.put(MinionConstants.UPLOAD_URL_KEY, _context.getVipUrl() + "/segments");
       return new PinotTaskConfig(MaterializedViewTask.TASK_TYPE, configs);
     }
@@ -360,7 +393,18 @@ public class MaterializedViewTaskScheduler {
     if (currentFp.equals(staleInfo.getFingerprint())) {
       LOGGER.info("STALE partition [{}, {}) fingerprint matches for table: {}. "
           + "Reverting to VALID (false positive).", windowStartMs, windowEndMs, viewTableName);
-      persistPartitionStateChangeWithRetry(viewTableName, earliestStaleMs, PartitionState.VALID);
+      // Best-effort revert: if it fails (CAS budget exhausted, transient ZK error), the
+      // partition stays STALE and the next scheduling cycle either reverts again (if the
+      // fingerprint still matches) or generates an OVERWRITE task — either way the system
+      // self-heals.  Spending the executor's critical-write retry budget on this avoidable
+      // optimization would be wasteful, so the manager uses its smaller `revert` profile.
+      try {
+        new MaterializedViewPartitionManager(_context.getPropertyStore(),
+            _context::getClusterConfig).revertValid(viewTableName, earliestStaleMs);
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to revert STALE partition {} to VALID for MV table: {}; will retry "
+            + "on the next scheduling cycle", earliestStaleMs, viewTableName, e);
+      }
       return null;
     }
 
@@ -369,82 +413,6 @@ public class MaterializedViewTaskScheduler {
     return buildTaskConfig(viewTableName, sourceTableName, sourceTableWithType, definedSQL,
         taskConfigs, windowStartMs, windowEndMs, MaterializedViewTask.TASK_MODE_OVERWRITE,
         effectiveLimit, userDeclaredLimit);
-  }
-
-  /// CAS-retry budget for STALE -> VALID transitions written by the scheduler.
-  /// The runtime znode is concurrently mutated by the executor (after each task completion) and by
-  /// the consistency manager (on base table changes). A bounded retry loop converges in practice.
-  private static final int MAX_PARTITION_STATE_PERSIST_RETRIES = 8;
-
-  /// Persists a STALE -> VALID transition (false-positive recovery) under a CAS retry loop.
-  /// On each attempt the latest runtime znode is re-fetched, the target partition's state is
-  /// re-evaluated, and the change is rewritten on top of the current version. This preserves
-  /// concurrent updates from the executor (watermark advance) and the consistency manager
-  /// (other partitions' STALE markings).
-  ///
-  /// If the partition is no longer STALE on a retry (executor or consistency manager
-  /// already changed it), the method exits successfully — the desired transition is either
-  /// already done or no longer applicable to a stale view of the world.
-  ///
-  /// If the budget is exhausted, logs ERROR. The next scheduling cycle will retry.
-  private void persistPartitionStateChangeWithRetry(String viewTableName, long partitionStartMs,
-      PartitionState newState) {
-    String viewTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(viewTableName);
-    Exception lastException = null;
-    for (int attempt = 0; attempt < MAX_PARTITION_STATE_PERSIST_RETRIES; attempt++) {
-      Stat stat = new Stat();
-      MaterializedViewRuntimeMetadata current = MaterializedViewRuntimeMetadataUtils.fetchWithVersion(
-          _context.getPropertyStore(), viewTableWithType, stat);
-      if (current == null) {
-        LOGGER.warn("Runtime metadata missing for MV table: {} during partition state persist; aborting",
-            viewTableName);
-        return;
-      }
-      Map<Long, PartitionInfo> currentInfos = current.getPartitions();
-      PartitionInfo info = currentInfos.get(partitionStartMs);
-      if (info == null || info.getState() != PartitionState.STALE) {
-        LOGGER.info("Partition {} for MV table: {} is no longer STALE on attempt {}; skipping persist",
-            partitionStartMs, viewTableName, attempt + 1);
-        return;
-      }
-      Map<Long, PartitionInfo> updatedInfos = new HashMap<>(currentInfos);
-      updatedInfos.put(partitionStartMs, info.withState(newState));
-      MaterializedViewRuntimeMetadata updated = new MaterializedViewRuntimeMetadata(
-          current.getMaterializedViewTableNameWithType(),
-          current.getWatermarkMs(),
-          updatedInfos);
-      try {
-        MaterializedViewRuntimeMetadataUtils.persist(_context.getPropertyStore(), updated, stat.getVersion());
-        LOGGER.info("Persisted partition {} state {} -> {} for MV table: {} on attempt {}",
-            partitionStartMs, PartitionState.STALE, newState, viewTableName, attempt + 1);
-        return;
-      } catch (IllegalStateException e) {
-        // Writer-side invariant violation surfaced by `validateForPersist` on the freshly-fetched
-        // runtime. Retrying will not change the underlying state — fail fast so the caller can
-        // surface the bug instead of burning the retry budget.
-        LOGGER.error("Aborting CAS retry for MV table {}: writer-side invariant violation "
-                + "({}). Generator will not retry until the underlying runtime znode is fixed.",
-            viewTableName, e.getMessage());
-        return;
-      } catch (Exception e) {
-        lastException = e;
-        LOGGER.debug("CAS conflict on attempt {} persisting partition {} state for MV table: {}",
-            attempt + 1, partitionStartMs, viewTableName, e);
-      }
-      // Small jittered backoff so a tight CAS race doesn't burn the budget in microseconds
-      // and starve the competing writers — also gives transient ZK errors a chance to resolve.
-      try {
-        Thread.sleep(5L + ThreadLocalRandom.current().nextInt(20));
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        LOGGER.warn("Interrupted while persisting partition {} state for MV table: {}",
-            partitionStartMs, viewTableName);
-        return;
-      }
-    }
-    LOGGER.error("Failed to persist partition {} state {} for MV table: {} after {} retries. "
-            + "Generator will retry on next scheduling cycle. Last exception:",
-        partitionStartMs, newState, viewTableName, MAX_PARTITION_STATE_PERSIST_RETRIES, lastException);
   }
 
   /// Builds a complete [PinotTaskConfig] for either APPEND or OVERWRITE mode.
@@ -461,8 +429,8 @@ public class MaterializedViewTaskScheduler {
       boolean userDeclaredLimit) {
     String taskType = MaterializedViewTask.TASK_TYPE;
 
-    PartitionFingerprint windowFingerprint =
-        computeWindowFingerprint(sourceTableWithType, windowStartMs, windowEndMs);
+    PartitionFingerprint windowFingerprint = MaterializedViewTaskUtils.computeWindowFingerprint(
+        _context.getSegmentsZKMetadata(sourceTableWithType), windowStartMs, windowEndMs);
 
     // The source time column may use any DateTimeFieldSpec format (TIMESTAMP, INT-days, etc.).
     // Convert the window boundaries to the source's native unit so the appended WHERE filter
@@ -975,57 +943,59 @@ public class MaterializedViewTaskScheduler {
     return watermarkMs;
   }
 
-  /// Resolves the source table name with type suffix. Tries OFFLINE first, then REALTIME.
+  /// Resolves the source table name with type suffix via the shared OFFLINE-first probe in
+  /// [MaterializedViewTaskUtils#resolveTableNameWithType]; fails loud when neither table
+  /// config exists (the scheduler cannot generate tasks against a missing source).
   private String resolveSourceTableNameWithType(String rawSourceTableName) {
-    String sourceTableWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawSourceTableName);
-    TableConfig sourceTableConfig = _context.getTableConfig(sourceTableWithType);
-    if (sourceTableConfig != null) {
-      return sourceTableWithType;
-    }
-    sourceTableWithType = TableNameBuilder.REALTIME.tableNameWithType(rawSourceTableName);
-    sourceTableConfig = _context.getTableConfig(sourceTableWithType);
-    Preconditions.checkState(sourceTableConfig != null,
+    String sourceTableWithType = MaterializedViewTaskUtils.resolveTableNameWithType(
+        _context::getTableConfig, rawSourceTableName);
+    Preconditions.checkState(sourceTableWithType != null,
         "Source table config not found for: %s", rawSourceTableName);
     return sourceTableWithType;
   }
 
-  /// Computes a [PartitionFingerprint] by fetching segments from ZK.
-  private PartitionFingerprint computeWindowFingerprint(String sourceTableWithType,
-      long windowStartMs, long windowEndMs) {
-    return computeWindowFingerprint(_context.getSegmentsZKMetadata(sourceTableWithType),
-        windowStartMs, windowEndMs);
-  }
-
-  /// Computes a [PartitionFingerprint] for the given time window from pre-fetched
-  /// segment metadata.
+  /// Returns the maximum valid `endTimeMs` across all source segments, or [Long#MIN_VALUE]
+  /// when none of the segments carry a usable end time (empty list, or every segment has a
+  /// negative end time — the legacy "unset" marker `SegmentZKMetadata` returns for old
+  /// znodes without `TIME_UNIT`). Used by [#generateTasks] to cap the APPEND cutoff at the
+  /// latest known source data: without this cap, the scheduler would walk past the actual
+  /// data tail one bucket at a time (each empty bucket completes with zero rows, the
+  /// executor persists a VALID-empty partition + advances watermark), so `watermarkMs`
+  /// would drift toward `now - bufferMs` even when source ingestion has stalled — defeating
+  /// the staleness-threshold contract in the rewrite engine, where
+  /// `now - watermarkMs <= stalenessThresholdMs` is meant to reflect real data freshness.
   ///
-  /// The fingerprint is `Hashing.farmHashFingerprint64` over the sorted concatenation of
-  /// `<segmentName>\0<crc>\n` lines. Sorting makes the hash insensitive to listing order;
-  /// FarmHash64 is non-cryptographic but collision-resistant for non-adversarial inputs.
-  /// Replaces a previous XOR-CRC scheme that exhibited cancellation collisions (swap two
-  /// segments with the same combined contribution → identical fingerprint).
-  private PartitionFingerprint computeWindowFingerprint(List<SegmentZKMetadata> allSegments,
-      long windowStartMs, long windowEndMs) {
-    List<SegmentZKMetadata> overlapping = new ArrayList<>();
-    for (SegmentZKMetadata seg : allSegments) {
-      long segStartMs = seg.getStartTimeMs();
-      long segEndMs = seg.getEndTimeMs();
-      if (segStartMs < windowEndMs && segEndMs >= windowStartMs) {
-        overlapping.add(seg);
+  /// The `endMs >= 0` filter mirrors the cold-start scan in [#getWatermarkMs], which
+  /// already excludes negative `startTimeMs` for the same reason.
+  @VisibleForTesting
+  static long computeMaxSourceEndTimeMs(List<SegmentZKMetadata> segments) {
+    long maxEndMs = Long.MIN_VALUE;
+    for (SegmentZKMetadata seg : segments) {
+      long endMs = seg.getEndTimeMs();
+      if (endMs >= 0 && endMs > maxEndMs) {
+        maxEndMs = endMs;
       }
     }
-    overlapping.sort(Comparator.comparing(SegmentZKMetadata::getSegmentName));
+    return maxEndMs;
+  }
 
-    Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
-    for (SegmentZKMetadata seg : overlapping) {
-      hasher.putString(seg.getSegmentName(), StandardCharsets.UTF_8);
-      hasher.putByte((byte) 0);
-      hasher.putLong(seg.getCrc());
-      hasher.putByte((byte) '\n');
+  /// Tightens the wall-clock APPEND cutoff (`now - bufferMs`) by the end of the source data,
+  /// so the scheduler never materializes buckets past the data tail (see the stage-2 comment
+  /// in [#generateTasks]).
+  ///
+  /// `maxSourceEndMs` is the **inclusive** maximum `endTimeMs` across source segments (the
+  /// same convention `computeWindowFingerprint`'s overlap filter relies on), while the loop
+  /// gate compares against the bucket's **exclusive** `windowEndMs`.  The `+ 1` converts
+  /// between the two: a segment ending at `windowEndMs - 1` fully covers the bucket and must
+  /// admit it — without the adjustment, a complete day-aligned batch segment would never
+  /// admit its own final bucket, and a static historical dataset would never materialize its
+  /// last window.  `Long.MIN_VALUE` (no usable end time) falls back to the rough cutoff, and
+  /// a corrupt `Long.MAX_VALUE` end time is clamped rather than overflowed.
+  @VisibleForTesting
+  static long resolveAppendCutoffMs(long roughCutoffMs, long maxSourceEndMs) {
+    if (maxSourceEndMs == Long.MIN_VALUE || maxSourceEndMs == Long.MAX_VALUE) {
+      return roughCutoffMs;
     }
-    long crcFingerprint = hasher.hash().asLong();
-    LOGGER.info("Computed partition fingerprint for window [{}, {}): segmentCount={}, crcFingerprint={}",
-        windowStartMs, windowEndMs, overlapping.size(), crcFingerprint);
-    return new PartitionFingerprint(overlapping.size(), crcFingerprint);
+    return Math.min(roughCutoffMs, maxSourceEndMs + 1);
   }
 }
