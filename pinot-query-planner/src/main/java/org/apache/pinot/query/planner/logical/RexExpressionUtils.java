@@ -36,6 +36,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
@@ -351,20 +352,20 @@ public class RexExpressionUtils {
         return evaluateLiteralIn((RexLiteral) leftOperand, sarg.rangeSet.asRanges());
       }
       RexExpression inExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
-              toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
+          toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, inExpr);
     } else if (sarg.isComplementedPoints()) {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralNotIn((RexLiteral) leftOperand, sarg.rangeSet.complement().asRanges());
       }
       RexExpression notInExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
-              toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
+          toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, notInExpr);
     } else {
       if (leftOperand instanceof RexLiteral) {
         return evaluateLiteralOrRanges((RexLiteral) leftOperand, sarg.rangeSet.asRanges());
       }
-      RexExpression orExpr = convertRangesToOr(dataType, leftOperand, ranges);
+      RexExpression orExpr = convertRangesToOr(dataType, leftOperand, sarg.rangeSet.asRanges());
       return addNullCheckIfRequired(leftOperand, sarg.nullAs, orExpr);
     }
   }
@@ -403,12 +404,12 @@ public class RexExpressionUtils {
     switch (nullAs) {
       case TRUE:
         RexExpression isNullExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IS_NULL.name(),
-                List.of(fromRexNode(leftOperand)));
+            List.of(fromRexNode(leftOperand)));
         return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(), List.of(expr, isNullExpr));
 
       case FALSE:
         RexExpression isNotNullExpr = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IS_NOT_NULL.name(),
-                List.of(fromRexNode(leftOperand)));
+            List.of(fromRexNode(leftOperand)));
         return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(), List.of(expr, isNotNullExpr));
 
       default:
