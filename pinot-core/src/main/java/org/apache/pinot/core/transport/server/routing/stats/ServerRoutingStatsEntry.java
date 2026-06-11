@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
 
 
@@ -37,24 +38,24 @@ public class ServerRoutingStatsEntry {
 
   // Fields related to number of in-flight requests.
   private volatile int _numInFlightRequests;
-  private final ExponentialMovingAverage _inFlighRequestsEMA;
+  private final ExponentialMovingAverage _inFlightRequestsEMA;
 
   // Fields related to latency
   private final ExponentialMovingAverage _latencyMsEMA;
 
   // Hybrid score exponent.
-  private final int _hybridScoreExponent;
+  private volatile int _hybridScoreExponent;
 
   // Hybrid score queue size floor (added to A+B before exponentiation to avoid score collapsing to 0 when idle).
   private final int _hybridScoreQueueFloor;
 
   public ServerRoutingStatsEntry(String serverInstanceId, double alphaEMA, long autoDecayWindowMsEMA,
       long warmupDurationMsEMA, double avgInitializationValEMA, int scoreExponent, int queueFloor,
-      ScheduledExecutorService periodicTaskExecutor) {
+      @Nullable ScheduledExecutorService periodicTaskExecutor) {
     _serverInstanceId = serverInstanceId;
     _serverLock = new ReentrantReadWriteLock();
 
-    _inFlighRequestsEMA =
+    _inFlightRequestsEMA =
         new ExponentialMovingAverage(alphaEMA, autoDecayWindowMsEMA, warmupDurationMsEMA, avgInitializationValEMA,
             periodicTaskExecutor);
     _latencyMsEMA =
@@ -81,7 +82,7 @@ public class ServerRoutingStatsEntry {
   }
 
   public Double getInFlightRequestsEMA() {
-    return _inFlighRequestsEMA.getAverage();
+    return _inFlightRequestsEMA.getAverage();
   }
 
   public Double getLatencyEMA() {
@@ -90,13 +91,13 @@ public class ServerRoutingStatsEntry {
 
   @JsonProperty("hybridScore")
   public double computeHybridScore() {
-    double estimatedQSize = _hybridScoreQueueFloor + _numInFlightRequests + _inFlighRequestsEMA.getAverage();
+    double estimatedQSize = _hybridScoreQueueFloor + _numInFlightRequests + _inFlightRequestsEMA.getAverage();
     return Math.pow(estimatedQSize, _hybridScoreExponent) * _latencyMsEMA.getAverage();
   }
 
   public void updateNumInFlightRequestsForQuerySubmission() {
     ++_numInFlightRequests;
-    _inFlighRequestsEMA.compute(_numInFlightRequests);
+    _inFlightRequestsEMA.compute(_numInFlightRequests);
   }
 
   public void updateNumInFlightRequestsForResponseArrival() {
@@ -105,5 +106,29 @@ public class ServerRoutingStatsEntry {
 
   public void updateLatency(double latencyMs) {
     _latencyMsEMA.compute(latencyMs);
+  }
+
+  /**
+   * Updates the hybrid score exponent used in {@link #computeHybridScore()}.
+   */
+  public void setHybridScoreExponent(int exponent) {
+    _hybridScoreExponent = exponent;
+  }
+
+  /**
+   * Updates the EWMA alpha (smoothing factor) on both the in-flight requests and latency EMAs.
+   */
+  public void setAlpha(double alpha) {
+    ExponentialMovingAverage.validateAlpha(alpha);
+    _inFlightRequestsEMA.setAlpha(alpha);
+    _latencyMsEMA.setAlpha(alpha);
+  }
+
+  /**
+   * Updates the auto-decay window on both the in-flight requests and latency EMAs.
+   */
+  public void setAutoDecayWindowMs(long autoDecayWindowMs) {
+    _inFlightRequestsEMA.setAutoDecayWindowMs(autoDecayWindowMs);
+    _latencyMsEMA.setAutoDecayWindowMs(autoDecayWindowMs);
   }
 }

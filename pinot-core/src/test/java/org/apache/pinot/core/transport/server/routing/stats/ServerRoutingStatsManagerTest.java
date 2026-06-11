@@ -693,6 +693,286 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(mseList.get(0).getRight().intValue(), 1);
   }
 
+  @Test
+  public void testDynamicHybridScoreExponentChange() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    // Submit + respond to build up stats: numInFlight=0, inFlightEMA=1, latencyEMA=10.
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 10);
+    waitForStatsUpdate(manager, requestId);
+
+    // With exponent=3: (0+1)^3 * 10 = 10
+    assertEquals(manager.fetchHybridScoreForServer("server1"), 10.0);
+
+    // Change exponent to 2 at runtime.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, "2"));
+
+    // With exponent=2: (0+1)^2 * 10 = 10
+    assertEquals(manager.fetchHybridScoreForServer("server1"), 10.0);
+
+    // Submit another query so numInFlight=1, inFlightEMA=1, latencyEMA=10.
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+
+    // With exponent=2: (1+1)^2 * 10 = 40
+    assertEquals(manager.fetchHybridScoreForServer("server1"), 40.0);
+
+    // With exponent=3 that would have been (1+1)^3 * 10 = 80. Verify by switching back.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, "3"));
+    assertEquals(manager.fetchHybridScoreForServer("server1"), 80.0);
+
+    // Invalid negative exponent should be ignored.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, "-1"));
+    assertEquals(manager.fetchHybridScoreForServer("server1"), 80.0);
+  }
+
+  @Test
+  public void testDynamicEwmaAlphaChange() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    // With alpha=1.0, EMA = latest value. Record latency=100.
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 100);
+    waitForStatsUpdate(manager, requestId);
+    assertEquals(manager.fetchEMALatencyForServer("server1"), 100.0);
+
+    // Change alpha to 0.5 at runtime.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, "0.5"));
+
+    // Record latency=200. New EMA = 200*0.5 + 100*0.5 = 150.
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 200);
+    waitForStatsUpdate(manager, requestId);
+    assertEquals(manager.fetchEMALatencyForServer("server1"), 150.0);
+
+    // Newly created entries also use the updated alpha.
+    manager.recordStatsForQuerySubmission(requestId++, "server2");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server2", 80);
+    waitForStatsUpdate(manager, requestId);
+    // alpha=0.5: EMA = 80*0.5 + 0*0.5 = 40
+    assertEquals(manager.fetchEMALatencyForServer("server2"), 40.0);
+  }
+
+  @Test
+  public void testDynamicAlphaRejectsInvalid() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 0.5);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 100);
+    waitForStatsUpdate(manager, requestId);
+
+    // alpha=0 is valid (freezes EMA at current value).
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, "0.0"));
+
+    // With alpha=0: EMA = 200*0 + prevEMA*1 = prevEMA (unchanged).
+    // Previous EMA = 100*0.5 + 0*0.5 = 50.
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 200);
+    waitForStatsUpdate(manager, requestId);
+    assertEquals(manager.fetchEMALatencyForServer("server1"), 50.0);
+
+    // Attempting to set alpha > 1 should be silently ignored (logged as warning).
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, "1.5"));
+
+    // Verify manager is still functional — new entries should be created with the last valid alpha (0.0).
+    manager.recordStatsForQuerySubmission(requestId++, "server2");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server2", 50);
+    waitForStatsUpdate(manager, requestId);
+    // alpha=0 freezes EMA at init value (0.0), so latency stays at 0.
+    assertEquals(manager.fetchEMALatencyForServer("server2"), 0.0);
+
+    // Attempting to set alpha < 0 should be silently ignored.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, "-0.1"));
+  }
+
+  @Test
+  public void testDynamicAutoDecayWindowChange() {
+    // Start with a short autodecay window so the periodic task IS scheduled.
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, 50);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 100);
+    waitForStatsUpdate(manager, requestId);
+    assertEquals(manager.fetchEMALatencyForServer("server1"), 100.0);
+
+    TestUtils.waitForCondition(aVoid -> manager.fetchEMALatencyForServer("server1") == 0.0,
+        10L, 5000, "Expected latency EMA to decay with the initial auto-decay window");
+
+    // Change autodecay window to a very large value so decay threshold is never met.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, "999999"));
+    assertEquals(manager.getAutoDecayWindowMs(), 999999);
+
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 100);
+    waitForStatsUpdate(manager, requestId);
+    assertEquals(manager.fetchEMALatencyForServer("server1"), 100.0);
+  }
+
+  @Test
+  public void testDynamicAutoDecayWindowChangeFromDisabled() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+    manager.recordStatsForQuerySubmission(requestId++, "server1");
+    waitForStatsUpdate(manager, requestId);
+    manager.recordStatsUponResponseArrival(requestId++, "server1", 100);
+    waitForStatsUpdate(manager, requestId);
+    assertEquals(manager.fetchEMALatencyForServer("server1"), 100.0);
+
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, "50"));
+
+    TestUtils.waitForCondition(aVoid -> manager.fetchEMALatencyForServer("server1") == 0.0,
+        10L, 5000, "Expected latency EMA to decay after enabling auto-decay at runtime");
+  }
+
+  @Test
+  public void testDynamicChangePropagatesBothSseAndMse() {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_EWMA_ALPHA, 1.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AUTODECAY_WINDOW_MS, -1);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
+    properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
+    manager.init();
+
+    int requestId = 0;
+
+    // Create entries in both SSE and MSE maps.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+    }
+    waitForStatsUpdate(manager, requestId);
+
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      manager.recordStatsUponResponseArrival(requestId++, "server1", 10);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      manager.recordStatsUponResponseArrival(requestId++, "server1", 20);
+    }
+    waitForStatsUpdate(manager, requestId);
+
+    // With exponent=3: SSE=(0+1)^3*10=10, MSE=(0+1)^3*20=20.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchHybridScoreForServer("server1"), 10.0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchHybridScoreForServer("server1"), 20.0);
+    }
+
+    // Change exponent to 1. Both maps should be updated.
+    manager.onChange(
+        Set.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT),
+        Map.of(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, "1"));
+
+    // With exponent=1: SSE=(0+1)^1*10=10, MSE=(0+1)^1*20=20.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchHybridScoreForServer("server1"), 10.0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchHybridScoreForServer("server1"), 20.0);
+    }
+
+    // Submit more queries so numInFlight=1, inFlightEMA=1 for both.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      manager.recordStatsForQuerySubmission(requestId++, "server1");
+    }
+    waitForStatsUpdate(manager, requestId);
+
+    // With exponent=1: SSE=(1+1)^1*10=20, MSE=(1+1)^1*20=40.
+    try (QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
+      assertEquals(manager.fetchHybridScoreForServer("server1"), 20.0);
+    }
+    try (QueryThreadContext ignored = QueryThreadContext.openForMseTest()) {
+      assertEquals(manager.fetchHybridScoreForServer("server1"), 40.0);
+    }
+  }
+
   private void assertStatsNullForInstance(ServerRoutingStatsManager manager, String instanceId) {
     Integer numInFlightReq = manager.fetchNumInFlightRequestsForServer(instanceId);
     assertNull(numInFlightReq);
