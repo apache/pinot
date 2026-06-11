@@ -592,4 +592,87 @@ public class FieldSpecTest {
 
     assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
   }
+
+  @Test
+  public void testFieldIdAndAliasesSerdeRoundtrip()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("user_id", STRING, true);
+    fieldSpec.setFieldId(42);
+    fieldSpec.setAliases(Arrays.asList("uid", "userId"));
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).contains("\"fieldId\":42");
+    assertThat(json).contains("\"aliases\":[\"uid\",\"userId\"]");
+
+    DimensionFieldSpec deserialized = JsonUtils.stringToObject(json, DimensionFieldSpec.class);
+    assertThat(deserialized.getFieldId()).isEqualTo(42);
+    assertThat(deserialized.getAliases()).isEqualTo(Arrays.asList("uid", "userId"));
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    DimensionFieldSpec fromJackson = JsonUtils.stringToObject(jacksonJson, DimensionFieldSpec.class);
+    assertThat(fromJackson.getFieldId()).isEqualTo(42);
+    assertThat(fromJackson.getAliases()).isEqualTo(Arrays.asList("uid", "userId"));
+  }
+
+  @Test
+  public void testFieldIdAndAliasesOmittedWhenNotSet()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col1", INT, true);
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).as("fieldId should be absent when null").doesNotContain("fieldId");
+    assertThat(json).as("aliases should be absent when null").doesNotContain("aliases");
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    assertThat(jacksonJson).as("fieldId should be absent when null").doesNotContain("fieldId");
+    assertThat(jacksonJson).as("aliases should be absent when null").doesNotContain("aliases");
+  }
+
+  @Test
+  public void testEmptyAliasesOmittedFromJson()
+      throws Exception {
+    DimensionFieldSpec fieldSpec = new DimensionFieldSpec("col1", INT, true);
+    fieldSpec.setAliases(List.of());
+
+    String json = fieldSpec.toJsonObject().toString();
+    assertThat(json).as("empty aliases should be absent").doesNotContain("aliases");
+
+    String jacksonJson = JsonUtils.objectToString(fieldSpec);
+    assertThat(jacksonJson).as("empty aliases should be absent (Jackson)").doesNotContain("aliases");
+  }
+
+  @Test
+  public void testOldJsonWithoutFieldIdAndAliasesDeserializesCleanly()
+      throws Exception {
+    String oldJson = "{\"name\":\"col1\",\"dataType\":\"STRING\"}";
+    DimensionFieldSpec fieldSpec = JsonUtils.stringToObject(oldJson, DimensionFieldSpec.class);
+    assertThat(fieldSpec.getFieldId()).isNull();
+    assertThat(fieldSpec.getAliases()).isNull();
+  }
+
+  @Test
+  public void testFieldIdAndAliasesInEqualsAndHashCode() {
+    DimensionFieldSpec spec1 = new DimensionFieldSpec("col1", STRING, true);
+    DimensionFieldSpec spec2 = new DimensionFieldSpec("col1", STRING, true);
+    spec2.setFieldId(42);
+    spec2.setAliases(Arrays.asList("uid"));
+
+    assertThat(spec1).isNotEqualTo(spec2);
+    assertThat(spec1.hashCode()).isNotEqualTo(spec2.hashCode());
+
+    spec1.setFieldId(42);
+    spec1.setAliases(Arrays.asList("uid"));
+    assertThat(spec1).isEqualTo(spec2);
+    assertThat(spec1.hashCode()).isEqualTo(spec2.hashCode());
+  }
+
+  @Test
+  public void testFieldIdAndAliasesNotInBackwardCompatibility() {
+    DimensionFieldSpec oldSpec = new DimensionFieldSpec("col1", STRING, true);
+    DimensionFieldSpec newSpec = new DimensionFieldSpec("col1", STRING, true);
+    newSpec.setFieldId(42);
+    newSpec.setAliases(Arrays.asList("uid"));
+
+    assertThat(newSpec.isBackwardCompatibleWith(oldSpec)).isTrue();
+  }
 }
