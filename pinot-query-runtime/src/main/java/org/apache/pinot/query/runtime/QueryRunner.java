@@ -53,11 +53,11 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.executor.OpChainCompletionListener;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
@@ -132,6 +132,9 @@ public class QueryRunner {
   private WindowOverFlowMode _windowOverflowMode;
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
+  /// Cluster-level decision on whether to send stats over the mailbox path, driven by the {@code SendStatsPredicate}
+  /// at startup time. <b>May be overridden per-request</b> via the {@code KEY_OF_STATS_REPORTING_MODE} metadata key —
+  /// see {@link #effectiveSendStats(Map)}.
   private BooleanSupplier _sendStats;
   private BooleanSupplier _keepPipelineBreakerStats;
 
@@ -300,10 +303,15 @@ public class QueryRunner {
     StageMetadata stageMetadata = stagePlan.getStageMetadata();
     Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
+    // The cluster-level _sendStats decision can be overridden per-request by the SubmitWithStream RPC handler via
+    // MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE; in stream mode stats travel out-of-band
+    // and we suppress the mailbox-side path to avoid duplication.
+    boolean sendStats = effectiveSendStats(requestMetadata);
+
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult = PipelineBreakerExecutor.executePipelineBreakers(
         _opChainScheduler, _mailboxService, workerMetadata, stagePlan, opChainMetadata,
-        _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+        sendStats, _keepPipelineBreakerStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -316,7 +324,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-            pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+            pipelineBreakerResult, sendStats, _keepPipelineBreakerStats.getAsBoolean());
     try {
       OpChain opChain;
       if (workerMetadata.isLeafStageWorker()) {
@@ -338,6 +346,10 @@ public class QueryRunner {
 
   /**
    * Attempts to propagate stage failures through the active {@link OpChainConverter}.
+   * <p>
+   * Note: the cluster-level {@code _sendStats} decision can be overridden per-request via
+   * {@link CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE} — see
+   * {@link #effectiveSendStats(Map)}.
    */
   private void tryPropagateErrorViaOpChainConverter(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult,
@@ -350,13 +362,29 @@ public class QueryRunner {
     try {
       OpChainExecutionContext executionContext =
           OpChainExecutionContext.fromQueryContext(_mailboxService, opChainMetadata, stageMetadata, workerMetadata,
-              pipelineBreakerResult, _sendStats.getAsBoolean(), _keepPipelineBreakerStats.getAsBoolean());
+              pipelineBreakerResult, effectiveSendStats(opChainMetadata), _keepPipelineBreakerStats.getAsBoolean());
       OpChain errorOpChain = OpChainConverterDispatcher.sendEarlyError(executionContext, stagePlan, errorBlock);
       _opChainScheduler.register(errorOpChain);
     } catch (RuntimeException e) {
       LOGGER.warn("Failed to propagate stage error via OpChainConverter for request: {}, stage: {}",
           requestId, stageMetadata.getStageId(), e);
     }
+  }
+
+  /**
+   * Returns the effective {@code sendStats} flag for the current request: starts from the cluster-level
+   * {@link #_sendStats} decision and forces it to {@code false} when
+   * {@link CommonConstants.MultiStageQueryRunner#KEY_OF_STATS_REPORTING_MODE} is set to
+   * {@link CommonConstants.MultiStageQueryRunner#STATS_REPORTING_MODE_STREAM} on the request metadata. The
+   * stream-mode handler injects this key when stats are being collected out-of-band on the bidi RPC, so the
+   * mailbox-side path can be skipped.
+   */
+  private boolean effectiveSendStats(Map<String, String> requestMetadata) {
+    String mode = requestMetadata.get(MultiStageQueryRunner.KEY_OF_STATS_REPORTING_MODE);
+    if (MultiStageQueryRunner.STATS_REPORTING_MODE_STREAM.equals(mode)) {
+      return false;
+    }
+    return _sendStats.getAsBoolean();
   }
 
   /**
@@ -525,8 +553,44 @@ public class QueryRunner {
     return _mailboxService;
   }
 
-  public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
-    return _opChainScheduler.cancel(requestId);
+  /**
+   * Cancels all opchains registered for the given request id.
+   *
+   * <p><b>Return-type note:</b> this method previously returned {@code Map<Integer, StageStats.Closed>}, collecting
+   * partial per-stage stats from each opchain synchronously during cancellation. That return value was removed because:
+   * <ul>
+   *   <li>Collecting stats synchronously on the cancel path required an extra fan-out RPC to every participating
+   *       server on every query failure — at high QPS this produced an amplified load spike on already-stressed
+   *       servers, risking a cascade (see {@code QueryDispatcher.tryRecover} for full rationale).</li>
+   *   <li>This change also removes the only consumer of those stats ({@code QueryDispatcher.tryRecover}, which on
+   *       master merged them into the error result), so retaining the synchronous collection would be pure overhead
+   *       with no benefit.</li>
+   * </ul>
+   * Stats on the error path are now collected out-of-band via the {@code SubmitWithStream} stream in stream mode:
+   * servers push {@code OpChainComplete} messages independently and the broker drains whatever arrived before the
+   * cancel within the configured timeout window. Note that a cancel received over the stream promptly completes the
+   * stream ({@code QueryServer.handleCancel}), so stats from opchains finishing <em>after</em> the cancel are not
+   * delivered — error-path coverage is whatever was already reported or in flight when the cancel landed.
+   */
+  public void cancel(long requestId) {
+    _opChainScheduler.cancel(requestId);
+  }
+
+  /**
+   * Registers an opchain completion listener for the given request id. Used by the stream-mode stats reporting path
+   * (gRPC {@code SubmitWithStream}) so the {@link org.apache.pinot.query.service.server.QueryServer} can be notified
+   * each time an opchain finishes and emit a corresponding {@code OpChainComplete} message on the broker stream.
+   *
+   * <p>The listener fires once per opchain that runs on this server for the request and must be unregistered by the
+   * caller (typically when the per-request opchain count reaches the expected total) via
+   * {@link #unregisterOpChainCompletionListener(long)}.
+   */
+  public void registerOpChainCompletionListener(long requestId, OpChainCompletionListener listener) {
+    _opChainScheduler.registerCompletionListener(requestId, listener);
+  }
+
+  public void unregisterOpChainCompletionListener(long requestId) {
+    _opChainScheduler.unregisterCompletionListener(requestId);
   }
 
   public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,

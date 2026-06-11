@@ -72,7 +72,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
    */
   protected abstract Logger logger();
 
-  public abstract Type getOperatorType();
+  public abstract OperatorTypeDescriptor getOperatorType();
 
   public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
 
@@ -242,7 +242,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
    * always append them at the end and assign the next available ID. Never reuse or change existing IDs as this
    * would break backward compatibility with older versions.
    */
-  public enum Type {
+  public enum Type implements OperatorTypeDescriptor {
     AGGREGATE(0, AggregateOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {

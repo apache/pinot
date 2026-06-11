@@ -558,6 +558,21 @@ public class CommonConstants {
         "pinot.broker.mse.use.leaf.server.for.intermediate.stage";
     public static final boolean DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = false;
 
+    /// Cluster-level default for stream-mode stats reporting. When {@code true} the broker opens a
+    /// {@code SubmitWithStream} bidi RPC for every multi-stage query instead of the legacy unary Submit, enabling
+    /// reliable per-operator stats delivery even on the error path. Individual queries may override this default
+    /// via the {@link Request.QueryOptionKey#STREAM_STATS} query option. Requires all servers to
+    /// implement the {@code SubmitWithStream} RPC; enabling it on a mixed-version cluster will cause query failures.
+    public static final String CONFIG_OF_STREAM_STATS = "pinot.broker.mse.stream.stats";
+    public static final boolean DEFAULT_STREAM_STATS = false;
+
+    /// Best-effort wait window (ms) the broker spends draining out-of-band per-stage stats after the result mailbox
+    /// has finished, in stream-stats mode. Bounded by the query's remaining deadline. A larger value yields more
+    /// complete stats when some stage is slow to report, at the cost of up to this much added latency on a query
+    /// whose results are already in hand. Applies only to the {@code SubmitWithStream} stats path.
+    public static final String CONFIG_OF_STREAM_STATS_DRAIN_MS = "pinot.broker.mse.stream.stats.drain.ms";
+    public static final long DEFAULT_STREAM_STATS_DRAIN_MS = 50L;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
@@ -797,6 +812,21 @@ public class CommonConstants {
         public static final String APPLICATION_NAME = "applicationName";
         public static final String USE_SPOOLS = "useSpools";
         public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        /**
+         * When set to true, the broker uses the long-lived {@code SubmitWithStream} bidi RPC to dispatch the query,
+         * receiving stage stats out-of-band as {@code OpChainComplete} messages instead of via mailbox EOS. The
+         * broker awaits stats completion as soon as the receiving mailbox finishes (early completion), bounded by
+         * the query's remaining timeout.
+         *
+         * <p>When unset / false, the legacy unary {@code Submit} path is used and stats travel via mailbox EOS.
+         *
+         * <p><b>Mixed-version note.</b> All servers in the cluster must support {@code SubmitWithStream} when this
+         * option is enabled. Operators are responsible for setting it only after the entire fleet has been upgraded
+         * — there is no automatic fallback to the unary path. If any server returns {@code UNIMPLEMENTED} (or any
+         * other transport error) during dispatch, the broker cancels the query and surfaces the error to the
+         * client.
+         */
+        public static final String STREAM_STATS = "streamStats";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -2556,6 +2586,19 @@ public class CommonConstants {
     /// - "NEVER": MSE will never send stats.
     public static final String KEY_OF_SEND_STATS_MODE = "pinot.query.mse.stats.mode";
     public static final String DEFAULT_SEND_STATS_MODE = "ALWAYS";
+
+    /// Per-request metadata key that overrides the cluster-level send-stats decision for the duration of a single
+    /// query. Set automatically by the {@code SubmitWithStream} bidi RPC handler on the server: when stats travel
+    /// out-of-band on the bidi stream there is no point in also paying the cost of serializing them onto the mailbox
+    /// path, so the mailbox-side {@code sendStats} flag is forced to {@code false} for that request.
+    ///
+    /// This is **not** a user-facing option — it exists purely as a server-internal channel from the
+    /// {@code SubmitWithStream} handler down to {@code QueryRunner.processQueryBlocking}. Brokers do not set it.
+    public static final String KEY_OF_STATS_REPORTING_MODE = "pinot.query.mse.statsReportingMode";
+    /// Value indicating the new bidi-stream stats reporting path is in use; mailbox-side stats are suppressed.
+    public static final String STATS_REPORTING_MODE_STREAM = "stream";
+    /// Value indicating today's legacy mailbox-piggyback stats reporting path. Equivalent to leaving the key unset.
+    public static final String STATS_REPORTING_MODE_LEGACY = "legacy";
 
     /// Used to indicate whether MSE pipeline breaker stats should be included in the stageStats field.
     /// This flag was introduced in 1.5.0. Before 1.5.0, MSE pipeline breaker stats were not kept. In 1.5.0 they were

@@ -96,16 +96,58 @@ public class PlanNodeToOpChain {
    */
   public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
-    MyVisitor visitor = new MyVisitor(tracker);
+    // Assign deterministic stage-scoped ids to every PlanNode reachable from the root before constructing operators,
+    // so the stream-mode stats encoder can attach plan_node_ids to each StageStatsNode without needing to mutate or
+    // re-walk the plan. All workers of a stage perform this same pre-walk over the same plan structure (the ids are
+    // serialized on the wire), producing matching ids. Gate on stream-mode — the only consumer of these ids
+    // (MultiStageStatsTreeEncoder) — rather than isSendStats(): isSendStats() is true by default (legacy SAFE mode)
+    // where the ids are never read (pure GC dead weight on the hot path) yet false in stream mode (where they ARE
+    // needed), so gating on it is both wasteful and incorrect.
+    if (context.isStreamStatsReporting()) {
+      assignPlanNodeIds(node, context);
+    }
+    MyVisitor visitor = new MyVisitor(context, tracker);
     MultiStageOperator root = node.visit(visitor, context);
+    visitor.record(node, root);
     tracker.accept(node, root);
     return new OpChain(context, root);
   }
 
+  /**
+   * Pre-order walk that assigns each PlanNode in the sub-tree a sequential integer id, recorded on the context.
+   */
+  private static void assignPlanNodeIds(PlanNode root, OpChainExecutionContext context) {
+    assignPlanNodeIds(root, context, new int[]{0});
+  }
+
+  private static void assignPlanNodeIds(PlanNode node, OpChainExecutionContext context, int[] counter) {
+    context.recordPlanNodeId(node, counter[0]++);
+    for (PlanNode child : node.getInputs()) {
+      assignPlanNodeIds(child, context, counter);
+    }
+  }
+
+  /**
+   * Recursively collects all PlanNodes in the sub-tree rooted at {@code root} (including {@code root} itself), in
+   * pre-order (root first, then children left-to-right).
+   * <p>
+   * Used to record the leaf operator's full one-to-many mapping: the leaf operator's tracker fires once with the
+   * leaf-stage boundary PlanNode, but the leaf actually represents the whole sub-tree of v1 plan nodes below that
+   * boundary. We walk the boundary's sub-tree once at construction and store the full list on the operator.
+   */
+  private static void collectPlanNodeSubTree(PlanNode root, List<PlanNode> out) {
+    out.add(root);
+    for (PlanNode child : root.getInputs()) {
+      collectPlanNodeSubTree(child, out);
+    }
+  }
+
   private static class MyVisitor implements PlanNodeVisitor<MultiStageOperator, OpChainExecutionContext> {
+    private final OpChainExecutionContext _context;
     private final BiConsumer<PlanNode, MultiStageOperator> _tracker;
 
-    public MyVisitor(BiConsumer<PlanNode, MultiStageOperator> tracker) {
+    public MyVisitor(OpChainExecutionContext context, BiConsumer<PlanNode, MultiStageOperator> tracker) {
+      _context = context;
       _tracker = tracker;
     }
 
@@ -127,8 +169,31 @@ public class PlanNodeToOpChain {
       } else {
         result = node.visit(this, context);
       }
+      record(node, result);
       _tracker.accept(node, result);
       return result;
+    }
+
+    /**
+     * Records the operator-to-PlanNode mapping on the execution context. For non-leaf operators this is a 1:1 mapping
+     * to {@code node}. For the leaf operator we walk the sub-tree below the leaf-stage boundary and record every
+     * PlanNode encountered (one-to-many: a leaf operator owns the whole v1 sub-plan below it).
+     * <p>No-op outside stream-mode stats reporting (the only consumer of this mapping) — avoids the O(depth) sub-tree
+     * walk on the legacy hot path. See {@link OpChainExecutionContext#isStreamStatsReporting()}.
+     */
+    void record(PlanNode node, MultiStageOperator operator) {
+      if (!_context.isStreamStatsReporting()) {
+        return;
+      }
+      List<PlanNode> mapping;
+      ServerPlanRequestContext leafStageContext = _context.getLeafStageContext();
+      if (leafStageContext != null && leafStageContext.getLeafStageBoundaryNode() == node) {
+        mapping = new ArrayList<>();
+        collectPlanNodeSubTree(node, mapping);
+      } else {
+        mapping = List.of(node);
+      }
+      _context.recordPlanNodesForOperator(operator, mapping);
     }
 
     @Override

@@ -148,7 +148,9 @@ public class PlannerContext implements AutoCloseable, Context {
 
   @Override
   public void close() {
-    _planner.close();
+    if (_planner != null) {
+      _planner.close();
+    }
   }
 
   public Map<String, String> getPlannerOutput() {
