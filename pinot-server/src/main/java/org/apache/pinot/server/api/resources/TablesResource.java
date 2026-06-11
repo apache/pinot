@@ -388,7 +388,8 @@ public class TablesResource {
             Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
 
     // Build compression stats when the table flag is enabled and any columns have stats.
-    // compressionStats summary is always built; columnCompressionStats per-column list only when includeColumnStats=true.
+    // compressionStats summary is always built; columnCompressionStats per-column list only when
+    // includeColumnStats=true.
     List<ColumnCompressionStatsInfo> columnCompressionStats = null;
     CompressionStatsSummary compressionStatsSummary = null;
     if (compressionStatsEnabled && !columnCompressionAccum.isEmpty()) {
