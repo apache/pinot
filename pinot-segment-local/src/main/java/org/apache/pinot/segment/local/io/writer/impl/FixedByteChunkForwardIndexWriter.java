@@ -54,36 +54,24 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
   }
 
   public void putInt(int value) {
-    if (_trackUncompressedSize) {
-      _uncompressedSize += Integer.BYTES;
-    }
     _chunkBuffer.putInt(value);
     _chunkDataOffset += Integer.BYTES;
     flushChunkIfNeeded();
   }
 
   public void putLong(long value) {
-    if (_trackUncompressedSize) {
-      _uncompressedSize += Long.BYTES;
-    }
     _chunkBuffer.putLong(value);
     _chunkDataOffset += Long.BYTES;
     flushChunkIfNeeded();
   }
 
   public void putFloat(float value) {
-    if (_trackUncompressedSize) {
-      _uncompressedSize += Float.BYTES;
-    }
     _chunkBuffer.putFloat(value);
     _chunkDataOffset += Float.BYTES;
     flushChunkIfNeeded();
   }
 
   public void putDouble(double value) {
-    if (_trackUncompressedSize) {
-      _uncompressedSize += Double.BYTES;
-    }
     _chunkBuffer.putDouble(value);
     _chunkDataOffset += Double.BYTES;
     flushChunkIfNeeded();
@@ -91,6 +79,9 @@ public class FixedByteChunkForwardIndexWriter extends BaseChunkForwardIndexWrite
 
   @Override
   protected void writeChunk() {
+    if (_trackUncompressedSize) {
+      _uncompressedSize += _chunkDataOffset;
+    }
     super.writeChunk();
     _chunkDataOffset = 0;
   }

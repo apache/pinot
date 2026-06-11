@@ -300,13 +300,14 @@ public class ForwardIndexWriterUncompressedSizeTest {
   @Test
   public void testPartialChunkAccountedInClose()
       throws IOException {
-    // Use non-aligned doc count so there's a partial chunk that's flushed during close()
     // V4 normalizes 100 → 128 docs per chunk. 500 docs / 128 = 3 full chunks + 116 remaining.
-    // Before close: 3 * 128 * 4 = 1536 bytes. After close: 1536 + 116*4 = 2000 bytes.
+    // Tracking is per-chunk-flush: before close only 3 full chunks are counted (384 * 4 = 1536).
+    // close() flushes the partial chunk, adding 116 * 4 = 464, giving total 500 * 4 = 2000.
     File file = new File(_tempDir, "partialChunk");
     int totalDocs = 500;
     int requestedDocsPerChunk = 100; // normalized to 128 by V4
     int normalizedDocsPerChunk = 128;
+    int fullChunks = totalDocs / normalizedDocsPerChunk; // 3
 
     FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, totalDocs,
@@ -316,16 +317,15 @@ public class ForwardIndexWriterUncompressedSizeTest {
       writer.putInt(i);
     }
 
-    // With per-value tracking, all values are accounted for immediately (not per-chunk)
+    // Only the 3 full flushed chunks are counted before close
+    long expectedBeforeClose = (long) fullChunks * normalizedDocsPerChunk * Integer.BYTES;
+    assertEquals(writer.getUncompressedSize(), expectedBeforeClose,
+        "Before close, only flushed chunks should be counted");
+
+    // close() flushes the partial chunk — total should now equal all 500 docs
+    writer.close();
     long expectedTotal = (long) totalDocs * Integer.BYTES;
     assertEquals(writer.getUncompressedSize(), expectedTotal,
-        "Before close, all written values should be tracked");
-
-    // After close: same total — close flushes the chunk buffer but doesn't change uncompressed size
-    writer.close();
-    assertEquals(writer.getUncompressedSize(), expectedTotal,
-        "After close, total uncompressed size should be unchanged");
-    assertEquals(expectedTotal, (long) totalDocs * Integer.BYTES,
-        "Total uncompressed size should equal totalDocs * INT_BYTES");
+        "After close, partial chunk is flushed and all docs are counted");
   }
 }

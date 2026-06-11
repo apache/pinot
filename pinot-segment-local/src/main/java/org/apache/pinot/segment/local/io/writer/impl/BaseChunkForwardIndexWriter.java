@@ -200,7 +200,11 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   }
 
   /**
-   * Returns the total uncompressed size of data written so far.
+   * Returns the total uncompressed size of data written so far. For fixed-byte writers
+   * ({@link FixedByteChunkForwardIndexWriter}), accumulation happens per chunk flush rather than
+   * per value, so this value only reflects fully flushed chunks until {@link #close()} is called.
+   * Always call {@code close()} before reading this value to ensure the trailing partial chunk is
+   * included.
    */
   public long getUncompressedSize() {
     return _uncompressedSize;
