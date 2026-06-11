@@ -307,8 +307,6 @@ public class ForwardIndexWriterUncompressedSizeTest {
     int totalDocs = 500;
     int requestedDocsPerChunk = 100; // normalized to 128 by V4
     int normalizedDocsPerChunk = 128;
-    int fullChunks = totalDocs / normalizedDocsPerChunk; // 3
-
     FixedByteChunkForwardIndexWriter writer =
         new FixedByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, totalDocs,
             requestedDocsPerChunk, Integer.BYTES, 4);
@@ -317,15 +315,15 @@ public class ForwardIndexWriterUncompressedSizeTest {
       writer.putInt(i);
     }
 
-    // Only the 3 full flushed chunks are counted before close
-    long expectedBeforeClose = (long) fullChunks * normalizedDocsPerChunk * Integer.BYTES;
-    assertEquals(writer.getUncompressedSize(), expectedBeforeClose,
-        "Before close, only flushed chunks should be counted");
-
-    // close() flushes the partial chunk — total should now equal all 500 docs
-    writer.close();
+    // getUncompressedSize() includes in-flight bytes from the current unflushed chunk,
+    // so it returns the correct total even before close().
     long expectedTotal = (long) totalDocs * Integer.BYTES;
     assertEquals(writer.getUncompressedSize(), expectedTotal,
-        "After close, partial chunk is flushed and all docs are counted");
+        "Before close, getUncompressedSize() should include in-flight bytes");
+
+    // After close: same total — the partial chunk is flushed and in-flight bytes clear
+    writer.close();
+    assertEquals(writer.getUncompressedSize(), expectedTotal,
+        "After close, total uncompressed size should be unchanged");
   }
 }
