@@ -21,10 +21,22 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -250,5 +262,44 @@ public class SegmentDictionaryCreatorRawIngestSizeTest {
       assertEquals(creator.getTotalRawIngestBytes(), 0L,
           "getTotalRawIngestBytes() should be 0 before any rows are indexed");
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // End-to-end: dict.rawIngestSizeBytes persisted in segment metadata
+  // -----------------------------------------------------------------------
+
+  @Test
+  public void testDictColumnRawIngestSizePersistsToSegmentMetadata() throws Exception {
+    String tableName = "dictRawIngestTest";
+    String col = "stringCol";
+    File segDir = new File(TEMP_DIR, "seg");
+    FileUtils.forceMkdir(segDir);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(tableName)
+        .addSingleValueDimension(col, org.apache.pinot.spi.data.FieldSpec.DataType.STRING)
+        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+    tableConfig.getIndexingConfig().setCompressionStatsEnabled(true);
+
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 50; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(col, "value_" + i);
+      rows.add(row);
+    }
+
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    config.setOutDir(segDir.getPath());
+    config.setSegmentName("seg0");
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config, new GenericRowRecordReader(rows));
+    driver.build();
+
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(new File(segDir, "seg0"));
+    ColumnMetadata colMeta = metadata.getColumnMetadataFor(col);
+
+    assertTrue(colMeta.hasDictionary(), col + " should be dict-encoded by default");
+    assertTrue(colMeta.getDictColumnRawIngestSizeBytes() > 0,
+        "dict.rawIngestSizeBytes should be > 0 after segment creation with compressionStatsEnabled");
   }
 }
