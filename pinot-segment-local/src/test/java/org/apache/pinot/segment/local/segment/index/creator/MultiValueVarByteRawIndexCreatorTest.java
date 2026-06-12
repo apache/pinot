@@ -256,4 +256,34 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
       }
     }
   }
+
+  @Test
+  public void testUncompressedSizeTrackingEnabled()
+      throws IOException {
+    String column = "mvVarTrackingEnabled";
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        OUTPUT_DIR, ChunkCompressionType.LZ4, column, 100, DataType.STRING, 100, 3)) {
+      creator.setTrackUncompressedSize(true);
+      for (int i = 0; i < 100; i++) {
+        creator.putStringMV(new String[]{"val" + i, "extra" + i});
+      }
+      assertTrue(creator.getUncompressedSize() > 0,
+          "MV var-byte creator should report > 0 uncompressed size when tracking enabled");
+    }
+  }
+
+  @Test
+  public void testUncompressedSizeTrackingDisabled()
+      throws IOException {
+    String column = "mvVarTrackingDisabled";
+    try (MultiValueVarByteRawIndexCreator creator = new MultiValueVarByteRawIndexCreator(
+        OUTPUT_DIR, ChunkCompressionType.LZ4, column, 100, DataType.STRING, 100, 3)) {
+      // tracking off by default
+      for (int i = 0; i < 100; i++) {
+        creator.putStringMV(new String[]{"val" + i});
+      }
+      assertEquals(creator.getUncompressedSize(), 0L,
+          "MV var-byte creator should report 0 uncompressed size when tracking disabled");
+    }
+  }
 }

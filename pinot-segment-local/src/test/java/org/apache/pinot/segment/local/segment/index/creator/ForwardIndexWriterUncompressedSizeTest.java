@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.testng.annotations.AfterMethod;
@@ -294,6 +295,37 @@ public class ForwardIndexWriterUncompressedSizeTest {
       }
       assertTrue(writer.getUncompressedSize() > 0,
           "MV writer should track non-zero uncompressed size");
+    }
+  }
+
+  @Test
+  public void testLegacyVarByteWriterTracksUncompressedSize()
+      throws IOException {
+    // Covers VarByteChunkForwardIndexWriter (V2/V3 — legacy var-byte writer)
+    File file = new File(_tempDir, "legacyVarByte");
+    try (VarByteChunkForwardIndexWriter writer =
+        new VarByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, 100, 10, 50, 2)) {
+      writer.setTrackUncompressedSize(true);
+      for (int i = 0; i < 100; i++) {
+        writer.putString("value_" + i);
+      }
+      assertTrue(writer.getUncompressedSize() > 0,
+          "Legacy VarByteChunkForwardIndexWriter should track > 0 uncompressed size");
+    }
+  }
+
+  @Test
+  public void testLegacyVarByteWriterTrackingDisabledReturnsZero()
+      throws IOException {
+    File file = new File(_tempDir, "legacyVarByteDisabled");
+    try (VarByteChunkForwardIndexWriter writer =
+        new VarByteChunkForwardIndexWriter(file, ChunkCompressionType.LZ4, 100, 10, 50, 2)) {
+      // tracking disabled by default
+      for (int i = 0; i < 100; i++) {
+        writer.putString("value_" + i);
+      }
+      assertEquals(writer.getUncompressedSize(), 0L,
+          "Legacy VarByteChunkForwardIndexWriter should return 0 when tracking disabled");
     }
   }
 
