@@ -188,7 +188,7 @@ public class EagerToLazyBrokerResponseAdaptorTest {
   /// {@code @JsonIgnore} on {@code getResultTable()}.  If the mixin is not applied (e.g. the wrong
   /// ObjectMapper is used), the resultTable will appear in the JSON and this test will fail.
   @Test
-  public void testMixinIsApplied_failsIfResultTableAppearsInJson() {
+  public void testMixinIsAppliedFailsIfResultTableAppearsInJson() {
     DataSchema schema = new DataSchema(
         new String[]{"a", "b"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}
