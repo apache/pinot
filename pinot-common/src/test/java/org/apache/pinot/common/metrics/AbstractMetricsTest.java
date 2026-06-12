@@ -74,6 +74,13 @@ public abstract class AbstractMetricsTest {
     return new ControllerMetrics(buildRegistry());
   }
 
+  protected ServerMetrics buildServerMetrics() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
+    PinotMetricUtils.init(config);
+    return new ServerMetrics(buildRegistry());
+  }
+
   /**
    * Tear down the PinotMetricUtils static factory after each subclass finishes. The factory installs a
    * {@link org.apache.pinot.spi.metrics.PinotJmxReporter}; leaving it registered can cause cross-test JMX collisions
@@ -419,10 +426,7 @@ public abstract class AbstractMetricsTest {
 
   @Test
   public void testTableTenantRegistration() {
-    PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
-    PinotMetricUtils.init(config);
-    ServerMetrics serverMetrics = new ServerMetrics(buildRegistry());
+    ServerMetrics serverMetrics = buildServerMetrics();
     MetricsInspector inspector = createInspector(serverMetrics.getMetricsRegistry());
     String tableNameWithType = "myTable_REALTIME";
     String tenantName = "analytics";
@@ -452,10 +456,7 @@ public abstract class AbstractMetricsTest {
 
   @Test
   public void testTableTenantRegistrationWithNullOrEmpty() {
-    PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
-    PinotMetricUtils.init(config);
-    ServerMetrics serverMetrics = new ServerMetrics(buildRegistry());
+    ServerMetrics serverMetrics = buildServerMetrics();
 
     // null tenant should not throw or register
     serverMetrics.registerTableTenant("myTable_OFFLINE", null);
@@ -468,16 +469,13 @@ public abstract class AbstractMetricsTest {
 
   @Test
   public void testTableTenantGaugeMetrics() {
-    PinotConfiguration config = new PinotConfiguration();
-    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
-    PinotMetricUtils.init(config);
-    ServerMetrics serverMetrics = new ServerMetrics(buildRegistry());
+    ServerMetrics serverMetrics = buildServerMetrics();
     String tableNameWithType = "events_OFFLINE";
     String tenantName = "platformTenant";
 
     serverMetrics.registerTableTenant(tableNameWithType, tenantName);
 
-    serverMetrics.setOrUpdateTableGauge(tableNameWithType, ServerGauge.SEGMENT_COUNT, 42L);
+    serverMetrics.setValueOfTableGauge(tableNameWithType, ServerGauge.SEGMENT_COUNT, 42L);
     String expectedGaugeName =
         ServerGauge.SEGMENT_COUNT.getGaugeName() + "." + tableNameWithType + ".tenant." + tenantName;
     Long gaugeValue = serverMetrics.getGaugeValue(expectedGaugeName);

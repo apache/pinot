@@ -18,14 +18,6 @@ rules:
     table: "$3$5"
     tableType: "$6"
     tenant: "$7"
-# Meters/timers that accept rawTableName + tenant
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.tenant\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$6_$7"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tenant: "$5"
 # === End tenant-aware rules ===
 
 # Meters/timers that accept tableNameWithType
