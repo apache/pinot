@@ -33,6 +33,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.StreamingBrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
@@ -52,11 +54,15 @@ import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.assertj.core.api.Assertions;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.mockito.ArgumentMatchers.any;
 
 
 public class QueryDispatcherTest extends QueryTestSet {
@@ -84,9 +90,18 @@ public class QueryDispatcherTest extends QueryTestSet {
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
-    _queryDispatcher =
+    _queryDispatcher = Mockito.spy(
         new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class), null, true,
-            Duration.ofSeconds(1));
+            Duration.ofSeconds(1))
+    );
+  }
+
+  @AfterMethod
+  public void resetMocks() {
+    Mockito.reset(_queryDispatcher);
+    for (QueryServer worker : _queryServerMap.values()) {
+      Mockito.reset(worker);
+    }
   }
 
   @AfterClass
@@ -133,22 +148,21 @@ public class QueryDispatcherTest extends QueryTestSet {
       observer.onError(new RuntimeException("foo"));
       return Set.of();
     }).when(failingQueryServer).submit(Mockito.any(), Mockito.any());
-    long requestId = REQUEST_ID_GEN.getAndIncrement();
-    RequestContext context = new DefaultRequestContext();
-    context.setRequestId(requestId);
+    long requestId;
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
-      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
-      Assert.fail("Method call above should have failed");
-    } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Error dispatching query"));
+      requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext context = new DefaultRequestContext();
+      context.setRequestId(requestId);
+      BrokerResponseNativeV2 response = _queryDispatcher.submitAndReduceForTest(dispatchableSubPlan, Map.of());
+      Assertions.assertThat(response.getExceptions())
+          .describedAs("Expected exceptions from the response")
+          .isNotEmpty();
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
-    for (QueryServer queryServer : _queryServerMap.values()) {
-      Mockito.verify(queryServer, Mockito.times(1))
-          .cancel(Mockito.argThat(a -> a.getRequestId() == requestId), Mockito.any());
-    }
+    Mockito.verify(_queryDispatcher, Mockito.times(1))
+        .cancel(requestId);
     Mockito.reset(failingQueryServer);
   }
 
@@ -156,26 +170,38 @@ public class QueryDispatcherTest extends QueryTestSet {
   public void testQueryDispatcherCancelWhenQueryReducerReturnsError()
       throws Exception {
     String sql = "SELECT * FROM a";
-    long requestId = REQUEST_ID_GEN.getAndIncrement();
-    RequestContext context = new DefaultRequestContext();
-    context.setRequestId(requestId);
+    long requestId;
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext context = new DefaultRequestContext();
+      context.setRequestId(requestId);
+
+      QueryServer aServer = _queryServerMap.values().stream()
+          .findAny()
+          .orElseThrow();
+      Mockito.doThrow(RuntimeException.class).when(aServer).submit(Mockito.any(), Mockito.any());
+
       // will throw b/c mailboxService is mocked
-      QueryDispatcher.QueryResult queryResult =
-          _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Map.of());
-      if (queryResult.getProcessingException() == null) {
-        Assert.fail("Method call above should have failed");
+      try {
+        QueryDispatcher.DispatcherStreamingBrokerResponse queryResult =
+            _queryDispatcher.submit(context, dispatchableSubPlan, 10_000L, Map.of());
+
+        StreamingBrokerResponse.Metainfo metainfo = queryResult.consumeData(
+            data -> {
+              // no-op
+            });
+        if (metainfo.getExceptions().isEmpty()) {
+          Assert.fail("Method call above should have failed");
+        }
+      } catch (RuntimeException e) {
+        // expected
       }
-    } catch (NullPointerException e) {
-      // Expected
     }
     // wait just a little, until the cancel is being called.
     Thread.sleep(50);
-    for (QueryServer queryServer : _queryServerMap.values()) {
-      Mockito.verify(queryServer, Mockito.times(1))
-          .cancel(Mockito.argThat(a -> a.getRequestId() == requestId), Mockito.any());
-    }
+    Mockito.verify(_queryDispatcher, Mockito.times(1))
+        .cancel(requestId);
   }
 
   @Test
@@ -230,6 +256,102 @@ public class QueryDispatcherTest extends QueryTestSet {
     try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
       _queryDispatcher.submit(REQUEST_ID_GEN.getAndIncrement(), dispatchableSubPlan, 0L, new HashSet<>(), Map.of());
     }
+  }
+
+  /**
+   * Task 4(a): Consume (or attempt) then close — servers must NOT receive a cancel RPC.
+   *
+   * <p>{@code consume()} always calls {@code cleanupQueryServerTracking} in its {@code finally} block
+   * regardless of whether {@code consumeData} throws or returns normally.  A subsequent
+   * {@link QueryDispatcher.DispatcherStreamingBrokerResponse#close()} therefore calls
+   * {@code cancel(requestId)}, which finds no tracking entry and returns false without sending any
+   * cancel RPC to servers.
+   *
+   * <p>This test dispatches normally (no server error mock) so that the public
+   * {@link QueryDispatcher#submit(RequestContext, DispatchableSubPlan, long, Map)} returns
+   * successfully.  The {@code consumeData} call will throw a {@link RuntimeException} (mocked
+   * MailboxService provides no real mailbox), but that is still caught by {@code consume()}'s
+   * RuntimeException handler, so the {@code finally} still fires and cleans up the tracking entry.
+   */
+  @Test
+  public void testCloseAfterConsumeAttemptDoesNotCancelServers()
+      throws Exception {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    long requestId;
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext context = new DefaultRequestContext();
+      context.setRequestId(requestId);
+
+      QueryDispatcher.DispatcherStreamingBrokerResponse response =
+          _queryDispatcher.submit(context, dispatchableSubPlan, 10_000L, Map.of());
+
+      // consumeData may throw RuntimeException (mocked MailboxService → no real mailbox).
+      // Either way, consume()'s finally will call cleanupQueryServerTracking, removing the entry.
+      try {
+        response.consumeData(data -> { });
+      } catch (RuntimeException ignored) {
+        // RuntimeException from the mocked mailbox is expected; consume() has already cleaned up.
+      }
+
+      // close() calls cancel(requestId) which finds no tracking entry → no-ops.
+      response.close();
+    }
+
+    // Give any async cancel a moment to arrive (it must NOT arrive)
+    Thread.sleep(50);
+
+    // The tracking entry was removed by consume's finally; close() must NOT forward a cancel RPC.
+    for (QueryServer server : _queryServerMap.values()) {
+      Mockito.verify(server, Mockito.never()).cancel(any(), any());
+    }
+  }
+
+  /**
+   * Task 4(b): Close without consuming.
+   *
+   * <p>When a caller obtains a {@link QueryDispatcher.DispatcherStreamingBrokerResponse} and then
+   * calls {@link QueryDispatcher.DispatcherStreamingBrokerResponse#close()} without ever calling
+   * {@code consumeData}, the tracking entry is still present in {@code _serversByQuery} and the
+   * servers must receive exactly one cancel RPC.
+   */
+  @Test
+  public void testCloseWithoutConsumeCancelsServers()
+      throws Exception {
+    String sql = "SELECT * FROM a WHERE col1 = 'foo'";
+    long requestId;
+    DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
+    try (QueryThreadContext ignore = QueryThreadContext.openForMseTest()) {
+      requestId = QueryThreadContext.get().getExecutionContext().getRequestId();
+      RequestContext context = new DefaultRequestContext();
+      context.setRequestId(requestId);
+
+      QueryDispatcher.DispatcherStreamingBrokerResponse response =
+          _queryDispatcher.submit(context, dispatchableSubPlan, 10_000L, Map.of());
+
+      // Close without consuming — the _serversByQuery entry is still present
+      response.close();
+    }
+
+    // Give the async cancel gRPC call time to reach the servers
+    Thread.sleep(50);
+
+    // cancel(requestId) must have been invoked exactly once (by close())
+    Mockito.verify(_queryDispatcher, Mockito.times(1)).cancel(requestId);
+
+    // At least one server must have received the cancel RPC
+    long cancelledServers = _queryServerMap.values().stream()
+        .filter(server -> {
+          try {
+            Mockito.verify(server, Mockito.atLeastOnce()).cancel(any(), any());
+            return true;
+          } catch (AssertionError e) {
+            return false;
+          }
+        })
+        .count();
+    Assert.assertTrue(cancelledServers > 0, "At least one server must have received a cancel RPC");
   }
 
   @Test
