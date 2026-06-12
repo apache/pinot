@@ -246,4 +246,34 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
         })
         .collect(Collectors.toList());
   }
+
+  @Test
+  public void testUncompressedSizeTrackingEnabled()
+      throws IOException {
+    try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(
+        new File(_outputDir), ChunkCompressionType.LZ4, "mvFixedTrackingEnabled",
+        100, DataType.INT, 3, false, 4, 1024 * 1024, 1000)) {
+      creator.setTrackUncompressedSize(true);
+      for (int i = 0; i < 100; i++) {
+        creator.putIntMV(new int[]{i, i + 1, i + 2});
+      }
+      assertTrue(creator.getUncompressedSize() > 0,
+          "MV fixed-byte creator should report > 0 uncompressed size when tracking enabled");
+    }
+  }
+
+  @Test
+  public void testUncompressedSizeTrackingDisabled()
+      throws IOException {
+    try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(
+        new File(_outputDir), ChunkCompressionType.LZ4, "mvFixedTrackingDisabled",
+        100, DataType.INT, 3, false, 4, 1024 * 1024, 1000)) {
+      // tracking off by default
+      for (int i = 0; i < 100; i++) {
+        creator.putIntMV(new int[]{i, i + 1});
+      }
+      assertEquals(creator.getUncompressedSize(), 0L,
+          "MV fixed-byte creator should report 0 uncompressed size when tracking disabled");
+    }
+  }
 }

@@ -359,6 +359,37 @@ public class ForwardIndexHandlerCompressionStatsTest {
   }
 
   @Test
+  public void testCodecNotPersistedWhenCompressionStatsDisabled()
+      throws Exception {
+    // When compressionStatsEnabled=false, codec change should NOT persist codec in metadata
+    _fieldConfigMap.put(RAW_INT_COL,
+        new FieldConfig(RAW_INT_COL, FieldConfig.EncodingType.RAW, List.of(), CompressionCodec.LZ4, null));
+
+    TableConfig configWithStatsDisabled = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
+        .setFieldConfigList(new ArrayList<>(_fieldConfigMap.values()))
+        .build();
+    // compressionStatsEnabled defaults to false — do not set it
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(configWithStatsDisabled, SCHEMA);
+
+    try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
+        SegmentDirectory.Writer writer = segmentDirectory.createWriter()) {
+      ForwardIndexHandler handler = new ForwardIndexHandler(segmentDirectory, loadingConfig);
+      assertTrue(handler.needUpdateIndices(writer), "Handler should detect compression change");
+      handler.updateIndices(writer);
+      handler.postUpdateIndicesCleanup(writer);
+    }
+
+    // Compression codec should NOT be persisted when stats are disabled
+    SegmentMetadataImpl metadata = new SegmentMetadataImpl(INDEX_DIR);
+    ColumnMetadata colMeta = metadata.getColumnMetadataFor(RAW_INT_COL);
+    assertFalse(colMeta.hasDictionary());
+    assertNull(colMeta.getCompressionCodec(),
+        "Compression codec should NOT be persisted when compressionStatsEnabled=false");
+  }
+
+  @Test
   public void testRawToDictClearsCompressionStats()
       throws Exception {
     // First, verify that the raw column has compression stats persisted
