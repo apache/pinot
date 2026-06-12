@@ -186,7 +186,7 @@ public final class TableConfigUtils {
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
-                                                   Set<ValidationType> skipTypes) {
+      Set<ValidationType> skipTypes) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
@@ -1361,7 +1361,7 @@ public final class TableConfigUtils {
    * @param violations     list to collect violation messages
    */
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
-                                                 List<String> violations) {
+      List<String> violations) {
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
     boolean newUpsertEnabled = newConfig.isUpsertEnabled();
 
@@ -1429,7 +1429,7 @@ public final class TableConfigUtils {
    * @param violations     list to collect violation messages
    */
   private static void validateDedupConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
-                                                List<String> violations) {
+      List<String> violations) {
     boolean existingDedupEnabled = existingConfig.isDedupEnabled();
     boolean newDedupEnabled = newConfig.isDedupEnabled();
     if (existingDedupEnabled != newDedupEnabled) {
@@ -1504,7 +1504,7 @@ public final class TableConfigUtils {
   }
 
   private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
-                                                           List<String> violations) {
+      List<String> violations) {
     if (existingConfig.isMaterializedView() != newConfig.isMaterializedView()) {
       violations.add(String.format("isMaterializedView (%s -> %s) cannot be changed; drop and recreate the table",
           existingConfig.isMaterializedView(), newConfig.isMaterializedView()));
@@ -1735,7 +1735,7 @@ public final class TableConfigUtils {
   /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
   /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
   private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
-                                                                            List<FieldConfig> fieldConfigs) {
+      List<FieldConfig> fieldConfigs) {
     Set<String> noDictionaryColumnsFromIndexingConfig = new HashSet<>();
     if (indexingConfig.getNoDictionaryColumns() != null) {
       noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryColumns());
@@ -1761,7 +1761,7 @@ public final class TableConfigUtils {
   /// - Either functionColumnPairs or aggregationConfigs must be specified, but not both
   /// - All referenced columns exist in the schema and are single-valued
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
-                                                   Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
+      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
     Set<String> dimensionColumns = new HashSet<>();
     for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
       // Validate dimension columns are dictionary encoded
@@ -1943,7 +1943,7 @@ public final class TableConfigUtils {
    * Consistency checks across the offline and realtime counterparts of a hybrid table
    */
   public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
-                                              TableConfig realtimeTableConfig) {
+      TableConfig realtimeTableConfig) {
     Preconditions.checkNotNull(offlineTableConfig,
         "Found null offline table config in hybrid table check for table: %s", rawTableName);
     Preconditions.checkNotNull(realtimeTableConfig,
@@ -2339,7 +2339,7 @@ public final class TableConfigUtils {
   /// The original [IndexLoadingConfig] is left untouched so the commit path and immutable segment load path continue to
   /// use the persisted table config and real segment tier.
   public static IndexLoadingConfig buildConsumingSegmentIndexLoadingConfig(TableConfig tableConfig, Schema schema,
-                                                                           IndexLoadingConfig indexLoadingConfig) {
+      IndexLoadingConfig indexLoadingConfig) {
     if (!hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
       return indexLoadingConfig;
     }
