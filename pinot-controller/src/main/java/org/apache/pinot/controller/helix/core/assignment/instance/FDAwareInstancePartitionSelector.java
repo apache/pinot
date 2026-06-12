@@ -135,8 +135,8 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
       Map<Integer, LinkedHashSet<String>> faultDomainToCandidateInstancesMap = new TreeMap<>();
       faultDomainToInstanceConfigsMap.forEach(
           (k, v) -> faultDomainToCandidateInstancesMap.put(k, new LinkedHashSet<String>() {{
-            v.forEach(instance -> add(instance.getInstanceName()));
-          }}));
+              v.forEach(instance -> add(instance.getInstanceName()));
+            }}));
 
       // create an instance_name -> FD_id map, just for look up
       Map<String, Integer> aliveInstanceNameToFDMap = new HashMap<>();

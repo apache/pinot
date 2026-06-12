@@ -37,6 +37,7 @@ import org.apache.calcite.sql.SqlWith;
 import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.validate.SelectScope;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql.validate.SqlDelegatingConformance;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
@@ -47,9 +48,27 @@ import org.apache.calcite.sql.validate.SqlValidatorScope;
  */
 public class Validator extends SqlValidatorImpl {
 
+  /**
+   * Pinot conformance that delegates to BABEL but disables non-strict GROUP BY.
+   *
+   * <p>Calcite 1.41.0 (CALCITE-7189) added MySQL-style non-strict GROUP BY support that wraps non-aggregated,
+   * non-grouped columns in {@code ANY_VALUE()}. However, the implementation has a bug where it doesn't handle window
+   * functions properly, causing an NPE during validation of queries like
+   * {@code SELECT MIN(col) OVER() FROM t GROUP BY col}. Disabling non-strict GROUP BY avoids this bug and is the
+   * correct behavior for Pinot, which requires all non-aggregated columns to appear in GROUP BY. The feature is still
+   * present (un-reverted) in Calcite 1.42.0, so this override must be retained.
+   */
+  private static final SqlDelegatingConformance PINOT_CONFORMANCE =
+      new SqlDelegatingConformance(SqlConformanceEnum.BABEL) {
+        @Override
+        public boolean isNonStrictGroupBy() {
+          return false;
+        }
+      };
+
   public Validator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader, RelDataTypeFactory typeFactory) {
     super(opTab, catalogReader, typeFactory,
-        Config.DEFAULT.withConformance(SqlConformanceEnum.BABEL)
+        Config.DEFAULT.withConformance(PINOT_CONFORMANCE)
             .withIdentifierExpansion(true)
             .withTypeCoercionFactory(PinotTypeCoercion::new));
   }

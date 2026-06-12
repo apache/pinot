@@ -28,7 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.MseMetrics;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -308,17 +308,17 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   private void updateMetrics(MultiStageQueryStats queryStats) {
-    ServerMetrics serverMetrics = ServerMetrics.get();
+    MseMetrics mseMetrics = MseMetrics.get();
     if (queryStats == null) {
       LOGGER.info("Query stats not found in the EOS block.");
     } else {
       for (MultiStageQueryStats.StageStats.Closed closed : queryStats.getClosedStats()) {
         if (closed != null) {
-          closed.forEach((type, stats) -> type.updateServerMetrics(stats, serverMetrics));
+          closed.forEach((type, stats) -> type.updateMseMetrics(stats, mseMetrics));
         }
       }
       queryStats.getCurrentStats().forEach((type, stats) -> {
-        type.updateServerMetrics(stats, serverMetrics);
+        type.updateMseMetrics(stats, mseMetrics);
       });
     }
   }

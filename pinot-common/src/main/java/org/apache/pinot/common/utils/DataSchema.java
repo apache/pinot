@@ -927,6 +927,8 @@ public class DataSchema {
           return BYTES;
         case MAP:
           return MAP;
+        case OPEN_STRUCT:
+          return OBJECT;
         case UNKNOWN:
           return UNKNOWN;
         default:

@@ -102,6 +102,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     return SCHEMA_FILE_NAME;
   }
 
+  @Override
+  protected TableConfig createOfflineTableConfig() {
+    // Enable the TimeSegmentPruner so that useBrokerPruning can eliminate segments based on time
+    // filters. Without this, the broker has no pruner registered and cannot determine that
+    // DaysSinceEpoch < 0 matches zero segments — which is required for the short-circuit tests.
+    TableConfig tableConfig = super.createOfflineTableConfig();
+    tableConfig.setRoutingConfig(new RoutingConfig(null, List.of("time"), null, null));
+    return tableConfig;
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -217,6 +227,126 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(query);
     long expectedResult = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     assertEquals(joinResult, expectedResult);
+  }
+
+  @Test
+  public void testAllLeafStagesEmptyBrokerResponses()
+      throws Exception {
+    String table = "mytable";
+    assertAllLeafStagesEmptyRows("SELECT AirlineID, Carrier FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(), "LONG", "STRING");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(0)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT SUM(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) + 1 FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(1)), "LONG");
+    assertAllLeafStagesEmptyRows(
+        "SELECT COALESCE(SUM(ActualElapsedTime), 0) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(List.<Object>of(0)), "LONG");
+    assertAllLeafStagesEmptyRows("SELECT COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 HAVING COUNT(*) > 0",
+        List.of(), "LONG");
+    assertAllLeafStagesEmptyRows(
+        "SELECT AirlineID, COUNT(*) FROM " + table + " WHERE DaysSinceEpoch < 0 GROUP BY AirlineID",
+        List.of(), "LONG", "LONG");
+    // MIN/MAX return null on empty input (not +/-INFINITY)
+    assertAllLeafStagesEmptyRows("SELECT MIN(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "INT");
+    assertAllLeafStagesEmptyRows("SELECT MAX(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "INT");
+    // AVG returns null on empty input
+    assertAllLeafStagesEmptyRows("SELECT AVG(ActualElapsedTime) FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Collections.singletonList(null)), "DOUBLE");
+    // Multi-aggregate row alignment
+    assertAllLeafStagesEmptyRows(
+        "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), AVG(ActualElapsedTime), COUNT(*)"
+            + " FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(Arrays.asList(null, null, null, 0L)), "INT", "INT", "DOUBLE", "LONG");
+    // HAVING with IS NULL
+    assertAllLeafStagesEmptyRows(
+        "SELECT SUM(ActualElapsedTime) FROM " + table
+            + " WHERE DaysSinceEpoch < 0 HAVING SUM(ActualElapsedTime) IS NULL",
+        List.of(Collections.singletonList(null)), "LONG");
+    // Window function over empty input
+    assertAllLeafStagesEmptyRows(
+        "SELECT SUM(ActualElapsedTime) OVER () FROM " + table + " WHERE DaysSinceEpoch < 0",
+        List.of(), "LONG");
+  }
+
+  @Test
+  public void testReplicatedLeavesThatCanProduceRowsDoNotShortCircuit()
+      throws Exception {
+    assertDoesNotShortCircuitRows("SELECT d.dayId FROM " + DIM_TABLE
+            + " d LEFT JOIN (SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f "
+            + "ON d.dayId = f.DayOfWeek ORDER BY d.dayId",
+        DIM_NUMBER_OF_RECORDS);
+    assertDoesNotShortCircuitRows("SELECT d.dayId FROM (SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f "
+            + "RIGHT JOIN " + DIM_TABLE + " d ON f.DayOfWeek = d.dayId ORDER BY d.dayId",
+        DIM_NUMBER_OF_RECORDS);
+    assertDoesNotShortCircuitRows("SELECT d.dayId FROM (SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f "
+            + "FULL JOIN " + DIM_TABLE + " d ON f.DayOfWeek = d.dayId ORDER BY d.dayId",
+        DIM_NUMBER_OF_RECORDS);
+    assertDoesNotShortCircuitSingleLong("SELECT COUNT(*) FROM "
+            + "(SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) f LEFT JOIN " + DIM_TABLE
+            + " d ON f.DayOfWeek = d.dayId",
+        0);
+    assertDoesNotShortCircuitSingleLong("SELECT COUNT(*) FROM (SELECT dayId FROM " + DIM_TABLE
+            + " UNION ALL SELECT DayOfWeek FROM mytable WHERE DaysSinceEpoch < 0) u",
+        DIM_NUMBER_OF_RECORDS);
+  }
+
+  private JsonNode assertAllLeafStagesEmptyRows(String query, List<List<Object>> expectedRows, String... expectedTypes)
+      throws Exception {
+    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
+    assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
+    assertEquals(response.get("numServersQueried").asInt(), 0, "Query should not dispatch to servers: " + query);
+    assertEquals(response.get("numServersResponded").asInt(), 0, "Query should not dispatch to servers: " + query);
+
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), expectedRows.size(), "Unexpected row count for query: " + query);
+    for (int rowId = 0; rowId < expectedRows.size(); rowId++) {
+      List<Object> expectedRow = expectedRows.get(rowId);
+      JsonNode actualRow = rows.get(rowId);
+      assertEquals(actualRow.size(), expectedRow.size(), "Unexpected column count for query: " + query);
+      for (int colId = 0; colId < expectedRow.size(); colId++) {
+        Object expectedValue = expectedRow.get(colId);
+        if (expectedValue == null) {
+          assertTrue(actualRow.get(colId).isNull(), "Expected null for query: " + query);
+        } else if (expectedValue instanceof Number) {
+          assertEquals(actualRow.get(colId).asLong(), ((Number) expectedValue).longValue(),
+              "Unexpected numeric value for query: " + query);
+        } else {
+          assertEquals(actualRow.get(colId).asText(), expectedValue, "Unexpected value for query: " + query);
+        }
+      }
+    }
+
+    JsonNode columnDataTypes = resultTable.get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), expectedTypes.length, "Unexpected schema width for query: " + query);
+    for (int i = 0; i < expectedTypes.length; i++) {
+      assertEquals(columnDataTypes.get(i).asText(), expectedTypes[i], "Unexpected type for query: " + query);
+    }
+    return response;
+  }
+
+  private void assertDoesNotShortCircuitRows(String query, int expectedRowCount)
+      throws Exception {
+    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
+    assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
+    assertTrue(response.get("numServersQueried").asInt() > 0, "Query should dispatch to servers: " + query);
+    assertEquals(response.get("resultTable").get("rows").size(), expectedRowCount,
+        "Unexpected row count for query: " + query);
+  }
+
+  private void assertDoesNotShortCircuitSingleLong(String query, long expectedValue)
+      throws Exception {
+    JsonNode response = postQuery("SET useBrokerPruning = 'true'; " + query);
+    assertTrue(response.get("exceptions").isEmpty(), "Unexpected exceptions for query: " + query);
+    assertTrue(response.get("numServersQueried").asInt() > 0, "Query should dispatch to servers: " + query);
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 1, "Unexpected row count for query: " + query);
+    assertEquals(rows.get(0).get(0).asLong(), expectedValue, "Unexpected value for query: " + query);
   }
 
   @Test
@@ -2198,16 +2328,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testStageStatsPipelineBreaker()
-      throws Exception {
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    try {
-      _helixManager.getConfigAccessor()
-          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "false");
-      String query = "select * from mytable "
-          + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+  public void testStageStatsPipelineBreaker() {
+    String query = "select * from mytable "
+        + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+    // Pipeline breaker stats are kept by default. Retry in case a sibling test that overrode the default has just
+    // finished and the reset has not yet propagated to the server.
+    String errorMsg = "Failed to verify presence of pipeline breaker stats after multiple attempts";
+    TestUtils.waitForCondition(() -> {
       JsonNode response = postQuery(query);
       assertNotNull(response.get("stageStats"), "Should have stage stats");
 
@@ -2221,6 +2348,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
       Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
 
+      if (mytableLeaf.get("children") == null) {
+        // Sibling test's reset has not yet propagated. Retry.
+        return false;
+      }
+
       JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
       Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
@@ -2230,29 +2362,24 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       JsonNode dayOfWeekLeaf = pipelineSend.get("children").get(0);
       Assertions.assertThat(dayOfWeekLeaf.get("type").asText()).isEqualTo("LEAF");
       Assertions.assertThat(dayOfWeekLeaf.get("table").asText()).isEqualTo("daysOfWeek");
-    } finally {
-      _helixManager.getConfigAccessor()
-          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "true");
-    }
+      return true;
+    }, 100, 10_000L, errorMsg, Duration.ofSeconds(1));
   }
 
   @Test
-  public void testPipelineBreakerKeepsNumGroupsLimitReached()
-      throws Exception {
-    HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
-    try {
-      _helixManager.getConfigAccessor()
-          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "false");
-      String query = ""
-          + "SET numGroupsLimit = 1;"
-          + "SELECT * FROM daysOfWeek "
-          + "WHERE dayid in ("
-          + " SELECT DayOfWeek FROM mytable"
-          + " GROUP BY DayOfWeek"
-          + ")";
+  public void testPipelineBreakerKeepsNumGroupsLimitReached() {
+    String query = ""
+        + "SET numGroupsLimit = 1;"
+        + "SELECT * FROM daysOfWeek "
+        + "WHERE dayid in ("
+        + " SELECT DayOfWeek FROM mytable"
+        + " GROUP BY DayOfWeek"
+        + ")";
 
+    // Pipeline breaker stats are kept by default. Retry in case a sibling test that overrode the default has just
+    // finished and the reset has not yet propagated to the server.
+    String errorMsg = "Failed to verify numGroupsLimitReached on a pipeline breaker after multiple attempts";
+    TestUtils.waitForCondition(() -> {
       JsonNode response = postQuery(query);
       assertNotNull(response.get("stageStats"), "Should have stage stats");
 
@@ -2266,6 +2393,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
       Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualToIgnoringCase("daysOfWeek");
 
+      if (mytableLeaf.get("children") == null) {
+        // Sibling test's reset has not yet propagated. Retry.
+        return false;
+      }
+
       JsonNode pipelineReceive = mytableLeaf.get("children").get(0);
       Assertions.assertThat(pipelineReceive.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
@@ -2275,36 +2407,46 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       Assertions.assertThat(response.get("numGroupsLimitReached").asBoolean(false))
           .describedAs("numGroupsLimitReached should be true even when the limit is reached on a pipeline breaker")
           .isEqualTo(true);
-    } finally {
-      _helixManager.getConfigAccessor()
-          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "true");
-    }
+      return true;
+    }, 100, 10_000L, errorMsg, Duration.ofSeconds(1));
   }
 
   @Test
   public void testPipelineBreakerWithoutKeepingStats() {
-    // let's try several times to give helix time to propagate the config change
-    String errorMsg = "Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts";
-    TestUtils.waitForCondition(() -> {
-      String query = "select * from mytable "
-          + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
-      JsonNode response = postQuery(query);
-      assertNotNull(response.get("stageStats"), "Should have stage stats");
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    try {
+      // Pipeline breaker stats are kept by default, so explicitly skip them for this test.
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "true");
+      // let's try several times to give helix time to propagate the config change
+      String errorMsg = "Failed to verify absence of pipeline breaker stats after multiple attempts after 10 attempts";
+      TestUtils.waitForCondition(() -> {
+        String query = "select * from mytable "
+            + "WHERE DayOfWeek in (select dayid from daysOfWeek)";
+        JsonNode response = postQuery(query);
+        assertNotNull(response.get("stageStats"), "Should have stage stats");
 
-      JsonNode receiveNode = response.get("stageStats");
-      Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
+        JsonNode receiveNode = response.get("stageStats");
+        Assertions.assertThat(receiveNode.get("type").asText()).isEqualTo("MAILBOX_RECEIVE");
 
-      JsonNode sendNode = receiveNode.get("children").get(0);
-      Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
+        JsonNode sendNode = receiveNode.get("children").get(0);
+        Assertions.assertThat(sendNode.get("type").asText()).isEqualTo("MAILBOX_SEND");
 
-      JsonNode mytableLeaf = sendNode.get("children").get(0);
-      Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
-      Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
+        JsonNode mytableLeaf = sendNode.get("children").get(0);
+        Assertions.assertThat(mytableLeaf.get("type").asText()).isEqualTo("LEAF");
+        Assertions.assertThat(mytableLeaf.get("table").asText()).isEqualTo("mytable");
 
-      Assert.assertNull(mytableLeaf.get("children"), "When pipeline breaker stats are not kept, "
-          + "there should be no children under the leaf node");
-      return true;
-    }, 100, 10_000L, errorMsg, Duration.ofSeconds(1));
+        // Once the config change has propagated, there should be no children (pipeline breaker stats) under the leaf
+        // node. Return the result instead of asserting so that waitForCondition keeps retrying while the change is
+        // still propagating (AssertionError would not be caught and retried).
+        return mytableLeaf.get("children") == null;
+      }, 100, 10_000L, errorMsg, Duration.ofSeconds(1));
+    } finally {
+      _helixManager.getConfigAccessor()
+          .set(scope, CommonConstants.MultiStageQueryRunner.KEY_OF_SKIP_PIPELINE_BREAKER_STATS, "false");
+    }
   }
 
   @AfterClass

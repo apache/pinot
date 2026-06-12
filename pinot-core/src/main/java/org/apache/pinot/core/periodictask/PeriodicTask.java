@@ -19,6 +19,7 @@
 package org.apache.pinot.core.periodictask;
 
 import java.util.Properties;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 
@@ -50,6 +51,13 @@ public interface PeriodicTask extends Runnable {
    * @return initial delay in seconds.
    */
   long getInitialDelayInSeconds();
+
+  /**
+   * Returns the CRON expression for absolute scheduling, or null if fixed-delay scheduling should be used.
+   * @return Cron expression
+   */
+  @Nullable
+  String getCronExpression();
 
   /**
    * Performs necessary setups and starts the periodic task. Should be called before scheduling the periodic task. Can

@@ -21,6 +21,7 @@ package org.apache.pinot.core.periodictask;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,7 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   protected final String _taskName;
   protected final long _intervalInSeconds;
   protected final long _initialDelayInSeconds;
+  protected final String _cronExpression;
   protected final ReentrantLock _runLock;
 
   // Lock used to synchronize life-cycle functions
@@ -61,11 +63,30 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
+    this(taskName, runFrequencyInSeconds, initialDelayInSeconds, null);
+  }
+
+  public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
+      @Nullable String cronExpression) {
     _taskName = taskName;
-    _intervalInSeconds = runFrequencyInSeconds;
-    _initialDelayInSeconds = initialDelayInSeconds;
     _runLock = new ReentrantLock();
     _lifeCycleLock = new Object();
+    boolean hasCronScheduling = cronExpression != null && !cronExpression.trim().isEmpty();
+    boolean hasFrequencyScheduling = runFrequencyInSeconds > 0;
+
+    if (hasCronScheduling && hasFrequencyScheduling) {
+      LOGGER.warn("Task '{}' is configured with both a cron expression ('{}') "
+              + "and a fixed execution frequency ({}s). Preferring cron scheduling.",
+          taskName, cronExpression, runFrequencyInSeconds);
+      _intervalInSeconds = 0;
+      _initialDelayInSeconds = 0;
+      _cronExpression = cronExpression;
+    } else {
+      _intervalInSeconds = runFrequencyInSeconds;
+      _initialDelayInSeconds = initialDelayInSeconds;
+      //this will be null/empty anyway if it's not set.
+      _cronExpression = cronExpression;
+    }
   }
 
   @Override
@@ -81,6 +102,11 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   @Override
   public long getInitialDelayInSeconds() {
     return _initialDelayInSeconds;
+  }
+
+  @Override
+  public String getCronExpression() {
+    return _cronExpression;
   }
 
   /**

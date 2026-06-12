@@ -43,12 +43,9 @@ public final class StatsCollectorUtil {
   public static AbstractColumnStatisticsCollector createStatsCollector(String columnName, FieldSpec fieldSpec,
       FieldIndexConfigs indexConfig, StatsCollectorConfig statsCollectorConfig) {
     boolean dictionaryEnabled = indexConfig.getConfig(StandardIndexes.dictionary()).isEnabled();
-    if (!dictionaryEnabled) {
-      // MAP collector is optimised for no-dictionary collection
-      if (!fieldSpec.getDataType().getStoredType().equals(FieldSpec.DataType.MAP)) {
-        if (ClusterConfigForTable.useOptimizedNoDictCollector(statsCollectorConfig.getTableConfig())) {
-          return new NoDictColumnStatisticsCollector(columnName, statsCollectorConfig);
-        }
+    if (!dictionaryEnabled && fieldSpec.getDataType().getStoredType() != FieldSpec.DataType.MAP) {
+      if (ClusterConfigForTable.useOptimizedNoDictCollector(statsCollectorConfig.getTableConfig())) {
+        return new NoDictColumnStatisticsCollector(columnName, statsCollectorConfig);
       }
     }
     switch (fieldSpec.getDataType().getStoredType()) {

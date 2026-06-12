@@ -43,7 +43,7 @@ public class PinotSemiJoinDistinctProjectRule extends RelOptRule {
       new PinotSemiJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
   public static PinotSemiJoinDistinctProjectRule instanceWithDescription(String description) {
-      return new PinotSemiJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    return new PinotSemiJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
   }
 
   public PinotSemiJoinDistinctProjectRule(RelBuilderFactory factory, @Nullable String description) {

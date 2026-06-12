@@ -48,7 +48,7 @@ public class StringReader extends Reader {
 
   @Override
   public int read(char[] cbuf, int off, int len)
-  throws IOException {
+      throws IOException {
     if (len == 0) {
       return 0;
     }
@@ -63,7 +63,7 @@ public class StringReader extends Reader {
 
   @Override
   public int read()
-  throws IOException {
+      throws IOException {
     if (_next >= _length) {
       return -1;
     }
@@ -72,19 +72,19 @@ public class StringReader extends Reader {
 
   @Override
   public int read(char[] cbuf)
-  throws IOException {
+      throws IOException {
     return super.read(cbuf);
   }
 
   @Override
   public int read(CharBuffer target)
-  throws IOException {
+      throws IOException {
     return super.read(target);
   }
 
   @Override
   public void mark(int readAheadLimit)
-  throws IOException {
+      throws IOException {
     super.mark(readAheadLimit);
   }
 
@@ -95,7 +95,7 @@ public class StringReader extends Reader {
 
   @Override
   public void close()
-  throws IOException {
+      throws IOException {
     _length = 0;
     _str = null;
     _next = 0;
@@ -103,25 +103,25 @@ public class StringReader extends Reader {
 
   @Override
   public void reset()
-  throws IOException {
+      throws IOException {
     super.reset();
   }
 
   @Override
   public boolean ready()
-  throws IOException {
+      throws IOException {
     return super.ready();
   }
 
   @Override
   public long skip(long n)
-  throws IOException {
+      throws IOException {
     return super.skip(n);
   }
 
   @Override
   public long transferTo(Writer out)
-  throws IOException {
+      throws IOException {
     return super.transferTo(out);
   }
 }

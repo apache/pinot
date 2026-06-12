@@ -48,6 +48,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.calcite.util.TimestampString;
+import org.apache.pinot.common.function.scalar.arithmetic.NegateScalarFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -276,6 +277,14 @@ public class RexExpressionUtils {
         return handleReinterpret(rexCall);
       case SEARCH:
         return handleSearch(rexCall);
+      case MINUS_PREFIX:
+        // Without this explicit case the default branch calls getFunctionName(), which returns
+        // SqlKind.MINUS_PREFIX.name() = "MINUS_PREFIX". That canonicalizes to "minusprefix", which is
+        // not registered in FunctionRegistry. Map directly to NegateScalarFunction's registered name.
+        // Note: PLUS_PREFIX is intentionally not handled here. Calcite's StandardConvertletTable strips
+        // UNARY_PLUS during SqlNode -> RexNode conversion, so it never reaches this switch.
+        return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
+            NegateScalarFunction.FUNCTION_NAME, fromRexNodes(rexCall.operands));
       default:
         return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(rexCall.type),
             getFunctionName(rexCall.op), fromRexNodes(rexCall.operands));

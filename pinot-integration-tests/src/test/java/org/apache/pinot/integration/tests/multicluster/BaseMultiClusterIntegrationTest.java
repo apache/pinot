@@ -489,7 +489,7 @@ public abstract class BaseMultiClusterIntegrationTest extends ClusterTest {
   protected long getCount(String tableName, ClusterComponents cluster, boolean enableMultiClusterRouting)
       throws Exception {
     String query = "SET enableMultiClusterRouting=" + enableMultiClusterRouting + "; SELECT COUNT(*) as count FROM "
-      + tableName;
+        + tableName;
     return parseCountResult(executeQuery(query, cluster));
   }
 

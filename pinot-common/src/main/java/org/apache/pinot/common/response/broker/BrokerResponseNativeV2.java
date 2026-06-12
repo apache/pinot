@@ -21,6 +21,7 @@ package org.apache.pinot.common.response.broker;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,8 +39,8 @@ import org.apache.pinot.common.response.ProcessingException;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
-    "numGroupsWarningLimitReached", "numGroups", "maxRowsInJoinReached", "maxRowsInJoin",
-    "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats",
+    "numGroupsWarningLimitReached", "numGroups", "earlyTerminationReasons", "maxRowsInJoinReached",
+    "maxRowsInJoin", "maxRowsInWindowReached", "maxRowsInWindow", "timeUsedMs", "stageStats", "streamStatsCoverage",
     "maxRowsInOperator", "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs",
     "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
@@ -68,6 +69,13 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
    * Statistics for each stage of the query execution.
    */
   private ObjectNode _stageStats;
+  /**
+   * Stream-mode stats coverage, populated only when the query used {@code SubmitWithStream}. An array indexed by stage
+   * id; each element is an object with {@code responded}, {@code mergeFailed}, and {@code missing} counters, or
+   * {@code null} for stages that have no coverage info (e.g. stage 0 which runs broker-local).
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private ArrayNode _streamStatsCoverage;
   /**
    * The max number of rows seen at runtime.
    * <p>
@@ -112,8 +120,8 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   @Override
   public boolean isPartialResult() {
-    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || isMaxRowsInJoinReached()
-        || isMaxRowsInWindowReached();
+    return getExceptionsSize() > 0 || isNumGroupsLimitReached() || !getEarlyTerminationReasons().isEmpty()
+        || isMaxRowsInJoinReached() || isMaxRowsInWindowReached();
   }
 
   @Override
@@ -164,6 +172,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     _brokerStats.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, numGroupsWarningLimitReached);
   }
 
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public List<String> getEarlyTerminationReasons() {
+    return List.copyOf(_brokerStats.getStringSet(StatKey.EARLY_TERMINATION_REASONS));
+  }
+
   @Override
   public boolean isMaxRowsInJoinReached() {
     return _maxRowsInJoinReached;
@@ -207,6 +220,19 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
 
   public void setStageStats(ObjectNode stageStats) {
     _stageStats = stageStats;
+  }
+
+  /**
+   * Returns the stream-mode stats coverage, or {@code null} when the query ran in legacy mode. Array indexed by stage
+   * id; elements may be {@code null} for stages with no coverage (e.g. stage 0).
+   */
+  @Nullable
+  public ArrayNode getStreamStatsCoverage() {
+    return _streamStatsCoverage;
+  }
+
+  public void setStreamStatsCoverage(ArrayNode streamStatsCoverage) {
+    _streamStatsCoverage = streamStatsCoverage;
   }
 
   /**
@@ -489,9 +515,10 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
         return Math.max(value1, value2);
       }
     },
+    EARLY_TERMINATION_REASONS(StatMap.Type.STRING_SET),
 
     MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
-    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN),;
+    MAX_ROWS_IN_WINDOW_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 

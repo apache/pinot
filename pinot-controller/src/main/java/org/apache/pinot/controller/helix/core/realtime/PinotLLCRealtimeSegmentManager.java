@@ -2022,13 +2022,9 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
       streamConfig.setOffsetCriteria(OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
 
       // Kinesis shard-split flow requires us to pass currentPartitionGroupConsumptionStatusList so that
-      // we can check if its completely consumed
-      // However the kafka implementation of computePartitionGroupMetadata() breaks if we pass the current status
-      // This leads to streamSmallestOffset set to null in selectStartOffset() method
-      // The overall dependency isn't clean and is causing the issue and requires refactor
-      // Temporarily, we are passing a boolean flag to indicate if we want to use the current status
-      // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
-      // while the kinesis implementation will use it.
+      // we can check if it is completely consumed. Kafka needs stream offsets for every partition in this path, so
+      // forceGetOffsetFromStream lets its metadata provider fetch offsets from the stream instead of reusing
+      // current status offsets.
       List<StreamMetadata> streamMetadataList = getNewStreamMetadataList(
           streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
@@ -2921,9 +2917,8 @@ public class PinotLLCRealtimeSegmentManager implements PinotClusterConfigChangeL
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
-      // TODO: add paused topics information
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
-          pauseState.getComment(), pauseState.getTimeInMillis());
+          pauseState.getComment(), pauseState.getTimeInMillis(), pauseState.getIndexOfInactiveTopics());
     }
     String isTablePausedStr = idealState.getRecord().getSimpleField(IS_TABLE_PAUSED);
     return new PauseStatusDetails(Boolean.parseBoolean(isTablePausedStr), consumingSegments,

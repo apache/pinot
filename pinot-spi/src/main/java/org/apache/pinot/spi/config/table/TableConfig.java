@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.SegmentAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.sampler.TableSamplerConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -45,6 +46,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
   public static final String IS_DIM_TABLE_KEY = "isDimTable";
+  public static final String IS_MATERIALIZED_VIEW_KEY = "isMaterializedView";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -81,6 +83,9 @@ public class TableConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Indicates whether the table is a dimension table or not")
   private final boolean _dimTable;
+
+  @JsonPropertyDescription("Indicates whether the table is a materialized view or not")
+  private final boolean _materializedView;
 
   private SegmentsValidationAndRetentionConfig _validationConfig;
   private TenantConfig _tenantConfig;
@@ -134,6 +139,30 @@ public class TableConfig extends BaseJsonConfig {
   @JsonPropertyDescription(value = "Configs for table samplers")
   private List<TableSamplerConfig> _tableSamplers;
 
+  /// Legacy constructor preserved for binary backward-compatibility on the public SPI surface.
+  /// Callers compiled against the pre-`isMaterializedView` signature still link against this entry
+  /// point; it forwards to the canonical constructor with `materializedView=false`. Prefer the
+  /// {@link TableConfigBuilder} or the canonical constructor below for new code.
+  @Deprecated
+  public TableConfig(String tableName, String tableType,
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
+      IndexingConfig indexingConfig, TableCustomConfig customConfig, @Nullable QuotaConfig quotaConfig,
+      @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable QueryConfig queryConfig,
+      @Nullable Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap,
+      @Nullable List<FieldConfig> fieldConfigList, @Nullable UpsertConfig upsertConfig,
+      @Nullable DedupConfig dedupConfig, @Nullable DimensionTableConfig dimensionTableConfig,
+      @Nullable IngestionConfig ingestionConfig, @Nullable List<TierConfig> tierConfigsList, boolean dimTable,
+      @Nullable List<TunerConfig> tunerConfigList,
+      @Nullable Map<InstancePartitionsType, String> instancePartitionsMap,
+      @Nullable Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
+      @Nullable List<TableSamplerConfig> tableSamplers) {
+    this(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig, quotaConfig, taskConfig,
+        routingConfig, queryConfig, instanceAssignmentConfigMap, fieldConfigList, upsertConfig, dedupConfig,
+        dimensionTableConfig, ingestionConfig, tierConfigsList, dimTable, tunerConfigList, instancePartitionsMap,
+        segmentAssignmentConfigMap, tableSamplers, /*materializedView=*/ false);
+  }
+
   @JsonCreator
   public TableConfig(@JsonProperty(value = TABLE_NAME_KEY, required = true) String tableName,
       @JsonProperty(value = TABLE_TYPE_KEY, required = true) String tableType,
@@ -160,7 +189,8 @@ public class TableConfig extends BaseJsonConfig {
       Map<InstancePartitionsType, String> instancePartitionsMap,
       @JsonProperty(SEGMENT_ASSIGNMENT_CONFIG_MAP_KEY) @Nullable
       Map<String, SegmentAssignmentConfig> segmentAssignmentConfigMap,
-      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers) {
+      @JsonProperty(TABLE_SAMPLERS_KEY) @Nullable List<TableSamplerConfig> tableSamplers,
+      @JsonProperty(IS_MATERIALIZED_VIEW_KEY) boolean materializedView) {
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
     Preconditions.checkArgument(!tableName.contains(TABLE_NAME_FORBIDDEN_SUBSTRING),
         "'tableName' cannot contain double underscore ('__')");
@@ -188,6 +218,7 @@ public class TableConfig extends BaseJsonConfig {
     _ingestionConfig = ingestionConfig;
     _tierConfigsList = tierConfigsList;
     _dimTable = dimTable;
+    _materializedView = materializedView;
     _tunerConfigList = tunerConfigList;
     _instancePartitionsMap = instancePartitionsMap;
     _segmentAssignmentConfigMap = segmentAssignmentConfigMap;
@@ -213,6 +244,7 @@ public class TableConfig extends BaseJsonConfig {
     _ingestionConfig = tableConfig.getIngestionConfig();
     _tierConfigsList = tableConfig.getTierConfigsList();
     _dimTable = tableConfig.isDimTable();
+    _materializedView = tableConfig.isMaterializedView();
     _tunerConfigList = tableConfig.getTunerConfigsList();
     _instancePartitionsMap = tableConfig.getInstancePartitionsMap();
     _segmentAssignmentConfigMap = tableConfig.getSegmentAssignmentConfigMap();
@@ -259,6 +291,49 @@ public class TableConfig extends BaseJsonConfig {
   @JsonProperty(IS_DIM_TABLE_KEY)
   public boolean isDimTable() {
     return _dimTable;
+  }
+
+  @JsonProperty(IS_MATERIALIZED_VIEW_KEY)
+  public boolean isMaterializedView() {
+    return _materializedView;
+  }
+
+  /// Returns task configs for [CommonConstants.MaterializedViewTask#TASK_TYPE], or null if absent.
+  @JsonIgnore
+  @Nullable
+  public Map<String, String> getMaterializedViewTaskConfigs() {
+    if (_taskConfig == null) {
+      return null;
+    }
+    return _taskConfig.getConfigsForTaskType(CommonConstants.MaterializedViewTask.TASK_TYPE);
+  }
+
+  /// Whether the table has a non-empty `definedSQL` under any registered MV-style task type.
+  ///
+  /// Recognizes both the built-in OSS [CommonConstants.MaterializedViewTask#TASK_TYPE] and any
+  /// downstream task variant (e.g. StarTree's `MseMaterializedViewTask` for multi-stage MVs) by
+  /// scanning every task config for a non-empty `definedSQL` key. This keeps the
+  /// `isMaterializedView=true` invariant compatible with the wider ecosystem without OSS having to
+  /// hard-code each variant's task-type label.
+  @JsonIgnore
+  public boolean hasMaterializedViewTaskWithDefinedSql() {
+    if (_taskConfig == null) {
+      return false;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = _taskConfig.getTaskTypeConfigsMap();
+    if (taskTypeConfigsMap == null) {
+      return false;
+    }
+    for (Map<String, String> configs : taskTypeConfigsMap.values()) {
+      if (configs == null) {
+        continue;
+      }
+      String definedSql = configs.get(CommonConstants.MaterializedViewTask.DEFINED_SQL_KEY);
+      if (definedSql != null && !definedSql.trim().isEmpty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @JsonProperty(VALIDATION_CONFIG_KEY)

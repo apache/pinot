@@ -151,6 +151,12 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         LOGGER.warn("Transient Exception: Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;
         return Boolean.FALSE;
+      } catch (PermanentConsumerException e) {
+        // A confirmed-permanent failure (e.g. topic deleted from Kafka) must not block metadata
+        // fetching for the remaining healthy topics in a multi-topic table. Log, record, and
+        // continue — the caller emits a metric and healthy topics proceed normally.
+        LOGGER.warn("Permanent failure fetching StreamMetadata for topic {}, skipping in multi-topic fetch",
+            topicName, e);
       } catch (Exception e) {
         LOGGER.warn("Could not get StreamMetadata for topic {}", topicName, e);
         _exception = e;

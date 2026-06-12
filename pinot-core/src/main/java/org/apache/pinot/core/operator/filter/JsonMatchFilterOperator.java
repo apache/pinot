@@ -128,6 +128,9 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   }
 
   private ImmutableRoaringBitmap getMatchingDocIdBitmap() {
+    // getMatchingDocIds may return a read-only bitmap backed by the index's (possibly memory-mapped) storage. This
+    // operator only iterates it (BitmapDocIdSet / BitmapCollection / getCardinality) within the segment's acquired
+    // lifetime and never mutates it, so a borrowed posting list can be consumed directly without a copy.
     if (_predicate != null) {
       return _jsonIndex.getMatchingDocIds(_predicate.getValue(), _predicate.getCountPredicate());
     } else {

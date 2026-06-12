@@ -437,7 +437,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (validDocIds.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());
-      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
+      ThreadSafeMutableRoaringBitmap queryableDocIds =
+          (_deleteRecordColumn == null) ? null : new ThreadSafeMutableRoaringBitmap();
+      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), queryableDocIds);
       return;
     }
     if (isTTLEnabled() && !_comparisonColumns.isEmpty()) {
@@ -492,17 +494,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (queryableDocIds == null && _deleteRecordColumn != null) {
       queryableDocIds = new ThreadSafeMutableRoaringBitmap();
     }
-    addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
-  }
-
-  protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
-      @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-    if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
-    }
-    doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
-        validDocIdsForOldSegment);
+    doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
   protected abstract void doAddOrReplaceSegment(ImmutableSegmentImpl segment,
@@ -512,7 +504,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void addSegmentWithoutUpsert(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
-    addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
+    doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
   }
 
   /**
@@ -666,8 +658,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      addOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
-          validDocIdsForOldSegment);
+      doAddOrReplaceSegment((ImmutableSegmentImpl) segment, validDocIds, queryableDocIds, recordInfoIterator,
+          oldSegment, validDocIdsForOldSegment);
     }
     if (_upsertViewManager != null) {
       // When using consistency mode, the old segment's bitmap is updated in place, so we get the validDocIds after
@@ -1239,6 +1231,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       throws IOException {
   }
 
+  @Nullable
+  @Override
   public UpsertViewManager getUpsertViewManager() {
     return _upsertViewManager;
   }

@@ -39,7 +39,12 @@ import org.slf4j.LoggerFactory;
 
 public class DefaultLineageManager implements LineageManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLineageManager.class);
-  private static final long REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
+  // Default grace window before replaced (segmentsFrom) segments are dropped, used when the table does not
+  // configure replacedSegmentsRetentionPeriod. REFRESH tables keep a longer window because their replaced
+  // segments are the only copy of the previous snapshot and may be needed for a lineage rollback; other
+  // (e.g. APPEND) tables only need enough of a window for brokers to catch up on the latest lineage/IS/EV.
+  private static final long REFRESH_REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.HOURS.toMillis(24L); // 24 hrs
+  private static final long DEFAULT_REPLACED_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.HOURS.toMillis(4L); // 4 hrs
   private static final long LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(1L); // 1 day
 
   protected ControllerConf _controllerConf;
@@ -78,9 +83,15 @@ public class DefaultLineageManager implements LineageManager {
     long lineageCleanupRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getLineageEntryCleanupRetentionPeriod(),
         LINEAGE_ENTRY_CLEANUP_RETENTION_IN_MILLIS, tableNameWithType, "lineageEntryCleanupRetentionPeriod");
+    // When replacedSegmentsRetentionPeriod is configured it is honored as-is for every table type. When it is
+    // absent we fall back to a longer default for REFRESH tables (their replaced segments back a potential
+    // lineage rollback) and a shorter default for other table types (only a broker-catchup window is needed).
+    String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
+    long defaultReplacedSegmentsRetentionMs = batchSegmentIngestionType.equalsIgnoreCase("REFRESH")
+        ? REFRESH_REPLACED_SEGMENTS_RETENTION_IN_MILLIS : DEFAULT_REPLACED_SEGMENTS_RETENTION_IN_MILLIS;
     long replacedSegmentsRetentionMs = getRetentionMsFromConfig(
         tableConfig.getValidationConfig().getReplacedSegmentsRetentionPeriod(),
-        REPLACED_SEGMENTS_RETENTION_IN_MILLIS, tableNameWithType, "replacedSegmentsRetentionPeriod");
+        defaultReplacedSegmentsRetentionMs, tableNameWithType, "replacedSegmentsRetentionPeriod");
     Set<String> segmentsForTable = new HashSet<>(allSegments);
     Iterator<LineageEntry> lineageEntryIterator = lineage.getLineageEntries().values().iterator();
     while (lineageEntryIterator.hasNext()) {
@@ -94,7 +105,7 @@ public class DefaultLineageManager implements LineageManager {
         } else {
           // If the lineage state is 'COMPLETED' and we already preserved the original segments for the required
           // retention, it is safe to delete all segments from 'segmentsFrom'
-          if (shouldDeleteReplacedSegments(tableConfig, lineageEntry, replacedSegmentsRetentionMs)) {
+          if (shouldDeleteReplacedSegments(lineageEntry, replacedSegmentsRetentionMs)) {
             segmentsToDelete.addAll(sourceSegments);
           }
         }
@@ -122,24 +133,18 @@ public class DefaultLineageManager implements LineageManager {
   /**
    * Helper function to decide whether we should delete segmentsFrom (replaced segments) given a lineage entry.
    *
-   * The replaced segments are safe to delete if either:
-   * 1) The table is not "REFRESH" (e.g. "APPEND"), in which case they are deleted immediately, or
-   * 2) The lineage entry has been in "COMPLETED" state for longer than {@code replacedSegmentsRetentionMs}
-   *    (configurable via {@code replacedSegmentsRetentionPeriod} in table config, defaulting to 1 day).
+   * The replaced segments are safe to delete once the lineage entry has been in "COMPLETED" state for longer
+   * than {@code replacedSegmentsRetentionMs}. The retention applies uniformly to all batch ingestion types —
+   * any replacement protocol (REFRESH-table snapshot replace, APPEND-table minion-driven replace,
+   * segment-group merge) gets the same configurable grace window before its replaced segments are dropped.
+   * The window is configurable via {@code replacedSegmentsRetentionPeriod} in table config; when it is unset
+   * the default is resolved per ingestion type by the caller (longer for REFRESH, shorter for others).
    *
-   * @param tableConfig a table config
    * @param lineageEntry lineage entry
    * @param replacedSegmentsRetentionMs configured retention in ms for replaced segments
    * @return True if we can safely delete the replaced segments. False otherwise.
    */
-  private boolean shouldDeleteReplacedSegments(TableConfig tableConfig, LineageEntry lineageEntry,
-      long replacedSegmentsRetentionMs) {
-    // TODO: Currently, we preserve the replaced segments for REFRESH tables only. Once we support
-    // data rollback for APPEND tables, we should remove this check.
-    String batchSegmentIngestionType = IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig);
-    if (!batchSegmentIngestionType.equalsIgnoreCase("REFRESH")) {
-      return true;
-    }
+  private boolean shouldDeleteReplacedSegments(LineageEntry lineageEntry, long replacedSegmentsRetentionMs) {
     // Strict < means a 0ms retention won't delete on the exact same millisecond; this is intentional to
     // avoid edge-case races and is consistent with the existing behavior for non-zero retention values.
     return lineageEntry.getTimestamp() < (System.currentTimeMillis() - replacedSegmentsRetentionMs);

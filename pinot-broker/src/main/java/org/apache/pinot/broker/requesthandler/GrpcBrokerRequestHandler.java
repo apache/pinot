@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -43,6 +44,7 @@ import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.materializedview.handler.MaterializedViewHandler;
 import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -63,14 +65,26 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   protected final PinotServerStreamingQueryClient _streamingQueryClient;
   protected final FailureDetector _failureDetector;
 
-  // TODO: Support TLS
+  /// Legacy constructor without an MV handler — see [BaseSingleStageBrokerRequestHandler]'s
+  /// legacy ctor for the rationale.  Delegates with `materializedViewHandler = null`.
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       FailureDetector failureDetector, ThreadAccountant threadAccountant,
       MultiClusterRoutingContext multiClusterRoutingContext) {
+    this(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        failureDetector, threadAccountant, multiClusterRoutingContext, null);
+  }
+
+  /// TODO: Support TLS
+  public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      FailureDetector failureDetector, ThreadAccountant threadAccountant,
+      MultiClusterRoutingContext multiClusterRoutingContext,
+      @Nullable MaterializedViewHandler materializedViewHandler) {
     super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        threadAccountant, multiClusterRoutingContext);
+        threadAccountant, multiClusterRoutingContext, materializedViewHandler);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;

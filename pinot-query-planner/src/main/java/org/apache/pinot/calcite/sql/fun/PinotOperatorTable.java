@@ -20,6 +20,7 @@ package org.apache.pinot.calcite.sql.fun;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,6 +187,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // PREFIX OPERATORS
       SqlStdOperatorTable.EXISTS,
       SqlStdOperatorTable.NOT,
+      SqlStdOperatorTable.UNARY_MINUS,
+      SqlStdOperatorTable.UNARY_PLUS,
 
       // AGGREGATE OPERATORS
       SqlStdOperatorTable.COUNT,
@@ -332,12 +335,12 @@ public class PinotOperatorTable implements SqlOperatorTable {
   );
   //@formatter:on
 
-  // Key is canonical name
-  private final Map<String, SqlOperator> _operatorMap;
+  // Key is canonical name. Multiple operators can share the same name (e.g. binary "-" and unary "-").
+  private final Map<String, List<SqlOperator>> _operatorMap;
   private final List<SqlOperator> _operatorList;
 
   private PinotOperatorTable(boolean nullHandlingEnabled) {
-    Map<String, SqlOperator> operatorMap = new HashMap<>();
+    Map<String, List<SqlOperator>> operatorMap = new HashMap<>();
 
     // Register standard operators
     for (SqlOperator operator : STANDARD_OPERATORS) {
@@ -354,8 +357,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
     // `col IS NOT NULL AND col <> 0` is simplified to `col <> 0` because `col IS NOT NULL` is always true if
     // `col <> 0` is true. However, in Pinot, `IS NOT NULL` has a special meaning when using basic null handling
     if (!nullHandlingEnabled) {
-      operatorMap.put(FunctionRegistry.canonicalize(PINOT_IS_NULL.getName()), PINOT_IS_NULL);
-      operatorMap.put(FunctionRegistry.canonicalize(PINOT_IS_NOT_NULL.getName()), PINOT_IS_NOT_NULL);
+      registerOverride(FunctionRegistry.canonicalize(PINOT_IS_NULL.getName()), PINOT_IS_NULL, operatorMap);
+      registerOverride(FunctionRegistry.canonicalize(PINOT_IS_NOT_NULL.getName()), PINOT_IS_NOT_NULL, operatorMap);
     }
 
     // Register Pinot operators
@@ -373,16 +376,45 @@ public class PinotOperatorTable implements SqlOperatorTable {
     registerTransformFunctions(operatorMap);
     registerScalarFunctions(operatorMap);
 
-    _operatorMap = Map.copyOf(operatorMap);
-    _operatorList = List.copyOf(operatorMap.values());
+    Map<String, List<SqlOperator>> immutableMap = new HashMap<>(operatorMap.size());
+    List<SqlOperator> allOperators = new ArrayList<>();
+    for (Map.Entry<String, List<SqlOperator>> entry : operatorMap.entrySet()) {
+      List<SqlOperator> immutableList = List.copyOf(entry.getValue());
+      immutableMap.put(entry.getKey(), immutableList);
+      allOperators.addAll(immutableList);
+    }
+    _operatorMap = Map.copyOf(immutableMap);
+    _operatorList = List.copyOf(allOperators);
   }
 
-  private void register(String name, SqlOperator sqlOperator, Map<String, SqlOperator> operatorMap) {
-    Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(name), sqlOperator) == null,
-        "SqlOperator: %s is already registered", name);
+  /**
+   * Registers an operator under the given name. Multiple operators with different syntax (e.g. binary "-" and
+   * prefix unary "-") are allowed to share the same canonical name; all other duplicates are rejected.
+   */
+  private void register(String name, SqlOperator sqlOperator, Map<String, List<SqlOperator>> operatorMap) {
+    String canonicalName = FunctionRegistry.canonicalize(name);
+    List<SqlOperator> existing = operatorMap.get(canonicalName);
+    if (existing != null) {
+      for (SqlOperator op : existing) {
+        Preconditions.checkState(op.getSyntax() != sqlOperator.getSyntax(),
+            "SqlOperator: %s with syntax %s is already registered", name, sqlOperator.getSyntax());
+      }
+      existing.add(sqlOperator);
+    } else {
+      operatorMap.put(canonicalName, new ArrayList<>(List.of(sqlOperator)));
+    }
   }
 
-  private void registerAggregateFunctions(Map<String, SqlOperator> operatorMap) {
+  /**
+   * Forcibly registers an operator under the given canonical name, replacing any existing entry.
+   * Used to override standard Calcite operators (e.g. PINOT_IS_NULL / PINOT_IS_NOT_NULL).
+   */
+  private void registerOverride(String canonicalName, SqlOperator sqlOperator,
+      Map<String, List<SqlOperator>> operatorMap) {
+    operatorMap.put(canonicalName, new ArrayList<>(List.of(sqlOperator)));
+  }
+
+  private void registerAggregateFunctions(Map<String, List<SqlOperator>> operatorMap) {
     for (AggregationFunctionType functionType : AggregationFunctionType.values()) {
       if (functionType.getReturnTypeInference() != null) {
         String functionName = functionType.getName();
@@ -396,26 +428,30 @@ public class PinotOperatorTable implements SqlOperatorTable {
               functionType.getOperandTypeChecker());
         }
 
-        Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(functionName), function) == null,
+        String canonicalName = FunctionRegistry.canonicalize(functionName);
+        Preconditions.checkState(!operatorMap.containsKey(canonicalName),
             "Aggregate function: %s is already registered", functionName);
+        operatorMap.put(canonicalName, new ArrayList<>(List.of(function)));
       }
     }
   }
 
-  private void registerTransformFunctions(Map<String, SqlOperator> operatorMap) {
+  private void registerTransformFunctions(Map<String, List<SqlOperator>> operatorMap) {
     for (TransformFunctionType functionType : TransformFunctionType.values()) {
       if (functionType.getReturnTypeInference() != null) {
         PinotSqlFunction function = new PinotSqlFunction(functionType.getName(), functionType.getReturnTypeInference(),
             functionType.getOperandTypeChecker());
         for (String name : functionType.getNames()) {
-          Preconditions.checkState(operatorMap.put(FunctionRegistry.canonicalize(name), function) == null,
+          String canonicalName = FunctionRegistry.canonicalize(name);
+          Preconditions.checkState(!operatorMap.containsKey(canonicalName),
               "Transform function: %s is already registered", name);
+          operatorMap.put(canonicalName, new ArrayList<>(List.of(function)));
         }
       }
     }
   }
 
-  private void registerScalarFunctions(Map<String, SqlOperator> operatorMap) {
+  private void registerScalarFunctions(Map<String, List<SqlOperator>> operatorMap) {
     for (Map.Entry<String, PinotScalarFunction> entry : FunctionRegistry.FUNCTION_MAP.entrySet()) {
       String canonicalName = entry.getKey();
       PinotScalarFunction scalarFunction = entry.getValue();
@@ -429,7 +465,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
             "Scalar function: %s is already registered", canonicalName);
         continue;
       }
-      operatorMap.put(canonicalName, sqlFunction);
+      operatorMap.put(canonicalName, new ArrayList<>(List.of(sqlFunction)));
     }
   }
 
@@ -440,9 +476,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
       return;
     }
     String canonicalName = FunctionRegistry.canonicalize(opName.getSimple());
-    SqlOperator operator = _operatorMap.get(canonicalName);
-    if (operator != null) {
-      operatorList.add(operator);
+    List<SqlOperator> operators = _operatorMap.get(canonicalName);
+    if (operators != null) {
+      operatorList.addAll(operators);
     }
   }
 
@@ -573,7 +609,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
         operandType = opBinding.getOperandType(0);
       }
 
-      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter()) {
+      // A filtered aggregate (or one over an empty group) can observe zero rows, making MIN/MAX nullable. Calcite
+      // 1.42 signals this to the aggregate via SqlOperatorBinding.hasEmptyGroup() (set by SqlFilterOperator during
+      // validation, where the inner aggregate's own hasFilter()/getGroupCount() do not reflect the wrapping FILTER).
+      if (opBinding.getGroupCount() == 0 || opBinding.hasFilter() || opBinding.hasEmptyGroup()) {
         return opBinding.getTypeFactory().createTypeWithNullability(operandType, true);
       } else {
         return operandType;

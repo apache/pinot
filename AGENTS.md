@@ -114,6 +114,11 @@ repo. It is intentionally short and focused on day-to-day work.
 - Prefer imports over fully qualified class names (e.g., use `import com.foo.Bar` and refer to `Bar`, not `com.foo.Bar` inline).
 - Prefer targeted unit tests; use integration tests when behavior crosses roles.
 
+## Commit messages
+- Do not include `Co-authored-by` trailers that reference AI tools (e.g., Claude, Copilot).
+  - **Why**: These trailers propagate into squash-merge commits on GitHub, making the project history appear AI-authored rather than human-authored.
+  - **Fix**: Omit the `Co-authored-by` line entirely when committing.
+
 ## Checkstyle config
 - Checkstyle rules and related config files live under `config/`.
 - Use the Maven wrapper (`./mvnw` on Unix-like systems or `mvnw.cmd` on Windows) to run `spotless:apply` to format code and `checkstyle:check` to validate style.

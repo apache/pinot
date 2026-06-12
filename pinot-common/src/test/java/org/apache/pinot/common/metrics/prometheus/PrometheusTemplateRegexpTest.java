@@ -134,19 +134,31 @@ public class PrometheusTemplateRegexpTest {
   }
 
   /**
-   * broker.yml: global gauge/meter/timer (no table scope).
-   * e.g. pinot.broker.totalDocuments
+   * broker.yml: global gauge/meter/timer (no table scope). The catch-all is group-flexible at the
+   * prefix so non-broker MBean groups registered in the broker JVM (e.g. pinot.mse.*) are also
+   * exported with this rule.
+   * e.g. pinot.broker.totalDocuments, pinot.mse.queries
    */
   @Test
   public void testBrokerGlobalMeterPattern()
       throws Exception {
-    String pattern = loadPatternByName("broker.yml", "pinot_broker_$1_$2");
-    Matcher m = Pattern.compile(pattern).matcher(
+    String pattern = loadPatternByName("broker.yml", "pinot_$1_$2_$3");
+    Pattern compiled = Pattern.compile(pattern);
+
+    Matcher brokerMatch = compiled.matcher(
         "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", "
             + "name=\"pinot.broker.totalDocuments\"><>Value");
-    Assert.assertTrue(m.matches(), "Pattern should match global broker gauge");
-    Assert.assertEquals(m.group(1), "totalDocuments");
-    Assert.assertEquals(m.group(2), "Value");
+    Assert.assertTrue(brokerMatch.matches(), "Pattern should match global broker gauge");
+    Assert.assertEquals(brokerMatch.group(1), "broker");
+    Assert.assertEquals(brokerMatch.group(2), "totalDocuments");
+    Assert.assertEquals(brokerMatch.group(3), "Value");
+
+    Matcher mseMatch = compiled.matcher(
+        "\"org.apache.pinot.common.metrics\"<type=\"MseMetrics\", name=\"pinot.mse.queries\"><>Count");
+    Assert.assertTrue(mseMatch.matches(), "Pattern should also match pinot.mse.* mbeans on broker JVMs");
+    Assert.assertEquals(mseMatch.group(1), "mse");
+    Assert.assertEquals(mseMatch.group(2), "queries");
+    Assert.assertEquals(mseMatch.group(3), "Count");
   }
 
   // ---- Server patterns ----

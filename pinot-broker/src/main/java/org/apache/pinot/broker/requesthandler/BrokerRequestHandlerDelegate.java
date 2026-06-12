@@ -204,7 +204,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       throws Exception {
     if (_multiStageBrokerRequestHandler != null && _multiStageBrokerRequestHandler.cancelQuery(
         queryId, timeoutMs, executor, connMgr, serverResponses)) {
-        return true;
+      return true;
     }
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }

@@ -19,6 +19,8 @@
 
 package org.apache.pinot.plugin.metrics.dropwizard.prometheus;
 
+import org.apache.pinot.common.metrics.MseMeter;
+import org.apache.pinot.common.metrics.MseTimer;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerTimer;
@@ -58,5 +60,15 @@ public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetri
   @Test(dataProvider = "serverGauges", enabled = false)
   public void gaugeTest(ServerGauge serverGauge) {
     super.gaugeTest(serverGauge);
+  }
+
+  @Test(dataProvider = "mseMeters", enabled = false)
+  public void mseMeterExportedFromServerJmx(MseMeter meter) {
+    super.mseMeterExportedFromServerJmx(meter);
+  }
+
+  @Test(dataProvider = "mseTimers", enabled = false)
+  public void mseTimerExportedFromServerJmx(MseTimer timer) {
+    super.mseTimerExportedFromServerJmx(timer);
   }
 }

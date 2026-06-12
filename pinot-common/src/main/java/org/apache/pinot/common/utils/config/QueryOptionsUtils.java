@@ -150,6 +150,18 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT));
   }
 
+  /// Returns whether materialized-view rewrite is allowed for this query. Defaults to `true`
+  /// (absence ⇒ rewrite allowed) for backward compatibility with the pre-option behavior; the
+  /// MV minion executor sets it to `false` so a materialization query is never rewritten back
+  /// onto an MV.
+  public static boolean isMaterializedViewRewriteEnabled(Map<String, String> queryOptions) {
+    if (queryOptions == null) {
+      return true;
+    }
+    String value = queryOptions.get(QueryOptionKey.ENABLE_MATERIALIZED_VIEW_REWRITE);
+    return value == null || Boolean.parseBoolean(value);
+  }
+
   public static boolean isSkipUpsertView(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
   }
@@ -190,6 +202,13 @@ public class QueryOptionsUtils {
   public static Double getInvertedIndexDistinctCostRatio(Map<String, String> queryOptions) {
     return checkedParseDoubleNonNegative(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO,
         queryOptions.get(QueryOptionKey.INVERTED_INDEX_DISTINCT_COST_RATIO));
+  }
+
+  /// When true, [org.apache.pinot.core.operator.query.JsonIndexDistinctOperator] skips its missing-path handling —
+  /// does not add a 4-arg default, does not add null, and does not throw `Illegal Json Path`. The distinct set is
+  /// purely the values returned by the JSON-index lookup.
+  public static boolean isJsonIndexDistinctSkipMissingPath(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.JSON_INDEX_DISTINCT_SKIP_MISSING_PATH));
   }
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
@@ -530,6 +549,15 @@ public class QueryOptionsUtils {
 
   public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
     String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  /**
+   * Reads the {@code streamStats} query option that opts a single query into the {@code SubmitWithStream}
+   * dispatch path. See {@link QueryOptionKey#STREAM_STATS}.
+   */
+  public static boolean isStreamStats(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.STREAM_STATS);
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 

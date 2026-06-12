@@ -38,6 +38,10 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
@@ -51,6 +55,10 @@
     <dependency>
       <groupId>org.immutables</groupId>
       <artifactId>value-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.auto.service</groupId>
+      <artifactId>auto-service-annotations</artifactId>
     </dependency>
 
     <dependency>

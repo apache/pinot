@@ -440,6 +440,18 @@ public interface BrokerResponse {
    */
   boolean getRLSFiltersApplied();
 
+  /// Get the materialized view table name that was hit (used) for this query, or `null`
+  /// if no materialized view was used.  The default returns `null` so impls that do not track MV
+  /// rewrite (e.g. MSE response paths) need no explicit override; the matching *setter* is
+  /// deliberately NOT defaulted here — callers that want to record an MV-queried name must obtain
+  /// a concrete `BrokerResponseNative` and invoke its setter directly.  Without that asymmetry, a
+  /// future caller could silently drop the MV-queried name on any impl that forgot to override
+  /// the setter, producing an observability hole indistinguishable from "no MV was used".
+  @Nullable
+  default String getMaterializedViewQueried() {
+    return null;
+  }
+
   default StreamingBrokerResponse toStreamingResponse() {
     return new EagerToLazyBrokerResponseAdaptor(this);
   }

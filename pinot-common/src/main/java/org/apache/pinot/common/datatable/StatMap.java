@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.datatable;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.DataInput;
@@ -26,8 +27,10 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -149,6 +152,24 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return this;
   }
 
+  public Set<String> getStringSet(K key) {
+    Preconditions.checkArgument(key.getType() == Type.STRING_SET, "Key %s is of type %s, not STRING_SET", key,
+        key.getType());
+    Object o = _map.get(key);
+    return o == null ? Set.of() : (Set<String>) o;
+  }
+
+  public StatMap<K> merge(K key, Set<String> value) {
+    Set<String> oldValue = getStringSet(key);
+    Set<String> newValue = key.merge(oldValue, value);
+    if (newValue.isEmpty()) {
+      _map.remove(key);
+    } else {
+      _map.put(key, Collections.unmodifiableSet(new LinkedHashSet<>(newValue)));
+    }
+    return this;
+  }
+
   /**
    * Returns the value associated with the key.
    * <p>
@@ -164,6 +185,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         return getLong(key);
       case STRING:
         return getString(key);
+      case STRING_SET:
+        return getStringSet(key);
       default:
         throw new IllegalArgumentException("Unsupported type: " + key.getType());
     }
@@ -216,6 +239,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case STRING:
           merge(key, (String) value);
           break;
+        case STRING_SET:
+          merge(key, (Set<String>) value);
+          break;
         default:
           throw new IllegalArgumentException("Unsupported type: " + key.getType());
       }
@@ -260,6 +286,14 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           break;
         case STRING:
           merge(key, input.readUTF());
+          break;
+        case STRING_SET:
+          int size = input.readInt();
+          LinkedHashSet<String> values = new LinkedHashSet<>(size);
+          for (int j = 0; j < size; j++) {
+            values.add(input.readUTF());
+          }
+          merge(key, values);
           break;
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
@@ -309,6 +343,18 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             }
           } else {
             node.put(key.getStatName(), (String) value);
+          }
+          break;
+        case STRING_SET:
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.putArray(key.getStatName());
+            }
+          } else {
+            ArrayNode arrayNode = node.putArray(key.getStatName());
+            for (String stringValue : (Set<String>) value) {
+              arrayNode.add(stringValue);
+            }
           }
           break;
         default:
@@ -366,6 +412,18 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           }
           break;
         }
+        case STRING_SET: {
+          Set<String> value = getStringSet(key);
+          if (!value.isEmpty()) {
+            writtenKeys++;
+            output.writeByte(ordinal);
+            output.writeInt(value.size());
+            for (String stringValue : value) {
+              output.writeUTF(stringValue);
+            }
+          }
+          break;
+        }
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
       }
@@ -396,6 +454,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case STRING:
           if (value == null) {
             throw new IllegalStateException("String value must be non-null but null is stored for key " + key);
+          }
+          break;
+        case STRING_SET:
+          if (value == null || ((Set<String>) value).isEmpty()) {
+            throw new IllegalStateException("String set value must be non-empty but " + value + " is stored for key "
+                + key);
           }
           break;
         default:
@@ -493,6 +557,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return value2 != null ? value2 : value1;
     }
 
+    default Set<String> merge(Set<String> value1, Set<String> value2) {
+      LinkedHashSet<String> merged = new LinkedHashSet<>(value1);
+      merged.addAll(value2);
+      return merged;
+    }
+
     /**
      * The type of the values associated to this key.
      */
@@ -540,6 +610,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     BOOLEAN,
     INT,
     LONG,
-    STRING
+    STRING,
+    STRING_SET
   }
 }

@@ -19,13 +19,16 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.io.File;
+import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
@@ -87,6 +90,22 @@ public class HelixInstanceDataManagerTest {
     } finally {
       _testInstanceDataDir.setWritable(true);
     }
+  }
+
+  @Test
+  public void testDirectoryWritabilityCheckDoesNotLeaveProbeFile()
+      throws IOException {
+    if (!_testInstanceDataDir.exists()) {
+      assertTrue(_testInstanceDataDir.mkdirs(), "Failed to create test directory.");
+    } else {
+      FileUtils.cleanDirectory(_testInstanceDataDir);
+    }
+
+    HelixInstanceDataManager.ensureDirectoryWritable(_testInstanceDataDir, "instance data dir");
+
+    File[] files = _testInstanceDataDir.listFiles();
+    assertNotNull(files, "Expected test directory to remain listable after writability check.");
+    assertEquals(files.length, 0, "Writability check should not leave probe files behind.");
   }
 
   @Test

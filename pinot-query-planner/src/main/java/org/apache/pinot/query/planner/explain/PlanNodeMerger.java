@@ -493,7 +493,7 @@ class PlanNodeMerger {
       if (exchangeNode.isSortOnReceiver() != otherNode.isSortOnReceiver()) {
         return null;
       }
-      if (Objects.equals(exchangeNode.getTableNames(), otherNode.getTableNames())) {
+      if (!Objects.equals(exchangeNode.getTableNames(), otherNode.getTableNames())) {
         return null;
       }
       List<PlanNode> children = mergeChildren(exchangeNode, context);

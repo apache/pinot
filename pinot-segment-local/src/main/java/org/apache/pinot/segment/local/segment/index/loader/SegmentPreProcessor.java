@@ -398,8 +398,9 @@ public class SegmentPreProcessor implements AutoCloseable {
         StarTreeBuilderUtils.removeStarTrees(indexDir);
       } else {
         // NOTE: Always use OFF_HEAP mode on server side.
+        // Pass _indexLoadingConfig so downstream readers can resolve table-level configs we set
         MultipleTreesBuilder builder = new MultipleTreesBuilder(starTreeBuilderConfigs, indexDir,
-            MultipleTreesBuilder.BuildMode.OFF_HEAP);
+            MultipleTreesBuilder.BuildMode.OFF_HEAP, _indexLoadingConfig);
         // We don't create the builder using the try-with-resources pattern because builder.close() performs
         // some clean-up steps to roll back the star-tree index to the previous state if it exists. If this goes wrong
         // the star-tree index can be in an inconsistent state. To prevent that, when builder.close() throws an

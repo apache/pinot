@@ -22,32 +22,32 @@ package org.apache.pinot.client;
  * Connections time out for AsyncHttpClient
  */
 public class ConnectionTimeouts {
-    private final int _readTimeoutMs;
-    private final int _connectTimeoutMs;
-    private final int _handshakeTimeoutMs;
+  private final int _readTimeoutMs;
+  private final int _connectTimeoutMs;
+  private final int _handshakeTimeoutMs;
 
-    private ConnectionTimeouts(int readTimeoutMs, int connectTimeoutMs, int handshakeTimeoutMs) {
-        _readTimeoutMs = readTimeoutMs;
-        _connectTimeoutMs = connectTimeoutMs;
-        _handshakeTimeoutMs = handshakeTimeoutMs;
-    }
+  private ConnectionTimeouts(int readTimeoutMs, int connectTimeoutMs, int handshakeTimeoutMs) {
+    _readTimeoutMs = readTimeoutMs;
+    _connectTimeoutMs = connectTimeoutMs;
+    _handshakeTimeoutMs = handshakeTimeoutMs;
+  }
 
-    public static ConnectionTimeouts create(int readTimeoutMs, int connectTimeoutMs, int handshakeTimeoutMs) {
-        if (readTimeoutMs < 1 || connectTimeoutMs < 1 || handshakeTimeoutMs < 1) {
-            throw new IllegalArgumentException("Timeouts must be > 0");
-        }
-        return new ConnectionTimeouts(readTimeoutMs, connectTimeoutMs, handshakeTimeoutMs);
+  public static ConnectionTimeouts create(int readTimeoutMs, int connectTimeoutMs, int handshakeTimeoutMs) {
+    if (readTimeoutMs < 1 || connectTimeoutMs < 1 || handshakeTimeoutMs < 1) {
+      throw new IllegalArgumentException("Timeouts must be > 0");
     }
+    return new ConnectionTimeouts(readTimeoutMs, connectTimeoutMs, handshakeTimeoutMs);
+  }
 
-    public int getReadTimeoutMs() {
-        return _readTimeoutMs;
-    }
+  public int getReadTimeoutMs() {
+    return _readTimeoutMs;
+  }
 
-    public int getConnectTimeoutMs() {
-        return _connectTimeoutMs;
-    }
+  public int getConnectTimeoutMs() {
+    return _connectTimeoutMs;
+  }
 
-    public int getHandshakeTimeoutMs() {
-        return _handshakeTimeoutMs;
-    }
+  public int getHandshakeTimeoutMs() {
+    return _handshakeTimeoutMs;
+  }
 }

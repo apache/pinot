@@ -145,11 +145,14 @@ public abstract class AggregationStrategy<A> {
   abstract void add(Dictionary dictionary, A aggResult, int step, int correlationId);
 
   private Dictionary getDictionary(Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    final Dictionary primaryCorrelationDictionary = blockValSetMap.get(_primaryCorrelationCol).getDictionary();
-    Preconditions.checkArgument(primaryCorrelationDictionary != null,
+    final BlockValSet primaryCorrelationValSet = blockValSetMap.get(_primaryCorrelationCol);
+    // FUNNELCOUNT requires dict-id reads from the forward index; a column with EncodingType.RAW + dictionaryIndex
+    // exposes a Dictionary but BlockValSet#getDictionaryIdsSV throws on the RAW forward index. Gate on the
+    // explicit forward-index encoding flag rather than dictionary nullness alone.
+    Preconditions.checkArgument(primaryCorrelationValSet.isDictionaryEncoded(),
         "CORRELATE_BY column in FUNNELCOUNT aggregation function not supported, please use a dictionary encoded "
             + "column.");
-    return primaryCorrelationDictionary;
+    return primaryCorrelationValSet.getDictionary();
   }
 
   private int[] getCorrelationIds(Map<ExpressionContext, BlockValSet> blockValSetMap) {

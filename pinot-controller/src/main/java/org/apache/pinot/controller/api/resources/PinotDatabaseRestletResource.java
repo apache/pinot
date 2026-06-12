@@ -152,7 +152,7 @@ public class PinotDatabaseRestletResource {
       DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
       QuotaConfig quotaConfig = new QuotaConfig(null, queryQuota);
       if (databaseConfig == null) {
-         databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
+        databaseConfig = new DatabaseConfig(databaseName, quotaConfig);
         _pinotHelixResourceManager.addDatabaseConfig(databaseConfig);
       } else {
         databaseConfig.setQuotaConfig(quotaConfig);

@@ -29,7 +29,9 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -42,10 +44,10 @@ public class QueryOptionsUtilsTest {
       List.of(MIN_SEGMENT_GROUP_TRIM_SIZE, MIN_SERVER_GROUP_TRIM_SIZE, MIN_BROKER_GROUP_TRIM_SIZE,
           GROUP_TRIM_THRESHOLD);
   private static final List<String> INT_KEYS = new ArrayList<>() {{
-    addAll(POSITIVE_INT_KEYS);
-    addAll(NON_NEGATIVE_INT_KEYS);
-    addAll(UNBOUNDED_INT_KEYS);
-  }};
+      addAll(POSITIVE_INT_KEYS);
+      addAll(NON_NEGATIVE_INT_KEYS);
+      addAll(UNBOUNDED_INT_KEYS);
+    }};
   private static final List<String> POSITIVE_LONG_KEYS =
       List.of(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES);
 
@@ -67,6 +69,24 @@ public class QueryOptionsUtilsTest {
     Map<String, String> resolved = QueryOptionsUtils.resolveCaseInsensitiveOptions(Map.of("SAMPLER", "firstOnly"));
 
     assertEquals(resolved.get(TABLE_SAMPLER), "firstOnly");
+  }
+
+  @Test
+  public void materializedViewRewriteDefaultsToEnabled() {
+    // Absent option and null map both default to enabled (back-compat with pre-option behavior).
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(null));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(new HashMap<>()));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "true")));
+    assertTrue(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "TRUE")));
+    // Anything that is not "true" disables (explicit false, case variants, and any non-true value).
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "false")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "FALSE")));
+    assertFalse(QueryOptionsUtils.isMaterializedViewRewriteEnabled(
+        Map.of(ENABLE_MATERIALIZED_VIEW_REWRITE, "1")));
   }
 
   @Test

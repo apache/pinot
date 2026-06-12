@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -45,6 +46,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.QueryFingerprint;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.glassfish.grizzly.http.server.Request;
 import org.mockito.ArgumentCaptor;
@@ -223,16 +225,65 @@ public class PinotClientRequestTest {
   }
 
   @Test
-  public void testPinotQueryComparisonApiMissingSql() throws Exception {
+  public void testPinotQueryComparisonApiMissingV2Sql() throws Exception {
     AsyncResponse asyncResponse = mock(AsyncResponse.class);
     Request request = mock(Request.class);
     when(request.getRequestURL()).thenReturn(new StringBuilder());
-    // Both v1sql and v2sql should be present
+    // Payload has v1sql but is missing v2sql (and also missing the unified 'sql' field)
     _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"v1sql\": \"SELECT v1 FROM mytable\"}",
         asyncResponse, request, null);
 
     verify(_requestHandler, never()).handleRequest(any(), any(), any(), any(), any());
-    verify(asyncResponse, times(1)).resume(any(Throwable.class));
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testProcessSqlWithMultiStageQueryEnginePostMissingSql() {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlWithMultiStageQueryEnginePost("{}", asyncResponse, false, 0, request, null);
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testProcessSqlWithMultiStageQueryEnginePostInvalidJson() {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlWithMultiStageQueryEnginePost("{bad json", asyncResponse, false, 0, request, null);
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testPinotQueryComparisonApiInvalidJson() {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{bad json", asyncResponse, request, null);
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
   }
 
   @Test
@@ -305,7 +356,7 @@ public class PinotClientRequestTest {
 
     // multi stage query
     requestJson = "{\"sql\": \"SET useMultistageEngine=true; \\n"
-      + "SELECT * FROM table1 t1 LEFT JOIN table2 t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
+        + "SELECT * FROM table1 t1 LEFT JOIN table2 t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
     response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
 
     assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
@@ -326,10 +377,173 @@ public class PinotClientRequestTest {
     when(request.getRequestURL()).thenReturn(new StringBuilder());
 
     String requestJson = "{\"sql\": \"INVALID SQL QUERY\"}";
-    Response response = _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+    try {
+      _pinotClientRequest.getQueryFingerprint(requestJson, request, null);
+      Assert.fail("Expected BadRequestException");
+    } catch (WebApplicationException wae) {
+      assertEquals(wae.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode(),
+          "Invalid SQL query should return BAD_REQUEST status");
+    }
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
 
-    assertEquals(response.getStatus(), Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(),
-        "Invalid SQL query should return INTERNAL_SERVER_ERROR status");
+  @Test
+  public void testProcessSqlQueryPostMissingSql() {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryPost("{}", asyncResponse, false, 0, request, null);
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testProcessSqlQueryPostInvalidJson() {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processSqlQueryPost("{bad json", asyncResponse, false, 0, request, null);
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testGetQueryFingerprintMissingSql() {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    try {
+      _pinotClientRequest.getQueryFingerprint("{}", request, null);
+      Assert.fail("Expected BadRequestException");
+    } catch (WebApplicationException wae) {
+      assertEquals(wae.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    }
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testGetQueryFingerprintInvalidJson() {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    try {
+      _pinotClientRequest.getQueryFingerprint("{bad json", request, null);
+      Assert.fail("Expected BadRequestException");
+    } catch (WebApplicationException wae) {
+      assertEquals(wae.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    }
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testCancelQueryWithInvalidId() {
+    try {
+      _pinotClientRequest.cancelQuery("not-a-number", false, 3000, false);
+      Assert.fail("Expected WebApplicationException");
+    } catch (WebApplicationException wae) {
+      assertEquals(wae.getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    }
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testCancelQueryWithClientIdTrue() {
+    try {
+      _pinotClientRequest.cancelQuery("anything", true, 3000, false);
+      Assert.fail("Expected WebApplicationException");
+    } catch (WebApplicationException wae) {
+      assertEquals(wae.getResponse().getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    }
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testProcessTimeSeriesQueryEngineMissingQuery() {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    _pinotClientRequest.processTimeSeriesQueryEngine(
+        JsonUtils.newObjectNode(), asyncResponse, request, null);
+
+    ArgumentCaptor<WebApplicationException> captor = ArgumentCaptor.forClass(WebApplicationException.class);
+    verify(asyncResponse).resume(captor.capture());
+    assertEquals(captor.getValue().getResponse().getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
+    verify(_brokerMetrics).addMeteredGlobalValue(BrokerMeter.BAD_REQUEST_EXCEPTIONS, 1L);
+    verify(_brokerMetrics, never()).addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+  }
+
+  @Test
+  public void testValidateSqlSyntaxSingleStage() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"SELECT * FROM myTable WHERE id > 10\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    SqlSyntaxValidationResponse body = (SqlSyntaxValidationResponse) response.getEntity();
+    Assert.assertTrue(body.isValid(), "Valid single-stage query should parse successfully");
+    assertEquals(body.getSqlType(), "DQL");
+    Assert.assertNull(body.getErrorMessage());
+  }
+
+  @Test
+  public void testValidateSqlSyntaxMultiStage() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"SET useMultistageEngine=true; \\n"
+        + "SELECT * FROM t1 LEFT JOIN t2 ON t1.id = t2.id WHERE t1.col1 > 100\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+    SqlSyntaxValidationResponse body = (SqlSyntaxValidationResponse) response.getEntity();
+    Assert.assertTrue(body.isValid(), "Valid multi-stage query should parse successfully");
+    assertEquals(body.getSqlType(), "DQL");
+    Assert.assertNull(body.getErrorMessage());
+  }
+
+  @Test
+  public void testValidateSqlSyntaxWithInvalidSql() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"sql\": \"SELECT FROM WHERE\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.OK.getStatusCode(),
+        "Invalid SQL should still return HTTP 200 with valid=false in body");
+    SqlSyntaxValidationResponse body = (SqlSyntaxValidationResponse) response.getEntity();
+    assertFalse(body.isValid(), "Unparseable query should report valid=false");
+    Assert.assertNull(body.getSqlType());
+    Assert.assertNotNull(body.getErrorMessage(), "Failed validation should include an error message");
+  }
+
+  @Test
+  public void testValidateSqlSyntaxMissingSqlField() throws Exception {
+    Request request = mock(Request.class);
+    when(request.getRequestURL()).thenReturn(new StringBuilder());
+
+    String requestJson = "{\"notSql\": \"SELECT * FROM myTable\"}";
+    Response response = _pinotClientRequest.validateSqlSyntax(requestJson, request, null);
+
+    assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode(),
+        "Payload missing the 'sql' field should return BAD_REQUEST");
   }
 
   @Test
