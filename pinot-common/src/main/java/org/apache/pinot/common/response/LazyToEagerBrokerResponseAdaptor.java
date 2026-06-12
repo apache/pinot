@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.common.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +36,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /// An adaptor that converts a lazy [StreamingBrokerResponse] into an eager [BrokerResponse].
 ///
-/// These object can be build using the static [#of] method which consumes the data from the streaming response.
+/// These objects can be built using the static [#of] method which consumes the data from the streaming response.
+/// Serialization delegates to the captured metainfo JSON node (which excludes {@code resultTable}) and then
+/// injects the materialized {@code resultTable}, ensuring the JSON shape matches {@code BrokerResponseNativeV2}
+/// regardless of which fields the source response includes.
 public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
   private final DataSchema _dataSchema;
   private final StreamingBrokerResponse.Metainfo _metainfo;
@@ -56,6 +60,10 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
   /// on the size of the response.
   /// The method can also be interrupted while consuming the data, in which case the thread's interrupt
   /// status is set and a [RuntimeException] is thrown.
+  ///
+  /// The given response is fully consumed and **closed** by this method, releasing any resources it holds
+  /// (op chains, server-side tracking). Callers must not use the streaming response afterwards; a redundant
+  /// close by the caller (e.g. try-with-resources) is harmless.
   public static BrokerResponse of(StreamingBrokerResponse streamingResponse) {
     DataSchema dataSchema = streamingResponse.getDataSchema();
 
@@ -63,7 +71,12 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
     List<Object[]> rows;
     try {
       if (dataSchema == null) {
-        metainfo = streamingResponse.getMetaInfo();
+        // Always consume (even when there are no rows) so the streaming response is fully driven through any
+        // decorator chain (e.g. MetainfoJsonDecorator / StdMetainfoDecorator) that attaches post-processing
+        // to the metainfo returned by consumeData. Calling getMetaInfo() before consumeData would bypass those
+        // decorators and can throw IllegalStateException on strict implementations.
+        metainfo = streamingResponse.consumeData(data -> {
+        });
         rows = new ArrayList<>();
       } else {
         int width = dataSchema.size();
@@ -81,11 +94,46 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Thread interrupted while converting to eager broker response", e);
+    } finally {
+      streamingResponse.close();
     }
     return new LazyToEagerBrokerResponseAdaptor(dataSchema, metainfo, rows);
   }
 
-  @JsonInclude(JsonInclude.Include.NON_NULL)
+  // ---- Serialization -----------------------------------------------------------------------
+  // Build a deterministic ObjectNode from the captured metainfo JSON (which already excludes
+  // resultTable) and inject the materialized resultTable. This keeps the JSON shape in sync
+  // with BrokerResponseNativeV2 regardless of which fields the source response includes,
+  // without relying on reflective bean-serialization of this class.
+
+  /// Returns a JSON node representing the full response (metainfo fields + resultTable).
+  ///
+  /// The node is built fresh each time to avoid aliasing the mutable metainfo ObjectNode.
+  private ObjectNode toJsonNode() {
+    ObjectNode root = JsonUtils.newObjectNode();
+    ResultTable resultTable = getResultTable();
+    if (resultTable != null) {
+      root.set("resultTable", JsonUtils.objectToJsonNode(resultTable));
+    }
+    _json.fields().forEachRemaining(entry -> root.set(entry.getKey(), entry.getValue()));
+    return root;
+  }
+
+  @Override
+  public String toJsonString()
+      throws IOException {
+    return JsonUtils.objectToString(toJsonNode());
+  }
+
+  @Override
+  public void toOutputStream(OutputStream outputStream)
+      throws IOException {
+    JsonUtils.objectToOutputStream(toJsonNode(), outputStream);
+  }
+
+  // ---- BrokerResponse methods -------------------------------------------------------------
+
+  @JsonIgnore
   @Nullable
   @Override
   public ResultTable getResultTable() {
@@ -110,8 +158,8 @@ public class LazyToEagerBrokerResponseAdaptor implements BrokerResponse {
 
   @Override
   public boolean isPartialResult() {
-    JsonNode partialResults = _json.get("partialResults");
-    return partialResults != null && partialResults.asBoolean();
+    JsonNode partialResult = _json.get("partialResult");
+    return partialResult != null && partialResult.asBoolean();
   }
 
   @Override

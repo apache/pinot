@@ -59,6 +59,9 @@ public interface StreamingBrokerResponse extends AutoCloseable {
   Metainfo getMetaInfo()
       throws IllegalStateException;
 
+  /// Fully consumes this response and materializes it as an eager [BrokerResponse].
+  ///
+  /// This response is **closed** by this call; it must not be used afterwards.
   default BrokerResponse asEagerBrokerResponse() {
     return LazyToEagerBrokerResponseAdaptor.of(this);
   }
