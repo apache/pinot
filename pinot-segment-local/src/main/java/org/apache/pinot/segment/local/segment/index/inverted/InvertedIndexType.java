@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.inverted;
 
 import com.google.common.base.Preconditions;
@@ -40,6 +39,7 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
@@ -87,6 +87,19 @@ public class InvertedIndexType
           "Cannot create inverted index on column: %s without dictionary", column);
       Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
           "Cannot create inverted index on MAP column: %s", column);
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both inverted index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -146,7 +159,7 @@ public class InvertedIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
+                                         Schema schema, TableConfig tableConfig) {
     return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -172,14 +185,14 @@ public class InvertedIndexType
 
     /**
      * Creates a {@link InvertedIndexReader}.
-     *
+     * <p>
      * Unless {@link #createSkippingForward(SegmentDirectory.Reader, ColumnMetadata)}, this method first try to use the
      * forward index reader in case it is also an inverted index. That is the case, for example, when the column is
      * sorted and single value.
      */
     @Override
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+                                                 FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
       if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.inverted())) {
         return null;
@@ -200,7 +213,7 @@ public class InvertedIndexType
 
     /**
      * Directly creates a {@link InvertedIndexReader}.
-     *
+     * <p>
      * Unless {@link #createIndexReader}, this method always tries to create the actual inverted index reader instead of
      * try to use the forward index when the column is sorted and single value.
      */

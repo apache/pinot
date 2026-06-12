@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -110,11 +109,22 @@ public class DictionaryIndexType
   @Override
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
     DictionaryIndexConfig dictionaryConfig = indexConfigs.getConfig(StandardIndexes.dictionary());
-    if (dictionaryConfig.isEnabled() && dictionaryConfig.isUseVarLengthDictionary()) {
-      DataType storedType = fieldSpec.getDataType().getStoredType();
-      Preconditions.checkState(!storedType.isFixedWidth(),
-          "Cannot create var-length dictionary on column: %s of fixed-width stored type: %s", fieldSpec.getName(),
-          storedType);
+    if (dictionaryConfig.isEnabled()) {
+      if (dictionaryConfig.isUseVarLengthDictionary()) {
+        DataType storedType = fieldSpec.getDataType().getStoredType();
+        Preconditions.checkState(!storedType.isFixedWidth(),
+            "Cannot create var-length dictionary on column: %s of fixed-width stored type: %s", fieldSpec.getName(),
+            storedType);
+      }
+      for (IndexType indexType : List.of(
+          StandardIndexes.vector(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.h3())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both dictionary index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -299,8 +309,11 @@ public class DictionaryIndexType
    * @return true if dictionary should be created, false if noDictionary should be used
    */
   public static boolean ignoreDictionaryOverride(boolean optimizeDictionary, boolean optimizeDictionaryForMetrics,
-      double noDictionarySizeRatioThreshold, @Nullable Double noDictionaryCardinalityRatioThreshold,
-      FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality, int totalNumberOfEntries) {
+                                                 double noDictionarySizeRatioThreshold,
+                                                 @Nullable Double noDictionaryCardinalityRatioThreshold,
+                                                 FieldSpec fieldSpec,
+                                                 FieldIndexConfigs fieldIndexConfigs,
+                                                 int cardinality, int totalNumberOfEntries) {
     // For an inverted index dictionary is required
     if (fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
       return true;
@@ -331,7 +344,9 @@ public class DictionaryIndexType
    * Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
    */
   private static boolean ignoreDictionaryOverrideForSingleValueFields(int cardinality, int totalNumberOfEntries,
-      double noDictionarySizeRatioThreshold, Double noDictionaryCardinalityRatioThreshold, FieldSpec fieldSpec) {
+                                                                      double noDictionarySizeRatioThreshold,
+                                                                      Double noDictionaryCardinalityRatioThreshold,
+                                                                      FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       if (fieldSpec.getDataType().isFixedWidth()) {
         // if you can safely enable dictionary, you can ignore overrides
@@ -354,7 +369,8 @@ public class DictionaryIndexType
    * smaller than the threshold, we want to override to noDictionary.
    */
   private static boolean canSafelyCreateDictionaryWithinThreshold(int cardinality, int totalNumberOfEntries,
-      double noDictionarySizeRatioThreshold, FieldSpec spec) {
+                                                                  double noDictionarySizeRatioThreshold,
+                                                                  FieldSpec spec) {
     long dictionarySize = cardinality * (long) spec.getDataType().size();
     long forwardIndexSize =
         ((long) totalNumberOfEntries * PinotDataBitSet.getNumBitsPerValue(cardinality - 1)
@@ -388,7 +404,7 @@ public class DictionaryIndexType
   }
 
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-      DictionaryIndexConfig indexConfig, String internIdentifierStr)
+                                DictionaryIndexConfig indexConfig, String internIdentifierStr)
       throws IOException {
 
     DataType dataType = metadata.getDataType();
@@ -447,7 +463,7 @@ public class DictionaryIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
+                                         Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
   }
 
@@ -477,6 +493,7 @@ public class DictionaryIndexType
 
     private ReaderFactory() {
     }
+
     @Override
     protected IndexType<DictionaryIndexConfig, Dictionary, ?> getIndexType() {
       return StandardIndexes.dictionary();
@@ -484,14 +501,14 @@ public class DictionaryIndexType
 
     @Override
     protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-        DictionaryIndexConfig indexConfig)
+                                           DictionaryIndexConfig indexConfig)
         throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
     }
 
     @Override
     public Dictionary createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-        ColumnMetadata metadata) throws IOException, IndexReaderConstraintException {
+                                        ColumnMetadata metadata) throws IOException, IndexReaderConstraintException {
       String colName = metadata.getColumnName();
 
       if (!segmentReader.hasIndexFor(colName, StandardIndexes.dictionary())) {
@@ -572,12 +589,12 @@ public class DictionaryIndexType
 
   /**
    * Creates a MutableDictionary.
-   *
+   * <p>
    * Unlikes most indexes, while dictionaries are important when
    * {@link org.apache.pinot.segment.spi.MutableSegment mutable segments} are created, they do not follow the
    * {@link MutableIndex} interface and therefore
    * {@link DictionaryIndexType#createMutableIndex(MutableIndexContext, IndexConfig)} is not implemented.
-   *
+   * <p>
    * This also means that dictionaries cannot be overridden in realtime tables.
    */
   @Nullable

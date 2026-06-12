@@ -80,6 +80,19 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
           column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create IFST index on column: %s of stored type other than STRING", column);
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both IFST index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -122,7 +135,7 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+                                         @Nullable Schema schema, @Nullable TableConfig tableConfig) {
     return new IFSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -163,7 +176,7 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
 
     @Override
     protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-        FstIndexConfig indexConfig)
+                                                FstIndexConfig indexConfig)
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }

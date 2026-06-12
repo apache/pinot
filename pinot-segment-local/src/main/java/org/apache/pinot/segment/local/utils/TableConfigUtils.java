@@ -166,7 +166,7 @@ public final class TableConfigUtils {
    * 4. Indexing config
    * 5. Field Config List
    * 6. Instance pool and replica group, if enabled
-   *
+   * <p>
    * TODO: Add more validations for each section (e.g. validate conditions are met for aggregateMetrics)
    */
   public static void validate(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
@@ -186,7 +186,7 @@ public final class TableConfigUtils {
   }
 
   private static void validateEffectiveTableConfig(TableConfig tableConfig, Schema schema,
-      Set<ValidationType> skipTypes) {
+                                                   Set<ValidationType> skipTypes) {
     // Sanitize the table config before validation
     sanitize(tableConfig);
 
@@ -221,6 +221,7 @@ public final class TableConfigUtils {
 
   /**
    * Validates the table config is using instance pool and replica group configuration.
+   *
    * @param tableConfig Table config to validate
    * @return true if the table config is using instance pool and replica group configuration, false otherwise
    */
@@ -370,11 +371,11 @@ public final class TableConfigUtils {
    * - checks for non-null timeColumnName
    * - checks for valid field spec for timeColumnName in schema
    * - Validates retention config
-   *
+   * <p>
    * 2. For OFFLINE table
    * - checks for valid field spec for timeColumnName in schema, if timeColumnName and schema are non-null
    * - for Dimension tables checks the primary key requirement and incompatible segment assignment strategies
-   *
+   * <p>
    * 3. Checks peerDownloadSchema
    * 4. Checks time column existence if null handling for time column is enabled
    */
@@ -839,11 +840,11 @@ public final class TableConfigUtils {
 
   /**
    * Validates the upsert-related configurations
-   *  - check table type supports the configured mode
-   *  - the primary key exists on the schema
-   *  - strict replica-group is configured for routing type
-   *  - consumer type must be low-level
-   *  - comparison column exists
+   * - check table type supports the configured mode
+   * - the primary key exists on the schema
+   * - strict replica-group is configured for routing type
+   * - consumer type must be low-level
+   * - comparison column exists
    */
   @VisibleForTesting
   static void validateUpsertAndDedupConfig(TableConfig tableConfig, Schema schema) {
@@ -1063,7 +1064,7 @@ public final class TableConfigUtils {
   /**
    * Checks if a data type is valid for time-based comparison operations (upsert/dedup).
    * Valid types include numeric types and types with stored data as a numeric type:
-   *   e.g. TIMESTAMP which is stored as LONG internally.
+   * e.g. TIMESTAMP which is stored as LONG internally.
    *
    * @param dataType the data type to check
    * @return true if the data type can be used for time-based comparison, false otherwise
@@ -1269,12 +1270,12 @@ public final class TableConfigUtils {
 
   /**
    * Validates the partial upsert-related configurations:
-   *  - Null handling must be enabled
-   *  - Merger cannot be applied to private key columns
-   *  - Merger cannot be applied to non-existing columns
-   *  - INCREMENT merger must be applied to numeric columns
-   *  - APPEND/UNION merger cannot be applied to single-value columns
-   *  - INCREMENT merger cannot be applied to date time column
+   * - Null handling must be enabled
+   * - Merger cannot be applied to private key columns
+   * - Merger cannot be applied to non-existing columns
+   * - INCREMENT merger must be applied to numeric columns
+   * - APPEND/UNION merger cannot be applied to single-value columns
+   * - INCREMENT merger cannot be applied to date time column
    */
   @VisibleForTesting
   static void validatePartialUpsertStrategies(TableConfig tableConfig, Schema schema) {
@@ -1334,7 +1335,7 @@ public final class TableConfigUtils {
    * Validates backward compatibility for table config updates.
    * Checks critical upsert and dedup configuration fields that should not be changed.
    *
-   * @param newConfig the new table config being applied
+   * @param newConfig      the new table config being applied
    * @param existingConfig the existing table config
    * @return list of violations (empty if no violations)
    */
@@ -1355,12 +1356,12 @@ public final class TableConfigUtils {
    * <p>Partial-upsert strategy maps and the default partial-upsert strategy are intentionally
    * not validated here — they may be added, removed, or changed on existing tables.
    *
-   * @param newConfig the new table config being applied
+   * @param newConfig      the new table config being applied
    * @param existingConfig the existing table config
-   * @param violations list to collect violation messages
+   * @param violations     list to collect violation messages
    */
   private static void validateUpsertConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
-      List<String> violations) {
+                                                 List<String> violations) {
     boolean existingUpsertEnabled = existingConfig.isUpsertEnabled();
     boolean newUpsertEnabled = newConfig.isUpsertEnabled();
 
@@ -1387,25 +1388,25 @@ public final class TableConfigUtils {
       if (!Objects.equals(existingUpsertConfig.getComparisonColumns(), newUpsertConfig.getComparisonColumns())) {
         violations.add(
             String.format("upsertConfig.comparisonColumns (%s -> %s)", existingUpsertConfig.getComparisonColumns(),
-              newUpsertConfig.getComparisonColumns()));
+                newUpsertConfig.getComparisonColumns()));
       }
       List<String> existingComparisonColumns = existingUpsertConfig.getComparisonColumns();
       if (existingComparisonColumns == null || existingComparisonColumns.isEmpty()) {
         String existingTimeColumn =
             existingConfig.getValidationConfig() != null ? existingConfig.getValidationConfig().getTimeColumnName()
-              : null;
+                : null;
         String newTimeColumn =
             newConfig.getValidationConfig() != null ? newConfig.getValidationConfig().getTimeColumnName() : null;
         if (!Objects.equals(existingTimeColumn, newTimeColumn)) {
           violations.add(
               String.format("timeColumnName (%s -> %s) - used as default comparison column", existingTimeColumn,
-                newTimeColumn));
+                  newTimeColumn));
         }
       }
       if (existingUpsertConfig.isDropOutOfOrderRecord() != newUpsertConfig.isDropOutOfOrderRecord()) {
         violations.add(
             String.format("upsertConfig.dropOutOfOrderRecord (%s -> %s)", existingUpsertConfig.isDropOutOfOrderRecord(),
-              newUpsertConfig.isDropOutOfOrderRecord()));
+                newUpsertConfig.isDropOutOfOrderRecord()));
       }
       if (!Objects.equals(existingUpsertConfig.getOutOfOrderRecordColumn(),
           newUpsertConfig.getOutOfOrderRecordColumn())) {
@@ -1423,12 +1424,12 @@ public final class TableConfigUtils {
    * Validates that critical dedup configuration fields are not changed during table config update.
    * Checks: dedupEnabled, hashFunction, dedupTimeColumn, timeColumnName (when dedupTimeColumn not specified).
    *
-   * @param newConfig the new table config being applied
+   * @param newConfig      the new table config being applied
    * @param existingConfig the existing table config
-   * @param violations list to collect violation messages
+   * @param violations     list to collect violation messages
    */
   private static void validateDedupConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
-      List<String> violations) {
+                                                List<String> violations) {
     boolean existingDedupEnabled = existingConfig.isDedupEnabled();
     boolean newDedupEnabled = newConfig.isDedupEnabled();
     if (existingDedupEnabled != newDedupEnabled) {
@@ -1503,7 +1504,7 @@ public final class TableConfigUtils {
   }
 
   private static void validateMaterializedViewConfigUpdate(TableConfig newConfig, TableConfig existingConfig,
-      List<String> violations) {
+                                                           List<String> violations) {
     if (existingConfig.isMaterializedView() != newConfig.isMaterializedView()) {
       violations.add(String.format("isMaterializedView (%s -> %s) cannot be changed; drop and recreate the table",
           existingConfig.isMaterializedView(), newConfig.isMaterializedView()));
@@ -1674,6 +1675,15 @@ public final class TableConfigUtils {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null, "Failed to find sorted column: %s in schema", column);
         Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", column);
+        FieldIndexConfigs indexConfigsForSortedColumn = indexConfigsMap.get(column);
+        for (IndexType indexType : List.of(
+            StandardIndexes.bloomFilter(),
+            StandardIndexes.inverted(),
+            StandardIndexes.range())) {
+          Preconditions.checkState(indexConfigsForSortedColumn.getConfig(indexType).isDisabled(),
+              "Redundant to enable %s on a sorted column: %s",
+              indexType.getPrettyName(), fieldSpec.getName());
+        }
       }
     }
 
@@ -1725,7 +1735,7 @@ public final class TableConfigUtils {
   /// Validates compatibility across [IndexingConfig] and [FieldConfig]s, ensures that:
   /// - Columns with DICTIONARY encoding type in [FieldConfig]s are not defined as no-dictionary in [IndexingConfig]
   private static void validateIndexingConfigAndFieldConfigListCompatibility(IndexingConfig indexingConfig,
-      List<FieldConfig> fieldConfigs) {
+                                                                            List<FieldConfig> fieldConfigs) {
     Set<String> noDictionaryColumnsFromIndexingConfig = new HashSet<>();
     if (indexingConfig.getNoDictionaryColumns() != null) {
       noDictionaryColumnsFromIndexingConfig.addAll(indexingConfig.getNoDictionaryColumns());
@@ -1751,7 +1761,7 @@ public final class TableConfigUtils {
   /// - Either functionColumnPairs or aggregationConfigs must be specified, but not both
   /// - All referenced columns exist in the schema and are single-valued
   private static void validateStarTreeIndexConfigs(List<StarTreeIndexConfig> starTreeIndexConfigs,
-      Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
+                                                   Map<String, FieldIndexConfigs> indexConfigsMap, Schema schema) {
     Set<String> dimensionColumns = new HashSet<>();
     for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
       // Validate dimension columns are dictionary encoded
@@ -1933,7 +1943,7 @@ public final class TableConfigUtils {
    * Consistency checks across the offline and realtime counterparts of a hybrid table
    */
   public static void verifyHybridTableConfigs(String rawTableName, TableConfig offlineTableConfig,
-      TableConfig realtimeTableConfig) {
+                                              TableConfig realtimeTableConfig) {
     Preconditions.checkNotNull(offlineTableConfig,
         "Found null offline table config in hybrid table check for table: %s", rawTableName);
     Preconditions.checkNotNull(realtimeTableConfig,
@@ -2007,6 +2017,7 @@ public final class TableConfigUtils {
 
   /**
    * needsEmptySegmentPruner checks if EmptySegmentPruner is needed for a TableConfig.
+   *
    * @param tableConfig Input table config.
    */
   public static boolean needsEmptySegmentPruner(TableConfig tableConfig) {
@@ -2161,30 +2172,30 @@ public final class TableConfigUtils {
    * Helper method to create a new TableConfig by overwriting the original TableConfig with tier specific configs, so
    * that the consumers of TableConfig don't have to handle tier overwrites themselves. To begin with, we only
    * consider to overwrite the index configs in `tableIndexConfig` and `fieldConfigList`, e.g.
-   *
+   * <p>
    * {
-   *   "tableIndexConfig": {
-   *     ... // configs allowed in IndexingConfig, for default tier
-   *     "tierOverwrites": {
-   *       "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
-   *       "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
-   *     }
-   *   }
-   *   "fieldConfigList": [
-   *     {
-   *       ... // configs allowed in FieldConfig, for default tier
-   *       "tierOverwrites": {
-   *         "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
-   *         "coldTier": {...} // configs allowed in FieldConfig, for cold tier
-   *       }
-   *     },
-   *     ...
-   *   ]
+   * "tableIndexConfig": {
+   * ... // configs allowed in IndexingConfig, for default tier
+   * "tierOverwrites": {
+   * "hotTier": {...}, // configs allowed in IndexingConfig, for hot tier
+   * "coldTier": {...} // configs allowed in IndexingConfig, for cold tier
    * }
-   *
+   * }
+   * "fieldConfigList": [
+   * {
+   * ... // configs allowed in FieldConfig, for default tier
+   * "tierOverwrites": {
+   * "hotTier": {...}, // configs allowed in FieldConfig, for hot tier
+   * "coldTier": {...} // configs allowed in FieldConfig, for cold tier
+   * }
+   * },
+   * ...
+   * ]
+   * }
+   * <p>
    * Overwriting is to extract tier specific configs from those `tierOverwrites` sections and replace the
    * corresponding configs set for default tier.
-   *
+   * <p>
    * TODO: Other tier specific configs like segment assignment policy may be handled in this helper method too, to
    *       keep tier overwrites transparent to consumers of TableConfig.
    *
@@ -2296,8 +2307,8 @@ public final class TableConfigUtils {
   private static boolean hasConsumingSegmentTierOverwriteForRealtimeTable(TableConfig tableConfig) {
     if (tableConfig.getTableType() != TableType.REALTIME
         || (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
-            && tableConfig.getTierConfigsList().stream()
-                .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
+        && tableConfig.getTierConfigsList().stream()
+        .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
       return false;
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -2328,7 +2339,7 @@ public final class TableConfigUtils {
   /// The original [IndexLoadingConfig] is left untouched so the commit path and immutable segment load path continue to
   /// use the persisted table config and real segment tier.
   public static IndexLoadingConfig buildConsumingSegmentIndexLoadingConfig(TableConfig tableConfig, Schema schema,
-      IndexLoadingConfig indexLoadingConfig) {
+                                                                           IndexLoadingConfig indexLoadingConfig) {
     if (!hasConsumingSegmentTierOverwriteForRealtimeTable(tableConfig)) {
       return indexLoadingConfig;
     }
@@ -2343,6 +2354,7 @@ public final class TableConfigUtils {
 
   /**
    * Get the partition column from tableConfig instance assignment config map.
+   *
    * @param tableConfig table config
    * @return partition column
    */

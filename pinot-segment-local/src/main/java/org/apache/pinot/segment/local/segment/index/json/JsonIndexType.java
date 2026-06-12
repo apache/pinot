@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.json;
 
 import com.google.common.base.Preconditions;
@@ -85,6 +84,22 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
       DataType storedType = fieldSpec.getDataType().getStoredType();
       Preconditions.checkState(storedType == DataType.STRING || storedType == DataType.MAP,
           "Cannot create JSON index on column: %s of stored type other than STRING or MAP", column);
+      Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create JSON index on multi-value column: %s",
+          column);
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.dictionary(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both json index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -117,7 +132,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
         context.getTableNameWithType(), context.isContinueOnError(), indexConfig)
         : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-            context.getTableNameWithType(), context.isContinueOnError(), indexConfig);
+        context.getTableNameWithType(), context.isContinueOnError(), indexConfig);
   }
 
   @Override
@@ -137,7 +152,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
+                                         Schema schema, TableConfig tableConfig) {
     return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -166,7 +181,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
     @Override
     protected JsonIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-        JsonIndexConfig indexConfig)
+                                                JsonIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return createIndexReader(dataBuffer, metadata);
     }

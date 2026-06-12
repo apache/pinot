@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.google.common.base.Preconditions;
@@ -84,6 +83,19 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
           column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
           "Cannot create FST index on column: %s of stored type other than STRING", column);
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.range(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both FST index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -126,7 +138,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
+                                         Schema schema, TableConfig tableConfig) {
     return new FSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -171,7 +183,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
     @Override
     protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-        FstIndexConfig indexConfig)
+                                                FstIndexConfig indexConfig)
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }

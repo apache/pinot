@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.range;
 
 import com.google.common.base.Preconditions;
@@ -97,6 +96,19 @@ public class RangeIndexType
           "Cannot create range index version %s on column: %s with RAW forward index and dictionary; "
               + "use BitSliced range index version %s instead",
           RangeIndexCreator.VERSION, column, BitSlicedRangeIndexCreator.VERSION);
+      for (IndexType indexType : List.of(
+          StandardIndexes.bloomFilter(),
+          StandardIndexes.inverted(),
+          StandardIndexes.vector(),
+          StandardIndexes.json(),
+          StandardIndexes.text(),
+          StandardIndexes.fst(),
+          StandardIndexes.h3(),
+          StandardIndexes.ifst())) {
+        Preconditions.checkState(indexConfigs.getConfig(indexType).isDisabled(),
+            "Anti pattern to enable both range index and %s on column: %s",
+            indexType.getPrettyName(), fieldSpec.getName());
+      }
     }
   }
 
@@ -135,7 +147,7 @@ public class RangeIndexType
 
   @Override
   public CombinedInvertedIndexCreator createIndexCreator(IndexCreationContext context,
-      RangeIndexConfig rangeIndexConfig)
+                                                         RangeIndexConfig rangeIndexConfig)
       throws IOException {
     FieldSpec fieldSpec = context.getFieldSpec();
     if (rangeIndexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION && fieldSpec.isSingleValueField()) {
@@ -168,7 +180,7 @@ public class RangeIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
+                                         Schema schema, TableConfig tableConfig) {
     return new RangeIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -199,7 +211,7 @@ public class RangeIndexType
 
     @Override
     protected RangeIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-        RangeIndexConfig indexConfig)
+                                                 RangeIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return read(dataBuffer, metadata);
     }

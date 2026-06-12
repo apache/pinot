@@ -1437,7 +1437,6 @@ public class TableConfigUtilsTest {
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(List.of("myCol2"))
         .setInvertedIndexColumns(List.of("myCol1"))
-        .setSortedColumn("myCol1")
         .build();
     try {
       // Enable forward index disabled flag for a column with inverted index and is sorted
@@ -1449,6 +1448,7 @@ public class TableConfigUtilsTest {
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
+      e.printStackTrace();
       fail("Should not fail for myCol1 with forward index disabled but is sorted, this is a no-op");
     }
 
