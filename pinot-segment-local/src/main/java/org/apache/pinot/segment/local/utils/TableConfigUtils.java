@@ -180,8 +180,8 @@ public final class TableConfigUtils {
       TableConfig consumingTableConfig = overwriteTableConfigForConsumingSegmentTier(tableConfig);
       validateEffectiveTableConfig(consumingTableConfig, schema, skipTypes);
     } catch (RuntimeException e) {
-      throw new IllegalStateException(
-          "tierOverwrites.consuming produces an invalid table config: " + e.getMessage(), e);
+      throw new IllegalStateException("tierOverwrites.consuming produces an invalid table config: " + e.getMessage(),
+          e);
     }
   }
 
@@ -426,8 +426,8 @@ public final class TableConfigUtils {
         return;
       }
       String segmentAssignmentStrategy = segmentAssignmentConfig.getAssignmentStrategy();
-      if (segmentAssignmentStrategy != null
-          && !segmentAssignmentStrategy.equalsIgnoreCase(AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
+      if (segmentAssignmentStrategy != null && !segmentAssignmentStrategy.equalsIgnoreCase(
+          AssignmentStrategy.DIM_TABLE_SEGMENT_ASSIGNMENT_STRATEGY)) {
         throw new IllegalStateException(
             String.format("Dimension table: %s can only use '%s' segment assignment strategy, found: %s",
                 tableConfig.getTableName(),
@@ -672,8 +672,8 @@ public final class TableConfigUtils {
           // Skip Groovy expressions when Groovy is disabled: do not compile them just to collect arguments (the main
           // loop below rejects Groovy without compiling). Such a config is rejected anyway, so these columns are not
           // needed as valid intermediate targets.
-          if (transformFunction != null
-              && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction))) {
+          if (transformFunction != null && !(_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(
+              transformFunction))) {
             try {
               transformInputColumns.addAll(
                   FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction).getArguments());
@@ -693,12 +693,10 @@ public final class TableConfigUtils {
           if (!transformColumns.add(columnName)) {
             throw new IllegalStateException("Duplicate transform config found for column '" + columnName + "'");
           }
-          Preconditions.checkState(
-              schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName)
-                  || transformInputColumns.contains(columnName),
-              "The destination column '" + columnName
-                  + "' of the transform function must be present in the schema, be consumed as the input of another "
-                  + "transform function, or be a source column for aggregations");
+          Preconditions.checkState(schema.hasColumn(columnName) || aggregationSourceColumns.contains(columnName)
+              || transformInputColumns.contains(columnName), "The destination column '" + columnName
+              + "' of the transform function must be present in the schema, be consumed as the input of another "
+              + "transform function, or be a source column for aggregations");
           FunctionEvaluator expressionEvaluator;
           if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
@@ -901,12 +899,12 @@ public final class TableConfigUtils {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (PinotMd5Mode.isPinotMd5Disabled()) {
       if (isUpsertEnabled && upsertConfig != null && upsertConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Upsert hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+        throw new IllegalStateException(String.format("Upsert hash function MD5 is disabled via '%s=true'",
+            CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
       }
       if (isDedupEnabled && dedupConfig.getHashFunction() == HashFunction.MD5) {
-        throw new IllegalStateException(String.format(
-            "Dedup hash function MD5 is disabled via '%s=true'", CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
+        throw new IllegalStateException(String.format("Dedup hash function MD5 is disabled via '%s=true'",
+            CommonConstants.CONFIG_OF_PINOT_MD5_DISABLED));
       }
     }
     if (upsertConfig != null) {
@@ -977,8 +975,7 @@ public final class TableConfigUtils {
       }
 
       // Validate post-partial-upsert transform configs
-      List<TransformConfig> postPartialUpsertTransformConfigs =
-          upsertConfig.getPostPartialUpsertTransformConfigs();
+      List<TransformConfig> postPartialUpsertTransformConfigs = upsertConfig.getPostPartialUpsertTransformConfigs();
       if (postPartialUpsertTransformConfigs != null) {
         Preconditions.checkState(upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL,
             "postPartialUpsertTransformConfigs can only be configured for PARTIAL upsert tables");
@@ -989,8 +986,7 @@ public final class TableConfigUtils {
           String transformFunction = transformConfig.getTransformFunction();
           if (columnName == null || transformFunction == null) {
             throw new IllegalStateException(
-                "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs "
-                    + transformConfig);
+                "columnName/transformFunction cannot be null in postPartialUpsertTransformConfigs " + transformConfig);
           }
           Preconditions.checkState(!primaryKeyColumns.contains(columnName),
               "Post-partial-upsert transform cannot target primary key column '%s'", columnName);
@@ -1009,24 +1005,22 @@ public final class TableConfigUtils {
                   + "schema", columnName);
           if (_disableGroovy && FunctionEvaluatorFactory.isGroovyExpression(transformFunction)) {
             throw new IllegalStateException(
-                "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '"
-                    + columnName + "' in postPartialUpsertTransformConfigs");
+                "Groovy transform functions are disabled. Found '" + transformFunction + "' for column '" + columnName
+                    + "' in postPartialUpsertTransformConfigs");
           }
           try {
-            FunctionEvaluator expressionEvaluator =
-                FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
+            FunctionEvaluator expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
             List<String> arguments = expressionEvaluator.getArguments();
             if (arguments.contains(columnName)) {
-              throw new IllegalStateException(
-                  "Arguments of a post-partial-upsert transform function '" + arguments
-                      + "' cannot contain the destination column '" + columnName + "'");
+              throw new IllegalStateException("Arguments of a post-partial-upsert transform function '" + arguments
+                  + "' cannot contain the destination column '" + columnName + "'");
             }
           } catch (IllegalStateException e) {
             throw e;
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '"
-                    + columnName + "'", e);
+                "Invalid post-partial-upsert transform function '" + transformFunction + "' for column '" + columnName
+                    + "'", e);
           }
         }
       }
@@ -1090,16 +1084,16 @@ public final class TableConfigUtils {
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
-          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
-          comparisonColumn, comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     } else {
       String comparisonColumn = tableConfig.getValidationConfig().getTimeColumnName();
       Preconditions.checkState(comparisonColumn != null,
           "MetadataTTL / DeletedKeysTTL requires either a comparison column or a time column to be configured");
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(isValidTimeComparisonType(comparisonColumnDataType),
-          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s",
-          comparisonColumn, comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have time column: %s in numeric type, found: %s", comparisonColumn,
+          comparisonColumnDataType);
     }
 
     if (upsertConfig.getMetadataTTL() > 0) {
@@ -1134,8 +1128,7 @@ public final class TableConfigUtils {
       String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
       DataType timeColumnDataType = schema.getFieldSpecFor(timeColumn).getDataType();
       Preconditions.checkState(isValidTimeComparisonType(timeColumnDataType),
-          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn,
-          timeColumnDataType);
+          "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
     }
     if (tableConfig.getTierConfigsList() != null) {
       validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
@@ -1226,8 +1219,8 @@ public final class TableConfigUtils {
     if (tableConfig.getInstanceAssignmentConfigMap() == null) {
       return;
     }
-    for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
-        : tableConfig.getInstanceAssignmentConfigMap()
+    for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry :
+        tableConfig.getInstanceAssignmentConfigMap()
         .entrySet()) {
       String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
       InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
@@ -1414,8 +1407,9 @@ public final class TableConfigUtils {
             existingUpsertConfig.getOutOfOrderRecordColumn(), newUpsertConfig.getOutOfOrderRecordColumn()));
       }
       if (!Objects.equals(existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn())) {
-        violations.add(String.format("upsertConfig.deleteRecordColumn (%s -> %s)",
-            existingUpsertConfig.getDeleteRecordColumn(), newUpsertConfig.getDeleteRecordColumn()));
+        violations.add(
+            String.format("upsertConfig.deleteRecordColumn (%s -> %s)", existingUpsertConfig.getDeleteRecordColumn(),
+                newUpsertConfig.getDeleteRecordColumn()));
       }
     }
   }
@@ -1492,14 +1486,13 @@ public final class TableConfigUtils {
     if (hasMvTaskWithDefinedSql && !isMaterializedView) {
       throw new IllegalStateException(String.format(
           "MaterializedViewTask is configured but isMaterializedView is not true for table: %s. "
-              + "Set \"isMaterializedView\": true or remove MaterializedViewTask.",
-          tableConfig.getTableName()));
+              + "Set \"isMaterializedView\": true or remove MaterializedViewTask.", tableConfig.getTableName()));
     }
 
     if (hasMvTask && !hasMvTaskWithDefinedSql) {
-      throw new IllegalStateException(String.format(
-          "MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
-          tableConfig.getTableName()));
+      throw new IllegalStateException(
+          String.format("MaterializedViewTask is configured but definedSQL is missing or empty for table: %s",
+              tableConfig.getTableName()));
     }
   }
 
@@ -1547,20 +1540,20 @@ public final class TableConfigUtils {
     Map<String, Map<String, String>> taskTypeConfigsMap = taskConfig.getTaskTypeConfigsMap();
 
     String minNumSegmentsPerTaskKey = "minNumSegmentsPerTask";
-    if (taskTypeConfigsMap.containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)
-        && taskTypeConfigsMap.containsKey(UPSERT_COMPACTION_TASK_TYPE)) {
+    if (taskTypeConfigsMap.containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE) && taskTypeConfigsMap.containsKey(
+        UPSERT_COMPACTION_TASK_TYPE)) {
 
       Map<String, String> upsertCompactMergeConfig = taskTypeConfigsMap.get(UPSERT_COMPACT_MERGE_TASK_TYPE);
 
       if (upsertCompactMergeConfig != null) {
-        long minNumSegments = Long.parseLong(
-            upsertCompactMergeConfig.getOrDefault(minNumSegmentsPerTaskKey, String.valueOf(2)));
+        long minNumSegments =
+            Long.parseLong(upsertCompactMergeConfig.getOrDefault(minNumSegmentsPerTaskKey, String.valueOf(2)));
 
         Preconditions.checkState(minNumSegments > 1, String.format(
             "When %s.%s is set to 1, %s should not be configured to avoid indeterministic behavior. "
-                + "Please remove %s configuration or set %s to a value greater than 1.",
-            UPSERT_COMPACT_MERGE_TASK_TYPE, minNumSegmentsPerTaskKey, UPSERT_COMPACTION_TASK_TYPE,
-            UPSERT_COMPACTION_TASK_TYPE, minNumSegmentsPerTaskKey));
+                + "Please remove %s configuration or set %s to a value greater than 1.", UPSERT_COMPACT_MERGE_TASK_TYPE,
+            minNumSegmentsPerTaskKey, UPSERT_COMPACTION_TASK_TYPE, UPSERT_COMPACTION_TASK_TYPE,
+            minNumSegmentsPerTaskKey));
       }
     }
   }
@@ -1676,13 +1669,10 @@ public final class TableConfigUtils {
         Preconditions.checkState(fieldSpec != null, "Failed to find sorted column: %s in schema", column);
         Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot sort on multi-value column: %s", column);
         FieldIndexConfigs indexConfigsForSortedColumn = indexConfigsMap.get(column);
-        for (IndexType indexType : List.of(
-            StandardIndexes.bloomFilter(),
-            StandardIndexes.inverted(),
+        for (IndexType indexType : List.of(StandardIndexes.bloomFilter(), StandardIndexes.inverted(),
             StandardIndexes.range())) {
           Preconditions.checkState(indexConfigsForSortedColumn.getConfig(indexType).isDisabled(),
-              "Redundant to enable %s on a sorted column: %s",
-              indexType.getPrettyName(), fieldSpec.getName());
+              "Redundant to enable %s on a sorted column: %s", indexType.getPrettyName(), fieldSpec.getName());
         }
       }
     }
@@ -1817,8 +1807,9 @@ public final class TableConfigUtils {
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
             aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
-            throw new IllegalStateException("Non-COUNT function set the column as '*' in the functionColumnPair: "
-                + functionColumnPair + ". Please configure an actual column for the function");
+            throw new IllegalStateException(
+                "Non-COUNT function set the column as '*' in the functionColumnPair: " + functionColumnPair
+                    + ". Please configure an actual column for the function");
           }
         }
       }
@@ -1846,9 +1837,10 @@ public final class TableConfigUtils {
           if (!column.equals(AggregationFunctionColumnPair.STAR)) {
             aggregatedColumns.add(column);
           } else if (columnPair.getFunctionType() != AggregationFunctionType.COUNT) {
-            throw new IllegalStateException("Non-COUNT function set the column as '*' in the aggregationConfig for "
-                + "function: " + aggregationConfig.getAggregationFunction()
-                + ". Please configure an actual column for the function");
+            throw new IllegalStateException(
+                "Non-COUNT function set the column as '*' in the aggregationConfig for " + "function: "
+                    + aggregationConfig.getAggregationFunction()
+                    + ". Please configure an actual column for the function");
           }
         }
       }
@@ -2210,8 +2202,7 @@ public final class TableConfigUtils {
     try {
       IndexingConfig effectiveIndexing = applyIndexingConfigTierOverride(tableConfig.getIndexingConfig(), tier);
       List<FieldConfig> effectiveFields = applyFieldConfigListTierOverrides(tableConfig.getFieldConfigList(), tier);
-      if (effectiveIndexing == tableConfig.getIndexingConfig()
-          && effectiveFields == tableConfig.getFieldConfigList()) {
+      if (effectiveIndexing == tableConfig.getIndexingConfig() && effectiveFields == tableConfig.getFieldConfigList()) {
         return tableConfig;
       }
       TableConfig overwritten = new TableConfig(tableConfig);
@@ -2229,8 +2220,8 @@ public final class TableConfigUtils {
     if (indexingConfig != null) {
       JsonNode tierOverwrite = getTierOverwrite(indexingConfig.getTierOverwrites(), CONSUMING_SEGMENT_TIER);
       if (tierOverwrite != null) {
-        Preconditions.checkState(tierOverwrite.isObject(),
-            "tableIndexConfig.tierOverwrites.%s must be a JSON object", CONSUMING_SEGMENT_TIER);
+        Preconditions.checkState(tierOverwrite.isObject(), "tableIndexConfig.tierOverwrites.%s must be a JSON object",
+            CONSUMING_SEGMENT_TIER);
       }
     }
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
@@ -2305,10 +2296,10 @@ public final class TableConfigUtils {
   }
 
   private static boolean hasConsumingSegmentTierOverwriteForRealtimeTable(TableConfig tableConfig) {
-    if (tableConfig.getTableType() != TableType.REALTIME
-        || (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList())
-        && tableConfig.getTierConfigsList().stream()
-        .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
+    if (tableConfig.getTableType() != TableType.REALTIME || (
+        CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && tableConfig.getTierConfigsList()
+            .stream()
+            .anyMatch(tierConfig -> CONSUMING_SEGMENT_TIER.equals(tierConfig.getName())))) {
       return false;
     }
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
