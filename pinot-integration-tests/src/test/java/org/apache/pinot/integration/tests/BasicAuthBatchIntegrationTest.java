@@ -24,12 +24,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -185,6 +194,58 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
     } catch (IOException e) {
       HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
       Assert.assertEquals(httpErrorStatusException.getStatusCode(), 403, "must return 403");
+    }
+  }
+
+  /**
+   * Verifies that the controller's segment fetcher auth token ({@code pinot.controller.segment.fetcher.auth.token})
+   * is correctly used when the controller fetches a segment via URI.
+   *
+   * <p>The controller's {@code SegmentFetcherFactory} is initialized with this token at startup.
+   * When a segment is uploaded via a download URI pointing to an auth-protected endpoint (such as
+   * the controller's own segment download endpoint), the fetcher must present the configured token
+   * or the fetch will fail with HTTP 401.
+   *
+   * <p>If the config key were wrong (e.g. the old {@code controller.segment.fetcher.auth.token}
+   * without the {@code pinot.} prefix), the fetcher would initialize without credentials, the
+   * controller-to-controller download would return 401, and this test would fail.
+   */
+  @Test(dependsOnMethods = "testIngestionBatch")
+  public void testControllerSegmentFetcherUsesAuthToken()
+      throws Exception {
+    // List segments in the baseballStats_OFFLINE table (populated by testIngestionBatch).
+    // The response format is: [{"OFFLINE": ["seg1", "seg2"]}, ...]
+    JsonNode segmentSets = JsonUtils.stringToJsonNode(
+        sendGetRequest("http://localhost:" + getControllerPort() + "/segments/baseballStats_OFFLINE", AUTH_HEADER));
+    Assert.assertTrue(segmentSets.isArray() && segmentSets.size() > 0, "Expected at least one segment set");
+
+    // Extract any offline segment name
+    String segmentName = null;
+    for (JsonNode segmentSet : segmentSets) {
+      if (segmentSet.has("OFFLINE") && segmentSet.get("OFFLINE").size() > 0) {
+        segmentName = segmentSet.get("OFFLINE").get(0).asText();
+        break;
+      }
+    }
+    Assert.assertNotNull(segmentName, "Could not find any offline segment in baseballStats_OFFLINE");
+
+    // The segment download URL is auth-protected (BasicAuth is enabled on the controller).
+    // The controller will fetch from this URL using SegmentFetcherFactory, which must be
+    // initialized with pinot.controller.segment.fetcher.auth.token to pass credentials.
+    String segmentDownloadUrl =
+        "http://localhost:" + getControllerPort() + "/segments/baseballStats_OFFLINE/" + segmentName;
+
+    URI uploadUri = URI.create("http://localhost:" + getControllerPort() + "/v2/segments");
+    List<Header> authHeaders = Arrays.asList(new BasicHeader("Authorization", AUTH_TOKEN));
+    List<NameValuePair> params =
+        Arrays.asList(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, "baseballStats"));
+
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      int statusCode =
+          fileUploadDownloadClient.sendSegmentUri(uploadUri, segmentDownloadUrl, authHeaders, params,
+              HttpClient.DEFAULT_SOCKET_TIMEOUT_MS).getStatusCode();
+      Assert.assertEquals(statusCode, 200,
+          "Controller should successfully fetch segment from auth-protected URI using configured auth token");
     }
   }
 }
