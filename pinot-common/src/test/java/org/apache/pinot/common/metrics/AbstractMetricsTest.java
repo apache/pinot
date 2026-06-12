@@ -416,4 +416,72 @@ public abstract class AbstractMetricsTest {
     Assert.assertEquals(
         getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName() + "." + table), 10);
   }
+
+  @Test
+  public void testTableTenantRegistration() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
+    PinotMetricUtils.init(config);
+    ServerMetrics serverMetrics = new ServerMetrics(buildRegistry());
+    MetricsInspector inspector = createInspector(serverMetrics.getMetricsRegistry());
+    String tableNameWithType = "myTable_REALTIME";
+    String tenantName = "analytics";
+
+    // Without tenant registered, metric name uses plain table name
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERIES, 1);
+    PinotMetricName metricWithoutTenant = inspector.lastMetric();
+    Assert.assertTrue(metricWithoutTenant.toString().contains(tableNameWithType));
+    Assert.assertFalse(metricWithoutTenant.toString().contains("tenant"));
+
+    // Register tenant
+    serverMetrics.registerTableTenant(tableNameWithType, tenantName);
+
+    // With tenant registered, metric name includes tenant segment
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERIES, 1);
+    PinotMetricName metricWithTenant = inspector.lastMetric();
+    Assert.assertTrue(metricWithTenant.toString().contains(tableNameWithType + ".tenant." + tenantName));
+
+    // Unregister tenant
+    serverMetrics.unregisterTableTenant(tableNameWithType);
+
+    // After unregister, metric name no longer includes tenant
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERIES_KILLED, 1);
+    PinotMetricName metricAfterUnregister = inspector.lastMetric();
+    Assert.assertFalse(metricAfterUnregister.toString().contains("tenant"));
+  }
+
+  @Test
+  public void testTableTenantRegistrationWithNullOrEmpty() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
+    PinotMetricUtils.init(config);
+    ServerMetrics serverMetrics = new ServerMetrics(buildRegistry());
+
+    // null tenant should not throw or register
+    serverMetrics.registerTableTenant("myTable_OFFLINE", null);
+    serverMetrics.registerTableTenant("myTable_OFFLINE", "");
+    serverMetrics.registerTableTenant(null, "tenant1");
+
+    // unregister null should not throw
+    serverMetrics.unregisterTableTenant(null);
+  }
+
+  @Test
+  public void testTableTenantGaugeMetrics() {
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, metricsFactoryClassName());
+    PinotMetricUtils.init(config);
+    ServerMetrics serverMetrics = new ServerMetrics(buildRegistry());
+    String tableNameWithType = "events_OFFLINE";
+    String tenantName = "platformTenant";
+
+    serverMetrics.registerTableTenant(tableNameWithType, tenantName);
+
+    serverMetrics.setOrUpdateTableGauge(tableNameWithType, ServerGauge.SEGMENT_COUNT, 42L);
+    String expectedGaugeName =
+        ServerGauge.SEGMENT_COUNT.getGaugeName() + "." + tableNameWithType + ".tenant." + tenantName;
+    Long gaugeValue = serverMetrics.getGaugeValue(expectedGaugeName);
+    Assert.assertNotNull(gaugeValue);
+    Assert.assertEquals(gaugeValue.longValue(), 42L);
+  }
 }

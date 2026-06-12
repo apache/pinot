@@ -234,6 +234,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .build();
     updateCachedTableConfigAndSchema(tableConfig, schema);
 
+    String serverTenant = tableConfig.getTenantConfig().getServer();
+    _serverMetrics.registerTableTenant(_tableNameWithType, serverTenant);
+
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
       _peerDownloadScheme = instanceDataManagerConfig.getSegmentPeerDownloadScheme();
@@ -306,6 +309,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     _logger.info("Shutting down table data manager");
     _shutDown = true;
+    _serverMetrics.unregisterTableTenant(_tableNameWithType);
     doShutdown();
     _logger.info("Shut down table data manager");
   }
@@ -434,6 +438,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
     updateCachedTableConfigAndSchema(tableConfig, schema);
+    _serverMetrics.registerTableTenant(_tableNameWithType, tableConfig.getTenantConfig().getServer());
     return indexLoadingConfig;
   }
 

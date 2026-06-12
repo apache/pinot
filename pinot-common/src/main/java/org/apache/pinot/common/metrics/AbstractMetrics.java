@@ -68,6 +68,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   // Table level metrics are still emitted for allowed tables even if emitting table level metrics is disabled
   private final Set<String> _allowedTables;
 
+  // Maps tableNameWithType (or raw table name) to the tenant name for that table.
+  // When populated, table-scoped metrics include a ".tenant.{tenantName}" suffix so the
+  // Prometheus JMX exporter can extract it as a label.
+  private final Map<String, String> _tableTenantMap = new ConcurrentHashMap<>();
+
   public AbstractMetrics(String metricPrefix, PinotMetricsRegistry metricsRegistry, Class clazz) {
     this(metricPrefix, metricsRegistry, clazz, true, Collections.emptySet());
   }
@@ -824,6 +829,43 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract G[] getGauges();
 
   protected String getTableName(String tableName) {
-    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+    if (!_isTableLevelMetricsEnabled && !_allowedTables.contains(tableName)) {
+      return "allTables";
+    }
+    String tenant = _tableTenantMap.get(tableName);
+    if (tenant != null) {
+      return tableName + ".tenant." + tenant;
+    }
+    return tableName;
+  }
+
+  /**
+   * Registers a tenant mapping for a table so that table-scoped metrics include
+   * the tenant as an additional label dimension in Prometheus.
+   *
+   * @param tableNameWithType the table name (with or without type suffix)
+   * @param tenantName the tenant name from the table's TenantConfig
+   */
+  public void registerTableTenant(String tableNameWithType, String tenantName) {
+    if (tableNameWithType != null && tenantName != null && !tenantName.isEmpty()) {
+      _tableTenantMap.put(tableNameWithType, sanitizeTenantName(tenantName));
+    }
+  }
+
+  private static String sanitizeTenantName(String tenantName) {
+    // Replace non-word characters with underscore to ensure the tenant name is safe for
+    // JMX metric names and can be matched by \\w+ in Prometheus exporter regex patterns.
+    return tenantName.replaceAll("\\W+", "_");
+  }
+
+  /**
+   * Removes the tenant mapping for a table (e.g. when a table is dropped).
+   *
+   * @param tableNameWithType the table name (with or without type suffix)
+   */
+  public void unregisterTableTenant(String tableNameWithType) {
+    if (tableNameWithType != null) {
+      _tableTenantMap.remove(tableNameWithType);
+    }
   }
 }

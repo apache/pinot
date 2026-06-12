@@ -719,6 +719,8 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
       TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
+      _brokerMetrics.registerTableTenant(tableNameWithType, tableConfig.getTenantConfig().getBroker());
+
       String idealStatePath = getIdealStatePath(tableNameWithType);
       IdealState idealState = getIdealState(idealStatePath);
       Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
@@ -970,6 +972,7 @@ public abstract class BaseBrokerRoutingManager implements RoutingManager, Cluste
 
       if (_routingEntryMap.remove(tableNameWithType) != null) {
         LOGGER.info("Removed routing for table: {}", tableNameWithType);
+        _brokerMetrics.unregisterTableTenant(tableNameWithType);
 
         // Remove time boundary manager for the offline part routing if the removed routing is the real-time part of a
         // hybrid table

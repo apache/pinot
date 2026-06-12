@@ -1,4 +1,35 @@
 rules:
+# === Tenant-aware rules (must precede non-tenant rules to match first) ===
+# Gauges that accept tableNameWithType + tenant
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.tenant\\.(\\w+)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$8"
+  cache: true
+  labels:
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+    tenant: "$7"
+# Gauges that accept tableNameWithType + partitionId + tenant
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.tenant\\.(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_$1_$8"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    tenant: "$6"
+    partition: "$7"
+# Meters/timers that accept tableNameWithType + tenant
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.tenant\\.(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_$6_$7"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+    tenant: "$5"
+# === End tenant-aware rules ===
+
 # Gauges that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
   name: "pinot_$1_$2_$7"
@@ -66,6 +97,14 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
+# Meters/timers that accept rawTableName + tenant
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.server\\.((\\w+)\\.)?(\\w+)\\.tenant\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_server_$5_$6"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tenant: "$4"
 # Meters/timers that accept rawTableName
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.server\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_server_$4_$5"
