@@ -211,10 +211,10 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      StreamingBrokerResponse brokerResponse = onQueryFinished(
+      StreamingBrokerResponse streamingResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
-              getCursor, numRows));
-      asyncResponse.resume(streamResponse(brokerResponse, httpHeaders));
+              getCursor, numRows);
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -282,9 +282,9 @@ public class PinotClientRequest {
     try {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
-      StreamingBrokerResponse brokerResponse = onQueryFinished(
-          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true));
-      asyncResponse.resume(streamResponse(brokerResponse, httpHeaders));
+      StreamingBrokerResponse streamingResponse =
+          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -317,10 +317,10 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-      StreamingBrokerResponse brokerResponse = onQueryFinished(
+      StreamingBrokerResponse streamingResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
-              getCursor, numRows));
-      asyncResponse.resume(streamResponse(brokerResponse, httpHeaders));
+              getCursor, numRows);
+      respond(asyncResponse, streamingResponse, httpHeaders);
     } catch (WebApplicationException wae) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WEB_APPLICATION_EXCEPTIONS, 1L);
       asyncResponse.resume(wae);
@@ -702,6 +702,13 @@ public class PinotClientRequest {
    * If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
    * otherwise, the first error code of the broker response exception array will become the header value.
    *
+   * By default, returns HTTP 200 OK even for errors. If the request header
+   * 'Pinot-Use-Http-Status-For-Errors' is set to 'true', returns appropriate HTTP status
+   * codes based on the error type from QueryErrorCode.getHttpResponseStatus().
+   *
+   * Note: callers are responsible for emitting the RESPONSE_EXCEPTION_MARKER log line (via the
+   * consumption listener installed by onQueryFinished) before invoking this method.
+   *
    * @param brokerResponse The broker response containing query results or errors
    * @param httpHeaders The HTTP headers from the request
    * @return Response
@@ -723,16 +730,6 @@ public class PinotClientRequest {
         QueryErrorCode queryErrorCode = QueryErrorCode.fromErrorCode(queryErrorCodeHeaderValue);
         httpStatus = queryErrorCode.getHttpResponseStatus();
       }
-
-      // do log with the exception flagged with a particular marker for filtering
-      MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
-      StringBuilder sb = new StringBuilder();
-      sb.append("Query processing exceptions:");
-      for (QueryProcessingException exception : exceptions) {
-        sb.append(" ").append(exception.toString());
-      }
-      LOGGER.error(RESPONSE_EXCEPTION_MARKER, sb.toString());
-      MDC.remove("queryErrorCode");
     }
 
     // returning the Response with appropriate status and header value.
@@ -838,6 +835,8 @@ public class PinotClientRequest {
   private void respond(
       AsyncResponse asyncResponse, StreamingBrokerResponse streamingResponse, HttpHeaders httpHeaders
   ) throws Exception {
+    // Attach the consumption listener to all paths: emits error metrics and logs exceptions once per query.
+    StreamingBrokerResponse withListener = onQueryFinished(streamingResponse);
 
     boolean errorsAsHttpCode = Boolean.parseBoolean(httpHeaders.getHeaderString(
         CommonConstants.Broker.USE_HTTP_STATUS_FOR_ERRORS_HEADER));
@@ -846,21 +845,44 @@ public class PinotClientRequest {
       // We need to set the HTTP status code based on whether there are errors in the response.
       // Given the HTTP status code needs to be set before the response entity is written out, we need to
       // pre-scan the response for errors and therefore we cannot stream the response directly.
-      BrokerResponse eagerResponse = streamingResponse.asEagerBrokerResponse();
-      eagerResponse.emitBrokerResponseMetrics(_brokerMetrics);
+      // Consuming via asEagerBrokerResponse() fires the listener, which emits error metrics.
+      BrokerResponse eagerResponse = withListener.asEagerBrokerResponse();
       asyncResponse.resume(getPinotQueryResponse(eagerResponse, httpHeaders, _brokerMetrics));
     } else {
-      asyncResponse.resume(streamResponse(streamingResponse, httpHeaders));
+      // In default mode, set X-Pinot-Error-Code if the metainfo is already known (EarlyResponse or
+      // EagerToLazyBrokerResponseAdaptor). For truly streaming responses the header is omitted because
+      // HTTP response headers must be committed before the body, so the error code is unavailable
+      // until after the stream is consumed.
+      int errorCodeHeaderValue = -1;
+      boolean headerKnown = false;
+      try {
+        StreamingBrokerResponse.Metainfo preMetainfo = withListener.getMetaInfo();
+        QueryErrorCode errorCode = preMetainfo.getErrorCode();
+        errorCodeHeaderValue = errorCode != null ? errorCode.getId() : -1;
+        headerKnown = true;
+      } catch (IllegalStateException ignored) {
+        // Truly streaming response: metainfo not yet known; omit the header.
+      }
+      Response.ResponseBuilder builder = Response.ok()
+          .type(MediaType.APPLICATION_JSON)
+          .entity(streamResponse(withListener));
+      if (headerKnown) {
+        builder.header(PINOT_QUERY_ERROR_CODE_HEADER, errorCodeHeaderValue);
+      }
+      asyncResponse.resume(builder.build());
     }
   }
 
-  private StreamingOutput streamResponse(StreamingBrokerResponse streamingResponse, HttpHeaders httpHeaders) {
+  private StreamingOutput streamResponse(StreamingBrokerResponse streamingResponse) {
     return (outputStream) -> {
       try {
-        _mapper.writeValue(outputStream, streamingResponse);
-        streamingResponse.getMetaInfo().emitBrokerResponseMetrics(_brokerMetrics);
+        CountingOutputStream countingOutputStream = new CountingOutputStream(outputStream);
+        _mapper.writeValue(countingOutputStream, streamingResponse);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES, countingOutputStream.getCount());
+        // Error metrics are emitted via the consumption listener added by onQueryFinished() — not here,
+        // to avoid double-counting when onQueryFinished() is used.
       } catch (Exception e) {
-        LOGGER.error(RESPONSE_EXCEPTION_MARKER, "Caught exception while writing streaming response", e);
+        LOGGER.error("Caught exception while writing streaming response", e);
         throw new RuntimeException(e);
       } finally {
         streamingResponse.close();
@@ -871,6 +893,18 @@ public class PinotClientRequest {
   private StreamingBrokerResponse onQueryFinished(StreamingBrokerResponse streamingResponse) {
     return streamingResponse.withListener((finishedResponse, metainfo) -> {
       emitBrokerResponseMetrics(metainfo);
+      List<QueryProcessingException> exceptions = metainfo.getExceptions();
+      if (!exceptions.isEmpty()) {
+        int queryErrorCodeHeaderValue = exceptions.get(0).getErrorCode();
+        MDC.put("queryErrorCode", Integer.toString(queryErrorCodeHeaderValue));
+        StringBuilder sb = new StringBuilder();
+        sb.append("Query processing exceptions:");
+        for (QueryProcessingException exception : exceptions) {
+          sb.append(" ").append(exception.toString());
+        }
+        LOGGER.error(RESPONSE_EXCEPTION_MARKER, sb.toString());
+        MDC.remove("queryErrorCode");
+      }
     });
   }
 

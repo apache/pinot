@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -603,6 +605,73 @@ public class StreamingBrokerResponseJacksonSerializerTest {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     mapper.writeValue(outputStream, response);
     assertTrue(outputStream.size() > 0);
+  }
+
+  /// Verifies that when the OutputStream throws during serialization, the original IOException surfaces and any
+  /// cleanup failure (writeEndObject on a broken generator) is attached as a suppressed exception rather than
+  /// replacing the root cause.
+  @Test
+  public void testOutputStreamFailurePreservesOriginalExceptionWithSuppressedCleanup() throws Exception {
+    DataSchema dataSchema = new DataSchema(
+        new String[]{"col1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}
+    );
+    // Use enough rows that we are well past the byte limit before the stream ends.
+    List<Object[]> rows = new ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      rows.add(new Object[]{"value_" + i});
+    }
+    StreamingBrokerResponse.Metainfo metainfo = new TestMetainfo(Collections.emptyList());
+    StreamingBrokerResponse response = new StreamingBrokerResponse.ListStreamingBrokerResponse(
+        dataSchema, metainfo, rows);
+
+    // OutputStream that throws an IOException after a fixed number of bytes have been written.
+    final int failAfterBytes = 50;
+    final IOException rootCause = new IOException("simulated write failure");
+    OutputStream failingStream = new OutputStream() {
+      private int _written = 0;
+
+      @Override
+      public void write(int b) throws IOException {
+        if (_written >= failAfterBytes) {
+          throw rootCause;
+        }
+        _written++;
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        if (_written + len > failAfterBytes) {
+          throw rootCause;
+        }
+        _written += len;
+      }
+    };
+
+    ObjectMapper mapper = createMapper(Comparator.naturalOrder());
+    try {
+      mapper.writeValue(failingStream, response);
+      fail("Expected IOException to propagate from failing OutputStream");
+    } catch (IOException e) {
+      // The original root cause must be the exception thrown by the stream, not a secondary cleanup failure.
+      // Either e IS rootCause, or rootCause is reachable via getCause() chain.
+      boolean rootCauseReachable = (e == rootCause);
+      Throwable cause = e.getCause();
+      while (!rootCauseReachable && cause != null) {
+        if (cause == rootCause) {
+          rootCauseReachable = true;
+        }
+        cause = cause.getCause();
+      }
+      assertTrue(rootCauseReachable,
+          "Original IOException must surface as root cause or direct cause; got: " + e);
+      // If there was a cleanup failure (writeEndObject on broken generator), it must be suppressed, not primary.
+      // This is a soft assertion: the cleanup may or may not throw depending on Jackson internals.
+      for (Throwable suppressed : e.getSuppressed()) {
+        assertNotSame(suppressed, rootCause,
+            "rootCause must not appear as its own suppressed exception");
+      }
+    }
   }
 
   /// Helper class for creating test metainfo

@@ -29,6 +29,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -172,12 +173,36 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     StreamingBrokerResponse streamingBrokerResponse = handleStreamingRequest(
         requestId, query, actualSqlNodeAndOptions, request, requesterIdentity, requestContext,
         httpHeaders, accessControl);
-    return streamingBrokerResponse
+
+    // Ensure onStreamingQueryCompletion fires exactly once: either when consumption completes
+    // (via withListener) or when the response is closed without being fully consumed (via close()).
+    AtomicBoolean notified = new AtomicBoolean(false);
+    Runnable notifyOnce = () -> {
+      if (notified.compareAndSet(false, true)) {
+        onStreamingQueryCompletion(requestContext);
+      }
+    };
+
+    @SuppressWarnings("resource")
+    StreamingBrokerResponse decorated = streamingBrokerResponse
         .withDecoratedMetainfo(jsonObj -> {
           jsonObj.put("brokerId", _brokerId);
           jsonObj.put("requestId", Long.toString(requestId));
-          _brokerQueryEventListener.onQueryCompletion(requestContext);
-        });
+        })
+        .withListener((response, metainfo) -> notifyOnce.run());
+
+    // Intercept close() so that the notification fires even if the response is closed
+    // before consumption completes (e.g. on error or early client disconnect).
+    return new StreamingBrokerResponse.Delegator(decorated) {
+      @Override
+      public void close() {
+        try {
+          super.close();
+        } finally {
+          notifyOnce.run();
+        }
+      }
+    };
   }
 
   @Override
@@ -221,6 +246,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * calling {@code super} to preserve the SPI listener behaviour.
    */
   protected void onQueryCompletion(RequestContext requestContext, BrokerResponse brokerResponse) {
+    _brokerQueryEventListener.onQueryCompletion(requestContext);
+  }
+
+  /**
+   * Called exactly once for every streaming query, either when data consumption completes or when
+   * the response is closed without being fully consumed (e.g. on error or early client disconnect).
+   * The default implementation fires the configured
+   * {@link org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener}. Subclasses may
+   * override to intercept streaming query completion (e.g. for async query-log pipelines) while
+   * still calling {@code super} to preserve the SPI listener behaviour.
+   */
+  protected void onStreamingQueryCompletion(RequestContext requestContext) {
     _brokerQueryEventListener.onQueryCompletion(requestContext);
   }
 

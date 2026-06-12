@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Preconditions;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -291,6 +290,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       StreamingBrokerResponse plainResponse = handleStreamingRequestThrowing(requestId, query, sqlNodeAndOptions,
           requesterIdentity, requestContext, httpHeaders);
       return postDecorate(plainResponse, sqlNodeAndOptions, requestId);
+    } catch (WebApplicationException e) {
+      // a _yellow_ error (see handleRequestThrowing javadoc)
+      LOGGER.info("Request {} failed as HTTP request", requestId, e);
+      throw e;
     } catch (QueryException e) {
       String exceptionMessage = ExceptionUtils.consolidateExceptionMessages(e);
       if (isYellowError(e)) {
@@ -343,7 +346,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         : "with errors " + metainfo.getExceptions();
     String logTemplate = "Request finished {} in {}ms. Stats: {}";
     ObjectNode json = metainfo.asJson();
-    long timeUsedMs = json.get("timeUsedMs").asLong(0);
+    JsonNode timeUsedMsNode = json.get("timeUsedMs");
+    long timeUsedMs = timeUsedMsNode == null ? -1 : timeUsedMsNode.asLong(0);
 
     JsonNode stageStats = json.get("stageStats");
     if (metainfo.getExceptions().isEmpty() && !explicitSummarizeLogRequested) {
@@ -634,11 +638,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       @Override
       public Metainfo consumeData(DataConsumer consumer)
           throws InterruptedException {
+        boolean failureAccountedFor = false;
         try {
           Metainfo metainfo = _delegate.consumeData(consumer);
           if (!metainfo.getExceptions().isEmpty()) {
             // a _green_ error (see handleRequestThrowing javadoc)
             onFailedRequest(metainfo.getExceptions());
+            failureAccountedFor = true;
           }
           summarizeQuery(metainfo, explicitSummarizeLogRequested(sqlNodeAndOptions));
           _metainfo = metainfo;
@@ -653,21 +659,31 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             LOGGER.info("Request {} failed during reduction with messages {}", requestId, errorMessage);
           }
           _metainfo = new Metainfo.Error(e.getErrorCode(), errorMessage);
-          onFailedRequest(_metainfo.getExceptions());
+          if (!failureAccountedFor) {
+            onFailedRequest(_metainfo.getExceptions());
+          }
           return _metainfo;
         } catch (RuntimeException e) {
           // a _red_ error (see handleRequestThrowing javadoc)
           LOGGER.warn("Request {} failed in an uncontrolled manner", requestId, e);
           _metainfo = new Metainfo.Error(QueryErrorCode.UNKNOWN, ExceptionUtils.consolidateExceptionMessages(e));
-          onFailedRequest(_metainfo.getExceptions());
+          if (!failureAccountedFor) {
+            onFailedRequest(_metainfo.getExceptions());
+          }
           return _metainfo;
         }
       }
 
       @Override
       public Metainfo getMetaInfo() {
-        Preconditions.checkState(_metainfo != null, "getMetadata() called before consumeData()");
-        return _metainfo;
+        if (_metainfo != null) {
+          return _metainfo;
+        }
+        // Before consumption, fall back to the delegate: early responses (parse/auth/quota errors) know their
+        // metainfo upfront, which lets the REST layer set the X-Pinot-Error-Code header for them. Truly streaming
+        // delegates (LazyBrokerResponse) still throw IllegalStateException here, signalling the header must be
+        // omitted because the metainfo is unknown until the body has been consumed.
+        return _delegate.getMetaInfo();
       }
     };
   }
@@ -1001,6 +1017,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     private final InternalQueryResponseContext _context;
     private final int _estimatedNumQueryThreads;
     private final QueryExecutionContext _executionContext;
+    private final long _executionStartTimeNs;
+    private final AtomicBoolean _resourcesReleased = new AtomicBoolean(false);
 
     public MseHandlerStreamingBrokerResponse(QueryDispatcher.DispatcherStreamingBrokerResponse delegate,
         InternalQueryResponseContext context, int estimatedNumQueryThreads, QueryExecutionContext executionContext) {
@@ -1008,6 +1026,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _context = context;
       _estimatedNumQueryThreads = estimatedNumQueryThreads;
       _executionContext = executionContext;
+      _executionStartTimeNs = System.nanoTime();
     }
 
     @Override
@@ -1033,10 +1052,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         LOGGER.warn("Request {} failed while reducing results", _context._requestContext.getRequestId(), e);
         return new Metainfo.Error(QueryErrorCode.INTERNAL, ExceptionUtils.consolidateExceptionMessages(e));
       } finally {
-        _queryThrottler.release(_estimatedNumQueryThreads);
-        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
-            _queryThrottler.currentQueryServerThreads());
-        onQueryFinish(_context._requestContext.getRequestId());
+        releaseResources();
       }
 
       if (!(metainfo.getBrokerResponse() instanceof BrokerResponseNativeV2)) {
@@ -1056,11 +1072,27 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       return metainfo;
     }
 
+    private void releaseResources() {
+      if (_resourcesReleased.compareAndSet(false, true)) {
+        _queryThrottler.release(_estimatedNumQueryThreads);
+        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ESTIMATED_MSE_SERVER_THREADS,
+            _queryThrottler.currentQueryServerThreads());
+        onQueryFinish(_context._requestContext.getRequestId());
+      }
+    }
+
+    @Override
+    public void close() {
+      try {
+        _delegate.close();
+      } finally {
+        releaseResources();
+      }
+    }
+
     private void postExecution(BrokerResponseNativeV2 brokerResponse) {
       _stagesFinishedMeter.mark(countStages(_context._dispatchableSubPlan));
       _opchainsCompletedMeter.mark(countOpChain(_context._dispatchableSubPlan));
-
-      long executionStartTimeNs = System.nanoTime();
 
       for (QueryProcessingException processingException : brokerResponse.getExceptions()) {
         QueryErrorCode errorCode = QueryErrorCode.fromErrorCode(processingException.getErrorCode());
@@ -1076,7 +1108,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         brokerResponse.setResultTable(brokerResponse.getResultTable());
         long executionEndTimeNs = System.nanoTime();
         updatePhaseTimingForTables(_context._tableNames, BrokerQueryPhase.QUERY_EXECUTION,
-            executionEndTimeNs - executionStartTimeNs);
+            executionEndTimeNs - _executionStartTimeNs);
       }
 
       postProcessBrokerResponse(brokerResponse, _context);

@@ -364,6 +364,130 @@ public class PinotClientRequestTest {
         "Metric should record the actual response size in bytes");
   }
 
+  /**
+   * Verifies that POST sql, GET query (MSE), and POST query (MSE) endpoints route through respond(),
+   * which sets the X-Pinot-Error-Code response header, matching the GET sql behavior.
+   */
+  @Test
+  public void testAllEndpointsSetsErrorCodeHeader() throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request grizzlyRequest = mock(Request.class);
+    when(grizzlyRequest.getRequestURL()).thenReturn(new StringBuilder());
+
+    // Successful response: handleRequest returns empty result — X-Pinot-Error-Code should be -1.
+    // _httpHeaders mock returns null for getHeaderString, so errorsAsHttpCode=false (default mode).
+    when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
+        .thenReturn(BrokerResponseNative.EMPTY_RESULT);
+
+    ArgumentCaptor<Object> resumeCaptor = ArgumentCaptor.forClass(Object.class);
+
+    // POST sql
+    _pinotClientRequest.processSqlQueryPost("{\"sql\": \"SELECT 1 FROM T\"}", asyncResponse, false, 0,
+        grizzlyRequest, _httpHeaders);
+    verify(asyncResponse, times(1)).resume(resumeCaptor.capture());
+    Response postSqlResponse = (Response) resumeCaptor.getValue();
+    assertTrue(postSqlResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER),
+        "POST sql: X-Pinot-Error-Code header should be present");
+    assertEquals(postSqlResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), -1,
+        "POST sql: X-Pinot-Error-Code should be -1 for success");
+
+    reset(asyncResponse);
+
+    // GET query (MSE)
+    _pinotClientRequest.processSqlWithMultiStageQueryEngineGet("SELECT 1 FROM T", asyncResponse,
+        grizzlyRequest, _httpHeaders);
+    verify(asyncResponse, times(1)).resume(resumeCaptor.capture());
+    Response getMseResponse = (Response) resumeCaptor.getValue();
+    assertTrue(getMseResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER),
+        "GET query: X-Pinot-Error-Code header should be present");
+    assertEquals(getMseResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), -1,
+        "GET query: X-Pinot-Error-Code should be -1 for success");
+
+    reset(asyncResponse);
+
+    // POST query (MSE)
+    _pinotClientRequest.processSqlWithMultiStageQueryEnginePost("{\"sql\": \"SELECT 1 FROM T\"}", asyncResponse,
+        false, 0, grizzlyRequest, _httpHeaders);
+    verify(asyncResponse, times(1)).resume(resumeCaptor.capture());
+    Response postMseResponse = (Response) resumeCaptor.getValue();
+    assertTrue(postMseResponse.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER),
+        "POST query: X-Pinot-Error-Code header should be present");
+    assertEquals(postMseResponse.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0), -1,
+        "POST query: X-Pinot-Error-Code should be -1 for success");
+  }
+
+  /**
+   * Verifies that the error code header reflects the error when an error occurs, and that error
+   * metrics are emitted exactly once (no double-counting from the listener vs streamResponse).
+   */
+  @Test
+  public void testErrorCodeHeaderAndMetricsSingleEmission() throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request grizzlyRequest = mock(Request.class);
+    when(grizzlyRequest.getRequestURL()).thenReturn(new StringBuilder());
+
+    // Return a TABLE_DOES_NOT_EXIST error response
+    when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
+        .thenReturn(BrokerResponseNative.TABLE_DOES_NOT_EXIST);
+
+    ArgumentCaptor<Object> resumeCaptor = ArgumentCaptor.forClass(Object.class);
+    _pinotClientRequest.processSqlQueryPost("{\"sql\": \"SELECT 1 FROM T\"}", asyncResponse, false, 0,
+        grizzlyRequest, _httpHeaders);
+
+    verify(asyncResponse, times(1)).resume(resumeCaptor.capture());
+    Response response = (Response) resumeCaptor.getValue();
+
+    // X-Pinot-Error-Code header should reflect the TABLE_DOES_NOT_EXIST error
+    assertTrue(response.getHeaders().containsKey(PINOT_QUERY_ERROR_CODE_HEADER));
+    assertEquals(response.getHeaders().get(PINOT_QUERY_ERROR_CODE_HEADER).get(0),
+        QueryErrorCode.TABLE_DOES_NOT_EXIST.getId(),
+        "Error code header should match TABLE_DOES_NOT_EXIST");
+
+    // Write the body: consuming fires the listener which emits error metrics
+    StreamingOutput streamingOutput = (StreamingOutput) response.getEntity();
+    streamingOutput.write(new ByteArrayOutputStream());
+
+    // Error metric should be emitted exactly once (from the listener, not duplicated from streamResponse)
+    verify(_brokerMetrics, times(1)).addMeteredGlobalValue(
+        eq(BrokerMeter.getQueryErrorMeter(QueryErrorCode.TABLE_DOES_NOT_EXIST)), eq(1L));
+  }
+
+  /**
+   * Verifies that the streaming path (via respond() + streamResponse()) emits QUERY_RESPONSE_SIZE_BYTES.
+   */
+  @Test
+  public void testStreamingPathEmitsResponseSizeMetric() throws Exception {
+    AsyncResponse asyncResponse = mock(AsyncResponse.class);
+    Request grizzlyRequest = mock(Request.class);
+    when(grizzlyRequest.getRequestURL()).thenReturn(new StringBuilder());
+
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    DataSchema dataSchema = new DataSchema(new String[]{"col1"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
+    brokerResponse.setResultTable(new ResultTable(dataSchema, List.<Object[]>of(new Object[]{"hello"})));
+    when(_requestHandler.handleRequest(any(), any(), any(), any(), any())).thenReturn(brokerResponse);
+
+    ArgumentCaptor<Object> resumeCaptor = ArgumentCaptor.forClass(Object.class);
+    _pinotClientRequest.processSqlQueryPost("{\"sql\": \"SELECT 1 FROM T\"}", asyncResponse, false, 0,
+        grizzlyRequest, _httpHeaders);
+
+    verify(asyncResponse, times(1)).resume(resumeCaptor.capture());
+    Response response = (Response) resumeCaptor.getValue();
+
+    // Trigger body write to capture the size metric
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StreamingOutput streamingOutput = (StreamingOutput) response.getEntity();
+    streamingOutput.write(out);
+
+    long writtenBytes = out.size();
+    assertTrue(writtenBytes > 0, "Response body should be non-empty");
+
+    ArgumentCaptor<Long> sizeCaptor = ArgumentCaptor.forClass(Long.class);
+    verify(_brokerMetrics).addMeteredGlobalValue(eq(BrokerMeter.QUERY_RESPONSE_SIZE_BYTES), sizeCaptor.capture());
+    assertEquals(sizeCaptor.getValue().longValue(), writtenBytes,
+        "QUERY_RESPONSE_SIZE_BYTES metric should match actual bytes written");
+  }
+
   private static BrokerResponseNative getComparisonResult() {
     BrokerResponseNative response = new BrokerResponseNative();
     DataSchema dataSchema = new DataSchema(new String[]{"col1"},
