@@ -326,7 +326,7 @@ public class QueryEnvironmentTestBase {
         }
         TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo =
             new TablePartitionReplicatedServersInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions,
-                partitionIdToInfoMap, Collections.emptyList());
+                partitionIdToInfoMap, Collections.emptyList(), Collections.emptyList());
         partitionInfoMap.put(tableNameWithType, tablePartitionReplicatedServersInfo);
       }
     }

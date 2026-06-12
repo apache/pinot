@@ -904,6 +904,12 @@ public class WorkerManager {
     // verifies that the partition table obtained from routing manager is compatible with the hint options
     checkPartitionInfoMap(partitionTableInfo, tableName, partitionKey, partitionFunction, numWorkers);
 
+    // Attach unavailable segments (no available replica, excluded from the partition info) to the metadata so that
+    // they are reported in the query response
+    for (Map.Entry<String, List<String>> entry : partitionTableInfo._unavailableSegmentsByTable.entrySet()) {
+      metadata.addUnavailableSegments(entry.getKey(), entry.getValue());
+    }
+
     PartitionInfo[] partitionInfoMap = partitionTableInfo._partitionInfoMap;
     int numPartitions = partitionInfoMap.length;
     assert numPartitions % numWorkers == 0;
@@ -1079,8 +1085,11 @@ public class WorkerManager {
           partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
               realtimePartitionInfo._segments);
         }
+        Map<String, List<String>> unavailableSegmentsByTable =
+            new HashMap<>(PartitionTableInfo.getUnavailableSegmentsByTable(offlineTpi));
+        unavailableSegmentsByTable.putAll(PartitionTableInfo.getUnavailableSegmentsByTable(realtimeTpi));
         return new PartitionTableInfo(offlineTpi.getPartitionColumn(), offlineTpi.getPartitionFunctionName(),
-            partitionInfoMap, timeBoundaryInfo);
+            partitionInfoMap, timeBoundaryInfo, unavailableSegmentsByTable);
       } else if (offlineRoutingExists) {
         return getOfflinePartitionTableInfo(offlineTableName);
       } else {
@@ -1148,13 +1157,23 @@ public class WorkerManager {
     final PartitionInfo[] _partitionInfoMap;
     @Nullable
     final TimeBoundaryInfo _timeBoundaryInfo;
+    /// Unavailable segments (no available replica, excluded from the partition info) keyed by table name with type
+    final Map<String, List<String>> _unavailableSegmentsByTable;
 
     PartitionTableInfo(String partitionKey, String partitionFunction, PartitionInfo[] partitionInfoMap,
-        @Nullable TimeBoundaryInfo timeBoundaryInfo) {
+        @Nullable TimeBoundaryInfo timeBoundaryInfo, Map<String, List<String>> unavailableSegmentsByTable) {
       _partitionKey = partitionKey;
       _partitionFunction = partitionFunction;
       _partitionInfoMap = partitionInfoMap;
       _timeBoundaryInfo = timeBoundaryInfo;
+      _unavailableSegmentsByTable = unavailableSegmentsByTable;
+    }
+
+    static Map<String, List<String>> getUnavailableSegmentsByTable(
+        TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo) {
+      List<String> unavailableSegments = tablePartitionReplicatedServersInfo.getUnavailableSegments();
+      return unavailableSegments.isEmpty() ? Map.of()
+          : Map.of(tablePartitionReplicatedServersInfo.getTableNameWithType(), unavailableSegments);
     }
 
     static PartitionTableInfo fromTablePartitionInfo(
@@ -1188,7 +1207,8 @@ public class WorkerManager {
         }
       }
       return new PartitionTableInfo(tablePartitionReplicatedServersInfo.getPartitionColumn(),
-          tablePartitionReplicatedServersInfo.getPartitionFunctionName(), workerPartitionInfoMap, null);
+          tablePartitionReplicatedServersInfo.getPartitionFunctionName(), workerPartitionInfoMap, null,
+          getUnavailableSegmentsByTable(tablePartitionReplicatedServersInfo));
     }
   }
 

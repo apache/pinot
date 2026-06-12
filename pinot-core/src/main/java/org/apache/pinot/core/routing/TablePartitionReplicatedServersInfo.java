@@ -33,16 +33,18 @@ public class TablePartitionReplicatedServersInfo {
   private final int _numPartitions;
   private final PartitionInfo[] _partitionInfoMap;
   private final List<String> _segmentsWithInvalidPartition;
+  private final List<String> _unavailableSegments;
 
   public TablePartitionReplicatedServersInfo(String tableNameWithType, String partitionColumn,
       String partitionFunctionName, int numPartitions, PartitionInfo[] partitionInfoMap,
-      List<String> segmentsWithInvalidPartition) {
+      List<String> segmentsWithInvalidPartition, List<String> unavailableSegments) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
     _partitionInfoMap = partitionInfoMap;
     _segmentsWithInvalidPartition = segmentsWithInvalidPartition;
+    _unavailableSegments = unavailableSegments;
   }
 
   public String getTableNameWithType() {
@@ -67,6 +69,12 @@ public class TablePartitionReplicatedServersInfo {
 
   public List<String> getSegmentsWithInvalidPartition() {
     return _segmentsWithInvalidPartition;
+  }
+
+  /// Returns the segments excluded from the partition info because they have no available replica, thus cannot be
+  /// served regardless of the server picked.
+  public List<String> getUnavailableSegments() {
+    return _unavailableSegments;
   }
 
   public static class PartitionInfo {
