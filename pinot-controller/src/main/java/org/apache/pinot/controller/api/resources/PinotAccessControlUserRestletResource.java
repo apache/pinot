@@ -115,7 +115,8 @@ public class PinotAccessControlUserRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_USER)
   @ApiOperation(value = "Get an user in cluster", notes = "Get an user in cluster")
   public String getUser(@PathParam("username") String username,
-      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER", required = true) @QueryParam("component")
+      String componentTypeStr) {
     try {
       ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
       ComponentType componentType = Constants.validateComponentType(componentTypeStr);
@@ -168,7 +169,8 @@ public class PinotAccessControlUserRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Delete a user", notes = "Delete a user")
   public SuccessResponse deleteUser(@PathParam("username") String username,
-      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr) {
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER", required = true) @QueryParam("component")
+      String componentTypeStr) {
 
     List<String> usersDeleted = new LinkedList<>();
     String usernameWithComponentType = username + "_" + componentTypeStr;
@@ -200,7 +202,8 @@ public class PinotAccessControlUserRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update user config for a user", notes = "Update user config for user")
   public SuccessResponse updateUserConfig(@PathParam("username") String username,
-      @ApiParam(value = "CONTROLLER|SERVER|BROKER") @QueryParam("component") String componentTypeStr,
+      @ApiParam(value = "CONTROLLER|SERVER|BROKER", required = true) @QueryParam("component")
+      String componentTypeStr,
       @QueryParam("passwordChanged") boolean passwordChanged, String userConfigString) {
 
     UserConfig userConfig;
