@@ -138,6 +138,16 @@ public class IndexCombinationValidationTest {
     assertValid(tc);
   }
 
+  @Test
+  public void testDictEncodedWithInvertedAndTextAndBloomPasses() {
+    // multiple indexes on a dict-encoded column
+    TableConfig tc = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STR_COL))
+        .setBloomFilterColumns(List.of(STR_COL))
+        .build();
+    assertValid(tc);
+  }
+
   // ============================================================
   // 2. RAW forward index without explicit dictionary
   //    + inverted/FST/IFST index → FAILS (all require a dictionary)
