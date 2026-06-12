@@ -132,7 +132,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
     return context.isOnHeap() ? new OnHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
         context.getTableNameWithType(), context.isContinueOnError(), indexConfig)
         : new OffHeapJsonIndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
-        context.getTableNameWithType(), context.isContinueOnError(), indexConfig);
+            context.getTableNameWithType(), context.isContinueOnError(), indexConfig);
   }
 
   @Override
@@ -152,7 +152,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new JsonIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -181,7 +181,7 @@ public class JsonIndexType extends AbstractIndexType<JsonIndexConfig, JsonIndexR
 
     @Override
     protected JsonIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                                JsonIndexConfig indexConfig)
+        JsonIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return createIndexReader(dataBuffer, metadata);
     }

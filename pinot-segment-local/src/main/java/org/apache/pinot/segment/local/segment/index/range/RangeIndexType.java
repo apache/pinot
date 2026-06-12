@@ -147,7 +147,7 @@ public class RangeIndexType
 
   @Override
   public CombinedInvertedIndexCreator createIndexCreator(IndexCreationContext context,
-                                                         RangeIndexConfig rangeIndexConfig)
+      RangeIndexConfig rangeIndexConfig)
       throws IOException {
     FieldSpec fieldSpec = context.getFieldSpec();
     if (rangeIndexConfig.getVersion() == BitSlicedRangeIndexCreator.VERSION && fieldSpec.isSingleValueField()) {
@@ -180,7 +180,7 @@ public class RangeIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new RangeIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -211,7 +211,7 @@ public class RangeIndexType
 
     @Override
     protected RangeIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                                 RangeIndexConfig indexConfig)
+        RangeIndexConfig indexConfig)
         throws IndexReaderConstraintException {
       return read(dataBuffer, metadata);
     }

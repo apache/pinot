@@ -172,7 +172,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new VectorIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -214,7 +214,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
     @Override
     public VectorIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-                                               FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
         throws IndexReaderConstraintException {
       if (metadata.getDataType() != FieldSpec.DataType.FLOAT || metadata.getFieldSpec().isSingleValueField()) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.vector(),

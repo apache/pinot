@@ -159,7 +159,7 @@ public class InvertedIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -192,7 +192,7 @@ public class InvertedIndexType
      */
     @Override
     public InvertedIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-                                                 FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
+        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
         throws IOException, IndexReaderConstraintException {
       if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.inverted())) {
         return null;

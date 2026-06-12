@@ -138,7 +138,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new FSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -183,7 +183,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
     @Override
     protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                                FstIndexConfig indexConfig)
+        FstIndexConfig indexConfig)
         throws IndexReaderConstraintException, IOException {
       return createIndexReader(dataBuffer, metadata);
     }

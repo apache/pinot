@@ -1448,7 +1448,6 @@ public class TableConfigUtilsTest {
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
     } catch (Exception e) {
-      e.printStackTrace();
       fail("Should not fail for myCol1 with forward index disabled but is sorted, this is a no-op");
     }
 

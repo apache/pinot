@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -127,7 +127,7 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -164,7 +164,7 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
 
     @Override
     protected BloomFilterReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                                  BloomFilterConfig indexConfig) {
+        BloomFilterConfig indexConfig) {
       return BloomFilterReaderFactory.getBloomFilterReader(dataBuffer, indexConfig.isLoadOnHeap());
     }
   }

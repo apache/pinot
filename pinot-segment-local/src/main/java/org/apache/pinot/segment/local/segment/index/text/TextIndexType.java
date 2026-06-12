@@ -129,7 +129,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return new TextIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
@@ -159,7 +159,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
 
     @Override
     public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-                                             ColumnMetadata metadata)
+        ColumnMetadata metadata)
         throws IndexReaderConstraintException {
       if (metadata.getDataType() != FieldSpec.DataType.STRING) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),

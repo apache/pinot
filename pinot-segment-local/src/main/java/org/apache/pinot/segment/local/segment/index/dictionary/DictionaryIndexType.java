@@ -300,7 +300,6 @@ public class DictionaryIndexType
     return false;
   }
 
-
   /**
    * This function evaluates whether to override dictionary (i.e use noDictionary)
    * for a column even when its explicitly configured. This evaluation is for both dimension and metric
@@ -309,11 +308,11 @@ public class DictionaryIndexType
    * @return true if dictionary should be created, false if noDictionary should be used
    */
   public static boolean ignoreDictionaryOverride(boolean optimizeDictionary, boolean optimizeDictionaryForMetrics,
-                                                 double noDictionarySizeRatioThreshold,
-                                                 @Nullable Double noDictionaryCardinalityRatioThreshold,
-                                                 FieldSpec fieldSpec,
-                                                 FieldIndexConfigs fieldIndexConfigs,
-                                                 int cardinality, int totalNumberOfEntries) {
+      double noDictionarySizeRatioThreshold,
+      @Nullable Double noDictionaryCardinalityRatioThreshold,
+      FieldSpec fieldSpec,
+      FieldIndexConfigs fieldIndexConfigs,
+      int cardinality, int totalNumberOfEntries) {
     // For an inverted index dictionary is required
     if (fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
       return true;
@@ -344,9 +343,9 @@ public class DictionaryIndexType
    * Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
    */
   private static boolean ignoreDictionaryOverrideForSingleValueFields(int cardinality, int totalNumberOfEntries,
-                                                                      double noDictionarySizeRatioThreshold,
-                                                                      Double noDictionaryCardinalityRatioThreshold,
-                                                                      FieldSpec fieldSpec) {
+      double noDictionarySizeRatioThreshold,
+      Double noDictionaryCardinalityRatioThreshold,
+      FieldSpec fieldSpec) {
     if (fieldSpec.isSingleValueField()) {
       if (fieldSpec.getDataType().isFixedWidth()) {
         // if you can safely enable dictionary, you can ignore overrides
@@ -369,8 +368,8 @@ public class DictionaryIndexType
    * smaller than the threshold, we want to override to noDictionary.
    */
   private static boolean canSafelyCreateDictionaryWithinThreshold(int cardinality, int totalNumberOfEntries,
-                                                                  double noDictionarySizeRatioThreshold,
-                                                                  FieldSpec spec) {
+      double noDictionarySizeRatioThreshold,
+      FieldSpec spec) {
     long dictionarySize = cardinality * (long) spec.getDataType().size();
     long forwardIndexSize =
         ((long) totalNumberOfEntries * PinotDataBitSet.getNumBitsPerValue(cardinality - 1)
@@ -404,7 +403,7 @@ public class DictionaryIndexType
   }
 
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                DictionaryIndexConfig indexConfig, String internIdentifierStr)
+      DictionaryIndexConfig indexConfig, String internIdentifierStr)
       throws IOException {
 
     DataType dataType = metadata.getDataType();
@@ -463,7 +462,7 @@ public class DictionaryIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-                                         Schema schema, TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
   }
 
@@ -501,14 +500,15 @@ public class DictionaryIndexType
 
     @Override
     protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-                                           DictionaryIndexConfig indexConfig)
+        DictionaryIndexConfig indexConfig)
         throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
     }
 
     @Override
     public Dictionary createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
-                                        ColumnMetadata metadata) throws IOException, IndexReaderConstraintException {
+        ColumnMetadata metadata)
+        throws IOException, IndexReaderConstraintException {
       String colName = metadata.getColumnName();
 
       if (!segmentReader.hasIndexFor(colName, StandardIndexes.dictionary())) {
