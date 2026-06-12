@@ -39,6 +39,7 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /// A [org.apache.pinot.common.response.BrokerResponse] that is lazily evaluated.
@@ -46,7 +47,7 @@ import org.slf4j.Logger;
 /// This class can only be used once the data schema is known. In case there is an error before that, an
 /// early error [EarlyResponse] should be used.
 public class LazyBrokerResponse implements StreamingBrokerResponse {
-  private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(LazyBrokerResponse.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LazyBrokerResponse.class);
 
   private final DataSchema _dataSchema;
   private final OpChain _opChain;
@@ -111,7 +112,7 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
         error = queryExceptions.entrySet().iterator().next();
         errorMessage = "Received 1 error" + from + ": " + error.getValue();
       } else {
-        error = queryExceptions.entrySet().stream().max(LazyBrokerResponse::compareErrors).orElseThrow();
+        error = queryExceptions.entrySet().stream().max(QueryErrorComparators::compareErrors).orElseThrow();
         errorMessage =
             "Received " + queryExceptions.size() + " errors" + from + ". " + "The one with highest priority is: "
                 + error.getValue();
@@ -128,8 +129,10 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
 
       @Override
       public ObjectNode asJson() {
-        return JsonUtils.newObjectNode()
-            .set("exceptions", JsonUtils.newArrayNode());
+        ObjectNode node = JsonUtils.newObjectNode();
+        node.set("exceptions", JsonUtils.newArrayNode());
+        node.put("brokerReduceTimeMs", reduceTimeMs);
+        return node;
       }
     };
   }
@@ -137,22 +140,6 @@ public class LazyBrokerResponse implements StreamingBrokerResponse {
   @Override
   public void close() {
     _opChain.close();
-  }
-
-  // TODO: Improve the way the errors are compared
-  private static int compareErrors(
-      Map.Entry<QueryErrorCode, String> entry1,
-      Map.Entry<QueryErrorCode, String> entry2
-  ) {
-    QueryErrorCode errorCode1 = entry1.getKey();
-    QueryErrorCode errorCode2 = entry2.getKey();
-    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION) {
-      return 1;
-    }
-    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION) {
-      return -1;
-    }
-    return Integer.compare(errorCode1.getId(), errorCode2.getId());
   }
 
   public MultiStageQueryStats calculateStats() {

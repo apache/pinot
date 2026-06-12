@@ -91,7 +91,6 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainConverterDispatcher;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryExecutionContext;
@@ -183,9 +182,8 @@ public class QueryDispatcher {
       return getStreamingQueryResult(dispatchableSubPlan, queryOptions, _mailboxService, this, servers);
     } catch (Throwable e) {
       cancel(requestId);
-      throw e;
-    } finally {
       cleanupQueryServerTracking(requestId);
+      throw e;
     }
   }
 
@@ -723,8 +721,7 @@ public class QueryDispatcher {
     ArrayList<Object[]> resultRows = new ArrayList<>();
     MseBlock block;
     MultiStageQueryStats queryStats;
-    try (OpChain opChain = PlanNodeToOpChain.convert(rootNode, opChainExecutionContext, (a, b) -> {
-    })) {
+    try (OpChain opChain = OpChainConverterDispatcher.convert(rootNode, opChainExecutionContext)) {
       MultiStageOperator rootOperator = opChain.getRoot();
       block = rootOperator.nextBlock();
       while (block.isData()) {
@@ -769,7 +766,7 @@ public class QueryDispatcher {
         error = queryExceptions.entrySet().iterator().next();
         errorMessage = "Received 1 error" + from + ": " + error.getValue();
       } else {
-        error = queryExceptions.entrySet().stream().max(QueryDispatcher::compareErrors).orElseThrow();
+        error = queryExceptions.entrySet().stream().max(QueryErrorComparators::compareErrors).orElseThrow();
         errorMessage =
             "Received " + queryExceptions.size() + " errors" + from + ". " + "The one with highest priority is: "
                 + error.getValue();
@@ -780,19 +777,6 @@ public class QueryDispatcher {
     assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
-  }
-
-  // TODO: Improve the way the errors are compared
-  private static int compareErrors(Map.Entry<QueryErrorCode, String> entry1, Map.Entry<QueryErrorCode, String> entry2) {
-    QueryErrorCode errorCode1 = entry1.getKey();
-    QueryErrorCode errorCode2 = entry2.getKey();
-    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION) {
-      return 1;
-    }
-    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION) {
-      return -1;
-    }
-    return Integer.compare(errorCode1.getId(), errorCode2.getId());
   }
 
   public void shutdown() {
@@ -927,6 +911,11 @@ public class QueryDispatcher {
         _closed = true;
         super.close();
         if (_dispatcher != null) {
+          // Use the public, map-based cancel rather than cancel(requestId, _servers). When consumption has already
+          // completed, consume()'s finally has removed the query from _serversByQuery, so this no-ops -- exactly what
+          // we want (a finished query must not be cancelled). When the response is closed without consumption ever
+          // completing (abandoned client, early close), the entry is still present and the servers get cancelled.
+          // It also honors isQueryCancellationEnabled(), which the private overload would bypass.
           _dispatcher.cancel(_requestId);
         }
       }
@@ -959,7 +948,7 @@ public class QueryDispatcher {
         if (_dispatcher != null) {
           // We cannot cancel with stats here because the current thread is already interrupted and we don't want to
           // wait for the cancel responses.
-          _dispatcher.cancel(_requestId);
+          _dispatcher.cancel(_requestId, _servers);
         }
         throw e;
       } catch (RuntimeException e) {
@@ -973,6 +962,10 @@ public class QueryDispatcher {
           stats = _dispatcher.cancelWithStats(_requestId, _servers);
         } else {
           stats = null;
+        }
+      } finally {
+        if (_dispatcher != null) {
+          _dispatcher.cleanupQueryServerTracking(_requestId);
         }
       }
       long reduceTime = System.currentTimeMillis() - start;
