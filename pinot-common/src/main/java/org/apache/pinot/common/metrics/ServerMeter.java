@@ -160,7 +160,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   // PageCacheWarmup related metrics
   PAGE_CACHE_WARMUP_QUERIES("pageCacheWarmupQueries", true),
-  PAGE_CACHE_WARMUP_TIMEOUT_ERRORS("pageCacheWarmupTimeoutErrors", true),
   PAGE_CACHE_WARMUP_SERVER_ERRORS("pageCacheWarmupServerErrors", true),
 
   // Multi-stage

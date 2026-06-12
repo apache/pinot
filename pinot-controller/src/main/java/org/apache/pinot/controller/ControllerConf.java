@@ -451,6 +451,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String EXIT_ON_SCHEMA_CHECK_FAILURE = "controller.startup.exitOnSchemaCheckFailure";
   public static final boolean DEFAULT_EXIT_ON_SCHEMA_CHECK_FAILURE = true;
   public static final String DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR = "/home/pinot/data/pageCacheWarmupQueries";
+  public static final String CONFIG_OF_PAGE_CACHE_WARMUP_DURATION_MS = "controller.page.cache.warmup.duration.ms";
+  public static final long DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS = 180_000L;
 
   public static final String CONFIG_OF_MAX_TABLE_REBALANCE_JOBS_IN_ZK = "controller.table.rebalance.maxJobsInZK";
   public static final String CONFIG_OF_MAX_TENANT_REBALANCE_JOBS_IN_ZK = "controller.tenant.rebalance.maxJobsInZK";
@@ -1649,5 +1651,9 @@ public class ControllerConf extends PinotConfiguration {
 
   public String getPageCacheWarmupQueriesDataDir() {
     return getProperty(CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR);
+  }
+
+  public long getPageCacheWarmupDurationMs() {
+    return getProperty(CONFIG_OF_PAGE_CACHE_WARMUP_DURATION_MS, DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS);
   }
 }

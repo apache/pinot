@@ -192,7 +192,7 @@ public class ServerInstance {
     }
     TransformFunctionFactory.init(transformFunctionClasses);
     _pageCacheWarmupServerQueryExecutor = new PageCacheWarmupServerQueryExecutor(_instanceDataManager, _queryScheduler,
-        serverConf.getPinotConfig());
+        serverConf.getPinotConfig(), _helixManager);
 
     LOGGER.info("Finish initializing server instance");
   }

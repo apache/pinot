@@ -30,9 +30,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpStatus;
@@ -43,6 +45,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.PageCacheWarmupRequest;
@@ -68,8 +71,8 @@ import org.slf4j.LoggerFactory;
  * and POSTs the request to every server that hosts the table.</p>
  *
  * <p>The call is retried with an exponential back‑off (3 attempts, starting at
- * 3&nbsp;seconds) and the overall execution is bounded by
- * {@link org.apache.pinot.spi.config.table.PageCacheWarmupConfig#getMaxWarmupDurationSeconds()}.
+ * 3&nbsp;seconds) and the overall fan‑out is bounded by the controller‑level
+ * {@code controller.page.cache.warmup.duration.ms} config.
  * </p>
  *
  * <h2>Sequence</h2>
@@ -85,20 +88,33 @@ import org.slf4j.LoggerFactory;
 public class PageCacheWarmupControllerExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PageCacheWarmupControllerExecutor.class);
 
+  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(3, 3000L, 2.0f);
+
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final ControllerMetrics _controllerMetrics;
   private final String _pageCacheWarmupQueriesDataDir;
-
-  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(3, 3000L, 2.0f);
+  private final long _maxPageCacheWarmupDurationMs;
+  private final ExecutorService _warmupRequestExecutor;
 
   /**
-   * Creates an executor bound to the given Controller services.
+   * Creates an executor bound to the given Controller services. The warmup query directory and the
+   * overall warmup duration are read from the {@link ControllerConf} (defaults are used when it is
+   * {@code null}).
    */
   public PageCacheWarmupControllerExecutor(PinotHelixResourceManager pinotHelixResourceManager,
-                                           String pageCacheWarmupQueriesDataDir) {
+                                           @Nullable ControllerConf controllerConf) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _controllerMetrics = ControllerMetrics.get();
-    _pageCacheWarmupQueriesDataDir = pageCacheWarmupQueriesDataDir;
+    _pageCacheWarmupQueriesDataDir =
+        controllerConf != null ? controllerConf.getPageCacheWarmupQueriesDataDir() : null;
+    _maxPageCacheWarmupDurationMs =
+        controllerConf != null ? controllerConf.getPageCacheWarmupDurationMs()
+            : ControllerConf.DEFAULT_PAGE_CACHE_WARMUP_DURATION_MS;
+    _warmupRequestExecutor = Executors.newCachedThreadPool(runnable -> {
+      Thread thread = new Thread(runnable, "page-cache-warmup-request");
+      thread.setDaemon(true);
+      return thread;
+    });
   }
 
   /**
@@ -118,80 +134,87 @@ public class PageCacheWarmupControllerExecutor {
    * @param segmentsTo        list of segment names to touch; {@code null} or empty means all segments
    */
   public void triggerPageCacheWarmup(String tableNameWithType, List<String> segmentsTo) {
-    String rawTableName = null;
     try {
-      rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      assert tableType == TableType.OFFLINE;
+      if (tableType != TableType.OFFLINE) {
+        return;
+      }
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       if (tableConfig == null) {
         return;
       }
       PageCacheWarmupConfig pageCacheWarmupConfig = tableConfig.getPageCacheWarmupConfig();
-      if (pageCacheWarmupConfig == null || !pageCacheWarmupConfig.enableOnRefresh()) {
+      PageCacheWarmupConfig.Spec spec = pageCacheWarmupConfig != null ? pageCacheWarmupConfig.getOnRefresh() : null;
+      if (spec == null || !spec.isEnabled()) {
         return;
       }
 
-      long maxWarmupDurationMs = pageCacheWarmupConfig.getMaxWarmupDurationSeconds() * 1000L;
-      final String finalRawTableName = rawTableName;
-      CompletableFuture<Void> warmupFuture = CompletableFuture.runAsync(() -> {
-        LOGGER.info("Starting page cache warmup for table: {}, maxWarmupDurationMs: {}", finalRawTableName,
-            maxWarmupDurationMs);
-        _controllerMetrics.addMeteredTableValue(finalRawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS, 1);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS, 1);
+      LOGGER.info("Starting page cache warmup for table: {}, maxWarmupDurationMs: {}", tableNameWithType,
+          _maxPageCacheWarmupDurationMs);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS, 1);
 
-        PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_pageCacheWarmupQueriesDataDir).getScheme());
-        File tableDir = new File(_pageCacheWarmupQueriesDataDir, tableNameWithType);
-        File[] files = tableDir.listFiles(File::isFile);
-        if (files == null || files.length == 0) {
-          LOGGER.warn("No warm‑up query files found for table: {}", finalRawTableName);
-          return;
-        }
-        // If there are multiple files, use the most recently modified one.
-        Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
-        File queryFile = files[0];
-        LOGGER.info("Using warm‑up query file: {}", queryFile.getName());
-        try (InputStream inputStream = pinotFS.open(queryFile.toURI())) {
-          String json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-          List<String> queries = JsonUtils.stringToObject(json, new TypeReference<>() {
-          });
-          if (queries.isEmpty()) {
-            LOGGER.warn("No queries found in warm‑up query file: {} for table: {}",
-                queryFile.getName(), finalRawTableName);
-            return;
-          }
+      PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_pageCacheWarmupQueriesDataDir).getScheme());
+      File tableDir = new File(_pageCacheWarmupQueriesDataDir, tableNameWithType);
+      File[] files = tableDir.listFiles(File::isFile);
+      if (files == null || files.length == 0) {
+        LOGGER.warn("No warm‑up query files found for table: {}", tableNameWithType);
+        return;
+      }
+      // If there are multiple files, use the most recently modified one.
+      Arrays.sort(files, Comparator.comparingLong(File::lastModified).reversed());
+      File queryFile = files[0];
+      LOGGER.info("Using warm‑up query file: {}", queryFile.getName());
 
-          PageCacheWarmupRequest warmupRequest =
-              new PageCacheWarmupRequest(appendSecondaryWorkload(queries), segmentsTo);
+      List<String> queries;
+      try (InputStream inputStream = pinotFS.open(queryFile.toURI())) {
+        String json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        queries = JsonUtils.stringToObject(json, new TypeReference<>() {
+        });
+      }
+      if (queries == null || queries.isEmpty()) {
+        LOGGER.warn("No queries found in warm‑up query file: {} for table: {}", queryFile.getName(), tableNameWithType);
+        return;
+      }
 
-          List<String> serverInstancesForTable =
-              _pinotHelixResourceManager.getServerInstancesForTable(finalRawTableName, tableType);
-          BiMap<String, String> serverToEndPoints =
-              _pinotHelixResourceManager.getDataInstanceAdminEndpoints(new HashSet<>(serverInstancesForTable));
-          BiMap<String, String> endpointsToServers = serverToEndPoints.inverse();
+      PageCacheWarmupRequest warmupRequest =
+          new PageCacheWarmupRequest(appendSecondaryWorkload(queries), segmentsTo);
 
-          CompletableFuture.allOf(endpointsToServers.keySet().stream()
-            .map(serverInstance -> {
-              try {
-                URI warmupUri = new URI(serverInstance + "/tables/" + tableNameWithType + "/triggerWarmup");
-                return CompletableFuture.runAsync(() ->
-                    sendWarmupRequestWithRetry(warmupUri, warmupRequest, serverInstance, finalRawTableName));
-              } catch (Exception e) {
-                throw new CompletionException("Invalid URI for server: " + serverInstance, e);
-              }
-            })
-            .toArray(CompletableFuture[]::new))
-              .join();
+      List<String> serverInstancesForTable =
+          _pinotHelixResourceManager.getServerInstancesForTable(rawTableName, tableType);
+      BiMap<String, String> serverToEndPoints =
+          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(new HashSet<>(serverInstancesForTable));
+      BiMap<String, String> endpointsToServers = serverToEndPoints.inverse();
+
+      List<CompletableFuture<Void>> futures = new ArrayList<>();
+      for (String serverEndpoint : endpointsToServers.keySet()) {
+        URI warmupUri;
+        try {
+          warmupUri = new URI(serverEndpoint + "/tables/" + tableNameWithType + "/triggerWarmup");
         } catch (Exception e) {
-          throw new CompletionException(e);
+          LOGGER.error("Invalid warmup URI for server: {} table: {}", serverEndpoint, tableNameWithType, e);
+          continue;
         }
-      });
-      warmupFuture.get(maxWarmupDurationMs, TimeUnit.MILLISECONDS);
-    } catch (TimeoutException e) {
-      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
-      LOGGER.error("Global warmup timed out for table: {}", rawTableName);
+        futures.add(CompletableFuture.runAsync(
+            () -> sendWarmupRequestWithRetry(warmupUri, warmupRequest, serverEndpoint, rawTableName),
+            _warmupRequestExecutor));
+      }
+
+      try {
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+            .get(_maxPageCacheWarmupDurationMs, TimeUnit.MILLISECONDS);
+      } catch (TimeoutException e) {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
+        LOGGER.error("Global warmup timed out for table: {}", tableNameWithType);
+        // Stop awaiting any server requests that ran past the warmup budget.
+        for (CompletableFuture<Void> future : futures) {
+          if (!future.isDone()) {
+            future.cancel(true);
+          }
+        }
+      }
     } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
       LOGGER.error("Failed to serve queries for table: {}", tableNameWithType, e);
     }
   }
@@ -231,9 +254,16 @@ public class PageCacheWarmupControllerExecutor {
         }
       });
     } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
       LOGGER.error("Error sending warmup request to server: {} for table: {}", serverInstance, tableName, e);
     }
+  }
+
+  /**
+   * Shuts down the warmup request thread pool. Should be called when the owning resource manager stops.
+   */
+  public void shutdown() {
+    _warmupRequestExecutor.shutdownNow();
   }
 
   /**

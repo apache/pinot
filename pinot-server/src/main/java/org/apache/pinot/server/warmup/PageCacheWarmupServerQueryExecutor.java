@@ -32,11 +32,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -67,8 +67,8 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@link #startWarmupOnRestart()} – Invoked at server startup.  Iterates over every table
- *       hosted by the instance and kicks off warm‑up if the table’s
- *       {@link PageCacheWarmupConfig#enableOnRestart()} flag is set.</li>
+ *       hosted by the instance and kicks off warm‑up if the table’s {@code onRestart}
+ *       {@link PageCacheWarmupConfig.Spec} is enabled.</li>
  *   <li>{@link #startWarmupOnRefresh(String, java.util.List, java.util.List)} – Invoked by the controller
  *       after a segment refresh.  Optionally receives pre‑computed warm‑up queries and/or a list
  *       of freshly‑downloaded segments to target.</li>
@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
  *       path allows a <i>segment filter</i> so we don’t thrash the cache with untargeted reads.</li>
  *   <li><b>Time‑bounded execution</b>:  Both the instance‑level warm‑up window and table‑level
  *       warm‑up duration are enforced; overruns are logged and counted via
- *       {@link ServerMeter#PAGE_CACHE_WARMUP_TIMEOUT_ERRORS}.</li>
+ *       {@link ServerMeter#PAGE_CACHE_WARMUP_SERVER_ERRORS}.</li>
  * </ul>
  *
  *
@@ -95,9 +95,10 @@ public class PageCacheWarmupServerQueryExecutor {
   private final long _maxPageCacheWarmupDurationMs;
   private final double _refreshWarmupQpsRateLimit;
   private final ServerMetrics _serverMetrics;
+  private final HelixManager _helixManager;
 
   public PageCacheWarmupServerQueryExecutor(InstanceDataManager instanceDataManager, QueryScheduler queryScheduler,
-                                            PinotConfiguration config) {
+                                            PinotConfiguration config, HelixManager helixManager) {
     _instanceDataManager = instanceDataManager;
     _queryScheduler = queryScheduler;
     _maxPageCacheWarmupDurationMs = config.getProperty(CommonConstants.Server.MAX_PAGECACHE_WARMUP_DURATION_MS,
@@ -105,6 +106,7 @@ public class PageCacheWarmupServerQueryExecutor {
     _refreshWarmupQpsRateLimit = config.getProperty(CommonConstants.Server.MAX_PAGECACHE_REFRESH_WARMUP_QPS_RATE,
         CommonConstants.Server.DEFAULT_MAX_PAGECACHE_REFRESH_WARMUP_QPS_RATE);
     _serverMetrics = ServerMetrics.get();
+    _helixManager = helixManager;
   }
 
   public void startWarmupOnRestart() {
@@ -114,22 +116,23 @@ public class PageCacheWarmupServerQueryExecutor {
       try {
         long instanceWarmupTimeRemainingMs = startTime - System.currentTimeMillis();
         if (instanceWarmupTimeRemainingMs <= 0) {
-          _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_TIMEOUT_ERRORS, 1L);
+          _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
           LOGGER.warn("Instance Warmup timeout exceeded");
           break;
         }
         TableConfig tableConfig = getTableConfig(tableNameWithType);
         if (tableConfig == null) {
-          return;
-        }
-        PageCacheWarmupConfig warmupConfig = tableConfig.getPageCacheWarmupConfig();
-        if (warmupConfig == null || !warmupConfig.enableOnRestart()) {
           continue;
         }
-        double warmupQps = warmupConfig.getQpsLimitOnRestart() != null
-            ? warmupConfig.getQpsLimitOnRestart()
+        PageCacheWarmupConfig warmupConfig = tableConfig.getPageCacheWarmupConfig();
+        PageCacheWarmupConfig.Spec spec = warmupConfig != null ? warmupConfig.getOnRestart() : null;
+        if (spec == null || !spec.isEnabled()) {
+          continue;
+        }
+        double warmupQps = spec.getQpsLimit() != null
+            ? spec.getQpsLimit()
             : Math.max(getQpsPerReplica(tableConfig), 1);
-        warmupTable(tableNameWithType, warmupConfig, null, null, warmupQps);
+        warmupTable(tableNameWithType, spec, null, null, warmupQps);
       } catch (Exception e) {
         String errorMessage = String.format("PageCache warmup failed on restart for table: %s", tableNameWithType);
         handleError(tableNameWithType, errorMessage, e);
@@ -145,14 +148,15 @@ public class PageCacheWarmupServerQueryExecutor {
         return;
       }
       PageCacheWarmupConfig warmupConfig = tableConfig.getPageCacheWarmupConfig();
-      if (warmupConfig == null || !warmupConfig.enableOnRefresh()) {
+      PageCacheWarmupConfig.Spec spec = warmupConfig != null ? warmupConfig.getOnRefresh() : null;
+      if (spec == null || !spec.isEnabled()) {
         return;
       }
-      double warmupQps = warmupConfig.getQpsLimitOnRefresh() != null
-          ? warmupConfig.getQpsLimitOnRefresh()
-          // Apply rate limit over the qpsLimit to avoid overwhelming the server since it is handling live traffic
-          : Math.max(getQpsPerReplica(tableConfig) * _refreshWarmupQpsRateLimit, 1);;
-      warmupTable(tableNameWithType, warmupConfig, warmupQueries, segmentFilter, warmupQps);
+      double warmupQps = spec.getQpsLimit() != null
+          ? spec.getQpsLimit()
+          // Apply rate limit if not specified to avoid overwhelming the server since it is handling live traffic
+          : Math.max(getQpsPerReplica(tableConfig) * _refreshWarmupQpsRateLimit, 1);
+      warmupTable(tableNameWithType, spec, warmupQueries, segmentFilter, warmupQps);
     } catch (Exception e) {
       String errorMessage = String.format("PageCache warmup failed on refresh for table: %s", tableNameWithType);
       handleError(tableNameWithType, errorMessage, e);
@@ -169,24 +173,29 @@ public class PageCacheWarmupServerQueryExecutor {
 
   private double getQpsPerReplica(TableConfig tableConfig) {
     QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
-    assert quotaConfig != null;
+    if (quotaConfig == null || quotaConfig.getMaxQPS() <= 0) {
+      // No QPS quota configured; callers floor the warmup QPS to 1.
+      return 0;
+    }
     return quotaConfig.getMaxQPS() / tableConfig.getReplication();
   }
 
   private void handleError(String tableNameWithType, String errorMessage, Exception e) {
     _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
-    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
     LOGGER.error(errorMessage, e);
     throw new RuntimeException(errorMessage, e);
   }
 
   @VisibleForTesting
-  public void warmupTable(String tableNameWithType, PageCacheWarmupConfig warmupConfig,
+  public void warmupTable(String tableNameWithType, PageCacheWarmupConfig.Spec warmupSpec,
                            @Nullable List<String> warmupQueries, @Nullable List<String> segmentFilter,
                            double warmupQps) throws Exception {
     long startTimeMs = System.currentTimeMillis();
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
-    assert tableDataManager != null;
+    if (tableDataManager == null) {
+      LOGGER.warn("No table data manager for table: {}, skipping warmup", tableNameWithType);
+      return;
+    }
     List<String> segments = getSegments(tableDataManager, segmentFilter);
     if (segments.isEmpty()) {
       LOGGER.info("Skipping warmup, no segments found for table: {}", tableNameWithType);
@@ -194,16 +203,20 @@ public class PageCacheWarmupServerQueryExecutor {
     }
     List<String> queries = warmupQueries;
     if (queries == null) {
-      // TODO: Find a better way to get the controller base URI
-      SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segments.get(0));
-      URI baseURI = FileUploadDownloadClient.extractBaseURI(new URI(segmentZKMetadata.getDownloadUrl()));
-      queries = PageCacheWarmupQueryUtils.getWarmupQueries(tableNameWithType, baseURI);
+      // Fetch the warmup queries from any live controller (the GET is read-only, so leadership is
+      // irrelevant); load is spread across controllers by the discovery helper.
+      String controllerUrl = HelixHelper.getControllerUrl(_helixManager);
+      if (controllerUrl == null) {
+        LOGGER.warn("No live controller found to fetch warmup queries for table: {}", tableNameWithType);
+        return;
+      }
+      queries = PageCacheWarmupQueryUtils.getWarmupQueries(tableNameWithType, new URI(controllerUrl));
       if (queries == null || queries.isEmpty()) {
         LOGGER.warn("No warmup queries found for table: {}", tableNameWithType);
         return;
       }
     }
-    executeWarmupQueries(tableNameWithType, queries, segments, warmupConfig, startTimeMs, warmupQps);
+    executeWarmupQueries(tableNameWithType, queries, segments, warmupSpec, startTimeMs, warmupQps);
   }
 
   private List<String> getSegments(TableDataManager tableDataManager, List<String> segmentFilter) {
@@ -224,8 +237,9 @@ public class PageCacheWarmupServerQueryExecutor {
   }
 
   private void executeWarmupQueries(String tableNameWithType, List<String> queries, List<String> segments,
-                                    PageCacheWarmupConfig warmupConfig, long tableWarmupStartTimeMs, double warmupQps) {
-    long tableWarmupDurationMs = warmupConfig.getMaxWarmupDurationSeconds() * 1000;
+                                    PageCacheWarmupConfig.Spec warmupSpec, long tableWarmupStartTimeMs,
+                                    double warmupQps) {
+    long tableWarmupDurationMs = warmupSpec.getMaxWarmupDurationSeconds() * 1000L;
     LOGGER.info("Starting warmup for table={}, totalQueries={}, warmupDurationMs={}, warmupQps={}",
         tableNameWithType, queries.size(), tableWarmupDurationMs, warmupQps);
 
@@ -233,7 +247,8 @@ public class PageCacheWarmupServerQueryExecutor {
     RateLimiter rateLimiter = warmupQps > 0 ? RateLimiter.create(warmupQps) : null;
 
     long remainingWarmupTimeMs = tableWarmupDurationMs - (System.currentTimeMillis() - tableWarmupStartTimeMs);
-    List<CompletableFuture<byte[]>> futures = new ArrayList<>();
+    // Track the timeout-bounded query chains so the per-query timeout is what allOf() waits on.
+    List<CompletableFuture<?>> futures = new ArrayList<>();
 
     for (String query : queries) {
       remainingWarmupTimeMs = tableWarmupDurationMs - (System.currentTimeMillis() - tableWarmupStartTimeMs);
@@ -257,46 +272,46 @@ public class PageCacheWarmupServerQueryExecutor {
 
         ServerQueryRequest serverQueryRequest = new ServerQueryRequest(instanceRequest, ServerMetrics.get(),
             System.currentTimeMillis());
-        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_QUERIES, 1L);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_QUERIES, 1L);
 
         // Execute query with timeout
         ListenableFuture<byte[]> listenableFuture = _queryScheduler.submit(serverQueryRequest);
         CompletableFuture<byte[]> queryFuture = toCompletableFuture(listenableFuture);
-        queryFuture.orTimeout(remainingWarmupTimeMs, TimeUnit.MILLISECONDS)
+        CompletableFuture<Void> trackedFuture = queryFuture.orTimeout(remainingWarmupTimeMs, TimeUnit.MILLISECONDS)
             .thenAccept(result -> LOGGER.info("Successfully executed warmup query={}", query))
             .exceptionally(ex -> {
               if (ex instanceof TimeoutException) {
                 LOGGER.warn("Query execution timed out for table={} query={}", tableNameWithType, query, ex);
-                _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_TIMEOUT_ERRORS, 1L);
-                _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_TIMEOUT_ERRORS,
-                    1L);
               } else {
                 LOGGER.error("Failed to execute warmup for table={} query={}", tableNameWithType, query, ex);
-                _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
-                _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS,
-                    1L);
               }
+              _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
               return null;
             });
-        futures.add(queryFuture);
+        futures.add(trackedFuture);
       } catch (Exception e) {
         LOGGER.error("Error while warmup query for table={}, query={}", tableNameWithType, query, e);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
-        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
       }
     }
     try {
-      // Wait for all futures to complete within table-level timeout
+      // Wait for all futures to complete within the remaining table-level warmup budget
+      remainingWarmupTimeMs = tableWarmupDurationMs - (System.currentTimeMillis() - tableWarmupStartTimeMs);
       CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
-      allFutures.get(remainingWarmupTimeMs, TimeUnit.MILLISECONDS);
+      allFutures.get(Math.max(remainingWarmupTimeMs, 0L), TimeUnit.MILLISECONDS);
       LOGGER.info("Warmup completed for table={}, durationMs={}",
           tableNameWithType, System.currentTimeMillis() - tableWarmupStartTimeMs);
     } catch (TimeoutException e) {
       LOGGER.error("Table warmup timeout exceeded for table={}, durationMs={}, configuredWarmupDurationMs={}",
           tableNameWithType, System.currentTimeMillis() - tableWarmupStartTimeMs, tableWarmupDurationMs);
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_TIMEOUT_ERRORS, 1L);
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.PAGE_CACHE_WARMUP_TIMEOUT_ERRORS, 1L);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS, 1L);
+      // Stop awaiting the query chains that ran past the table budget (best-effort: this does not
+      // interrupt the underlying scheduler task, it just releases the warmup's references to them).
+      for (CompletableFuture<?> future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
     } catch (Exception e) {
       LOGGER.error("Error during warmup execution for table={}", tableNameWithType, e);
     }

@@ -24,75 +24,93 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
- * This configuration is used to control the behavior of the page cache warmup process.
+ * Controls the behavior of the page cache warmup process.
+ *
+ * <p>Warmup runs in two independent cases that share the same set of knobs: when a server
+ * restarts ({@code onRestart}) and after a segment is refreshed ({@code onRefresh}). Each case is
+ * configured with its own {@link Spec} block so it can be enabled/disabled and tuned separately.
+ * A {@code null}/absent block disables warmup for that case.
  */
 public class PageCacheWarmupConfig extends BaseJsonConfig {
 
-  // Whether page cache warmup be enabled on restart
-  private final boolean _enableOnRestart;
-  // Whether page cache warmup be enabled on refresh
-  private final boolean _enableOnRefresh;
-  // Duration in seconds for which the page cache warmup should run
-  private final Integer _maxWarmupDurationSeconds;
-  // Query Selection Policy for page cache warmup, can be null
-  // This is used to define a strategy for how queries should be selected for warmup
+  // Warmup settings applied when a server restarts; null disables restart warmup
   @Nullable
-  private final String _policy;
-  // Warmup QPS limit, defaults to the table QPS limit per replica if not set
-  private final Integer _qpsLimitOnRestart;
-  // Warmup QPS limit, defaults to the table QPS limit per replica if not set
-  private final Integer _qpsLimitOnRefresh;
-
-  private static final int DEFAULT_WARMUP_DURATION_SECONDS = 180;
+  private final Spec _onRestart;
+  // Warmup settings applied after a segment refresh; null disables refresh warmup
+  @Nullable
+  private final Spec _onRefresh;
 
   @JsonCreator
-  public PageCacheWarmupConfig(@JsonProperty("enableOnRestart") boolean enableOnRestart,
-                               @JsonProperty("enableOnRefresh") boolean enableOnRefresh,
-                               @JsonProperty("maxWarmupDurationSeconds") @Nullable Integer maxWarmupDurationSeconds,
-                               @Nullable @JsonProperty("policy") String policy,
-                               @Nullable @JsonProperty("qpsLimitOnRestart") Integer qpsLimitOnRestart,
-                               @Nullable @JsonProperty("qpsLimitOnRefresh") Integer qpsLimitOnRefresh) {
-    _enableOnRestart = enableOnRestart;
-    _enableOnRefresh = enableOnRefresh;
-    _maxWarmupDurationSeconds = (maxWarmupDurationSeconds != null)
-        ? maxWarmupDurationSeconds
-        : DEFAULT_WARMUP_DURATION_SECONDS;
-    _policy = policy;
-    _qpsLimitOnRestart = qpsLimitOnRestart;
-    _qpsLimitOnRefresh = qpsLimitOnRefresh;
-  }
-
-  // Getters
-  @JsonProperty("enableOnRestart")
-  public boolean enableOnRestart() {
-    return _enableOnRestart;
-  }
-
-  @JsonProperty("enableOnRefresh")
-  public boolean enableOnRefresh() {
-    return _enableOnRefresh;
-  }
-
-  @JsonProperty("maxWarmupDurationSeconds")
-  public Integer getMaxWarmupDurationSeconds() {
-    return _maxWarmupDurationSeconds;
+  public PageCacheWarmupConfig(@JsonProperty("onRestart") @Nullable Spec onRestart,
+      @JsonProperty("onRefresh") @Nullable Spec onRefresh) {
+    _onRestart = onRestart;
+    _onRefresh = onRefresh;
   }
 
   @Nullable
-  @JsonProperty("policy")
-  public String getPolicy() {
-    return _policy;
+  @JsonProperty("onRestart")
+  public Spec getOnRestart() {
+    return _onRestart;
   }
 
   @Nullable
-  @JsonProperty("qpsLimitOnRestart")
-  public Integer getQpsLimitOnRestart() {
-    return _qpsLimitOnRestart;
+  @JsonProperty("onRefresh")
+  public Spec getOnRefresh() {
+    return _onRefresh;
   }
 
-  @Nullable
-  @JsonProperty("qpsLimitOnRefresh")
-  public Integer getQpsLimitOnRefresh() {
-    return _qpsLimitOnRefresh;
+  /**
+   * Per-case page cache warmup settings. The same shape is reused for the server-restart and
+   * segment-refresh cases (see {@link #getOnRestart()} / {@link #getOnRefresh()}).
+   */
+  public static class Spec extends BaseJsonConfig {
+    private static final int DEFAULT_WARMUP_DURATION_SECONDS = 180;
+
+    // Whether page cache warmup is enabled for this case
+    private final boolean _enabled;
+    // Duration in seconds for which warmup should run (defaults to 180 when not set)
+    private final Integer _maxWarmupDurationSeconds;
+    // Warmup QPS limit; defaults to the table QPS limit per replica when not set
+    @Nullable
+    private final Integer _qpsLimit;
+    // Query-selection policy: selects which warmup queries to replay for this case (e.g. choose
+    // among the stored query sets). Reserved for future query-selection strategies; currently
+    // carried through config without a consumer. Nullable.
+    @Nullable
+    private final String _policy;
+
+    @JsonCreator
+    public Spec(@JsonProperty("enabled") boolean enabled,
+        @JsonProperty("maxWarmupDurationSeconds") @Nullable Integer maxWarmupDurationSeconds,
+        @JsonProperty("qpsLimit") @Nullable Integer qpsLimit,
+        @JsonProperty("policy") @Nullable String policy) {
+      _enabled = enabled;
+      _maxWarmupDurationSeconds =
+          (maxWarmupDurationSeconds != null) ? maxWarmupDurationSeconds : DEFAULT_WARMUP_DURATION_SECONDS;
+      _qpsLimit = qpsLimit;
+      _policy = policy;
+    }
+
+    @JsonProperty("enabled")
+    public boolean isEnabled() {
+      return _enabled;
+    }
+
+    @JsonProperty("maxWarmupDurationSeconds")
+    public Integer getMaxWarmupDurationSeconds() {
+      return _maxWarmupDurationSeconds;
+    }
+
+    @Nullable
+    @JsonProperty("qpsLimit")
+    public Integer getQpsLimit() {
+      return _qpsLimit;
+    }
+
+    @Nullable
+    @JsonProperty("policy")
+    public String getPolicy() {
+      return _policy;
+    }
   }
 }

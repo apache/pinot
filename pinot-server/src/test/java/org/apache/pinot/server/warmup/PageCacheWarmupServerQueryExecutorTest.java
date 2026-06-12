@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -68,7 +69,7 @@ public class PageCacheWarmupServerQueryExecutorTest {
     metricsStatic.when(ServerMetrics::get).thenReturn(mock(ServerMetrics.class));
 
     _warmupServerQueryExecutor = Mockito.spy(new PageCacheWarmupServerQueryExecutor(
-        _instanceMgr, _queryScheduler, cfg));
+        _instanceMgr, _queryScheduler, cfg, mock(HelixManager.class)));
   }
 
   /** Table enables warm‑up; verify computed per‑replica QPS for both restart and refresh. */
@@ -87,11 +88,12 @@ public class PageCacheWarmupServerQueryExecutorTest {
     when(cfg.getQuotaConfig()).thenReturn(quota);
     when(cfg.getReplication()).thenReturn(5);       // 5 replicas → 100 QPS per replica
 
+    // Restart and refresh enabled, no explicit qps limit (falls back to per-replica QPS)
+    PageCacheWarmupConfig.Spec restartSpec = new PageCacheWarmupConfig.Spec(true, null, null, null);
+    PageCacheWarmupConfig.Spec refreshSpec = new PageCacheWarmupConfig.Spec(true, null, null, null);
     PageCacheWarmupConfig warm = mock(PageCacheWarmupConfig.class);
-    when(warm.enableOnRestart()).thenReturn(true);
-    when(warm.enableOnRefresh()).thenReturn(true);
-    when(warm.getQpsLimitOnRestart()).thenReturn(null);
-    when(warm.getQpsLimitOnRefresh()).thenReturn(null);
+    when(warm.getOnRestart()).thenReturn(restartSpec);
+    when(warm.getOnRefresh()).thenReturn(refreshSpec);
     when(cfg.getPageCacheWarmupConfig()).thenReturn(warm);
 
     when(_tableMgr.getCachedTableConfigAndSchema()).thenReturn(Pair.of(cfg, null));
@@ -99,7 +101,7 @@ public class PageCacheWarmupServerQueryExecutorTest {
     // --- spy the heavy private method ---
     ArgumentCaptor<Double> qps = ArgumentCaptor.forClass(Double.class);
     doNothing().when(_warmupServerQueryExecutor)
-        .warmupTable(eq(table), eq(warm), isNull(), isNull(), qps.capture());
+        .warmupTable(eq(table), any(PageCacheWarmupConfig.Spec.class), isNull(), isNull(), qps.capture());
 
     _warmupServerQueryExecutor.startWarmupOnRestart();
 
@@ -126,11 +128,8 @@ public class PageCacheWarmupServerQueryExecutorTest {
     when(_queryScheduler.submit(any())).thenAnswer(inv ->
         com.google.common.util.concurrent.Futures.immediateFuture(new byte[0]));
 
-    // Dummy warm‑up config: 2‑second budget
-    PageCacheWarmupConfig warmCfg = mock(PageCacheWarmupConfig.class);
-    when(warmCfg.getMaxWarmupDurationSeconds()).thenReturn(2);
-    // Enable flags so we can re‑use executeWarmupQueries signature (not checked here)
-    when(warmCfg.enableOnRefresh()).thenReturn(true);
+    // Dummy warm‑up spec: 2‑second budget
+    PageCacheWarmupConfig.Spec warmSpec = new PageCacheWarmupConfig.Spec(true, 2, null, null);
 
     // Wire the table manager and a single segment so warmupTable() finds data
     when(_instanceMgr.getTableDataManager(table)).thenReturn(_tableMgr);
@@ -152,13 +151,13 @@ public class PageCacheWarmupServerQueryExecutorTest {
 
     // --- Invoke the method directly ---
     long startTimeMs = System.currentTimeMillis();
-    _warmupServerQueryExecutor.warmupTable(table, warmCfg, queries, null, warmupQps);
+    _warmupServerQueryExecutor.warmupTable(table, warmSpec, queries, null, warmupQps);
 
     // Submit should be called once per query
     verify(_queryScheduler, times(queries.size())).submit(any());
 
-    // No timeout‑error metric should be recorded
+    // No error metric should be recorded
     verify(ServerMetrics.get(), never())
-        .addMeteredGlobalValue(eq(ServerMeter.PAGE_CACHE_WARMUP_TIMEOUT_ERRORS), anyLong());
+        .addMeteredGlobalValue(eq(ServerMeter.PAGE_CACHE_WARMUP_SERVER_ERRORS), anyLong());
   }
 }

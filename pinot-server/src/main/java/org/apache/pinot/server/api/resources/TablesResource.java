@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -156,7 +157,7 @@ public class TablesResource {
   @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
 
-  private final Set<String> _tablesWithWarmupInProgress = new HashSet<>();
+  private final Set<String> _tablesWithWarmupInProgress = ConcurrentHashMap.newKeySet();
 
   @GET
   @Path("/tables")
@@ -1330,14 +1331,14 @@ public class TablesResource {
   public Response triggerPageCacheWarmup(
       @ApiParam(required = true) @PathParam("tableNameWithType") String tableNameWithType, String requestString
   ) {
+    LOGGER.info("Received request to initiate page cache warmup with request: {}", requestString);
+    // Atomically claim the table to prevent concurrent warmup requests; add() returns false if already claimed.
+    if (!_tablesWithWarmupInProgress.add(tableNameWithType)) {
+      String message = String.format("Page cache warmup is already in progress for table: %s. ", tableNameWithType);
+      LOGGER.warn(message);
+      return Response.status(Response.Status.CONFLICT).entity(message).build();
+    }
     try {
-      LOGGER.info("Received request to initiate page cache warmup with request: {}", requestString);
-      // Prevent concurrent warmup requests
-      if (_tablesWithWarmupInProgress.contains(tableNameWithType)) {
-        String message = String.format("Page cache warmup is already in progress for table: %s. ", tableNameWithType);
-        LOGGER.warn(message);
-        return Response.status(Response.Status.CONFLICT).entity(message).build();
-      }
       PageCacheWarmupRequest warmupRequest = JsonUtils.stringToObject(requestString, PageCacheWarmupRequest.class);
       // Validate the parsed request
       if (warmupRequest.getQueries() == null || warmupRequest.getQueries().isEmpty()) {
@@ -1346,7 +1347,6 @@ public class TablesResource {
         throw new BadRequestException("Segments cannot be null or empty.");
       }
       // Trigger the warmup
-      _tablesWithWarmupInProgress.add(tableNameWithType);
       _serverInstance.getPageCacheWarmupServerQueryExecutor().startWarmupOnRefresh(tableNameWithType,
           warmupRequest.getQueries(), warmupRequest.getSegments());
       String responseString = String.format("Successfully triggered page cache warmup for table: %s",
@@ -1362,6 +1362,7 @@ public class TablesResource {
       LOGGER.error(errorMessage, e);
       return Response.serverError().entity(errorMessage).build();
     } finally {
+      // Only the request that claimed the table clears the flag.
       _tablesWithWarmupInProgress.remove(tableNameWithType);
     }
   }

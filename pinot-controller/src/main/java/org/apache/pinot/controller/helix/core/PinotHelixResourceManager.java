@@ -294,8 +294,7 @@ public class PinotHelixResourceManager {
       _lineageUpdaterLocks[i] = new Object();
     }
     _lineageManager = lineageManager;
-    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this,
-        controllerConf != null ? controllerConf.getPageCacheWarmupQueriesDataDir() : null);
+    _pageCacheWarmupControllerExecutor = new PageCacheWarmupControllerExecutor(this, controllerConf);
   }
 
   public PinotHelixResourceManager(ControllerConf controllerConf) {
@@ -364,6 +363,7 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    _pageCacheWarmupControllerExecutor.shutdown();
     ZkClient zkClient = _zkClient;
     if (zkClient != null) {
       _zkClient = null;

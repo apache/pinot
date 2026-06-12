@@ -181,12 +181,6 @@ public class TableConfigSerDeUtils {
       });
     }
 
-    PageCacheWarmupConfig pageCacheWarmupConfig = null;
-    String pageCacheWarmupConfigString = simpleFields.get(TableConfig.PAGE_CACHE_WARMUP_CONFIG_KEY);
-    if (pageCacheWarmupConfigString != null) {
-      pageCacheWarmupConfig = JsonUtils.stringToObject(pageCacheWarmupConfigString, PageCacheWarmupConfig.class);
-    }
-
     List<TableSamplerConfig> tableSamplerConfigs = null;
     String tableSamplerConfigsString = simpleFields.get(TableConfig.TABLE_SAMPLERS_KEY);
     if (tableSamplerConfigsString != null) {
@@ -201,6 +195,12 @@ public class TableConfigSerDeUtils {
     if (tagsString != null) {
       tags = JsonUtils.stringToObject(tagsString, new TypeReference<>() {
       });
+    }
+
+    PageCacheWarmupConfig pageCacheWarmupConfig = null;
+    String pageCacheWarmupConfigString = simpleFields.get(TableConfig.PAGE_CACHE_WARMUP_CONFIG_KEY);
+    if (pageCacheWarmupConfigString != null) {
+      pageCacheWarmupConfig = JsonUtils.stringToObject(pageCacheWarmupConfigString, PageCacheWarmupConfig.class);
     }
 
     TableConfig tableConfig =
@@ -298,6 +298,10 @@ public class TableConfigSerDeUtils {
     List<String> tags = tableConfig.getTags();
     if (tags != null && !tags.isEmpty()) {
       simpleFields.put(TableConfig.TAGS_KEY, JsonUtils.objectToString(tags));
+    }
+    PageCacheWarmupConfig pageCacheWarmupConfig = tableConfig.getPageCacheWarmupConfig();
+    if (pageCacheWarmupConfig != null) {
+      simpleFields.put(TableConfig.PAGE_CACHE_WARMUP_CONFIG_KEY, pageCacheWarmupConfig.toJsonString());
     }
 
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
